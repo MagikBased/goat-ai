@@ -7,6 +7,9 @@ import pytest
 from goat_ai.engine.native_messages import decode_decision
 from goat_ai.engine.ocgcore_probe import (
     GOAT_FLAGS,
+    MSG_ATTACK,
+    MSG_DAMAGE_STEP_END,
+    MSG_DAMAGE_STEP_START,
     MSG_DRAW,
     MSG_SELECT_CHAIN,
     OcgcoreProbe,
@@ -23,6 +26,23 @@ def test_message_frame_parser():
         split_messages(b"\x01")
     with pytest.raises(ValueError, match="invalid"):
         split_messages(struct.pack("<I", 10) + b"\x5a")
+
+
+def test_public_battle_events_update_observed_phase():
+    probe = object.__new__(OcgcoreProbe)
+    probe._turn = 0
+    probe._phase = "unknown"
+    probe._chain = []
+    probe._update_public_clock([b"\x29\x08\x00"])
+    assert probe._phase == "battle_start"
+    probe._update_public_clock([bytes((MSG_ATTACK,))])
+    assert probe._phase == "battle_step"
+    probe._update_public_clock([bytes((MSG_DAMAGE_STEP_START,))])
+    assert probe._phase == "damage_step"
+    probe._update_public_clock([bytes((MSG_DAMAGE_STEP_END,))])
+    assert probe._phase == "battle_step"
+    with pytest.raises(ValueError, match="MSG_DAMAGE_STEP_START"):
+        probe._update_public_clock([bytes((MSG_DAMAGE_STEP_START, 0))])
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

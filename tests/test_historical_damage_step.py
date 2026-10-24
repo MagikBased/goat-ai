@@ -43,9 +43,11 @@ def test_book_available_on_attack_but_not_after_defender_flips(tmp_path):
                 book = choice("chain", BOOK_OF_MOON)
                 if not defender_faceup and book is not None:
                     book_available_on_attack = True
+                    assert observation.phase == "battle_step"
                 if defender_faceup and not book_barred_after_flip:
                     assert book_available_on_attack
                     assert set_book
+                    assert observation.phase == "damage_step"
                     assert any(card.controller == 1 and card.zone == "spell_trap"
                                and card.code == BOOK_OF_MOON for card in observation.field)
                     assert book is None

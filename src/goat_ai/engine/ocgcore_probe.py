@@ -30,6 +30,9 @@ MSG_SELECT_CHAIN = 16
 MSG_CHAINING = 70
 MSG_CHAIN_END = 74
 MSG_DRAW = 90
+MSG_ATTACK = 110
+MSG_DAMAGE_STEP_START = 113
+MSG_DAMAGE_STEP_END = 114
 STATUS_AWAITING = 1
 
 
@@ -323,7 +326,8 @@ class OcgcoreProbe:
 
     def _update_public_clock(self, messages: list[bytes]) -> None:
         phases = {1: "draw", 2: "standby", 4: "main1", 8: "battle_start",
-                  16: "battle_step", 128: "battle", 256: "main2", 512: "end"}
+                  16: "battle_step", 32: "damage_step", 64: "damage_calculation",
+                  128: "battle", 256: "main2", 512: "end"}
         for message in messages:
             if message[0] == 40:
                 self._turn += 1
@@ -332,6 +336,16 @@ class OcgcoreProbe:
                     raise ValueError("truncated MSG_NEW_PHASE")
                 phase = struct.unpack_from("<H", message, 1)[0]
                 self._phase = phases.get(phase, f"phase_{phase}")
+            elif message[0] == MSG_ATTACK:
+                self._phase = "battle_step"
+            elif message[0] == MSG_DAMAGE_STEP_START:
+                if len(message) != 1:
+                    raise ValueError("invalid MSG_DAMAGE_STEP_START length")
+                self._phase = "damage_step"
+            elif message[0] == MSG_DAMAGE_STEP_END:
+                if len(message) != 1:
+                    raise ValueError("invalid MSG_DAMAGE_STEP_END length")
+                self._phase = "battle_step"
             elif message[0] == MSG_CHAINING:
                 if len(message) != 33:
                     raise ValueError("invalid MSG_CHAINING length")
