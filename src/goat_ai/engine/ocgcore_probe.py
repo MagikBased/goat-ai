@@ -38,6 +38,10 @@ MSG_SHUFFLE_SET_CARD = 36
 MSG_ATTACK = 110
 MSG_DAMAGE_STEP_START = 113
 MSG_DAMAGE_STEP_END = 114
+MSG_PLAYER_HINT = 165
+PHINT_DESC_ADD = 6
+PHINT_DESC_REMOVE = 7
+SCAPEGOAT_SUMMON_HINT = (504700123 << 20) | 1
 STATUS_AWAITING = 1
 
 
@@ -153,6 +157,7 @@ class OcgcoreProbe:
         self._chain: list[ChainLinkView] = []
         self._public_history: list[str] = []
         self._known_facedown: dict[tuple[int, int, int], int] = {}
+        self._restriction_hints: dict[tuple[int, int], int] = {}
         self._bind()
         major, minor = c.c_int(), c.c_int()
         self.lib.OCG_GetVersion(c.byref(major), c.byref(minor))
@@ -365,6 +370,23 @@ class OcgcoreProbe:
                 location = message[1]
                 self._known_facedown = {key: code for key, code in
                                         self._known_facedown.items() if key[1] != location}
+            elif message[0] == MSG_PLAYER_HINT:
+                if len(message) != 11 or message[1] not in (0, 1):
+                    raise ValueError("invalid MSG_PLAYER_HINT")
+                hint = message[2]
+                description = struct.unpack_from("<Q", message, 3)[0]
+                if description == SCAPEGOAT_SUMMON_HINT:
+                    key = (message[1], description)
+                    if hint == PHINT_DESC_ADD:
+                        self._restriction_hints[key] = self._restriction_hints.get(key, 0) + 1
+                    elif hint == PHINT_DESC_REMOVE:
+                        count = self._restriction_hints.get(key, 0)
+                        if not count:
+                            raise ValueError("unmatched Scapegoat restriction hint removal")
+                        if count == 1:
+                            del self._restriction_hints[key]
+                        else:
+                            self._restriction_hints[key] = count - 1
             if message[0] == 40:
                 self._turn += 1
                 self._public_history.append(f"turn:{self._turn}")
@@ -501,6 +523,10 @@ class OcgcoreProbe:
                 and (card.controller,
                      LOCATION_MZONE if card.zone == "monster" else LOCATION_SZONE,
                      card.sequence) in self._known_facedown),
+            restrictions=tuple(
+                f"player{player}:cannot_summon_this_turn:scapegoat"
+                for player in (0, 1)
+                if self._restriction_hints.get((player, SCAPEGOAT_SUMMON_HINT), 0)),
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:

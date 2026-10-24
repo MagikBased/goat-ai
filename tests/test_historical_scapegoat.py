@@ -1,18 +1,22 @@
 """GOAT Scapegoat token and same-turn Summon restriction regressions."""
 
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 SCAPEGOAT = 504700123
 CANNON_SOLDIER = 11384280
 DMOC = 511001039
 TOKEN_CODES = {73915052, 73915053, 73915054, 73915055}
+SCAPEGOAT_RESTRICTION = "player0:cannot_summon_this_turn:scapegoat"
 OPPONENT = Path(__file__).resolve().parent.parent / "examples/decks/vanilla_probe.ydk"
 
 
@@ -45,6 +49,7 @@ def test_scapegoat_summons_four_tokens_but_still_allows_a_set(scapegoat_deck):
                 action.kind == "set_monster" for action in choices
             ):
                 assert activated
+                assert observation.restrictions == (SCAPEGOAT_RESTRICTION,)
                 assert {card.code for card in tokens} == TOKEN_CODES
                 assert all(card.position == "faceup" and card.orientation == "defense"
                            for card in tokens)
@@ -53,6 +58,8 @@ def test_scapegoat_summons_four_tokens_but_still_allows_a_set(scapegoat_deck):
                 assert "goat/c504700123.lua" in env.engine.probe.loaded_script_sha256
                 return
             action = None
+            if activated and observation.acting_player == 1 and observation.turn == 1:
+                assert observation.restrictions == (SCAPEGOAT_RESTRICTION,)
             if observation.acting_player == 0 and observation.phase == "main1" and not activated:
                 action = next((item for item in choices if item.kind == "activate"
                                and item.parameters.get("code") == SCAPEGOAT), None)
@@ -79,6 +86,7 @@ def test_scapegoat_cannot_activate_after_normal_summon(scapegoat_deck):
             choices = env.legal_actions()
             if observation.turn > 1:
                 assert normal_summoned and checked_after_summon
+                assert observation.restrictions == ()
                 return
             if normal_summoned:
                 assert not any(item.kind in ("chain", "activate")
@@ -125,6 +133,8 @@ def test_sheep_token_is_cannon_cost_but_not_tribute_summon_material(tmp_path):
                     assert goat_activated and cannon_summoned and ignition_activated
                     return
             action = None
+            if observation.turn == 3:
+                assert observation.restrictions == ()
             if observation.acting_player == 0:
                 if observation.turn == 1 and observation.phase == "main1" and not goat_activated:
                     action = next((item for item in choices if item.kind == "activate"
@@ -156,3 +166,34 @@ def test_sheep_token_is_cannon_cost_but_not_tribute_summon_material(tmp_path):
                 action = next((item for item in choices if item.kind == "pass"), choices[0])
             observation = env.step(action)
         pytest.fail("Scapegoat/Cannon Soldier interaction did not resolve")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_public_scapegoat_restriction_replays_in_new_and_old_schemas(
+    scapegoat_deck, tmp_path,
+):
+    root = _native_root()
+    with GoatEnvironment(str(scapegoat_deck), str(OPPONENT), seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        agent = RandomAgent(3)
+        for _ in range(5000):
+            observation = env.step(agent.select_action(observation, env.legal_actions()))
+            if env.is_terminal():
+                trajectory = env.trajectory()
+                break
+        else:
+            pytest.fail("Scapegoat duel did not finish within 5000 decisions")
+    assert any(SCAPEGOAT_RESTRICTION in record.observation.restrictions
+               for record in trajectory.decisions)
+    path = tmp_path / "scapegoat.json"
+    write_trajectory(path, trajectory)
+    assert verify_trajectory(read_trajectory(path), ExperimentalOcgcoreEngine(root)) == len(
+        trajectory.decisions)
+    previous = replace(trajectory, schema_version=6,
+                       decisions=tuple(replace(record, observation=replace(
+                           record.observation, restrictions=()))
+                                       for record in trajectory.decisions))
+    write_trajectory(path, previous)
+    assert verify_trajectory(read_trajectory(path), ExperimentalOcgcoreEngine(root)) == len(
+        previous.decisions)

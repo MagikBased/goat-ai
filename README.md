@@ -10,9 +10,9 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
 | Complete headless duel | Restricted native adapter reaches terminal through `GoatEnvironment`; general card support unfinished |
 | Environment contract and illegal-action validation | Implemented |
-| Player-visible observation schema | Own hand and Extra Deck, public zones, battle position, chain links, bounded public events, and memory of opponent field cards seen face-up before turning facedown; other private reveals pending |
+| Player-visible observation schema | Own hand and Extra Deck, public zones, battle position, chain links, bounded public events, known opponent field cards, and the public Scapegoat summon restriction; other private reveals and restrictions pending |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
-| JSON trajectory round trip | Schema v6 locates publicly known facedown opponent cards by field slot; v1–v5 remain readable, and fingerprinted v3–v5 recordings remain replay-verifiable |
+| JSON trajectory round trip | Schema v7 records the public Scapegoat restriction alongside v6 field-slot knowledge; v1–v6 remain readable, and fingerprinted v3–v6 recordings remain replay-verifiable |
 | Tournaments | Seeded, seat-swapped sequential and spawned-process runners; paired score intervals and Wilson intervals for supported decks |
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
