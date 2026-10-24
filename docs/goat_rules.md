@@ -16,5 +16,7 @@ The pinned Nobleman variant script targets a set monster and banishes it. The na
 
 **Field Spell replacement:** [GoatFormat's mechanics guide](https://www.goatformat.com/basics.html) says only one face-up Field Spell can remain active; when a new Field Spell activation resolves, the previous one is destroyed. One native test activates pre-errata Necrovalley (`511002998`) for player 0, then A Legendary Ocean (`295517`) for player 1. At the next turn, only Ocean remains in the Field Zone and Necrovalley is in player 0's Graveyard. A second test sets Mystical Space Typhoon, then chains it to Ocean's activation and destroys Ocean before resolution; Necrovalley remains face-up. Other field interactions remain untested.
 
+**Flip Effect:** The [official Dekoichi card database entry](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6201&ope=2&request_locale=en) states that its Flip Effect draws one card, plus one per face-up Bokoichi controlled. A native regression sets Dekoichi (`87621407`), Flip Summons it on the next turn, and verifies one card moves from deck to hand with no Bokoichi present. The [GoatFormat Dekoichi rulings](https://www.goatformat.com/rulings2.html) add card-specific cases involving Bokoichi at resolution; those cases are not yet covered.
+
 Unresolved: exact script revisions for 2005 TCG card text, card-specific rulings that differ from current OCG scripts, and differences among community tournament interpretations. These require individual source-backed regression cases before a correctness claim.
 
