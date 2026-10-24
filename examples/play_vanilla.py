@@ -1,10 +1,11 @@
-"""Play a real GOAT-mode vanilla fixture with two random-policy seats."""
+"""Play and optionally record a real GOAT-mode fixture duel."""
 
 import argparse
 from dataclasses import replace
 from pathlib import Path
 
 from goat_ai.agents import HumanAgent, RandomAgent
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import write_trajectory
@@ -16,11 +17,16 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--trajectory", type=Path)
     parser.add_argument("--human-seat", type=int, choices=(0, 1))
+    parser.add_argument("--deck1", type=Path)
+    parser.add_argument("--deck2", type=Path)
+    parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     args = parser.parse_args()
-    deck1 = Path(__file__).parent / "decks/vanilla_probe.ydk"
-    deck2 = Path(__file__).parent / "decks/vanilla_reverse.ydk"
+    deck1 = args.deck1 or Path(__file__).parent / "decks/vanilla_probe.ydk"
+    deck2 = args.deck2 or Path(__file__).parent / "decks/vanilla_reverse.ydk"
+    engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
+                   else ExperimentalOcgcoreEngine)
     with GoatEnvironment(str(deck1), str(deck2), args.seed,
-                         engine=RestrictedOcgcoreEngine(args.native_root)) as env:
+                         engine=engine_type(args.native_root)) as env:
         observation = env.reset()
         agents = (RandomAgent(args.seed), RandomAgent(args.seed + 1))
         human = HumanAgent()

@@ -13,6 +13,7 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 SCAPEGOAT = 504700123
+SOLEMN_JUDGMENT = 41420027
 CANNON_SOLDIER = 11384280
 DMOC = 511001039
 TOKEN_CODES = {73915052, 73915053, 73915054, 73915055}
@@ -197,3 +198,95 @@ def test_public_scapegoat_restriction_replays_in_new_and_old_schemas(
     write_trajectory(path, previous)
     assert verify_trajectory(read_trajectory(path), ExperimentalOcgcoreEngine(root)) == len(
         previous.decisions)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_negated_scapegoat_activation_restores_summon_permission(
+    scapegoat_deck, tmp_path,
+):
+    root = _native_root()
+    if not (root / f"scripts/official/c{SOLEMN_JUDGMENT}.lua").is_file():
+        pytest.skip("Solemn Judgment script not installed")
+    opponent = tmp_path / "solemn.ydk"
+    opponent.write_text("#main\n" + "\n".join(map(str, (
+        SOLEMN_JUDGMENT, *VANILLA_DECK[1:]))) + "\n")
+    with GoatEnvironment(str(scapegoat_deck), str(opponent), seed=52,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        trap_set = scapegoat_activated = solemn_chained = saw_restriction = False
+        for _ in range(50):
+            choices = env.legal_actions()
+            if scapegoat_activated and SCAPEGOAT_RESTRICTION in observation.restrictions:
+                saw_restriction = True
+            if (solemn_chained and observation.turn == 3
+                    and observation.acting_player == 0
+                    and any(item.kind == "normal_summon" for item in choices)):
+                assert trap_set and scapegoat_activated and saw_restriction
+                assert observation.restrictions == ()
+                assert observation.life_points == (8000, 4000)
+                assert any(card.code == SCAPEGOAT for card in observation.graveyards[0])
+                assert any(card.code == SOLEMN_JUDGMENT
+                           for card in observation.graveyards[1])
+                assert not any(card.code in TOKEN_CODES for card in observation.field)
+                return
+            action = None
+            if observation.acting_player == 1 and observation.turn == 2 and not trap_set:
+                action = next((item for item in choices if item.kind == "set_spell_trap"
+                               and item.parameters.get("code") == SOLEMN_JUDGMENT), None)
+                trap_set |= action is not None
+            if (action is None and observation.acting_player == 0
+                    and observation.turn == 3 and observation.phase == "main1"
+                    and not scapegoat_activated):
+                action = next((item for item in choices if item.kind == "activate"
+                               and item.parameters.get("code") == SCAPEGOAT), None)
+                scapegoat_activated |= action is not None
+            if (action is None and observation.acting_player == 1
+                    and scapegoat_activated and not solemn_chained):
+                action = next((item for item in choices if item.kind == "chain"
+                               and item.parameters.get("code") == SOLEMN_JUDGMENT), None)
+                solemn_chained |= action is not None
+            if action is None:
+                action = next((item for item in choices if item.kind == "place"), None)
+            if action is None:
+                action = next((item for item in choices if item.kind == "end_phase"), None)
+            if action is None:
+                action = next((item for item in choices if item.kind == "pass"), choices[0])
+            observation = env.step(action)
+        pytest.fail("Solemn did not negate Scapegoat before the next summon decision")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_scapegoat_needs_four_vacant_monster_zones(scapegoat_deck):
+    root = _native_root()
+    with GoatEnvironment(str(scapegoat_deck), str(OPPONENT), seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        normal_summons = 0
+        for _ in range(60):
+            choices = env.legal_actions()
+            if (observation.turn == 5 and observation.acting_player == 0
+                    and observation.phase == "main1"
+                    and any(item.kind == "normal_summon" for item in choices)):
+                assert normal_summons == 2
+                assert sum(card.controller == 0 and card.zone == "monster"
+                           for card in observation.field) == 2
+                assert observation.restrictions == ()
+                assert any(item.kind == "set_spell_trap"
+                           and item.parameters.get("code") == SCAPEGOAT for item in choices)
+                assert not any(item.kind in ("activate", "chain")
+                               and item.parameters.get("code") == SCAPEGOAT
+                               for item in choices)
+                return
+            action = None
+            if (observation.acting_player == 0 and observation.turn in (1, 3)
+                    and normal_summons < (observation.turn + 1) // 2):
+                action = next((item for item in choices if item.kind == "normal_summon"), None)
+                normal_summons += action is not None
+            if action is None:
+                action = next((item for item in choices if item.kind == "place"), None)
+            if action is None:
+                action = next((item for item in choices if item.kind == "end_phase"), None)
+            if action is None:
+                action = next((item for item in choices if item.kind == "pass"), choices[0])
+            observation = env.step(action)
+        pytest.fail("did not reach the later Main Phase with two monsters")

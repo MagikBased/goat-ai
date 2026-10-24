@@ -79,6 +79,22 @@ recordings also check rules-profile, deck-file, and loaded native-asset hashes. 
 prove that a card interaction is historically correct; it detects divergence
 from the engine and assets used for the replay.
 
+## View a replay
+
+The offline [replay viewer](examples/replay_viewer.html) shows each recorded decision as a board snapshot from the acting player's visible view. Record and render a Scapegoat fixture duel:
+
+```bash
+python examples/play_vanilla.py \
+  --deck1 examples/decks/scapegoat_probe.ydk \
+  --deck2 examples/decks/vanilla_probe.ydk \
+  --engine experimental --seed 3 \
+  --trajectory replays/scapegoat_3.json
+python scripts/render_replay.py replays/scapegoat_3.json
+xdg-open replays/scapegoat_3.html
+```
+
+The generated HTML is self-contained and shows card names when the pinned card database is installed. Use its slider, arrow keys, or Play button to step through decisions; `#decision=11` opens a particular decision. You can also open `examples/replay_viewer.html` directly and choose any saved GOAT AI JSON trajectory, in which case cards appear by ID. The viewer has no card art or animations and does not open EDOPro `.yrp`/`.yrpX` files. Replays and generated HTML live in ignored `replays/`.
+
 The play example prints the winner and decision count and optionally writes a JSON trajectory. `--human-seat` uses the same action API for a CLI player. The evaluation command swaps candidate seats for each seed and reports matchup and seat results; see [the evaluation log](docs/evaluation.md). Supported decision types remain limited to the tested decks, and unsupported requests fail explicitly. The default environment still fails closed because general GOAT effects and visibility cases are unfinished. The benchmark includes reset and Python action selection; results are specific to this fixture and machine.
 
 For experimental effect-card coverage, run:
