@@ -1,6 +1,6 @@
 # GOAT AI
 
-Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. **This repository does not yet run a GOAT duel.** The Python environment API, baseline agents, and trajectory format are implemented, but the historical rules engine adapter is unfinished and fails explicitly. No training or playing strength is claimed.
+Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restricted native adapter runs complete duels with 40-card normal-monster decks. General effect-card support and historical rules validation are unfinished. No training or playing strength is claimed.
 
 ## Status
 
@@ -8,12 +8,12 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. **This re
 | --- | --- |
 | Engine selection and source review | Initial research complete |
 | Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
-| Complete headless duel | Narrow vanilla-fixture smoke duel reaches terminal; general adapter unfinished |
+| Complete headless duel | Vanilla-only native adapter reaches terminal through `GoatEnvironment`; general card support unfinished |
 | Environment contract and illegal-action validation | Implemented |
 | Player-visible observation schema | Implemented; native hand/facedown redaction tested on fixture |
-| Random, heuristic, CLI human agents | Implemented against contract |
-| JSON trajectory round trip | Implemented |
-| Real duel, tournaments, throughput benchmarks | Blocked on engine adapter |
+| Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
+| JSON trajectory round trip | Implemented and verified on a native random-agent duel |
+| Tournaments and throughput benchmarks | General card support and benchmark harness unfinished |
 
 The selected direction is [Project Ignis/edo9300 ocgcore](https://github.com/edo9300/ygopro-core), configured with its `DUEL_MODE_GOAT` flag, historical card data and scripts, and an audited Python-facing decision adapter. A 2005 banlist alone is insufficient. See [research](docs/research.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md).
 
@@ -31,11 +31,11 @@ python examples/show_contract.py
 
 PyTorch is an optional future training dependency: `python -m pip install -e '.[ml]'`. No PyTorch model or training algorithm is implemented yet.
 
-The API is `GoatEnvironment(player1_deck, player2_deck, seed, engine=...)`; `reset()`, `legal_actions()`, `step()`, `is_terminal()`, and `result()` are defined. Without an audited engine, `reset()` raises `SimulatorUnavailable` with the outstanding integration tasks. This is intentional: it prevents a modern-rules duel from being presented as GOAT.
+The API is `GoatEnvironment(player1_deck, player2_deck, seed, engine=...)`; `reset()`, `legal_actions()`, `step()`, `is_terminal()`, `result()`, and `trajectory()` are defined. Pass `VanillaOcgcoreEngine` for the restricted native path. The default engine raises `SimulatorUnavailable` because general GOAT support is unfinished.
 
-## Native first-decision probe (Linux)
+## Native setup (Linux)
 
-The separate M0 probe calls a real, pinned ocgcore build with `DUEL_MODE_GOAT`. It is **not yet connected to `GoatEnvironment`** and its raw messages must not be passed to an agent because their visibility has not been audited. It uses a 40-card normal-monster fixture to verify startup and the first-turn draw; full deck legality is planned for M1.
+The M0 probe calls a real, pinned ocgcore build with `DUEL_MODE_GOAT`. Its raw messages stay inside the adapter. The restricted adapter uses player-visible queries and redacts hidden card identities in observations and action parameters. Visibility coverage remains limited to the vanilla fixture.
 
 ```bash
 python -m pip install -e '.[dev,native]'
@@ -48,6 +48,14 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai python -m pytest -q tests/test_ocgcore_probe.
 Setup downloads and builds external dependencies under ignored `.cache/goat-ai/`. See [native setup](docs/native_setup.md) for pinned revisions, licensing, and the probe's limits.
 
 The smoke runner validates its 40-card fixture against a pinned Project Ignis GOAT whitelist, decodes empty chain windows, idle choices, and single-card selections, then ends turns and discards at hand limit until the native core reports a winner. This is a protocol regression for one simple fixture, not a general GOAT environment or an agent-strength benchmark.
+
+The restricted `VanillaOcgcoreEngine` connects the same native core to `GoatEnvironment` for 40-card normal-monster decks. To run a real duel between two fixture decks with a `RandomAgent`:
+
+```bash
+python examples/play_vanilla.py --seed 42 --trajectory replays/vanilla_42.json
+```
+
+The example prints the winner and decision count and writes a JSON trajectory. Its supported decision types are limited to the requests exercised by these decks; unsupported requests fail explicitly. The default environment still fails closed because general GOAT effects and visibility cases are unfinished.
 
 ## Contributions and data
 

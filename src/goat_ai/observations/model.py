@@ -9,6 +9,7 @@ class CardView:
     zone: str
     position: str
     code: int | None = None  # None means identity is hidden from this viewer.
+    sequence: int | None = None
 
 
 @dataclass(frozen=True)

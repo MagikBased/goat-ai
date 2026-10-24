@@ -321,28 +321,30 @@ class OcgcoreProbe:
             tuple(len(locations[p, LOCATION_SZONE]) for p in (0, 1)),
         )
 
-        def view_card(player: int, location: int, card) -> CardView:
+        def view_card(player: int, location: int, sequence: int, card) -> CardView:
             faceup = bool(card.position & 0x5)
             visible_code = card.code if player == viewer or faceup else None
             position = "faceup" if faceup else "facedown"
             zone = {LOCATION_MZONE: "monster", LOCATION_SZONE: "spell_trap",
                     LOCATION_GRAVE: "graveyard", LOCATION_REMOVED: "banished"}[location]
-            return CardView(player, zone, position, visible_code)
+            return CardView(player, zone, position, visible_code, sequence)
 
-        field = tuple(view_card(player, location, card)
+        field = tuple(view_card(player, location, sequence, card)
                       for player in (0, 1) for location in (LOCATION_MZONE, LOCATION_SZONE)
-                      for card in locations[player, location] if card is not None)
-        graveyards = tuple(tuple(view_card(player, LOCATION_GRAVE, card)
-                                 for card in locations[player, LOCATION_GRAVE] if card is not None)
+                      for sequence, card in enumerate(locations[player, location]) if card is not None)
+        graveyards = tuple(tuple(view_card(player, LOCATION_GRAVE, sequence, card)
+                                 for sequence, card in enumerate(locations[player, LOCATION_GRAVE])
+                                 if card is not None)
                            for player in (0, 1))
-        banished = tuple(tuple(view_card(player, LOCATION_REMOVED, card)
-                               for card in locations[player, LOCATION_REMOVED] if card is not None)
+        banished = tuple(tuple(view_card(player, LOCATION_REMOVED, sequence, card)
+                               for sequence, card in enumerate(locations[player, LOCATION_REMOVED])
+                               if card is not None)
                          for player in (0, 1))
         return Observation(
             viewer=viewer, acting_player=decode_decision(self._pending_message).player,
             turn=self._turn, phase=self._phase, life_points=lp,
-            hand=tuple(CardView(viewer, "hand", "hidden", card.code)
-                       for card in hand if card is not None),
+            hand=tuple(CardView(viewer, "hand", "hidden", card.code, sequence)
+                       for sequence, card in enumerate(hand) if card is not None),
             field=field, graveyards=graveyards, banished=banished,
             opponent_hand_count=self.lib.OCG_DuelQueryCount(self._duel, 1 - viewer,
                                                             LOCATION_HAND),

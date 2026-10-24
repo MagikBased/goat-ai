@@ -96,6 +96,36 @@ def decode_decision(message: bytes) -> NativeDecision:
         if not choices:
             raise ValueError("no legal place in MSG_SELECT_PLACE")
         return NativeDecision(player, tuple(choices))
+    if kind == 10:  # MSG_SELECT_BATTLECMD
+        player = reader.integer(1)
+        choices = []
+        activate_count = reader.integer(4)
+        for index in range(activate_count):
+            code = reader.integer(4)
+            controller = reader.integer(1)
+            location = reader.integer(1)
+            sequence = reader.integer(4)
+            reader.integer(8)  # effect description
+            reader.integer(1)  # response flag
+            choices.append(NativeChoice("activate", index << 16, code, controller,
+                                        location, sequence))
+        attack_count = reader.integer(4)
+        for index in range(attack_count):
+            code = reader.integer(4)
+            controller = reader.integer(1)
+            location = reader.integer(1)
+            sequence = reader.integer(1)
+            reader.integer(1)  # direct-attack flag
+            choices.append(NativeChoice("attack", (index << 16) | 1, code,
+                                        controller, location, sequence))
+        if reader.integer(1):
+            choices.append(NativeChoice("main2", 2))
+        if reader.integer(1):
+            choices.append(NativeChoice("end_phase", 3))
+        reader.finish()
+        if not choices:
+            raise ValueError("empty battle command")
+        return NativeDecision(player, tuple(choices))
     if kind != MSG_SELECT_IDLECMD:
         raise NotImplementedError(f"native decision message {kind} is not decoded")
 

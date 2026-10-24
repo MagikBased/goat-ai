@@ -4,6 +4,7 @@ from goat_ai.actions import Action
 from goat_ai.engine import Decision, RulesEngine
 from goat_ai.engine.protocol import UnavailableOcgcore
 from goat_ai.observations import Observation
+from goat_ai.replay import DecisionRecord, Trajectory
 
 
 class GoatEnvironment:
@@ -15,11 +16,13 @@ class GoatEnvironment:
         self.seed = seed
         self.engine = engine if engine is not None else UnavailableOcgcore()
         self._decision: Decision | None = None
+        self._history: list[DecisionRecord] = []
 
     def reset(self, seed: int | None = None) -> Observation:
         if seed is not None:
             self.seed = seed
         self._decision = self.engine.reset(*self.decks, self.seed)
+        self._history = []
         return self._decision.observation
 
     def _current(self) -> Decision:
@@ -36,7 +39,9 @@ class GoatEnvironment:
             raise RuntimeError("duel is terminal")
         if action not in decision.legal_actions:
             raise ValueError("illegal action")
-        self._decision = self.engine.step(action)
+        next_decision = self.engine.step(action)
+        self._history.append(DecisionRecord(decision.observation, decision.legal_actions, action))
+        self._decision = next_decision
         return self._decision.observation
 
     def is_terminal(self) -> bool:
@@ -47,4 +52,22 @@ class GoatEnvironment:
         if not decision.terminal:
             raise RuntimeError("duel has not ended")
         return decision.winner
+
+    def trajectory(self) -> Trajectory:
+        decision = self._current()
+        if not decision.terminal:
+            raise RuntimeError("duel has not ended")
+        return Trajectory(self.engine.ruleset.name, self.decks, self.seed,
+                          tuple(self._history), decision.winner)
+
+    def close(self) -> None:
+        close = getattr(self.engine, "close", None)
+        if close is not None:
+            close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
 
