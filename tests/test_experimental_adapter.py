@@ -47,6 +47,70 @@ def test_new_native_choice_formats():
         "tribute", "tribute", "tribute_cards", "cancel"]
 
 
+def test_native_multi_zone_selection_uses_exact_three_byte_locations():
+    # Only own Monster Zones 0, 1 and 2 are available.
+    forbidden = 0xFFFFFFFF ^ 0b111
+    decision = decode_decision(bytes((24, 0, 2)) + struct.pack("<I", forbidden))
+    assert [choice.zones for choice in decision.choices] == [
+        ((0, 4, 0), (0, 4, 1)),
+        ((0, 4, 0), (0, 4, 2)),
+        ((0, 4, 1), (0, 4, 2)),
+    ]
+    assert decision.choices[0].response == bytes((0, 4, 0, 0, 4, 1))
+    assert {choice.kind for choice in decision.choices} == {"disable_zones"}
+    place = decode_decision(bytes((18, 0, 2)) + struct.pack("<I", forbidden))
+    assert {choice.kind for choice in place.choices} == {"place_zones"}
+    with pytest.raises(ValueError, match="too few legal zones"):
+        decode_decision(bytes((24, 0, 4)) + struct.pack("<I", forbidden))
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_ground_collapse_disables_two_chosen_monster_zones():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    ground_collapse = 90502999
+    if not (root / f"scripts/official/c{ground_collapse}.lua").is_file():
+        pytest.skip("Ground Collapse script not installed")
+    with GoatEnvironment("examples/decks/ground_collapse_probe.ydk",
+                         "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        env.reset()
+        activated = disabled = summoned = False
+        for _ in range(25):
+            actions = env.legal_actions()
+            action = None
+            if not activated:
+                action = next((choice for choice in actions if choice.kind == "activate"
+                               and choice.parameters.get("code") == ground_collapse), None)
+                activated |= action is not None
+            if action is None and actions[0].kind == "disable_zones":
+                action = next(choice for choice in actions if choice.parameters["zones"] == [
+                    {"controller": 0, "location": 4, "sequence": 0},
+                    {"controller": 0, "location": 4, "sequence": 1},
+                ])
+                disabled = True
+            if action is None and disabled and not summoned:
+                action = next((choice for choice in actions
+                               if choice.kind == "normal_summon"), None)
+                summoned |= action is not None
+            if action is None:
+                action = next((choice for choice in actions if choice.kind == "place"), None)
+            if action is None:
+                action = next((choice for choice in actions if choice.kind == "pass"), None)
+            if action is None:
+                action = next((choice for choice in actions if choice.kind == "end_phase"),
+                              actions[0])
+            observation = env.step(action)
+            if summoned:
+                slots = {choice.parameters["sequence"] for choice in env.legal_actions()
+                         if choice.kind == "place"}
+                assert activated and disabled and slots == {2, 3, 4}
+                assert {(slot.player, slot.zone, slot.sequence)
+                        for slot in observation.disabled_zones} == {
+                            (0, "monster", 0), (0, "monster", 1)}
+                return
+        pytest.fail("Ground Collapse did not reach the zone selection")
+
+
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_control_probe_complete_and_seeded():
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])

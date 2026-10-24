@@ -31,6 +31,7 @@
     .player-header strong { font-size: 1.1rem; }
     .zones { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 6px 0 12px; }
     .slot { min-height: 99px; border: 1px dashed #62836f; border-radius: 8px; padding: 5px; display: flex; flex-direction: column; justify-content: center; }
+    .slot.disabled { border-color: #b86b6b; background: #4d2f35; }
     .slot-label { font-size: .68rem; color: #afc9b7; margin-bottom: 3px; }
     .card { min-height: 65px; border-radius: 6px; padding: 7px; display: flex; flex-direction: column; justify-content: space-between; font-size: .82rem; overflow-wrap: anywhere; box-shadow: 0 2px 7px #0005; }
     .monster { background: #b18b50; color: #201709; }
@@ -143,10 +144,12 @@
     function zoneRow(observation, player, zone, known) {
       const row = node("div", "zones");
       for (let slot = 0; slot < 5; slot++) {
-        const holder = node("div", "slot");
+        const disabled = (observation.disabled_zones || []).some(item => item.player === player && item.zone === zone && item.sequence === slot);
+        const holder = node("div", disabled ? "slot disabled" : "slot");
         holder.append(node("span", "slot-label", `${zone === "monster" ? "Monster" : "Spell/Trap"} ${slot + 1}`));
         const card = observation.field.find(item => item.controller === player && item.zone === zone && item.sequence === slot);
         if (card) holder.append(cardElement(observation, card, known));
+        else if (disabled) holder.append(node("span", "muted", "Disabled"));
         row.append(holder);
       }
       return row;
@@ -198,6 +201,7 @@
         parts.push(`P${parameters.controller} ${zone} ${parameters.sequence + 1}`);
       }
       if (parameters.cards) parts.push(parameters.cards.map(card => cardLabel(observation, card, known)).join(", "));
+      if (parameters.zones) parts.push(parameters.zones.map(zone => `P${zone.controller} ${zone.location === 4 ? "Monster" : "Spell/Trap"} ${zone.sequence + 1}`).join(", "));
       if (parameters.position != null) parts.push(`position ${parameters.position}`);
       if (parameters.race != null) parts.push(`race ${parameters.race}`);
       return parts.join(" · ");

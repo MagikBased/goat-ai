@@ -10,6 +10,7 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.observations import (
     CardView,
     ChainLinkView,
+    DisabledZoneView,
     KnownCardView,
     Observation,
     PublicRevealView,
@@ -127,6 +128,20 @@ def test_public_deck_reveal_round_trip_and_legacy_reader(tmp_path):
     raw["decisions"][0]["observation"].pop("public_reveals")
     path.write_text(json.dumps(raw))
     assert read_trajectory(path).decisions[0].observation.public_reveals == ()
+
+
+def test_disabled_zone_round_trip_and_legacy_reader(tmp_path):
+    observation = replace(view(), disabled_zones=(DisabledZoneView(1, "monster", 2),))
+    action = Action("0", "pass", 0)
+    path = tmp_path / "disabled.json"
+    write_trajectory(path, Trajectory("goat", ("a", "b"), 7,
+                                      (DecisionRecord(observation, (action,), action),), 0))
+    assert read_trajectory(path).decisions[0].observation.disabled_zones == observation.disabled_zones
+    raw = json.loads(path.read_text())
+    raw["schema_version"] = 8
+    raw["decisions"][0]["observation"].pop("disabled_zones")
+    path.write_text(json.dumps(raw))
+    assert read_trajectory(path).decisions[0].observation.disabled_zones == ()
 
 
 def test_agents_use_same_contract():

@@ -3,7 +3,7 @@
 import sqlite3
 
 from goat_ai.actions import Action
-from goat_ai.observations import CardView, Observation, PublicRevealView
+from goat_ai.observations import CardView, DisabledZoneView, Observation, PublicRevealView
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
 from scripts.render_replay import render_replay
 
@@ -22,6 +22,7 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
         graveyards=((), ()), banished=((), ()), opponent_hand_count=5,
         deck_counts=(34, 35), extra_deck_counts=(0, 0),
         public_reveals=(PublicRevealView(1, 1, "deck_top", (11,)),),
+        disabled_zones=(DisabledZoneView(0, "monster", 2),),
     )
     action = Action("0", "normal_summon", 0, {"code": 10})
     trajectory = Trajectory(
@@ -37,6 +38,8 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     assert '"10":"Visible Monster"' in html
     assert '"11":"Revealed Monster"' in html
     assert '"public_reveals"' in html
+    assert '"disabled_zones"' in html
+    assert 'slot.disabled' in html
     assert '"opponent_hand_count":5' in html
     assert '"code":null' in html
     assert "window.injected=true" in html

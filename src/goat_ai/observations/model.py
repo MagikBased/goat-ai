@@ -43,6 +43,15 @@ class PublicRevealView:
 
 
 @dataclass(frozen=True)
+class DisabledZoneView:
+    """A field slot disabled by a public, currently active effect."""
+
+    player: int
+    zone: str
+    sequence: int
+
+
+@dataclass(frozen=True)
 class Observation:
     viewer: int
     acting_player: int
@@ -63,6 +72,7 @@ class Observation:
     own_extra_deck: tuple[CardView, ...] = ()
     known_opponent_field_cards: tuple[KnownCardView, ...] = ()
     public_reveals: tuple[PublicRevealView, ...] = ()
+    disabled_zones: tuple[DisabledZoneView, ...] = ()
 
     def __post_init__(self) -> None:
         if self.viewer not in (0, 1) or self.acting_player not in (0, 1):
@@ -88,6 +98,13 @@ class Observation:
                or not reveal.codes or any(code <= 0 for code in reveal.codes)
                for reveal in self.public_reveals):
             raise ValueError("invalid public Deck reveal")
+        disabled_slots = [(slot.player, slot.zone, slot.sequence)
+                          for slot in self.disabled_zones]
+        if len(disabled_slots) != len(set(disabled_slots)) or any(
+                slot.player not in (0, 1) or slot.zone not in ("monster", "spell_trap")
+                or not 0 <= slot.sequence < (7 if slot.zone == "monster" else 8)
+                for slot in self.disabled_zones):
+            raise ValueError("invalid disabled field zone")
         if self.opponent_hand_count < 0 or any(n < 0 for n in self.deck_counts):
             raise ValueError("counts must be nonnegative")
 

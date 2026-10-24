@@ -25,8 +25,9 @@ ACTION_KINDS = (
     "set_spell_trap", "shuffle_hand", "special_summon", "tribute", "tribute_cards",
     "unselect_card", "yes",
 )
+ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
-POLICY_FEATURE_VERSION = 3  # resolve publicly known facedown card IDs by field slot
+POLICY_FEATURE_VERSION = 4  # distinguish zone choices and active zone restrictions
 
 
 @dataclass(frozen=True)
@@ -62,7 +63,7 @@ class CardVocabulary:
 @dataclass(frozen=True)
 class DecisionFeatures:
     state_cards: Tensor  # [N, 4]: card, zone, owner, position
-    state_numbers: Tensor  # [10]
+    state_numbers: Tensor  # [10] for v1-v3, [42] for v4
     phase: Tensor  # scalar
     action_kinds: Tensor  # [A]
     action_cards: Tensor  # [A]
@@ -83,7 +84,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in (1, 2, 3):
+    if feature_version not in (1, 2, 3, 4):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -124,19 +125,30 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         len(observation.hand) / 40, observation.opponent_hand_count / 40,
         observation.turn / 100, len(observation.chain) / 10,
     )
+    if feature_version >= 4:
+        disabled = {(slot.player, slot.zone, slot.sequence)
+                    for slot in observation.disabled_zones}
+        numbers += tuple(
+            float((player, zone, sequence) in disabled)
+            for player in (own, opponent)
+            for zone in ("monster", "spell_trap")
+            for sequence in range(8)
+        )
     kind_indices = []
     card_indices = []
     targets = []
     target_context = []
     action_numbers = []
+    kinds = ACTION_KINDS + ZONE_ACTION_KINDS if feature_version >= 4 else ACTION_KINDS
     for action in legal_actions:
         params = action.parameters
-        kind_indices.append(ACTION_KINDS.index(action.kind) + 1
-                            if action.kind in ACTION_KINDS else 0)
+        kind_indices.append(kinds.index(action.kind) + 1
+                            if action.kind in kinds else 0)
         card_indices.append(vocabulary.index(visible_code(
             params.get("code"), params.get("controller"), params.get("location"),
             params.get("sequence"))))
-        selected = params.get("cards", ())
+        selected = (params.get("cards", params.get("zones", ()))
+                    if feature_version >= 4 else params.get("cards", ()))
         targets.append([vocabulary.index(visible_code(
             card.get("code"), card.get("controller"), card.get("location"),
             card.get("sequence"))) for card in selected])
@@ -183,7 +195,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in (1, 2, 3):
+        if feature_version not in (1, 2, 3, 4):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -191,8 +203,9 @@ class LegalActionPolicy(nn.Module):
         self.owner = nn.Embedding(3, width, padding_idx=0)
         self.position = nn.Embedding(len(POSITIONS) + 1, width, padding_idx=0)
         self.phase = nn.Embedding(len(PHASES) + 1, width, padding_idx=0)
-        self.kind = nn.Embedding(len(ACTION_KINDS) + 1, width, padding_idx=0)
-        self.state_numbers = nn.Sequential(nn.Linear(10, width), nn.ReLU(),
+        kind_count = len(ACTION_KINDS) + (len(ZONE_ACTION_KINDS) if feature_version >= 4 else 0)
+        self.kind = nn.Embedding(kind_count + 1, width, padding_idx=0)
+        self.state_numbers = nn.Sequential(nn.Linear(42 if feature_version >= 4 else 10, width), nn.ReLU(),
                                            nn.Linear(width, width))
         self.action_numbers = nn.Sequential(nn.Linear(8, width), nn.ReLU(),
                                             nn.Linear(width, width))

@@ -131,6 +131,11 @@ class RestrictedOcgcoreEngine:
                         target["code"] = visible_code
                     cards.append(target)
                 parameters["cards"] = cards
+            if choice.zones:
+                parameters["zones"] = [
+                    {"controller": controller, "location": location, "sequence": sequence}
+                    for controller, location, sequence in choice.zones
+                ]
             if choice.location is not None:
                 parameters["location"] = choice.location
             if choice.position is not None:

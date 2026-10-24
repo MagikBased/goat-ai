@@ -12,7 +12,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Environment contract and illegal-action validation | Implemented |
 | Player-visible observation schema | Own hand and Extra Deck, public zones, battle position, chain links, bounded public events, known opponent field cards, and the public Scapegoat summon restriction; other private reveals and restrictions pending |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
-| JSON trajectory round trip | Schema v8 records public Deck-top reveals and distinguishes Flip Summons; earlier schemas remain readable and replay-verifiable |
+| JSON trajectory round trip | Schema v9 records active disabled field zones alongside public reveals and Flip Summons; earlier schemas remain readable and replay-verifiable |
 | Tournaments | Seeded, seat-swapped sequential and spawned-process runners; paired score intervals and Wilson intervals for supported decks |
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
@@ -93,7 +93,9 @@ python scripts/render_replay.py replays/scapegoat_3.json
 xdg-open replays/scapegoat_3.html
 ```
 
-The generated HTML is self-contained and shows card names when the pinned card database is installed. Use its slider, arrow keys, or Play button to step through decisions; `#decision=11` opens a particular decision. Public Deck-top reveals appear in Public context on new recordings. You can also open `examples/replay_viewer.html` directly and choose any saved GOAT AI JSON trajectory, in which case cards appear by ID. The viewer has no card art or animations and does not open EDOPro `.yrp`/`.yrpX` files. Replays and generated HTML live in ignored `replays/`.
+The generated HTML is self-contained and shows card names when the pinned card database is installed. Use its slider, arrow keys, or Play button to step through decisions; `#decision=11` opens a particular decision. Public Deck-top reveals and active disabled field zones appear on new recordings. You can also open `examples/replay_viewer.html` directly and choose any saved GOAT AI JSON trajectory, in which case cards appear by ID. The viewer has no card art or animations and does not open EDOPro `.yrp`/`.yrpX` files. Replays and generated HTML live in ignored `replays/`.
+
+For a replay that shows a two-zone choice and the resulting disabled Monster Zones, run `python examples/record_ground_collapse.py`, then `python scripts/render_replay.py replays/ground_collapse_3.json` and open `replays/ground_collapse_3.html`. This uses the experimental adapter and verifies the full seeded duel before writing the trajectory.
 
 The play example prints the winner and decision count and optionally writes a JSON trajectory. `--human-seat` uses the same action API for a CLI player. The evaluation command swaps candidate seats for each seed and reports matchup and seat results; see [the evaluation log](docs/evaluation.md). Supported decision types remain limited to the tested decks, and unsupported requests fail explicitly. The default environment still fails closed because general GOAT effects and visibility cases are unfinished. The benchmark includes reset and Python action selection; results are specific to this fixture and machine.
 

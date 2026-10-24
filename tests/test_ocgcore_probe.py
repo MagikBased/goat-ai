@@ -11,6 +11,7 @@ from goat_ai.engine.ocgcore_probe import (
     MSG_DAMAGE_STEP_END,
     MSG_DAMAGE_STEP_START,
     MSG_DRAW,
+    MSG_FIELD_DISABLED,
     MSG_MOVE,
     MSG_POS_CHANGE,
     MSG_SELECT_CHAIN,
@@ -49,6 +50,24 @@ def test_public_battle_events_update_observed_phase():
                                      "damage_step:start", "damage_step:end"]
     with pytest.raises(ValueError, match="MSG_DAMAGE_STEP_START"):
         probe._update_public_clock([bytes((MSG_DAMAGE_STEP_START, 0))])
+
+
+def test_public_field_disabled_mask_replaces_previous_zones():
+    probe = object.__new__(OcgcoreProbe)
+    probe._turn = 1
+    probe._phase = "main1"
+    probe._chain = []
+    probe._public_history = []
+    probe._known_facedown = {}
+    probe._disabled_zones = ()
+    mask = (1 << 0) | (1 << 1) | (1 << (16 + 8 + 2))
+    probe._update_public_clock([bytes((MSG_FIELD_DISABLED,)) + struct.pack("<I", mask)])
+    assert {(slot.player, slot.zone, slot.sequence) for slot in probe._disabled_zones} == {
+        (0, "monster", 0), (0, "monster", 1), (1, "spell_trap", 2)}
+    probe._update_public_clock([bytes((MSG_FIELD_DISABLED,)) + struct.pack("<I", 0)])
+    assert probe._disabled_zones == ()
+    with pytest.raises(ValueError, match="MSG_FIELD_DISABLED"):
+        probe._update_public_clock([bytes((MSG_FIELD_DISABLED, 1))])
 
 
 def test_known_facedown_memory_requires_public_flip_and_clears_on_move():

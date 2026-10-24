@@ -24,6 +24,7 @@ class NativeChoice:
     position: int | None = None
     race: int | None = None
     prompt_id: int | None = None
+    zones: tuple[tuple[int, int, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -241,24 +242,36 @@ def decode_decision(message: bytes) -> NativeDecision:
         if not choices:
             raise ValueError("empty select/unselect decision")
         return NativeDecision(player, tuple(choices))
-    if kind == 18:  # MSG_SELECT_PLACE
+    if kind in (18, 24):  # MSG_SELECT_PLACE / MSG_SELECT_DISFIELD
         player = reader.integer(1)
         count = reader.integer(1)
         forbidden = reader.integer(4)
         reader.finish()
-        if count != 1:
-            raise NotImplementedError("multi-place selection is not decoded")
-        choices = []
+        if player not in (0, 1) or not count:
+            raise ValueError("invalid field-zone selection")
+        zones = []
         for group in range(4):
             controller = player if group < 2 else 1 - player
             location = 0x4 if group % 2 == 0 else 0x8
-            for sequence in range(8):
+            for sequence in range(7 if location == 0x4 else 8):
                 if not forbidden & (1 << (group * 8 + sequence)):
-                    choices.append(NativeChoice("place", bytes((controller, location, sequence)),
-                                                controller=controller, location=location,
-                                                sequence=sequence))
-        if not choices:
-            raise ValueError("no legal place in MSG_SELECT_PLACE")
+                    zones.append((controller, location, sequence))
+        if count > len(zones):
+            raise ValueError("field-zone selection has too few legal zones")
+        if comb(len(zones), count) > 2048:
+            raise NotImplementedError("field-zone selection has too many combinations")
+        choices = []
+        for selected in combinations(zones, count):
+            response = bytes(value for zone in selected for value in zone)
+            if count == 1:
+                controller, location, sequence = selected[0]
+                choices.append(NativeChoice(
+                    "place" if kind == 18 else "disable_zone", response,
+                    controller=controller, location=location, sequence=sequence))
+            else:
+                choices.append(NativeChoice(
+                    "place_zones" if kind == 18 else "disable_zones", response,
+                    zones=selected))
         return NativeDecision(player, tuple(choices))
     if kind == 10:  # MSG_SELECT_BATTLECMD
         player = reader.integer(1)

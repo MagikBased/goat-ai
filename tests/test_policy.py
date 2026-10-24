@@ -8,7 +8,7 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from goat_ai.actions import Action
-from goat_ai.observations import CardView, KnownCardView, Observation
+from goat_ai.observations import CardView, DisabledZoneView, KnownCardView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory, demonstrator_records
 from goat_ai.training import (
     CardVocabulary,
@@ -123,6 +123,36 @@ def test_feature_version_three_uses_only_publicly_known_facedown_id():
     assert legacy.action_targets[2].tolist() == [0, 0]
 
 
+def test_feature_version_four_represents_zone_choices_and_disabled_slots():
+    vocabulary = CardVocabulary((10, 20))
+    zones = [
+        {"controller": 0, "location": 4, "sequence": 0},
+        {"controller": 1, "location": 4, "sequence": 2},
+    ]
+    choices = (
+        Action("a", "disable_zones", 0, {"zones": zones}),
+        Action("b", "disable_zones", 0, {"zones": [zones[0],
+               {"controller": 1, "location": 4, "sequence": 3}]}),
+    )
+    observation = replace(view(), disabled_zones=(DisabledZoneView(0, "monster", 1),))
+    features = encode_decision(observation, choices, vocabulary, feature_version=4)
+    assert features.state_numbers.shape == (42,)
+    assert features.state_numbers[11].item() == 1  # own Monster Zone 1
+    assert features.action_kinds.tolist() == [len(ACTION_KINDS) + 2] * 2
+    assert not torch.equal(features.action_target_context[0],
+                           features.action_target_context[1])
+    torch.manual_seed(19)
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=4)
+    scores = model(features)
+    assert scores[0] != scores[1]
+    reversed_zones = Action("c", "disable_zones", 0, {"zones": list(reversed(zones))})
+    reversed_score = model(encode_decision(observation, (reversed_zones,), vocabulary,
+                                           feature_version=4))
+    assert torch.allclose(scores[:1], reversed_score)
+    clear = encode_decision(view(), choices, vocabulary, feature_version=4)
+    assert not torch.equal(features.state_numbers, clear.state_numbers)
+
+
 def test_supervised_update_reduces_loss_for_visible_decision():
     torch.manual_seed(6)
     torch.set_num_threads(1)
@@ -170,7 +200,7 @@ def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):
     legacy_choices = (Action("multi", "select_cards", 0, {"cards": [
         {"controller": 1, "location": 8, "sequence": 0},
         {"controller": 0, "location": 4, "sequence": 1, "code": 20}]}),)
-    features = encode_decision(view(), legacy_choices, vocabulary)
+    features = encode_decision(view(), legacy_choices, vocabulary, feature_version=1)
     assert torch.allclose(legacy(features), restored.model(features))
     assert restored.select_action(view(), actions()) in actions()
 

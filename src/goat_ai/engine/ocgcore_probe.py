@@ -16,6 +16,7 @@ from pathlib import Path
 from goat_ai.observations import (
     CardView,
     ChainLinkView,
+    DisabledZoneView,
     KnownCardView,
     Observation,
     PublicRevealView,
@@ -42,6 +43,7 @@ MSG_SET = 54
 MSG_SWAP = 55
 MSG_SHUFFLE_SET_CARD = 36
 MSG_CONFIRM_DECKTOP = 30
+MSG_FIELD_DISABLED = 56
 MSG_ATTACK = 110
 MSG_DAMAGE_STEP_START = 113
 MSG_DAMAGE_STEP_END = 114
@@ -166,6 +168,7 @@ class OcgcoreProbe:
         self._known_facedown: dict[tuple[int, int, int], int] = {}
         self._restriction_hints: dict[tuple[int, int], int] = {}
         self._public_reveals: list[PublicRevealView] = []
+        self._disabled_zones: tuple[DisabledZoneView, ...] = ()
         self._bind()
         major, minor = c.c_int(), c.c_int()
         self.lib.OCG_GetVersion(c.byref(major), c.byref(minor))
@@ -388,6 +391,17 @@ class OcgcoreProbe:
                               for index in range(count))
                 self._public_reveals.append(PublicRevealView(
                     self._turn, message[1], "deck_top", codes))
+            elif message[0] == MSG_FIELD_DISABLED:
+                if len(message) != 5:
+                    raise ValueError("invalid MSG_FIELD_DISABLED length")
+                mask = struct.unpack_from("<I", message, 1)[0]
+                self._disabled_zones = tuple(
+                    DisabledZoneView(player, zone, sequence)
+                    for player in (0, 1)
+                    for zone, offset, size in (("monster", 0, 7), ("spell_trap", 8, 8))
+                    for sequence in range(size)
+                    if mask & (1 << (player * 16 + offset + sequence))
+                )
             elif message[0] == MSG_PLAYER_HINT:
                 if len(message) != 11 or message[1] not in (0, 1):
                     raise ValueError("invalid MSG_PLAYER_HINT")
@@ -546,6 +560,7 @@ class OcgcoreProbe:
                 for player in (0, 1)
                 if self._restriction_hints.get((player, SCAPEGOAT_SUMMON_HINT), 0)),
             public_reveals=tuple(self._public_reveals),
+            disabled_zones=self._disabled_zones,
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:
