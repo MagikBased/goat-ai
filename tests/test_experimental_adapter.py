@@ -290,3 +290,74 @@ def test_different_opponent_set_traps_have_identical_visible_decisions(tmp_path)
                for card in first_view.field)
     assert first_view == next_view
     assert first_actions == next_actions
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_dust_tornado_target_choice_hides_opponent_set_trap_identity(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / "scripts/official/c60082869.lua").is_file():
+        pytest.skip("full card script checkout not installed")
+    original = read_ydk(DECK)
+    changed = list(original.main)
+    # Seed 1 draws the last Sakuretsu copy in the opponent's opening hand.
+    changed[len(changed) - 1 - changed[::-1].index(56120475)] = 60082869
+    alternate = tmp_path / "alternate_target.ydk"
+    alternate.write_text("#main\n" + "\n".join(map(str, changed)) + "\n")
+
+    def target_decision(opponent_deck, target):
+        with GoatEnvironment(DECK, str(opponent_deck), 1,
+                             ExperimentalOcgcoreEngine(root)) as env:
+            observation = env.reset()
+            own_set = False
+            opponent_sets = 0
+            for _ in range(80):
+                actions = env.legal_actions()
+                action = None
+                if observation.acting_player == 0:
+                    if observation.turn == 1 and not own_set:
+                        action = next((a for a in actions if a.kind == "set_spell_trap"
+                                       and a.parameters.get("code") == 60082869), None)
+                        own_set |= action is not None
+                    if observation.turn == 3 and own_set and opponent_sets == 2:
+                        action = next((a for a in actions if a.kind == "activate"
+                                       and a.parameters.get("code") == 60082869), None)
+                        if action is not None:
+                            private_code = env.engine.probe._query_location(
+                                1, LOCATION_SZONE)[1].code
+                            observation = env.step(action)
+                            target_view, target_actions = observation, env.legal_actions()
+                            assert len(target_actions) == 2
+                            target_action = next(a for a in target_actions
+                                                 if a.parameters.get("sequence") == 1)
+                            observation = env.step(target_action)
+                            for _ in range(12):
+                                if any(card.code == target
+                                       for card in observation.graveyards[1]):
+                                    return target_view, target_actions, private_code
+                                responses = env.legal_actions()
+                                response = next((a for a in responses if a.kind == "pass"),
+                                                responses[0])
+                                observation = env.step(response)
+                            pytest.fail("Dust Tornado target did not reach opponent Graveyard")
+                elif observation.turn == 2 and opponent_sets < 2:
+                    set_code = 44095762 if opponent_sets == 0 else target  # Mirror Force first
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == set_code), None)
+                    opponent_sets += action is not None
+                if action is None:
+                    action = next((a for a in actions if a.kind == "end_phase"), None)
+                if action is None:
+                    action = next((a for a in actions if a.kind == "pass"), actions[0])
+                observation = env.step(action)
+            pytest.fail("Dust Tornado target decision not reached")
+
+    first_view, first_actions, first_private = target_decision(DECK, 56120475)
+    next_view, next_actions, next_private = target_decision(alternate, 60082869)
+    assert (first_private, next_private) == (56120475, 60082869)
+    assert first_view == next_view
+    assert first_actions == next_actions
+    assert [action.kind for action in first_actions] == ["select_card", "select_card"]
+    assert [action.parameters for action in first_actions] == [
+        {"controller": 1, "location": 8, "sequence": 0},
+        {"controller": 1, "location": 8, "sequence": 1},
+    ]

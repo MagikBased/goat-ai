@@ -67,6 +67,10 @@ decision points while private native queries confirm the identities differ.
 Another differential fixture sets Dust Tornado versus Sakuretsu Armor from
 opponent hands and confirms that the next acting-player observation and legal
 actions match while private Spell/Trap Zone queries show different identities.
+An end-to-end Dust Tornado fixture then chooses between two set opponent Traps,
+one with alternate hidden identities. The target-selection observations and
+two-action lists match, each action carries only the public zone and slot, and
+selecting the changed slot destroys the actual target in either duel.
 This is an initial visibility regression, not a full information-flow audit.
 Generic yes/no, effect yes/no, and indexed option requests now carry native
 prompt identifiers
