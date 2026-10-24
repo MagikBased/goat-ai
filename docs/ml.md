@@ -1,6 +1,6 @@
 # Initial policy and imitation pipeline
 
-`LegalActionPolicy` scores the legal options supplied by `GoatEnvironment`. It uses only the `Observation` and `Action` values that baseline agents receive. A sorted vocabulary comes from the pinned GOAT whitelist; hidden or absent card identities map to token 0 and visible cards missing from that vocabulary map to an unknown token. The model embeds visible cards, their zones, owners, and positions; pools them into a state vector; then scores each action using its kind, referenced card, selected-card identities, and numeric parameters. It returns one logit per legal action, with no fixed option count or model access to native core state. `PolicyAgent` chooses the highest-scoring legal action through the common agent API.
+`LegalActionPolicy` scores the legal options supplied by `GoatEnvironment`. It uses only the `Observation` and `Action` values that baseline agents receive. A sorted vocabulary comes from the pinned GOAT whitelist; hidden or absent card identities map to token 0 and visible cards missing from that vocabulary map to an unknown token. The model embeds visible cards, their zones, owners, and positions; pools them into a state vector; then scores each action using its kind, referenced card, selected-card identities, and numeric parameters. It returns one logit per legal action, with no fixed option count or model access to native core state. `PolicyAgent` uses those scores through the common agent API. Inference version 2 also applies a generic liveness guard at multi-step selections: it avoids a legal `cancel` when another choice is available, finishes a selection instead of unselecting when possible, and avoids immediately unselecting the card it just selected if another card can be selected. These choices can change strategy; reports identify the inference version.
 
 This is a first representation, not a validated strong architecture. It does not yet model public event history, known opponent cards, restrictions, deck composition, detailed target locations for multi-card choices, or individual Damage Step substeps. Unknown card IDs share one embedding. The model does not infer hidden hands or deck order. It currently scores one decision at a time; batched inference, recurrent memory, and action-set attention remain open experiments.
 
@@ -15,7 +15,26 @@ python scripts/train_behavioral_clone.py replays/vanilla_42.json \
 
 The training command first replays every input trajectory against the selected pinned native engine, checking each visible observation, legal-action list, chosen action, result, deck hash, and loaded asset hashes. It requires fingerprinted schema-v3 recordings. Use `--engine experimental` for an experimental-adapter trajectory. It then fits cross-entropy to selected actions and saves a versioned checkpoint containing model weights, card vocabulary, seed, PyTorch version, source counts, trajectory hashes, and epoch losses. Generated replays and checkpoints live in ignored directories. Only ingest demonstrations whose use is authorized.
 
-The fixture command demonstrates software integration. Its source is random self-play, not skilled human data, and its training loss says nothing about playing strength. No human replay parser, held-out deck evaluation, self-play improvement algorithm, or trained competitive checkpoint is available yet. Before using imitation learning as a strength baseline, collect authorized human trajectories with legal actions and visibility reconstructed, split them by players/decks/matches, verify them, and measure win rate against held-out agents and deck families.
+The fixture command demonstrates software integration. Its source is random self-play, not skilled human data, and its training loss says nothing about playing strength. No automated EDOPro or DuelingBook human replay parser, authorized tournament human dataset, or trained competitive checkpoint is available yet. Before using human imitation as a strength baseline, collect authorized trajectories with legal actions and visibility reconstructed, split them by players/decks/matches, verify them, and measure win rate against held-out agents and deck families.
+
+## Seat-labeled demonstrations
+
+A full-duel trajectory can name `skill_metadata.demonstrator_seat` as 0 or 1. Behavioral cloning verifies the **entire** native replay, then uses only that seat's selected actions as labels. This prevents an opponent's random decisions from contaminating a heuristic or human demonstration. The CLI human player in `examples/play_vanilla.py --human-seat 0` records `source=human_cli`, `authorization=self_recorded`, and the selected seat when a trajectory path is supplied. This is a local interactive recording path; it does not parse tournament videos or third-party replays.
+
+For a controlled baseline, collect heuristic decisions against RandomAgent in both seats and train on only those decisions:
+
+```bash
+python scripts/collect_heuristic_demos.py --seed 1000 --seeds 4 \
+  --output-dir replays/heuristic_1000_1003
+OMP_NUM_THREADS=1 python scripts/train_behavioral_clone.py \
+  replays/heuristic_1000_1003/*.json \
+  --output checkpoints/heuristic_bc_1000_1003.pt \
+  --epochs 3 --width 32 --seed 17 --learning-rate 0.001
+python scripts/evaluate_policy.py checkpoints/heuristic_bc_1000_1003.pt \
+  --seed 2000 --seeds 8 --opponent random
+```
+
+This teacher is the project's generic `HeuristicAgent`, not a human player. The measured results and limits are in [the evaluation log](evaluation.md). The same schema can hold authorized human choices, but card-by-card historical correctness and broad visibility coverage still need expansion before using the experimental adapter for research training.
 
 To measure a saved checkpoint against RandomAgent on seeds excluded from its training recordings:
 

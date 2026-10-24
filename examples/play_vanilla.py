@@ -1,6 +1,7 @@
 """Play a real GOAT-mode vanilla fixture with two random-policy seats."""
 
 import argparse
+from dataclasses import replace
 from pathlib import Path
 
 from goat_ai.agents import HumanAgent, RandomAgent
@@ -29,6 +30,12 @@ def main() -> None:
             observation = env.step(action)
             if env.is_terminal():
                 trajectory = env.trajectory()
+                if args.human_seat is not None:
+                    trajectory = replace(
+                        trajectory, source="human_cli",
+                        skill_metadata={"demonstrator_seat": args.human_seat,
+                                        "authorization": "self_recorded"},
+                    )
                 print(f"winner={env.result()} decisions={len(trajectory.decisions)}")
                 if args.trajectory:
                     args.trajectory.parent.mkdir(parents=True, exist_ok=True)

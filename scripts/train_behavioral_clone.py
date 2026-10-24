@@ -11,7 +11,12 @@ import torch
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.replay import read_trajectory, verify_trajectory
-from goat_ai.training import CardVocabulary, LegalActionPolicy, fit_behavioral_clone
+from goat_ai.training import (
+    CardVocabulary,
+    LegalActionPolicy,
+    demonstrator_records,
+    fit_behavioral_clone,
+)
 
 
 def main() -> None:
@@ -41,12 +46,17 @@ def main() -> None:
         ):
             raise ValueError(f"{path}: training requires replay-fingerprinted schema v3")
         count = verify_trajectory(trajectory, engine_type(args.native_root))
-        records.extend(trajectory.decisions)
-        sources[trajectory.source] += count
+        selected = demonstrator_records(trajectory)
+        records.extend(selected)
+        sources[trajectory.source] += len(selected)
         trajectory_hashes[str(path)] = hashlib.sha256(raw).hexdigest()
         training_games.append({"seed": trajectory.seed,
                                "deck_sha256": trajectory.deck_sha256,
-                               "source": trajectory.source})
+                               "source": trajectory.source,
+                               "demonstrator_seat": (trajectory.skill_metadata or {}).get(
+                                   "demonstrator_seat"),
+                               "verified_decisions": count,
+                               "selected_decisions": len(selected)})
     vocabulary = CardVocabulary.from_goat_whitelist(
         args.native_root / "banlist/GOAT.lflist.conf")
     torch.manual_seed(args.seed)

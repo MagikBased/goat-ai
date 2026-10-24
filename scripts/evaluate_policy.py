@@ -16,6 +16,7 @@ from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import run_tournament, run_tournament_parallel
 from goat_ai.training import load_policy_agent
+from goat_ai.training.policy import POLICY_INFERENCE_VERSION
 
 
 def make_policy_agent(_seed: int, checkpoint: str):
@@ -91,6 +92,7 @@ def main() -> None:
     }
     result = {
         "checkpoint_sha256": sha256(args.checkpoint),
+        "policy_inference_version": POLICY_INFERENCE_VERSION,
         "core_commit": "baa3881d0bae48e9994f915f5c931be53c1ba8ef",
         "asset_sha256": assets,
         "training_games": checkpoint["training_games"],

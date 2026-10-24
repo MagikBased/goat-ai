@@ -24,6 +24,7 @@ ACTION_KINDS = (
     "set_spell_trap", "shuffle_hand", "special_summon", "tribute", "tribute_cards",
     "unselect_card", "yes",
 )
+POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
 
 
 @dataclass(frozen=True)
@@ -179,6 +180,12 @@ class PolicyAgent:
     def __init__(self, model: LegalActionPolicy, vocabulary: CardVocabulary) -> None:
         self.model = model
         self.vocabulary = vocabulary
+        self._last_selection: tuple[int, str, tuple] | None = None
+
+    @staticmethod
+    def _card_reference(action: Action) -> tuple:
+        return tuple(action.parameters.get(key) for key in
+                     ("code", "controller", "location", "sequence"))
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         features = encode_decision(observation, legal_actions, self.vocabulary)
@@ -186,4 +193,25 @@ class PolicyAgent:
         self.model.eval()
         with torch.no_grad():
             scores = self.model(features.to(device))
-        return legal_actions[int(scores.argmax().item())]
+        chosen = legal_actions[int(scores.argmax().item())]
+        if chosen.kind == "cancel":
+            alternatives = [(index, action) for index, action in enumerate(legal_actions)
+                            if action.kind != "cancel"]
+            if alternatives:
+                chosen = max(alternatives, key=lambda item: scores[item[0]].item())[1]
+        if chosen.kind == "unselect_card":
+            finish = next((action for action in legal_actions
+                           if action.kind == "finish_selection"), None)
+            if finish is not None:
+                chosen = finish
+            elif self._last_selection == (
+                observation.turn, observation.phase, self._card_reference(chosen)
+            ):
+                alternatives = [(index, action) for index, action in enumerate(legal_actions)
+                                if action.kind == "select_card"]
+                if alternatives:
+                    chosen = max(alternatives, key=lambda item: scores[item[0]].item())[1]
+        self._last_selection = ((observation.turn, observation.phase,
+                                 self._card_reference(chosen))
+                                if chosen.kind == "select_card" else None)
+        return chosen

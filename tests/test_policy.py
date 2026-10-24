@@ -1,20 +1,24 @@
 """Contract checks for the optional PyTorch legal-action policy."""
 
+from dataclasses import replace
+
 import pytest
 
 torch = pytest.importorskip("torch")
 
 from goat_ai.actions import Action
 from goat_ai.observations import CardView, Observation
-from goat_ai.replay import DecisionRecord
+from goat_ai.replay import DecisionRecord, Trajectory
 from goat_ai.training import (
     CardVocabulary,
     LegalActionPolicy,
     PolicyAgent,
+    demonstrator_records,
     encode_decision,
     fit_behavioral_clone,
     load_policy_agent,
 )
+from goat_ai.training.policy import ACTION_KINDS
 from goat_ai.training.self_play import policy_gradient_update, sample_legal_action
 from scripts.evaluate_policy import validate_heldout_seeds
 
@@ -125,3 +129,54 @@ def test_terminal_reward_moves_selected_action_probability():
         assert (after - before) * direction > 0
     generator = torch.Generator().manual_seed(9)
     assert sample_legal_action(model, vocabulary, view(), actions(), generator) in actions()
+
+
+def test_demonstration_seat_filters_verified_duel_labels():
+    first = DecisionRecord(view(), actions(), actions()[1])
+    second_view = replace(
+        view(), viewer=1, acting_player=1,
+        hand=(CardView(1, "hand", "hidden", 20, 0),),
+        field=(CardView(0, "monster", "facedown", None, 0, "defense"),),
+    )
+    second_action = Action("opponent", "pass", 1)
+    second = DecisionRecord(second_view, (second_action,), second_action)
+    trajectory = Trajectory("goat", ("a", "b"), 1, (first, second), 0,
+                            source="heuristic", skill_metadata={"demonstrator_seat": 0})
+    assert demonstrator_records(trajectory) == (first,)
+    assert demonstrator_records(replace(
+        trajectory, skill_metadata={"demonstrator_seat": 1})) == (second,)
+    assert demonstrator_records(replace(
+        trajectory, source="self_play", skill_metadata=None)) == (first, second)
+    with pytest.raises(ValueError, match="demonstrator_seat"):
+        demonstrator_records(replace(trajectory, skill_metadata=None))
+    with pytest.raises(ValueError, match="demonstrator_seat"):
+        demonstrator_records(replace(trajectory, skill_metadata={"demonstrator_seat": True}))
+
+
+def test_policy_agent_progresses_multi_card_selection():
+    class FavorUnselect(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, features):
+            return (features.action_kinds == ACTION_KINDS.index("unselect_card") + 1
+                    ).float() * 10 + self.dummy
+
+    agent = PolicyAgent(FavorUnselect(), CardVocabulary((10, 20)))
+    first = Action("first", "select_card", 0, {"code": 10, "sequence": 0})
+    assert agent.select_action(view(), (first,)) == first
+    toggle = Action("toggle", "unselect_card", 0, {"code": 10, "sequence": 0})
+    other = Action("other", "select_card", 0, {"code": 20, "sequence": 1})
+    assert agent.select_action(view(), (toggle, other)) == other
+    finish = Action("finish", "finish_selection", 0)
+    assert agent.select_action(view(), (toggle, finish)) == finish
+
+    class FavorCancel(FavorUnselect):
+        def forward(self, features):
+            return (features.action_kinds == ACTION_KINDS.index("cancel") + 1
+                    ).float() * 10 + self.dummy
+
+    cancel_agent = PolicyAgent(FavorCancel(), CardVocabulary((10, 20)))
+    cancel = Action("cancel", "cancel", 0)
+    assert cancel_agent.select_action(view(), (cancel, first)) == first
