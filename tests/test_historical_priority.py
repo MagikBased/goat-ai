@@ -61,6 +61,7 @@ def test_turn_player_ignition_priority_before_opponents_set_book():
                     if use_ignition:
                         assert book_option is None
                     elif book_option is not None:
+                        assert book_option.parameters["controller"] == 1
                         book_response_seen = True
                         action = book_option
                 if action is None:

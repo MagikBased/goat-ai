@@ -12,7 +12,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
-ml = ["torch>=2.3"]
+ml = ["torch>=2.3", "numpy>=1.26,<2"]
 native = ["meson>=1.7", "ninja>=1.11"]
 
 [tool.setuptools.packages.find]

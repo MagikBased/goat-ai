@@ -131,7 +131,7 @@ class RestrictedOcgcoreEngine:
                 parameters["prompt_id"] = choice.prompt_id
             if choice.sequence is not None:
                 parameters["sequence"] = choice.sequence
-            if choice.kind == "place" and choice.controller is not None:
+            if choice.controller is not None:
                 parameters["controller"] = choice.controller
             actions.append(Action(str(index), choice.kind, native.player, parameters))
         self._choices = native.choices
