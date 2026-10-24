@@ -245,13 +245,16 @@ class OcgcoreProbe:
         self.errors.append(message.decode("utf-8", errors="replace"))
 
     def first_decision(self, seed: int, deck: tuple[int, ...],
-                       opponent_deck: tuple[int, ...] | None = None) -> FirstDecision:
+                       opponent_deck: tuple[int, ...] | None = None,
+                       extra: tuple[int, ...] = (),
+                       opponent_extra: tuple[int, ...] = ()) -> FirstDecision:
         if self._duel.value:
             raise RuntimeError("probe instance already used")
         if len(deck) < 6:
             raise ValueError("probe deck requires at least six cards")
-        if len(deck) != 40:
-            raise ValueError("probe fixture must have exactly forty cards")
+        if not 40 <= len(deck) <= 60 or (opponent_deck is not None
+                                          and not 40 <= len(opponent_deck) <= 60):
+            raise ValueError("native duel requires 40 to 60 main-deck cards per player")
         # Four nonzero 64-bit words; exact split is part of reproducibility.
         words = tuple((seed + i + 1) & ((1 << 64) - 1) for i in range(4))
         opts = DuelOptions(
@@ -271,6 +274,11 @@ class OcgcoreProbe:
             random.Random(seed * 2 + team).shuffle(shuffled)
             for code in shuffled:
                 card = NewCard(team, 0, code, team, LOCATION_DECK, 0,
+                               POSITION_FACEDOWN_DEFENSE)
+                self.lib.OCG_DuelNewCard(self._duel, c.byref(card))
+        for team, cards in enumerate((extra, opponent_extra)):
+            for code in cards:
+                card = NewCard(team, 0, code, team, LOCATION_EXTRA, 0,
                                POSITION_FACEDOWN_DEFENSE)
                 self.lib.OCG_DuelNewCard(self._duel, c.byref(card))
         if self.errors:

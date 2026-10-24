@@ -74,8 +74,9 @@ python scripts/probe_control_deck.py --seed 42
 The sample is a synthetic control-style protocol probe, not a sourced
 tournament decklist. On pinned assets, seed 42 ends after 1,251 random
 decisions with winner seat 1. This is neither a playing-strength benchmark
-nor a historical-rulings validation. `ExperimentalOcgcoreEngine` accepts only
-40-card main decks without Extra or Side Decks and may fail on unhandled
+nor a historical-rulings validation. `ExperimentalOcgcoreEngine` accepts
+whitelist-legal 40–60 card main decks and Fusion Extra Decks; the Side Deck is
+validated but unused in a single duel. The adapter may fail on unhandled
 native requests. Its action semantics and player-visible observations must be
 audited before using it for training or competitive evaluation.
 

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from goat_ai.agents import RandomAgent
+from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.native_messages import decode_decision
 from goat_ai.engine.protocol import SimulatorUnavailable
@@ -57,3 +58,24 @@ def test_control_probe_complete_and_seeded():
     assert first[0] == 1
     assert len(first[1]) == 1251
     assert first == run()
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_experimental_duel_loads_fusion_and_41_card_main(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / "scripts/goat/c504700102.lua").is_file():
+        pytest.skip("full card script checkout not installed")
+    sample = read_ydk(DECK)
+    deck_path = tmp_path / "expanded.ydk"
+    deck_path.write_text(
+        "#main\n" + "\n".join(map(str, (*sample.main, 87621407)))
+        + "\n#extra\n504700102\n80071763\n!side\n70074904\n",
+        encoding="utf-8",
+    )
+    with GoatEnvironment(str(deck_path), DECK, 42,
+                         ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        assert observation.deck_counts == (35, 35)
+        assert observation.extra_deck_counts == (2, 0)
+        assert observation.opponent_hand_count == 5
+        assert len(observation.hand) == 6

@@ -9,7 +9,7 @@ import sqlite3
 from pathlib import Path
 
 from goat_ai.actions import Action
-from goat_ai.engine.decks import read_goat_whitelist, read_ydk, validate_goat_deck
+from goat_ai.engine.decks import Decklist, read_goat_whitelist, read_ydk, validate_goat_deck
 from goat_ai.engine.native_messages import NativeChoice, decode_decision
 from goat_ai.engine.ocgcore_probe import OcgcoreProbe
 from goat_ai.engine.protocol import Decision, RulesProfile, SimulatorUnavailable
@@ -27,7 +27,7 @@ class RestrictedOcgcoreEngine:
         self._actions: tuple[Action, ...] = ()
         self._last_observation = None
 
-    def _load_deck(self, path: str) -> tuple[int, ...]:
+    def _load_deck(self, path: str) -> Decklist:
         deck = read_ydk(path)
         database = self.root / "database/cards.cdb"
         goat_database = self.root / "database/goat-entries.cdb"
@@ -60,7 +60,7 @@ class RestrictedOcgcoreEngine:
                     self.root / f"scripts/{script_dir}/c{code}.lua"
                 ).is_file():
                     raise SimulatorUnavailable(f"card {code} script missing; rerun setup_native.py")
-        return deck.main
+        return deck
 
     def reset(self, deck1: str, deck2: str, seed: int) -> Decision:
         self.close()
@@ -69,7 +69,8 @@ class RestrictedOcgcoreEngine:
         self.probe = OcgcoreProbe(self.root / "build/libocgcore.so",
                                   self.root / "database/cards.cdb", self.root / "scripts")
         try:
-            self.probe.first_decision(seed, cards1, cards2)
+            self.probe.first_decision(seed, cards1.main, cards2.main,
+                                      cards1.extra, cards2.extra)
             return self._decision()
         except Exception:
             self.close()
