@@ -44,6 +44,9 @@ class ContractEngine:
         self.steps += 1
         return Decision(view(), (), terminal=True, winner=0)
 
+    def replay_manifest(self) -> dict[str, str]:
+        return {"fixture": "sha256-value"}
+
 
 def test_default_engine_fails_explicitly():
     with pytest.raises(SimulatorUnavailable, match="unfinished"):
@@ -114,6 +117,30 @@ def test_replay_verifier_detects_changed_decision_and_outcome():
         verify_trajectory(replace(trajectory, decisions=(changed,)), ContractEngine())
     with pytest.raises(ReplayMismatch, match="winner"):
         verify_trajectory(replace(trajectory, winner=1), ContractEngine())
+    with pytest.raises(ReplayMismatch, match="rules profile"):
+        verify_trajectory(replace(trajectory, rules_profile={"side_deck_policy": "community"}),
+                          ContractEngine())
+    with pytest.raises(ReplayMismatch, match="native assets"):
+        verify_trajectory(replace(trajectory, asset_sha256={"fixture": "wrong"}),
+                          ContractEngine())
+
+
+def test_replay_verifier_detects_changed_deck_contents(tmp_path):
+    paths = (tmp_path / "a.ydk", tmp_path / "b.ydk")
+    for path in paths:
+        path.write_text("#main\n123\n")
+    action = Action("0", "pass", 0)
+    from goat_ai.replay.fingerprint import sha256_file
+
+    trajectory = Trajectory(
+        RulesProfile().name, tuple(str(path) for path in paths), 42,
+        (DecisionRecord(view(), (action, Action("1", "attack", 0)), action),), 0,
+        deck_sha256=tuple(sha256_file(path) for path in paths),
+    )
+    assert verify_trajectory(trajectory, ContractEngine()) == 1
+    paths[1].write_text("#main\n456\n")
+    with pytest.raises(ReplayMismatch, match="deck contents"):
+        verify_trajectory(trajectory, ContractEngine())
 
 
 def test_schema_one_trajectory_remains_readable(tmp_path):
@@ -130,6 +157,24 @@ def test_schema_one_trajectory_remains_readable(tmp_path):
     restored = read_trajectory(path)
     assert restored.schema_version == 1
     assert restored.decisions[0].observation.field[0].orientation is None
+
+
+def test_schema_two_trajectory_remains_readable(tmp_path):
+    action = Action("0", "pass", 0)
+    observation = replace(view(), chain=(ChainLinkView(1, 123, 0, 4, 2),))
+    trajectory = Trajectory("goat", ("a", "b"), 7,
+                            (DecisionRecord(observation, (action,), action),), 0)
+    path = tmp_path / "old_v2.json"
+    write_trajectory(path, trajectory)
+    raw = json.loads(path.read_text())
+    raw["schema_version"] = 2
+    for key in ("rules_profile", "deck_sha256", "asset_sha256"):
+        raw.pop(key)
+    path.write_text(json.dumps(raw))
+    restored = read_trajectory(path)
+    assert restored.schema_version == 2
+    assert restored.rules_profile is None
+    assert restored.decisions[0].observation.chain == observation.chain
 
 
 def test_decision_rejects_wrong_actor_and_empty_nonterminal():

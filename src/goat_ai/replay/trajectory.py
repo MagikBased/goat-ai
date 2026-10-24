@@ -30,7 +30,10 @@ class Trajectory:
     winner: int | None
     source: str = "self_play"
     skill_metadata: dict | None = None
-    schema_version: int = 2
+    schema_version: int = 3
+    rules_profile: dict | None = None
+    deck_sha256: tuple[str, str] | None = None
+    asset_sha256: dict[str, str] | None = None
 
 
 def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
@@ -40,7 +43,7 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     version = raw.get("schema_version")
-    if version not in (1, 2):
+    if version not in (1, 2, 3):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
@@ -53,7 +56,7 @@ def read_trajectory(path: str | Path) -> Trajectory:
         view["field"] = cards(view["field"])
         view["graveyards"] = tuple(cards(zone) for zone in view["graveyards"])
         view["banished"] = tuple(cards(zone) for zone in view["banished"])
-        if version == 2:
+        if version >= 2:
             view["chain"] = tuple(ChainLinkView(**link) for link in view["chain"])
         else:
             view["chain"] = tuple(view["chain"])
@@ -63,6 +66,11 @@ def read_trajectory(path: str | Path) -> Trajectory:
         records.append(DecisionRecord(Observation(**view),
                                       tuple(Action(**a) for a in record["legal_actions"]),
                                       Action(**record["selected_action"])))
-    return Trajectory(raw["ruleset"], tuple(raw["decks"]), raw["seed"], tuple(records),
-                      raw["winner"], raw["source"], raw.get("skill_metadata"), version)
+    hashes = raw.get("deck_sha256")
+    return Trajectory(
+        raw["ruleset"], tuple(raw["decks"]), raw["seed"], tuple(records),
+        raw["winner"], raw["source"], raw.get("skill_metadata"), version,
+        raw.get("rules_profile"), tuple(hashes) if hashes is not None else None,
+        raw.get("asset_sha256"),
+    )
 

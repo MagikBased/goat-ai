@@ -1,10 +1,14 @@
 """Stable environment boundary; actual duel behavior is delegated to a rules engine."""
 
+from dataclasses import asdict
+from pathlib import Path
+
 from goat_ai.actions import Action
 from goat_ai.engine import Decision, RulesEngine
 from goat_ai.engine.protocol import UnavailableOcgcore
 from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory
+from goat_ai.replay.fingerprint import sha256_file
 
 
 class GoatEnvironment:
@@ -57,8 +61,14 @@ class GoatEnvironment:
         decision = self._current()
         if not decision.terminal:
             raise RuntimeError("duel has not ended")
+        hashes = (tuple(sha256_file(path) for path in self.decks)
+                  if all(Path(path).is_file() for path in self.decks) else None)
+        manifest = getattr(self.engine, "replay_manifest", None)
+        assets = manifest() if manifest is not None else None
         return Trajectory(self.engine.ruleset.name, self.decks, self.seed,
-                          tuple(self._history), decision.winner)
+                          tuple(self._history), decision.winner,
+                          rules_profile=asdict(self.engine.ruleset),
+                          deck_sha256=hashes, asset_sha256=assets)
 
     def close(self) -> None:
         close = getattr(self.engine, "close", None)

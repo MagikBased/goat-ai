@@ -1,8 +1,10 @@
 """Check that a recorded decision sequence reproduces on a rules engine."""
 
+from dataclasses import asdict
 from pathlib import Path
 
 from goat_ai.engine.protocol import RulesEngine
+from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.replay.trajectory import Trajectory
 
 
@@ -21,9 +23,18 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
     """
     if trajectory.ruleset != engine.ruleset.name:
         raise ReplayMismatch("ruleset differs from recorded trajectory")
+    if trajectory.rules_profile is not None and trajectory.rules_profile != asdict(engine.ruleset):
+        raise ReplayMismatch("rules profile differs from recorded trajectory")
     from goat_ai.environments import GoatEnvironment
 
     paths = deck_paths or trajectory.decks
+    if trajectory.deck_sha256 is not None:
+        try:
+            hashes = tuple(sha256_file(path) for path in paths)
+        except OSError as exc:
+            raise ReplayMismatch(f"recorded deck file unavailable: {exc}") from exc
+        if hashes != trajectory.deck_sha256:
+            raise ReplayMismatch("deck contents differ from recorded trajectory")
     with GoatEnvironment(str(paths[0]), str(paths[1]), trajectory.seed, engine) as env:
         observation = env.reset()
         for index, record in enumerate(trajectory.decisions):
@@ -38,4 +49,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             raise ReplayMismatch("record ended before engine terminal state")
         if env.result() != trajectory.winner:
             raise ReplayMismatch("winner differs from recorded trajectory")
+        if trajectory.asset_sha256 is not None:
+            manifest = getattr(engine, "replay_manifest", None)
+            if manifest is None or manifest() != trajectory.asset_sha256:
+                raise ReplayMismatch("native assets differ from recorded trajectory")
     return len(trajectory.decisions)

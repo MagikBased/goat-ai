@@ -6,6 +6,7 @@ private information and most decision messages are not decoded here.
 """
 
 import ctypes as c
+import hashlib
 import random
 import sqlite3
 import struct
@@ -135,6 +136,7 @@ class OcgcoreProbe:
                             (f"file:{unofficial_database.resolve()}?mode=ro",))
         self.scripts = scripts.resolve()
         self.errors: list[str] = []
+        self.loaded_script_sha256: dict[str, str] = {}
         self._setcodes: dict[int, c.Array] = {}
         self._duel = c.c_void_p()
         self._pending_message: bytes | None = None
@@ -239,6 +241,9 @@ class OcgcoreProbe:
                 self.errors.append(f"missing script: {relative}")
             return 0
         contents = path.read_bytes()
+        self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
+            hashlib.sha256(contents).hexdigest()
+        )
         return self.lib.OCG_LoadScript(duel, contents, len(contents), name)
 
     def _log(self, _payload: int, message: bytes, _kind: int) -> None:

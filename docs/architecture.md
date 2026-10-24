@@ -19,15 +19,15 @@ The observation schema has explicit visible zones, public counts, own hand, and 
 
 Do not use `ygoenv`'s current EDOPro binary as a GOAT engine: its source currently selects MR5. The direct `ctypes` probe reaches real native decisions without a fixed option-list size, so it is the current M1 adapter direction. Its response protocol and visibility boundary are only partially implemented. The interface avoids coupling downstream agent and replay code to this choice.
 
-Trajectory JSON schema v2 stores the visible observation, full legal action list, chosen action, acting player and phase (inside the observation), deck identifiers, ruleset, source, optional skill metadata, and result. It adds monster orientation and structured chain links. The reader accepts v1 trajectories and preserves their earlier chain strings; v2 writers produce structured links. It excludes native full-state snapshots. A future training process can map variable-length actions to masked scores; any PyTorch encoder and algorithm remain independent of the simulator.
+Trajectory JSON schema v3 stores the visible observation, full legal action list, chosen action, acting player and phase (inside the observation), deck identifiers, ruleset, source, optional skill metadata, and result. It retains monster orientation and structured chain links from v2. It adds the complete rules profile, SHA-256 hashes of deck files, native core and database files, the GOAT list, and every script loaded during the duel. The reader accepts v1 and v2 trajectories; v1 preserves its earlier chain strings. No native full-state snapshot is stored. A future training process can map variable-length actions to masked scores; any PyTorch encoder and algorithm remain independent of the simulator.
 
 `goat_ai.replay.verify_trajectory` reconstructs a duel from its seed and
 decklists, compares each player-visible observation and complete legal-action
 set with the recording, applies the selected action, and checks the result.
-This detects engine or asset drift along the recorded path. Deck paths alone
-do not pin deck contents or native asset versions; callers must retain the
-original files and pinned setup. A future trajectory schema should store deck
-and asset fingerprints before human-data ingestion or large-scale training.
+Schema v3 verifies deck contents and native asset fingerprints as well as the
+recorded path. Callers must retain the original deck files and native assets;
+the recording stores hashes, not copies. Older v1/v2 recordings can still be
+replayed but lack these content checks.
 
 `goat_ai.evaluation.run_tournament` depends only on the `RulesEngine` and agent interfaces. It runs each seed and matchup with both seat assignments and records wins, losses, draws, decisions, and a Wilson interval for decisive wins. The native CLI adds deck and asset fingerprints. This keeps evaluation separate from policy implementation and makes later checkpoint opponents possible without changing the duel engine.
 

@@ -12,7 +12,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Environment contract and illegal-action validation | Implemented |
 | Player-visible observation schema | Native hand/facedown redaction, battle position, and public chain tested on fixtures; history and known-card memory pending |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
-| JSON trajectory round trip | Schema v2 verified on native duels with chain links; v1 remains readable |
+| JSON trajectory round trip | Schema v3 records visible decisions, full rules profile, deck hashes, and loaded native asset hashes; v1/v2 remain readable |
 | Tournaments | Seeded, seat-swapped runner and Wilson intervals implemented for supported decks |
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
@@ -69,7 +69,8 @@ python scripts/verify_trajectory.py replays/vanilla_42.json
 ```
 
 The verifier replays each selected action, compares the visible observation
-and complete legal-action list at every decision, and checks the winner. Use
+and complete legal-action list at every decision, and checks the winner. New
+recordings also check rules-profile, deck-file, and loaded native-asset hashes. Use
 `--deck1` and `--deck2` when the original YDK paths have moved. It cannot
 prove that a card interaction is historically correct; it detects divergence
 from the engine and assets used for the replay.

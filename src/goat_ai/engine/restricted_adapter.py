@@ -13,6 +13,7 @@ from goat_ai.engine.decks import Decklist, read_goat_whitelist, read_ydk, valida
 from goat_ai.engine.native_messages import NativeChoice, decode_decision
 from goat_ai.engine.ocgcore_probe import OcgcoreProbe
 from goat_ai.engine.protocol import Decision, RulesProfile, SimulatorUnavailable
+from goat_ai.replay.fingerprint import sha256_file
 
 
 class RestrictedOcgcoreEngine:
@@ -160,4 +161,18 @@ class RestrictedOcgcoreEngine:
             self.probe = None
         self._choices = ()
         self._actions = ()
+
+    def replay_manifest(self) -> dict[str, str]:
+        """Hash native files and every script loaded during the current duel."""
+        if self.probe is None:
+            raise RuntimeError("native duel is not active")
+        required = (
+            "build/libocgcore.so", "database/cards.cdb",
+            "database/goat-entries.cdb", "database/cards-unofficial.cdb",
+            "banlist/GOAT.lflist.conf",
+        )
+        result = {name: sha256_file(self.root / name) for name in required}
+        result.update({f"scripts/{name}": digest
+                       for name, digest in self.probe.loaded_script_sha256.items()})
+        return result
 
