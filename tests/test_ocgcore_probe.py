@@ -33,6 +33,7 @@ def test_public_battle_events_update_observed_phase():
     probe._turn = 0
     probe._phase = "unknown"
     probe._chain = []
+    probe._public_history = []
     probe._update_public_clock([b"\x29\x08\x00"])
     assert probe._phase == "battle_start"
     probe._update_public_clock([bytes((MSG_ATTACK,))])
@@ -41,6 +42,8 @@ def test_public_battle_events_update_observed_phase():
     assert probe._phase == "damage_step"
     probe._update_public_clock([bytes((MSG_DAMAGE_STEP_END,))])
     assert probe._phase == "battle_step"
+    assert probe._public_history == ["phase:battle_start", "attack",
+                                     "damage_step:start", "damage_step:end"]
     with pytest.raises(ValueError, match="MSG_DAMAGE_STEP_START"):
         probe._update_public_clock([bytes((MSG_DAMAGE_STEP_START, 0))])
 

@@ -1,4 +1,5 @@
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -35,13 +36,17 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     trajectory = play()
     assert trajectory == play()
     assert trajectory.winner == 1
-    assert trajectory.schema_version == 3
+    assert trajectory.schema_version == 4
     assert trajectory.rules_profile == vars(RestrictedOcgcoreEngine(root).ruleset)
     assert trajectory.deck_sha256 is not None
     assert trajectory.asset_sha256 is not None
     assert "build/libocgcore.so" in trajectory.asset_sha256
     assert "scripts/constant.lua" in trajectory.asset_sha256
     assert len(trajectory.decisions) > 100
+    assert trajectory.decisions[0].observation.public_history[:2] == (
+        "turn:1", "phase:draw")
+    assert any("attack" in record.observation.public_history
+               for record in trajectory.decisions)
     assert any(
         any(card.controller != record.observation.viewer and card.position == "facedown"
             for card in record.observation.field)
@@ -54,6 +59,10 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     assert read_trajectory(path) == trajectory
     assert verify_trajectory(read_trajectory(path), RestrictedOcgcoreEngine(root)) == len(
         trajectory.decisions)
+    legacy = replace(trajectory, schema_version=3,
+                     decisions=tuple(replace(record, observation=replace(
+                         record.observation, public_history=())) for record in trajectory.decisions))
+    assert verify_trajectory(legacy, RestrictedOcgcoreEngine(root)) == len(legacy.decisions)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -157,6 +166,10 @@ def test_book_of_moon_chains_and_hides_turned_monster(tmp_path):
                 assert verified_hidden_target
                 trajectory = env.trajectory()
                 assert any(record.observation.chain for record in trajectory.decisions)
+                assert any("chain:1:start" in record.observation.public_history
+                           for record in trajectory.decisions)
+                assert any("chain:end" in record.observation.public_history
+                           for record in trajectory.decisions)
                 path = tmp_path / "book.json"
                 write_trajectory(path, trajectory)
                 assert read_trajectory(path) == trajectory

@@ -146,6 +146,7 @@ class OcgcoreProbe:
         self._turn = 0
         self._phase = "unknown"
         self._chain: list[ChainLinkView] = []
+        self._public_history: list[str] = []
         self._bind()
         major, minor = c.c_int(), c.c_int()
         self.lib.OCG_GetVersion(c.byref(major), c.byref(minor))
@@ -331,21 +332,26 @@ class OcgcoreProbe:
         for message in messages:
             if message[0] == 40:
                 self._turn += 1
+                self._public_history.append(f"turn:{self._turn}")
             elif message[0] == 41:
                 if len(message) < 3:
                     raise ValueError("truncated MSG_NEW_PHASE")
                 phase = struct.unpack_from("<H", message, 1)[0]
                 self._phase = phases.get(phase, f"phase_{phase}")
+                self._public_history.append(f"phase:{self._phase}")
             elif message[0] == MSG_ATTACK:
                 self._phase = "battle_step"
+                self._public_history.append("attack")
             elif message[0] == MSG_DAMAGE_STEP_START:
                 if len(message) != 1:
                     raise ValueError("invalid MSG_DAMAGE_STEP_START length")
                 self._phase = "damage_step"
+                self._public_history.append("damage_step:start")
             elif message[0] == MSG_DAMAGE_STEP_END:
                 if len(message) != 1:
                     raise ValueError("invalid MSG_DAMAGE_STEP_END length")
                 self._phase = "battle_step"
+                self._public_history.append("damage_step:end")
             elif message[0] == MSG_CHAINING:
                 if len(message) != 33:
                     raise ValueError("invalid MSG_CHAINING length")
@@ -357,10 +363,12 @@ class OcgcoreProbe:
                     controller=message[15], location=message[16],
                     sequence=struct.unpack_from("<I", message, 17)[0],
                 ))
+                self._public_history.append(f"chain:{index}:start")
             elif message[0] == MSG_CHAIN_END:
                 if len(message) != 1:
                     raise ValueError("invalid MSG_CHAIN_END length")
                 self._chain.clear()
+                self._public_history.append("chain:end")
 
     def _query_location(self, player: int, location: int):
         from goat_ai.engine.native_queries import decode_location
@@ -440,6 +448,7 @@ class OcgcoreProbe:
                                  for sequence, card in enumerate(own_extra)
                                  if card is not None),
             chain=tuple(self._chain),
+            public_history=tuple(self._public_history[-64:]),
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:

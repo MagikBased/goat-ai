@@ -1,6 +1,6 @@
 """Check that a recorded decision sequence reproduces on a rules engine."""
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from goat_ai.engine.protocol import RulesEngine
@@ -40,7 +40,9 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
         for index, record in enumerate(trajectory.decisions):
             if env.is_terminal():
                 raise ReplayMismatch(f"decision {index}: engine terminated early")
-            if observation != record.observation:
+            compared_observation = (replace(observation, public_history=())
+                                    if trajectory.schema_version < 4 else observation)
+            if compared_observation != record.observation:
                 raise ReplayMismatch(f"decision {index}: observation differs")
             if env.legal_actions() != record.legal_actions:
                 raise ReplayMismatch(f"decision {index}: legal actions differ")

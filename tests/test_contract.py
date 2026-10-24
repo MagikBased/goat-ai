@@ -90,6 +90,7 @@ def test_agents_use_same_contract():
 def test_trajectory_round_trip_and_legality(tmp_path):
     action = Action("1", "attack", 0, {"target": "direct"})
     observation = replace(view(), chain=(ChainLinkView(1, 123, 0, 4, 2),),
+                          public_history=("turn:1", "phase:main1"),
                           field=(CardView(1, "monster", "facedown", None, 2, "defense"),),
                           own_extra_deck=(CardView(0, "extra", "facedown", 504700102),))
     record = DecisionRecord(observation, (action,), action)
