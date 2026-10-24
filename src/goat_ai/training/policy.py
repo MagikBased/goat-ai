@@ -26,7 +26,7 @@ ACTION_KINDS = (
     "unselect_card", "yes",
 )
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
-POLICY_FEATURE_VERSION = 2  # multi-target controller, location, and sequence
+POLICY_FEATURE_VERSION = 3  # resolve publicly known facedown card IDs by field slot
 
 
 @dataclass(frozen=True)
@@ -76,12 +76,26 @@ class DecisionFeatures:
 
 
 def encode_decision(observation: Observation, legal_actions: Sequence[Action],
-                    vocabulary: CardVocabulary) -> DecisionFeatures:
+                    vocabulary: CardVocabulary,
+                    feature_version: int = POLICY_FEATURE_VERSION) -> DecisionFeatures:
     """Read only the public agent contract; action IDs and native state are ignored."""
     if not legal_actions:
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
+    if feature_version not in (1, 2, 3):
+        raise ValueError("unsupported policy feature version")
+
+    zone_locations = {"monster": 0x04, "spell_trap": 0x08}
+    known_codes = ({(card.controller, zone_locations[card.zone], card.sequence): card.code
+                    for card in observation.known_opponent_field_cards}
+                   if feature_version >= 3 else {})
+
+    def visible_code(code: int | None, controller: int | None,
+                     location: int | None, sequence: int | None) -> int | None:
+        if code is not None:
+            return code
+        return known_codes.get((controller, location, sequence))
 
     cards = []
     for card in (*observation.hand, *observation.field, *observation.graveyards[0],
@@ -89,7 +103,9 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                  *observation.banished[1], *observation.own_extra_deck):
         if card.zone not in ZONES or card.position not in POSITIONS:
             raise ValueError("unknown visible card zone or position")
-        cards.append((vocabulary.index(card.code), ZONES.index(card.zone) + 1,
+        code = visible_code(card.code, card.controller, zone_locations.get(card.zone),
+                            card.sequence)
+        cards.append((vocabulary.index(code), ZONES.index(card.zone) + 1,
                       int(card.controller != observation.viewer) + 1,
                       POSITIONS.index(card.position) + 1))
     for link in observation.chain:
@@ -117,9 +133,13 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         params = action.parameters
         kind_indices.append(ACTION_KINDS.index(action.kind) + 1
                             if action.kind in ACTION_KINDS else 0)
-        card_indices.append(vocabulary.index(params.get("code")))
+        card_indices.append(vocabulary.index(visible_code(
+            params.get("code"), params.get("controller"), params.get("location"),
+            params.get("sequence"))))
         selected = params.get("cards", ())
-        targets.append([vocabulary.index(card.get("code")) for card in selected])
+        targets.append([vocabulary.index(visible_code(
+            card.get("code"), card.get("controller"), card.get("location"),
+            card.get("sequence"))) for card in selected])
         target_context.append([
             (float(card.get("controller", own) != own),
              int(card.get("location", 0)) / 64,
@@ -163,7 +183,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in (1, 2):
+        if feature_version not in (1, 2, 3):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -218,7 +238,8 @@ class PolicyAgent:
                      ("code", "controller", "location", "sequence"))
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
-        features = encode_decision(observation, legal_actions, self.vocabulary)
+        features = encode_decision(observation, legal_actions, self.vocabulary,
+                                   getattr(self.model, "feature_version", POLICY_FEATURE_VERSION))
         device = next(self.model.parameters()).device
         self.model.eval()
         with torch.no_grad():

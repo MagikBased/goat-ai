@@ -8,7 +8,7 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from goat_ai.actions import Action
-from goat_ai.observations import CardView, Observation
+from goat_ai.observations import CardView, KnownCardView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory, demonstrator_records
 from goat_ai.training import (
     CardVocabulary,
@@ -95,6 +95,34 @@ def test_multi_target_features_preserve_visible_slots_without_hidden_codes():
     assert torch.allclose(scores[:1], reversed_score)
 
 
+def test_feature_version_three_uses_only_publicly_known_facedown_id():
+    vocabulary = CardVocabulary((10, 20))
+    observation = replace(
+        view(),
+        field=(CardView(1, "monster", "facedown", None, 0, "defense"),
+               CardView(1, "monster", "facedown", None, 1, "defense")),
+        known_opponent_field_cards=(KnownCardView(1, "monster", 0, 20),),
+    )
+    choices = (
+        Action("known", "select_card", 0,
+               {"controller": 1, "location": 4, "sequence": 0}),
+        Action("unknown", "select_card", 0,
+               {"controller": 1, "location": 4, "sequence": 1}),
+        Action("multi", "select_cards", 0, {"cards": [
+            {"controller": 1, "location": 4, "sequence": 0},
+            {"controller": 1, "location": 4, "sequence": 1}]}),
+    )
+    current = encode_decision(observation, choices, vocabulary, feature_version=3)
+    assert current.state_cards[1, 0].item() == vocabulary.index(20)
+    assert current.state_cards[2, 0].item() == 0
+    assert current.action_cards.tolist() == [vocabulary.index(20), 0, 0]
+    assert current.action_targets[2].tolist() == [vocabulary.index(20), 0]
+    legacy = encode_decision(observation, choices, vocabulary, feature_version=2)
+    assert legacy.state_cards[1:3, 0].tolist() == [0, 0]
+    assert legacy.action_cards.tolist() == [0, 0, 0]
+    assert legacy.action_targets[2].tolist() == [0, 0]
+
+
 def test_supervised_update_reduces_loss_for_visible_decision():
     torch.manual_seed(6)
     torch.set_num_threads(1)
@@ -145,6 +173,24 @@ def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):
     features = encode_decision(view(), legacy_choices, vocabulary)
     assert torch.allclose(legacy(features), restored.model(features))
     assert restored.select_action(view(), actions()) in actions()
+
+
+def test_version_two_checkpoint_ignores_new_known_card_memory(tmp_path):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=2)
+    checkpoint = tmp_path / "v2.pt"
+    torch.save({"schema_version": 1, "model_state": model.state_dict(),
+                "vocabulary_codes": vocabulary.codes, "width": 16,
+                "feature_version": 2}, checkpoint)
+    restored = load_policy_agent(checkpoint)
+    assert restored.model.feature_version == 2
+    observation = replace(view(), known_opponent_field_cards=(
+        KnownCardView(1, "monster", 0, 20),))
+    without_memory = replace(observation, known_opponent_field_cards=())
+    before = encode_decision(observation, actions(), vocabulary, feature_version=2)
+    after = encode_decision(without_memory, actions(), vocabulary, feature_version=2)
+    assert torch.equal(restored.model(before), restored.model(after))
+    assert restored.select_action(observation, actions()) in actions()
 
 
 def test_evaluation_rejects_training_seed_overlap():

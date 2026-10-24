@@ -24,7 +24,8 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
     device = next(model.parameters()).device
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     losses = []
-    examples = [(encode_decision(record.observation, record.legal_actions, vocabulary),
+    examples = [(encode_decision(record.observation, record.legal_actions, vocabulary,
+                                 model.feature_version),
                  record.legal_actions.index(record.selected_action)) for record in records]
     for epoch in range(epochs):
         order = list(range(len(examples)))

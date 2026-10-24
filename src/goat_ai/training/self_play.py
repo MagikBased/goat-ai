@@ -36,7 +36,7 @@ def sample_legal_action(model: LegalActionPolicy, vocabulary: CardVocabulary,
     """Sample from visible legal options, with no native-state access."""
     if temperature <= 0:
         raise ValueError("temperature must be positive")
-    features = encode_decision(observation, legal_actions, vocabulary)
+    features = encode_decision(observation, legal_actions, vocabulary, model.feature_version)
     device = next(model.parameters()).device
     with torch.no_grad():
         logits = model(features.to(device)) / temperature
@@ -100,7 +100,7 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
     total = 0.0
     for record in records:
         features = encode_decision(record.observation, record.legal_actions,
-                                   vocabulary).to(device)
+                                   vocabulary, model.feature_version).to(device)
         logits = model(features)
         log_probabilities = torch.log_softmax(logits, dim=0)
         probabilities = log_probabilities.exp()

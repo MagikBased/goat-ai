@@ -24,7 +24,7 @@ Trajectory JSON schema v6 stores the visible observation, full legal action list
 `goat_ai.replay.verify_trajectory` reconstructs a duel from its seed and
 decklists, compares each player-visible observation and complete legal-action
 set with the recording, applies the selected action, and checks the result.
-Schemas v3–v5 verify deck contents and native asset fingerprints as well as the
+Schemas v3–v6 verify deck contents and native asset fingerprints as well as the
 recorded path. Callers must retain the original deck files and native assets;
 the recording stores hashes, not copies. Older v1/v2 recordings can still be
 replayed but lack these content checks.
