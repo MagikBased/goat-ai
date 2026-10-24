@@ -9,12 +9,11 @@ torch = pytest.importorskip("torch")
 
 from goat_ai.actions import Action
 from goat_ai.observations import CardView, Observation
-from goat_ai.replay import DecisionRecord, Trajectory
+from goat_ai.replay import DecisionRecord, Trajectory, demonstrator_records
 from goat_ai.training import (
     CardVocabulary,
     LegalActionPolicy,
     PolicyAgent,
-    demonstrator_records,
     encode_decision,
     fit_behavioral_clone,
     load_policy_agent,

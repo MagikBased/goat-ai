@@ -10,11 +10,10 @@ import torch
 
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
-from goat_ai.replay import read_trajectory, verify_trajectory
+from goat_ai.replay import demonstrator_records, read_trajectory, verify_trajectory
 from goat_ai.training import (
     CardVocabulary,
     LegalActionPolicy,
-    demonstrator_records,
     fit_behavioral_clone,
 )
 

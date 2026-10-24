@@ -1,6 +1,6 @@
 """Select the demonstrated seat after full-duel replay verification."""
 
-from goat_ai.replay import DecisionRecord, Trajectory
+from .trajectory import DecisionRecord, Trajectory
 
 
 def demonstrator_records(trajectory: Trajectory) -> tuple[DecisionRecord, ...]:

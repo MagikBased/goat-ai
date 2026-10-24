@@ -9,8 +9,7 @@ import pytest
 from goat_ai.agents import HeuristicAgent, RandomAgent
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
-from goat_ai.replay import verify_trajectory
-from goat_ai.training.demonstrations import demonstrator_records
+from goat_ai.replay import demonstrator_records, verify_trajectory
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
