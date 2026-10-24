@@ -121,6 +121,11 @@ class OcgcoreProbe:
     def __init__(self, library: Path, database: Path, scripts: Path) -> None:
         self.lib = c.CDLL(str(library.resolve()))
         self.db = sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True)
+        goat_database = database.parent / "goat-entries.cdb"
+        self._has_goat_database = goat_database.is_file()
+        if self._has_goat_database:
+            self.db.execute("ATTACH DATABASE ? AS goat",
+                            (f"file:{goat_database.resolve()}?mode=ro",))
         self.scripts = scripts.resolve()
         self.errors: list[str] = []
         self._setcodes: dict[int, c.Array] = {}
@@ -161,10 +166,8 @@ class OcgcoreProbe:
             function.restype = restype
 
     def _read_card(self, _payload: int, code: int, result: c.POINTER(CardData)) -> None:
-        row = self.db.execute(
-            "SELECT alias, setcode, type, level, attribute, race, atk, def "
-            "FROM datas WHERE id=?", (code,),
-        ).fetchone()
+        row = self._card_row(code,
+            "alias, setcode, type, level, attribute, race, atk, def")
         if row is None:
             self.errors.append(f"card {code} absent from database")
             return
@@ -185,6 +188,16 @@ class OcgcoreProbe:
             self._setcodes[code] = (c.c_uint16 * 5)(*parts, 0)
             data.setcodes = self._setcodes[code]
 
+    def _card_row(self, code: int, columns: str):
+        if self._has_goat_database:
+            row = self.db.execute(f"SELECT {columns} FROM goat.datas WHERE id=?",
+                                  (code,)).fetchone()
+            if row is not None:
+                return row
+        return self.db.execute(
+            f"SELECT {columns} FROM main.datas WHERE id=?", (code,),
+        ).fetchone()
+
     def _read_script(self, _payload: int, duel: int, name: bytes) -> int:
         relative = Path(name.decode("utf-8"))
         if relative.is_absolute() or ".." in relative.parts:
@@ -196,13 +209,15 @@ class OcgcoreProbe:
         if not path.is_file():
             path = self.scripts / "unofficial" / relative
         if not path.is_file():
+            path = self.scripts / "goat" / relative
+        if not path.is_file():
             # Vanilla monsters have no card script. Missing effect scripts
             # remain fatal, so the probe cannot silently omit card behavior.
             if relative.name == "c0.lua":
                 return 0
             if relative.name.startswith("c") and relative.stem[1:].isdigit():
                 code = int(relative.stem[1:])
-                row = self.db.execute("SELECT type FROM datas WHERE id=?", (code,)).fetchone()
+                row = self._card_row(code, "type")
                 if row and row[0] == 17:  # normal monster
                     return 0
             if not path.is_file():

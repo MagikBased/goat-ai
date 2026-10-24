@@ -56,10 +56,23 @@ def decode_decision(message: bytes) -> NativeDecision:
         forced = reader.integer(1)
         reader.integer(8)  # timing hints
         count = reader.integer(4)
-        if count or forced:
-            raise NotImplementedError("nonempty or forced chain choices are not decoded")
+        choices = []
+        for index in range(count):
+            code = reader.integer(4)
+            controller = reader.integer(1)
+            location = reader.integer(1)
+            sequence = reader.integer(4)
+            reader.integer(4)  # position
+            reader.integer(8)  # effect description
+            reader.integer(1)  # response flag
+            choices.append(NativeChoice("chain", index, code, controller,
+                                        location, sequence))
+        if not forced:
+            choices.append(NativeChoice("pass", -1))
         reader.finish()
-        return NativeDecision(player, (NativeChoice("pass", -1),))
+        if not choices:
+            raise ValueError("forced chain has no legal choices")
+        return NativeDecision(player, tuple(choices))
     if kind == 15:  # MSG_SELECT_CARD
         player = reader.integer(1)
         cancelable = reader.integer(1)

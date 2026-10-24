@@ -58,7 +58,8 @@ def read_goat_whitelist(path: str | Path) -> dict[int, int]:
     return limits
 
 
-def validate_goat_deck(deck: Decklist, limits: dict[int, int], database: Path) -> None:
+def validate_goat_deck(deck: Decklist, limits: dict[int, int], database: Path,
+                       goat_database: Path | None = None) -> None:
     """Validate list membership/copies; deeper historical card rulings are separate."""
     if not 40 <= len(deck.main) <= 60:
         raise ValueError("GOAT main deck must contain 40 to 60 cards")
@@ -66,13 +67,22 @@ def validate_goat_deck(deck: Decklist, limits: dict[int, int], database: Path) -
         raise ValueError("side deck exceeds 15 cards")
     counts: Counter[int] = Counter()
     with sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True) as connection:
+        if goat_database is not None:
+            connection.execute("ATTACH DATABASE ? AS goat",
+                               (f"file:{goat_database.resolve()}?mode=ro",))
         for zone, cards in (("main", deck.main), ("extra", deck.extra), ("side", deck.side)):
             for code in cards:
                 if code not in limits or limits[code] == 0:
                     raise ValueError(f"card {code} is outside the GOAT whitelist or forbidden")
-                row = connection.execute(
-                    "SELECT alias, type FROM datas WHERE id=?", (code,),
-                ).fetchone()
+                row = None
+                if goat_database is not None:
+                    row = connection.execute(
+                        "SELECT alias, type FROM goat.datas WHERE id=?", (code,),
+                    ).fetchone()
+                if row is None:
+                    row = connection.execute(
+                        "SELECT alias, type FROM main.datas WHERE id=?", (code,),
+                    ).fetchone()
                 if row is None:
                     raise ValueError(f"card {code} is absent from pinned cards.cdb")
                 alias, card_type = row

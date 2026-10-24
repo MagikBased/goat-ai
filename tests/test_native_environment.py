@@ -81,3 +81,60 @@ def test_pot_of_greed_resolves_draw_two_with_player_visible_actions():
         assert resolved
         assert any(record.selected_action.kind == "select_cards"
                    for record in env.trajectory().decisions)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_goat_nobleman_targets_hidden_monster_and_banishes_it():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    deck = Path(__file__).resolve().parent.parent / "examples/decks/nobleman_probe.ydk"
+    with GoatEnvironment(str(deck), str(deck), seed=42,
+                         engine=RestrictedOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        agents = (RandomAgent(42), RandomAgent(43))
+        selected_hidden_target = False
+        for _ in range(100):
+            choices = env.legal_actions()
+            action = next((choice for choice in choices if choice.kind == "activate"
+                           and choice.parameters.get("code") == 504700116), None)
+            if action is None:
+                action = agents[observation.acting_player].select_action(observation, choices)
+            if action.kind == "select_card" and "code" not in action.parameters:
+                assert any(card.controller != observation.viewer
+                           and card.position == "facedown" and card.code is None
+                           for card in observation.field)
+                selected_hidden_target = True
+            observation = env.step(action)
+            if selected_hidden_target and observation.banished[1]:
+                assert observation.banished[1][0].code == 69140098
+                return
+        pytest.fail("Nobleman did not banish its hidden target")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_book_of_moon_chains_and_hides_turned_monster():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    deck = Path(__file__).resolve().parent.parent / "examples/decks/book_probe.ydk"
+    with GoatEnvironment(str(deck), str(deck), seed=42,
+                         engine=RestrictedOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        agents = (RandomAgent(42), RandomAgent(43))
+        chained = False
+        target_selected = False
+        for _ in range(50):
+            choices = env.legal_actions()
+            action = next((choice for choice in choices if choice.kind == "chain"
+                           and choice.parameters.get("code") == 14087893), None)
+            if action is None:
+                action = agents[observation.acting_player].select_action(observation, choices)
+            if action.kind == "chain" and action.parameters.get("code") == 14087893:
+                chained = True
+            if chained and action.kind == "select_card":
+                target_selected = True
+            observation = env.step(action)
+            if target_selected and observation.viewer == 1:
+                target = next((card for card in observation.field
+                               if card.controller == 0 and card.sequence == 2), None)
+                if target is not None and target.position == "facedown":
+                    assert target.code is None
+                    return
+        pytest.fail("Book of Moon did not turn its target facedown")

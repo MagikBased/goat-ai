@@ -1,4 +1,4 @@
-"""Real ocgcore adapter for normal-monster decks plus Pot of Greed.
+"""Real ocgcore adapter for normal-monster decks and selected spells.
 
 This bridge exposes every choice decoded by native_messages. It fails on an
 unsupported request; it does not silently hide legal choices or fake rules.
@@ -17,6 +17,7 @@ from goat_ai.engine.protocol import Decision, RulesProfile, SimulatorUnavailable
 
 class RestrictedOcgcoreEngine:
     ruleset = RulesProfile()
+    supported_spells = frozenset({55144522, 14087893, 504700116})
 
     def __init__(self, native_root: str | Path) -> None:
         self.root = Path(native_root)
@@ -28,19 +29,29 @@ class RestrictedOcgcoreEngine:
     def _load_deck(self, path: str) -> tuple[int, ...]:
         deck = read_ydk(path)
         database = self.root / "database/cards.cdb"
+        goat_database = self.root / "database/goat-entries.cdb"
         limits = read_goat_whitelist(self.root / "banlist/GOAT.lflist.conf")
-        validate_goat_deck(deck, limits, database)
+        validate_goat_deck(deck, limits, database, goat_database)
         if deck.extra or deck.side or len(deck.main) != 40:
-            raise SimulatorUnavailable("vanilla adapter currently supports a 40-card main deck only")
+            raise SimulatorUnavailable("restricted adapter currently supports a 40-card main deck only")
         with sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True) as connection:
+            connection.execute("ATTACH DATABASE ? AS goat",
+                               (f"file:{goat_database.resolve()}?mode=ro",))
             for code in deck.main:
-                row = connection.execute("SELECT type FROM datas WHERE id=?", (code,)).fetchone()
-                if row is None or (row[0] != 17 and code != 55144522):
+                row = connection.execute("SELECT type FROM goat.datas WHERE id=?",
+                                         (code,)).fetchone()
+                if row is None:
+                    row = connection.execute("SELECT type FROM main.datas WHERE id=?",
+                                             (code,)).fetchone()
+                if row is None or (row[0] != 17 and code not in self.supported_spells):
                     raise SimulatorUnavailable(
                         f"restricted adapter cannot simulate card {code}; card script is not audited"
                     )
-                if code == 55144522 and not (self.root / "scripts/official/c55144522.lua").is_file():
-                    raise SimulatorUnavailable("Pot of Greed script is missing; rerun setup_native.py")
+                script_dir = "goat" if code == 504700116 else "official"
+                if code in self.supported_spells and not (
+                    self.root / f"scripts/{script_dir}/c{code}.lua"
+                ).is_file():
+                    raise SimulatorUnavailable(f"card {code} script missing; rerun setup_native.py")
         return deck.main
 
     def reset(self, deck1: str, deck2: str, seed: int) -> Decision:
@@ -62,7 +73,7 @@ class RestrictedOcgcoreEngine:
         try:
             native = decode_decision(self.probe._pending_message)
         except NotImplementedError as exc:
-            raise SimulatorUnavailable(f"native request unsupported by vanilla adapter: {exc}") from exc
+            raise SimulatorUnavailable(f"native request unsupported by restricted adapter: {exc}") from exc
         observation = self.probe.observation(native.player)
         zones = {0x04: "monster", 0x08: "spell_trap", 0x10: "graveyard", 0x20: "banished"}
         visible_cards = (*observation.field, *observation.graveyards[0],

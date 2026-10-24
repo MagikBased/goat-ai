@@ -1,6 +1,6 @@
 # GOAT AI
 
-Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restricted native adapter runs complete duels with 40-card normal-monster decks and one tested spell, Pot of Greed. General effect-card support and historical rules validation are unfinished. No training or playing strength is claimed.
+Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restricted native adapter runs complete duels with 40-card normal-monster decks and tested spells including Pot of Greed, Book of Moon, and the GOAT variant of Nobleman of Crossout. General effect-card support and historical rules validation are unfinished. No training or playing strength is claimed.
 
 ## Status
 
@@ -36,7 +36,7 @@ The API is `GoatEnvironment(player1_deck, player2_deck, seed, engine=...)`; `res
 
 ## Native setup (Linux)
 
-The M0 probe calls a real, pinned ocgcore build with `DUEL_MODE_GOAT`. Its raw messages stay inside the adapter. The restricted adapter uses player-visible queries and redacts hidden card identities in observations and action parameters. Visibility coverage remains limited to the vanilla fixture.
+The M0 probe calls a real, pinned ocgcore build with `DUEL_MODE_GOAT`. Its raw messages stay inside the adapter. The restricted adapter uses player-visible queries and redacts hidden card identities in observations and action parameters. Visibility tests now include a targeted set opponent monster.
 
 ```bash
 python -m pip install -e '.[dev,native]'
@@ -50,7 +50,7 @@ Setup downloads and builds external dependencies under ignored `.cache/goat-ai/`
 
 The smoke runner validates its 40-card fixture against a pinned Project Ignis GOAT whitelist, decodes empty chain windows, idle choices, and single-card selections, then ends turns and discards at hand limit until the native core reports a winner. This is a protocol regression for one simple fixture, not a general GOAT environment or an agent-strength benchmark.
 
-The restricted `RestrictedOcgcoreEngine` connects the same native core to `GoatEnvironment` for 40-card normal-monster decks, optionally containing Pot of Greed. To run a real duel between two fixture decks with a `RandomAgent`:
+The restricted `RestrictedOcgcoreEngine` connects the same native core to `GoatEnvironment` for 40-card normal-monster decks, optionally containing the three tested spells. To run a real duel between two fixture decks with a `RandomAgent`:
 
 ```bash
 python examples/play_vanilla.py --seed 42 --trajectory replays/vanilla_42.json

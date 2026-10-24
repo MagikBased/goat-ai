@@ -38,3 +38,22 @@ def test_pinned_goat_fixture_legality():
     with pytest.raises(ValueError, match="Fusion monster"):
         validate_goat_deck(Decklist(VANILLA_DECK, extra=(VANILLA_DECK[0],)),
                            limits, database)
+
+
+@pytest.mark.skipif(not Path(".cache/goat-ai/database/goat-entries.cdb").exists(),
+                    reason="GOAT variant database not installed")
+def test_pinned_goat_variant_uses_historical_id_and_copy_limit():
+    root = Path(".cache/goat-ai")
+    limits = read_goat_whitelist(root / "banlist/GOAT.lflist.conf")
+    database = root / "database/cards.cdb"
+    variants = root / "database/goat-entries.cdb"
+    nobleman = 504700116
+    assert limits[nobleman] == 2
+    validate_goat_deck(Decklist((nobleman,) + VANILLA_DECK[1:]),
+                       limits, database, variants)
+    with pytest.raises(ValueError, match="copy limit"):
+        validate_goat_deck(Decklist((nobleman,) * 3 + VANILLA_DECK[3:]),
+                           limits, database, variants)
+    with pytest.raises(ValueError, match="whitelist"):
+        validate_goat_deck(Decklist((71044499,) + VANILLA_DECK[1:]),
+                           limits, database, variants)
