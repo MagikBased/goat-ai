@@ -16,3 +16,12 @@ python scripts/train_behavioral_clone.py replays/vanilla_42.json \
 The training command first replays every input trajectory against the selected pinned native engine, checking each visible observation, legal-action list, chosen action, result, deck hash, and loaded asset hashes. It requires fingerprinted schema-v3 recordings. Use `--engine experimental` for an experimental-adapter trajectory. It then fits cross-entropy to selected actions and saves a versioned checkpoint containing model weights, card vocabulary, seed, PyTorch version, source counts, trajectory hashes, and epoch losses. Generated replays and checkpoints live in ignored directories. Only ingest demonstrations whose use is authorized.
 
 The fixture command demonstrates software integration. Its source is random self-play, not skilled human data, and its training loss says nothing about playing strength. No human replay parser, held-out deck evaluation, self-play improvement algorithm, or trained competitive checkpoint is available yet. Before using imitation learning as a strength baseline, collect authorized human trajectories with legal actions and visibility reconstructed, split them by players/decks/matches, verify them, and measure win rate against held-out agents and deck families.
+
+To measure a saved checkpoint against RandomAgent on seeds excluded from its training recordings:
+
+```bash
+python scripts/evaluate_policy.py checkpoints/vanilla_bc.pt --seed 43 --seeds 4 \
+  --opponent random --output artifacts/vanilla_bc_eval.json
+```
+
+The evaluator refuses seeds present in checkpoint training-game metadata. It uses paired seat swaps and reports individual results, seat splits, a paired score interval, and core/deck/checkpoint hashes. `--workers 2` uses spawned native and policy workers; `--matchup DECK_A DECK_B` accepts additional deck pairs, and `--engine experimental` selects the broader unaudited adapter. A held-out seed on the same fixture decks is a protocol and baseline check; it is not held-out deck-family evaluation. See [the measured evaluation log](evaluation.md).

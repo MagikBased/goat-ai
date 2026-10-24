@@ -15,6 +15,7 @@ from goat_ai.training import (
     fit_behavioral_clone,
     load_policy_agent,
 )
+from scripts.evaluate_policy import validate_heldout_seeds
 
 
 def view() -> Observation:
@@ -98,3 +99,12 @@ def test_behavioral_clone_records_and_checkpoint_round_trip(tmp_path):
     assert restored.select_action(view(), actions()) == actions()[1]
     with pytest.raises(ValueError, match="training needs records"):
         fit_behavioral_clone(policy, vocabulary, [])
+
+
+def test_evaluation_rejects_training_seed_overlap():
+    checkpoint = {"training_games": [{"seed": 42}]}
+    validate_heldout_seeds(checkpoint, [43, 44])
+    with pytest.raises(ValueError, match="overlap"):
+        validate_heldout_seeds(checkpoint, [42, 43])
+    with pytest.raises(ValueError, match="provenance"):
+        validate_heldout_seeds({}, [43])

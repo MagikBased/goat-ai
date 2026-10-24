@@ -51,7 +51,7 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M4 — Learn a competitive policy
 
-**Status: in progress.** An initial PyTorch policy scores variable-length legal action sets from visible observations, and a behavioral cloning command fits replay-verified schema-v3 trajectories into a versioned checkpoint. Unit tests cover permutation of legal options, gradient learning, and checkpoint loading. No authorized human training set, self-play RL algorithm, held-out competitive evaluation, or strength claim exists yet.
+**Status: in progress.** An initial PyTorch policy scores variable-length legal action sets from visible observations, and a behavioral cloning command fits replay-verified schema-v3 trajectories into a versioned checkpoint. Unit tests cover permutation of legal options, gradient learning, and checkpoint loading. A checkpoint evaluator runs paired, seat-swapped tournaments on seeds excluded from training; the first random-imitation smoke checkpoint lost all eight held-out-seed games against RandomAgent on one vanilla fixture pairing. No authorized human training set, self-play RL algorithm, held-out deck-family evaluation, or strength claim exists yet.
 
 **Work:** Implement a PyTorch policy that scores variable-length legal actions from visible observations. Establish random and heuristic baselines first. Train behavioral cloning on verified demonstrations, then self-play with a historical checkpoint pool and held-out deck families. Compare PPO or other algorithms on win rate and stability rather than selecting one in advance.
 

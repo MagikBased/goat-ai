@@ -32,6 +32,7 @@ def main() -> None:
     records = []
     sources: Counter[str] = Counter()
     trajectory_hashes = {}
+    training_games = []
     for path in args.trajectories:
         raw = path.read_bytes()
         trajectory = read_trajectory(path)
@@ -43,6 +44,9 @@ def main() -> None:
         records.extend(trajectory.decisions)
         sources[trajectory.source] += count
         trajectory_hashes[str(path)] = hashlib.sha256(raw).hexdigest()
+        training_games.append({"seed": trajectory.seed,
+                               "deck_sha256": trajectory.deck_sha256,
+                               "source": trajectory.source})
     vocabulary = CardVocabulary.from_goat_whitelist(
         args.native_root / "banlist/GOAT.lflist.conf")
     torch.manual_seed(args.seed)
@@ -54,6 +58,7 @@ def main() -> None:
         "schema_version": 1, "model_state": model.state_dict(),
         "vocabulary_codes": vocabulary.codes, "width": args.width,
         "trajectory_sha256": trajectory_hashes, "source_decisions": dict(sources),
+        "training_games": training_games,
         "seed": args.seed, "torch_version": str(torch.__version__),
         "losses": losses,
     }
