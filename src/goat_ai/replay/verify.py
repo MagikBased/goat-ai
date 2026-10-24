@@ -40,8 +40,11 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
         for index, record in enumerate(trajectory.decisions):
             if env.is_terminal():
                 raise ReplayMismatch(f"decision {index}: engine terminated early")
-            compared_observation = (replace(observation, public_history=())
-                                    if trajectory.schema_version < 4 else observation)
+            compared_observation = observation
+            if trajectory.schema_version < 5:
+                compared_observation = replace(compared_observation, known_opponent_cards=())
+            if trajectory.schema_version < 4:
+                compared_observation = replace(compared_observation, public_history=())
             if compared_observation != record.observation:
                 raise ReplayMismatch(f"decision {index}: observation differs")
             if env.legal_actions() != record.legal_actions:

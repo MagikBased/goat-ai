@@ -36,7 +36,7 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     trajectory = play()
     assert trajectory == play()
     assert trajectory.winner == 1
-    assert trajectory.schema_version == 4
+    assert trajectory.schema_version == 5
     assert trajectory.rules_profile == vars(RestrictedOcgcoreEngine(root).ruleset)
     assert trajectory.deck_sha256 is not None
     assert trajectory.asset_sha256 is not None
@@ -59,6 +59,12 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     assert read_trajectory(path) == trajectory
     assert verify_trajectory(read_trajectory(path), RestrictedOcgcoreEngine(root)) == len(
         trajectory.decisions)
+    previous = replace(trajectory, schema_version=4,
+                       decisions=tuple(replace(record, observation=replace(
+                           record.observation, known_opponent_cards=()))
+                                       for record in trajectory.decisions))
+    assert verify_trajectory(previous, RestrictedOcgcoreEngine(root)) == len(
+        previous.decisions)
     legacy = replace(trajectory, schema_version=3,
                      decisions=tuple(replace(record, observation=replace(
                          record.observation, public_history=())) for record in trajectory.decisions))
@@ -139,7 +145,13 @@ def test_book_of_moon_chains_and_hides_turned_monster(tmp_path):
         target_selected = False
         saw_public_chain = False
         verified_hidden_target = False
+        known_target_code = None
         for _ in range(5000):
+            visible_target = next((card.code for card in observation.field
+                                   if card.controller == 0 and card.sequence == 2
+                                   and card.position == "faceup"), None)
+            if visible_target is not None:
+                known_target_code = visible_target
             if observation.chain:
                 assert observation.chain[0].card_code == 14087893
                 if observation.chain[0].controller == 0:
@@ -161,6 +173,7 @@ def test_book_of_moon_chains_and_hides_turned_monster(tmp_path):
                     assert target.code is None
                     assert target.orientation == "defense"
                     assert saw_public_chain and not observation.chain
+                    assert known_target_code in observation.known_opponent_cards
                     verified_hidden_target = True
             if env.is_terminal():
                 assert verified_hidden_target

@@ -241,6 +241,7 @@ def test_different_opponent_set_effect_cards_have_identical_visible_decisions(tm
     next_view, next_actions, next_private = after_set(alternate, 39507162)
     assert (first_private, next_private) == (2134346, 39507162)
     assert first_view.field[0].code is None
+    assert first_view.known_opponent_cards == ()
     assert first_view == next_view
     assert first_actions == next_actions
 
@@ -288,6 +289,7 @@ def test_different_opponent_set_traps_have_identical_visible_decisions(tmp_path)
     assert any(card.controller == 1 and card.zone == "spell_trap"
                and card.position == "facedown" and card.code is None
                for card in first_view.field)
+    assert first_view.known_opponent_cards == ()
     assert first_view == next_view
     assert first_actions == next_actions
 

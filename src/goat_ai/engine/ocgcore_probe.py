@@ -30,6 +30,11 @@ MSG_SELECT_CHAIN = 16
 MSG_CHAINING = 70
 MSG_CHAIN_END = 74
 MSG_DRAW = 90
+MSG_MOVE = 50
+MSG_POS_CHANGE = 53
+MSG_SET = 54
+MSG_SWAP = 55
+MSG_SHUFFLE_SET_CARD = 36
 MSG_ATTACK = 110
 MSG_DAMAGE_STEP_START = 113
 MSG_DAMAGE_STEP_END = 114
@@ -147,6 +152,7 @@ class OcgcoreProbe:
         self._phase = "unknown"
         self._chain: list[ChainLinkView] = []
         self._public_history: list[str] = []
+        self._known_facedown: dict[tuple[int, int, int], int] = {}
         self._bind()
         major, minor = c.c_int(), c.c_int()
         self.lib.OCG_GetVersion(c.byref(major), c.byref(minor))
@@ -330,6 +336,35 @@ class OcgcoreProbe:
                   16: "battle_step", 32: "damage_step", 64: "damage_calculation",
                   128: "battle", 256: "main2", 512: "end"}
         for message in messages:
+            if message[0] == MSG_MOVE:
+                if len(message) != 29:
+                    raise ValueError("invalid MSG_MOVE length")
+                for offset in (5, 15):
+                    key = (message[offset], message[offset + 1],
+                           struct.unpack_from("<I", message, offset + 2)[0])
+                    self._known_facedown.pop(key, None)
+            elif message[0] == MSG_POS_CHANGE:
+                if len(message) != 10:
+                    raise ValueError("invalid MSG_POS_CHANGE length")
+                key = (message[5], message[6], message[7])
+                self._known_facedown.pop(key, None)
+                if (key[0] in (0, 1) and key[1] in (LOCATION_MZONE, LOCATION_SZONE)
+                        and message[8] & 0x5 and message[9] & 0xA):
+                    # The card was face-up immediately before this public change.
+                    self._known_facedown[key] = struct.unpack_from("<I", message, 1)[0]
+            elif message[0] == MSG_SET:
+                if len(message) != 15:
+                    raise ValueError("invalid MSG_SET length")
+                key = (message[5], message[6], struct.unpack_from("<I", message, 7)[0])
+                self._known_facedown.pop(key, None)
+            elif message[0] == MSG_SWAP:
+                self._known_facedown.clear()
+            elif message[0] == MSG_SHUFFLE_SET_CARD:
+                if len(message) < 3:
+                    raise ValueError("invalid MSG_SHUFFLE_SET_CARD length")
+                location = message[1]
+                self._known_facedown = {key: code for key, code in
+                                        self._known_facedown.items() if key[1] != location}
             if message[0] == 40:
                 self._turn += 1
                 self._public_history.append(f"turn:{self._turn}")
@@ -449,6 +484,14 @@ class OcgcoreProbe:
                                  if card is not None),
             chain=tuple(self._chain),
             public_history=tuple(self._public_history[-64:]),
+            known_opponent_cards=tuple(
+                self._known_facedown[(card.controller,
+                                      LOCATION_MZONE if card.zone == "monster" else LOCATION_SZONE,
+                                      card.sequence)]
+                for card in field if card.controller != viewer and card.position == "facedown"
+                and (card.controller,
+                     LOCATION_MZONE if card.zone == "monster" else LOCATION_SZONE,
+                     card.sequence) in self._known_facedown),
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:

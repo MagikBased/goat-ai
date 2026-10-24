@@ -11,6 +11,8 @@ from goat_ai.engine.ocgcore_probe import (
     MSG_DAMAGE_STEP_END,
     MSG_DAMAGE_STEP_START,
     MSG_DRAW,
+    MSG_MOVE,
+    MSG_POS_CHANGE,
     MSG_SELECT_CHAIN,
     OcgcoreProbe,
     split_messages,
@@ -34,6 +36,7 @@ def test_public_battle_events_update_observed_phase():
     probe._phase = "unknown"
     probe._chain = []
     probe._public_history = []
+    probe._known_facedown = {}
     probe._update_public_clock([b"\x29\x08\x00"])
     assert probe._phase == "battle_start"
     probe._update_public_clock([bytes((MSG_ATTACK,))])
@@ -46,6 +49,31 @@ def test_public_battle_events_update_observed_phase():
                                      "damage_step:start", "damage_step:end"]
     with pytest.raises(ValueError, match="MSG_DAMAGE_STEP_START"):
         probe._update_public_clock([bytes((MSG_DAMAGE_STEP_START, 0))])
+
+
+def test_known_facedown_memory_requires_public_flip_and_clears_on_move():
+    probe = object.__new__(OcgcoreProbe)
+    probe._turn = 0
+    probe._phase = "unknown"
+    probe._chain = []
+    probe._public_history = []
+    probe._known_facedown = {}
+    code = 12345678
+    key = (1, 4, 2)
+    probe._update_public_clock([bytes((MSG_POS_CHANGE,))
+                                + struct.pack("<IBBBBB", code, 1, 4, 2, 8, 4)])
+    assert probe._known_facedown == {}
+    probe._update_public_clock([bytes((MSG_POS_CHANGE,))
+                                + struct.pack("<IBBBBB", code, 1, 4, 2, 4, 8)])
+    assert probe._known_facedown == {key: code}
+    # MSG_MOVE contains the raw identity even for private moves. Only its public
+    # old/new locations are used to invalidate memory.
+    move = (bytes((MSG_MOVE,)) + struct.pack("<I", 99999999)
+            + struct.pack("<BBII", 1, 4, 2, 8)
+            + struct.pack("<BBII", 1, 16, 0, 1)
+            + struct.pack("<I", 0))
+    probe._update_public_clock([move])
+    assert probe._known_facedown == {}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

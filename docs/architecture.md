@@ -19,12 +19,12 @@ The observation schema has explicit visible zones, public counts, own hand and F
 
 Do not use `ygoenv`'s current EDOPro binary as a GOAT engine: its source currently selects MR5. The direct `ctypes` probe reaches real native decisions without a fixed option-list size, so it is the current M1 adapter direction. Its response protocol and visibility boundary are only partially implemented. The interface avoids coupling downstream agent and replay code to this choice.
 
-Trajectory JSON schema v4 stores the visible observation, full legal action list, chosen action, acting player and phase (inside the observation), deck identifiers, ruleset, source, optional skill metadata, and result. It retains monster orientation and structured chain links from v2, and the rules profile, deck hashes, and loaded native-asset hashes from v3. Version 4 adds the latest 64 observed public turn, phase, attack, Damage Step, and chain events, without card IDs. The reader accepts v1–v3 trajectories; the verifier ignores newly recorded history when checking older recordings. No native full-state snapshot is stored. The optional [PyTorch policy](ml.md) maps player-visible decisions to variable-length action logits independently of the simulator. The behavioral cloning command verifies trajectories before fitting; other training algorithms can use the same decision boundary.
+Trajectory JSON schema v5 stores the visible observation, full legal action list, chosen action, acting player and phase (inside the observation), deck identifiers, ruleset, source, optional skill metadata, and result. It retains monster orientation and structured chain links from v2, the rules profile, deck hashes, and loaded native-asset hashes from v3, and the latest 64 observed public turn, phase, attack, Damage Step, and chain events from v4. Version 5 adds opponent field-card identities known through a public face-up-to-facedown position change. The reader accepts v1–v4 trajectories; the verifier ignores fields added later when checking older recordings. No native full-state snapshot is stored. The optional [PyTorch policy](ml.md) maps player-visible decisions to variable-length action logits independently of the simulator. The behavioral cloning command verifies trajectories before fitting; other training algorithms can use the same decision boundary.
 
 `goat_ai.replay.verify_trajectory` reconstructs a duel from its seed and
 decklists, compares each player-visible observation and complete legal-action
 set with the recording, applies the selected action, and checks the result.
-Schemas v3 and v4 verify deck contents and native asset fingerprints as well as the
+Schemas v3–v5 verify deck contents and native asset fingerprints as well as the
 recorded path. Callers must retain the original deck files and native assets;
 the recording stores hashes, not copies. Older v1/v2 recordings can still be
 replayed but lack these content checks.
