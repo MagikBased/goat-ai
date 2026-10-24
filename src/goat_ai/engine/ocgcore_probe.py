@@ -6,6 +6,7 @@ private information and most decision messages are not decoded here.
 """
 
 import ctypes as c
+import random
 import sqlite3
 import struct
 from dataclasses import dataclass
@@ -236,7 +237,9 @@ class OcgcoreProbe:
             if not self._read_script(0, self._duel, name):
                 raise RuntimeError(f"could not load {name.decode()}: {self.errors}")
         for team, cards in enumerate((deck, opponent_deck or deck)):
-            for code in cards:
+            shuffled = list(cards)
+            random.Random(seed * 2 + team).shuffle(shuffled)
+            for code in shuffled:
                 card = NewCard(team, 0, code, team, LOCATION_DECK, 0,
                                POSITION_FACEDOWN_DEFENSE)
                 self.lib.OCG_DuelNewCard(self._duel, c.byref(card))

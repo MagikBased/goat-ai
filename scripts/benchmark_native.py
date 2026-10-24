@@ -7,7 +7,7 @@ from pathlib import Path
 from time import perf_counter
 
 from goat_ai.agents import RandomAgent
-from goat_ai.engine.vanilla_adapter import VanillaOcgcoreEngine
+from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 
 
@@ -36,7 +36,7 @@ def main() -> None:
     for game in range(args.games):
         seed = args.seed + game
         with GoatEnvironment(deck1, deck2, seed,
-                             engine=VanillaOcgcoreEngine(args.native_root)) as env:
+                             engine=RestrictedOcgcoreEngine(args.native_root)) as env:
             before_reset = perf_counter()
             observation = env.reset()
             reset_seconds += perf_counter() - before_reset

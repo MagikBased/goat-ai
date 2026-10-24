@@ -72,3 +72,17 @@ def test_first_idle_actions_and_illegal_response():
         }
         assert len(decision.choices) == 14
 
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_opening_hand_is_seeded_and_shuffled():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+
+    def hand(seed):
+        with OcgcoreProbe(root / "build/libocgcore.so", root / "database/cards.cdb",
+                          root / "scripts") as probe:
+            probe.first_decision(seed, VANILLA_DECK)
+            return tuple(card.code for card in probe.observation(0).hand)
+
+    assert hand(42) == hand(42)
+    assert hand(42) != hand(43)
+

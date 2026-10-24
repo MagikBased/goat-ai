@@ -40,7 +40,8 @@ def fetch(root: Path, name: str, url: str, revision: str) -> Path:
         run("git", "-C", str(path), "submodule", "update", "--init", "--depth", "1")
     elif name == "scripts":
         run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone",
-            "/*.lua", "/unofficial/proc_unofficial.lua")
+            "/*.lua", "/unofficial/proc_unofficial.lua",
+            "/official/c55144522.lua")
     elif name == "banlist":
         run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone",
             "/GOAT.lflist.conf")

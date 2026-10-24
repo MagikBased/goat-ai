@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from goat_ai.agents import HumanAgent, RandomAgent
-from goat_ai.engine.vanilla_adapter import VanillaOcgcoreEngine
+from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import write_trajectory
 
@@ -19,7 +19,7 @@ def main() -> None:
     deck1 = Path(__file__).parent / "decks/vanilla_probe.ydk"
     deck2 = Path(__file__).parent / "decks/vanilla_reverse.ydk"
     with GoatEnvironment(str(deck1), str(deck2), args.seed,
-                         engine=VanillaOcgcoreEngine(args.native_root)) as env:
+                         engine=RestrictedOcgcoreEngine(args.native_root)) as env:
         observation = env.reset()
         agents = (RandomAgent(args.seed), RandomAgent(args.seed + 1))
         human = HumanAgent()

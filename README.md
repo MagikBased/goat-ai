@@ -1,6 +1,6 @@
 # GOAT AI
 
-Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restricted native adapter runs complete duels with 40-card normal-monster decks. General effect-card support and historical rules validation are unfinished. No training or playing strength is claimed.
+Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restricted native adapter runs complete duels with 40-card normal-monster decks and one tested spell, Pot of Greed. General effect-card support and historical rules validation are unfinished. No training or playing strength is claimed.
 
 ## Status
 
@@ -8,7 +8,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | --- | --- |
 | Engine selection and source review | Initial research complete |
 | Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
-| Complete headless duel | Vanilla-only native adapter reaches terminal through `GoatEnvironment`; general card support unfinished |
+| Complete headless duel | Restricted native adapter reaches terminal through `GoatEnvironment`; general card support unfinished |
 | Environment contract and illegal-action validation | Implemented |
 | Player-visible observation schema | Implemented; native hand/facedown redaction tested on fixture |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
@@ -32,7 +32,7 @@ python examples/show_contract.py
 
 PyTorch is an optional future training dependency: `python -m pip install -e '.[ml]'`. No PyTorch model or training algorithm is implemented yet.
 
-The API is `GoatEnvironment(player1_deck, player2_deck, seed, engine=...)`; `reset()`, `legal_actions()`, `step()`, `is_terminal()`, `result()`, and `trajectory()` are defined. Pass `VanillaOcgcoreEngine` for the restricted native path. The default engine raises `SimulatorUnavailable` because general GOAT support is unfinished.
+The API is `GoatEnvironment(player1_deck, player2_deck, seed, engine=...)`; `reset()`, `legal_actions()`, `step()`, `is_terminal()`, `result()`, and `trajectory()` are defined. Pass `RestrictedOcgcoreEngine` for the restricted native path. The default engine raises `SimulatorUnavailable` because general GOAT support is unfinished.
 
 ## Native setup (Linux)
 
@@ -50,7 +50,7 @@ Setup downloads and builds external dependencies under ignored `.cache/goat-ai/`
 
 The smoke runner validates its 40-card fixture against a pinned Project Ignis GOAT whitelist, decodes empty chain windows, idle choices, and single-card selections, then ends turns and discards at hand limit until the native core reports a winner. This is a protocol regression for one simple fixture, not a general GOAT environment or an agent-strength benchmark.
 
-The restricted `VanillaOcgcoreEngine` connects the same native core to `GoatEnvironment` for 40-card normal-monster decks. To run a real duel between two fixture decks with a `RandomAgent`:
+The restricted `RestrictedOcgcoreEngine` connects the same native core to `GoatEnvironment` for 40-card normal-monster decks, optionally containing Pot of Greed. To run a real duel between two fixture decks with a `RandomAgent`:
 
 ```bash
 python examples/play_vanilla.py --seed 42 --trajectory replays/vanilla_42.json

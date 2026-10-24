@@ -6,6 +6,8 @@ the observation and action visibility boundary is audited.
 
 import struct
 from dataclasses import dataclass
+from itertools import combinations
+from math import comb
 
 from goat_ai.engine.ocgcore_probe import MSG_SELECT_CHAIN, MSG_SELECT_IDLECMD
 
@@ -18,6 +20,7 @@ class NativeChoice:
     controller: int | None = None
     location: int | None = None
     sequence: int | None = None
+    cards: tuple[tuple[int, int, int, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -44,7 +47,7 @@ class _Reader:
 
 
 def decode_decision(message: bytes) -> NativeDecision:
-    """Decode chain and idle choices; fail on every other request type."""
+    """Decode supported native choices; fail on every other request type."""
     reader = _Reader(message)
     kind = reader.integer(1)
     if kind == MSG_SELECT_CHAIN:
@@ -63,20 +66,33 @@ def decode_decision(message: bytes) -> NativeDecision:
         minimum = reader.integer(4)
         maximum = reader.integer(4)
         count = reader.integer(4)
-        if minimum != 1 or maximum != 1 or not count:
+        if not count or minimum > maximum or maximum > count:
             raise NotImplementedError(
                 f"card selection mode not decoded: cancelable={cancelable} "
                 f"minimum={minimum} maximum={maximum} count={count}")
-        choices = []
+        cards = []
         for index in range(count):
             code = reader.integer(4)
             controller = reader.integer(1)
             location = reader.integer(1)
             sequence = reader.integer(4)
             reader.integer(4)  # position
-            # Response type 0: size then uint32 card indices.
-            choices.append(NativeChoice("select_card", struct.pack("<III", 0, 1, index),
-                                        code, controller, location, sequence))
+            cards.append((code, controller, location, sequence))
+        option_count = sum(comb(count, size) for size in range(minimum, maximum + 1))
+        if option_count > 2048:
+            raise NotImplementedError(f"card selection has {option_count} combinations")
+        choices = []
+        for size in range(minimum, maximum + 1):
+            for indices in combinations(range(count), size):
+                # Response type 0: size then uint32 card indices.
+                response = struct.pack("<II", 0, size) + struct.pack(f"<{size}I", *indices)
+                selected = tuple(cards[index] for index in indices)
+                if size == 1:
+                    code, controller, location, sequence = selected[0]
+                    choices.append(NativeChoice("select_card", response, code,
+                                                controller, location, sequence))
+                else:
+                    choices.append(NativeChoice("select_cards", response, cards=selected))
         if cancelable:
             choices.append(NativeChoice("cancel", -1))
         reader.finish()

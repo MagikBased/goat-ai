@@ -21,7 +21,7 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
-**Status: in progress.** A direct native binding completes a 40-card vanilla-fixture duel through `GoatEnvironment` with a seeded `RandomAgent` and records visible trajectories. `.ydk` parsing, a pinned Project Ignis whitelist check, and initial native-query redaction tests are implemented. General effect and decision coverage, independently audited historical legality, and complete player-visible observations are still required.
+**Status: in progress.** A direct native binding completes 40-card normal-monster fixture duels and resolves Pot of Greed through `GoatEnvironment` with a seeded `RandomAgent` and records visible trajectories. `.ydk` parsing, a pinned Project Ignis whitelist check, and initial native-query redaction tests and deterministic deck shuffling are implemented. General effect and decision coverage, independently audited historical legality, and complete player-visible observations are still required.
 
 **Work**
 
