@@ -371,6 +371,7 @@ class OcgcoreProbe:
                              LOCATION_REMOVED):
                 locations[player, location] = self._query_location(player, location)
         hand = self._query_location(viewer, LOCATION_HAND)
+        own_extra = self._query_location(viewer, LOCATION_EXTRA)
         length = c.c_uint32()
         pointer = self.lib.OCG_DuelQueryField(self._duel, c.byref(length))
         if not pointer or not length.value:
@@ -386,7 +387,8 @@ class OcgcoreProbe:
             visible_code = card.code if player == viewer or faceup else None
             position = "faceup" if faceup else "facedown"
             zone = {LOCATION_MZONE: "monster", LOCATION_SZONE: "spell_trap",
-                    LOCATION_GRAVE: "graveyard", LOCATION_REMOVED: "banished"}[location]
+                    LOCATION_GRAVE: "graveyard", LOCATION_REMOVED: "banished",
+                    LOCATION_EXTRA: "extra"}[location]
             orientation = None
             if location == LOCATION_MZONE:
                 if card.position in (0x1, 0x2):
@@ -420,6 +422,9 @@ class OcgcoreProbe:
                               for p in (0, 1)),
             extra_deck_counts=tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_EXTRA)
                                     for p in (0, 1)),
+            own_extra_deck=tuple(view_card(viewer, LOCATION_EXTRA, sequence, card)
+                                 for sequence, card in enumerate(own_extra)
+                                 if card is not None),
             chain=tuple(self._chain),
         )
 

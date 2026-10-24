@@ -7,7 +7,7 @@ default, with an explicit community option for 0–15 cards. Main Decks require
 at least 40 cards and have no project-imposed maximum. The experimental native
 adapter has a 61-card startup test; broader large-deck behavior is unmeasured.
 
-The observation schema has explicit visible zones, public counts, own hand, and structured chain links. Field monsters record their visible attack or defense position. History and known-opponent-card fields exist but are not populated by the native adapter yet. It has no opponent hand identities or deck order. Schema shape alone cannot prove the native adapter redacts data. The native adapter must use the engine's player-scoped queries, hide facedown cards where appropriate, and test identical visible states with different hidden cards. Action IDs are local to a decision and must map to the exact native response payload; effects with targets or multiple choices may take several decisions.
+The observation schema has explicit visible zones, public counts, own hand and Fusion Extra Deck identities, and structured chain links. Opponent Extra Deck identities are withheld. Field monsters record their visible attack or defense position. History and known-opponent-card fields exist but are not populated by the native adapter yet. It has no opponent hand identities or deck order. Schema shape alone cannot prove the native adapter redacts data. The native adapter must use the engine's player-scoped queries, hide facedown cards where appropriate, and test identical visible states with different hidden cards. Action IDs are local to a decision and must map to the exact native response payload; effects with targets or multiple choices may take several decisions.
 
 ## Next adapter implementation
 

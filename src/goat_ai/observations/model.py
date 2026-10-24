@@ -40,12 +40,16 @@ class Observation:
     public_history: tuple[str, ...] = ()
     known_opponent_cards: tuple[int, ...] = ()
     restrictions: tuple[str, ...] = ()
+    own_extra_deck: tuple[CardView, ...] = ()
 
     def __post_init__(self) -> None:
         if self.viewer not in (0, 1) or self.acting_player not in (0, 1):
             raise ValueError("viewer and acting player must be 0 or 1")
         if any(card.controller != self.viewer for card in self.hand):
             raise ValueError("observation hand must contain viewer's cards only")
+        if any(card.controller != self.viewer or card.zone != "extra" or card.code is None
+               for card in self.own_extra_deck):
+            raise ValueError("own Extra Deck must contain only visible viewer cards")
         if any(card.controller != self.viewer and card.position == "facedown" and card.code is not None
                for card in self.field):
             raise ValueError("opponent facedown identity must be hidden")

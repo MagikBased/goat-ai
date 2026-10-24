@@ -53,6 +53,8 @@ def read_trajectory(path: str | Path) -> Trajectory:
     for record in raw["decisions"]:
         view = record["observation"]
         view["hand"] = cards(view["hand"])
+        if "own_extra_deck" in view:
+            view["own_extra_deck"] = cards(view["own_extra_deck"])
         view["field"] = cards(view["field"])
         view["graveyards"] = tuple(cards(zone) for zone in view["graveyards"])
         view["banished"] = tuple(cards(zone) for zone in view["banished"])

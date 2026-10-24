@@ -53,6 +53,23 @@ def decode_decision(message: bytes) -> NativeDecision:
     """Decode supported native choices; fail on every other request type."""
     reader = _Reader(message)
     kind = reader.integer(1)
+    if kind == 12:  # MSG_SELECT_EFFECTYN
+        player = reader.integer(1)
+        code = reader.integer(4)
+        controller = reader.integer(1)
+        location = reader.integer(1)
+        sequence = reader.integer(4)
+        reader.integer(4)  # position
+        prompt_id = reader.integer(8)
+        reader.finish()
+        if player not in (0, 1) or controller not in (0, 1):
+            raise ValueError("invalid effect yes/no player or controller")
+        return NativeDecision(player, (
+            NativeChoice("no", 0, code, controller, location, sequence,
+                         prompt_id=prompt_id),
+            NativeChoice("yes", 1, code, controller, location, sequence,
+                         prompt_id=prompt_id),
+        ))
     if kind == 13:  # MSG_SELECT_YESNO
         player = reader.integer(1)
         prompt_id = reader.integer(8)

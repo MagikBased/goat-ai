@@ -10,7 +10,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
 | Complete headless duel | Restricted native adapter reaches terminal through `GoatEnvironment`; general card support unfinished |
 | Environment contract and illegal-action validation | Implemented |
-| Player-visible observation schema | Native hand/facedown redaction, battle position, and public chain tested on fixtures; history and known-card memory pending |
+| Player-visible observation schema | Own hand and Extra Deck, public zones, battle position, and chain links; hidden opponent card tests pass on fixtures; history and known-card memory pending |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
 | JSON trajectory round trip | Schema v3 records visible decisions, full rules profile, deck hashes, and loaded native asset hashes; v1/v2 remain readable |
 | Tournaments | Seeded, seat-swapped runner and Wilson intervals implemented for supported decks |
@@ -82,11 +82,14 @@ For experimental effect-card coverage, run:
 ```bash
 python scripts/setup_native.py --full-card-scripts
 python scripts/probe_control_deck.py --seed 42
+python scripts/probe_control_deck.py --seed 0 --seeds 50
+python scripts/probe_control_deck.py --deck examples/decks/control_probe.ydk --opponent-deck examples/decks/chaos_probe.ydk --seed 0 --seeds 10
 ```
 
 The sample is a synthetic control-style protocol probe, not a sourced
-tournament decklist. On pinned assets, seed 42 ends after 1,251 random
-decisions with winner seat 1. This is neither a playing-strength benchmark
+tournament decklist. On pinned assets, seeds 0–49 all reached terminal states
+with seeded random actions after effect yes/no decoding was added; seed 42
+ends after 1,251 decisions with winner seat 1. This is neither a playing-strength benchmark
 nor a historical-rulings validation. `ExperimentalOcgcoreEngine` accepts
 whitelist-legal main decks of at least 40 cards and Fusion Extra Decks; the Side Deck is
 validated but unused in a single duel. Historical 0-or-15 Side Deck sizing is
@@ -94,6 +97,11 @@ the default; `RulesProfile(side_deck_policy="community")` permits a shorter
 Side Deck. The adapter may fail on unhandled
 native requests. Its action semantics and player-visible observations must be
 audited before using it for training or competitive evaluation.
+
+The second synthetic Chaos-style probe includes a Fusion Deck and additional
+search and discard effects. Ten seeds completed in each seat order against
+the control probe. These results show protocol coverage for the sampled
+random action paths; they do not establish card-by-card correctness.
 
 ## Contributions and data
 

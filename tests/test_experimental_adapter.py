@@ -10,15 +10,21 @@ from goat_ai.agents import RandomAgent
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.native_messages import decode_decision
-from goat_ai.engine.ocgcore_probe import LOCATION_HAND, LOCATION_MZONE
+from goat_ai.engine.ocgcore_probe import LOCATION_EXTRA, LOCATION_HAND, LOCATION_MZONE
 from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments.goat import GoatEnvironment
 
 DECK = "examples/decks/control_probe.ydk"
+CHAOS_DECK = "examples/decks/chaos_probe.ydk"
 
 
 def test_new_native_choice_formats():
+    effect_yes_no = decode_decision(
+        b"\x0c\x01" + struct.pack("<IBBIIQ", 87621407, 1, 4, 0, 1, 95))
+    assert [(choice.kind, choice.code, choice.controller, choice.location,
+             choice.sequence, choice.prompt_id) for choice in effect_yes_no.choices] == [
+        ("no", 87621407, 1, 4, 0, 95), ("yes", 87621407, 1, 4, 0, 95)]
     yes_no = decode_decision(b"\x0d\x00" + struct.pack("<Q", 123))
     assert [choice.kind for choice in yes_no.choices] == ["no", "yes"]
     assert [choice.prompt_id for choice in yes_no.choices] == [123, 123]
@@ -66,6 +72,78 @@ def test_control_probe_complete_and_seeded():
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_control_probe_twelve_seed_protocol_coverage():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / "scripts/official/c79571449.lua").is_file():
+        pytest.skip("full card script checkout not installed")
+    effect_yes_no_seen = False
+    for seed in range(12):
+        with GoatEnvironment(DECK, DECK, seed,
+                             ExperimentalOcgcoreEngine(root)) as env:
+            observation = env.reset()
+            agent = RandomAgent(seed=seed)
+            for _ in range(5000):
+                if env.is_terminal():
+                    break
+                actions = env.legal_actions()
+                effect_yes_no_seen |= any(
+                    action.kind == "yes" and "code" in action.parameters
+                    and "prompt_id" in action.parameters for action in actions)
+                observation = env.step(agent.select_action(observation, actions))
+            assert env.is_terminal(), f"seed {seed} exceeded 5000 decisions"
+            assert env.result() in (0, 1), f"seed {seed} ended without a winner"
+    assert effect_yes_no_seen
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_control_chaos_matchup_both_seats_complete():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / "scripts/goat/c504700054.lua").is_file():
+        pytest.skip("full card script checkout not installed")
+    for decks in ((DECK, CHAOS_DECK), (CHAOS_DECK, DECK)):
+        for seed in (0, 1, 2, 3):
+            with GoatEnvironment(*decks, seed, ExperimentalOcgcoreEngine(root)) as env:
+                observation = env.reset()
+                agent = RandomAgent(seed)
+                for _ in range(5000):
+                    if env.is_terminal():
+                        break
+                    observation = env.step(agent.select_action(
+                        observation, env.legal_actions()))
+                assert env.is_terminal(), f"{decks} seed {seed} exceeded 5000 decisions"
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_opponent_extra_deck_identity_is_hidden(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / "scripts/goat/c504700054.lua").is_file():
+        pytest.skip("full card script checkout not installed")
+    original = read_ydk(CHAOS_DECK)
+    changed = tmp_path / "alternate_extra.ydk"
+    changed.write_text(
+        "#main\n" + "\n".join(map(str, original.main)) + "\n#extra\n"
+        + "\n".join(map(str, (86805855, *original.extra[1:]))) + "\n!side\n")
+
+    def initial_view(opponent_deck):
+        engine = ExperimentalOcgcoreEngine(root)
+        try:
+            decision = engine.reset(DECK, str(opponent_deck), 42)
+            private_extra = tuple(card.code for card in engine.probe._query_location(
+                1, LOCATION_EXTRA) if card is not None)
+            return decision, private_extra
+        finally:
+            engine.close()
+
+    first, first_private = initial_view(CHAOS_DECK)
+    second, second_private = initial_view(changed)
+    assert first_private != second_private
+    assert first.observation.extra_deck_counts == (0, 3)
+    assert first.observation.own_extra_deck == ()
+    assert first.observation == second.observation
+    assert first.legal_actions == second.legal_actions
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_experimental_duel_loads_fusion_and_41_card_main(tmp_path):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     if not (root / "scripts/goat/c504700102.lua").is_file():
@@ -82,6 +160,9 @@ def test_experimental_duel_loads_fusion_and_41_card_main(tmp_path):
         observation = env.reset()
         assert observation.deck_counts == (35, 35)
         assert observation.extra_deck_counts == (2, 0)
+        assert {card.code for card in observation.own_extra_deck} == {504700102, 80071763}
+        assert all(card.controller == 0 and card.zone == "extra"
+                   for card in observation.own_extra_deck)
         assert observation.opponent_hand_count == 5
         assert len(observation.hand) == 6
 

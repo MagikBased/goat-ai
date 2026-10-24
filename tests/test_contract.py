@@ -76,6 +76,8 @@ def test_visible_schema_excludes_hidden_opponent_cards():
         replace(view(), hand=(CardView(1, "hand", "hidden", 999),))
     with pytest.raises(ValueError, match="facedown"):
         replace(view(), field=(CardView(1, "monster", "facedown", 999),))
+    with pytest.raises(ValueError, match="Extra Deck"):
+        replace(view(), own_extra_deck=(CardView(1, "extra", "facedown", 999),))
 
 
 def test_agents_use_same_contract():
@@ -88,13 +90,15 @@ def test_agents_use_same_contract():
 def test_trajectory_round_trip_and_legality(tmp_path):
     action = Action("1", "attack", 0, {"target": "direct"})
     observation = replace(view(), chain=(ChainLinkView(1, 123, 0, 4, 2),),
-                          field=(CardView(1, "monster", "facedown", None, 2, "defense"),))
+                          field=(CardView(1, "monster", "facedown", None, 2, "defense"),),
+                          own_extra_deck=(CardView(0, "extra", "facedown", 504700102),))
     record = DecisionRecord(observation, (action,), action)
     trajectory = Trajectory("tcg-goat-2005-08-17", ("a", "b"), 42, (record,), 0)
     path = tmp_path / "game.json"
     write_trajectory(path, trajectory)
     assert read_trajectory(path) == trajectory
     assert read_trajectory(path).decisions[0].observation.chain[0].card_code == 123
+    assert read_trajectory(path).decisions[0].observation.own_extra_deck[0].code == 504700102
     assert "999" not in path.read_text()
     with pytest.raises(ValueError, match="legal"):
         DecisionRecord(view(), (), action)
@@ -153,6 +157,7 @@ def test_schema_one_trajectory_remains_readable(tmp_path):
     raw["schema_version"] = 1
     raw["decisions"][0]["observation"]["hand"][0].pop("orientation")
     raw["decisions"][0]["observation"]["field"][0].pop("orientation")
+    raw["decisions"][0]["observation"].pop("own_extra_deck")
     path.write_text(json.dumps(raw))
     restored = read_trajectory(path)
     assert restored.schema_version == 1
@@ -168,6 +173,7 @@ def test_schema_two_trajectory_remains_readable(tmp_path):
     write_trajectory(path, trajectory)
     raw = json.loads(path.read_text())
     raw["schema_version"] = 2
+    raw["decisions"][0]["observation"].pop("own_extra_deck")
     for key in ("rules_profile", "deck_sha256", "asset_sha256"):
         raw.pop(key)
     path.write_text(json.dumps(raw))

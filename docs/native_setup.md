@@ -57,16 +57,30 @@ cards are unused in a single duel. The adapter still fails on unsupported native
 decisions. Its synthetic control-style probe exercises effect cards, generated Sheep Tokens, yes/no,
 tribute, position, and race selections. `python scripts/probe_control_deck.py
 --seed 42` completes one pinned random duel in 1,251 decisions, winner seat
-1. This covers that seed and action path only. A separate differential test
+1. The same synthetic deck completed seeds 0–49 with random actions after
+decoding `MSG_SELECT_EFFECTYN`. The 50-seed protocol probe was run in two
+batches (0–11 and 12–49); all 50 reached terminal states, with 550–1,454
+decisions per duel. These runs do not validate card behavior or strategy. A separate differential test
 replaces an opponent's opening-hand effect monster and then sets each version
 facedown; the acting player's observations and legal actions agree at both
 decision points while private native queries confirm the identities differ.
 This is an initial visibility regression, not a full information-flow audit.
-Yes/no and indexed option requests now carry their native prompt identifiers
+Generic yes/no, effect yes/no, and indexed option requests now carry native
+prompt identifiers
 in structured actions. Those identifiers are not yet mapped to readable
 historical card text; their information boundary still needs an audit. Card
 effects, hidden-information memory, untested requests, Extra Deck effect
 interactions, sideboarding, and historical rulings remain unaudited. Do not use the experimental adapter for
 policy training or competitive claims.
+
+The synthetic `examples/decks/chaos_probe.ydk` adds search, discard, and
+Special Summon effects plus three Fusion cards. Against the control probe,
+ten seeded random duels reached terminal in each seat order (20/20) on the
+pinned assets. The observed decision counts were 584–1,255 with control in
+seat 0 and 866–1,194 with Chaos in seat 0. A test gates four seeds per seat
+order. These paths do not demonstrate that every effect in either deck was
+activated. The observation now includes the acting player's own Fusion Deck
+identities. A differential test changes only the opponent's Fusion cards and
+confirms the acting player's observation and legal actions stay identical.
 
 Use this binding for M1 unless broader protocol coverage or measured throughput shows a concrete reason to adopt a patched ygoenv fork. Expand request and response handling, effect-card support, and visibility audits before claiming general GOAT coverage.
