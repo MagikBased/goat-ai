@@ -5,10 +5,17 @@ import pytest
 
 from goat_ai.actions import Action
 from goat_ai.agents import HeuristicAgent, HumanAgent, RandomAgent
-from goat_ai.engine import Decision, SimulatorUnavailable
+from goat_ai.engine import Decision, RulesProfile, SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
 from goat_ai.observations import CardView, ChainLinkView, Observation
-from goat_ai.replay import DecisionRecord, Trajectory, read_trajectory, write_trajectory
+from goat_ai.replay import (
+    DecisionRecord,
+    ReplayMismatch,
+    Trajectory,
+    read_trajectory,
+    verify_trajectory,
+    write_trajectory,
+)
 
 
 def view(hidden_code: int = 1) -> Observation:
@@ -25,6 +32,8 @@ def view(hidden_code: int = 1) -> Observation:
 
 class ContractEngine:
     """Test double for boundary behavior only; it does not model Yu-Gi-Oh!."""
+
+    ruleset = RulesProfile()
 
     def reset(self, deck1: str, deck2: str, seed: int) -> Decision:
         self.seed = seed
@@ -86,6 +95,25 @@ def test_trajectory_round_trip_and_legality(tmp_path):
     assert "999" not in path.read_text()
     with pytest.raises(ValueError, match="legal"):
         DecisionRecord(view(), (), action)
+
+
+def test_replay_verifier_detects_changed_decision_and_outcome():
+    action = Action("0", "pass", 0)
+    legal = (action, Action("1", "attack", 0))
+    trajectory = Trajectory(RulesProfile().name, ("a", "b"), 42,
+                            (DecisionRecord(view(), legal, action),), 0)
+    assert verify_trajectory(trajectory, ContractEngine()) == 1
+    with pytest.raises(ReplayMismatch, match="ruleset"):
+        verify_trajectory(replace(trajectory, ruleset="other"), ContractEngine())
+    with pytest.raises(ReplayMismatch, match="observation"):
+        changed = replace(trajectory.decisions[0],
+                          observation=replace(view(), life_points=(7000, 8000)))
+        verify_trajectory(replace(trajectory, decisions=(changed,)), ContractEngine())
+    with pytest.raises(ReplayMismatch, match="legal actions"):
+        changed = replace(trajectory.decisions[0], legal_actions=(action,))
+        verify_trajectory(replace(trajectory, decisions=(changed,)), ContractEngine())
+    with pytest.raises(ReplayMismatch, match="winner"):
+        verify_trajectory(replace(trajectory, winner=1), ContractEngine())
 
 
 def test_schema_one_trajectory_remains_readable(tmp_path):

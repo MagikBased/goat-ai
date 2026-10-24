@@ -62,6 +62,18 @@ python scripts/audit_card_pool.py
 python scripts/evaluate_native.py --agent-a heuristic --agent-b random --seeds 10
 ```
 
+To verify a saved fixture trajectory against the current pinned native assets:
+
+```bash
+python scripts/verify_trajectory.py replays/vanilla_42.json
+```
+
+The verifier replays each selected action, compares the visible observation
+and complete legal-action list at every decision, and checks the winner. Use
+`--deck1` and `--deck2` when the original YDK paths have moved. It cannot
+prove that a card interaction is historically correct; it detects divergence
+from the engine and assets used for the replay.
+
 The play example prints the winner and decision count and optionally writes a JSON trajectory. `--human-seat` uses the same action API for a CLI player. The evaluation command swaps candidate seats for each seed and reports matchup and seat results; see [the evaluation log](docs/evaluation.md). Supported decision types remain limited to the tested decks, and unsupported requests fail explicitly. The default environment still fails closed because general GOAT effects and visibility cases are unfinished. The benchmark includes reset and Python action selection; results are specific to this fixture and machine.
 
 For experimental effect-card coverage, run:

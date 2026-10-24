@@ -16,5 +16,13 @@ Do not use `ygoenv`'s current EDOPro binary as a GOAT engine: its source current
 
 Trajectory JSON schema v2 stores the visible observation, full legal action list, chosen action, acting player and phase (inside the observation), deck identifiers, ruleset, source, optional skill metadata, and result. It adds monster orientation and structured chain links. The reader accepts v1 trajectories and preserves their earlier chain strings; v2 writers produce structured links. It excludes native full-state snapshots. A future training process can map variable-length actions to masked scores; any PyTorch encoder and algorithm remain independent of the simulator.
 
+`goat_ai.replay.verify_trajectory` reconstructs a duel from its seed and
+decklists, compares each player-visible observation and complete legal-action
+set with the recording, applies the selected action, and checks the result.
+This detects engine or asset drift along the recorded path. Deck paths alone
+do not pin deck contents or native asset versions; callers must retain the
+original files and pinned setup. A future trajectory schema should store deck
+and asset fingerprints before human-data ingestion or large-scale training.
+
 `goat_ai.evaluation.run_tournament` depends only on the `RulesEngine` and agent interfaces. It runs each seed and matchup with both seat assignments and records wins, losses, draws, decisions, and a Wilson interval for decisive wins. The native CLI adds deck and asset fingerprints. This keeps evaluation separate from policy implementation and makes later checkpoint opponents possible without changing the duel engine.
 

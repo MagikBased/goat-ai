@@ -8,7 +8,7 @@ from goat_ai.agents import RandomAgent
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
-from goat_ai.replay import read_trajectory, write_trajectory
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -46,6 +46,8 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     path = tmp_path / "duel.json"
     write_trajectory(path, trajectory)
     assert read_trajectory(path) == trajectory
+    assert verify_trajectory(read_trajectory(path), RestrictedOcgcoreEngine(root)) == len(
+        trajectory.decisions)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
