@@ -59,12 +59,14 @@ def decode_decision(message: bytes) -> NativeDecision:
         return NativeDecision(player, (NativeChoice("pass", -1),))
     if kind == 15:  # MSG_SELECT_CARD
         player = reader.integer(1)
-        reader.integer(1)  # cancelable
+        cancelable = reader.integer(1)
         minimum = reader.integer(4)
         maximum = reader.integer(4)
         count = reader.integer(4)
         if minimum != 1 or maximum != 1 or not count:
-            raise NotImplementedError("multi-card selection is not decoded")
+            raise NotImplementedError(
+                f"card selection mode not decoded: cancelable={cancelable} "
+                f"minimum={minimum} maximum={maximum} count={count}")
         choices = []
         for index in range(count):
             code = reader.integer(4)
@@ -75,6 +77,8 @@ def decode_decision(message: bytes) -> NativeDecision:
             # Response type 0: size then uint32 card indices.
             choices.append(NativeChoice("select_card", struct.pack("<III", 0, 1, index),
                                         code, controller, location, sequence))
+        if cancelable:
+            choices.append(NativeChoice("cancel", -1))
         reader.finish()
         return NativeDecision(player, tuple(choices))
     if kind == 18:  # MSG_SELECT_PLACE
@@ -155,7 +159,8 @@ def decode_decision(message: bytes) -> NativeDecision:
         choices.append(NativeChoice("battle_phase", 6))
     if reader.integer(1):
         choices.append(NativeChoice("end_phase", 7))
-    reader.integer(1)  # can shuffle hand; no action exposed yet
+    if reader.integer(1):
+        choices.append(NativeChoice("shuffle_hand", 8))
     reader.finish()
     if player not in (0, 1) or not choices:
         raise ValueError("invalid or empty idle decision")

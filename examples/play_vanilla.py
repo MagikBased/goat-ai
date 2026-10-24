@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from goat_ai.agents import RandomAgent
+from goat_ai.agents import HumanAgent, RandomAgent
 from goat_ai.engine.vanilla_adapter import VanillaOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import write_trajectory
@@ -14,14 +14,17 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--trajectory", type=Path)
+    parser.add_argument("--human-seat", type=int, choices=(0, 1))
     args = parser.parse_args()
     deck1 = Path(__file__).parent / "decks/vanilla_probe.ydk"
     deck2 = Path(__file__).parent / "decks/vanilla_reverse.ydk"
     with GoatEnvironment(str(deck1), str(deck2), args.seed,
                          engine=VanillaOcgcoreEngine(args.native_root)) as env:
         observation = env.reset()
-        agent = RandomAgent(args.seed)
+        agents = (RandomAgent(args.seed), RandomAgent(args.seed + 1))
+        human = HumanAgent()
         for _ in range(5000):
+            agent = human if observation.acting_player == args.human_seat else agents[observation.acting_player]
             action = agent.select_action(observation, env.legal_actions())
             observation = env.step(action)
             if env.is_terminal():

@@ -4,7 +4,7 @@ GOAT AI's first goal is a **verified, headless GOAT duel that two random agents 
 
 ## Current baseline
 
-The repository has a Python environment contract, observation and action types, three baseline agents, JSON trajectory serialization, and CI. The default engine raises `SimulatorUnavailable`. A separate native probe now reaches the first GOAT-mode decision and checks the opening draw; it is not a complete adapter or a historical correctness claim. The selected engine is modern ocgcore with `DUEL_MODE_GOAT`, subject to ruling validation and license review. See [native setup](native_setup.md).
+The repository has a Python environment contract, observation and action types, three baseline agents, JSON trajectory serialization, and CI. The default engine raises `SimulatorUnavailable`. A restricted native adapter now completes normal-monster fixture duels; this is not a historical correctness claim. The selected engine is modern ocgcore with `DUEL_MODE_GOAT`, subject to ruling validation. See [native setup](native_setup.md).
 
 ## M0 — Prove the native engine path
 
@@ -61,4 +61,4 @@ Keep training in Python. Define a versioned, game-independent decision boundary:
 
 ## Immediate next work item
 
-Start M0 with the pinned native-core build and first-decision harness. Do not start training or report simulator performance until M1 is complete. Keep each implementation change small enough to demonstrate with a command, test, and documented limitation.
+Broaden M1 by fetching and validating effect-card scripts, decoding their decision messages, and auditing hidden-information boundaries. Begin M2 with source-backed priority and ruling fixtures before training. Keep each implementation change small enough to demonstrate with a command, test, and documented limitation.

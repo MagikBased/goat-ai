@@ -68,7 +68,7 @@ def test_first_idle_actions_and_illegal_response():
         decision = decode_decision(probe._pending_message)
         assert decision.player == 0
         assert {choice.kind for choice in decision.choices} == {
-            "normal_summon", "set_monster", "end_phase",
+            "normal_summon", "set_monster", "end_phase", "shuffle_hand",
         }
-        assert len(decision.choices) == 13
+        assert len(decision.choices) == 14
 

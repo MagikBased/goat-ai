@@ -13,7 +13,8 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Player-visible observation schema | Implemented; native hand/facedown redaction tested on fixture |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
 | JSON trajectory round trip | Implemented and verified on a native random-agent duel |
-| Tournaments and throughput benchmarks | General card support and benchmark harness unfinished |
+| Tournaments | Pending general card support and evaluation harness |
+| Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 
 The selected direction is [Project Ignis/edo9300 ocgcore](https://github.com/edo9300/ygopro-core), configured with its `DUEL_MODE_GOAT` flag, historical card data and scripts, and an audited Python-facing decision adapter. A 2005 banlist alone is insufficient. See [research](docs/research.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md).
 
@@ -53,9 +54,11 @@ The restricted `VanillaOcgcoreEngine` connects the same native core to `GoatEnvi
 
 ```bash
 python examples/play_vanilla.py --seed 42 --trajectory replays/vanilla_42.json
+python examples/play_vanilla.py --human-seat 0
+python scripts/benchmark_native.py --games 3 --seed 42
 ```
 
-The example prints the winner and decision count and writes a JSON trajectory. Its supported decision types are limited to the requests exercised by these decks; unsupported requests fail explicitly. The default environment still fails closed because general GOAT effects and visibility cases are unfinished.
+The example prints the winner and decision count and optionally writes a JSON trajectory. `--human-seat` uses the same action API for a CLI player. Its supported decision types are limited to the requests exercised by these decks; unsupported requests fail explicitly. The default environment still fails closed because general GOAT effects and visibility cases are unfinished. The benchmark includes reset and Python action selection; results are specific to this fixture and machine.
 
 ## Contributions and data
 
