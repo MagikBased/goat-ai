@@ -21,7 +21,7 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
-**Status: in progress.** A direct native binding completes restricted fixture duels with selected scripted cards. It handles optional chain choices, exposes structured public chain links and monster battle positions, and redacts the ID of a set opponent monster targeted by Nobleman. `.ydk` parsing, pinned whitelist checks, deterministic deck shuffling, and a complete metadata/script-path inventory for the 1,685 allowed whitelist IDs are implemented. A separate experimental adapter completes one seeded synthetic control-deck duel using full scripts, but its decisions and visibility are unaudited. General effect and decision coverage, independently audited historical legality, and complete player-visible observations are still required.
+**Status: in progress.** A direct native binding completes restricted fixture duels with selected scripted cards. It handles optional chain choices, exposes structured public chain links and monster battle positions, and redacts the ID of a set opponent monster targeted by Nobleman. `.ydk` parsing, pinned whitelist checks, deterministic deck shuffling, and a complete metadata/script-path inventory for the 1,685 allowed whitelist IDs are implemented. A separate experimental adapter completes one seeded synthetic control-deck duel using full scripts. Differential tests cover hidden opening-hand and set-monster identities, but its broader decisions and visibility remain unaudited. General effect and decision coverage, independently audited historical legality, and complete player-visible observations are still required.
 
 **Work**
 
@@ -43,7 +43,7 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M3 — Evaluation and data
 
-**Status: in progress.** A seeded tournament runner swaps seats for each deck matchup, records individual outcomes, reports seat and matchup splits, and gives Wilson intervals for decisive win rates. A restricted-fixture baseline report is in [the evaluation log](evaluation.md). Broader deck families, held-out opponents, authorized human replay reconstruction, and training/evaluation separation remain outstanding.
+**Status: in progress.** A seeded tournament runner swaps seats for each deck matchup, records individual outcomes, reports seat and matchup splits, and gives Wilson intervals for decisive win rates. A restricted-fixture baseline report is in [the evaluation log](evaluation.md). Recorded decision trajectories can now be replayed against the native engine with exact observation, legal-action, and result comparisons. Broader deck families, pinned deck/asset fingerprints in trajectories, held-out opponents, authorized human replay reconstruction, and training/evaluation separation remain outstanding.
 
 **Work:** Build seeded agent tournaments with deck and matchup splits, seat swaps, confidence intervals, and held-out evaluation opponents. Measure duel throughput, decisions per second, runtime memory, and initialization overhead on named hardware. Validate self-play trajectory round trips. Investigate `.yrp` and `.yrpX` reconstruction; ingest human games only when permission, legal-action recovery, and player-visible knowledge can be established.
 

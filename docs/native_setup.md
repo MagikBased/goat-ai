@@ -56,7 +56,12 @@ decisions. Its synthetic
 control-style probe exercises effect cards, generated Sheep Tokens, yes/no,
 tribute, position, and race selections. `python scripts/probe_control_deck.py
 --seed 42` completes one pinned random duel in 1,251 decisions, winner seat
-1. This covers that seed and action path only. Prompt descriptions, card
+1. This covers that seed and action path only. A separate differential test
+replaces an opponent's opening-hand effect monster and then sets each version
+facedown; the acting player's observations and legal actions agree at both
+decision points while private native queries confirm the identities differ.
+This is an initial visibility regression, not a full information-flow audit.
+Prompt descriptions, card
 effects, hidden-information memory, untested requests, Extra Deck effect
 interactions, sideboarding, and
 historical rulings remain unaudited. Do not use the experimental adapter for
