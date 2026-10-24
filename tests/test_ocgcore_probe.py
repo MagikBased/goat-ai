@@ -86,3 +86,14 @@ def test_opening_hand_is_seeded_and_shuffled():
     assert hand(42) == hand(42)
     assert hand(42) != hand(43)
 
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_pre_errata_card_metadata_and_script_load_at_startup():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    deck = (511001039,) + VANILLA_DECK[1:]  # Dark Magician of Chaos (Pre-Errata)
+    with OcgcoreProbe(root / "build/libocgcore.so", root / "database/cards.cdb",
+                      root / "scripts") as probe:
+        probe.first_decision(42, deck)
+        assert probe.errors == []
+        assert probe._card_row(511001039, "alias, type") == (40737112, 33)
+

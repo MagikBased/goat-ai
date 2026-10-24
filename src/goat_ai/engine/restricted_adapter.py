@@ -31,18 +31,24 @@ class RestrictedOcgcoreEngine:
         deck = read_ydk(path)
         database = self.root / "database/cards.cdb"
         goat_database = self.root / "database/goat-entries.cdb"
+        unofficial_database = self.root / "database/cards-unofficial.cdb"
         limits = read_goat_whitelist(self.root / "banlist/GOAT.lflist.conf")
-        validate_goat_deck(deck, limits, database, goat_database)
+        validate_goat_deck(deck, limits, database, goat_database, unofficial_database)
         if deck.extra or deck.side or len(deck.main) != 40:
             raise SimulatorUnavailable("restricted adapter currently supports a 40-card main deck only")
         with sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True) as connection:
             connection.execute("ATTACH DATABASE ? AS goat",
                                (f"file:{goat_database.resolve()}?mode=ro",))
+            connection.execute("ATTACH DATABASE ? AS unofficial",
+                               (f"file:{unofficial_database.resolve()}?mode=ro",))
             for code in deck.main:
                 row = connection.execute("SELECT type FROM goat.datas WHERE id=?",
                                          (code,)).fetchone()
                 if row is None:
                     row = connection.execute("SELECT type FROM main.datas WHERE id=?",
+                                             (code,)).fetchone()
+                if row is None:
+                    row = connection.execute("SELECT type FROM unofficial.datas WHERE id=?",
                                              (code,)).fetchone()
                 if row is None or (row[0] != 17 and code not in self.supported_spells
                                    and code not in self.supported_monsters):

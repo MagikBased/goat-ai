@@ -15,6 +15,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | JSON trajectory round trip | Schema v2 verified on native duels with chain links; v1 remains readable |
 | Tournaments | Seeded, seat-swapped runner and Wilson intervals implemented for supported decks |
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
+| Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
 
 The selected direction is [Project Ignis/edo9300 ocgcore](https://github.com/edo9300/ygopro-core), configured with its `DUEL_MODE_GOAT` flag, historical card data and scripts, and an audited Python-facing decision adapter. A 2005 banlist alone is insufficient. See [research](docs/research.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md).
 
@@ -56,6 +57,7 @@ The restricted `RestrictedOcgcoreEngine` connects the same native core to `GoatE
 python examples/play_vanilla.py --seed 42 --trajectory replays/vanilla_42.json
 python examples/play_vanilla.py --human-seat 0
 python scripts/benchmark_native.py --games 3 --seed 42
+python scripts/audit_card_pool.py
 python scripts/evaluate_native.py --agent-a heuristic --agent-b random --seeds 10
 ```
 

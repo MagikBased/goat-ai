@@ -128,6 +128,11 @@ class OcgcoreProbe:
         if self._has_goat_database:
             self.db.execute("ATTACH DATABASE ? AS goat",
                             (f"file:{goat_database.resolve()}?mode=ro",))
+        unofficial_database = database.parent / "cards-unofficial.cdb"
+        self._has_unofficial_database = unofficial_database.is_file()
+        if self._has_unofficial_database:
+            self.db.execute("ATTACH DATABASE ? AS unofficial",
+                            (f"file:{unofficial_database.resolve()}?mode=ro",))
         self.scripts = scripts.resolve()
         self.errors: list[str] = []
         self._setcodes: dict[int, c.Array] = {}
@@ -197,9 +202,13 @@ class OcgcoreProbe:
                                   (code,)).fetchone()
             if row is not None:
                 return row
-        return self.db.execute(
+        row = self.db.execute(
             f"SELECT {columns} FROM main.datas WHERE id=?", (code,),
         ).fetchone()
+        if row is None and self._has_unofficial_database:
+            row = self.db.execute(f"SELECT {columns} FROM unofficial.datas WHERE id=?",
+                                  (code,)).fetchone()
+        return row
 
     def _read_script(self, _payload: int, duel: int, name: bytes) -> int:
         relative = Path(name.decode("utf-8"))
@@ -213,6 +222,8 @@ class OcgcoreProbe:
             path = self.scripts / "unofficial" / relative
         if not path.is_file():
             path = self.scripts / "goat" / relative
+        if not path.is_file():
+            path = self.scripts / "pre-errata" / relative
         if not path.is_file():
             # Vanilla monsters have no card script. Missing effect scripts
             # remain fatal, so the probe cannot silently omit card behavior.

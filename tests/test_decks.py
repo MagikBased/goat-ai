@@ -1,9 +1,11 @@
+import sqlite3
 from pathlib import Path
 
 import pytest
 
 from goat_ai.engine.decks import Decklist, read_goat_whitelist, read_ydk, validate_goat_deck
 from goat_ai.engine.probe_deck import VANILLA_DECK
+from scripts.audit_card_pool import audit
 
 
 def test_ydk_sections_and_errors(tmp_path):
@@ -57,3 +59,34 @@ def test_pinned_goat_variant_uses_historical_id_and_copy_limit():
     with pytest.raises(ValueError, match="whitelist"):
         validate_goat_deck(Decklist((71044499,) + VANILLA_DECK[1:]),
                            limits, database, variants)
+
+
+@pytest.mark.skipif(not Path(".cache/goat-ai/database/cards-unofficial.cdb").exists(),
+                    reason="all pinned card databases not installed")
+def test_every_allowed_goat_id_has_pinned_metadata():
+    root = Path(".cache/goat-ai")
+    limits = read_goat_whitelist(root / "banlist/GOAT.lflist.conf")
+    with sqlite3.connect(root / "database/cards.cdb") as connection:
+        connection.execute("ATTACH DATABASE ? AS goat",
+                           (str(root / "database/goat-entries.cdb"),))
+        connection.execute("ATTACH DATABASE ? AS unofficial",
+                           (str(root / "database/cards-unofficial.cdb"),))
+        missing = [code for code, limit in limits.items() if limit > 0 and not any(
+            connection.execute(f"SELECT 1 FROM {schema}.datas WHERE id=?", (code,)).fetchone()
+            for schema in ("goat", "main", "unofficial")
+        )]
+    assert len([code for code, limit in limits.items() if limit > 0]) == 1685
+    assert missing == []
+    validate_goat_deck(Decklist((511001039,) + VANILLA_DECK[1:]), limits,
+                       root / "database/cards.cdb", root / "database/goat-entries.cdb",
+                       root / "database/cards-unofficial.cdb")
+
+
+@pytest.mark.skipif(not Path(".cache/goat-ai/database/cards-unofficial.cdb").exists(),
+                    reason="all pinned card databases not installed")
+def test_pinned_goat_card_script_path_inventory():
+    result = audit(Path(".cache/goat-ai"))
+    assert result["allowed_ids"] == 1685
+    assert result["missing_metadata"] == []
+    assert result["missing_script_path"] == []
+    assert result["direct_script_paths"] + result["alias_script_paths"] == 1339

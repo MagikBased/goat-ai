@@ -21,7 +21,7 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
-**Status: in progress.** A direct native binding completes 40-card normal-monster fixture duels with Pot of Greed, Book of Moon, and GOAT-variant Nobleman of Crossout. It handles optional chain choices, exposes structured public chain links and monster battle positions, and redacts the ID of a set opponent monster targeted by Nobleman. `.ydk` parsing, pinned whitelist and GOAT-variant database checks, and deterministic deck shuffling are implemented. General effect and decision coverage, independently audited historical legality, and complete player-visible observations are still required.
+**Status: in progress.** A direct native binding completes restricted fixture duels with selected scripted cards. It handles optional chain choices, exposes structured public chain links and monster battle positions, and redacts the ID of a set opponent monster targeted by Nobleman. `.ydk` parsing, pinned whitelist checks, deterministic deck shuffling, and a complete metadata/script-path inventory for the 1,685 allowed whitelist IDs are implemented. General effect and decision coverage, independently audited historical legality, and complete player-visible observations are still required.
 
 **Work**
 

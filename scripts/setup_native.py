@@ -19,6 +19,7 @@ SOURCES = (
 )
 DATABASE_SHA256 = "d5166c35296a6c65dcc0230c7bc0e9f25721639159b80fa78bf724be61183a6a"
 GOAT_DATABASE_SHA256 = "042ffc3de692245d13d144656a79a34cb114d291ddd0c93a21bee9c0e607b4b4"
+UNOFFICIAL_DATABASE_SHA256 = "7753f01785fbf174be2ec3833610306b02a8ce2cb45ac09339ea50afe164bb6a"
 GOAT_LIST_SHA256 = "2159b6eb0868816860c4913571b514c27fd777755a09c358f250e6cc7cc5db37"
 
 
@@ -44,13 +45,13 @@ def fetch(root: Path, name: str, url: str, revision: str) -> Path:
             "/*.lua", "/unofficial/proc_unofficial.lua",
             "/official/c55144522.lua", "/official/c14087893.lua",
             "/official/c11384280.lua",
-            "/goat/c504700116.lua")
+            "/goat/c504700116.lua", "/pre-errata/c511001039.lua")
     elif name == "banlist":
         run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone",
             "/GOAT.lflist.conf")
     else:
         run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone",
-            "/cards.cdb", "/goat-entries.cdb")
+            "/cards.cdb", "/goat-entries.cdb", "/cards-unofficial.cdb")
     return path
 
 
@@ -71,6 +72,9 @@ def main() -> None:
     goat_hash = hashlib.sha256((paths["database"] / "goat-entries.cdb").read_bytes()).hexdigest()
     if goat_hash != GOAT_DATABASE_SHA256:
         raise SystemExit(f"GOAT entries database checksum mismatch: {goat_hash}")
+    unofficial_hash = hashlib.sha256((paths["database"] / "cards-unofficial.cdb").read_bytes()).hexdigest()
+    if unofficial_hash != UNOFFICIAL_DATABASE_SHA256:
+        raise SystemExit(f"unofficial database checksum mismatch: {unofficial_hash}")
     list_hash = hashlib.sha256((paths["banlist"] / "GOAT.lflist.conf").read_bytes()).hexdigest()
     if list_hash != GOAT_LIST_SHA256:
         raise SystemExit(f"GOAT whitelist checksum mismatch: {list_hash}")

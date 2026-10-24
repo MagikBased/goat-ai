@@ -9,10 +9,10 @@ The probe in `goat_ai.engine.ocgcore_probe` calls the native C API through Pytho
 | [edo9300/ygopro-core](https://github.com/edo9300/ygopro-core) | `baa3881d0bae48e9994f915f5c931be53c1ba8ef` | C++ duel core, AGPL-3.0-or-later modifications plus upstream MIT notices |
 | [lua/lua](https://github.com/lua/lua) | `6e22fedb74cf0c9b6656e9fce8b7331db847c605` | Core's pinned submodule; see upstream license |
 | [ProjectIgnis/CardScripts](https://github.com/ProjectIgnis/CardScripts) | `196eb043514e2cbc23ff891e3cfe31b89765ce49` | Global scripts and selected official/GOAT card scripts; see upstream license |
-| [ProjectIgnis/BabelCDB](https://github.com/ProjectIgnis/BabelCDB) | `19339149fa5ee509327023f15a81d8ba4164c5a1` | Main and GOAT-variant card metadata; see upstream terms |
+| [ProjectIgnis/BabelCDB](https://github.com/ProjectIgnis/BabelCDB) | `19339149fa5ee509327023f15a81d8ba4164c5a1` | Main, GOAT-variant, and unofficial/pre-errata card metadata; see upstream terms |
 | [ProjectIgnis/LFLists](https://github.com/ProjectIgnis/LFLists) | `b95e30d7453bb9e692a08ae3081aeceb70582341` | GOAT whitelist and copy limits; see upstream terms |
 
-The `cards.cdb` SHA-256 is `d5166c35296a6c65dcc0230c7bc0e9f25721639159b80fa78bf724be61183a6a`; `goat-entries.cdb` is `042ffc3de692245d13d144656a79a34cb114d291ddd0c93a21bee9c0e607b4b4`; `GOAT.lflist.conf` is `2159b6eb0868816860c4913571b514c27fd777755a09c358f250e6cc7cc5db37`. The GOAT flag value for the pinned API is `34226374444` (`DUEL_MODE_GOAT`). Setup checks all asset hashes and the binding checks API version 11.0. The pinned Lua submodule revision is supplied by the core commit.
+The `cards.cdb` SHA-256 is `d5166c35296a6c65dcc0230c7bc0e9f25721639159b80fa78bf724be61183a6a`; `goat-entries.cdb` is `042ffc3de692245d13d144656a79a34cb114d291ddd0c93a21bee9c0e607b4b4`; `cards-unofficial.cdb` is `7753f01785fbf174be2ec3833610306b02a8ce2cb45ac09339ea50afe164bb6a`; `GOAT.lflist.conf` is `2159b6eb0868816860c4913571b514c27fd777755a09c358f250e6cc7cc5db37`. The GOAT flag value for the pinned API is `34226374444` (`DUEL_MODE_GOAT`). Setup checks all asset hashes and the binding checks API version 11.0. The pinned Lua submodule revision is supplied by the core commit.
 
 Requires Linux, Git, a C++17 compiler, Python 3.10+, Meson 1.7+, and Ninja. From a clean clone:
 
@@ -23,6 +23,7 @@ python -m pip install -e '.[dev,native]'
 python scripts/setup_native.py
 python scripts/probe_native.py --seed 42
 python scripts/run_native_smoke.py --seed 42
+python scripts/audit_card_pool.py
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai python -m pytest -q tests/test_ocgcore_probe.py
 ```
 
@@ -40,6 +41,6 @@ The direct `ctypes` path reaches the first decision with a small binding and no 
 
 `RestrictedOcgcoreEngine` validates 40-card fixture YDK decklists and allows three tested spells plus Cannon Soldier. It maps decoded native choices to `Action`s and keeps response bytes inside the engine. Tests cover terminal outcomes, trajectories, Pot's two-card draw, Book's chain response, Nobleman's banishing of a set monster, redaction of that target's hidden ID, and Cannon Soldier's Ignition priority after a summon. `MSG_SELECT_UNSELECT_CARD` choices are exposed for Cannon Soldier's tribute cost. GOAT variant metadata is read from `goat-entries.cdb` before the main database. Other effects remain unsupported. The bridge shuffles both decks deterministically from the duel seed before inserting cards into the native core, which otherwise draws from the supplied order.
 
-`goat_ai.engine.decks` parses `.ydk` sections and checks main/side sizes, pinned whitelist membership, forbidden/limited/semi-limited counts, aliases, and Fusion Deck placement across both pinned databases. This is an initial deck legality gate. Only selected scripts are fetched by sparse checkout; decks with other effect cards fail explicitly. The whitelist and card data still need an independent historical audit.
+`goat_ai.engine.decks` parses `.ydk` sections and checks main/side sizes, pinned whitelist membership, forbidden/limited/semi-limited counts, aliases, and Fusion Deck placement across all three pinned databases. A pre-errata Dark Magician of Chaos card and script are tested at native startup. The card-pool audit finds metadata and a candidate script path for all 1,685 allowed whitelist IDs. Only selected scripts are fetched by sparse checkout; decks with other effect cards fail explicitly in the restricted adapter. This is an asset and legality gate, not a historical behavior audit.
 
 Use this binding for M1 unless broader protocol coverage or measured throughput shows a concrete reason to adopt a patched ygoenv fork. Expand request and response handling, effect-card support, and visibility audits before claiming general GOAT coverage.
