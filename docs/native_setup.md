@@ -21,6 +21,7 @@ source .venv/bin/activate
 python -m pip install -e '.[dev,native]'
 python scripts/setup_native.py
 python scripts/probe_native.py --seed 42
+python scripts/run_native_smoke.py --seed 42
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai python -m pytest -q tests/test_ocgcore_probe.py
 ```
 
@@ -32,4 +33,6 @@ The core requests `c0.lua` and individual scripts even for vanilla monsters; the
 
 Native messages are length-prefixed binary frames. The first processed sequence includes opening draws, turn and phase changes, the first-turn draw, then `MSG_SELECT_CHAIN`. The next adapter must parse every request type, choose a response using the engine's response protocol, and provide player-scoped redacted observations. The core's query functions can expose complete internal state, so calling them does not itself enforce information boundaries. State cloning, complete-game throughput, and historical card behavior remain unmeasured.
 
-The direct `ctypes` path reaches the first decision with a small binding and no fixed action-list size. Use it for M1 unless protocol coverage or measured throughput shows a concrete reason to adopt a patched ygoenv fork. Its action observation and response handling still need implementation and audit.
+The direct `ctypes` path reaches the first decision with a small binding and no fixed action-list size. A narrow smoke runner now decodes zero-option chain windows, idle actions, and single-card selections, and completes a vanilla-fixture duel by ending turns and discarding at hand limit. Seed 42 terminates after 350 decisions with player 1 winning by deck-out. This is a real native duel; it does not cover arbitrary cards, full legal-action enumeration, safe player observations, or an agent-facing environment. Raw native choices remain internal. The smoke runner is a protocol regression, not a performance benchmark.
+
+Use this binding for M1 unless broader protocol coverage or measured throughput shows a concrete reason to adopt a patched ygoenv fork. Implement full response handling and player-visible observation construction before connecting it to `GoatEnvironment`.

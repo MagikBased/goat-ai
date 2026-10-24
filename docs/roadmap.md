@@ -21,6 +21,8 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+**Status: in progress.** A direct native binding completes a 40-card vanilla-fixture duel using a narrow pass-only policy. General decision coverage, legally validated decklists, player-visible observations, and the agent-facing environment are still required.
+
 **Work**
 
 1. Implement `.ydk` parsing and April 2005 deck/card-pool validation. Begin with two small legal fixture decks and expand coverage.

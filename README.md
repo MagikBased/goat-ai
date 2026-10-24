@@ -8,7 +8,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. **This re
 | --- | --- |
 | Engine selection and source review | Initial research complete |
 | Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
-| Complete headless duel | Unfinished |
+| Complete headless duel | Narrow vanilla-fixture smoke duel reaches terminal; general adapter unfinished |
 | Environment contract and illegal-action validation | Implemented |
 | Player-visible observation schema | Implemented; engine redaction unverified |
 | Random, heuristic, CLI human agents | Implemented against contract |
@@ -41,10 +41,13 @@ The separate M0 probe calls a real, pinned ocgcore build with `DUEL_MODE_GOAT`. 
 python -m pip install -e '.[dev,native]'
 python scripts/setup_native.py
 python scripts/probe_native.py --seed 42
+python scripts/run_native_smoke.py --seed 42
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai python -m pytest -q tests/test_ocgcore_probe.py
 ```
 
 Setup downloads and builds external dependencies under ignored `.cache/goat-ai/`. See [native setup](docs/native_setup.md) for pinned revisions, licensing, and the probe's limits.
+
+The smoke runner decodes empty chain windows, idle choices, and single-card selections, then ends turns and discards at hand limit until the native core reports a winner. This is a protocol regression for one simple fixture, not a general GOAT environment or an agent-strength benchmark.
 
 ## Contributions and data
 

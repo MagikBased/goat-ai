@@ -77,6 +77,13 @@ class FirstDecision:
     decision_player: int
 
 
+@dataclass(frozen=True)
+class NativeTransition:
+    message_ids: tuple[int, ...]
+    terminal: bool
+    winner: int | None = None
+
+
 def split_messages(buffer: bytes) -> tuple[bytes, ...]:
     """Core messages are length-prefixed frames; unknown IDs remain opaque."""
     messages = []
@@ -103,6 +110,7 @@ class OcgcoreProbe:
         self.errors: list[str] = []
         self._setcodes: dict[int, c.Array] = {}
         self._duel = c.c_void_p()
+        self._pending_message: bytes | None = None
         self._bind()
         major, minor = c.c_int(), c.c_int()
         self.lib.OCG_GetVersion(c.byref(major), c.byref(minor))
@@ -123,6 +131,7 @@ class OcgcoreProbe:
             "OCG_StartDuel": ([c.c_void_p], None),
             "OCG_DuelProcess": ([c.c_void_p], c.c_int),
             "OCG_DuelGetMessage": ([c.c_void_p, c.POINTER(c.c_uint32)], c.c_void_p),
+            "OCG_DuelSetResponse": ([c.c_void_p, c.c_void_p, c.c_uint32], None),
             "OCG_LoadScript": ([c.c_void_p, c.c_char_p, c.c_uint32, c.c_char_p], c.c_int),
             "OCG_DuelQueryCount": ([c.c_void_p, c.c_uint8, c.c_uint32], c.c_uint32),
         }
@@ -232,6 +241,7 @@ class OcgcoreProbe:
         decision = messages[-1]
         if decision[0] != MSG_SELECT_CHAIN or len(decision) < 2:
             raise RuntimeError(f"unsupported first decision message: {decision[0]}")
+        self._pending_message = decision
         draw_events = []
         for message in messages:
             if message[0] == MSG_DRAW:
@@ -244,6 +254,60 @@ class OcgcoreProbe:
             tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_DECK) for p in (0, 1)),
             tuple(message[0] for message in messages), tuple(draw_events), decision[0], decision[1],
         )
+
+    def pass_empty_chain(self) -> tuple[int, ...]:
+        """Advance one zero-option chain response; never expose raw state to an agent."""
+        message = self._pending_message
+        if message is None or len(message) < 16 or message[0] != MSG_SELECT_CHAIN:
+            raise RuntimeError("expected a pending MSG_SELECT_CHAIN")
+        option_count = struct.unpack_from("<I", message, 12)[0]
+        if option_count or message[3]:
+            raise RuntimeError("chain has choices or a forced response")
+        return self.respond(-1).message_ids
+
+    def respond(self, response_value: int | bytes) -> NativeTransition:
+        """Send one native response and process until another decision or terminal."""
+        if self._pending_message is None:
+            raise RuntimeError("no pending native decision")
+        from goat_ai.engine.native_messages import decode_decision
+
+        choices = decode_decision(self._pending_message).choices
+        if response_value not in {choice.response for choice in choices}:
+            raise ValueError("illegal native response")
+        if isinstance(response_value, int):
+            response = c.c_int32(response_value)
+            self.lib.OCG_DuelSetResponse(self._duel, c.byref(response), c.sizeof(response))
+        else:
+            response = c.create_string_buffer(response_value)
+            self.lib.OCG_DuelSetResponse(self._duel, response, len(response_value))
+        self._pending_message = None
+        frames_seen: list[bytes] = []
+        for _ in range(1000):
+            status = self.lib.OCG_DuelProcess(self._duel)
+            length = c.c_uint32()
+            pointer = self.lib.OCG_DuelGetMessage(self._duel, c.byref(length))
+            if length.value:
+                frames = split_messages(c.string_at(pointer, length.value))
+                frames_seen.extend(frames)
+                if status == STATUS_AWAITING:
+                    self._pending_message = frames[-1]
+            if self.errors:
+                raise RuntimeError(f"native processing errors: {self.errors}")
+            win_frames = [frame for frame in frames_seen if frame[0] == 5]
+            if win_frames:
+                if len(win_frames) != 1 or len(win_frames[0]) < 2:
+                    raise RuntimeError("invalid MSG_WIN")
+                winner = win_frames[0][1]
+                self._pending_message = None
+                return NativeTransition(tuple(frame[0] for frame in frames_seen), True,
+                                        winner if winner in (0, 1) else None)
+            if status == STATUS_AWAITING:
+                if self._pending_message is None:
+                    raise RuntimeError("native core awaited a response without a message")
+                return NativeTransition(tuple(frame[0] for frame in frames_seen), False)
+            if status == 0:
+                raise RuntimeError("duel ended without MSG_WIN")
+        raise RuntimeError("native core did not reach the next decision")
 
     def close(self) -> None:
         if self._duel.value:
