@@ -25,3 +25,16 @@ python scripts/evaluate_policy.py checkpoints/vanilla_bc.pt --seed 43 --seeds 4 
 ```
 
 The evaluator refuses seeds present in checkpoint training-game metadata. It uses paired seat swaps and reports individual results, seat splits, a paired score interval, and core/deck/checkpoint hashes. `--workers 2` uses spawned native and policy workers; `--matchup DECK_A DECK_B` accepts additional deck pairs, and `--engine experimental` selects the broader unaudited adapter. A held-out seed on the same fixture decks is a protocol and baseline check; it is not held-out deck-family evaluation. See [the measured evaluation log](evaluation.md).
+
+## Initial self-play experiment
+
+`scripts/train_self_play.py` implements an episodic score-function policy-gradient update inspired by [Williams's REINFORCE paper](https://doi.org/10.1007/bf00992696). It samples legal actions from the current policy, plays native duels against a mixture of frozen historical policy snapshots and RandomAgent, and applies terminal rewards of +1 for a win, −1 for a loss, and 0 for a draw. A moving return baseline and entropy bonus are optional variance and exploration aids. Frozen snapshots preserve past opponents during updates; the first snapshot remains in the pool. The trainer alternates learner seats, records seeds and opponents, and can write complete player-visible trajectories with `--record-dir`. It never grants the learner access to an opponent's hidden cards.
+
+```bash
+OMP_NUM_THREADS=1 python scripts/train_self_play.py checkpoints/vanilla_bc.pt \
+  --output checkpoints/vanilla_rl.pt --seed 100 --games 16 \
+  --record-dir replays/vanilla_rl
+python scripts/evaluate_policy.py checkpoints/vanilla_rl.pt --seed 200 --seeds 8
+```
+
+This is an experiment, not a selected final RL algorithm. Terminal reward is sparse; no value function, PPO update, opponent league, or checkpoint selection by held-out win rate exists. The first measured run from random imitation did not improve against RandomAgent; see [the evaluation log](evaluation.md). Future work should compare stronger demonstrations, a richer action encoder, value baselines and PPO under the same held-out schedule, while keeping training opponents separate from evaluation opponents.

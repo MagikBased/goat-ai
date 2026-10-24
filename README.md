@@ -1,6 +1,6 @@
 # GOAT AI
 
-Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restricted native adapter runs complete duels with 40-card normal-monster decks and selected scripted cards: Pot of Greed, Book of Moon, the GOAT variant of Nobleman of Crossout, and Cannon Soldier. General effect-card support and historical rules validation are unfinished. No training or playing strength is claimed.
+Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restricted native adapter runs complete duels with 40-card normal-monster decks and selected scripted cards: Pot of Greed, Book of Moon, the GOAT variant of Nobleman of Crossout, and Cannon Soldier. General effect-card support and historical rules validation are unfinished. No competitive playing strength is claimed.
 
 ## Status
 
@@ -17,7 +17,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
 | Experimental control probe | One seeded 40-card synthetic control-style deck reaches a native terminal state with full scripts; behavior and visibility unaudited |
-| PyTorch policy | Initial visible-state, action-conditioned scorer and verified-trajectory behavioral cloning path; no competitive strength measured |
+| PyTorch policy | Visible-state action scorer, verified-trajectory imitation, initial snapshot-pool self-play experiment, and held-out-seed evaluation; no competitive strength demonstrated |
 
 The selected direction is [Project Ignis/edo9300 ocgcore](https://github.com/edo9300/ygopro-core), configured with its `DUEL_MODE_GOAT` flag, historical card data and scripts, and an audited Python-facing decision adapter. A 2005 banlist alone is insufficient. See [research](docs/research.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md).
 

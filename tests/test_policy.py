@@ -15,6 +15,7 @@ from goat_ai.training import (
     fit_behavioral_clone,
     load_policy_agent,
 )
+from goat_ai.training.self_play import policy_gradient_update, sample_legal_action
 from scripts.evaluate_policy import validate_heldout_seeds
 
 
@@ -108,3 +109,19 @@ def test_evaluation_rejects_training_seed_overlap():
         validate_heldout_seeds(checkpoint, [42, 43])
     with pytest.raises(ValueError, match="provenance"):
         validate_heldout_seeds({}, [43])
+
+
+def test_terminal_reward_moves_selected_action_probability():
+    vocabulary = CardVocabulary((10, 20))
+    record = DecisionRecord(view(), actions(), actions()[1])
+    features = encode_decision(view(), actions(), vocabulary)
+    for reward, direction in ((1.0, 1), (-1.0, -1)):
+        torch.manual_seed(8)
+        model = LegalActionPolicy(vocabulary.size, width=16)
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+        before = torch.softmax(model(features), 0)[1].item()
+        policy_gradient_update(model, vocabulary, [record], reward, 0.0, optimizer)
+        after = torch.softmax(model(features), 0)[1].item()
+        assert (after - before) * direction > 0
+    generator = torch.Generator().manual_seed(9)
+    assert sample_legal_action(model, vocabulary, view(), actions(), generator) in actions()
