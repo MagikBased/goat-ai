@@ -14,8 +14,11 @@ SOURCES = (
      "196eb043514e2cbc23ff891e3cfe31b89765ce49"),
     ("database", "https://github.com/ProjectIgnis/BabelCDB.git",
      "19339149fa5ee509327023f15a81d8ba4164c5a1"),
+    ("banlist", "https://github.com/ProjectIgnis/LFLists.git",
+     "b95e30d7453bb9e692a08ae3081aeceb70582341"),
 )
 DATABASE_SHA256 = "d5166c35296a6c65dcc0230c7bc0e9f25721639159b80fa78bf724be61183a6a"
+GOAT_LIST_SHA256 = "2159b6eb0868816860c4913571b514c27fd777755a09c358f250e6cc7cc5db37"
 
 
 def run(*args: str) -> None:
@@ -38,6 +41,9 @@ def fetch(root: Path, name: str, url: str, revision: str) -> Path:
     elif name == "scripts":
         run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone",
             "/*.lua", "/unofficial/proc_unofficial.lua")
+    elif name == "banlist":
+        run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone",
+            "/GOAT.lflist.conf")
     else:
         run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone", "/cards.cdb")
     return path
@@ -57,6 +63,9 @@ def main() -> None:
     actual_hash = hashlib.sha256((paths["database"] / "cards.cdb").read_bytes()).hexdigest()
     if actual_hash != DATABASE_SHA256:
         raise SystemExit(f"database checksum mismatch: {actual_hash}")
+    list_hash = hashlib.sha256((paths["banlist"] / "GOAT.lflist.conf").read_bytes()).hexdigest()
+    if list_hash != GOAT_LIST_SHA256:
+        raise SystemExit(f"GOAT whitelist checksum mismatch: {list_hash}")
     build = root / "build"
     if not (build / "build.ninja").exists():
         run("meson", "setup", str(build), str(paths["core"]), "-Ddefault_library=shared")

@@ -4,12 +4,18 @@ import argparse
 import json
 from pathlib import Path
 
+from goat_ai.engine.decks import Decklist, read_goat_whitelist, validate_goat_deck
 from goat_ai.engine.native_messages import decode_decision
 from goat_ai.engine.ocgcore_probe import GOAT_FLAGS, OcgcoreProbe
 from goat_ai.engine.probe_deck import VANILLA_DECK
 
 
 def run(native_root: Path, seed: int, max_decisions: int = 1000) -> dict:
+    validate_goat_deck(
+        Decklist(VANILLA_DECK),
+        read_goat_whitelist(native_root / "banlist/GOAT.lflist.conf"),
+        native_root / "database/cards.cdb",
+    )
     with OcgcoreProbe(native_root / "build/libocgcore.so",
                       native_root / "database/cards.cdb", native_root / "scripts") as probe:
         probe.first_decision(seed, VANILLA_DECK)

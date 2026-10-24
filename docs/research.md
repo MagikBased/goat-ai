@@ -11,7 +11,9 @@
 
 No maintained Python package was verified to expose all ocgcore decisions with historical GOAT rules and safe player views. A direct C API bridge or a carefully patched ygoenv fork are the practical next options. Native workers can later support parallel duels; neither state cloning nor deterministic throughput has been demonstrated here.
 
-**M0 prototype result:** A direct Python `ctypes` bridge to the pinned native core reached `MSG_SELECT_CHAIN` after the first player's six-card opening hand. This favors a direct binding for M1 because it avoids ygoenv's modern-rule hardcoding and fixed maximum option count. No complete duel, action enumeration, visibility audit, or throughput measurement has been completed. See [native setup](native_setup.md).
+**M0 prototype result:** A direct Python `ctypes` bridge to the pinned native core reached `MSG_SELECT_CHAIN` after the first player's six-card opening hand. This favors a direct binding for M1 because it avoids ygoenv's modern-rule hardcoding and fixed maximum option count. At M0, no complete duel, action enumeration, visibility audit, or throughput measurement had been completed. See [native setup](native_setup.md).
+
+**M1 update:** The direct binding now completes a narrow vanilla-fixture duel and validates that fixture against Project Ignis's pinned [GOAT whitelist](https://github.com/ProjectIgnis/LFLists/blob/master/GOAT.lflist.conf). The list includes GOAT-specific pre-errata card IDs, so alias and script compatibility need explicit checks before broader deck support. This does not prove all entries match the community's August 17, 2005 interpretation.
 
 ## Historical correctness
 
