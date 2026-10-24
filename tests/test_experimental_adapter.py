@@ -19,8 +19,12 @@ DECK = "examples/decks/control_probe.ydk"
 
 
 def test_new_native_choice_formats():
-    assert [choice.kind for choice in decode_decision(
-        b"\x0d\x00" + struct.pack("<Q", 123)).choices] == ["no", "yes"]
+    yes_no = decode_decision(b"\x0d\x00" + struct.pack("<Q", 123))
+    assert [choice.kind for choice in yes_no.choices] == ["no", "yes"]
+    assert [choice.prompt_id for choice in yes_no.choices] == [123, 123]
+    options = decode_decision(b"\x0e\x01\x02" + struct.pack("<QQ", 17, 23))
+    assert [(choice.response, choice.prompt_id) for choice in options.choices] == [
+        (0, 17), (1, 23)]
     positions = decode_decision(b"\x13\x00" + struct.pack("<I", 123) + b"\x05")
     assert [choice.position for choice in positions.choices] == [1, 4]
     races = decode_decision(b"\x8c\x00\x01" + struct.pack("<Q", 0b101))

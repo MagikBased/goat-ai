@@ -23,6 +23,7 @@ class NativeChoice:
     cards: tuple[tuple[int, int, int, int], ...] = ()
     position: int | None = None
     race: int | None = None
+    prompt_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -54,11 +55,22 @@ def decode_decision(message: bytes) -> NativeDecision:
     kind = reader.integer(1)
     if kind == 13:  # MSG_SELECT_YESNO
         player = reader.integer(1)
-        reader.integer(8)  # prompt description; not yet exposed to the agent
+        prompt_id = reader.integer(8)
         reader.finish()
         if player not in (0, 1):
             raise ValueError("invalid yes/no player")
-        return NativeDecision(player, (NativeChoice("no", 0), NativeChoice("yes", 1)))
+        return NativeDecision(player, (NativeChoice("no", 0, prompt_id=prompt_id),
+                                       NativeChoice("yes", 1, prompt_id=prompt_id)))
+    if kind == 14:  # MSG_SELECT_OPTION
+        player = reader.integer(1)
+        count = reader.integer(1)
+        if player not in (0, 1) or not count:
+            raise ValueError("invalid option selection")
+        choices = tuple(NativeChoice("select_option", index,
+                                     prompt_id=reader.integer(8))
+                        for index in range(count))
+        reader.finish()
+        return NativeDecision(player, choices)
     if kind == 19:  # MSG_SELECT_POSITION
         player = reader.integer(1)
         reader.integer(4)  # card identity is not needed to choose a position

@@ -124,6 +124,8 @@ class RestrictedOcgcoreEngine:
                 parameters["position"] = choice.position
             if choice.race is not None:
                 parameters["race"] = choice.race
+            if choice.prompt_id is not None:
+                parameters["prompt_id"] = choice.prompt_id
             if choice.sequence is not None:
                 parameters["sequence"] = choice.sequence
             if choice.kind == "place" and choice.controller is not None:

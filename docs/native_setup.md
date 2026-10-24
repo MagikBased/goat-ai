@@ -52,8 +52,7 @@ The direct `ctypes` path reaches the first decision with a small binding and no 
 `ExperimentalOcgcoreEngine` relaxes the audited-card gate for whitelist-legal
 40–60 card main decks and Fusion Extra Decks. It validates Side Deck cards,
 which are unused in a single duel, and still fails on unsupported native
-decisions. Its synthetic
-control-style probe exercises effect cards, generated Sheep Tokens, yes/no,
+decisions. Its synthetic control-style probe exercises effect cards, generated Sheep Tokens, yes/no,
 tribute, position, and race selections. `python scripts/probe_control_deck.py
 --seed 42` completes one pinned random duel in 1,251 decisions, winner seat
 1. This covers that seed and action path only. A separate differential test
@@ -61,10 +60,11 @@ replaces an opponent's opening-hand effect monster and then sets each version
 facedown; the acting player's observations and legal actions agree at both
 decision points while private native queries confirm the identities differ.
 This is an initial visibility regression, not a full information-flow audit.
-Prompt descriptions, card
+Yes/no and indexed option requests now carry their native prompt identifiers
+in structured actions. Those identifiers are not yet mapped to readable
+historical card text; their information boundary still needs an audit. Card
 effects, hidden-information memory, untested requests, Extra Deck effect
-interactions, sideboarding, and
-historical rulings remain unaudited. Do not use the experimental adapter for
+interactions, sideboarding, and historical rulings remain unaudited. Do not use the experimental adapter for
 policy training or competitive claims.
 
 Use this binding for M1 unless broader protocol coverage or measured throughput shows a concrete reason to adopt a patched ygoenv fork. Expand request and response handling, effect-card support, and visibility audits before claiming general GOAT coverage.
