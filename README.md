@@ -16,6 +16,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Tournaments | Seeded, seat-swapped runner and Wilson intervals implemented for supported decks |
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
+| Experimental control probe | One seeded 40-card synthetic control-style deck reaches a native terminal state with full scripts; behavior and visibility unaudited |
 
 The selected direction is [Project Ignis/edo9300 ocgcore](https://github.com/edo9300/ygopro-core), configured with its `DUEL_MODE_GOAT` flag, historical card data and scripts, and an audited Python-facing decision adapter. A 2005 banlist alone is insufficient. See [research](docs/research.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md).
 
@@ -62,6 +63,21 @@ python scripts/evaluate_native.py --agent-a heuristic --agent-b random --seeds 1
 ```
 
 The play example prints the winner and decision count and optionally writes a JSON trajectory. `--human-seat` uses the same action API for a CLI player. The evaluation command swaps candidate seats for each seed and reports matchup and seat results; see [the evaluation log](docs/evaluation.md). Supported decision types remain limited to the tested decks, and unsupported requests fail explicitly. The default environment still fails closed because general GOAT effects and visibility cases are unfinished. The benchmark includes reset and Python action selection; results are specific to this fixture and machine.
+
+For experimental effect-card coverage, run:
+
+```bash
+python scripts/setup_native.py --full-card-scripts
+python scripts/probe_control_deck.py --seed 42
+```
+
+The sample is a synthetic control-style protocol probe, not a sourced
+tournament decklist. On pinned assets, seed 42 ends after 1,251 random
+decisions with winner seat 1. This is neither a playing-strength benchmark
+nor a historical-rulings validation. `ExperimentalOcgcoreEngine` accepts only
+40-card main decks without Extra or Side Decks and may fail on unhandled
+native requests. Its action semantics and player-visible observations must be
+audited before using it for training or competitive evaluation.
 
 ## Contributions and data
 

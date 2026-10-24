@@ -21,6 +21,8 @@ class NativeChoice:
     location: int | None = None
     sequence: int | None = None
     cards: tuple[tuple[int, int, int, int], ...] = ()
+    position: int | None = None
+    race: int | None = None
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,72 @@ def decode_decision(message: bytes) -> NativeDecision:
     """Decode supported native choices; fail on every other request type."""
     reader = _Reader(message)
     kind = reader.integer(1)
+    if kind == 13:  # MSG_SELECT_YESNO
+        player = reader.integer(1)
+        reader.integer(8)  # prompt description; not yet exposed to the agent
+        reader.finish()
+        if player not in (0, 1):
+            raise ValueError("invalid yes/no player")
+        return NativeDecision(player, (NativeChoice("no", 0), NativeChoice("yes", 1)))
+    if kind == 19:  # MSG_SELECT_POSITION
+        player = reader.integer(1)
+        reader.integer(4)  # card identity is not needed to choose a position
+        mask = reader.integer(1)
+        reader.finish()
+        if player not in (0, 1) or not mask or mask & ~0xF:
+            raise ValueError("invalid position selection")
+        choices = tuple(NativeChoice("select_position", position, position=position)
+                        for position in (1, 2, 4, 8) if mask & position)
+        return NativeDecision(player, choices)
+    if kind == 140:  # MSG_ANNOUNCE_RACE
+        player = reader.integer(1)
+        count = reader.integer(1)
+        available = reader.integer(8)
+        reader.finish()
+        bits = tuple(1 << index for index in range(64) if available & (1 << index))
+        if player not in (0, 1) or not 1 <= count <= len(bits) or comb(len(bits), count) > 2048:
+            raise NotImplementedError("race announcement bounds are not supported")
+        choices = tuple(NativeChoice("announce_race", struct.pack("<Q", mask), race=mask)
+                        for group in combinations(bits, count)
+                        for mask in (sum(group),))
+        return NativeDecision(player, choices)
+    if kind == 20:  # MSG_SELECT_TRIBUTE
+        player = reader.integer(1)
+        cancelable = reader.integer(1)
+        minimum = reader.integer(4)
+        maximum = reader.integer(4)
+        count = reader.integer(4)
+        if player not in (0, 1) or maximum > 5 or count > 32:
+            raise NotImplementedError("tribute selection bounds are not supported")
+        cards = []
+        for _ in range(count):
+            code = reader.integer(4)
+            controller = reader.integer(1)
+            location = reader.integer(1)
+            sequence = reader.integer(4)
+            weight = reader.integer(1)
+            cards.append((code, controller, location, sequence, weight))
+        reader.finish()
+        if sum(comb(count, size) for size in range(min(count, maximum) + 1)) > 2048:
+            raise NotImplementedError("tribute selection has too many combinations")
+        choices = []
+        for size in range(min(count, maximum) + 1):
+            for indices in combinations(range(count), size):
+                if sum(cards[index][4] for index in indices) < minimum:
+                    continue
+                response = struct.pack("<II", 0, size) + struct.pack(f"<{size}I", *indices)
+                selected = tuple(cards[index][:4] for index in indices)
+                if size == 1:
+                    code, controller, location, sequence = selected[0]
+                    choices.append(NativeChoice("tribute", response, code, controller,
+                                                location, sequence))
+                else:
+                    choices.append(NativeChoice("tribute_cards", response, cards=selected))
+        if cancelable:
+            choices.append(NativeChoice("cancel", -1))
+        if not choices:
+            raise ValueError("empty tribute selection")
+        return NativeDecision(player, tuple(choices))
     if kind == MSG_SELECT_CHAIN:
         player = reader.integer(1)
         reader.integer(1)  # special count, independent from normal option count

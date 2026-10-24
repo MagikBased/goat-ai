@@ -29,7 +29,13 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai python -m pytest -q tests/test_ocgcore_probe.
 
 `setup_native.py` fetches the exact commits into ignored `.cache/goat-ai` and builds `libocgcore.so`. The first decision should be native message `16` (`MSG_SELECT_CHAIN`) for player 0, after draw events `(player 0, five)`, `(player 1, five)`, and `(player 0, one)`. Query counts should be hands `(6, 5)` and decks `(34, 35)` from 40-card starting decks. This checks startup behavior only; it does not establish historical ruling accuracy or legal-action completeness. The fixture passes the pinned Project Ignis GOAT whitelist, which still needs independent historical validation.
 
-The core requests `c0.lua` and individual scripts even for vanilla monsters; the probe accepts absent scripts only for `c0.lua` and database type-17 normal monsters. Missing effect scripts and global scripts fail. Assets are not committed or redistributed by this project.
+The core requests `c0.lua` and individual scripts even for vanilla monsters and generated Tokens; the probe accepts absent scripts only for `c0.lua`, database type-17 normal monsters, and Token cards. Missing effect scripts and global scripts fail. Assets are not committed or redistributed by this project.
+
+`python scripts/setup_native.py --full-card-scripts` checks out the pinned
+official, unofficial, GOAT, and pre-errata script directories for experimental
+probes. The default keeps the small sparse checkout. Setup uses the Meson
+executable beside the active Python interpreter when present, so an older
+system Meson does not open a newer build directory.
 
 ## Protocol findings and next boundary
 
@@ -42,5 +48,15 @@ The direct `ctypes` path reaches the first decision with a small binding and no 
 `RestrictedOcgcoreEngine` validates 40-card fixture YDK decklists and allows three tested spells plus Cannon Soldier. It maps decoded native choices to `Action`s and keeps response bytes inside the engine. Tests cover terminal outcomes, trajectories, Pot's two-card draw, Book's chain response, Nobleman's banishing of a set monster, redaction of that target's hidden ID, and Cannon Soldier's Ignition priority after a summon. `MSG_SELECT_UNSELECT_CARD` choices are exposed for Cannon Soldier's tribute cost. GOAT variant metadata is read from `goat-entries.cdb` before the main database. Other effects remain unsupported. The bridge shuffles both decks deterministically from the duel seed before inserting cards into the native core, which otherwise draws from the supplied order.
 
 `goat_ai.engine.decks` parses `.ydk` sections and checks main/side sizes, pinned whitelist membership, forbidden/limited/semi-limited counts, aliases, and Fusion Deck placement across all three pinned databases. A pre-errata Dark Magician of Chaos card and script are tested at native startup. The card-pool audit finds metadata and a candidate script path for all 1,685 allowed whitelist IDs. Only selected scripts are fetched by sparse checkout; decks with other effect cards fail explicitly in the restricted adapter. This is an asset and legality gate, not a historical behavior audit.
+
+`ExperimentalOcgcoreEngine` relaxes the audited-card gate for 40-card
+main-only decks and still fails on unsupported native decisions. Its synthetic
+control-style probe exercises effect cards, generated Sheep Tokens, yes/no,
+tribute, position, and race selections. `python scripts/probe_control_deck.py
+--seed 42` completes one pinned random duel in 1,251 decisions, winner seat
+1. This covers that seed and action path only. Prompt descriptions, card
+effects, hidden-information memory, untested requests, Extra/Side Decks, and
+historical rulings remain unaudited. Do not use the experimental adapter for
+policy training or competitive claims.
 
 Use this binding for M1 unless broader protocol coverage or measured throughput shows a concrete reason to adopt a patched ygoenv fork. Expand request and response handling, effect-card support, and visibility audits before claiming general GOAT coverage.

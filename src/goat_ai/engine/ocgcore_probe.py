@@ -232,7 +232,8 @@ class OcgcoreProbe:
             if relative.name.startswith("c") and relative.stem[1:].isdigit():
                 code = int(relative.stem[1:])
                 row = self._card_row(code, "type")
-                if row and row[0] == 17:  # normal monster
+                if row and (row[0] == 17 or row[0] & 0x4000):
+                    # Normal monsters and generated Tokens have no scripts.
                     return 0
             if not path.is_file():
                 self.errors.append(f"missing script: {relative}")

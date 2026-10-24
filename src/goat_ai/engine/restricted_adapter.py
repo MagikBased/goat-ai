@@ -119,6 +119,10 @@ class RestrictedOcgcoreEngine:
                 parameters["cards"] = cards
             if choice.location is not None:
                 parameters["location"] = choice.location
+            if choice.position is not None:
+                parameters["position"] = choice.position
+            if choice.race is not None:
+                parameters["race"] = choice.race
             if choice.sequence is not None:
                 parameters["sequence"] = choice.sequence
             if choice.kind == "place" and choice.controller is not None:

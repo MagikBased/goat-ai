@@ -21,7 +21,7 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
-**Status: in progress.** A direct native binding completes restricted fixture duels with selected scripted cards. It handles optional chain choices, exposes structured public chain links and monster battle positions, and redacts the ID of a set opponent monster targeted by Nobleman. `.ydk` parsing, pinned whitelist checks, deterministic deck shuffling, and a complete metadata/script-path inventory for the 1,685 allowed whitelist IDs are implemented. General effect and decision coverage, independently audited historical legality, and complete player-visible observations are still required.
+**Status: in progress.** A direct native binding completes restricted fixture duels with selected scripted cards. It handles optional chain choices, exposes structured public chain links and monster battle positions, and redacts the ID of a set opponent monster targeted by Nobleman. `.ydk` parsing, pinned whitelist checks, deterministic deck shuffling, and a complete metadata/script-path inventory for the 1,685 allowed whitelist IDs are implemented. A separate experimental adapter completes one seeded synthetic control-deck duel using full scripts, but its decisions and visibility are unaudited. General effect and decision coverage, independently audited historical legality, and complete player-visible observations are still required.
 
 **Work**
 
@@ -65,4 +65,4 @@ Keep training in Python. Define a versioned, game-independent decision boundary:
 
 ## Immediate next work item
 
-Broaden M1 by fetching and validating effect-card scripts, decoding their decision messages, and auditing hidden-information boundaries. Begin M2 with source-backed priority and ruling fixtures before training. Keep each implementation change small enough to demonstrate with a command, test, and documented limitation.
+Broaden M1 by auditing the experimental adapter's legal choices, prompt semantics, and hidden-information boundaries; then add Extra Deck support and card-family fixtures. Continue M2 with source-backed timing and ruling fixtures before training. Keep each implementation change small enough to demonstrate with a command, test, and documented limitation.
