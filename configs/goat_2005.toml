@@ -1,0 +1,9 @@
+name = "tcg-goat-2005-08-17"
+banlist = "tcg-2005-04"
+first_turn_draw = true
+obsolete_ignition_priority = true
+starting_lp = 8000
+starting_hand = 5
+draw_count = 1
+# Documentation only until native adapter verifies and applies every setting.
+

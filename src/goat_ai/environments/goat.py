@@ -1,0 +1,50 @@
+"""Stable environment boundary; actual duel behavior is delegated to a rules engine."""
+
+from goat_ai.actions import Action
+from goat_ai.engine import Decision, RulesEngine
+from goat_ai.engine.protocol import UnavailableOcgcore
+from goat_ai.observations import Observation
+
+
+class GoatEnvironment:
+    def __init__(
+        self, player1_deck: str, player2_deck: str, seed: int = 0,
+        engine: RulesEngine | None = None,
+    ) -> None:
+        self.decks = (player1_deck, player2_deck)
+        self.seed = seed
+        self.engine = engine if engine is not None else UnavailableOcgcore()
+        self._decision: Decision | None = None
+
+    def reset(self, seed: int | None = None) -> Observation:
+        if seed is not None:
+            self.seed = seed
+        self._decision = self.engine.reset(*self.decks, self.seed)
+        return self._decision.observation
+
+    def _current(self) -> Decision:
+        if self._decision is None:
+            raise RuntimeError("call reset before accessing a duel")
+        return self._decision
+
+    def legal_actions(self) -> tuple[Action, ...]:
+        return self._current().legal_actions
+
+    def step(self, action: Action) -> Observation:
+        decision = self._current()
+        if decision.terminal:
+            raise RuntimeError("duel is terminal")
+        if action not in decision.legal_actions:
+            raise ValueError("illegal action")
+        self._decision = self.engine.step(action)
+        return self._decision.observation
+
+    def is_terminal(self) -> bool:
+        return self._current().terminal
+
+    def result(self) -> int | None:
+        decision = self._current()
+        if not decision.terminal:
+            raise RuntimeError("duel has not ended")
+        return decision.winner
+
