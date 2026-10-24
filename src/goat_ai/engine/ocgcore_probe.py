@@ -19,7 +19,9 @@ from goat_ai.observations import (
     DisabledZoneView,
     KnownCardView,
     Observation,
+    PrivateRevealView,
     PublicRevealView,
+    RevealedCardView,
 )
 
 CORE_API_VERSION = (11, 0)
@@ -43,6 +45,7 @@ MSG_SET = 54
 MSG_SWAP = 55
 MSG_SHUFFLE_SET_CARD = 36
 MSG_CONFIRM_DECKTOP = 30
+MSG_CONFIRM_CARDS = 31
 MSG_FIELD_DISABLED = 56
 MSG_ATTACK = 110
 MSG_DAMAGE_STEP_START = 113
@@ -168,6 +171,7 @@ class OcgcoreProbe:
         self._known_facedown: dict[tuple[int, int, int], int] = {}
         self._restriction_hints: dict[tuple[int, int], int] = {}
         self._public_reveals: list[PublicRevealView] = []
+        self._private_reveals: list[PrivateRevealView] = []
         self._disabled_zones: tuple[DisabledZoneView, ...] = ()
         self._bind()
         major, minor = c.c_int(), c.c_int()
@@ -391,6 +395,20 @@ class OcgcoreProbe:
                               for index in range(count))
                 self._public_reveals.append(PublicRevealView(
                     self._turn, message[1], "deck_top", codes))
+            elif message[0] == MSG_CONFIRM_CARDS:
+                if len(message) < 6 or message[1] not in (0, 1):
+                    raise ValueError("invalid MSG_CONFIRM_CARDS")
+                count = struct.unpack_from("<I", message, 2)[0]
+                if len(message) != 6 + count * 10:
+                    raise ValueError("invalid MSG_CONFIRM_CARDS card count")
+                if count:
+                    cards = tuple(sorted((RevealedCardView(
+                        struct.unpack_from("<I", message, 6 + index * 10)[0],
+                        message[10 + index * 10], message[11 + index * 10])
+                        for index in range(count)),
+                        key=lambda card: (card.controller, card.location, card.code)))
+                    self._private_reveals.append(PrivateRevealView(
+                        self._turn, message[1], cards))
             elif message[0] == MSG_FIELD_DISABLED:
                 if len(message) != 5:
                     raise ValueError("invalid MSG_FIELD_DISABLED length")
@@ -561,6 +579,8 @@ class OcgcoreProbe:
                 if self._restriction_hints.get((player, SCAPEGOAT_SUMMON_HINT), 0)),
             public_reveals=tuple(self._public_reveals),
             disabled_zones=self._disabled_zones,
+            private_reveals=tuple(reveal for reveal in self._private_reveals
+                                  if reveal.recipient == viewer),
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:

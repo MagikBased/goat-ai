@@ -8,6 +8,7 @@ from goat_ai.engine.native_messages import decode_decision
 from goat_ai.engine.ocgcore_probe import (
     GOAT_FLAGS,
     MSG_ATTACK,
+    MSG_CONFIRM_CARDS,
     MSG_DAMAGE_STEP_END,
     MSG_DAMAGE_STEP_START,
     MSG_DRAW,
@@ -68,6 +69,26 @@ def test_public_field_disabled_mask_replaces_previous_zones():
     assert probe._disabled_zones == ()
     with pytest.raises(ValueError, match="MSG_FIELD_DISABLED"):
         probe._update_public_clock([bytes((MSG_FIELD_DISABLED, 1))])
+
+
+def test_confirm_cards_preserves_recipient_and_discards_native_card_order():
+    probe = object.__new__(OcgcoreProbe)
+    probe._turn = 3
+    probe._phase = "main1"
+    probe._chain = []
+    probe._public_history = []
+    probe._known_facedown = {}
+    probe._private_reveals = []
+    message = (bytes((MSG_CONFIRM_CARDS, 0)) + struct.pack("<I", 2)
+               + struct.pack("<IBBI", 200, 1, 1, 7)
+               + struct.pack("<IBBI", 100, 1, 1, 2))
+    probe._update_public_clock([message])
+    reveal = probe._private_reveals[0]
+    assert reveal.recipient == 0 and reveal.turn == 3
+    assert [(card.code, card.controller, card.location) for card in reveal.cards] == [
+        (100, 1, 1), (200, 1, 1)]
+    with pytest.raises(ValueError, match="MSG_CONFIRM_CARDS"):
+        probe._update_public_clock([message[:-1]])
 
 
 def test_known_facedown_memory_requires_public_flip_and_clears_on_move():

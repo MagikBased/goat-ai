@@ -13,7 +13,9 @@ from goat_ai.observations import (
     DisabledZoneView,
     KnownCardView,
     Observation,
+    PrivateRevealView,
     PublicRevealView,
+    RevealedCardView,
 )
 from goat_ai.replay import (
     DecisionRecord,
@@ -142,6 +144,23 @@ def test_disabled_zone_round_trip_and_legacy_reader(tmp_path):
     raw["decisions"][0]["observation"].pop("disabled_zones")
     path.write_text(json.dumps(raw))
     assert read_trajectory(path).decisions[0].observation.disabled_zones == ()
+
+
+def test_private_reveal_round_trip_and_cross_player_rejection(tmp_path):
+    reveal = PrivateRevealView(3, 0, (RevealedCardView(456, 1, 1),))
+    observation = replace(view(), private_reveals=(reveal,))
+    action = Action("0", "pass", 0)
+    path = tmp_path / "private.json"
+    write_trajectory(path, Trajectory("goat", ("a", "b"), 7,
+                                      (DecisionRecord(observation, (action,), action),), 0))
+    assert read_trajectory(path).decisions[0].observation.private_reveals == (reveal,)
+    with pytest.raises(ValueError, match="observation viewer"):
+        replace(observation, private_reveals=(replace(reveal, recipient=1),))
+    raw = json.loads(path.read_text())
+    raw["schema_version"] = 9
+    raw["decisions"][0]["observation"].pop("private_reveals")
+    path.write_text(json.dumps(raw))
+    assert read_trajectory(path).decisions[0].observation.private_reveals == ()
 
 
 def test_agents_use_same_contract():

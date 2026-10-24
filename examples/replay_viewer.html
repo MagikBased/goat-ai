@@ -96,6 +96,10 @@
           <div id="reveals"></div>
           <div id="history" class="muted"></div>
         </div>
+        <div class="panel">
+          <h2>Cards shown to this player</h2>
+          <div id="private-reveals" class="muted"></div>
+        </div>
       </div>
     </section>
   </main>
@@ -109,6 +113,7 @@
     let timer = null;
     const byId = id => document.getElementById(id);
     const phaseName = phase => String(phase || "unknown").replaceAll("_", " ");
+    const locationName = location => ({1: "Deck", 2: "Hand", 4: "Monster", 8: "Spell/Trap", 16: "Graveyard", 32: "Banished", 64: "Extra"})[location] || `zone ${location}`;
     const nameOf = code => code == null ? "Unknown card" : (names[String(code)] || `Card #${code}`);
     const node = (tag, className, content) => {
       const element = document.createElement(tag);
@@ -239,6 +244,9 @@
         ? `Public Deck reveals: ${observation.public_reveals.map(reveal => `Turn ${reveal.turn}, P${reveal.player}: ${reveal.codes.map(nameOf).join(", ")}`).join(" · ")}`
         : "Public Deck reveals: none recorded";
       byId("history").textContent = observation.public_history?.length ? `Recent events: ${observation.public_history.slice(-8).join(" · ")}` : "No public events recorded";
+      byId("private-reveals").textContent = observation.private_reveals?.length
+        ? observation.private_reveals.map(reveal => `Turn ${reveal.turn}: ${reveal.cards.map(card => `${nameOf(card.code)} (P${card.controller} ${locationName(card.location)})`).join(", ")}`).join(" · ")
+        : "No recipient-scoped reveals recorded";
     }
     function move(direction) {
       if (!replay) return;

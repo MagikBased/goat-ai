@@ -52,6 +52,22 @@ class DisabledZoneView:
 
 
 @dataclass(frozen=True)
+class RevealedCardView:
+    code: int
+    controller: int
+    location: int
+
+
+@dataclass(frozen=True)
+class PrivateRevealView:
+    """A multiset of cards shown only to the addressed player."""
+
+    turn: int
+    recipient: int
+    cards: tuple[RevealedCardView, ...]
+
+
+@dataclass(frozen=True)
 class Observation:
     viewer: int
     acting_player: int
@@ -73,6 +89,7 @@ class Observation:
     known_opponent_field_cards: tuple[KnownCardView, ...] = ()
     public_reveals: tuple[PublicRevealView, ...] = ()
     disabled_zones: tuple[DisabledZoneView, ...] = ()
+    private_reveals: tuple[PrivateRevealView, ...] = ()
 
     def __post_init__(self) -> None:
         if self.viewer not in (0, 1) or self.acting_player not in (0, 1):
@@ -105,6 +122,11 @@ class Observation:
                 or not 0 <= slot.sequence < (7 if slot.zone == "monster" else 8)
                 for slot in self.disabled_zones):
             raise ValueError("invalid disabled field zone")
+        if any(reveal.turn < 0 or reveal.recipient != self.viewer or not reveal.cards
+               or any(card.code <= 0 or card.controller not in (0, 1)
+                      or not 0 <= card.location <= 255 for card in reveal.cards)
+               for reveal in self.private_reveals):
+            raise ValueError("private reveal must belong to the observation viewer")
         if self.opponent_hand_count < 0 or any(n < 0 for n in self.deck_counts):
             raise ValueError("counts must be nonnegative")
 
