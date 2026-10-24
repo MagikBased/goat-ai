@@ -10,7 +10,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. **This re
 | Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
 | Complete headless duel | Narrow vanilla-fixture smoke duel reaches terminal; general adapter unfinished |
 | Environment contract and illegal-action validation | Implemented |
-| Player-visible observation schema | Implemented; engine redaction unverified |
+| Player-visible observation schema | Implemented; native hand/facedown redaction tested on fixture |
 | Random, heuristic, CLI human agents | Implemented against contract |
 | JSON trajectory round trip | Implemented |
 | Real duel, tournaments, throughput benchmarks | Blocked on engine adapter |

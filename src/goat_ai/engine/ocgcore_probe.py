@@ -11,10 +11,17 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
+from goat_ai.observations import CardView, Observation
+
 CORE_API_VERSION = (11, 0)
 GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
 LOCATION_DECK = 0x01
 LOCATION_HAND = 0x02
+LOCATION_MZONE = 0x04
+LOCATION_SZONE = 0x08
+LOCATION_GRAVE = 0x10
+LOCATION_REMOVED = 0x20
+LOCATION_EXTRA = 0x40
 POSITION_FACEDOWN_DEFENSE = 0x08
 MSG_SELECT_IDLECMD = 11
 MSG_SELECT_CHAIN = 16
@@ -61,6 +68,13 @@ class NewCard(c.Structure):
         ("team", c.c_uint8), ("duelist", c.c_uint8), ("code", c.c_uint32),
         ("con", c.c_uint8), ("loc", c.c_uint32), ("seq", c.c_uint32),
         ("pos", c.c_uint32),
+    ]
+
+
+class QueryInfo(c.Structure):
+    _fields_ = [
+        ("flags", c.c_uint32), ("con", c.c_uint8), ("loc", c.c_uint32),
+        ("seq", c.c_uint32), ("overlay_seq", c.c_uint32),
     ]
 
 
@@ -111,6 +125,8 @@ class OcgcoreProbe:
         self._setcodes: dict[int, c.Array] = {}
         self._duel = c.c_void_p()
         self._pending_message: bytes | None = None
+        self._turn = 0
+        self._phase = "unknown"
         self._bind()
         major, minor = c.c_int(), c.c_int()
         self.lib.OCG_GetVersion(c.byref(major), c.byref(minor))
@@ -134,6 +150,9 @@ class OcgcoreProbe:
             "OCG_DuelSetResponse": ([c.c_void_p, c.c_void_p, c.c_uint32], None),
             "OCG_LoadScript": ([c.c_void_p, c.c_char_p, c.c_uint32, c.c_char_p], c.c_int),
             "OCG_DuelQueryCount": ([c.c_void_p, c.c_uint8, c.c_uint32], c.c_uint32),
+            "OCG_DuelQueryLocation": ([c.c_void_p, c.POINTER(c.c_uint32),
+                                        c.POINTER(QueryInfo)], c.c_void_p),
+            "OCG_DuelQueryField": ([c.c_void_p, c.POINTER(c.c_uint32)], c.c_void_p),
         }
         for name, (argtypes, restype) in definitions.items():
             function = getattr(self.lib, name)
@@ -194,7 +213,8 @@ class OcgcoreProbe:
     def _log(self, _payload: int, message: bytes, _kind: int) -> None:
         self.errors.append(message.decode("utf-8", errors="replace"))
 
-    def first_decision(self, seed: int, deck: tuple[int, ...]) -> FirstDecision:
+    def first_decision(self, seed: int, deck: tuple[int, ...],
+                       opponent_deck: tuple[int, ...] | None = None) -> FirstDecision:
         if self._duel.value:
             raise RuntimeError("probe instance already used")
         if len(deck) < 6:
@@ -215,8 +235,8 @@ class OcgcoreProbe:
         for name in (b"constant.lua", b"utility.lua"):
             if not self._read_script(0, self._duel, name):
                 raise RuntimeError(f"could not load {name.decode()}: {self.errors}")
-        for team in (0, 1):
-            for code in deck:
+        for team, cards in enumerate((deck, opponent_deck or deck)):
+            for code in cards:
                 card = NewCard(team, 0, code, team, LOCATION_DECK, 0,
                                POSITION_FACEDOWN_DEFENSE)
                 self.lib.OCG_DuelNewCard(self._duel, c.byref(card))
@@ -238,6 +258,7 @@ class OcgcoreProbe:
             raise RuntimeError("native core did not reach a decision")
         if self.errors:
             raise RuntimeError(f"native processing errors: {self.errors}")
+        self._update_public_clock(messages)
         decision = messages[-1]
         if decision[0] != MSG_SELECT_CHAIN or len(decision) < 2:
             raise RuntimeError(f"unsupported first decision message: {decision[0]}")
@@ -253,6 +274,82 @@ class OcgcoreProbe:
             tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_HAND) for p in (0, 1)),
             tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_DECK) for p in (0, 1)),
             tuple(message[0] for message in messages), tuple(draw_events), decision[0], decision[1],
+        )
+
+    def _update_public_clock(self, messages: list[bytes]) -> None:
+        phases = {1: "draw", 2: "standby", 4: "main1", 8: "battle_start",
+                  16: "battle_step", 128: "battle", 256: "main2", 512: "end"}
+        for message in messages:
+            if message[0] == 40:
+                self._turn += 1
+            elif message[0] == 41:
+                if len(message) < 3:
+                    raise ValueError("truncated MSG_NEW_PHASE")
+                phase = struct.unpack_from("<H", message, 1)[0]
+                self._phase = phases.get(phase, f"phase_{phase}")
+
+    def _query_location(self, player: int, location: int):
+        from goat_ai.engine.native_queries import decode_location
+
+        query = QueryInfo(0x1 | 0x2, player, location, 0, 0)
+        length = c.c_uint32()
+        pointer = self.lib.OCG_DuelQueryLocation(self._duel, c.byref(length), c.byref(query))
+        if not pointer or not length.value:
+            raise RuntimeError("native location query returned no data")
+        return decode_location(c.string_at(pointer, length.value))
+
+    def observation(self, viewer: int) -> Observation:
+        """Build a redacted view; only audited fields are requested or returned."""
+        if self._pending_message is None or viewer not in (0, 1):
+            raise RuntimeError("observation requires a pending decision and valid viewer")
+        from goat_ai.engine.native_messages import decode_decision
+        from goat_ai.engine.native_queries import decode_life_points
+
+        locations = {}
+        for player in (0, 1):
+            for location in (LOCATION_MZONE, LOCATION_SZONE, LOCATION_GRAVE,
+                             LOCATION_REMOVED):
+                locations[player, location] = self._query_location(player, location)
+        hand = self._query_location(viewer, LOCATION_HAND)
+        length = c.c_uint32()
+        pointer = self.lib.OCG_DuelQueryField(self._duel, c.byref(length))
+        if not pointer or not length.value:
+            raise RuntimeError("native field query returned no data")
+        lp = decode_life_points(
+            c.string_at(pointer, length.value),
+            tuple(len(locations[p, LOCATION_MZONE]) for p in (0, 1)),
+            tuple(len(locations[p, LOCATION_SZONE]) for p in (0, 1)),
+        )
+
+        def view_card(player: int, location: int, card) -> CardView:
+            faceup = bool(card.position & 0x5)
+            visible_code = card.code if player == viewer or faceup else None
+            position = "faceup" if faceup else "facedown"
+            zone = {LOCATION_MZONE: "monster", LOCATION_SZONE: "spell_trap",
+                    LOCATION_GRAVE: "graveyard", LOCATION_REMOVED: "banished"}[location]
+            return CardView(player, zone, position, visible_code)
+
+        field = tuple(view_card(player, location, card)
+                      for player in (0, 1) for location in (LOCATION_MZONE, LOCATION_SZONE)
+                      for card in locations[player, location] if card is not None)
+        graveyards = tuple(tuple(view_card(player, LOCATION_GRAVE, card)
+                                 for card in locations[player, LOCATION_GRAVE] if card is not None)
+                           for player in (0, 1))
+        banished = tuple(tuple(view_card(player, LOCATION_REMOVED, card)
+                               for card in locations[player, LOCATION_REMOVED] if card is not None)
+                         for player in (0, 1))
+        return Observation(
+            viewer=viewer, acting_player=decode_decision(self._pending_message).player,
+            turn=self._turn, phase=self._phase, life_points=lp,
+            hand=tuple(CardView(viewer, "hand", "hidden", card.code)
+                       for card in hand if card is not None),
+            field=field, graveyards=graveyards, banished=banished,
+            opponent_hand_count=self.lib.OCG_DuelQueryCount(self._duel, 1 - viewer,
+                                                            LOCATION_HAND),
+            deck_counts=tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_DECK)
+                              for p in (0, 1)),
+            extra_deck_counts=tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_EXTRA)
+                                    for p in (0, 1)),
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:
@@ -289,6 +386,7 @@ class OcgcoreProbe:
             if length.value:
                 frames = split_messages(c.string_at(pointer, length.value))
                 frames_seen.extend(frames)
+                self._update_public_clock(list(frames))
                 if status == STATUS_AWAITING:
                     self._pending_message = frames[-1]
             if self.errors:

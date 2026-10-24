@@ -1,6 +1,6 @@
 # M0 native GOAT-mode probe
 
-The probe in `goat_ai.engine.ocgcore_probe` calls the native C API through Python `ctypes`. It starts a seeded duel, loads cards and global scripts, processes native messages until the first response request, and checks public counts. It does **not** decode legal actions or provide a player-visible observation. Raw core messages may contain private data.
+The probe in `goat_ai.engine.ocgcore_probe` calls the native C API through Python `ctypes`. It starts a seeded duel, loads cards and global scripts, processes native messages, and checks public counts. It now decodes a small subset of decisions and constructs a redacted observation for those states. It is **not** the general `GoatEnvironment` adapter. Raw core messages may contain private data and must stay inside the native layer.
 
 ## Pinned external sources
 
@@ -26,7 +26,7 @@ python scripts/run_native_smoke.py --seed 42
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai python -m pytest -q tests/test_ocgcore_probe.py
 ```
 
-`setup_native.py` fetches the exact commits into ignored `.cache/goat-ai` and builds `libocgcore.so`. The first decision should be native message `16` (`MSG_SELECT_CHAIN`) for player 0, after draw events `(player 0, five)`, `(player 1, five)`, and `(player 0, one)`. Query counts should be hands `(6, 5)` and decks `(34, 35)` from 40-card starting decks. This checks startup behavior only; it does not establish historical ruling accuracy or legal-action completeness. The fixture's card-pool legality remains unverified.
+`setup_native.py` fetches the exact commits into ignored `.cache/goat-ai` and builds `libocgcore.so`. The first decision should be native message `16` (`MSG_SELECT_CHAIN`) for player 0, after draw events `(player 0, five)`, `(player 1, five)`, and `(player 0, one)`. Query counts should be hands `(6, 5)` and decks `(34, 35)` from 40-card starting decks. This checks startup behavior only; it does not establish historical ruling accuracy or legal-action completeness. The fixture passes the pinned Project Ignis GOAT whitelist, which still needs independent historical validation.
 
 The core requests `c0.lua` and individual scripts even for vanilla monsters; the probe accepts absent scripts only for `c0.lua` and database type-17 normal monsters. Missing effect scripts and global scripts fail. Assets are not committed or redistributed by this project.
 
@@ -34,8 +34,10 @@ The core requests `c0.lua` and individual scripts even for vanilla monsters; the
 
 Native messages are length-prefixed binary frames. The first processed sequence includes opening draws, turn and phase changes, the first-turn draw, then `MSG_SELECT_CHAIN`. The next adapter must parse every request type, choose a response using the engine's response protocol, and provide player-scoped redacted observations. The core's query functions can expose complete internal state, so calling them does not itself enforce information boundaries. State cloning, complete-game throughput, and historical card behavior remain unmeasured.
 
-The direct `ctypes` path reaches the first decision with a small binding and no fixed action-list size. A narrow smoke runner now decodes zero-option chain windows, idle actions, and single-card selections, and completes a vanilla-fixture duel by ending turns and discarding at hand limit. The fixture has 40 cards, at most three copies each, and passes the pinned Project Ignis GOAT whitelist. Seed 42 terminates after 350 decisions with player 1 winning by deck-out. This is a real native duel; it does not cover arbitrary cards, full legal-action enumeration, safe player observations, or an agent-facing environment. Raw native choices remain internal. The smoke runner is a protocol regression, not a performance benchmark.
+The direct `ctypes` path reaches the first decision with a small binding and no fixed action-list size. A narrow smoke runner now decodes zero-option chain windows, idle actions, and single-card selections, and completes a vanilla-fixture duel by ending turns and discarding at hand limit. The fixture has 40 cards, at most three copies each, and passes the pinned Project Ignis GOAT whitelist. Seed 42 terminates after 350 decisions with player 1 winning by deck-out. This is a real native duel; it does not cover arbitrary cards, full legal-action enumeration, or an agent-facing environment. Raw native choices remain internal. The smoke runner is a protocol regression, not a performance benchmark.
 
-`goat_ai.engine.decks` parses `.ydk` sections and checks main/side sizes, pinned whitelist membership, forbidden/limited/semi-limited counts, and aliases in the pinned database. This is an initial deck legality gate. The whitelist and card data still need an independent historical audit, and effect-card scripts are not yet fetched by the sparse M0 setup.
+`OcgcoreProbe.observation(viewer)` queries only the viewer's own hand and counts for the opponent's hand and both decks. Field, graveyard, and banished-zone identities are redacted when facedown to the viewer. Native tests compare observations after changing only the opponent deck order and confirm that a set monster's ID is hidden from the opponent. This is an initial visibility boundary; chains, reveals, effects, history, and all position interactions still need an audit.
+
+`goat_ai.engine.decks` parses `.ydk` sections and checks main/side sizes, pinned whitelist membership, forbidden/limited/semi-limited counts, aliases, and Fusion Deck placement in the pinned database. This is an initial deck legality gate. The whitelist and card data still need an independent historical audit, and effect-card scripts are not yet fetched by the sparse M0 setup.
 
 Use this binding for M1 unless broader protocol coverage or measured throughput shows a concrete reason to adopt a patched ygoenv fork. Implement full response handling and player-visible observation construction before connecting it to `GoatEnvironment`.

@@ -77,6 +77,25 @@ def decode_decision(message: bytes) -> NativeDecision:
                                         code, controller, location, sequence))
         reader.finish()
         return NativeDecision(player, tuple(choices))
+    if kind == 18:  # MSG_SELECT_PLACE
+        player = reader.integer(1)
+        count = reader.integer(1)
+        forbidden = reader.integer(4)
+        reader.finish()
+        if count != 1:
+            raise NotImplementedError("multi-place selection is not decoded")
+        choices = []
+        for group in range(4):
+            controller = player if group < 2 else 1 - player
+            location = 0x4 if group % 2 == 0 else 0x8
+            for sequence in range(8):
+                if not forbidden & (1 << (group * 8 + sequence)):
+                    choices.append(NativeChoice("place", bytes((controller, location, sequence)),
+                                                controller=controller, location=location,
+                                                sequence=sequence))
+        if not choices:
+            raise ValueError("no legal place in MSG_SELECT_PLACE")
+        return NativeDecision(player, tuple(choices))
     if kind != MSG_SELECT_IDLECMD:
         raise NotImplementedError(f"native decision message {kind} is not decoded")
 
