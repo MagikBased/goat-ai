@@ -1,4 +1,4 @@
-"""Real ocgcore adapter for normal-monster decks and selected spells.
+"""Real ocgcore adapter for normal-monster decks and selected scripted cards.
 
 This bridge exposes every choice decoded by native_messages. It fails on an
 unsupported request; it does not silently hide legal choices or fake rules.
@@ -18,6 +18,7 @@ from goat_ai.engine.protocol import Decision, RulesProfile, SimulatorUnavailable
 class RestrictedOcgcoreEngine:
     ruleset = RulesProfile()
     supported_spells = frozenset({55144522, 14087893, 504700116})
+    supported_monsters = frozenset({11384280})
 
     def __init__(self, native_root: str | Path) -> None:
         self.root = Path(native_root)
@@ -43,12 +44,13 @@ class RestrictedOcgcoreEngine:
                 if row is None:
                     row = connection.execute("SELECT type FROM main.datas WHERE id=?",
                                              (code,)).fetchone()
-                if row is None or (row[0] != 17 and code not in self.supported_spells):
+                if row is None or (row[0] != 17 and code not in self.supported_spells
+                                   and code not in self.supported_monsters):
                     raise SimulatorUnavailable(
                         f"restricted adapter cannot simulate card {code}; card script is not audited"
                     )
                 script_dir = "goat" if code == 504700116 else "official"
-                if code in self.supported_spells and not (
+                if code in self.supported_spells | self.supported_monsters and not (
                     self.root / f"scripts/{script_dir}/c{code}.lua"
                 ).is_file():
                     raise SimulatorUnavailable(f"card {code} script missing; rerun setup_native.py")

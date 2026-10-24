@@ -43,6 +43,7 @@ def fetch(root: Path, name: str, url: str, revision: str) -> Path:
         run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone",
             "/*.lua", "/unofficial/proc_unofficial.lua",
             "/official/c55144522.lua", "/official/c14087893.lua",
+            "/official/c11384280.lua",
             "/goat/c504700116.lua")
     elif name == "banlist":
         run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone",

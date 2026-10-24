@@ -110,6 +110,40 @@ def decode_decision(message: bytes) -> NativeDecision:
             choices.append(NativeChoice("cancel", -1))
         reader.finish()
         return NativeDecision(player, tuple(choices))
+    if kind == 26:  # MSG_SELECT_UNSELECT_CARD
+        player = reader.integer(1)
+        finishable = reader.integer(1)
+        cancelable = reader.integer(1)
+        reader.integer(4)  # minimum cards in the completed selection
+        reader.integer(4)  # maximum cards in the completed selection
+        choices = []
+        count = reader.integer(4)
+        for index in range(count):
+            code = reader.integer(4)
+            controller = reader.integer(1)
+            location = reader.integer(1)
+            sequence = reader.integer(4)
+            reader.integer(4)  # position
+            choices.append(NativeChoice("select_card", struct.pack("<II", 1, index),
+                                        code, controller, location, sequence))
+        unselect_count = reader.integer(4)
+        for index in range(unselect_count):
+            code = reader.integer(4)
+            controller = reader.integer(1)
+            location = reader.integer(1)
+            sequence = reader.integer(4)
+            reader.integer(4)  # position
+            choices.append(NativeChoice("unselect_card",
+                                        struct.pack("<II", 1, count + index),
+                                        code, controller, location, sequence))
+        if finishable:
+            choices.append(NativeChoice("finish_selection", -1))
+        elif cancelable:
+            choices.append(NativeChoice("cancel", -1))
+        reader.finish()
+        if not choices:
+            raise ValueError("empty select/unselect decision")
+        return NativeDecision(player, tuple(choices))
     if kind == 18:  # MSG_SELECT_PLACE
         player = reader.integer(1)
         count = reader.integer(1)
