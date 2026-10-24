@@ -64,6 +64,9 @@ decisions per duel. These runs do not validate card behavior or strategy. A sepa
 replaces an opponent's opening-hand effect monster and then sets each version
 facedown; the acting player's observations and legal actions agree at both
 decision points while private native queries confirm the identities differ.
+Another differential fixture sets Dust Tornado versus Sakuretsu Armor from
+opponent hands and confirms that the next acting-player observation and legal
+actions match while private Spell/Trap Zone queries show different identities.
 This is an initial visibility regression, not a full information-flow audit.
 Generic yes/no, effect yes/no, and indexed option requests now carry native
 prompt identifiers

@@ -4,7 +4,7 @@ GOAT AI's first goal is a **verified, headless GOAT duel that two random agents 
 
 ## Current baseline
 
-The repository has a Python environment contract, observation and action types, three baseline agents, JSON trajectory serialization, and CI. The default engine raises `SimulatorUnavailable`. A restricted native adapter now completes normal-monster fixture duels; this is not a historical correctness claim. The selected engine is modern ocgcore with `DUEL_MODE_GOAT`, subject to ruling validation. See [native setup](native_setup.md).
+The repository has a Python environment contract, observation and action types, three baseline agents, and JSON trajectory serialization. Tests run locally; GitHub Actions is disabled for this project. The default engine raises `SimulatorUnavailable`. A restricted native adapter now completes normal-monster fixture duels; this is not a historical correctness claim. The selected engine is modern ocgcore with `DUEL_MODE_GOAT`, subject to ruling validation. See [native setup](native_setup.md).
 
 ## M0 — Prove the native engine path
 
@@ -21,7 +21,7 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
-**Status: in progress.** A direct native binding completes restricted fixture duels with selected scripted cards. It handles optional chain choices, exposes structured public chain links, monster battle positions, and Battle/Damage Step timing from public core events, and redacts the ID of a set opponent monster targeted by Nobleman. `.ydk` parsing, pinned whitelist checks, deterministic deck shuffling, and a complete metadata/script-path inventory for the 1,685 allowed whitelist IDs are implemented. Deck validation now admits more than 60 Main Deck cards and selects historical or community Side Deck sizing. A separate experimental adapter completes 50 seeded synthetic control-deck duels and 20 cross-deck duels against a Chaos-style probe, including effect yes/no prompts. Observations now include own Fusion Deck identities and withhold opponent identities. Differential tests cover hidden opening-hand, set-monster, and opponent Extra Deck identities, but broader decisions and visibility remain unaudited. General effect and decision coverage, independently audited historical legality, and complete player-visible observations are still required.
+**Status: in progress.** A direct native binding completes restricted fixture duels with selected scripted cards. It handles optional chain choices, exposes structured public chain links, monster battle positions, and Battle/Damage Step timing from public core events, and redacts the ID of a set opponent monster targeted by Nobleman. `.ydk` parsing, pinned whitelist checks, deterministic deck shuffling, and a complete metadata/script-path inventory for the 1,685 allowed whitelist IDs are implemented. Deck validation now admits more than 60 Main Deck cards and selects historical or community Side Deck sizing. A separate experimental adapter completes 50 seeded synthetic control-deck duels and 20 cross-deck duels against a Chaos-style probe, including effect yes/no prompts. Observations now include own Fusion Deck identities and withhold opponent identities. Differential tests cover hidden opening-hand, set-monster, set-Trap, and opponent Extra Deck identities, but broader decisions and visibility remain unaudited. General effect and decision coverage, independently audited historical legality, and complete player-visible observations are still required.
 
 **Work**
 

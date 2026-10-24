@@ -35,6 +35,8 @@ python examples/show_contract.py
 
 PyTorch is an optional training dependency: `python -m pip install -e '.[ml]'`. The first policy and replay-verified behavioral cloning path are described in [the ML notes](docs/ml.md).
 
+Tests are run locally; this repository does not use GitHub Actions. After native setup, run `GOAT_AI_NATIVE_ROOT=.cache/goat-ai python -m pytest -q` for the full native suite and `ruff check .` for lint.
+
 The API is `GoatEnvironment(player1_deck, player2_deck, seed, engine=...)`; `reset()`, `legal_actions()`, `step()`, `is_terminal()`, `result()`, and `trajectory()` are defined. Pass `RestrictedOcgcoreEngine` for the restricted native path. The default engine raises `SimulatorUnavailable` because general GOAT support is unfinished.
 
 ## Native setup (Linux)

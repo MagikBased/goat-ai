@@ -10,7 +10,12 @@ from goat_ai.agents import RandomAgent
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.native_messages import decode_decision
-from goat_ai.engine.ocgcore_probe import LOCATION_EXTRA, LOCATION_HAND, LOCATION_MZONE
+from goat_ai.engine.ocgcore_probe import (
+    LOCATION_EXTRA,
+    LOCATION_HAND,
+    LOCATION_MZONE,
+    LOCATION_SZONE,
+)
 from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments.goat import GoatEnvironment
@@ -236,5 +241,52 @@ def test_different_opponent_set_effect_cards_have_identical_visible_decisions(tm
     next_view, next_actions, next_private = after_set(alternate, 39507162)
     assert (first_private, next_private) == (2134346, 39507162)
     assert first_view.field[0].code is None
+    assert first_view == next_view
+    assert first_actions == next_actions
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_different_opponent_set_traps_have_identical_visible_decisions(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / "scripts/official/c60082869.lua").is_file():
+        pytest.skip("full card script checkout not installed")
+    original = read_ydk(DECK)
+    changed = list(original.main)
+    # Seed 2 draws the last Dust Tornado copy in the opponent's opening hand.
+    changed[len(changed) - 1 - changed[::-1].index(60082869)] = 56120475
+    alternate = tmp_path / "alternate_trap.ydk"
+    alternate.write_text("#main\n" + "\n".join(map(str, changed)) + "\n")
+
+    def after_set(opponent_deck, target):
+        with GoatEnvironment(DECK, str(opponent_deck), 2,
+                             ExperimentalOcgcoreEngine(root)) as env:
+            observation = env.reset()
+            set_target = False
+            for _ in range(80):
+                if observation.viewer == 0 and observation.turn == 3:
+                    assert set_target
+                    private_code = next(card.code for card in env.engine.probe._query_location(
+                        1, LOCATION_SZONE) if card is not None)
+                    return observation, env.legal_actions(), private_code
+                actions = env.legal_actions()
+                action = None
+                if observation.acting_player == 1 and not set_target:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == target), None)
+                    if action is not None:
+                        set_target = True
+                if action is None:
+                    action = next((a for a in actions if a.kind == "end_phase"), None)
+                if action is None:
+                    action = next((a for a in actions if a.kind == "pass"), actions[0])
+                observation = env.step(action)
+            pytest.fail("did not reach the next player-zero decision")
+
+    first_view, first_actions, first_private = after_set(DECK, 60082869)
+    next_view, next_actions, next_private = after_set(alternate, 56120475)
+    assert (first_private, next_private) == (60082869, 56120475)
+    assert any(card.controller == 1 and card.zone == "spell_trap"
+               and card.position == "facedown" and card.code is None
+               for card in first_view.field)
     assert first_view == next_view
     assert first_actions == next_actions
