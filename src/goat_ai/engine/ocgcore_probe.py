@@ -13,7 +13,7 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-from goat_ai.observations import CardView, ChainLinkView, Observation
+from goat_ai.observations import CardView, ChainLinkView, KnownCardView, Observation
 
 CORE_API_VERSION = (11, 0)
 GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
@@ -488,6 +488,15 @@ class OcgcoreProbe:
                 self._known_facedown[(card.controller,
                                       LOCATION_MZONE if card.zone == "monster" else LOCATION_SZONE,
                                       card.sequence)]
+                for card in field if card.controller != viewer and card.position == "facedown"
+                and (card.controller,
+                     LOCATION_MZONE if card.zone == "monster" else LOCATION_SZONE,
+                     card.sequence) in self._known_facedown),
+            known_opponent_field_cards=tuple(
+                KnownCardView(card.controller, card.zone, card.sequence,
+                              self._known_facedown[(card.controller,
+                                                    LOCATION_MZONE if card.zone == "monster"
+                                                    else LOCATION_SZONE, card.sequence)])
                 for card in field if card.controller != viewer and card.position == "facedown"
                 and (card.controller,
                      LOCATION_MZONE if card.zone == "monster" else LOCATION_SZONE,

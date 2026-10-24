@@ -1,4 +1,4 @@
-from .model import CardView, ChainLinkView, Observation
+from .model import CardView, ChainLinkView, KnownCardView, Observation
 
-__all__ = ["CardView", "ChainLinkView", "Observation"]
+__all__ = ["CardView", "ChainLinkView", "KnownCardView", "Observation"]
 

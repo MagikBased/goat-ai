@@ -12,7 +12,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Environment contract and illegal-action validation | Implemented |
 | Player-visible observation schema | Own hand and Extra Deck, public zones, battle position, chain links, bounded public events, and memory of opponent field cards seen face-up before turning facedown; other private reveals pending |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
-| JSON trajectory round trip | Schema v5 adds known facedown opponent identities to visible decisions; v1–v4 remain readable, and fingerprinted v3/v4 recordings remain replay-verifiable |
+| JSON trajectory round trip | Schema v6 locates publicly known facedown opponent cards by field slot; v1–v5 remain readable, and fingerprinted v3–v5 recordings remain replay-verifiable |
 | Tournaments | Seeded, seat-swapped sequential and spawned-process runners; paired score intervals and Wilson intervals for supported decks |
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |

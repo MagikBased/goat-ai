@@ -23,6 +23,16 @@ class ChainLinkView:
 
 
 @dataclass(frozen=True)
+class KnownCardView:
+    """Publicly seen opponent card that is now face-down at this field slot."""
+
+    controller: int
+    zone: str
+    sequence: int
+    code: int
+
+
+@dataclass(frozen=True)
 class Observation:
     viewer: int
     acting_player: int
@@ -41,6 +51,7 @@ class Observation:
     known_opponent_cards: tuple[int, ...] = ()
     restrictions: tuple[str, ...] = ()
     own_extra_deck: tuple[CardView, ...] = ()
+    known_opponent_field_cards: tuple[KnownCardView, ...] = ()
 
     def __post_init__(self) -> None:
         if self.viewer not in (0, 1) or self.acting_player not in (0, 1):
@@ -53,6 +64,15 @@ class Observation:
         if any(card.controller != self.viewer and card.position == "facedown" and card.code is not None
                for card in self.field):
             raise ValueError("opponent facedown identity must be hidden")
+        facedown_slots = {(card.controller, card.zone, card.sequence)
+                          for card in self.field if card.controller != self.viewer
+                          and card.position == "facedown"}
+        known_slots = [(card.controller, card.zone, card.sequence)
+                       for card in self.known_opponent_field_cards]
+        if (len(known_slots) != len(set(known_slots))
+                or any(slot not in facedown_slots or card.code <= 0
+                       for slot, card in zip(known_slots, self.known_opponent_field_cards))):
+            raise ValueError("known opponent card must match one face-down field slot")
         if self.opponent_hand_count < 0 or any(n < 0 for n in self.deck_counts):
             raise ValueError("counts must be nonnegative")
 

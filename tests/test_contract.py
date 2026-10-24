@@ -7,7 +7,7 @@ from goat_ai.actions import Action
 from goat_ai.agents import HeuristicAgent, HumanAgent, RandomAgent
 from goat_ai.engine import Decision, RulesProfile, SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
-from goat_ai.observations import CardView, ChainLinkView, Observation
+from goat_ai.observations import CardView, ChainLinkView, KnownCardView, Observation
 from goat_ai.replay import (
     DecisionRecord,
     ReplayMismatch,
@@ -78,6 +78,32 @@ def test_visible_schema_excludes_hidden_opponent_cards():
         replace(view(), field=(CardView(1, "monster", "facedown", 999),))
     with pytest.raises(ValueError, match="Extra Deck"):
         replace(view(), own_extra_deck=(CardView(1, "extra", "facedown", 999),))
+    with pytest.raises(ValueError, match="face-down field slot"):
+        replace(view(), known_opponent_field_cards=(KnownCardView(1, "monster", 2, 999),))
+
+
+def test_publicly_seen_facedown_card_keeps_its_slot(tmp_path):
+    observation = replace(
+        view(), field=(CardView(1, "monster", "facedown", None, 2, "defense"),),
+        known_opponent_cards=(123,),
+        known_opponent_field_cards=(KnownCardView(1, "monster", 2, 123),),
+    )
+    action = Action("0", "pass", 0)
+    trajectory = Trajectory("goat", ("a", "b"), 7,
+                            (DecisionRecord(observation, (action,), action),), 0)
+    path = tmp_path / "known.json"
+    write_trajectory(path, trajectory)
+    assert read_trajectory(path) == trajectory
+    with pytest.raises(ValueError, match="face-down field slot"):
+        replace(observation, known_opponent_field_cards=(
+            KnownCardView(1, "monster", 2, 123), KnownCardView(1, "monster", 2, 456)))
+    raw = json.loads(path.read_text())
+    raw["schema_version"] = 5
+    raw["decisions"][0]["observation"].pop("known_opponent_field_cards")
+    path.write_text(json.dumps(raw))
+    restored = read_trajectory(path)
+    assert restored.decisions[0].observation.known_opponent_cards == (123,)
+    assert restored.decisions[0].observation.known_opponent_field_cards == ()
 
 
 def test_agents_use_same_contract():

@@ -36,7 +36,7 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     trajectory = play()
     assert trajectory == play()
     assert trajectory.winner == 1
-    assert trajectory.schema_version == 5
+    assert trajectory.schema_version == 6
     assert trajectory.rules_profile == vars(RestrictedOcgcoreEngine(root).ruleset)
     assert trajectory.deck_sha256 is not None
     assert trajectory.asset_sha256 is not None
@@ -61,7 +61,8 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
         trajectory.decisions)
     previous = replace(trajectory, schema_version=4,
                        decisions=tuple(replace(record, observation=replace(
-                           record.observation, known_opponent_cards=()))
+                           record.observation, known_opponent_cards=(),
+                           known_opponent_field_cards=()))
                                        for record in trajectory.decisions))
     assert verify_trajectory(previous, RestrictedOcgcoreEngine(root)) == len(
         previous.decisions)
@@ -174,6 +175,9 @@ def test_book_of_moon_chains_and_hides_turned_monster(tmp_path):
                     assert target.orientation == "defense"
                     assert saw_public_chain and not observation.chain
                     assert known_target_code in observation.known_opponent_cards
+                    assert any(card.controller == 0 and card.zone == "monster"
+                               and card.sequence == 2 and card.code == known_target_code
+                               for card in observation.known_opponent_field_cards)
                     verified_hidden_target = True
             if env.is_terminal():
                 assert verified_hidden_target
@@ -186,5 +190,15 @@ def test_book_of_moon_chains_and_hides_turned_monster(tmp_path):
                 path = tmp_path / "book.json"
                 write_trajectory(path, trajectory)
                 assert read_trajectory(path) == trajectory
+                previous = replace(
+                    trajectory, schema_version=5,
+                    decisions=tuple(replace(
+                        record, observation=replace(
+                            record.observation, known_opponent_field_cards=()))
+                        for record in trajectory.decisions),
+                )
+                write_trajectory(path, previous)
+                assert verify_trajectory(read_trajectory(path), RestrictedOcgcoreEngine(root)) == len(
+                    previous.decisions)
                 return
         pytest.fail("Book of Moon fixture duel exceeded 5000 decisions")
