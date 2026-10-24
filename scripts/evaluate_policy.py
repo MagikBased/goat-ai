@@ -51,7 +51,10 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--matchup", nargs=2, action="append", metavar=("DECK_A", "DECK_B"))
-    parser.add_argument("--opponent", choices=("random", "heuristic"), default="random")
+    opponents = parser.add_mutually_exclusive_group()
+    opponents.add_argument("--opponent", choices=("random", "heuristic"), default="random")
+    opponents.add_argument("--opponent-checkpoint", type=Path,
+                           help="evaluate directly against another saved policy")
     parser.add_argument("--seed", type=int, default=43)
     parser.add_argument("--seeds", type=int, default=4)
     parser.add_argument("--max-decisions", type=int, default=5000)
@@ -65,13 +68,22 @@ def main() -> None:
         parser.error("unsupported policy checkpoint schema")
     seeds = list(range(args.seed, args.seed + args.seeds))
     validate_heldout_seeds(checkpoint, seeds)
+    if args.opponent_checkpoint:
+        opponent_checkpoint = torch.load(args.opponent_checkpoint, map_location="cpu",
+                                         weights_only=True)
+        if (not isinstance(opponent_checkpoint, dict)
+                or opponent_checkpoint.get("schema_version") != 1):
+            parser.error("unsupported opponent checkpoint schema")
+        validate_heldout_seeds(opponent_checkpoint, seeds)
     fixtures = Path(__file__).resolve().parent.parent / "examples/decks"
     matchups = args.matchup or [[str(fixtures / "vanilla_probe.ydk"),
                                   str(fixtures / "vanilla_reverse.ydk")]]
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     runner = run_tournament_parallel if args.workers > 1 else run_tournament
-    opponent = RandomAgent if args.opponent == "random" else make_heuristic_agent
+    opponent = (partial(make_policy_agent, checkpoint=str(args.opponent_checkpoint))
+                if args.opponent_checkpoint else
+                RandomAgent if args.opponent == "random" else make_heuristic_agent)
     started = perf_counter()
     report = runner(
         matchups, seeds, partial(make_policy_agent, checkpoint=str(args.checkpoint)),
@@ -97,7 +109,10 @@ def main() -> None:
         "asset_sha256": assets,
         "training_games": checkpoint["training_games"],
         "evaluation_seeds": seeds,
-        "opponent": args.opponent, "engine": args.engine,
+        "opponent": "checkpoint" if args.opponent_checkpoint else args.opponent,
+        "opponent_checkpoint_sha256": (sha256(args.opponent_checkpoint)
+                                        if args.opponent_checkpoint else None),
+        "engine": args.engine,
         "platform": platform.platform(), "cpu": platform.processor(),
         "workers": args.workers, "wall_seconds_tournament": wall,
         "duels_per_second": len(report.games) / wall,

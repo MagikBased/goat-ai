@@ -43,7 +43,7 @@ python scripts/evaluate_policy.py checkpoints/vanilla_bc.pt --seed 43 --seeds 4 
   --opponent random --output artifacts/vanilla_bc_eval.json
 ```
 
-The evaluator refuses seeds present in checkpoint training-game metadata. It uses paired seat swaps and reports individual results, seat splits, a paired score interval, and core/deck/checkpoint hashes. `--workers 2` uses spawned native and policy workers; `--matchup DECK_A DECK_B` accepts additional deck pairs, and `--engine experimental` selects the broader unaudited adapter. A held-out seed on the same fixture decks is a protocol and baseline check; it is not held-out deck-family evaluation. See [the measured evaluation log](evaluation.md).
+The evaluator refuses seeds present in checkpoint training-game metadata. It uses paired seat swaps and reports individual results, seat splits, a paired score interval, and core/deck/checkpoint hashes. `--opponent-checkpoint PATH` compares two saved policies and checks both checkpoints' training seeds. `--workers 2` uses spawned native and policy workers; `--matchup DECK_A DECK_B` accepts additional deck pairs, and `--engine experimental` selects the broader unaudited adapter. A held-out seed on the same fixture decks is a protocol and baseline check; it is not held-out deck-family evaluation. See [the measured evaluation log](evaluation.md).
 
 ## Initial self-play experiment
 
@@ -56,4 +56,4 @@ OMP_NUM_THREADS=1 python scripts/train_self_play.py checkpoints/vanilla_bc.pt \
 python scripts/evaluate_policy.py checkpoints/vanilla_rl.pt --seed 200 --seeds 8
 ```
 
-This is an experiment, not a selected final RL algorithm. Terminal reward is sparse; no value function, PPO update, opponent league, or checkpoint selection by held-out win rate exists. The first measured run from random imitation did not improve against RandomAgent; see [the evaluation log](evaluation.md). Future work should compare stronger demonstrations, a richer action encoder, value baselines and PPO under the same held-out schedule, while keeping training opponents separate from evaluation opponents.
+This is an experiment, not a selected final RL algorithm. Terminal reward is sparse; no value function, PPO update, opponent league, or checkpoint selection by held-out win rate exists. Runs from random imitation and from the stronger heuristic imitation checkpoint did not demonstrate an improvement in greedy playing strength; see [the evaluation log](evaluation.md). Future work should compare a richer action encoder, value baselines and PPO under the same held-out schedule, while keeping training opponents separate from evaluation opponents.

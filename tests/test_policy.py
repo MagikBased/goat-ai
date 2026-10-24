@@ -1,6 +1,7 @@
 """Contract checks for the optional PyTorch legal-action policy."""
 
 from dataclasses import replace
+from functools import partial
 
 import pytest
 
@@ -20,7 +21,7 @@ from goat_ai.training import (
 )
 from goat_ai.training.policy import ACTION_KINDS
 from goat_ai.training.self_play import policy_gradient_update, sample_legal_action
-from scripts.evaluate_policy import validate_heldout_seeds
+from scripts.evaluate_policy import make_policy_agent, validate_heldout_seeds
 
 
 def view() -> Observation:
@@ -113,6 +114,16 @@ def test_evaluation_rejects_training_seed_overlap():
         validate_heldout_seeds(checkpoint, [42, 43])
     with pytest.raises(ValueError, match="provenance"):
         validate_heldout_seeds({}, [43])
+
+
+def test_checkpoint_opponent_uses_common_agent_contract(tmp_path):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=16)
+    path = tmp_path / "opponent.pt"
+    torch.save({"schema_version": 1, "model_state": model.state_dict(),
+                "vocabulary_codes": vocabulary.codes, "width": 16}, path)
+    factory = partial(make_policy_agent, checkpoint=str(path))
+    assert factory(42).select_action(view(), actions()) in actions()
 
 
 def test_terminal_reward_moves_selected_action_probability():
