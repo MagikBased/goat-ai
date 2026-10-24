@@ -10,9 +10,9 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
 | Complete headless duel | Restricted native adapter reaches terminal through `GoatEnvironment`; general card support unfinished |
 | Environment contract and illegal-action validation | Implemented |
-| Player-visible observation schema | Implemented; native hand/facedown redaction tested on fixture |
+| Player-visible observation schema | Native hand/facedown redaction, battle position, and public chain tested on fixtures; history and known-card memory pending |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
-| JSON trajectory round trip | Implemented and verified on a native random-agent duel |
+| JSON trajectory round trip | Schema v2 verified on native duels with chain links; v1 remains readable |
 | Tournaments | Seeded, seat-swapped runner and Wilson intervals implemented for supported decks |
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 

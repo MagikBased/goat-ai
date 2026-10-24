@@ -10,6 +10,16 @@ class CardView:
     position: str
     code: int | None = None  # None means identity is hidden from this viewer.
     sequence: int | None = None
+    orientation: str | None = None  # attack/defense for monsters on the field.
+
+
+@dataclass(frozen=True)
+class ChainLinkView:
+    index: int
+    card_code: int
+    controller: int
+    location: int
+    sequence: int
 
 
 @dataclass(frozen=True)
@@ -26,7 +36,7 @@ class Observation:
     opponent_hand_count: int
     deck_counts: tuple[int, int]
     extra_deck_counts: tuple[int, int]
-    chain: tuple[str, ...] = ()
+    chain: tuple[ChainLinkView, ...] = ()
     public_history: tuple[str, ...] = ()
     known_opponent_cards: tuple[int, ...] = ()
     restrictions: tuple[str, ...] = ()

@@ -111,7 +111,7 @@ def test_goat_nobleman_targets_hidden_monster_and_banishes_it():
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_book_of_moon_chains_and_hides_turned_monster():
+def test_book_of_moon_chains_and_hides_turned_monster(tmp_path):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     deck = Path(__file__).resolve().parent.parent / "examples/decks/book_probe.ydk"
     with GoatEnvironment(str(deck), str(deck), seed=42,
@@ -120,7 +120,13 @@ def test_book_of_moon_chains_and_hides_turned_monster():
         agents = (RandomAgent(42), RandomAgent(43))
         chained = False
         target_selected = False
-        for _ in range(50):
+        saw_public_chain = False
+        verified_hidden_target = False
+        for _ in range(5000):
+            if observation.chain:
+                assert observation.chain[0].card_code == 14087893
+                if observation.chain[0].controller == 0:
+                    saw_public_chain = True
             choices = env.legal_actions()
             action = next((choice for choice in choices if choice.kind == "chain"
                            and choice.parameters.get("code") == 14087893), None)
@@ -131,10 +137,20 @@ def test_book_of_moon_chains_and_hides_turned_monster():
             if chained and action.kind == "select_card":
                 target_selected = True
             observation = env.step(action)
-            if target_selected and observation.viewer == 1:
+            if target_selected and not verified_hidden_target and observation.viewer == 1:
                 target = next((card for card in observation.field
                                if card.controller == 0 and card.sequence == 2), None)
                 if target is not None and target.position == "facedown":
                     assert target.code is None
-                    return
-        pytest.fail("Book of Moon did not turn its target facedown")
+                    assert target.orientation == "defense"
+                    assert saw_public_chain and not observation.chain
+                    verified_hidden_target = True
+            if env.is_terminal():
+                assert verified_hidden_target
+                trajectory = env.trajectory()
+                assert any(record.observation.chain for record in trajectory.decisions)
+                path = tmp_path / "book.json"
+                write_trajectory(path, trajectory)
+                assert read_trajectory(path) == trajectory
+                return
+        pytest.fail("Book of Moon fixture duel exceeded 5000 decisions")

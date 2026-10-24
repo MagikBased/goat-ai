@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 
 import pytest
@@ -6,7 +7,7 @@ from goat_ai.actions import Action
 from goat_ai.agents import HeuristicAgent, HumanAgent, RandomAgent
 from goat_ai.engine import Decision, SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
-from goat_ai.observations import CardView, Observation
+from goat_ai.observations import CardView, ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory, read_trajectory, write_trajectory
 
 
@@ -74,14 +75,33 @@ def test_agents_use_same_contract():
 
 def test_trajectory_round_trip_and_legality(tmp_path):
     action = Action("1", "attack", 0, {"target": "direct"})
-    record = DecisionRecord(view(), (action,), action)
+    observation = replace(view(), chain=(ChainLinkView(1, 123, 0, 4, 2),),
+                          field=(CardView(1, "monster", "facedown", None, 2, "defense"),))
+    record = DecisionRecord(observation, (action,), action)
     trajectory = Trajectory("tcg-goat-2005-08-17", ("a", "b"), 42, (record,), 0)
     path = tmp_path / "game.json"
     write_trajectory(path, trajectory)
     assert read_trajectory(path) == trajectory
+    assert read_trajectory(path).decisions[0].observation.chain[0].card_code == 123
     assert "999" not in path.read_text()
     with pytest.raises(ValueError, match="legal"):
         DecisionRecord(view(), (), action)
+
+
+def test_schema_one_trajectory_remains_readable(tmp_path):
+    action = Action("0", "pass", 0)
+    trajectory = Trajectory("goat", ("a", "b"), 7,
+                            (DecisionRecord(view(), (action,), action),), 0)
+    path = tmp_path / "old.json"
+    write_trajectory(path, trajectory)
+    raw = json.loads(path.read_text())
+    raw["schema_version"] = 1
+    raw["decisions"][0]["observation"]["hand"][0].pop("orientation")
+    raw["decisions"][0]["observation"]["field"][0].pop("orientation")
+    path.write_text(json.dumps(raw))
+    restored = read_trajectory(path)
+    assert restored.schema_version == 1
+    assert restored.decisions[0].observation.field[0].orientation is None
 
 
 def test_decision_rejects_wrong_actor_and_empty_nonterminal():

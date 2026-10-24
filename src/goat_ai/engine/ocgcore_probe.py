@@ -12,7 +12,7 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-from goat_ai.observations import CardView, Observation
+from goat_ai.observations import CardView, ChainLinkView, Observation
 
 CORE_API_VERSION = (11, 0)
 GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
@@ -26,6 +26,8 @@ LOCATION_EXTRA = 0x40
 POSITION_FACEDOWN_DEFENSE = 0x08
 MSG_SELECT_IDLECMD = 11
 MSG_SELECT_CHAIN = 16
+MSG_CHAINING = 70
+MSG_CHAIN_END = 74
 MSG_DRAW = 90
 STATUS_AWAITING = 1
 
@@ -133,6 +135,7 @@ class OcgcoreProbe:
         self._pending_message: bytes | None = None
         self._turn = 0
         self._phase = "unknown"
+        self._chain: list[ChainLinkView] = []
         self._bind()
         major, minor = c.c_int(), c.c_int()
         self.lib.OCG_GetVersion(c.byref(major), c.byref(minor))
@@ -305,6 +308,21 @@ class OcgcoreProbe:
                     raise ValueError("truncated MSG_NEW_PHASE")
                 phase = struct.unpack_from("<H", message, 1)[0]
                 self._phase = phases.get(phase, f"phase_{phase}")
+            elif message[0] == MSG_CHAINING:
+                if len(message) != 33:
+                    raise ValueError("invalid MSG_CHAINING length")
+                index = struct.unpack_from("<I", message, 29)[0]
+                if index != len(self._chain) + 1:
+                    raise ValueError("unexpected native chain index")
+                self._chain.append(ChainLinkView(
+                    index=index, card_code=struct.unpack_from("<I", message, 1)[0],
+                    controller=message[15], location=message[16],
+                    sequence=struct.unpack_from("<I", message, 17)[0],
+                ))
+            elif message[0] == MSG_CHAIN_END:
+                if len(message) != 1:
+                    raise ValueError("invalid MSG_CHAIN_END length")
+                self._chain.clear()
 
     def _query_location(self, player: int, location: int):
         from goat_ai.engine.native_queries import decode_location
@@ -345,7 +363,15 @@ class OcgcoreProbe:
             position = "faceup" if faceup else "facedown"
             zone = {LOCATION_MZONE: "monster", LOCATION_SZONE: "spell_trap",
                     LOCATION_GRAVE: "graveyard", LOCATION_REMOVED: "banished"}[location]
-            return CardView(player, zone, position, visible_code, sequence)
+            orientation = None
+            if location == LOCATION_MZONE:
+                if card.position in (0x1, 0x2):
+                    orientation = "attack"
+                elif card.position in (0x4, 0x8):
+                    orientation = "defense"
+                else:
+                    raise ValueError(f"unexpected monster position {card.position:#x}")
+            return CardView(player, zone, position, visible_code, sequence, orientation)
 
         field = tuple(view_card(player, location, sequence, card)
                       for player in (0, 1) for location in (LOCATION_MZONE, LOCATION_SZONE)
@@ -370,6 +396,7 @@ class OcgcoreProbe:
                               for p in (0, 1)),
             extra_deck_counts=tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_EXTRA)
                                     for p in (0, 1)),
+            chain=tuple(self._chain),
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:

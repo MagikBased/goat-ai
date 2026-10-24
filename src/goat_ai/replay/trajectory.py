@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from goat_ai.actions import Action
-from goat_ai.observations import CardView, Observation
+from goat_ai.observations import CardView, ChainLinkView, Observation
 
 
 @dataclass(frozen=True)
@@ -30,7 +30,7 @@ class Trajectory:
     winner: int | None
     source: str = "self_play"
     skill_metadata: dict | None = None
-    schema_version: int = 1
+    schema_version: int = 2
 
 
 def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
@@ -39,7 +39,8 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
 
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    if raw.get("schema_version") != 1:
+    version = raw.get("schema_version")
+    if version not in (1, 2):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
@@ -52,12 +53,16 @@ def read_trajectory(path: str | Path) -> Trajectory:
         view["field"] = cards(view["field"])
         view["graveyards"] = tuple(cards(zone) for zone in view["graveyards"])
         view["banished"] = tuple(cards(zone) for zone in view["banished"])
-        for key in ("life_points", "deck_counts", "extra_deck_counts", "chain",
+        if version == 2:
+            view["chain"] = tuple(ChainLinkView(**link) for link in view["chain"])
+        else:
+            view["chain"] = tuple(view["chain"])
+        for key in ("life_points", "deck_counts", "extra_deck_counts",
                     "public_history", "known_opponent_cards", "restrictions"):
             view[key] = tuple(view[key])
         records.append(DecisionRecord(Observation(**view),
                                       tuple(Action(**a) for a in record["legal_actions"]),
                                       Action(**record["selected_action"])))
     return Trajectory(raw["ruleset"], tuple(raw["decks"]), raw["seed"], tuple(records),
-                      raw["winner"], raw["source"], raw.get("skill_metadata"), 1)
+                      raw["winner"], raw["source"], raw.get("skill_metadata"), version)
 
