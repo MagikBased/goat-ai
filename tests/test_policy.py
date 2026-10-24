@@ -71,6 +71,30 @@ def test_action_ids_are_not_features_but_public_card_and_controller_are():
         encode_decision(view(), (Action("wrong", "pass", 1),), vocabulary)
 
 
+def test_multi_target_features_preserve_visible_slots_without_hidden_codes():
+    vocabulary = CardVocabulary((10, 20))
+    choices = (
+        Action("a", "select_cards", 0, {"cards": [
+            {"controller": 1, "location": 8, "sequence": 0},
+            {"controller": 1, "location": 8, "sequence": 3}]}),
+        Action("b", "select_cards", 0, {"cards": [
+            {"controller": 1, "location": 8, "sequence": 1},
+            {"controller": 1, "location": 8, "sequence": 2}]}),
+    )
+    features = encode_decision(view(), choices, vocabulary)
+    assert torch.equal(features.action_targets[0], features.action_targets[1])
+    assert not torch.equal(features.action_target_context[0],
+                           features.action_target_context[1])
+    torch.manual_seed(19)
+    model = LegalActionPolicy(vocabulary.size, width=16)
+    scores = model(features)
+    assert scores[0] != scores[1]
+    reversed_cards = Action("renamed", "select_cards", 0,
+                            {"cards": list(reversed(choices[0].parameters["cards"]))})
+    reversed_score = model(encode_decision(view(), (reversed_cards,), vocabulary))
+    assert torch.allclose(scores[:1], reversed_score)
+
+
 def test_supervised_update_reduces_loss_for_visible_decision():
     torch.manual_seed(6)
     torch.set_num_threads(1)
@@ -99,11 +123,28 @@ def test_behavioral_clone_records_and_checkpoint_round_trip(tmp_path):
     assert losses[-1] < losses[0]
     checkpoint = tmp_path / "policy.pt"
     torch.save({"schema_version": 1, "model_state": policy.state_dict(),
-                "vocabulary_codes": vocabulary.codes, "width": 16}, checkpoint)
+                "vocabulary_codes": vocabulary.codes, "width": 16,
+                "feature_version": policy.feature_version}, checkpoint)
     restored = load_policy_agent(checkpoint)
     assert restored.select_action(view(), actions()) == actions()[1]
     with pytest.raises(ValueError, match="training needs records"):
         fit_behavioral_clone(policy, vocabulary, [])
+
+
+def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):
+    vocabulary = CardVocabulary((10, 20))
+    legacy = LegalActionPolicy(vocabulary.size, width=16, feature_version=1)
+    checkpoint = tmp_path / "legacy.pt"
+    torch.save({"schema_version": 1, "model_state": legacy.state_dict(),
+                "vocabulary_codes": vocabulary.codes, "width": 16}, checkpoint)
+    restored = load_policy_agent(checkpoint)
+    assert restored.model.feature_version == 1
+    legacy_choices = (Action("multi", "select_cards", 0, {"cards": [
+        {"controller": 1, "location": 8, "sequence": 0},
+        {"controller": 0, "location": 4, "sequence": 1, "code": 20}]}),)
+    features = encode_decision(view(), legacy_choices, vocabulary)
+    assert torch.allclose(legacy(features), restored.model(features))
+    assert restored.select_action(view(), actions()) in actions()
 
 
 def test_evaluation_rejects_training_seed_overlap():
@@ -120,7 +161,8 @@ def test_checkpoint_opponent_uses_common_agent_contract(tmp_path):
     model = LegalActionPolicy(vocabulary.size, width=16)
     path = tmp_path / "opponent.pt"
     torch.save({"schema_version": 1, "model_state": model.state_dict(),
-                "vocabulary_codes": vocabulary.codes, "width": 16}, path)
+                "vocabulary_codes": vocabulary.codes, "width": 16,
+                "feature_version": model.feature_version}, path)
     factory = partial(make_policy_agent, checkpoint=str(path))
     assert factory(42).select_action(view(), actions()) in actions()
 

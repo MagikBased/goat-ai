@@ -99,6 +99,7 @@ def main() -> None:
         "schema_version": 1, "model_state": agent.model.state_dict(),
         "vocabulary_codes": agent.vocabulary.codes,
         "width": agent.model.card.embedding_dim,
+        "feature_version": agent.model.feature_version,
         "parent_checkpoint_sha256": sha256(args.checkpoint),
         "training_games": training_games,
         "trajectory_sha256": parent.get("trajectory_sha256", {}),

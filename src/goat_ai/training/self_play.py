@@ -143,7 +143,8 @@ def train_against_snapshot_pool(
         decks = (a, b) if learner_seat == 0 else (b, a)
         if rng.random() < historical_probability:
             snapshot_index = rng.randrange(len(snapshots))
-            frozen = LegalActionPolicy(vocabulary.size, width=model.card.embedding_dim)
+            frozen = LegalActionPolicy(vocabulary.size, width=model.card.embedding_dim,
+                                       feature_version=model.feature_version)
             frozen.load_state_dict(snapshots[snapshot_index])
             frozen.eval()
 

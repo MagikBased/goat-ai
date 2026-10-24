@@ -3,6 +3,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cached_property
+from math import cos, sin
 from pathlib import Path
 
 import torch
@@ -25,6 +26,7 @@ ACTION_KINDS = (
     "unselect_card", "yes",
 )
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
+POLICY_FEATURE_VERSION = 2  # multi-target controller, location, and sequence
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,8 @@ class DecisionFeatures:
     action_kinds: Tensor  # [A]
     action_cards: Tensor  # [A]
     action_targets: Tensor  # [A, T], zero-padded
+    action_target_context: Tensor  # [A, T, 5]: owner, zone, slot, slot sin/cos
+    action_target_mask: Tensor  # [A, T]: target exists, even when its ID is hidden
     action_numbers: Tensor  # [A, 8]
 
     def to(self, device: torch.device | str) -> "DecisionFeatures":
@@ -107,6 +111,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
     kind_indices = []
     card_indices = []
     targets = []
+    target_context = []
     action_numbers = []
     for action in legal_actions:
         params = action.parameters
@@ -115,6 +120,14 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         card_indices.append(vocabulary.index(params.get("code")))
         selected = params.get("cards", ())
         targets.append([vocabulary.index(card.get("code")) for card in selected])
+        target_context.append([
+            (float(card.get("controller", own) != own),
+             int(card.get("location", 0)) / 64,
+             int(card.get("sequence", 0)) / 64,
+             sin(int(card.get("sequence", 0))),
+             cos(int(card.get("sequence", 0))))
+            for card in selected
+        ])
         prompt_id = int(params.get("prompt_id", 0))
         race = int(params.get("race", 0))
         action_numbers.append((
@@ -129,12 +142,17 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         ))
     width = max(1, *(len(row) for row in targets))
     padded_targets = [row + [0] * (width - len(row)) for row in targets]
+    padded_context = [row + [(0.0, 0.0, 0.0, 0.0, 0.0)] * (width - len(row))
+                      for row in target_context]
+    target_masks = [[1] * len(row) + [0] * (width - len(row)) for row in targets]
     phase = PHASES.index(observation.phase) + 1 if observation.phase in PHASES else 0
     return DecisionFeatures(
         torch.tensor(cards, dtype=torch.long), torch.tensor(numbers, dtype=torch.float32),
         torch.tensor(phase, dtype=torch.long), torch.tensor(kind_indices, dtype=torch.long),
         torch.tensor(card_indices, dtype=torch.long),
         torch.tensor(padded_targets, dtype=torch.long),
+        torch.tensor(padded_context, dtype=torch.float32),
+        torch.tensor(target_masks, dtype=torch.bool),
         torch.tensor(action_numbers, dtype=torch.float32),
     )
 
@@ -142,8 +160,12 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
 class LegalActionPolicy(nn.Module):
     """Shared visible-state encoder and action-conditioned legal-option scorer."""
 
-    def __init__(self, vocabulary_size: int, width: int = 64) -> None:
+    def __init__(self, vocabulary_size: int, width: int = 64,
+                 feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
+        if feature_version not in (1, 2):
+            raise ValueError("unsupported policy feature version")
+        self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
         self.zone = nn.Embedding(len(ZONES) + 1, width, padding_idx=0)
         self.owner = nn.Embedding(3, width, padding_idx=0)
@@ -154,6 +176,9 @@ class LegalActionPolicy(nn.Module):
                                            nn.Linear(width, width))
         self.action_numbers = nn.Sequential(nn.Linear(8, width), nn.ReLU(),
                                             nn.Linear(width, width))
+        if feature_version >= 2:
+            self.target_context = nn.Sequential(nn.Linear(5, width), nn.ReLU(),
+                                                nn.Linear(width, width))
         self.score = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
                                    nn.Linear(width, 1))
 
@@ -166,9 +191,14 @@ class LegalActionPolicy(nn.Module):
         state = pooled + self.phase(features.phase) + self.state_numbers(
             features.state_numbers)
         targets = features.action_targets
-        target_mask = (targets != 0).unsqueeze(-1)
+        target_mask = ((targets != 0) if self.feature_version == 1
+                       else features.action_target_mask).unsqueeze(-1)
         target_mean = (self.card(targets) * target_mask).sum(1) / target_mask.sum(1).clamp(
             min=1)
+        if self.feature_version >= 2:
+            context = self.target_context(features.action_target_context)
+            target_mean = target_mean + (context * target_mask).sum(1) / target_mask.sum(
+                1).clamp(min=1)
         action = (self.kind(features.action_kinds) + self.card(features.action_cards)
                   + target_mean + self.action_numbers(features.action_numbers))
         return self.score(torch.cat((state.expand(len(action), -1), action), dim=1)).squeeze(1)

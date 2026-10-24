@@ -12,7 +12,8 @@ def load_policy_agent(path: str | Path, *, device: str = "cpu") -> PolicyAgent:
     if not isinstance(checkpoint, dict) or checkpoint.get("schema_version") != 1:
         raise ValueError("unsupported policy checkpoint schema")
     vocabulary = CardVocabulary(tuple(checkpoint["vocabulary_codes"]))
-    model = LegalActionPolicy(vocabulary.size, width=int(checkpoint["width"]))
+    model = LegalActionPolicy(vocabulary.size, width=int(checkpoint["width"]),
+                              feature_version=int(checkpoint.get("feature_version", 1)))
     model.load_state_dict(checkpoint["model_state"])
     model.to(device).eval()
     return PolicyAgent(model, vocabulary)

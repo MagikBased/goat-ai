@@ -66,6 +66,7 @@ def main() -> None:
     checkpoint = {
         "schema_version": 1, "model_state": model.state_dict(),
         "vocabulary_codes": vocabulary.codes, "width": args.width,
+        "feature_version": model.feature_version,
         "trajectory_sha256": trajectory_hashes, "source_decisions": dict(sources),
         "training_games": training_games,
         "seed": args.seed, "torch_version": str(torch.__version__),

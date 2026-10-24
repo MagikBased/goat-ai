@@ -105,6 +105,7 @@ def main() -> None:
     result = {
         "checkpoint_sha256": sha256(args.checkpoint),
         "policy_inference_version": POLICY_INFERENCE_VERSION,
+        "policy_feature_version": checkpoint.get("feature_version", 1),
         "core_commit": "baa3881d0bae48e9994f915f5c931be53c1ba8ef",
         "asset_sha256": assets,
         "training_games": checkpoint["training_games"],
