@@ -35,7 +35,7 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M2 — Historical correctness gate
 
-**Status: in progress.** The source-backed Cannon Soldier / Book of Moon fixture checks historical Ignition priority after a summon, and the GOAT Nobleman fixture checks a representative historical banish ruling. The remaining timing and card-specific cases below are untested.
+**Status: in progress.** The source-backed Cannon Soldier / Book of Moon fixture checks historical Ignition priority after a summon, the GOAT Nobleman fixture checks a representative historical banish ruling, and two Field Spell fixtures check replacement after resolution and preservation of the old spell when the new one is destroyed in a chain. The remaining timing and card-specific cases below are untested.
 
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
 
