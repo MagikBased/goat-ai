@@ -34,7 +34,7 @@ def test_dekoichi_flip_summon_draws_one_without_bokoichi(tmp_path):
                                and choice.parameters.get("code") == DEKOICHI), None)
                 set_card |= action is not None
             if observation.acting_player == 0 and observation.turn == 3 and not flipped:
-                action = next((choice for choice in choices if choice.kind == "change_position"
+                action = next((choice for choice in choices if choice.kind == "flip_summon"
                                and choice.parameters.get("code") == DEKOICHI), None)
                 if action is not None:
                     assert set_card

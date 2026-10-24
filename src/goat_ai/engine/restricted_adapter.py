@@ -105,6 +105,16 @@ class RestrictedOcgcoreEngine:
 
         actions = []
         for index, choice in enumerate(native.choices):
+            kind = choice.kind
+            if kind == "change_position" and choice.location == 0x04:
+                target = next((card for card in observation.field
+                               if card.controller == choice.controller
+                               and card.zone == "monster"
+                               and card.sequence == choice.sequence), None)
+                if target is None:
+                    raise SimulatorUnavailable("position choice references an unobserved monster")
+                if target.position == "facedown":
+                    kind = "flip_summon"
             parameters = {}
             if choice.code is not None:
                 code = public_code(choice.code, choice.controller,
@@ -133,7 +143,7 @@ class RestrictedOcgcoreEngine:
                 parameters["sequence"] = choice.sequence
             if choice.controller is not None:
                 parameters["controller"] = choice.controller
-            actions.append(Action(str(index), choice.kind, native.player, parameters))
+            actions.append(Action(str(index), kind, native.player, parameters))
         self._choices = native.choices
         self._actions = tuple(actions)
         self._last_observation = observation

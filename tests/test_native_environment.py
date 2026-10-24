@@ -12,6 +12,15 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 
+def _old_position_actions(record):
+    """Pre-v8 recordings used change_position for a Flip Summon."""
+    def old(action):
+        return replace(action, kind="change_position") if action.kind == "flip_summon" else action
+
+    return replace(record, legal_actions=tuple(old(action) for action in record.legal_actions),
+                   selected_action=old(record.selected_action))
+
+
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_path):
     deck = tmp_path / "vanilla.ydk"
@@ -36,7 +45,7 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     trajectory = play()
     assert trajectory == play()
     assert trajectory.winner == 1
-    assert trajectory.schema_version == 7
+    assert trajectory.schema_version == 8
     assert trajectory.rules_profile == vars(RestrictedOcgcoreEngine(root).ruleset)
     assert trajectory.deck_sha256 is not None
     assert trajectory.asset_sha256 is not None
@@ -60,15 +69,15 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     assert verify_trajectory(read_trajectory(path), RestrictedOcgcoreEngine(root)) == len(
         trajectory.decisions)
     previous = replace(trajectory, schema_version=4,
-                       decisions=tuple(replace(record, observation=replace(
+                       decisions=tuple(_old_position_actions(replace(record, observation=replace(
                            record.observation, known_opponent_cards=(),
-                           known_opponent_field_cards=()))
+                           known_opponent_field_cards=())))
                                        for record in trajectory.decisions))
     assert verify_trajectory(previous, RestrictedOcgcoreEngine(root)) == len(
         previous.decisions)
-    legacy = replace(trajectory, schema_version=3,
+    legacy = replace(previous, schema_version=3,
                      decisions=tuple(replace(record, observation=replace(
-                         record.observation, public_history=())) for record in trajectory.decisions))
+                         record.observation, public_history=())) for record in previous.decisions))
     assert verify_trajectory(legacy, RestrictedOcgcoreEngine(root)) == len(legacy.decisions)
 
 
@@ -192,9 +201,9 @@ def test_book_of_moon_chains_and_hides_turned_monster(tmp_path):
                 assert read_trajectory(path) == trajectory
                 previous = replace(
                     trajectory, schema_version=5,
-                    decisions=tuple(replace(
+                    decisions=tuple(_old_position_actions(replace(
                         record, observation=replace(
-                            record.observation, known_opponent_field_cards=()))
+                            record.observation, known_opponent_field_cards=())))
                         for record in trajectory.decisions),
                 )
                 write_trajectory(path, previous)

@@ -5,7 +5,13 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from goat_ai.actions import Action
-from goat_ai.observations import CardView, ChainLinkView, KnownCardView, Observation
+from goat_ai.observations import (
+    CardView,
+    ChainLinkView,
+    KnownCardView,
+    Observation,
+    PublicRevealView,
+)
 
 
 @dataclass(frozen=True)
@@ -30,7 +36,7 @@ class Trajectory:
     winner: int | None
     source: str = "self_play"
     skill_metadata: dict | None = None
-    schema_version: int = 7
+    schema_version: int = 8
     rules_profile: dict | None = None
     deck_sha256: tuple[str, str] | None = None
     asset_sha256: dict[str, str] | None = None
@@ -43,7 +49,7 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     version = raw.get("schema_version")
-    if version not in (1, 2, 3, 4, 5, 6, 7):
+    if version not in (1, 2, 3, 4, 5, 6, 7, 8):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
@@ -63,6 +69,12 @@ def read_trajectory(path: str | Path) -> Trajectory:
                 KnownCardView(**card) for card in view["known_opponent_field_cards"])
         else:
             view.pop("known_opponent_field_cards", None)
+        if version >= 8:
+            view["public_reveals"] = tuple(PublicRevealView(
+                reveal["turn"], reveal["player"], reveal["zone"], tuple(reveal["codes"]))
+                for reveal in view["public_reveals"])
+        else:
+            view.pop("public_reveals", None)
         if version >= 2:
             view["chain"] = tuple(ChainLinkView(**link) for link in view["chain"])
         else:

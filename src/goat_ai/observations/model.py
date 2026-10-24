@@ -33,6 +33,16 @@ class KnownCardView:
 
 
 @dataclass(frozen=True)
+class PublicRevealView:
+    """Cards publicly revealed from one player's Deck at a decision boundary."""
+
+    turn: int
+    player: int
+    zone: str
+    codes: tuple[int, ...]
+
+
+@dataclass(frozen=True)
 class Observation:
     viewer: int
     acting_player: int
@@ -52,6 +62,7 @@ class Observation:
     restrictions: tuple[str, ...] = ()
     own_extra_deck: tuple[CardView, ...] = ()
     known_opponent_field_cards: tuple[KnownCardView, ...] = ()
+    public_reveals: tuple[PublicRevealView, ...] = ()
 
     def __post_init__(self) -> None:
         if self.viewer not in (0, 1) or self.acting_player not in (0, 1):
@@ -73,6 +84,10 @@ class Observation:
                 or any(slot not in facedown_slots or card.code <= 0
                        for slot, card in zip(known_slots, self.known_opponent_field_cards))):
             raise ValueError("known opponent card must match one face-down field slot")
+        if any(reveal.turn < 0 or reveal.player not in (0, 1) or reveal.zone != "deck_top"
+               or not reveal.codes or any(code <= 0 for code in reveal.codes)
+               for reveal in self.public_reveals):
+            raise ValueError("invalid public Deck reveal")
         if self.opponent_hand_count < 0 or any(n < 0 for n in self.deck_counts):
             raise ValueError("counts must be nonnegative")
 

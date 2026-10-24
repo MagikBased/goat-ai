@@ -92,6 +92,7 @@
           <h2>Public context</h2>
           <div id="restrictions"></div>
           <div id="chain"></div>
+          <div id="reveals"></div>
           <div id="history" class="muted"></div>
         </div>
       </div>
@@ -230,6 +231,9 @@
       legal.replaceChildren(...record.legal_actions.map(action => node("li", "", actionLabel(observation, action, known))));
       byId("restrictions").textContent = observation.restrictions?.length ? `Restrictions: ${observation.restrictions.join(" · ")}` : "Restrictions: none recorded";
       byId("chain").textContent = observation.chain?.length ? `Chain: ${observation.chain.map(link => `${link.index}. ${nameOf(link.card_code)} (P${link.controller})`).join(" → ")}` : "Chain: empty";
+      byId("reveals").textContent = observation.public_reveals?.length
+        ? `Public Deck reveals: ${observation.public_reveals.map(reveal => `Turn ${reveal.turn}, P${reveal.player}: ${reveal.codes.map(nameOf).join(", ")}`).join(" · ")}`
+        : "Public Deck reveals: none recorded";
       byId("history").textContent = observation.public_history?.length ? `Recent events: ${observation.public_history.slice(-8).join(" · ")}` : "No public events recorded";
     }
     function move(direction) {

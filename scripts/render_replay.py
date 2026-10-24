@@ -18,6 +18,8 @@ def _card_codes(value) -> set[int]:
         return set()
     codes = {int(code) for key, code in value.items()
              if key in ("code", "card_code") and isinstance(code, int) and code > 0}
+    if "codes" in value and isinstance(value["codes"], list):
+        codes.update(code for code in value["codes"] if isinstance(code, int) and code > 0)
     for item in value.values():
         if isinstance(item, (dict, list)):
             codes.update(_card_codes(item))

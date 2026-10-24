@@ -192,8 +192,16 @@ def test_public_scapegoat_restriction_replays_in_new_and_old_schemas(
     assert verify_trajectory(read_trajectory(path), ExperimentalOcgcoreEngine(root)) == len(
         trajectory.decisions)
     previous = replace(trajectory, schema_version=6,
-                       decisions=tuple(replace(record, observation=replace(
-                           record.observation, restrictions=()))
+                       decisions=tuple(replace(
+                           record,
+                           observation=replace(record.observation, restrictions=()),
+                           legal_actions=tuple(replace(action, kind="change_position")
+                                               if action.kind == "flip_summon" else action
+                                               for action in record.legal_actions),
+                           selected_action=(replace(record.selected_action, kind="change_position")
+                                            if record.selected_action.kind == "flip_summon"
+                                            else record.selected_action),
+                       )
                                        for record in trajectory.decisions))
     write_trajectory(path, previous)
     assert verify_trajectory(read_trajectory(path), ExperimentalOcgcoreEngine(root)) == len(

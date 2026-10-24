@@ -41,6 +41,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             if env.is_terminal():
                 raise ReplayMismatch(f"decision {index}: engine terminated early")
             compared_observation = observation
+            if trajectory.schema_version < 8:
+                compared_observation = replace(compared_observation, public_reveals=())
             if trajectory.schema_version < 7:
                 compared_observation = replace(compared_observation, restrictions=())
             if trajectory.schema_version < 6:
@@ -52,9 +54,15 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                 compared_observation = replace(compared_observation, public_history=())
             if compared_observation != record.observation:
                 raise ReplayMismatch(f"decision {index}: observation differs")
-            if env.legal_actions() != record.legal_actions:
+            current_actions = env.legal_actions()
+            compared_actions = (tuple(replace(action, kind="change_position")
+                                      if action.kind == "flip_summon" else action
+                                      for action in current_actions)
+                                if trajectory.schema_version < 8 else current_actions)
+            if compared_actions != record.legal_actions:
                 raise ReplayMismatch(f"decision {index}: legal actions differ")
-            observation = env.step(record.selected_action)
+            observation = env.step(current_actions[record.legal_actions.index(
+                record.selected_action)])
         if not env.is_terminal():
             raise ReplayMismatch("record ended before engine terminal state")
         if env.result() != trajectory.winner:

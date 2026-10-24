@@ -7,7 +7,13 @@ from goat_ai.actions import Action
 from goat_ai.agents import HeuristicAgent, HumanAgent, RandomAgent
 from goat_ai.engine import Decision, RulesProfile, SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
-from goat_ai.observations import CardView, ChainLinkView, KnownCardView, Observation
+from goat_ai.observations import (
+    CardView,
+    ChainLinkView,
+    KnownCardView,
+    Observation,
+    PublicRevealView,
+)
 from goat_ai.replay import (
     DecisionRecord,
     ReplayMismatch,
@@ -106,6 +112,23 @@ def test_publicly_seen_facedown_card_keeps_its_slot(tmp_path):
     assert restored.decisions[0].observation.known_opponent_field_cards == ()
 
 
+def test_public_deck_reveal_round_trip_and_legacy_reader(tmp_path):
+    observation = replace(view(), public_reveals=(
+        PublicRevealView(3, 0, "deck_top", (123, 456)),
+        PublicRevealView(3, 1, "deck_top", (789,)),
+    ))
+    action = Action("0", "pass", 0)
+    path = tmp_path / "reveal.json"
+    write_trajectory(path, Trajectory("goat", ("a", "b"), 7,
+                                      (DecisionRecord(observation, (action,), action),), 0))
+    assert read_trajectory(path).decisions[0].observation.public_reveals == observation.public_reveals
+    raw = json.loads(path.read_text())
+    raw["schema_version"] = 7
+    raw["decisions"][0]["observation"].pop("public_reveals")
+    path.write_text(json.dumps(raw))
+    assert read_trajectory(path).decisions[0].observation.public_reveals == ()
+
+
 def test_agents_use_same_contract():
     actions = (Action("0", "pass", 0), Action("1", "attack", 0))
     assert RandomAgent(5).select_action(view(), actions) in actions
@@ -154,6 +177,24 @@ def test_replay_verifier_detects_changed_decision_and_outcome():
     with pytest.raises(ReplayMismatch, match="native assets"):
         verify_trajectory(replace(trajectory, asset_sha256={"fixture": "wrong"}),
                           ContractEngine())
+
+
+def test_old_position_action_replays_as_flip_summon():
+    class FlipEngine(ContractEngine):
+        def reset(self, deck1, deck2, seed):
+            return Decision(view(), (Action("0", "flip_summon", 0),))
+
+        def step(self, action):
+            assert action.kind == "flip_summon"
+            return Decision(view(), (), terminal=True, winner=0)
+
+    old_action = Action("0", "change_position", 0)
+    old = Trajectory(RulesProfile().name, ("a", "b"), 42,
+                     (DecisionRecord(view(), (old_action,), old_action),), 0,
+                     schema_version=7)
+    assert verify_trajectory(old, FlipEngine()) == 1
+    with pytest.raises(ReplayMismatch, match="legal actions"):
+        verify_trajectory(replace(old, schema_version=8), FlipEngine())
 
 
 def test_replay_verifier_detects_changed_deck_contents(tmp_path):

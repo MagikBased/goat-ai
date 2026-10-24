@@ -13,7 +13,13 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-from goat_ai.observations import CardView, ChainLinkView, KnownCardView, Observation
+from goat_ai.observations import (
+    CardView,
+    ChainLinkView,
+    KnownCardView,
+    Observation,
+    PublicRevealView,
+)
 
 CORE_API_VERSION = (11, 0)
 GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
@@ -35,6 +41,7 @@ MSG_POS_CHANGE = 53
 MSG_SET = 54
 MSG_SWAP = 55
 MSG_SHUFFLE_SET_CARD = 36
+MSG_CONFIRM_DECKTOP = 30
 MSG_ATTACK = 110
 MSG_DAMAGE_STEP_START = 113
 MSG_DAMAGE_STEP_END = 114
@@ -158,6 +165,7 @@ class OcgcoreProbe:
         self._public_history: list[str] = []
         self._known_facedown: dict[tuple[int, int, int], int] = {}
         self._restriction_hints: dict[tuple[int, int], int] = {}
+        self._public_reveals: list[PublicRevealView] = []
         self._bind()
         major, minor = c.c_int(), c.c_int()
         self.lib.OCG_GetVersion(c.byref(major), c.byref(minor))
@@ -370,6 +378,16 @@ class OcgcoreProbe:
                 location = message[1]
                 self._known_facedown = {key: code for key, code in
                                         self._known_facedown.items() if key[1] != location}
+            elif message[0] == MSG_CONFIRM_DECKTOP:
+                if len(message) < 6 or message[1] not in (0, 1):
+                    raise ValueError("invalid MSG_CONFIRM_DECKTOP")
+                count = struct.unpack_from("<I", message, 2)[0]
+                if not count or len(message) != 6 + count * 10:
+                    raise ValueError("invalid MSG_CONFIRM_DECKTOP card count")
+                codes = tuple(struct.unpack_from("<I", message, 6 + index * 10)[0]
+                              for index in range(count))
+                self._public_reveals.append(PublicRevealView(
+                    self._turn, message[1], "deck_top", codes))
             elif message[0] == MSG_PLAYER_HINT:
                 if len(message) != 11 or message[1] not in (0, 1):
                     raise ValueError("invalid MSG_PLAYER_HINT")
@@ -527,6 +545,7 @@ class OcgcoreProbe:
                 f"player{player}:cannot_summon_this_turn:scapegoat"
                 for player in (0, 1)
                 if self._restriction_hints.get((player, SCAPEGOAT_SUMMON_HINT), 0)),
+            public_reveals=tuple(self._public_reveals),
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:

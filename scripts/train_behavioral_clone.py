@@ -40,10 +40,10 @@ def main() -> None:
     for path in args.trajectories:
         raw = path.read_bytes()
         trajectory = read_trajectory(path)
-        if trajectory.schema_version not in (3, 4, 5, 6, 7) or not trajectory.deck_sha256 or not (
+        if trajectory.schema_version not in (3, 4, 5, 6, 7, 8) or not trajectory.deck_sha256 or not (
             trajectory.asset_sha256
         ):
-            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v7")
+            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v8")
         count = verify_trajectory(trajectory, engine_type(args.native_root))
         selected = demonstrator_records(trajectory)
         records.extend(selected)
