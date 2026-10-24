@@ -87,8 +87,10 @@ The sample is a synthetic control-style protocol probe, not a sourced
 tournament decklist. On pinned assets, seed 42 ends after 1,251 random
 decisions with winner seat 1. This is neither a playing-strength benchmark
 nor a historical-rulings validation. `ExperimentalOcgcoreEngine` accepts
-whitelist-legal 40–60 card main decks and Fusion Extra Decks; the Side Deck is
-validated but unused in a single duel. The adapter may fail on unhandled
+whitelist-legal main decks of at least 40 cards and Fusion Extra Decks; the Side Deck is
+validated but unused in a single duel. Historical 0-or-15 Side Deck sizing is
+the default; `RulesProfile(side_deck_policy="community")` permits a shorter
+Side Deck. The adapter may fail on unhandled
 native requests. Its action semantics and player-visible observations must be
 audited before using it for training or competitive evaluation.
 

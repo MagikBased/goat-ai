@@ -74,7 +74,7 @@ def test_experimental_duel_loads_fusion_and_41_card_main(tmp_path):
     deck_path = tmp_path / "expanded.ydk"
     deck_path.write_text(
         "#main\n" + "\n".join(map(str, (*sample.main, 87621407)))
-        + "\n#extra\n504700102\n80071763\n!side\n70074904\n",
+        + "\n#extra\n504700102\n80071763\n!side\n",
         encoding="utf-8",
     )
     with GoatEnvironment(str(deck_path), DECK, 42,

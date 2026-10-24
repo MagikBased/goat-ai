@@ -16,12 +16,13 @@ from goat_ai.engine.protocol import Decision, RulesProfile, SimulatorUnavailable
 
 
 class RestrictedOcgcoreEngine:
-    ruleset = RulesProfile()
     supported_spells = frozenset({55144522, 14087893, 504700116})
     supported_monsters = frozenset({11384280})
 
-    def __init__(self, native_root: str | Path) -> None:
+    def __init__(self, native_root: str | Path,
+                 ruleset: RulesProfile | None = None) -> None:
         self.root = Path(native_root)
+        self.ruleset = ruleset or RulesProfile()
         self.probe: OcgcoreProbe | None = None
         self._choices: tuple[NativeChoice, ...] = ()
         self._actions: tuple[Action, ...] = ()
@@ -33,7 +34,8 @@ class RestrictedOcgcoreEngine:
         goat_database = self.root / "database/goat-entries.cdb"
         unofficial_database = self.root / "database/cards-unofficial.cdb"
         limits = read_goat_whitelist(self.root / "banlist/GOAT.lflist.conf")
-        validate_goat_deck(deck, limits, database, goat_database, unofficial_database)
+        validate_goat_deck(deck, limits, database, goat_database, unofficial_database,
+                           self.ruleset.side_deck_policy)
         if deck.extra or deck.side or len(deck.main) != 40:
             raise SimulatorUnavailable("restricted adapter currently supports a 40-card main deck only")
         with sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True) as connection:

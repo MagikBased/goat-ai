@@ -252,9 +252,8 @@ class OcgcoreProbe:
             raise RuntimeError("probe instance already used")
         if len(deck) < 6:
             raise ValueError("probe deck requires at least six cards")
-        if not 40 <= len(deck) <= 60 or (opponent_deck is not None
-                                          and not 40 <= len(opponent_deck) <= 60):
-            raise ValueError("native duel requires 40 to 60 main-deck cards per player")
+        if len(deck) < 40 or (opponent_deck is not None and len(opponent_deck) < 40):
+            raise ValueError("native duel requires at least 40 main-deck cards per player")
         # Four nonzero 64-bit words; exact split is part of reproducibility.
         words = tuple((seed + i + 1) & ((1 << 64) - 1) for i in range(4))
         opts = DuelOptions(

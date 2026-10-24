@@ -1,7 +1,7 @@
 """An engine must perform real rule resolution and return already-redacted views."""
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from goat_ai.actions import Action
 from goat_ai.observations import Observation
@@ -17,6 +17,7 @@ class RulesProfile:
     april_2005_banlist: bool = True
     first_turn_draw: bool = True
     obsolete_ignition_priority: bool = True
+    side_deck_policy: Literal["historical", "community"] = "historical"
 
 
 @dataclass(frozen=True)

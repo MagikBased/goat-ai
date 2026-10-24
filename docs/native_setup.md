@@ -50,8 +50,10 @@ The direct `ctypes` path reaches the first decision with a small binding and no 
 `goat_ai.engine.decks` parses `.ydk` sections and checks main/side sizes, pinned whitelist membership, forbidden/limited/semi-limited counts, aliases, and Fusion Deck placement across all three pinned databases. A pre-errata Dark Magician of Chaos card and script are tested at native startup. The card-pool audit finds metadata and a candidate script path for all 1,685 allowed whitelist IDs. Only selected scripts are fetched by sparse checkout; decks with other effect cards fail explicitly in the restricted adapter. This is an asset and legality gate, not a historical behavior audit.
 
 `ExperimentalOcgcoreEngine` relaxes the audited-card gate for whitelist-legal
-40–60 card main decks and Fusion Extra Decks. It validates Side Deck cards,
-which are unused in a single duel, and still fails on unsupported native
+main decks of at least 40 cards and Fusion Extra Decks. A 61-card native
+startup test checks the absence of a 60-card maximum. It validates Side Deck
+cards, requiring 0 or 15 by default; a community policy allows 0–15. Side
+cards are unused in a single duel. The adapter still fails on unsupported native
 decisions. Its synthetic control-style probe exercises effect cards, generated Sheep Tokens, yes/no,
 tribute, position, and race selections. `python scripts/probe_control_deck.py
 --seed 42` completes one pinned random duel in 1,251 decisions, winner seat

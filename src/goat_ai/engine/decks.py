@@ -4,6 +4,7 @@ import sqlite3
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -60,12 +61,20 @@ def read_goat_whitelist(path: str | Path) -> dict[int, int]:
 
 def validate_goat_deck(deck: Decklist, limits: dict[int, int], database: Path,
                        goat_database: Path | None = None,
-                       unofficial_database: Path | None = None) -> None:
+                       unofficial_database: Path | None = None,
+                       side_deck_policy: Literal["historical", "community"] =
+                       "historical") -> None:
     """Validate list membership/copies; deeper historical card rulings are separate."""
-    if not 40 <= len(deck.main) <= 60:
-        raise ValueError("GOAT main deck must contain 40 to 60 cards")
-    if len(deck.side) > 15:
-        raise ValueError("side deck exceeds 15 cards")
+    if len(deck.main) < 40:
+        raise ValueError("GOAT main deck must contain at least 40 cards")
+    if side_deck_policy == "historical":
+        if len(deck.side) not in (0, 15):
+            raise ValueError("historical GOAT side deck must contain 0 or 15 cards")
+    elif side_deck_policy == "community":
+        if len(deck.side) > 15:
+            raise ValueError("side deck exceeds 15 cards")
+    else:
+        raise ValueError(f"unknown side deck policy: {side_deck_policy}")
     counts: Counter[int] = Counter()
     with sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True) as connection:
         if goat_database is not None:

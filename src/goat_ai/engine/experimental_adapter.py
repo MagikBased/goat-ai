@@ -17,5 +17,6 @@ class ExperimentalOcgcoreEngine(RestrictedOcgcoreEngine):
             deck, limits, self.root / "database/cards.cdb",
             self.root / "database/goat-entries.cdb",
             self.root / "database/cards-unofficial.cdb",
+            self.ruleset.side_deck_policy,
         )
         return deck

@@ -2,6 +2,11 @@
 
 `GoatEnvironment` validates action membership and delegates every rules transition to a `RulesEngine`. `Decision` returns one acting player's `Observation` and its variable-length legal `Action` tuple. The current default engine raises `SimulatorUnavailable`; no custom Yu-Gi-Oh! rules are simulated in Python. The restricted `RestrictedOcgcoreEngine` connects a [native core](native_setup.md) to this environment for normal-monster fixture decks and three tested spells. General response decoding and complete observation coverage are still unfinished, so the default remains fail-closed.
 
+`RulesProfile` now selects historical Side Deck sizing (0 or 15 cards) by
+default, with an explicit community option for 0–15 cards. Main Decks require
+at least 40 cards and have no project-imposed maximum. The experimental native
+adapter has a 61-card startup test; broader large-deck behavior is unmeasured.
+
 The observation schema has explicit visible zones, public counts, own hand, and structured chain links. Field monsters record their visible attack or defense position. History and known-opponent-card fields exist but are not populated by the native adapter yet. It has no opponent hand identities or deck order. Schema shape alone cannot prove the native adapter redacts data. The native adapter must use the engine's player-scoped queries, hide facedown cards where appropriate, and test identical visible states with different hidden cards. Action IDs are local to a decision and must map to the exact native response payload; effects with targets or multiple choices may take several decisions.
 
 ## Next adapter implementation
