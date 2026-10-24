@@ -11,6 +11,8 @@
 
 No maintained Python package was verified to expose all ocgcore decisions with historical GOAT rules and safe player views. A direct C API bridge or a carefully patched ygoenv fork are the practical next options. Native workers can later support parallel duels; neither state cloning nor deterministic throughput has been demonstrated here.
 
+**M0 prototype result:** A direct Python `ctypes` bridge to the pinned native core reached `MSG_SELECT_CHAIN` after the first player's six-card opening hand. This favors a direct binding for M1 because it avoids ygoenv's modern-rule hardcoding and fixed maximum option count. No complete duel, action enumeration, visibility audit, or throughput measurement has been completed. See [native setup](native_setup.md).
+
 ## Historical correctness
 
 [GoatFormat.com's mechanics guide](https://www.goatformat.com/basics.html) documents the first-player draw, historical priority for Ignition effects, field spell behavior, and many other deviations. [Its card pool and banlist](https://www.goatformat.com/cardpool.html) uses the April 2005 TCG Forbidden/Limited list and an August 17, 2005 event card pool. `DUEL_MODE_GOAT` includes flags for first-turn draw, old Ignition behavior, older field-spell handling, and further TCG timing differences in [core constants](https://github.com/edo9300/ygopro-core/blob/master/ocgapi_constants.h). This is promising but is not proof that all card scripts, errata, and rulings match the 2005 TCG. Pin and test concrete engine/database/script revisions before any correctness claim.

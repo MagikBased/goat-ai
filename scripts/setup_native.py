@@ -1,0 +1,68 @@
+"""Fetch pinned external assets and build ocgcore for the M0 probe (Linux)."""
+
+import argparse
+import hashlib
+import platform
+import shutil
+import subprocess
+from pathlib import Path
+
+SOURCES = (
+    ("core", "https://github.com/edo9300/ygopro-core.git",
+     "baa3881d0bae48e9994f915f5c931be53c1ba8ef"),
+    ("scripts", "https://github.com/ProjectIgnis/CardScripts.git",
+     "196eb043514e2cbc23ff891e3cfe31b89765ce49"),
+    ("database", "https://github.com/ProjectIgnis/BabelCDB.git",
+     "19339149fa5ee509327023f15a81d8ba4164c5a1"),
+)
+DATABASE_SHA256 = "d5166c35296a6c65dcc0230c7bc0e9f25721639159b80fa78bf724be61183a6a"
+
+
+def run(*args: str) -> None:
+    print("+", *args, flush=True)
+    subprocess.run(args, check=True)
+
+
+def fetch(root: Path, name: str, url: str, revision: str) -> Path:
+    path = root / name
+    if not path.exists():
+        args = ["git", "clone", "--filter=blob:none"]
+        if name != "core":
+            args.append("--sparse")
+        run(*args, url, str(path))
+    current = subprocess.check_output(["git", "-C", str(path), "rev-parse", "HEAD"], text=True).strip()
+    if current != revision:
+        run("git", "-C", str(path), "checkout", revision)
+    if name == "core":
+        run("git", "-C", str(path), "submodule", "update", "--init", "--depth", "1")
+    elif name == "scripts":
+        run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone",
+            "/*.lua", "/unofficial/proc_unofficial.lua")
+    else:
+        run("git", "-C", str(path), "sparse-checkout", "set", "--no-cone", "/cards.cdb")
+    return path
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
+    args = parser.parse_args()
+    if platform.system() != "Linux":
+        raise SystemExit("M0 native setup has only been verified on Linux")
+    if not shutil.which("meson"):
+        raise SystemExit("meson missing; install with pip install -e '.[native]'")
+    root = args.native_root.resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    paths = {name: fetch(root, name, url, revision) for name, url, revision in SOURCES}
+    actual_hash = hashlib.sha256((paths["database"] / "cards.cdb").read_bytes()).hexdigest()
+    if actual_hash != DATABASE_SHA256:
+        raise SystemExit(f"database checksum mismatch: {actual_hash}")
+    build = root / "build"
+    if not (build / "build.ninja").exists():
+        run("meson", "setup", str(build), str(paths["core"]), "-Ddefault_library=shared")
+    run("meson", "compile", "-C", str(build), "-j", "4")
+    print(f"Native probe assets ready at {root}")
+
+
+if __name__ == "__main__":
+    main()

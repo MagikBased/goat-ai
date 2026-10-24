@@ -1,0 +1,258 @@
+"""Minimal native ocgcore GOAT-mode startup probe, not a duel adapter.
+
+The ABI and flag value are pinned to edo9300/ygopro-core baa3881. Do not use
+this class as a player-facing environment: raw native messages may reveal
+private information and most decision messages are not decoded here.
+"""
+
+import ctypes as c
+import sqlite3
+import struct
+from dataclasses import dataclass
+from pathlib import Path
+
+CORE_API_VERSION = (11, 0)
+GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
+LOCATION_DECK = 0x01
+LOCATION_HAND = 0x02
+POSITION_FACEDOWN_DEFENSE = 0x08
+MSG_SELECT_IDLECMD = 11
+MSG_SELECT_CHAIN = 16
+MSG_DRAW = 90
+STATUS_AWAITING = 1
+
+
+class CardData(c.Structure):
+    _fields_ = [
+        ("code", c.c_uint32), ("alias", c.c_uint32),
+        ("setcodes", c.POINTER(c.c_uint16)), ("type", c.c_uint32),
+        ("level", c.c_uint32), ("attribute", c.c_uint32),
+        ("race", c.c_uint64), ("attack", c.c_int32), ("defense", c.c_int32),
+        ("lscale", c.c_uint32), ("rscale", c.c_uint32),
+        ("link_marker", c.c_uint32),
+    ]
+
+
+class Player(c.Structure):
+    _fields_ = [("startingLP", c.c_uint32), ("startingDrawCount", c.c_uint32),
+                ("drawCountPerTurn", c.c_uint32)]
+
+
+DataReader = c.CFUNCTYPE(None, c.c_void_p, c.c_uint32, c.POINTER(CardData))
+ScriptReader = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_void_p, c.c_char_p)
+LogHandler = c.CFUNCTYPE(None, c.c_void_p, c.c_char_p, c.c_int)
+DataReaderDone = c.CFUNCTYPE(None, c.c_void_p, c.POINTER(CardData))
+
+
+class DuelOptions(c.Structure):
+    _fields_ = [
+        ("seed", c.c_uint64 * 4), ("flags", c.c_uint64),
+        ("team1", Player), ("team2", Player),
+        ("cardReader", DataReader), ("payload1", c.c_void_p),
+        ("scriptReader", ScriptReader), ("payload2", c.c_void_p),
+        ("logHandler", LogHandler), ("payload3", c.c_void_p),
+        ("cardReaderDone", DataReaderDone), ("payload4", c.c_void_p),
+        ("enableUnsafeLibraries", c.c_uint8),
+    ]
+
+
+class NewCard(c.Structure):
+    _fields_ = [
+        ("team", c.c_uint8), ("duelist", c.c_uint8), ("code", c.c_uint32),
+        ("con", c.c_uint8), ("loc", c.c_uint32), ("seq", c.c_uint32),
+        ("pos", c.c_uint32),
+    ]
+
+
+@dataclass(frozen=True)
+class FirstDecision:
+    seed: int
+    core_version: tuple[int, int]
+    flags: int
+    hand_counts: tuple[int, int]
+    deck_counts: tuple[int, int]
+    message_ids: tuple[int, ...]
+    draw_events: tuple[tuple[int, int], ...]
+    decision_message_id: int
+    decision_player: int
+
+
+def split_messages(buffer: bytes) -> tuple[bytes, ...]:
+    """Core messages are length-prefixed frames; unknown IDs remain opaque."""
+    messages = []
+    offset = 0
+    while offset < len(buffer):
+        if len(buffer) - offset < 5:
+            raise ValueError("truncated native message header")
+        length = struct.unpack_from("<I", buffer, offset)[0]
+        offset += 4
+        if not length or offset + length > len(buffer):
+            raise ValueError("invalid native message length")
+        messages.append(buffer[offset:offset + length])
+        offset += length
+    return tuple(messages)
+
+
+class OcgcoreProbe:
+    """Owns one native duel; intended only for startup verification."""
+
+    def __init__(self, library: Path, database: Path, scripts: Path) -> None:
+        self.lib = c.CDLL(str(library.resolve()))
+        self.db = sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True)
+        self.scripts = scripts.resolve()
+        self.errors: list[str] = []
+        self._setcodes: dict[int, c.Array] = {}
+        self._duel = c.c_void_p()
+        self._bind()
+        major, minor = c.c_int(), c.c_int()
+        self.lib.OCG_GetVersion(c.byref(major), c.byref(minor))
+        self.version = (major.value, minor.value)
+        if self.version != CORE_API_VERSION:
+            raise RuntimeError(f"ocgcore API {self.version} != pinned {CORE_API_VERSION}")
+        self._reader = DataReader(self._read_card)
+        self._script_reader = ScriptReader(self._read_script)
+        self._logger = LogHandler(self._log)
+        self._reader_done = DataReaderDone(lambda _payload, _data: None)
+
+    def _bind(self) -> None:
+        definitions = {
+            "OCG_GetVersion": ([c.POINTER(c.c_int), c.POINTER(c.c_int)], None),
+            "OCG_CreateDuel": ([c.POINTER(c.c_void_p), c.POINTER(DuelOptions)], c.c_int),
+            "OCG_DestroyDuel": ([c.c_void_p], None),
+            "OCG_DuelNewCard": ([c.c_void_p, c.POINTER(NewCard)], None),
+            "OCG_StartDuel": ([c.c_void_p], None),
+            "OCG_DuelProcess": ([c.c_void_p], c.c_int),
+            "OCG_DuelGetMessage": ([c.c_void_p, c.POINTER(c.c_uint32)], c.c_void_p),
+            "OCG_LoadScript": ([c.c_void_p, c.c_char_p, c.c_uint32, c.c_char_p], c.c_int),
+            "OCG_DuelQueryCount": ([c.c_void_p, c.c_uint8, c.c_uint32], c.c_uint32),
+        }
+        for name, (argtypes, restype) in definitions.items():
+            function = getattr(self.lib, name)
+            function.argtypes = argtypes
+            function.restype = restype
+
+    def _read_card(self, _payload: int, code: int, result: c.POINTER(CardData)) -> None:
+        row = self.db.execute(
+            "SELECT alias, setcode, type, level, attribute, race, atk, def "
+            "FROM datas WHERE id=?", (code,),
+        ).fetchone()
+        if row is None:
+            self.errors.append(f"card {code} absent from database")
+            return
+        alias, setcode, card_type, level, attribute, race, attack, defense = row
+        data = result.contents
+        data.code = code
+        data.alias = alias
+        data.type = card_type
+        data.level = level & 0xFF
+        data.attribute = attribute
+        data.race = race
+        data.attack = attack
+        data.defense = defense
+        data.lscale = (level >> 24) & 0xFF
+        data.rscale = (level >> 16) & 0xFF
+        if setcode:
+            parts = [(setcode >> shift) & 0xFFFF for shift in (0, 16, 32, 48)]
+            self._setcodes[code] = (c.c_uint16 * 5)(*parts, 0)
+            data.setcodes = self._setcodes[code]
+
+    def _read_script(self, _payload: int, duel: int, name: bytes) -> int:
+        relative = Path(name.decode("utf-8"))
+        if relative.is_absolute() or ".." in relative.parts:
+            self.errors.append(f"unsafe script path: {relative}")
+            return 0
+        path = self.scripts / relative
+        if not path.is_file():
+            path = self.scripts / "official" / relative
+        if not path.is_file():
+            path = self.scripts / "unofficial" / relative
+        if not path.is_file():
+            # Vanilla monsters have no card script. Missing effect scripts
+            # remain fatal, so the probe cannot silently omit card behavior.
+            if relative.name == "c0.lua":
+                return 0
+            if relative.name.startswith("c") and relative.stem[1:].isdigit():
+                code = int(relative.stem[1:])
+                row = self.db.execute("SELECT type FROM datas WHERE id=?", (code,)).fetchone()
+                if row and row[0] == 17:  # normal monster
+                    return 0
+            if not path.is_file():
+                self.errors.append(f"missing script: {relative}")
+            return 0
+        contents = path.read_bytes()
+        return self.lib.OCG_LoadScript(duel, contents, len(contents), name)
+
+    def _log(self, _payload: int, message: bytes, _kind: int) -> None:
+        self.errors.append(message.decode("utf-8", errors="replace"))
+
+    def first_decision(self, seed: int, deck: tuple[int, ...]) -> FirstDecision:
+        if self._duel.value:
+            raise RuntimeError("probe instance already used")
+        if len(deck) < 6:
+            raise ValueError("probe deck requires at least six cards")
+        if len(deck) != 40:
+            raise ValueError("probe fixture must have exactly forty cards")
+        # Four nonzero 64-bit words; exact split is part of reproducibility.
+        words = tuple((seed + i + 1) & ((1 << 64) - 1) for i in range(4))
+        opts = DuelOptions(
+            (c.c_uint64 * 4)(*words), GOAT_FLAGS,
+            Player(8000, 5, 1), Player(8000, 5, 1),
+            self._reader, None, self._script_reader, None,
+            self._logger, None, self._reader_done, None, 0,
+        )
+        status = self.lib.OCG_CreateDuel(c.byref(self._duel), c.byref(opts))
+        if status != 0:
+            raise RuntimeError(f"OCG_CreateDuel returned {status}: {self.errors}")
+        for name in (b"constant.lua", b"utility.lua"):
+            if not self._read_script(0, self._duel, name):
+                raise RuntimeError(f"could not load {name.decode()}: {self.errors}")
+        for team in (0, 1):
+            for code in deck:
+                card = NewCard(team, 0, code, team, LOCATION_DECK, 0,
+                               POSITION_FACEDOWN_DEFENSE)
+                self.lib.OCG_DuelNewCard(self._duel, c.byref(card))
+        if self.errors:
+            raise RuntimeError(f"native setup failed: {self.errors}")
+        self.lib.OCG_StartDuel(self._duel)
+        messages: list[bytes] = []
+        for _ in range(1000):
+            status = self.lib.OCG_DuelProcess(self._duel)
+            length = c.c_uint32()
+            pointer = self.lib.OCG_DuelGetMessage(self._duel, c.byref(length))
+            if length.value:
+                messages.extend(split_messages(c.string_at(pointer, length.value)))
+            if status == STATUS_AWAITING:
+                break
+            if status == 0:
+                raise RuntimeError("duel ended before a decision")
+        else:
+            raise RuntimeError("native core did not reach a decision")
+        if self.errors:
+            raise RuntimeError(f"native processing errors: {self.errors}")
+        decision = messages[-1]
+        if decision[0] != MSG_SELECT_CHAIN or len(decision) < 2:
+            raise RuntimeError(f"unsupported first decision message: {decision[0]}")
+        draw_events = []
+        for message in messages:
+            if message[0] == MSG_DRAW:
+                if len(message) < 6:
+                    raise ValueError("truncated MSG_DRAW")
+                draw_events.append((message[1], struct.unpack_from("<I", message, 2)[0]))
+        return FirstDecision(
+            seed, self.version, GOAT_FLAGS,
+            tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_HAND) for p in (0, 1)),
+            tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_DECK) for p in (0, 1)),
+            tuple(message[0] for message in messages), tuple(draw_events), decision[0], decision[1],
+        )
+
+    def close(self) -> None:
+        if self._duel.value:
+            self.lib.OCG_DestroyDuel(self._duel)
+            self._duel = c.c_void_p()
+        self.db.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()

@@ -4,9 +4,11 @@ GOAT AI's first goal is a **verified, headless GOAT duel that two random agents 
 
 ## Current baseline
 
-The repository has a Python environment contract, observation and action types, three baseline agents, JSON trajectory serialization, and CI. The default engine raises `SimulatorUnavailable`. Existing tests validate the interfaces; they do not validate Yu-Gi-Oh! mechanics or a native engine. The selected engine direction is modern ocgcore with `DUEL_MODE_GOAT`, subject to historical validation and license review.
+The repository has a Python environment contract, observation and action types, three baseline agents, JSON trajectory serialization, and CI. The default engine raises `SimulatorUnavailable`. A separate native probe now reaches the first GOAT-mode decision and checks the opening draw; it is not a complete adapter or a historical correctness claim. The selected engine is modern ocgcore with `DUEL_MODE_GOAT`, subject to ruling validation and license review. See [native setup](native_setup.md).
 
 ## M0 — Prove the native engine path
+
+**Status: complete for the first-decision prototype.** Reproduction and exact pins are in [native setup](native_setup.md). The implementation uses a direct `ctypes` binding; M1 must still decode responses and enforce player-visible observations.
 
 **Work**
 

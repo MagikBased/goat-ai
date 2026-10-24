@@ -7,7 +7,8 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. **This re
 | Component | Status |
 | --- | --- |
 | Engine selection and source review | Initial research complete |
-| Historical GOAT rules in headless engine | Unfinished |
+| Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
+| Complete headless duel | Unfinished |
 | Environment contract and illegal-action validation | Implemented |
 | Player-visible observation schema | Implemented; engine redaction unverified |
 | Random, heuristic, CLI human agents | Implemented against contract |
@@ -31,6 +32,19 @@ python examples/show_contract.py
 PyTorch is an optional future training dependency: `python -m pip install -e '.[ml]'`. No PyTorch model or training algorithm is implemented yet.
 
 The API is `GoatEnvironment(player1_deck, player2_deck, seed, engine=...)`; `reset()`, `legal_actions()`, `step()`, `is_terminal()`, and `result()` are defined. Without an audited engine, `reset()` raises `SimulatorUnavailable` with the outstanding integration tasks. This is intentional: it prevents a modern-rules duel from being presented as GOAT.
+
+## Native first-decision probe (Linux)
+
+The separate M0 probe calls a real, pinned ocgcore build with `DUEL_MODE_GOAT`. It is **not yet connected to `GoatEnvironment`** and its raw messages must not be passed to an agent because their visibility has not been audited. It uses a 40-card normal-monster fixture to verify startup and the first-turn draw; full deck legality is planned for M1.
+
+```bash
+python -m pip install -e '.[dev,native]'
+python scripts/setup_native.py
+python scripts/probe_native.py --seed 42
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai python -m pytest -q tests/test_ocgcore_probe.py
+```
+
+Setup downloads and builds external dependencies under ignored `.cache/goat-ai/`. See [native setup](docs/native_setup.md) for pinned revisions, licensing, and the probe's limits.
 
 ## Contributions and data
 

@@ -13,6 +13,7 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
 ml = ["torch>=2.3"]
+native = ["meson>=1.7", "ninja>=1.11"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
