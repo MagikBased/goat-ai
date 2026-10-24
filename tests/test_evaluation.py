@@ -1,12 +1,13 @@
 import math
 import os
+from functools import partial
 from pathlib import Path
 
 import pytest
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
-from goat_ai.evaluation import GameResult, run_tournament, wilson_interval
+from goat_ai.evaluation import GameResult, run_tournament, run_tournament_parallel, wilson_interval
 from goat_ai.evaluation.tournament import bootstrap_score_interval
 
 
@@ -30,6 +31,12 @@ def test_paired_bootstrap_scores_complete_wins_and_draws():
     assert bootstrap_score_interval(draws) == (0.5, 0.5)
 
 
+def test_parallel_runner_rejects_unpickleable_factories():
+    with pytest.raises(TypeError, match="agent_a must be pickleable"):
+        run_tournament_parallel([("a", "b")], [42], lambda seed: RandomAgent(seed),
+                                RandomAgent, RandomAgent, workers=2)
+
+
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_native_tournament_swaps_seats_and_reproduces_results():
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
@@ -38,10 +45,13 @@ def test_native_tournament_swaps_seats_and_reproduces_results():
 
     def run():
         return run_tournament(matchup, [42, 43], RandomAgent, RandomAgent,
-                              lambda: RestrictedOcgcoreEngine(root))
+                              partial(RestrictedOcgcoreEngine, root))
 
     report = run()
     assert report == run()
+    assert report == run_tournament_parallel(
+        matchup, [42, 43], RandomAgent, RandomAgent,
+        partial(RestrictedOcgcoreEngine, root), workers=2)
     assert len(report.games) == 4
     assert [(game.seed, game.a_seat) for game in report.games] == [
         (42, 0), (42, 1), (43, 0), (43, 1),

@@ -1,8 +1,12 @@
 """Seat-swapped, seeded duels and decisive-win confidence intervals."""
 
+import pickle
 from collections.abc import Callable, Sequence
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
+from itertools import repeat
 from math import sqrt
+from multiprocessing import get_context
 from random import Random
 
 from goat_ai.agents import Agent
@@ -108,25 +112,56 @@ def run_tournament(
     """Run each matchup/seed twice, with candidate A in each seat once."""
     if not matchups or not seeds or max_decisions < 1:
         raise ValueError("nonempty matchups/seeds and positive max_decisions required")
-    games = []
-    for deck_a, deck_b in matchups:
-        for seed in seeds:
-            for a_seat in (0, 1):
-                decks = (deck_a, deck_b) if a_seat == 0 else (deck_b, deck_a)
-                a, b = agent_a(seed), agent_b(seed)
-                agents = (a, b) if a_seat == 0 else (b, a)
-                with GoatEnvironment(*decks, seed=seed, engine=engine_factory()) as env:
-                    observation = env.reset()
-                    for decision_count in range(1, max_decisions + 1):
-                        action = agents[observation.acting_player].select_action(
-                            observation, env.legal_actions())
-                        observation = env.step(action)
-                        if env.is_terminal():
-                            games.append(GameResult(deck_a, deck_b, seed, a_seat,
-                                                    env.result(), decision_count))
-                            break
-                    else:
-                        raise RuntimeError(
-                            f"duel exceeded {max_decisions} decisions: "
-                            f"decks={decks}, seed={seed}, A seat={a_seat}")
-    return TournamentReport(tuple(games))
+    schedule = ((a, b, seed, seat) for a, b in matchups
+                for seed in seeds for seat in (0, 1))
+    return TournamentReport(tuple(_play_game(job, agent_a, agent_b, engine_factory,
+                                             max_decisions) for job in schedule))
+
+
+def _play_game(job: tuple[str, str, int, int],
+               agent_a: Callable[[int], Agent], agent_b: Callable[[int], Agent],
+               engine_factory: Callable[[], RulesEngine],
+               max_decisions: int) -> GameResult:
+    deck_a, deck_b, seed, a_seat = job
+    decks = (deck_a, deck_b) if a_seat == 0 else (deck_b, deck_a)
+    a, b = agent_a(seed), agent_b(seed)
+    agents = (a, b) if a_seat == 0 else (b, a)
+    with GoatEnvironment(*decks, seed=seed, engine=engine_factory()) as env:
+        observation = env.reset()
+        for decision_count in range(1, max_decisions + 1):
+            action = agents[observation.acting_player].select_action(
+                observation, env.legal_actions())
+            observation = env.step(action)
+            if env.is_terminal():
+                return GameResult(deck_a, deck_b, seed, a_seat,
+                                  env.result(), decision_count)
+    raise RuntimeError(f"duel exceeded {max_decisions} decisions: "
+                       f"decks={decks}, seed={seed}, A seat={a_seat}")
+
+
+def run_tournament_parallel(
+    matchups: Sequence[tuple[str, str]], seeds: Sequence[int],
+    agent_a: Callable[[int], Agent], agent_b: Callable[[int], Agent],
+    engine_factory: Callable[[], RulesEngine], max_decisions: int = 5000,
+    workers: int = 2,
+) -> TournamentReport:
+    """Run independent games in spawned processes, preserving schedule order.
+
+    Agent and engine factories must be pickleable top-level callables or
+    ``functools.partial`` instances. Spawn avoids inheriting live native duels.
+    """
+    if not matchups or not seeds or max_decisions < 1 or workers < 1:
+        raise ValueError("nonempty matchups/seeds and positive limits/workers required")
+    for name, factory in (("agent_a", agent_a), ("agent_b", agent_b),
+                          ("engine_factory", engine_factory)):
+        try:
+            pickle.dumps(factory)
+        except (pickle.PicklingError, TypeError, AttributeError) as exc:
+            raise TypeError(f"{name} must be pickleable for process workers") from exc
+    schedule = tuple((a, b, seed, seat) for a, b in matchups
+                     for seed in seeds for seat in (0, 1))
+    with ProcessPoolExecutor(max_workers=workers, mp_context=get_context("spawn")) as executor:
+        games = tuple(executor.map(_play_game, schedule, repeat(agent_a),
+                                   repeat(agent_b), repeat(engine_factory),
+                                   repeat(max_decisions)))
+    return TournamentReport(games)

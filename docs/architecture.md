@@ -31,3 +31,10 @@ replayed but lack these content checks.
 
 `goat_ai.evaluation.run_tournament` depends only on the `RulesEngine` and agent interfaces. It runs each seed and matchup with both seat assignments and records wins, losses, draws, decisions, and a Wilson interval for decisive wins. The native CLI adds deck and asset fingerprints. This keeps evaluation separate from policy implementation and makes later checkpoint opponents possible without changing the duel engine.
 
+`run_tournament_parallel` executes the same schedule in spawned processes and
+returns results in schedule order. It requires pickleable top-level agent and
+engine factories, such as a class or `functools.partial`; spawning avoids
+inheriting live native duel state. The native evaluation CLI accepts
+`--workers`. The engine and public agent interfaces are unchanged, so future
+network inference can use the same schedule with a suitable worker factory.
+

@@ -13,7 +13,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Player-visible observation schema | Own hand and Extra Deck, public zones, battle position, and chain links; hidden opponent card tests pass on fixtures; history and known-card memory pending |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
 | JSON trajectory round trip | Schema v3 records visible decisions, full rules profile, deck hashes, and loaded native asset hashes; v1/v2 remain readable |
-| Tournaments | Seeded, seat-swapped runner and Wilson intervals implemented for supported decks |
+| Tournaments | Seeded, seat-swapped sequential and spawned-process runners; paired score intervals and Wilson intervals for supported decks |
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
 | Experimental control probe | One seeded 40-card synthetic control-style deck reaches a native terminal state with full scripts; behavior and visibility unaudited |
@@ -60,6 +60,7 @@ python examples/play_vanilla.py --human-seat 0
 python scripts/benchmark_native.py --games 3 --seed 42
 python scripts/audit_card_pool.py
 python scripts/evaluate_native.py --agent-a heuristic --agent-b random --seeds 10
+python scripts/evaluate_native.py --agent-a random --agent-b random --seeds 4 --workers 2
 ```
 
 To verify a saved fixture trajectory against the current pinned native assets:

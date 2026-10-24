@@ -13,3 +13,22 @@ This run used core commit `baa3881d0bae48e9994f915f5c931be53c1ba8ef`, seed start
 The second row uses the same core and fixture after attaching pinned `goat-entries.cdb` and loading selected GOAT scripts. Its reset time was 0.135 s, initial peak RSS 16,964 KiB, and winners `[1, 1, 1]`. These one-run differences do not establish a speed change.
 
 The third row used project commit `37390528635ffdfa3d2348ba6affa966cc2d21f3`, after adding structured chain links and monster battle position to observations. Total reset time was 0.144 s, initial peak RSS 17,512 KiB, and winners `[1, 1, 1]`. This is one run; the difference from prior rows is not a measured performance regression.
+
+## Parallel tournament measurement
+
+An eight-game random-agent tournament on the same vanilla fixture pairing,
+seeds 42–45 with both seat orders, produced the following one-run results on
+Linux 6.8.0-146-generic x86_64 with the pinned native core. The timer covers
+the tournament call, including worker startup and teardown, but excludes
+report hashing and JSON writing.
+
+| Workers | Games | Decisions | Wall time | Duels/s | Decisions/s |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 8 | 10,728 | 7.495 s | 1.067 | 1,431.33 |
+| 2 | 8 | 10,728 | 3.806 s | 2.102 | 2,818.99 |
+
+Reproduce with the `--workers 1` and `--workers 2` commands in
+[the evaluation log](evaluation.md). Game results and summaries matched
+exactly. This is one short run, not a scaling estimate; peak memory across
+worker processes was not measured. The earlier single-process RSS benchmark
+above is not a parallel memory measurement.

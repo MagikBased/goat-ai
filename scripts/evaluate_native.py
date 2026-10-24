@@ -5,11 +5,13 @@ import hashlib
 import json
 import platform
 from dataclasses import asdict
+from functools import partial
 from pathlib import Path
+from time import perf_counter
 
 from goat_ai.agents import HeuristicAgent, RandomAgent
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
-from goat_ai.evaluation import run_tournament
+from goat_ai.evaluation import run_tournament, run_tournament_parallel
 
 
 def sha256(path: Path) -> str:
@@ -24,8 +26,12 @@ def agent_factory(name: str):
     if name == "random":
         return RandomAgent
     if name == "heuristic":
-        return lambda _seed: HeuristicAgent()
+        return make_heuristic
     raise ValueError(f"unknown agent: {name}")
+
+
+def make_heuristic(_seed: int) -> HeuristicAgent:
+    return HeuristicAgent()
 
 
 def main() -> None:
@@ -37,18 +43,24 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--seeds", type=int, default=2)
     parser.add_argument("--max-decisions", type=int, default=5000)
+    parser.add_argument("--workers", type=int, default=1,
+                        help="spawn independent native duel processes")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    if args.seeds < 1:
-        parser.error("--seeds must be positive")
+    if args.seeds < 1 or args.workers < 1:
+        parser.error("--seeds and --workers must be positive")
     fixtures = Path(__file__).resolve().parent.parent / "examples/decks"
     matchups = args.matchup or [[str(fixtures / "vanilla_probe.ydk"),
                                   str(fixtures / "vanilla_reverse.ydk")]]
     seeds = list(range(args.seed, args.seed + args.seeds))
-    report = run_tournament(
+    runner = run_tournament_parallel if args.workers > 1 else run_tournament
+    started = perf_counter()
+    report = runner(
         matchups, seeds, agent_factory(args.agent_a), agent_factory(args.agent_b),
-        lambda: RestrictedOcgcoreEngine(args.native_root), args.max_decisions,
+        partial(RestrictedOcgcoreEngine, args.native_root), args.max_decisions,
+        **({"workers": args.workers} if args.workers > 1 else {}),
     )
+    wall_seconds = perf_counter() - started
     assets = {
         name: sha256(args.native_root / relative)
         for name, relative in {
@@ -68,6 +80,9 @@ def main() -> None:
         "ruleset_scope": "restricted GOAT-mode native adapter",
         "core": "edo9300/ygopro-core baa3881d0bae48e9994f915f5c931be53c1ba8ef",
         "platform": platform.platform(), "cpu": platform.processor(),
+        "workers": args.workers, "wall_seconds_tournament": wall_seconds,
+        "duels_per_second": len(report.games) / wall_seconds,
+        "decisions_per_second": sum(game.decisions for game in report.games) / wall_seconds,
         "asset_sha256": assets, "deck_sha256": deck_hashes,
         "seeds": seeds, "summary": report.summary(),
         "games": [asdict(game) | {"a_outcome": game.a_outcome} for game in report.games],
