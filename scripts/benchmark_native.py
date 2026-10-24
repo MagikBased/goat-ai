@@ -3,6 +3,7 @@
 import argparse
 import json
 import platform
+import subprocess
 from pathlib import Path
 from time import perf_counter
 
@@ -53,6 +54,9 @@ def main() -> None:
                 raise RuntimeError(f"game seed {seed} exceeded 5000 decisions")
     elapsed = perf_counter() - started
     print(json.dumps({
+        "project_commit": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True,
+            cwd=Path(__file__).resolve().parent.parent).strip(),
         "games": args.games, "seed_start": args.seed,
         "ruleset_scope": "GOAT-mode normal-monster fixture only",
         "core": "edo9300/ygopro-core baa3881d0bae48e9994f915f5c931be53c1ba8ef",
