@@ -241,3 +241,88 @@ def test_angel_empty_search_verifies_deck_only_to_opponent(tmp_path):
                     "select_card", "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
     pytest.fail("Shining Angel's empty search did not verify the Deck")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_stolen_angel_battle_recruitment_belongs_to_its_owner(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    snatch = 45986603
+    for relative in (f"goat/c{ANGEL}.lua", f"official/c{snatch}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    filler = [c for c in VANILLA_DECK if c != GEMINI_ELF]
+    owner = _deck(tmp_path / "owner.ydk", (
+        ANGEL, *([GEMINI_ELF] * 3), WARRIOR_LADY, *filler[:35]))
+    thief = _deck(tmp_path / "thief.ydk", (snatch, *VANILLA_DECK[1:]))
+    with GoatEnvironment(owner, thief, seed=52,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {ANGEL, GEMINI_ELF}.issubset(c.code for c in obs.hand)
+        assert snatch in {c.code for c in env.engine.probe.observation(1).hand}
+        angel_summoned = snatched = snatch_target = gemini_summoned = False
+        battle = attacked = battle_target = accepted = selected = False
+        selected_code = deck_before = None
+        for _ in range(85):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not angel_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == ANGEL), None)
+                angel_summoned |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not snatched:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == snatch), None)
+                snatched |= action is not None
+            if snatched and not snatch_target and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code") == ANGEL),
+                              None)
+                snatch_target |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not gemini_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == GEMINI_ELF), None)
+                gemini_summoned |= action is not None
+            if gemini_summoned and obs.turn == 3 and obs.phase == "main1" \
+                    and not battle and action is None:
+                assert any(c.code == ANGEL and c.controller == 1 for c in obs.field)
+                action = next((a for a in actions if a.kind == "battle_phase"), None)
+                battle |= action is not None
+            if battle and obs.turn == 3 and obs.phase == "battle_start" and not attacked:
+                action = next((a for a in actions if a.kind == "attack"
+                               and a.parameters.get("code") == GEMINI_ELF), None)
+                attacked |= action is not None
+            if attacked and not battle_target and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code") == ANGEL
+                               and a.parameters.get("controller") == 1), None)
+                battle_target |= action is not None
+            if battle_target and not accepted and any(a.kind == "yes" for a in actions):
+                assert obs.acting_player == obs.viewer == 0
+                assert obs.phase == "damage_step"
+                assert ANGEL in {c.code for c in obs.graveyards[0]}
+                assert snatch in {c.code for c in obs.graveyards[1]}
+                assert obs.life_points == (9000, 7500)
+                deck_before = obs.deck_counts[0]
+                action = next(a for a in actions if a.kind == "yes")
+                accepted = True
+            if accepted and not selected and actions[0].kind == "select_card":
+                assert obs.acting_player == obs.viewer == 0
+                assert all(a.parameters.get("location") == 1 and "sequence" not in a.parameters
+                           for a in actions)
+                assert not env.engine.probe.observation(1).private_reveals
+                action = next((a for a in actions if a.parameters.get("code") == WARRIOR_LADY),
+                              actions[0])
+                selected_code = action.parameters["code"]
+                selected = True
+            if selected and obs.phase == "battle_step" \
+                    and any(c.code == selected_code and c.controller == 0 for c in obs.field):
+                assert obs.deck_counts[0] == deck_before - 1
+                assert any(c.code == selected_code and c.position == "faceup"
+                           and c.orientation == "attack" for c in obs.field)
+                assert any(c.code == selected_code
+                           for c in env.engine.probe.observation(1).field)
+                assert f"goat/c{ANGEL}.lua" in env.engine.probe.loaded_script_sha256
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail("stolen Shining Angel did not recruit for its owner")
