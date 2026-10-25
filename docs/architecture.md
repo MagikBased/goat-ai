@@ -29,8 +29,8 @@ Spell/Trap Zone. The adapter exposes only the field slot of a face-up Equip
 Card's current target, including a monster absorbed by Thousand-Eyes Restrict;
 it exposes that public relation even when the Equip Card is face-down, without revealing its identity.
 The default PyTorch feature version 10 and experimental version 12 omit
-this relation. Opt-in version 13 binds the Equip Spell embedding to its public
-monster target slot. A first small held-out comparison found no strength gain; see [evaluation](evaluation.md).
+this relation. Opt-in versions 13 and 14 bind the Equip Spell embedding to its public
+monster target slot. Version 14 also binds public chain targets to their links. A first small held-out comparison found no strength gain; see [evaluation](evaluation.md).
 Schemas v3–v21 verify deck contents and native asset fingerprints as well as the
 recorded path. Callers must retain the original deck files and native assets;
 the recording stores hashes, not copies. Older v1/v2 recordings can still be

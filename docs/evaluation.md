@@ -934,3 +934,36 @@ with width 8 and model seed 16200. The measured epoch loss was 0.3800329. This
 checks the v20 collection and training path, not policy strength. The replay
 files and checkpoint are ignored under `.cache/goat-ai/v20_smoke_demos` and
 `.cache/goat-ai/v20_smoke_policy.pt`.
+
+## Public chain-target policy pipeline check
+
+Opt-in feature version 14 binds schema-v21 public field-target slots to their
+active chain links and visible field occupants. A sourced Goat Control versus
+Chaos Turbo collection on seed 16300, with CombatHeuristicAgent in each seat
+against RandomAgent, produced two terminal replay-verified trajectories of 577
+and 432 decisions. Eleven of the 522 teacher decisions had a public chain
+target; only one also had multiple legal actions. A one-epoch width-8 clone on
+all 522 teacher decisions, with model seed 16300 and learning rate 0.001, had
+loss 0.361470660887002. The saved v14 checkpoint loaded and selected a legal
+action at a four-option, targeted-chain decision. This checks encoding and
+training, not any improvement in competitive strength. The two replay hashes
+are `fcdeb7ecb7ee6a121b215564073a6f1bf1f57ff24d0a3b9cbfdb58caefcfcab8`
+and `716d0f3d8f79a9d9a3ff0847c2e0d2ec92feb988f07f1a3189159efcabd85ebd`;
+the checkpoint hash is
+`7eabddb0c2095bf9d9fbb9767deac58f21408bf208f9ff18e09b3ee332a8eb51`.
+All three files are ignored under `.cache/goat-ai`.
+
+Reproduce from the repository root with the pinned [native assets](native_setup.md):
+
+```bash
+PYTHONPATH=. OMP_NUM_THREADS=1 .venv/bin/python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher combat_heuristic \
+  --deck-a examples/decks/goat_control_lolmarcus_2020.ydk \
+  --deck-b examples/decks/chaos_turbo_riclar_2020.ydk \
+  --seed 16300 --seeds 1 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/v21_chain_target_demos
+PYTHONPATH=. OMP_NUM_THREADS=1 .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/v21_chain_target_demos/*.json --engine experimental \
+  --feature-version 14 --epochs 1 --width 8 --seed 16300 \
+  --output .cache/goat-ai/v21_chain_target_policy.pt
+```

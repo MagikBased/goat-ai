@@ -16,6 +16,7 @@ from goat_ai.observations import (
     DisabledZoneView,
     KnownCardView,
     Observation,
+    TargetSlotView,
 )
 from goat_ai.replay import DecisionRecord, Trajectory, demonstrator_records
 from goat_ai.training import (
@@ -268,6 +269,45 @@ def test_feature_version_thirteen_binds_public_equip_to_monster_slot():
     assert any(parameter.grad is not None and parameter.grad.abs().sum() > 0
                for parameter in model.equip_pair.parameters())
     assert torch.allclose(old_model(old_first), old_model(old_moved))
+
+
+def test_feature_version_fourteen_binds_public_chain_target_to_visible_slot():
+    vocabulary = CardVocabulary((10, 20, 30))
+    base = replace(view(), field=(
+        CardView(1, "monster", "facedown", None, 0, "defense"),
+        CardView(1, "monster", "faceup", 20, 1, "attack", 1600, 1000),
+    ))
+    first = replace(base, chain=(ChainLinkView(
+        1, 30, 0, 8, 0, (TargetSlotView(1, "monster", 0),)),))
+    second = replace(base, chain=(ChainLinkView(
+        1, 30, 0, 8, 0, (TargetSlotView(1, "monster", 1),)),))
+    choices = (Action("pass", "pass", 0),)
+    older_first = encode_decision(first, choices, vocabulary, feature_version=13)
+    older_second = encode_decision(second, choices, vocabulary, feature_version=13)
+    assert torch.equal(older_first.chain_target_slots, older_second.chain_target_slots)
+    current_first = encode_decision(first, choices, vocabulary, feature_version=14)
+    current_second = encode_decision(second, choices, vocabulary, feature_version=14)
+    empty_chain = encode_decision(base, choices, vocabulary, feature_version=14)
+    assert empty_chain.chain_target_slots.tolist() == [[[0, 0, -1]]]
+    untargeted = encode_decision(replace(base, chain=(ChainLinkView(1, 30, 0, 8, 0),)),
+                                 choices, vocabulary, feature_version=14)
+    assert untargeted.chain_target_slots.tolist() == [[[0, 0, -1]]]
+    assert current_first.chain_target_slots.tolist() == [[[2, 2, 0]]]
+    assert current_second.chain_target_slots.tolist() == [[[2, 2, 1]]]
+    assert current_first.state_cards[1, 0].item() == 0  # Hidden opponent monster.
+    torch.manual_seed(14)
+    old_model = LegalActionPolicy(vocabulary.size, width=16, feature_version=13)
+    torch.manual_seed(14)
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=14)
+    for name, parameter in old_model.named_parameters():
+        assert torch.equal(parameter, dict(model.named_parameters())[name])
+    assert torch.allclose(old_model(older_first), old_model(older_second))
+    assert not torch.allclose(model(current_first), model(current_second))
+    assert model(empty_chain).shape == (1,)
+    assert model(untargeted).shape == (1,)
+    model(current_first).sum().backward()
+    assert any(parameter.grad is not None and parameter.grad.abs().sum() > 0
+               for parameter in model.chain_target_pair.parameters())
 
 
 def test_action_ids_are_not_features_but_public_card_and_controller_are():

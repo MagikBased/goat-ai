@@ -29,7 +29,7 @@ ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
 SORT_ACTION_KINDS = ("sort_cards",)
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
-POLICY_FEATURE_VERSION = 10  # v11/v12 are opt-in representation experiments
+POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experiments
 
 
 @dataclass(frozen=True)
@@ -77,6 +77,7 @@ class DecisionFeatures:
     deck_cards: Tensor  # [D]: sorted initial own Main Deck card IDs, or [0] before v5
     known_hand_cards: Tensor  # [H]: publicly known opponent hand IDs, or [0] before v9
     chain_cards: Tensor  # [L, 2]: ordered public chain card and relative controller, or [[0, 0]]
+    chain_target_slots: Tensor  # [L, T, 3]: relative controller, field zone, sequence
     state_card_sequences: Tensor  # [N]: field sequence, -1 for non-field cards
     state_equip_slots: Tensor  # [N, 3]: public target controller, zone, sequence
     action_field_slots: Tensor  # [A, 3]: relative controller, zone, sequence
@@ -94,7 +95,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 14):
+    if feature_version not in range(1, 15):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -246,6 +247,13 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                    for link in observation.chain]
     if feature_version == 11:
         chain_links.sort()
+    chain_targets = [[(int(target.controller != observation.viewer) + 1,
+                       ZONES.index(target.zone) + 1, target.sequence)
+                      for target in link.targets]
+                     for link in observation.chain] if feature_version >= 14 else []
+    target_width = max(1, max((len(row) for row in chain_targets), default=0))
+    chain_targets = ([row + [(0, 0, -1)] * (target_width - len(row))
+                      for row in chain_targets] if chain_targets else [[(0, 0, -1)]])
     return DecisionFeatures(
         torch.tensor(cards, dtype=torch.long), torch.tensor(card_numbers, dtype=torch.float32),
         torch.tensor(numbers, dtype=torch.float32),
@@ -264,6 +272,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                      dtype=torch.long),
         torch.tensor(chain_links if feature_version >= 10 and chain_links else [(0, 0)],
                      dtype=torch.long),
+        torch.tensor(chain_targets, dtype=torch.long),
         torch.tensor(card_sequences, dtype=torch.long),
         torch.tensor(equip_slots, dtype=torch.long),
         torch.tensor(action_field_slots, dtype=torch.long),
@@ -277,7 +286,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 14):
+        if feature_version not in range(1, 15):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -314,6 +323,10 @@ class LegalActionPolicy(nn.Module):
         if feature_version >= 13:
             self.equip_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
                                             nn.Linear(width, width))
+        if feature_version >= 14:
+            self.chain_target_sequence = nn.Embedding(8, width)
+            self.chain_target_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
+                                                   nn.Linear(width, width))
 
     def forward(self, features: DecisionFeatures) -> Tensor:
         cards = features.state_cards
@@ -348,6 +361,22 @@ class LegalActionPolicy(nn.Module):
         if self.feature_version >= 10:
             chain = features.chain_cards
             chain_input = self.card(chain[:, 0]) + self.owner(chain[:, 1])
+            if self.feature_version >= 14:
+                slots = features.chain_target_slots
+                slot_mask = slots[:, :, 0] != 0
+                field_match = ((slots[:, :, None, 0] == cards[None, None, :, 2])
+                               & (slots[:, :, None, 1] == cards[None, None, :, 1])
+                               & (slots[:, :, None, 2] ==
+                                  features.state_card_sequences[None, None, :])
+                               & slot_mask[:, :, None])
+                occupant = field_match.to(visible.dtype) @ visible
+                target = (self.owner(slots[:, :, 0]) + self.zone(slots[:, :, 1])
+                          + self.chain_target_sequence(slots[:, :, 2].clamp(min=0))
+                          + occupant)
+                target_mean = (target * slot_mask.unsqueeze(-1)).sum(1) / (
+                    slot_mask.sum(1, keepdim=True).clamp(min=1))
+                chain_input = chain_input + self.chain_target_pair(torch.cat(
+                    (chain_input, target_mean), dim=1)) * slot_mask.any(1).unsqueeze(1)
             _, hidden = self.chain_encoder(chain_input.unsqueeze(0))
             state = state + hidden[-1, 0] * (chain[:, 0] != 0).any()
         targets = features.action_targets
