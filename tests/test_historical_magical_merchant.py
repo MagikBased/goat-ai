@@ -6,9 +6,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 MAGICAL_MERCHANT = 32362575
 POT_OF_GREED = 55144522
@@ -30,8 +32,9 @@ def test_magical_merchant_excavates_monsters_and_reveals_kept_pot(tmp_path):
         obs = env.reset()
         assert MAGICAL_MERCHANT in {c.code for c in obs.hand}
         assert POT_OF_GREED not in {c.code for c in obs.hand}
-        set_merchant = flipped = False
+        set_merchant = flipped = merchant_checked = pot_used = False
         deck_before = hand_before = None
+        pot_deck_before = pot_hand_before = None
         grave_before = Counter()
         for _ in range(55):
             actions = env.legal_actions()
@@ -48,11 +51,19 @@ def test_magical_merchant_excavates_monsters_and_reveals_kept_pot(tmp_path):
                     hand_before = len(obs.hand)
                     grave_before = Counter(c.code for c in obs.graveyards[0])
                     flipped = True
+            if merchant_checked and not pot_used and obs.acting_player == 0:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == POT_OF_GREED), action)
+                if action is not None and action.parameters.get("code") == POT_OF_GREED:
+                    pot_deck_before = obs.deck_counts[0]
+                    pot_hand_before = len(obs.hand)
+                    pot_used = True
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_card", "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if flipped and POT_OF_GREED in {c.code for c in obs.hand}:
+            if flipped and not merchant_checked and POT_OF_GREED in {
+                    c.code for c in obs.hand}:
                 opponent = env.engine.probe.observation(1)
                 milled = Counter(c.code for c in obs.graveyards[0]) - grave_before
                 excavated = [event for event in obs.public_reveals
@@ -71,8 +82,34 @@ def test_magical_merchant_excavates_monsters_and_reveals_kept_pot(tmp_path):
                 assert not obs.private_reveals
                 assert f"official/c{MAGICAL_MERCHANT}.lua" in (
                     env.engine.probe.loaded_script_sha256)
+                merchant_checked = True
+            if pot_used and POT_OF_GREED in {c.code for c in obs.graveyards[0]} \
+                    and not obs.chain:
+                opponent = env.engine.probe.observation(1)
+                assert obs.deck_counts[0] == pot_deck_before - 2
+                assert len(obs.hand) == pot_hand_before + 1
+                assert opponent.opponent_hand_count == len(obs.hand)
+                assert not opponent.known_opponent_hand_cards
+                assert [[c.code for c in event.cards]
+                        for event in opponent.private_reveals] == [[POT_OF_GREED]]
+                assert f"official/c{POT_OF_GREED}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                agents = (RandomAgent(10), RandomAgent(11))
+                for _ in range(3000):
+                    if env.is_terminal():
+                        break
+                    obs = env.step(agents[obs.acting_player].select_action(
+                        obs, env.legal_actions()))
+                else:
+                    pytest.fail("Magical Merchant/Pot duel did not terminate")
+                trajectory = env.trajectory()
+                path = tmp_path / "merchant_pot.json"
+                write_trajectory(path, trajectory)
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) \
+                    == len(trajectory.decisions)
                 return
-    pytest.fail("Magical Merchant did not excavate and keep Pot of Greed")
+    pytest.fail("Magical Merchant did not excavate and reuse Pot of Greed")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
