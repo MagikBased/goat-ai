@@ -312,6 +312,33 @@ def test_trajectory_round_trip_and_legality(tmp_path):
         DecisionRecord(view(), (), action)
 
 
+def test_writer_rejects_public_fields_older_schema_would_drop(tmp_path):
+    action = Action("0", "pass", 0)
+    target = TargetSlotView(1, "monster", 2)
+    observation = replace(
+        view(), chain=(ChainLinkView(1, 14087893, 0, 2, 0, (target,)),),
+        pending_attack=TargetSlotView(0, "monster", 1),
+        field=(CardView(0, "monster", "faceup", 456, 1, "attack"),
+               CardView(0, "spell_trap", "faceup", 123, 0,
+                        equipped_to=(0, 1))),
+    )
+    legacy = Trajectory("goat", ("a", "b"), 7,
+                        (DecisionRecord(observation, (action,), action),), 0)
+    path = tmp_path / "public_context.json"
+    with pytest.raises(ValueError, match="schema v19"):
+        write_trajectory(path, legacy)
+    assert not path.exists()
+    with pytest.raises(ValueError, match="schema v21"):
+        write_trajectory(path, replace(
+            legacy, schema_version=20, terminal_observation=observation))
+    with pytest.raises(ValueError, match="schema v22"):
+        write_trajectory(path, replace(
+            legacy, schema_version=21, terminal_observation=observation))
+    current = replace(legacy, schema_version=22, terminal_observation=observation)
+    write_trajectory(path, current)
+    assert read_trajectory(path) == current
+
+
 def test_replay_verifier_detects_changed_decision_and_outcome():
     action = Action("0", "pass", 0)
     legal = (action, Action("1", "attack", 0))

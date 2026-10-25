@@ -48,6 +48,42 @@ class Trajectory:
 
 
 def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
+    version = trajectory.schema_version
+    if version not in range(1, 23):
+        raise ValueError("unsupported trajectory schema")
+    if version >= 18 and trajectory.terminal_observation is None:
+        raise ValueError("schema v18 requires a terminal observation")
+    if version < 18 and trajectory.terminal_observation is not None:
+        raise ValueError("terminal observation requires schema v18")
+    views = [record.observation for record in trajectory.decisions]
+    if trajectory.terminal_observation is not None:
+        views.append(trajectory.terminal_observation)
+    for view in views:
+        if version < 6 and view.known_opponent_field_cards:
+            raise ValueError("known opponent field cards require schema v6")
+        if version < 8 and view.public_reveals:
+            raise ValueError("public reveals require schema v8")
+        if version < 9 and view.disabled_zones:
+            raise ValueError("disabled zones require schema v9")
+        if version < 10 and view.private_reveals:
+            raise ValueError("private reveals require schema v10")
+        if version < 11 and view.own_main_deck:
+            raise ValueError("own Main Deck composition requires schema v11")
+        cards = (*view.hand, *view.own_extra_deck, *view.field,
+                 *view.graveyards[0], *view.graveyards[1],
+                 *view.banished[0], *view.banished[1])
+        if version < 12 and any(
+                card.attack is not None or card.defense is not None or card.counters
+                for card in cards):
+            raise ValueError("public monster stats require schema v12")
+        if version < 17 and view.known_opponent_hand_cards:
+            raise ValueError("known opponent hand cards require schema v17")
+        if version < 19 and any(card.equipped_to is not None for card in cards):
+            raise ValueError("Equip target slots require schema v19")
+        if version < 21 and any(link.targets for link in view.chain):
+            raise ValueError("chain target slots require schema v21")
+        if version < 22 and view.pending_attack is not None:
+            raise ValueError("pending attacker slot requires schema v22")
     Path(path).write_text(json.dumps(asdict(trajectory), separators=(",", ":")) + "\n", encoding="utf-8")
 
 
