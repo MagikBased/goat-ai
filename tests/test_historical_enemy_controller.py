@@ -10,6 +10,7 @@ from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 
 ENEMY_CONTROLLER = 98045062
+BOOK_OF_MOON = 14087893
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -97,3 +98,94 @@ def test_enemy_controller_modes_and_end_phase_return(tmp_path, mode):
                 assert "official/c98045062.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail(f"Enemy Controller {mode} line did not finish")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("mode", ["position", "control"])
+def test_book_invalidates_either_enemy_controller_target(tmp_path, mode):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (ENEMY_CONTROLLER, BOOK_OF_MOON):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    own = tmp_path / "enemy_controller.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        ENEMY_CONTROLLER, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    other = tmp_path / "book.ydk"
+    other.write_text("#main\n" + "\n".join(map(str, (
+        *([BOOK_OF_MOON] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own), str(other), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        econ_set = own_summoned = opponent_summoned = book_set = False
+        activated = mode_chosen = paid_cost = econ_targeted = False
+        book_chained = book_targeted = False
+        own_code = target_code = None
+        for _ in range(90):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not econ_set:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == ENEMY_CONTROLLER), None)
+                    econ_set |= action is not None
+                if econ_set and not own_summoned and action is None:
+                    action = next((a for a in actions if a.kind == "normal_summon"), None)
+                    if action is not None:
+                        own_code = action.parameters["code"]
+                        own_summoned = True
+            if obs.turn == 2 and obs.acting_player == 1:
+                if not opponent_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"), None)
+                    if action is not None:
+                        target_code = action.parameters["code"]
+                        opponent_summoned = True
+                if opponent_summoned and not book_set and action is None:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == BOOK_OF_MOON), None)
+                    book_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and book_set \
+                    and not activated:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == ENEMY_CONTROLLER), None)
+                activated |= action is not None
+            if activated and not mode_chosen and actions[0].kind == "select_option":
+                action = actions[0 if mode == "position" else 1]
+                mode_chosen = True
+            if mode_chosen and actions[0].kind == "select_card" and not econ_targeted:
+                if mode == "control" and not paid_cost:
+                    action = next((a for a in actions if a.parameters.get("controller") == 0
+                                   and a.parameters.get("code") == own_code), None)
+                    paid_cost |= action is not None
+                else:
+                    action = next((a for a in actions if a.parameters.get("controller") == 1
+                                   and a.parameters.get("code") == target_code), None)
+                    econ_targeted |= action is not None
+            if econ_targeted and obs.acting_player == 1 and not book_chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == BOOK_OF_MOON), None)
+                book_chained |= action is not None
+            if book_chained and not book_targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("controller") == 1
+                               and a.parameters.get("code") == target_code), None)
+                book_targeted |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if book_targeted and obs.chain == () and {ENEMY_CONTROLLER, BOOK_OF_MOON} \
+                    <= {c.code for pile in obs.graveyards for c in pile}:
+                own_view = env.engine.probe.observation(0)
+                assert any(c.controller == 1 and c.zone == "monster"
+                           and c.position == "facedown" and c.code is None
+                           for c in own_view.field)
+                assert not any(c.controller == 0 and c.code == target_code
+                               for c in own_view.field)
+                assert (own_code in {c.code for c in own_view.graveyards[0]}) \
+                    == (mode == "control")
+                assert not own_view.private_reveals
+                assert {f"official/c{code}.lua" for code in (
+                    ENEMY_CONTROLLER, BOOK_OF_MOON)}.issubset(
+                        env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail(f"Book did not interrupt Enemy Controller's {mode} mode")
