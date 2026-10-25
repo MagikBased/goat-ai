@@ -15,6 +15,10 @@ RETURN = 27174286
 BOOK_OF_MOON = 14087893
 MYSTICAL_SPACE_TYPHOON = 5318639
 SOLEMN_JUDGMENT = 41420027
+SCAPEGOAT = 504700123
+BAZOO = 40133511
+CHASER = 7359741
+SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 LIGHT = 15025844
 DARK = 49881766
 
@@ -228,3 +232,115 @@ def test_return_chain_distinguishes_mst_destruction_from_solemn_negation(tmp_pat
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Return chain did not resolve for the selected response")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_return_with_one_open_monster_zone_revives_only_chosen_monster(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"official/c{GRACEFUL}.lua", f"official/c{BAZOO}.lua",
+                     f"official/c{RETURN}.lua", f"goat/c{SCAPEGOAT}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    own_cards = (GRACEFUL, *([BAZOO] * 3), *([RETURN] * 3),
+                 *(SCAPEGOAT if c == 51934376 else c for c in VANILLA_DECK[7:]))
+    assert len(own_cards) == 40
+    own = tmp_path / "return_one_space.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, own_cards)) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(own), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {GRACEFUL, BAZOO, RETURN, SCAPEGOAT, 62651957, 97590747}.issubset(
+            c.code for c in obs.hand)
+        first, second = 62651957, 97590747
+        graceful = discarded = summoned = cost_paid = return_set = goat_set = False
+        goat_used = chaser_summoned = attacked = target_chosen = False
+        return_used = return_chosen = return_resolved = False
+        for _ in range(120):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not graceful:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL), None)
+                    graceful |= action is not None
+                if graceful and not discarded:
+                    action = next((a for a in actions if a.kind == "select_cards"
+                                   and {c["code"] for c in a.parameters["cards"]}
+                                   == {first, second}), action)
+                    discarded |= action is not None and action.kind == "select_cards"
+                if discarded and not summoned and action is None:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == BAZOO), None)
+                    summoned |= action is not None
+                if summoned and not cost_paid:
+                    action = next((a for a in actions if a.kind in ("activate", "chain")
+                                   and a.parameters.get("code") == BAZOO), action)
+                    action = next((a for a in actions if a.kind == "select_cards"
+                                   and {c["code"] for c in a.parameters["cards"]}
+                                   == {first, second}), action)
+                    cost_paid |= action is not None and action.kind == "select_cards"
+                if cost_paid and not return_set and action is None:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == RETURN), None)
+                    return_set |= action is not None
+                if return_set and not goat_set and action is None:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == SCAPEGOAT), None)
+                    goat_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 0 and goat_set and not goat_used:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SCAPEGOAT), action)
+                goat_used |= action is not None and action.kind == "chain"
+            if obs.turn == 2 and obs.acting_player == 1:
+                if not chaser_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == CHASER), None)
+                    chaser_summoned |= action is not None
+                if chaser_summoned and obs.phase == "main1" and action is None:
+                    action = next((a for a in actions if a.kind == "battle_phase"), None)
+                if goat_used and obs.phase == "battle_start" and not attacked:
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == CHASER), None)
+                    attacked |= action is not None
+                if attacked and not target_chosen and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   in SHEEP_CODES and a.parameters.get("controller") == 0),
+                                  None)
+                    target_chosen |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0:
+                if not return_used:
+                    assert sum(c.controller == 0 and c.zone == "monster"
+                               for c in obs.field) == 4
+                    assert sum(c.code in SHEEP_CODES for c in obs.field) == 3
+                    assert {first, second} == {c.code for c in obs.banished[0]}
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == RETURN), None)
+                    return_used |= action is not None
+                if return_used and not return_chosen:
+                    action = next((a for a in actions if a.kind == "select_card"
+                                   and a.parameters.get("code") == first), action)
+                    return_chosen |= action is not None and action.kind == "select_card"
+                    if return_chosen:
+                        assert {a.parameters["code"] for a in actions
+                                if a.kind == "select_card"} == {first, second}
+                        assert not any(a.kind == "select_cards" for a in actions)
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_cards", "select_card", "place", "select_position",
+                    "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if return_chosen and not return_resolved and not obs.chain \
+                    and RETURN in {c.code for c in obs.graveyards[0]}:
+                assert obs.life_points == (4000, 8000)
+                assert sum(c.controller == 0 and c.zone == "monster"
+                           for c in obs.field) == 5
+                assert first in {c.code for c in obs.field}
+                assert {c.code for c in obs.banished[0]} == {second}
+                return_resolved = True
+            if return_resolved and obs.turn >= 4:
+                assert {c.code for c in obs.banished[0]} == {first, second}
+                assert sum(c.code in SHEEP_CODES for c in obs.field) == 3
+                assert BAZOO in {c.code for c in obs.field}
+                assert f"official/c{RETURN}.lua" in env.engine.probe.loaded_script_sha256
+                return
+    pytest.fail("Return's one-open-zone line did not finish")
