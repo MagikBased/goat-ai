@@ -15,6 +15,9 @@ from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.card_actions import (
+    SOURCE_KINDS, count_chain_response, count_source_actions,
+)
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
@@ -42,12 +45,6 @@ def make_agent(name: str, seed: int):
     if name == "combat_heuristic":
         return CombatHeuristicAgent()
     raise ValueError(f"unknown baseline agent: {name}")
-SOURCE_KINDS = frozenset({
-    "activate", "chain", "normal_summon", "flip_summon", "special_summon",
-    "set_monster", "set_spell_trap", "attack", "change_position",
-})
-
-
 def deck_label(path: Path) -> str:
     """Use checkout-independent paths for the repository's example decks."""
     absolute = path.resolve()
@@ -55,29 +52,6 @@ def deck_label(path: Path) -> str:
         return str(absolute.relative_to(ROOT))
     except ValueError:
         return str(absolute)
-
-
-def count_source_actions(legal_actions, selected_action,
-                         offered: Counter, selected: Counter) -> None:
-    """Count a card once per decision where its source action is offered."""
-    choices = {(action.parameters["code"], action.kind)
-               for action in legal_actions
-               if action.kind in SOURCE_KINDS
-               and isinstance(action.parameters.get("code"), int)}
-    offered.update(choices)
-    choice = (selected_action.parameters.get("code"), selected_action.kind)
-    if choice in choices:
-        selected[choice] += 1
-
-
-def count_chain_response(observation, selected_action,
-                         responses: Counter) -> None:
-    """Count a chosen card response to the currently latest public chain link."""
-    if selected_action.kind != "chain" or not observation.chain:
-        return
-    code = selected_action.parameters.get("code")
-    if isinstance(code, int):
-        responses[code, observation.chain[-1].card_code] += 1
 
 
 def card_names(native_root: Path, codes: set[int]) -> dict[int, str]:

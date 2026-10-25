@@ -73,6 +73,11 @@ An independent-opponent mode then paired 100 distinct legal tournament-card
 Main Deck compositions across 50 duels; all 48,248 decisions replay-verified
 without a cap or adapter error. This probes interactions between different
 generated decks while preserving the same source-card and asset provenance.
+An opt-in card-source counter reused the fixed-deck probe's target-safe
+counting rules on those exact 50 cross-deck games. Outcomes and decision
+counts reproduced; the run observed 61 Dekoichi Flip Summons and 131 selected
+card responses to public chain links. This gives the next historical-ruling
+audit a measured queue without claiming human play rates.
 The older full-whitelist seeds-0–9 report cited above no longer reproduces its
 12,382-decision count in this worktree: both the pre-change and current probe
 scripts now record 12,006 decisions. The difference remains unexplained and

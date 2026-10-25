@@ -316,6 +316,38 @@ rules profile, and **103 loaded native asset hashes**. Its SHA-256 is
 This strengthens protocol coverage across common-card combinations without
 proving every historical interaction correct.
 
+### Card-source actions in the cross-deck sweep
+
+Use `--count-card-actions` with the cross-deck command above to add
+`card_actions` and `chain_responses` to its report. The counter uses the same
+player-visible source-card rules as the fixed-deck probe: a target card's ID
+does not count as playing that card. It reports both legal offers and actual
+selections. Some `chain` actions are triggered or continuous card effects, so
+the kind alone is not always a new card activation.
+
+On seeds 18650–18699, adding counting left **all 50 winners, decision counts,
+and both deck hashes per game unchanged**. All **48,248 decisions** again
+replay-verified. The counted report has 264 card/kind rows, 67 card identities
+with a selected source action, and 131 selected responses to a public chain
+link. Its SHA-256 is
+`c11c8e2c01101de23768f6e1a3f5490069bba86b87186735fe677a39fca4633a`.
+
+| Selected action | Decisions |
+| --- | ---: |
+| Book of Moon chain | 175 |
+| Nobleman of Crossout activation | 114 |
+| Trap Dustshoot chain | 91 |
+| Dekoichi Flip Summon | 61 |
+| Heavy Storm activation | 60 |
+| Graceful Charity activation | 51 |
+
+The most frequent selected response pair was Solemn Judgment to Book of Moon
+(six decisions), which has a [source-backed fixture](goat_rules.md). Several
+other frequent pairs already have regressions. These generated decks and
+RandomAgent choices are a mechanism-coverage tool, not tournament play-rate
+evidence. Use the counts to prioritize independent historical rulings and
+paired native tests.
+
 ## Same-schedule random and combat-baseline exposure
 
 The probe also accepts `--agent combat_heuristic` (or `heuristic`). This

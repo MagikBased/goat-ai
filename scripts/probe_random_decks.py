@@ -17,6 +17,7 @@ from goat_ai.engine.decks import (
 )
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.card_actions import count_chain_response, count_source_actions
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
 from goat_ai.replay import verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
@@ -96,11 +97,15 @@ def write_deck(path: Path, deck: Decklist) -> None:
 def probe(root: Path, output: Path, first_seed: int, seeds: int,
           max_decisions: int, card_pool: str = "whitelist",
           verify_replays: bool = False,
-          distinct_opponents: bool = False) -> dict:
+          distinct_opponents: bool = False,
+          count_card_actions: bool = False) -> dict:
     if card_pool not in ("whitelist", "tournament"):
         raise ValueError("unknown card pool")
     output.mkdir(parents=True, exist_ok=True)
     games = []
+    offered: Counter[tuple[int, str]] = Counter()
+    selected: Counter[tuple[int, str]] = Counter()
+    responses: Counter[tuple[int, int]] = Counter()
     loaded_assets: dict[str, str] = {}
     rules_profile = None
     for seed in range(first_seed, first_seed + seeds):
@@ -142,6 +147,12 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
                         if asset in loaded_assets and loaded_assets[asset] != digest:
                             raise RuntimeError(f"native asset changed within probe: {asset}")
                         loaded_assets[asset] = digest
+                if trajectory is not None and count_card_actions:
+                    for record in trajectory.decisions:
+                        count_source_actions(record.legal_actions,
+                                             record.selected_action, offered, selected)
+                        count_chain_response(record.observation,
+                                             record.selected_action, responses)
             error = None
         except (OSError, RuntimeError, ValueError) as exc:
             terminal, winner = False, None
@@ -187,6 +198,18 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
             "verified_decisions": sum(game["replay_verified_decisions"] or 0
                                       for game in games),
         }
+    if count_card_actions:
+        report["card_actions"] = [
+            {"code": code, "kind": kind, "offered_decisions": offered[code, kind],
+             "selected_decisions": selected[code, kind]}
+            for code, kind in sorted(offered)
+        ]
+        report["chain_responses"] = [
+            {"responder_code": responder, "preceding_link_code": preceding,
+             "selected_decisions": count}
+            for (responder, preceding), count in sorted(
+                responses.items(), key=lambda item: (-item[1], item[0]))
+        ]
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     return report
 
@@ -203,12 +226,14 @@ def main() -> None:
     parser.add_argument("--verify-replays", action="store_true")
     parser.add_argument("--distinct-opponents", action="store_true",
                         help="generate an independent legal opponent deck per seed")
+    parser.add_argument("--count-card-actions", action="store_true",
+                        help="count source-card options and selected chain responses")
     args = parser.parse_args()
     if args.seeds < 1 or args.max_decisions < 1:
         parser.error("--seeds and --max-decisions must be positive")
     report = probe(args.native_root, args.output, args.seed, args.seeds,
                    args.max_decisions, args.card_pool, args.verify_replays,
-                   args.distinct_opponents)
+                   args.distinct_opponents, args.count_card_actions)
     for game in report["games"]:
         status = "error" if game["error"] else "terminal" if game["terminal"] else "limit"
         suffix = f" error={game['error']}" if game["error"] else ""

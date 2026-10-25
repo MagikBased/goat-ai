@@ -43,7 +43,7 @@ def test_distinct_tournament_mixes_replay_verify(tmp_path):
     native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     report = probe(native_root, tmp_path / "cross", 18650, 1, 3000,
                    card_pool="tournament", verify_replays=True,
-                   distinct_opponents=True)
+                   distinct_opponents=True, count_card_actions=True)
     game = report["games"][0]
     assert report["distinct_opponents"] is True
     assert report["opponent_seed_offset"] == 1_000_000
@@ -51,3 +51,8 @@ def test_distinct_tournament_mixes_replay_verify(tmp_path):
     assert Path(game["deck"]).is_file() and Path(game["opponent_deck"]).is_file()
     assert game["terminal"] and game["error"] is None
     assert game["replay_verified_decisions"] == game["decisions"]
+    assert report["card_actions"]
+    assert all(row["selected_decisions"] <= row["offered_decisions"]
+               for row in report["card_actions"])
+    assert all(row["selected_decisions"] > 0
+               for row in report["chain_responses"])
