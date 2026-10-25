@@ -15,13 +15,14 @@ METAMORPHOSIS = 46411259
 RYU_SENSHI = 49868263
 TORRENTIAL = 53582587
 BOOK_OF_MOON = 14087893
+ROYAL_DECREE = 51452091
 LIGHT = 62651957
 DARK = 49881766
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("interaction", [TORRENTIAL, BOOK_OF_MOON])
-def test_ryu_senshi_negates_targeted_book_or_torrential(tmp_path, interaction):
+@pytest.mark.parametrize("interaction", [TORRENTIAL, BOOK_OF_MOON, ROYAL_DECREE])
+def test_ryu_senshi_common_spell_and_trap_interactions(tmp_path, interaction):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for code in (SORCERER, GRACEFUL, METAMORPHOSIS, RYU_SENSHI, interaction):
         if not (root / f"scripts/official/c{code}.lua").is_file():
@@ -72,10 +73,10 @@ def test_ryu_senshi_negates_targeted_book_or_torrential(tmp_path, interaction):
                                in ({LIGHT, DARK} - set(sorcerer_costs))), action)
                 if action is not None and action.kind == "select_card":
                     sorcerer_costs.append(action.parameters["code"])
-            if (interaction == TORRENTIAL and obs.turn == 2
+            if (interaction in (TORRENTIAL, ROYAL_DECREE) and obs.turn == 2
                     and obs.acting_player == 1 and not trap_set):
                 action = next((a for a in actions if a.kind == "set_spell_trap"
-                               and a.parameters.get("code") == TORRENTIAL), None)
+                               and a.parameters.get("code") == interaction), None)
                 trap_set |= action is not None
             if obs.turn == 3 and obs.acting_player == 0:
                 if not meta:
@@ -95,11 +96,11 @@ def test_ryu_senshi_negates_targeted_book_or_torrential(tmp_path, interaction):
                 action = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == TORRENTIAL), action)
                 interaction_used |= action is not None and action.kind == "chain"
-            if (fusion_chosen and interaction == BOOK_OF_MOON
+            if (fusion_chosen and interaction in (BOOK_OF_MOON, ROYAL_DECREE)
                     and obs.turn == 4 and obs.acting_player == 1
                     and not interaction_used):
                 action = next((a for a in actions if a.kind == "activate"
-                               and a.parameters.get("code") == BOOK_OF_MOON), action)
+                               and a.parameters.get("code") == interaction), action)
                 interaction_used |= action is not None and action.kind == "activate"
             if (interaction == BOOK_OF_MOON and interaction_used
                     and not book_targeted and actions[0].kind == "select_card"):
@@ -109,7 +110,7 @@ def test_ryu_senshi_negates_targeted_book_or_torrential(tmp_path, interaction):
             if interaction_used and obs.acting_player == 0 and not ryu_chained:
                 action = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == RYU_SENSHI), action)
-                if interaction == BOOK_OF_MOON:
+                if interaction in (BOOK_OF_MOON, ROYAL_DECREE):
                     assert action is None or action.kind != "chain"
                 ryu_chained |= action is not None and action.kind == "chain"
             if action is None:
@@ -117,7 +118,12 @@ def test_ryu_senshi_negates_targeted_book_or_torrential(tmp_path, interaction):
                     "select_card", "place", "select_position", "pass", "end_phase")),
                     actions[0])
             obs = env.step(action)
-            if interaction_used and interaction in {c.code for c in obs.graveyards[1]} \
+            interaction_resolved = (
+                interaction in {c.code for c in obs.graveyards[1]}
+                if interaction != ROYAL_DECREE else any(
+                    c.code == ROYAL_DECREE and c.position == "faceup"
+                    for c in obs.field))
+            if interaction_used and interaction_resolved \
                     and not obs.chain:
                 assert {LIGHT, DARK} == set(sorcerer_costs)
                 assert {c.code for c in obs.banished[0]} == {LIGHT, DARK}
@@ -127,8 +133,11 @@ def test_ryu_senshi_negates_targeted_book_or_torrential(tmp_path, interaction):
                 if interaction == TORRENTIAL:
                     assert ryu_chained
                     assert obs.life_points == (7000, 8000)
-                else:
+                elif interaction == BOOK_OF_MOON:
                     assert book_targeted and not ryu_chained
+                    assert obs.life_points == (8000, 8000)
+                else:
+                    assert trap_set and not ryu_chained
                     assert obs.life_points == (8000, 8000)
                 assert f"official/c{RYU_SENSHI}.lua" in (
                     env.engine.probe.loaded_script_sha256)
