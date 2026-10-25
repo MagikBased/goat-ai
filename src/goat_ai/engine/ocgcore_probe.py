@@ -777,7 +777,7 @@ class OcgcoreProbe:
                             card.defense if location == LOCATION_MZONE and faceup else None,
                             card.counters if location == LOCATION_MZONE and faceup else (),
                             (card.equip_target[0], card.equip_target[2])
-                            if location == LOCATION_SZONE and faceup and card.equip_target
+                            if location == LOCATION_SZONE and card.equip_target
                             and card.equip_target[1] == LOCATION_MZONE else None)
 
         field = tuple(view_card(player, location, sequence, card)

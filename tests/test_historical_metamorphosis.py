@@ -127,9 +127,15 @@ def test_goat_control_token_restrict_equip_and_tsukuyomi_reset(tmp_path):
                 assert paid_token and chosen_fusion and activated_restrict
                 assert len(sheep) == 3
                 assert observation.extra_deck_counts[0] == 0
-                assert any(card.code == RESTRICT and card.controller == 0 for card in monsters)
-                assert any(card.code == 49003308 and card.controller == 0
-                           and card.zone == "spell_trap" for card in observation.field)
+                restrict = next(card for card in monsters
+                                if card.code == RESTRICT and card.controller == 0)
+                absorbed = next(card for card in observation.field
+                                if card.code == 49003308 and card.controller == 0
+                                and card.zone == "spell_trap")
+                assert absorbed.equipped_to == (0, restrict.sequence)
+                opponent = env.engine.probe.observation(1)
+                assert next(card for card in opponent.field
+                            if card.code == absorbed.code).equipped_to == absorbed.equipped_to
                 assert not any(card.code in SHEEP_CODES
                                for pile in observation.graveyards for card in pile)
                 equipped = True
@@ -156,6 +162,10 @@ def test_goat_control_token_restrict_equip_and_tsukuyomi_reset(tmp_path):
                            for card in own.field)
                 assert any(card.code == second_target_code and card.zone == "spell_trap"
                            for card in own.field)
+                restrict = next(card for card in own.field if card.code == RESTRICT)
+                absorbed = next(card for card in own.field
+                                if card.code == second_target_code and card.zone == "spell_trap")
+                assert absorbed.equipped_to == (0, restrict.sequence)
                 assert not any(card.code == TSUKUYOMI for card in own.field)
                 assert any(card.code == TSUKUYOMI for card in own.hand)
                 assert any(card.code == RESTRICT and card.position != "facedown"

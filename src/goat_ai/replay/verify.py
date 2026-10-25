@@ -47,6 +47,11 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                            banished=tuple(cards(zone) for zone in view.banished),
                            own_extra_deck=cards(view.own_extra_deck))
 
+        def without_facedown_equips(view):
+            return replace(view, field=tuple(
+                replace(card, equipped_to=None) if card.position == "facedown" else card
+                for card in view.field))
+
         observation = env.reset()
         for index, record in enumerate(trajectory.decisions):
             if env.is_terminal():
@@ -55,6 +60,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             recorded_observation = record.observation
             if trajectory.schema_version < 19:
                 compared_observation = without_equips(compared_observation)
+            elif trajectory.schema_version == 19:
+                compared_observation = without_facedown_equips(compared_observation)
             if trajectory.schema_version < 17:
                 compared_observation = replace(compared_observation,
                                                known_opponent_hand_cards=())
@@ -106,7 +113,9 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
         if env.result() != trajectory.winner:
             raise ReplayMismatch("winner differs from recorded trajectory")
         terminal_observation = (without_equips(observation)
-                                if trajectory.schema_version < 19 else observation)
+                                if trajectory.schema_version < 19 else
+                                without_facedown_equips(observation)
+                                if trajectory.schema_version == 19 else observation)
         if (trajectory.schema_version >= 18
                 and trajectory.terminal_observation is not None
                 and terminal_observation != trajectory.terminal_observation):

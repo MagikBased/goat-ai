@@ -83,7 +83,7 @@ def test_snatch_steal_upkeep_and_heavy_storm_return_control(tmp_path):
                 else:
                     pytest.fail("Snatch / Heavy duel exceeded 3000 decisions")
                 trajectory = env.trajectory()
-                assert trajectory.schema_version == 19
+                assert trajectory.schema_version == 20
                 assert any(card.equipped_to is not None
                            for decision in trajectory.decisions
                            for card in decision.observation.field)

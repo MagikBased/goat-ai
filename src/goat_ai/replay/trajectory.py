@@ -53,7 +53,7 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     version = raw.get("schema_version")
-    if version not in range(1, 20):
+    if version not in range(1, 21):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:

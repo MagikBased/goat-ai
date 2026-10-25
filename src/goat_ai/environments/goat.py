@@ -67,7 +67,7 @@ class GoatEnvironment:
         assets = manifest() if manifest is not None else None
         return Trajectory(self.engine.ruleset.name, self.decks, self.seed,
                           tuple(self._history), decision.winner,
-                          schema_version=19,
+                          schema_version=20,
                           rules_profile=asdict(self.engine.ruleset),
                           deck_sha256=hashes, asset_sha256=assets,
                           terminal_observation=decision.observation)

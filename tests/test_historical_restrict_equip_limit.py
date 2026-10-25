@@ -90,6 +90,10 @@ def test_restrict_cannot_equip_twice_after_mst_removes_equip(tmp_path):
                         assert opposing_goat_chained
                         assert sum(c.code in SHEEP_CODES for c in obs.field
                                    if c.controller == 1 and c.zone == "monster") == 4
+                        restrict_card = next(c for c in obs.field if c.code == RESTRICT)
+                        absorbed = next(c for c in obs.field if c.code == first_code
+                                        and c.zone == "spell_trap")
+                        assert absorbed.equipped_to == (0, restrict_card.sequence)
                 if first_equipped and not mst_used:
                     action = next((a for a in actions if a.kind == "activate"
                                    and a.parameters.get("code") == MST), action)
@@ -142,6 +146,10 @@ def test_restrict_cannot_equip_twice_after_mst_removes_equip(tmp_path):
                 assert second_effect and second_summon
                 assert second_code in {c.code for c in obs.field
                                        if c.zone == "spell_trap" and c.controller == 0}
+                restrict_card = next(c for c in obs.field if c.code == RESTRICT)
+                absorbed = next(c for c in obs.field if c.code == second_code
+                                and c.zone == "spell_trap")
+                assert absorbed.equipped_to == (0, restrict_card.sequence)
                 assert first_code in {c.code for c in obs.graveyards[1]}
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
                 return

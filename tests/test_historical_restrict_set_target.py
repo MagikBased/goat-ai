@@ -1,13 +1,16 @@
 """Restrict targets a hidden set monster by field slot before equipping it."""
 
+import json
 import os
 from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 SCAPEGOAT = 504700123
 METAMORPHOSIS = 46411259
@@ -92,9 +95,12 @@ def test_restrict_targets_set_dekoichi_without_revealing_it(tmp_path):
                             and c.controller == 0 and c.code == DEKOICHI]
                 assert len(equipped) == 1
                 assert equipped[0].position == "facedown"
+                restrict_card = next(c for c in own.field if c.code == RESTRICT)
+                assert equipped[0].equipped_to == (0, restrict_card.sequence)
                 hidden_equip = next(c for c in other.field if c.zone == "spell_trap"
                                     and c.controller == 0 and c.sequence == equipped[0].sequence)
                 assert hidden_equip.code is None and hidden_equip.position == "facedown"
+                assert hidden_equip.equipped_to == equipped[0].equipped_to
                 assert (0, "spell_trap", hidden_equip.sequence, DEKOICHI) in {
                     (c.controller, c.zone, c.sequence, c.code)
                     for c in other.known_opponent_field_cards}
@@ -107,5 +113,32 @@ def test_restrict_targets_set_dekoichi_without_revealing_it(tmp_path):
                         f"goat/c{RESTRICT}.lua"} \
                     <= env.engine.probe.loaded_script_sha256.keys()
                 assert target_slot is not None
+                agents = (RandomAgent(52), RandomAgent(53))
+                for _ in range(3000):
+                    if env.is_terminal():
+                        break
+                    obs = env.step(agents[obs.acting_player].select_action(
+                        obs, env.legal_actions()))
+                else:
+                    pytest.fail("Restrict / Dekoichi duel exceeded 3000 decisions")
+                trajectory = env.trajectory()
+                assert trajectory.schema_version == 20
+                path = tmp_path / "restrict_set_equip_v20.json"
+                write_trajectory(path, trajectory)
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
+                legacy = json.loads(path.read_text())
+                legacy["schema_version"] = 19
+                for view in [*(row["observation"] for row in legacy["decisions"]),
+                             legacy["terminal_observation"]]:
+                    for card in view["field"]:
+                        if card["position"] == "facedown":
+                            card["equipped_to"] = None
+                old_path = tmp_path / "restrict_set_equip_v19.json"
+                old_path.write_text(json.dumps(legacy))
+                assert verify_trajectory(read_trajectory(old_path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
                 return
     pytest.fail("Restrict did not equip set Dekoichi within 90 decisions")
