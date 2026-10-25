@@ -132,10 +132,11 @@ def test_return_revives_chaos_costs_with_book_end_phase_exception(
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("response", [MYSTICAL_SPACE_TYPHOON,
-                                      SOLEMN_JUDGMENT, ROYAL_DECREE])
-def test_return_chain_distinguishes_removal_activation_negation_and_decree(
-        tmp_path, response):
+@pytest.mark.parametrize("response,preexisting_decree", [
+    (MYSTICAL_SPACE_TYPHOON, False), (SOLEMN_JUDGMENT, False),
+    (ROYAL_DECREE, False), (ROYAL_DECREE, True),
+])
+def test_return_responses_and_preexisting_decree(tmp_path, response, preexisting_decree):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     negate = response == SOLEMN_JUDGMENT
     decree = response == ROYAL_DECREE
@@ -162,7 +163,7 @@ def test_return_chain_distinguishes_removal_activation_negation_and_decree(
         assert response in {
             c.code for c in env.engine.probe.observation(1).hand}
         graceful = discarded = summoned = return_set = response_set = return_used = False
-        response_chained = response_targeted = resolved = False
+        response_used = response_targeted = resolved = False
         costs = []
         for _ in range(105):
             actions = env.legal_actions()
@@ -193,18 +194,31 @@ def test_return_chain_distinguishes_removal_activation_negation_and_decree(
                 action = next((a for a in actions if a.kind == "set_spell_trap"
                                and a.parameters.get("code") == response), None)
                 response_set |= action is not None
-            if obs.turn == 3 and obs.acting_player == 0 and not return_used:
+            if preexisting_decree and obs.turn == 3 and obs.acting_player == 1 \
+                    and not response_used:
+                action = next((a for a in actions if a.kind in ("activate", "chain")
+                               and a.parameters.get("code") == ROYAL_DECREE), action)
+                response_used |= action is not None and action.kind in ("activate", "chain") \
+                    and action.parameters.get("code") == ROYAL_DECREE
+            if obs.turn == 3 and obs.acting_player == 0 and not return_used \
+                    and (not preexisting_decree or response_used):
                 action = next((a for a in actions if a.kind == "activate"
                                and a.parameters.get("code") == RETURN), action)
+                if preexisting_decree and action is not None \
+                        and action.kind == "activate" \
+                        and action.parameters.get("code") == RETURN:
+                    assert not obs.chain
+                    assert any(c.code == ROYAL_DECREE and c.position == "faceup"
+                               for c in obs.field)
                 return_used |= action is not None and action.kind == "activate"
-            if return_used and obs.acting_player == 1 and not response_chained:
+            if return_used and obs.acting_player == 1 and not response_used:
                 action = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == response), action)
-                response_chained |= action is not None and action.kind == "chain"
-                if response_chained:
+                response_used |= action is not None and action.kind == "chain"
+                if response_used:
                     assert obs.life_points == (4000, 8000)
                     assert {LIGHT, DARK} == {c.code for c in obs.banished[0]}
-            if response == MYSTICAL_SPACE_TYPHOON and response_chained \
+            if response == MYSTICAL_SPACE_TYPHOON and response_used \
                     and not response_targeted \
                     and actions[0].kind == "select_card":
                 assert obs.acting_player == obs.viewer == 1
@@ -216,7 +230,7 @@ def test_return_chain_distinguishes_removal_activation_negation_and_decree(
                     "select_cards", "select_card", "place", "select_position",
                     "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if response_chained and not resolved \
+            if response_used and not resolved \
                     and RETURN in {c.code for c in obs.graveyards[0]} \
                     and (response in {c.code for c in obs.graveyards[1]}
                          or (decree and any(c.code == ROYAL_DECREE
