@@ -14,6 +14,7 @@ METAMORPHOSIS = 46411259
 RESTRICT = 504700102
 TSUKUYOMI = 34853266
 SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
+SOLEMN_JUDGMENT = 41420027
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -161,3 +162,97 @@ def test_goat_control_token_restrict_equip_and_tsukuyomi_reset(tmp_path):
                            for card in opponent.field)
                 return
     pytest.fail("GOAT Control Restrict/Tsukuyomi line did not resolve")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("negate_activation", [False, True])
+def test_solemn_answers_metamorphosis_activation_not_effect_summon(
+    tmp_path, negate_activation,
+):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"goat/c{SCAPEGOAT}.lua",
+                     f"official/c{METAMORPHOSIS}.lua",
+                     f"goat/c{RESTRICT}.lua",
+                     f"official/c{SOLEMN_JUDGMENT}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    attacker = tmp_path / "goat_meta.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        (SCAPEGOAT, METAMORPHOSIS, TSUKUYOMI) * 3 + VANILLA_DECK[9:])))
+        + f"\n#extra\n{RESTRICT}\n!side\n")
+    defender = tmp_path / "solemn.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        *([SOLEMN_JUDGMENT] * 3), *VANILLA_DECK[3:])))
+                        + "\n#extra\n!side\n")
+    with GoatEnvironment(str(attacker), str(defender), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {SCAPEGOAT, METAMORPHOSIS}.issubset(c.code for c in obs.hand)
+        assert SOLEMN_JUDGMENT in {
+            c.code for c in env.engine.probe.observation(1).hand}
+        goat = solemn_set = meta = token_paid = responded = fusion_chosen = False
+        for _ in range(80):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not goat:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == SCAPEGOAT), None)
+                goat |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not solemn_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SOLEMN_JUDGMENT), None)
+                solemn_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not meta:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == METAMORPHOSIS), None)
+                meta |= action is not None
+            if meta and not token_paid and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               in SHEEP_CODES), None)
+                token_paid |= action is not None
+            if token_paid and obs.acting_player == 1 and not responded:
+                solemn = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SOLEMN_JUDGMENT), None)
+                if solemn is not None:
+                    assert sum(c.code in SHEEP_CODES for c in obs.field) == 3
+                    assert not any(c.code in SHEEP_CODES
+                                   for pile in obs.graveyards for c in pile)
+                    action = solemn if negate_activation else next(
+                        a for a in actions if a.kind == "pass")
+                    responded = True
+            if responded and not negate_activation and not fusion_chosen \
+                    and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               == RESTRICT), None)
+                fusion_chosen |= action is not None
+            if responded and obs.turn == 3 and obs.acting_player == 0 \
+                    and obs.phase == "main1" \
+                    and any(a.kind == "end_phase" for a in actions):
+                own_monsters = {c.code for c in obs.field
+                                if c.controller == 0 and c.zone == "monster"}
+                assert sum(code in SHEEP_CODES for code in own_monsters) == 3
+                assert METAMORPHOSIS in {c.code for c in obs.graveyards[0]}
+                assert not any(c.code in SHEEP_CODES
+                               for pile in obs.graveyards for c in pile)
+                if negate_activation:
+                    assert obs.life_points == (8000, 4000)
+                    assert RESTRICT not in own_monsters
+                    assert obs.extra_deck_counts[0] == 1
+                    assert SOLEMN_JUDGMENT in {c.code for c in obs.graveyards[1]}
+                else:
+                    assert fusion_chosen
+                    assert obs.life_points == (8000, 8000)
+                    assert RESTRICT in own_monsters
+                    assert obs.extra_deck_counts[0] == 0
+                    assert SOLEMN_JUDGMENT not in {c.code for c in obs.graveyards[1]}
+                    assert any(c.controller == 1 and c.zone == "spell_trap"
+                               for c in obs.field)
+                loaded = env.engine.probe.loaded_script_sha256
+                assert {f"official/c{METAMORPHOSIS}.lua",
+                        f"official/c{SOLEMN_JUDGMENT}.lua"}.issubset(loaded)
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail("Metamorphosis and Solemn did not resolve within 80 decisions")
