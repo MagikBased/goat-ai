@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 DEKOICHI = 87621407
 TSUKUYOMI = 34853266
@@ -98,6 +100,10 @@ def test_book_response_to_tsukuyomi_trigger(tmp_path, book_target):
                 if book_target == DEKOICHI:
                     assert any(c.code == TSUKUYOMI and c.position == "faceup"
                                for c in opposing_field)
+                assert {c.code for c in other.known_opponent_field_cards} == (
+                    {DEKOICHI, TSUKUYOMI} if book_target == TSUKUYOMI
+                    else {DEKOICHI})
+                assert not other.known_opponent_hand_cards
                 assert not any(a.kind == "flip_summon"
                                and a.parameters.get("code") in (DEKOICHI, TSUKUYOMI)
                                for a in env.legal_actions())
@@ -109,9 +115,29 @@ def test_book_response_to_tsukuyomi_trigger(tmp_path, book_target):
                     assert any(c.code == TSUKUYOMI and c.position == "facedown"
                                for c in own.field)
                     assert TSUKUYOMI not in {c.code for c in own.hand}
+                    other = env.engine.probe.observation(1)
+                    assert {c.code for c in other.known_opponent_field_cards} == {
+                        DEKOICHI, TSUKUYOMI}
+                    assert TSUKUYOMI not in other.known_opponent_hand_cards
                 else:
                     assert TSUKUYOMI in {c.code for c in own.hand}
                     assert not any(c.code == TSUKUYOMI for c in own.field)
+                    other = env.engine.probe.observation(1)
+                    assert {c.code for c in other.known_opponent_field_cards} == {
+                        DEKOICHI}
+                    assert TSUKUYOMI in other.known_opponent_hand_cards
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
-                return
+                agents = (RandomAgent(15), RandomAgent(16))
+                for _ in range(5000):
+                    action = agents[obs.acting_player].select_action(
+                        obs, env.legal_actions())
+                    obs = env.step(action)
+                    if env.is_terminal():
+                        path = tmp_path / f"tsukuyomi_book_{book_target}.json"
+                        write_trajectory(path, env.trajectory())
+                        assert verify_trajectory(read_trajectory(path),
+                                                 ExperimentalOcgcoreEngine(root)) == len(
+                                                     env.trajectory().decisions)
+                        return
+                pytest.fail("Tsukuyomi / Book duel did not finish")
     pytest.fail("Tsukuyomi / Book response did not resolve")
