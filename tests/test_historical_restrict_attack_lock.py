@@ -1,4 +1,4 @@
-"""Face-up Thousand-Eyes Restrict prevents attacks by other monsters."""
+"""Face-up Restrict blocks attacks and manual position changes."""
 
 import os
 from pathlib import Path
@@ -18,7 +18,9 @@ SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("set_restrict", [False, True])
-def test_restrict_attack_lock_lifts_after_book_sets_it(tmp_path, set_restrict):
+def test_restrict_attack_and_position_locks_lift_after_book_sets_it(
+    tmp_path, set_restrict,
+):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                      f"goat/c{RESTRICT}.lua", f"official/c{BOOK}.lua"):
@@ -38,9 +40,9 @@ def test_restrict_attack_lock_lifts_after_book_sets_it(tmp_path, set_restrict):
         assert BOOK in {c.code for c in env.engine.probe.observation(1).hand}
         goat = meta = token = fusion = restrict = target = False
         first_summon = second_summon = booked = book_target = False
-        battle_entered = False
+        battle_entered = turn4_lock_checked = position_lock_checked = False
         first_code = second_code = None
-        for _ in range(110):
+        for _ in range(170):
             actions = env.legal_actions()
             action = None
             if obs.turn == 1 and obs.acting_player == 0 and not goat:
@@ -95,11 +97,41 @@ def test_restrict_attack_lock_lifts_after_book_sets_it(tmp_path, set_restrict):
                     if option is not None:
                         action = option
                         battle_entered = True
+            if not set_restrict and turn4_lock_checked and obs.turn == 6 \
+                    and obs.acting_player == 1:
+                if not position_lock_checked and obs.phase == "main1" \
+                        and any(a.kind == "end_phase" for a in actions):
+                    assert second_code in {c.code for c in obs.field
+                                           if c.zone == "monster" and c.controller == 1}
+                    assert not any(a.kind == "change_position" and a.parameters.get("code")
+                                   == second_code for a in actions)
+                    assert any(a.kind == "activate" and a.parameters.get("code") == BOOK
+                               for a in actions)
+                    position_lock_checked = True
+                if position_lock_checked and not booked:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == BOOK), action)
+                    booked |= action is not None and action.kind == "activate"
+                if booked and not book_target and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == RESTRICT and a.parameters.get("controller") == 0),
+                                  action)
+                    book_target |= action is not None and action.kind == "select_card"
+                if position_lock_checked and book_target and obs.phase == "main1" \
+                        and not obs.chain and BOOK in {c.code for c in obs.graveyards[1]} \
+                        and any(a.kind == "end_phase" for a in actions):
+                    assert any(a.kind == "change_position" and a.parameters.get("code")
+                               == second_code for a in actions)
+                    assert first_code in {c.code for c in obs.graveyards[1]}
+                    assert f"official/c{BOOK}.lua" in \
+                        env.engine.probe.loaded_script_sha256
+                    return
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_card", "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if battle_entered and obs.turn == 4 and obs.acting_player == 1 \
+            if battle_entered and not turn4_lock_checked \
+                    and obs.turn == 4 and obs.acting_player == 1 \
                     and obs.phase == "battle_start":
                 own = env.engine.probe.observation(1)
                 opponent = env.engine.probe.observation(0)
@@ -127,5 +159,6 @@ def test_restrict_attack_lock_lifts_after_book_sets_it(tmp_path, set_restrict):
                 if set_restrict:
                     assert f"official/c{BOOK}.lua" in \
                         env.engine.probe.loaded_script_sha256
-                return
-    pytest.fail("Restrict attack-lock battle decision not reached")
+                    return
+                turn4_lock_checked = True
+    pytest.fail("Restrict attack or position-lock decision not reached")
