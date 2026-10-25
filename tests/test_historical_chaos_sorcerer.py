@@ -144,3 +144,101 @@ def test_sorcerer_cannot_pay_its_cost_with_light_and_dark_only_on_field(tmp_path
                     "place", "select_position", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("did not reach the LIGHT/DARK field-only control state")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_book_makes_sorcerer_target_invalid_but_still_spends_effect_and_attack(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (CHAOS_SORCERER, GRACEFUL_CHARITY, 14087893):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    book = 14087893
+    opponent = tmp_path / "book_response.ydk"
+    opponent.write_text("#main\n" + "\n".join(map(str, (
+        book, book, book, *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(chaos_deck(tmp_path)), str(opponent), seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        graceful = discarded = summoned = opponent_summoned = book_set = False
+        activated = targeted = book_chained = False
+        opponent_code = None
+        for _ in range(75):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 and not graceful:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == GRACEFUL_CHARITY), None)
+                graceful |= action is not None
+            if graceful and not discarded and actions[0].kind == "select_cards":
+                action = next((a for a in actions if {card["code"]
+                               for card in a.parameters["cards"]} == {LIGHT, DARK}), None)
+                discarded |= action is not None
+            if (discarded and observation.turn == 1 and observation.acting_player == 0
+                    and not summoned):
+                option = next((a for a in actions if a.kind == "special_summon"
+                               and a.parameters.get("code") == CHAOS_SORCERER), None)
+                if option is not None:
+                    action = option
+                    summoned = True
+            if observation.turn == 2 and observation.acting_player == 1:
+                if not opponent_summoned:
+                    option = next((a for a in actions if a.kind == "normal_summon"), None)
+                    if option is not None:
+                        action = option
+                        opponent_summoned = True
+                        opponent_code = option.parameters["code"]
+                if action is None and opponent_summoned and not book_set:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == book), None)
+                    book_set |= action is not None
+            if (observation.turn == 3 and observation.acting_player == 0
+                    and book_set and not activated):
+                option = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == CHAOS_SORCERER), None)
+                if option is not None:
+                    action = option
+                    activated = True
+            if activated and not targeted and actions[0].kind == "select_card":
+                option = next((a for a in actions if a.parameters.get("controller") == 1
+                               and a.parameters.get("code") == opponent_code
+                               and a.parameters.get("location") == 4), None)
+                if option is not None:
+                    action = option
+                    targeted = True
+            if targeted and observation.acting_player == 1 and not book_chained:
+                option = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == book), None)
+                if option is not None:
+                    action = option
+                    book_chained = True
+            if book_chained and observation.acting_player == 1 and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("controller") == 1
+                               and a.parameters.get("code") == opponent_code
+                               and a.parameters.get("location") == 4), action)
+            if (book_chained and observation.turn == 3 and observation.acting_player == 0
+                    and any(card.code == book for card in observation.graveyards[1])):
+                set_monster = next(card for card in observation.field
+                                   if card.controller == 1 and card.zone == "monster")
+                assert set_monster.position == "facedown" and set_monster.code is None
+                assert not observation.banished[1]
+                assert any(card.controller == 1 and card.zone == "monster"
+                           and card.sequence == set_monster.sequence
+                           and card.code == opponent_code
+                           for card in observation.known_opponent_field_cards)
+                assert not any(a.kind == "activate"
+                               and a.parameters.get("code") == CHAOS_SORCERER
+                               for a in actions)
+                if observation.phase == "battle_start":
+                    assert not any(a.kind == "attack"
+                                   and a.parameters.get("code") == CHAOS_SORCERER
+                                   for a in actions)
+                    return
+                if observation.phase == "main1":
+                    action = next((a for a in actions if a.kind == "battle_phase"), action)
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "select_position", "pass", "end_phase")),
+                    actions[0])
+            observation = env.step(action)
+    pytest.fail("Book of Moon did not invalidate the Sorcerer target")
