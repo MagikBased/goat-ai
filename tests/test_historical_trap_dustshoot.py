@@ -204,3 +204,87 @@ def test_dustshoot_reveals_nonmonster_hand_without_return_target(tmp_path):
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Dustshoot did not finish resolving against a nonmonster hand")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_dustshoot_still_resolves_after_book_reduces_hand_below_four(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (DUSTSHOOT, BOOK_OF_MOON):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    own = tmp_path / "dustshoot.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        *([DUSTSHOOT] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    opposing = tmp_path / "books.ydk"
+    opposing.write_text("#main\n" + "\n".join(map(str, (
+        *([BOOK_OF_MOON] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own), str(opposing), seed=28,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        trap_set = monster_summoned = book_set = dust_activated = False
+        book_chained = book_targeted = target_selected = False
+        summoned_code = None
+        before_deck = None
+        for _ in range(75):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 \
+                    and not trap_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == DUSTSHOOT), None)
+                trap_set |= action is not None
+            if observation.turn == 2 and observation.acting_player == 1:
+                if not monster_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"), None)
+                    if action is not None:
+                        summoned_code = action.parameters["code"]
+                        monster_summoned = True
+                if monster_summoned and action is None and not book_set:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == BOOK_OF_MOON), None)
+                    book_set |= action is not None
+            if book_set and observation.acting_player == 0 and not dust_activated:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == DUSTSHOOT), None)
+                if action is not None:
+                    assert observation.opponent_hand_count == 4
+                    before_deck = observation.deck_counts[1]
+                    dust_activated = True
+            if dust_activated and observation.acting_player == 1 and not book_chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == BOOK_OF_MOON
+                               and a.parameters.get("location") == 2), None)
+                book_chained |= action is not None
+            if book_chained and not book_targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("controller") == 1
+                               and a.parameters.get("code") == summoned_code), None)
+                book_targeted |= action is not None
+            if book_targeted and not target_selected and observation.acting_player == 0 \
+                    and actions[0].kind == "select_card":
+                assert observation.acting_player == observation.viewer == 0
+                assert observation.opponent_hand_count == 3
+                revealed = [c.code for event in observation.private_reveals
+                            for c in event.cards if c.controller == 1]
+                assert len(revealed) == 3
+                assert Counter(a.parameters["code"] for a in actions) == Counter(revealed)
+                assert not env.engine.probe.observation(1).private_reveals
+                action = actions[0]
+                target_selected = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "select_position", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+            if target_selected and observation.deck_counts[1] == before_deck + 1:
+                assert len(env.engine.probe.observation(1).hand) == 2
+                assert env.engine.probe.observation(0).opponent_hand_count == 2
+                assert observation.life_points == (8000, 8000)
+                assert BOOK_OF_MOON in {c.code for c in observation.graveyards[1]}
+                assert any(c.controller == 1 and c.zone == "monster"
+                           and c.position == "facedown" for c in observation.field)
+                loaded = env.engine.probe.loaded_script_sha256
+                assert {f"official/c{DUSTSHOOT}.lua",
+                        f"official/c{BOOK_OF_MOON}.lua"}.issubset(loaded)
+                return
+    pytest.fail("Dustshoot did not resolve after Book reduced the hand to three")
