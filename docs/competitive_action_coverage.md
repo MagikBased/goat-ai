@@ -225,6 +225,41 @@ effect still resolves, and both activated cards retain their discard costs.
 Both complete duels replay-verify. See [GOAT rules](goat_rules.md) for the
 source and historical-evidence limit.
 
+### Same-seed RandomAgent coverage check
+
+The same 30 tournament pairings and seed 18500 were also run with
+`--agent random --verify-replays` and no `--record-dir`. All **30 complete
+duels and 25,782 decisions** replay-verified from their in-memory
+trajectories; the maximum duel had 1,241 decisions. The report SHA-256 is
+`7021e8eb0952c92e62e796f7a48f0f5aea68a8f204688e4e478151b26ccd08b7`.
+The earlier combat run verified after a JSON round trip; this random run did
+not test trajectory serialization.
+
+| Selected source action | Combat heuristic | Random |
+| --- | ---: | ---: |
+| Dekoichi Flip Summon | 0 | 21 |
+| Nobleman activation | 13 | 63 |
+| Trap Dustshoot chain activation | 3 | 39 |
+| Book of Moon activation or chain | 34 | 110 |
+| Black Luster Soldier Special Summon | 9 | 38 |
+
+The random duels contained **8,803 more decisions** than the combat duels,
+and the policies reached different states. The counts are coverage signals,
+not normalized usage rates, historical play frequencies, or measures of agent
+strength. For additional Flip, hidden-hand, and removal correctness audits,
+use the random schedule; retain the combat schedule for behavior under the
+stronger baseline. Compare both against source-backed fixtures before making
+historical-ruling claims.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --tournament-corpus \
+  --agent random --seed 18500 --seeds 1 \
+  --max-decisions 3000 --verify-replays \
+  --output .cache/goat-ai/tournament_random_verified_18500.json
+```
+
 ## Same-schedule random and combat-baseline exposure
 
 The probe also accepts `--agent combat_heuristic` (or `heuristic`). This

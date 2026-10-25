@@ -118,6 +118,12 @@ against fresh pinned native engines after serialization. This broadens
 end-to-end adapter coverage of commonly played cards, while individual
 historical effect claims still require source-backed ruling fixtures. See
 [competitive action coverage](competitive_action_coverage.md).
+On the identical seed and deck schedule, RandomAgent completed and
+replay-verified 30 duels with 25,782 decisions. It selected 21 Dekoichi Flip
+Summons, versus zero under CombatHeuristicAgent, and reached substantially
+more Nobleman and Dustshoot activations. Future high-play-card audits should
+sample both agents; these unequal game lengths do not imply historical usage
+rates or an agent-strength comparison.
 
 ## M3 — Evaluation and data
 
