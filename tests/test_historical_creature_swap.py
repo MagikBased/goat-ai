@@ -98,7 +98,8 @@ def test_creature_swap_choices_after_chain_and_permanent_control(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_swap_of_set_monster_keeps_former_controller_knowledge(tmp_path):
+@pytest.mark.parametrize("opponent_set", [False, True])
+def test_swap_of_set_monster_keeps_former_controller_knowledge(tmp_path, opponent_set):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     if not (root / f"scripts/official/c{CREATURE_SWAP}.lua").is_file():
         pytest.skip("Creature Swap script not installed")
@@ -121,7 +122,8 @@ def test_swap_of_set_monster_keeps_former_controller_knowledge(tmp_path):
                     own_code = action.parameters["code"]
             if observation.turn == 2 and observation.acting_player == 1 \
                     and not opponent_summoned:
-                action = next((a for a in actions if a.kind == "normal_summon"), None)
+                kind = "set_monster" if opponent_set else "normal_summon"
+                action = next((a for a in actions if a.kind == kind), None)
                 if action is not None:
                     opponent_summoned = True
                     opponent_code = action.parameters["code"]
@@ -145,6 +147,14 @@ def test_swap_of_set_monster_keeps_former_controller_knowledge(tmp_path):
                 other = env.engine.probe.observation(1)
                 assert any(c.code == own_code and c.controller == 1
                            and c.position == "facedown" for c in other.field)
+                if opponent_set:
+                    assert any(c.controller == 0 and c.code == opponent_code
+                               and c.position == "facedown" for c in observation.field)
+                    assert any(c.controller == 0 and c.code is None
+                               and c.position == "facedown" for c in other.field)
+                    assert {(c.controller, c.zone, c.sequence, c.code)
+                            for c in other.known_opponent_field_cards} == {
+                                (0, "monster", 0, opponent_code)}
                 agents = (RandomAgent(3), RandomAgent(4))
                 for _ in range(5000):
                     action = agents[observation.acting_player].select_action(
@@ -153,7 +163,7 @@ def test_swap_of_set_monster_keeps_former_controller_knowledge(tmp_path):
                     if env.is_terminal():
                         trajectory = env.trajectory()
                         assert trajectory.schema_version == 16
-                        path = tmp_path / "creature_swap_set.json"
+                        path = tmp_path / f"creature_swap_set_{opponent_set}.json"
                         write_trajectory(path, trajectory)
                         assert verify_trajectory(read_trajectory(path),
                                                  ExperimentalOcgcoreEngine(root)) == len(
