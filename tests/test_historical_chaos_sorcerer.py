@@ -29,7 +29,8 @@ def chaos_deck(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_sorcerer_banishes_light_dark_cost_then_opponent_monster_and_cannot_attack(tmp_path):
+@pytest.mark.parametrize("effect_phase", ["main1", "main2"])
+def test_sorcerer_banishes_opponent_monster_in_either_main_phase(tmp_path, effect_phase):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for code in (CHAOS_SORCERER, GRACEFUL_CHARITY):
         if not (root / f"scripts/official/c{code}.lua").is_file():
@@ -76,8 +77,14 @@ def test_sorcerer_banishes_light_dark_cost_then_opponent_monster_and_cannot_atta
                     action = option
                     opponent_summoned = True
                     opponent_code = option.parameters["code"]
+            if (effect_phase == "main2" and observation.turn == 3
+                    and observation.acting_player == 0 and opponent_summoned
+                    and not effect_used and action is None):
+                action = next((a for a in actions if a.kind in ("battle_phase", "main2")),
+                              None)
             if (observation.acting_player == 0 and observation.turn == 3
-                    and opponent_summoned and not effect_used):
+                    and observation.phase == effect_phase
+                    and opponent_summoned and not effect_used and action is None):
                 option = next((a for a in actions if a.kind == "activate"
                                and a.parameters.get("code") == CHAOS_SORCERER), None)
                 if option is not None:
@@ -96,6 +103,10 @@ def test_sorcerer_banishes_light_dark_cost_then_opponent_monster_and_cannot_atta
                                for a in actions)
                 assert any(card.code == CHAOS_SORCERER and card.attack == 2300
                            and card.defense == 2000 for card in observation.field)
+                if effect_phase == "main2" and observation.phase == "main2" \
+                        and any(a.kind == "end_phase" for a in actions):
+                    assert observation.life_points == (8000, 8000)
+                    return
                 if observation.phase == "battle_start" and observation.acting_player == 0:
                     assert not any(a.kind == "attack"
                                    and a.parameters.get("code") == CHAOS_SORCERER
