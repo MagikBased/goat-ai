@@ -85,7 +85,9 @@ ordered response pairs. The report JSON SHA-256 was
 The sample also observed four Torrential Tribute responses to Breaker the
 Magical Warrior, which already have a [historical fixture](goat_rules.md).
 Solemn Judgment responding to Book of Moon now has a source-backed native
-regression. These counts are from random-agent choices; they do
+regression. Book of Moon responding to another Book also has a native
+same-target chain and visibility regression; that response appeared four times
+in the sample. These counts are from random-agent choices; they do
 not estimate tournament play rates or policy quality.
 
 Reproduce the expanded sample after [native setup](native_setup.md):
