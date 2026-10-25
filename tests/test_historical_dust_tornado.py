@@ -13,6 +13,7 @@ DUST_TORNADO = 60082869
 BOOK_OF_MOON = 14087893
 SAKURETSU_ARMOR = 56120475
 MYSTICAL_SPACE_TYPHOON = 5318639
+HEAVY_STORM = 19613556
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -187,3 +188,73 @@ def test_dust_tornado_cannot_set_when_mst_removes_its_target(tmp_path):
                 assert "official/c60082869.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail("MST did not remove Dust Tornado's target before resolution")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_dust_sets_book_in_heavy_storm_chain_then_storm_destroys_book(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (DUST_TORNADO, BOOK_OF_MOON, HEAVY_STORM):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    storm = tmp_path / "storm.ydk"
+    storm.write_text("#main\n" + "\n".join(map(str, (
+        HEAVY_STORM, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    dust = tmp_path / "dust.ydk"
+    dust.write_text("#main\n" + "\n".join(map(str, (
+        *([DUST_TORNADO] * 3), *([BOOK_OF_MOON] * 3),
+        *VANILLA_DECK[6:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(storm), str(dust), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        dust_set = storm_used = dust_chained = target_selected = False
+        accepted_set = book_selected = False
+        for _ in range(55):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1 and not dust_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == DUST_TORNADO), None)
+                dust_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and dust_set \
+                    and not storm_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == HEAVY_STORM), None)
+                storm_used |= action is not None
+            if storm_used and obs.acting_player == 1 and not dust_chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == DUST_TORNADO), None)
+                if action is not None:
+                    assert [link.card_code for link in obs.chain] == [HEAVY_STORM]
+                    dust_chained = True
+            if dust_chained and not target_selected and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               == HEAVY_STORM and a.parameters.get("controller") == 0), None)
+                target_selected |= action is not None
+            if target_selected and not accepted_set and actions[0].kind == "no":
+                assert [a.kind for a in actions] == ["no", "yes"]
+                action = next(a for a in actions if a.kind == "yes")
+                accepted_set = True
+            if accepted_set and not book_selected and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               == BOOK_OF_MOON and a.parameters.get("controller") == 1),
+                              None)
+                book_selected |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if book_selected and {DUST_TORNADO, BOOK_OF_MOON}.issubset(
+                    {c.code for c in obs.graveyards[1]}):
+                assert target_selected and accepted_set
+                assert HEAVY_STORM in {c.code for c in obs.graveyards[0]}
+                assert obs.chain == ()
+                assert not any(c.zone == "spell_trap" for c in obs.field)
+                assert BOOK_OF_MOON not in {
+                    c.code for c in env.engine.probe.observation(1).hand}
+                assert obs.life_points == (8000, 8000)
+                assert {f"official/c{code}.lua" for code in (
+                    DUST_TORNADO, BOOK_OF_MOON, HEAVY_STORM)}.issubset(
+                        env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Dust did not Set Book before Heavy Storm resolved")
