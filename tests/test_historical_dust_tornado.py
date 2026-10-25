@@ -8,6 +8,7 @@ import pytest
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.observations import TargetSlotView
 
 DUST_TORNADO = 60082869
 BOOK_OF_MOON = 14087893
@@ -188,6 +189,98 @@ def test_dust_tornado_cannot_set_when_mst_removes_its_target(tmp_path):
                 assert "official/c60082869.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail("MST did not remove Dust Tornado's target before resolution")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("chain_book", [False, True])
+def test_dust_targeted_book_still_allows_set_after_book_chains(tmp_path, chain_book):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (DUST_TORNADO, BOOK_OF_MOON):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    dust = tmp_path / "dust_book.ydk"
+    dust.write_text("#main\n" + "\n".join(map(str, (
+        *([DUST_TORNADO] * 3), *([BOOK_OF_MOON] * 3),
+        *VANILLA_DECK[6:]))) + "\n#extra\n!side\n")
+    book = tmp_path / "book.ydk"
+    book.write_text("#main\n" + "\n".join(map(str, (
+        *([BOOK_OF_MOON] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(dust), str(book), seed=556,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        dust_set = book_set = monster_summoned = dust_used = dust_targeted = False
+        book_chained = book_targeted = set_offered = targets_seen = False
+        dust_target_sequence = None
+        for _ in range(85):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not dust_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == DUST_TORNADO), None)
+                dust_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1:
+                if not monster_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"), None)
+                    monster_summoned |= action is not None
+                if action is None and not book_set:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == BOOK_OF_MOON), None)
+                    book_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and book_set \
+                    and not dust_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == DUST_TORNADO), None)
+                dust_used |= action is not None
+            if dust_used and not dust_targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("controller") == 1
+                               and a.parameters.get("location") == 8), None)
+                if action is not None:
+                    assert "code" not in action.parameters
+                    dust_target_sequence = action.parameters["sequence"]
+                    dust_targeted = True
+            if dust_targeted and obs.acting_player == 1 and not book_chained \
+                    and chain_book:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == BOOK_OF_MOON), None)
+                book_chained |= action is not None
+            if book_chained and not book_targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("controller") == 1
+                               and a.parameters.get("location") == 4), None)
+                book_targeted |= action is not None
+            if book_targeted and obs.acting_player == 0 and len(obs.chain) == 2:
+                other_view = env.engine.probe.observation(1)
+                assert other_view.chain == obs.chain
+                opponent_monster = next(c for c in obs.field if c.controller == 1
+                                        and c.zone == "monster")
+                assert obs.chain[0].targets == (TargetSlotView(
+                    1, "spell_trap", dust_target_sequence),)
+                assert obs.chain[1].targets == (TargetSlotView(
+                    1, "monster", opponent_monster.sequence),)
+                targets_seen = True
+            if dust_targeted and actions[0].kind == "no":
+                assert [a.kind for a in actions] == ["no", "yes"]
+                set_offered = True
+                action = next(a for a in actions if a.kind == "no")
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if set_offered and DUST_TORNADO in {c.code for c in obs.graveyards[0]}:
+                assert book_chained == chain_book
+                assert targets_seen == chain_book
+                assert BOOK_OF_MOON in {c.code for c in obs.graveyards[1]}
+                assert obs.chain == ()
+                monster = next(c for c in obs.field if c.controller == 1
+                               and c.zone == "monster")
+                assert (monster.position == "facedown") == chain_book
+                assert {f"official/c{code}.lua" for code in (
+                    DUST_TORNADO, BOOK_OF_MOON)}.issubset(
+                        env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Dust Tornado / Book chain did not reach the optional Set")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

@@ -84,6 +84,9 @@ ordered response pairs. The report JSON SHA-256 was
 
 The sample also observed four Torrential Tribute responses to Breaker the
 Magical Warrior, which already have a [historical fixture](goat_rules.md).
+A reverse-order fixture checks Dust Tornado targeting a Set Book of Moon,
+then Book activating in response; the activated target still permits Dust’s
+optional Set. This is separate from Dust responding to Book.
 Solemn Judgment responding to Book of Moon now has a source-backed native
 regression. Book of Moon responding to another Book also has a native
 same-target chain and visibility regression; that response appeared four times
