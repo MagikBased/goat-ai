@@ -713,6 +713,7 @@ class OcgcoreProbe:
             QUERY_CODE,
             QUERY_COUNTERS,
             QUERY_DEFENSE,
+            QUERY_EQUIP_CARD,
             QUERY_POSITION,
             decode_location,
         )
@@ -720,6 +721,8 @@ class OcgcoreProbe:
         flags = QUERY_CODE | QUERY_POSITION
         if location == LOCATION_MZONE:
             flags |= QUERY_ATTACK | QUERY_DEFENSE | QUERY_COUNTERS
+        elif location == LOCATION_SZONE:
+            flags |= QUERY_EQUIP_CARD
         query = QueryInfo(flags, player, location, 0, 0)
         length = c.c_uint32()
         pointer = self.lib.OCG_DuelQueryLocation(self._duel, c.byref(length), c.byref(query))
@@ -772,7 +775,10 @@ class OcgcoreProbe:
             return CardView(player, zone, position, visible_code, sequence, orientation,
                             card.attack if location == LOCATION_MZONE and faceup else None,
                             card.defense if location == LOCATION_MZONE and faceup else None,
-                            card.counters if location == LOCATION_MZONE and faceup else ())
+                            card.counters if location == LOCATION_MZONE and faceup else (),
+                            (card.equip_target[0], card.equip_target[2])
+                            if location == LOCATION_SZONE and faceup and card.equip_target
+                            and card.equip_target[1] == LOCATION_MZONE else None)
 
         field = tuple(view_card(player, location, sequence, card)
                       for player in (0, 1) for location in (LOCATION_MZONE, LOCATION_SZONE)

@@ -7,6 +7,7 @@ QUERY_CODE = 0x1
 QUERY_POSITION = 0x2
 QUERY_ATTACK = 0x100
 QUERY_DEFENSE = 0x200
+QUERY_EQUIP_CARD = 0x4000
 QUERY_COUNTERS = 0x20000
 QUERY_IS_PUBLIC = 0x100000
 QUERY_END = 0x80000000
@@ -20,6 +21,7 @@ class QueriedCard:
     attack: int | None = None
     defense: int | None = None
     counters: tuple[tuple[int, int], ...] = ()
+    equip_target: tuple[int, int, int] | None = None  # controller, location, sequence
 
 
 def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
@@ -41,6 +43,7 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
             continue
         values: dict[int, int] = {}
         counters: tuple[tuple[int, int], ...] = ()
+        equip_target: tuple[int, int, int] | None = None
         while True:
             if offset + 2 > len(buffer):
                 raise ValueError("truncated card query record")
@@ -76,6 +79,13 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
                 if len(payload) != 1:
                     raise ValueError("invalid public query flag")
                 values[flag] = payload[0]
+            elif flag == QUERY_EQUIP_CARD:
+                if len(payload) != 10:
+                    raise ValueError("invalid equip target query")
+                controller, location, sequence, _position = struct.unpack("<BBII", payload)
+                if location:
+                    equip_target = (controller, location, sequence)
+                values[flag] = 1
             else:
                 raise ValueError(f"unexpected query flag {flag:#x}")
         if QUERY_CODE not in values or QUERY_POSITION not in values:
@@ -83,7 +93,7 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
         cards.append(QueriedCard(values[QUERY_CODE], values[QUERY_POSITION],
                                  bool(values.get(QUERY_IS_PUBLIC, 0)),
                                  values.get(QUERY_ATTACK), values.get(QUERY_DEFENSE),
-                                 counters))
+                                 counters, equip_target))
     return tuple(cards)
 
 

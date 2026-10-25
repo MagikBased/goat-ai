@@ -1,13 +1,16 @@
 """Common GOAT control staple: Snatch Steal removed by Heavy Storm."""
 
+import json
 import os
 from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 SNATCH_STEAL = 45986603
 HEAVY_STORM = 19613556
@@ -54,6 +57,12 @@ def test_snatch_steal_upkeep_and_heavy_storm_return_control(tmp_path):
             if (snatched and observation.turn == 3 and monsters and snatch_on_field
                     and monsters[0].controller == 0):
                 assert observation.life_points == (8000, 8000)
+                snatch = next(card for card in observation.field
+                              if card.code == SNATCH_STEAL)
+                assert snatch.equipped_to == (0, monsters[0].sequence)
+                opponent = env.engine.probe.observation(1)
+                assert next(card for card in opponent.field
+                            if card.code == SNATCH_STEAL).equipped_to == snatch.equipped_to
             if observation.turn == 4 and observation.phase == "main1":
                 assert snatched
                 assert monsters and monsters[0].controller == 0
@@ -65,5 +74,35 @@ def test_snatch_steal_upkeep_and_heavy_storm_return_control(tmp_path):
                 assert any(card.code == SNATCH_STEAL
                            for card in observation.graveyards[0])
                 assert observation.life_points == (8000, 9000)
+                agents = (RandomAgent(18), RandomAgent(19))
+                for _ in range(3000):
+                    if env.is_terminal():
+                        break
+                    observation = env.step(agents[observation.acting_player].select_action(
+                        observation, env.legal_actions()))
+                else:
+                    pytest.fail("Snatch / Heavy duel exceeded 3000 decisions")
+                trajectory = env.trajectory()
+                assert trajectory.schema_version == 19
+                assert any(card.equipped_to is not None
+                           for decision in trajectory.decisions
+                           for card in decision.observation.field)
+                path = tmp_path / "snatch_heavy.json"
+                write_trajectory(path, trajectory)
+                loaded = read_trajectory(path)
+                assert loaded == trajectory
+                assert verify_trajectory(loaded, ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
+                legacy = json.loads(path.read_text())
+                legacy["schema_version"] = 18
+                for view in [*(row["observation"] for row in legacy["decisions"]),
+                             legacy["terminal_observation"]]:
+                    for card in view["field"]:
+                        card.pop("equipped_to", None)
+                old_path = tmp_path / "snatch_heavy_v18.json"
+                old_path.write_text(json.dumps(legacy))
+                assert verify_trajectory(read_trajectory(old_path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
                 return
     pytest.fail("Snatch Steal and Heavy Storm did not complete their control sequence")

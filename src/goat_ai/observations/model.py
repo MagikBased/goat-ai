@@ -14,6 +14,7 @@ class CardView:
     attack: int | None = None  # Current visible ATK; never set for face-down cards.
     defense: int | None = None  # Current visible DEF.
     counters: tuple[tuple[int, int], ...] = ()  # (counter type, count) on face-up monsters.
+    equipped_to: tuple[int, int] | None = None  # Public target monster (player, field slot).
 
 
 @dataclass(frozen=True)
@@ -116,6 +117,12 @@ class Observation:
                     or any(kind <= 0 or count <= 0 for kind, count in card.counters)
                     or tuple(sorted(card.counters)) != card.counters):
                 raise ValueError("invalid visible monster stats or counters")
+            if card.equipped_to is not None and (
+                    card.zone != "spell_trap" or card.position != "faceup"
+                    or len(card.equipped_to) != 2
+                    or card.equipped_to[0] not in (0, 1)
+                    or not 0 <= card.equipped_to[1] < 7):
+                raise ValueError("equip target requires a face-up field Spell or Trap")
         facedown_slots = {(card.controller, card.zone, card.sequence)
                           for card in self.field if card.controller != self.viewer
                           and card.position == "facedown"}

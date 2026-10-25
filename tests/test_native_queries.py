@@ -1,10 +1,12 @@
 import os
+import struct
 from pathlib import Path
 
 import pytest
 
 from goat_ai.engine.native_messages import decode_decision
-from goat_ai.engine.native_queries import decode_location
+from goat_ai.engine.native_queries import (QUERY_CODE, QUERY_END, QUERY_EQUIP_CARD,
+                                           QUERY_POSITION, decode_location)
 from goat_ai.engine.ocgcore_probe import OcgcoreProbe
 from goat_ai.engine.probe_deck import VANILLA_DECK
 
@@ -14,6 +16,28 @@ def test_query_location_rejects_truncation():
         decode_location(b"\x00")
     with pytest.raises(ValueError, match="size mismatch"):
         decode_location(b"\x01\x00\x00\x00")
+
+
+def test_query_location_decodes_public_equip_target():
+    def record(flag, payload=b""):
+        return struct.pack("<HI", 4 + len(payload), flag) + payload
+
+    card = (record(QUERY_CODE, struct.pack("<I", 45986603))
+            + record(QUERY_POSITION, struct.pack("<I", 5))
+            + record(QUERY_EQUIP_CARD, struct.pack("<BBII", 1, 4, 2, 1))
+            + record(QUERY_END))
+    frame = struct.pack("<I", len(card)) + card
+    assert decode_location(frame)[0].equip_target == (1, 4, 2)
+    empty_equip = (record(QUERY_CODE, struct.pack("<I", 45986603))
+                   + record(QUERY_POSITION, struct.pack("<I", 5))
+                   + record(QUERY_EQUIP_CARD, bytes(10)) + record(QUERY_END))
+    assert decode_location(struct.pack("<I", len(empty_equip))
+                           + empty_equip)[0].equip_target is None
+    bad = (record(QUERY_CODE, struct.pack("<I", 45986603))
+           + record(QUERY_POSITION, struct.pack("<I", 5))
+           + record(QUERY_EQUIP_CARD, bytes(9)) + record(QUERY_END))
+    with pytest.raises(ValueError, match="equip target"):
+        decode_location(struct.pack("<I", len(bad)) + bad)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

@@ -38,12 +38,23 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
         if hashes != trajectory.deck_sha256:
             raise ReplayMismatch("deck contents differ from recorded trajectory")
     with GoatEnvironment(str(paths[0]), str(paths[1]), trajectory.seed, engine) as env:
+        def without_equips(view):
+            def cards(items):
+                return tuple(replace(card, equipped_to=None) for card in items)
+
+            return replace(view, hand=cards(view.hand), field=cards(view.field),
+                           graveyards=tuple(cards(zone) for zone in view.graveyards),
+                           banished=tuple(cards(zone) for zone in view.banished),
+                           own_extra_deck=cards(view.own_extra_deck))
+
         observation = env.reset()
         for index, record in enumerate(trajectory.decisions):
             if env.is_terminal():
                 raise ReplayMismatch(f"decision {index}: engine terminated early")
             compared_observation = observation
             recorded_observation = record.observation
+            if trajectory.schema_version < 19:
+                compared_observation = without_equips(compared_observation)
             if trajectory.schema_version < 17:
                 compared_observation = replace(compared_observation,
                                                known_opponent_hand_cards=())
@@ -94,11 +105,13 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             raise ReplayMismatch("record ended before engine terminal state")
         if env.result() != trajectory.winner:
             raise ReplayMismatch("winner differs from recorded trajectory")
+        terminal_observation = (without_equips(observation)
+                                if trajectory.schema_version < 19 else observation)
         if (trajectory.schema_version >= 18
                 and trajectory.terminal_observation is not None
-                and observation != trajectory.terminal_observation):
-            fields = [name for name in vars(observation)
-                      if getattr(observation, name) != getattr(
+                and terminal_observation != trajectory.terminal_observation):
+            fields = [name for name in vars(terminal_observation)
+                      if getattr(terminal_observation, name) != getattr(
                           trajectory.terminal_observation, name)]
             raise ReplayMismatch(f"terminal observation differs in {fields}")
         if trajectory.asset_sha256 is not None:
