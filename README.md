@@ -12,9 +12,9 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Environment contract and illegal-action validation | Implemented |
 | Player-visible observation schema | Own hand, initial Main Deck composition, and Extra Deck; public zones, battle position, face-up monster ATK/DEF/counters, chain links, bounded public events, known opponent field and hand cards, public Deck-top reveals, recipient-scoped card reveals, disabled zones, and the public Scapegoat summon restriction; broader reveal and restriction coverage pending |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
-| JSON trajectory round trip | Schema v17 also tracks publicly known opponent hand cards from Graveyard or face-up field returns; v16 retained known identities when set monsters changed control. Earlier schemas remain readable, though affected recordings need re-recording for exact replay verification |
+| JSON trajectory round trip | Schema v18 records the final player-visible terminal observation; earlier schemas remain readable. Publicly known opponent hand cards and set-monster control memory are also tracked. Affected old recordings need re-recording for exact replay verification |
 | Tournaments | Seeded, seat-swapped sequential and spawned-process runners; paired score intervals and Wilson intervals for supported decks |
-| Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
+| Native throughput benchmark | Measures complete vanilla or sourced-deck duels, reset time, and single-process peak RSS; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
 | Experimental control probe | One seeded 40-card synthetic control-style deck reaches a native terminal state with full scripts; behavior and visibility unaudited |
 | PyTorch policy | Version-9 visible-state action scorer also encodes publicly known opponent hand cards; version 8 added face-up monster ATK, DEF, and counters; seat-labeled verified imitation, snapshot-pool self-play experiment, and held-out evaluation exist; heuristic imitation is a measured baseline, not a strength claim |
@@ -61,6 +61,7 @@ The restricted `RestrictedOcgcoreEngine` connects the same native core to `GoatE
 python examples/play_vanilla.py --seed 42 --trajectory replays/vanilla_42.json
 python examples/play_vanilla.py --human-seat 0
 python scripts/benchmark_native.py --games 3 --seed 42
+python scripts/benchmark_native.py --engine experimental --deck-a examples/decks/goat_control_lolmarcus_2020.ydk --deck-b examples/decks/chaos_turbo_riclar_2020.ydk --games 10 --seed 9700 --max-decisions 3000
 python scripts/audit_card_pool.py
 python scripts/evaluate_native.py --agent-a heuristic --agent-b random --seeds 10
 python scripts/evaluate_native.py --agent-a random --agent-b random --seeds 4 --workers 2
