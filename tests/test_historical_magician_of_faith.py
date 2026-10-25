@@ -14,6 +14,7 @@ MAGICIAN_OF_FAITH = 31560081
 BOOK_OF_MOON = 14087893
 GEMINI_ELF = 69140098
 NECROVALLEY = 511002998
+MYSTICAL_SPACE_TYPHOON = 5318639
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -300,16 +301,21 @@ def test_magician_of_faith_battle_flip_recovers_pot_before_destruction(tmp_path)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_pre_errata_necrovalley_negates_magician_of_faith_recovery(tmp_path):
+@pytest.mark.parametrize("mst_response", [False, True])
+def test_pre_errata_necrovalley_and_magician_of_faith_recovery(tmp_path, mst_response):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"official/c{POT_OF_GREED}.lua",
                      f"official/c{MAGICIAN_OF_FAITH}.lua",
-                     f"pre-errata/c{NECROVALLEY}.lua"):
+                     f"pre-errata/c{NECROVALLEY}.lua",
+                     *((f"official/c{MYSTICAL_SPACE_TYPHOON}.lua",)
+                       if mst_response else ())):
         if not (root / "scripts" / relative).is_file():
             pytest.skip(f"script {relative} not installed")
     faith_deck = tmp_path / "faith.ydk"
-    faith_deck.write_text("#main\n" + "\n".join(map(str, (
-        POT_OF_GREED, *([MAGICIAN_OF_FAITH] * 3), *VANILLA_DECK[4:])))
+    faith_cards = [POT_OF_GREED, *([MAGICIAN_OF_FAITH] * 3), *VANILLA_DECK[4:]]
+    if mst_response:
+        faith_cards[5] = MYSTICAL_SPACE_TYPHOON
+    faith_deck.write_text("#main\n" + "\n".join(map(str, faith_cards))
                           + "\n#extra\n!side\n")
     valley_deck = tmp_path / "valley.ydk"
     valley_deck.write_text("#main\n" + "\n".join(map(str, (
@@ -318,8 +324,11 @@ def test_pre_errata_necrovalley_negates_magician_of_faith_recovery(tmp_path):
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
         assert {POT_OF_GREED, MAGICIAN_OF_FAITH}.issubset(c.code for c in obs.hand)
+        if mst_response:
+            assert MYSTICAL_SPACE_TYPHOON in {c.code for c in obs.hand}
         assert NECROVALLEY in {c.code for c in env.engine.probe.observation(1).hand}
         pot_used = faith_set = valley_used = faith_flipped = pot_targeted = False
+        mst_chained = mst_targeted = False
         for _ in range(65):
             actions = env.legal_actions()
             action = None
@@ -346,6 +355,16 @@ def test_pre_errata_necrovalley_negates_magician_of_faith_recovery(tmp_path):
                                    == POT_OF_GREED and a.parameters.get("location") == 16),
                                   None)
                     pot_targeted |= action is not None
+                if mst_response and pot_targeted and not mst_chained and obs.chain:
+                    action = next((a for a in actions if a.kind == "chain"
+                                   and a.parameters.get("code") == MYSTICAL_SPACE_TYPHOON),
+                                  action)
+                    mst_chained |= action is not None and action.kind == "chain"
+                if mst_chained and not mst_targeted and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == NECROVALLEY and a.parameters.get("controller") == 1),
+                                  action)
+                    mst_targeted |= action is not None and action.kind == "select_card"
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_card", "place", "pass", "end_phase")), actions[0])
@@ -353,15 +372,28 @@ def test_pre_errata_necrovalley_negates_magician_of_faith_recovery(tmp_path):
             if pot_targeted and obs.turn == 3 and obs.acting_player == 0 \
                     and not obs.chain and any(a.kind == "normal_summon"
                                               for a in env.legal_actions()):
-                assert POT_OF_GREED in {c.code for c in obs.graveyards[0]}
-                assert POT_OF_GREED not in {c.code for c in obs.hand}
+                if mst_response:
+                    assert mst_chained and mst_targeted
+                    assert POT_OF_GREED in {c.code for c in obs.hand}
+                    assert POT_OF_GREED not in {c.code for c in obs.graveyards[0]}
+                    assert NECROVALLEY in {c.code for c in obs.graveyards[1]}
+                    assert MYSTICAL_SPACE_TYPHOON in {
+                        c.code for c in obs.graveyards[0]}
+                    assert [[c.code for c in reveal.cards] for reveal in
+                            env.engine.probe.observation(1).private_reveals] == [
+                                [POT_OF_GREED]]
+                else:
+                    assert POT_OF_GREED in {c.code for c in obs.graveyards[0]}
+                    assert POT_OF_GREED not in {c.code for c in obs.hand}
+                    assert any(c.code == NECROVALLEY and c.position == "faceup"
+                               for c in obs.field)
+                    assert not env.engine.probe.observation(1).private_reveals
                 assert any(c.code == MAGICIAN_OF_FAITH and c.position == "faceup"
                            for c in obs.field)
-                assert any(c.code == NECROVALLEY and c.position == "faceup"
-                           for c in obs.field)
-                assert not env.engine.probe.observation(1).private_reveals
                 loaded = env.engine.probe.loaded_script_sha256
                 assert {f"official/c{MAGICIAN_OF_FAITH}.lua",
                         f"pre-errata/c{NECROVALLEY}.lua"}.issubset(loaded)
+                if mst_response:
+                    assert f"official/c{MYSTICAL_SPACE_TYPHOON}.lua" in loaded
                 return
-    pytest.fail("Necrovalley did not negate Magician of Faith's recovery")
+    pytest.fail("Necrovalley/MST response did not resolve Magician of Faith's recovery")
