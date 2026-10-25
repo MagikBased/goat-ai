@@ -532,3 +532,14 @@ The generic heuristic scores face-up Normal Summons above monster Sets. A seed-9
 On the identical 120-game, six-deck schedule above, `flip_heuristic` scored **75 wins, 44 losses, and 1 draw** against RandomAgent (62.9%; paired score interval 52.9–72.5%). Its score difference from the original heuristic was **−0.4 percentage points**, with a paired 95% bootstrap interval of **−8.3 to +7.9 points**. Flip Control improved from 3/20 to 6/20 wins, and Chaos Turbo from 11/20 to 15/20, while Chaos Control fell from 14/20 to 7/20. The variant therefore has no measured aggregate improvement; more decision-level analysis and independent seeds are needed before making it the default. The four-worker run used 75,132 decisions in 16.98 seconds on the same pinned assets. All 120 games reached terminal states under the cap.
 
 To reproduce, run the schedule-building shell commands above with `--agent-a flip_heuristic` and `--output artifacts/sourced_balanced_flip_heuristic_random_9800_9801.json`. In the Python snippet above, load that report as the candidate and `sourced_balanced_heuristic_random_9800_9801.json` as the control.
+
+## Dimension Fusion Turbo guide-deck protocol check (2026-10-25)
+
+The [GoatFormat Dimension Fusion Turbo guide](https://www.goatformat.com/dimension-fusion-turbo.html) supplies a 40-card Main Deck built around Thunder Dragon, Bazoo, and Dimension Fusion. `examples/decks/dimension_fusion_turbo_goatformat_guide.ydk` transcribes that guide list with pinned GOAT/pre-errata IDs. The source provides no Extra or Side Deck for this example, so those sections are empty. It is a guide example, not a tournament submission or a metagame frequency sample. The pinned GOAT deck validator accepted the list.
+
+On the local pinned native assets, RandomAgent versus RandomAgent completed all **20** seat-swapped games against the sourced 2020 Chaos Turbo list on seeds 9900–9909 under a 3,000-decision cap. The Dimension Fusion Turbo slot won 11 and lost 9, with no draws. Mean decisions were 907.8 and the maximum was 1,202. Four native workers completed the tournament in 5.06 seconds, or 3.96 complete duels per wall-clock second. The measured score interval was 35–75%, too broad to infer a deck-strength advantage. Two additional seed-1 seat-swapped full-duel fixtures serialize and replay-verify their trajectories. These are protocol and reproducibility checks, not human-strength or complete historical-ruling claims.
+
+```sh
+OMP_NUM_THREADS=1 PYTHONPATH=. .venv/bin/python scripts/evaluate_native.py --engine experimental --matchup examples/decks/dimension_fusion_turbo_goatformat_guide.ydk examples/decks/chaos_turbo_riclar_2020.ydk --seed 9900 --seeds 10 --max-decisions 3000 --workers 4 --agent-a random --agent-b random --output artifacts/dft_chaos_random_9900_9909.json
+PYTHONPATH=. GOAT_AI_NATIVE_ROOT=.cache/goat-ai .venv/bin/pytest -q tests/test_dimension_fusion_turbo_duel.py tests/test_historical_dimension_fusion.py
+```
