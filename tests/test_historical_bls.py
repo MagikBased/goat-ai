@@ -18,7 +18,8 @@ BOOK_OF_MOON = 14087893
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("choice", [
-    "double_attack", "banish", "banish_book", "attack_then_main2", "attack_book"])
+    "double_attack", "banish", "banish_book", "attack_then_main2", "attack_book",
+    "self_banish"])
 def test_bls_historical_turn_choices(tmp_path, choice):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for script in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua"):
@@ -79,6 +80,17 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                 if action is not None:
                     assert action.parameters["location"] == 16
                     costs.append(action.parameters["code"])
+            if (choice == "self_banish" and observation.turn == 1
+                    and observation.acting_player == 0 and set(costs) == {LIGHT, DARK}):
+                if not effect_used:
+                    action = next((a for a in actions if a.kind in ("activate", "chain")
+                                   and a.parameters.get("code") == BLS), action)
+                    effect_used |= action is not None and action.parameters.get("code") == BLS
+                if effect_used and not effect_targeted and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code") == BLS
+                                   and a.parameters.get("controller") == 0
+                                   and a.parameters.get("location") == 4), action)
+                    effect_targeted |= action is not None and action.kind == "select_card"
             if choice != "attack_book" and observation.turn == 2 \
                     and observation.acting_player == 1 \
                     and not opponent_summoned:
@@ -209,6 +221,14 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                 assert any(c.code == BLS for c in observation.field)
                 assert not any(a.kind == "activate" and a.parameters.get("code") == BLS
                                for a in actions)
+                assert f"goat/c{BLS}.lua" in env.engine.probe.loaded_script_sha256
+                return
+            if choice == "self_banish" and effect_targeted \
+                    and any(c.code == BLS for c in observation.banished[0]):
+                assert observation.turn == 1
+                assert not any(c.code == BLS for c in observation.field)
+                assert {c.code for c in observation.banished[0]} == {LIGHT, DARK, BLS}
+                assert observation.life_points == (8000, 8000)
                 assert f"goat/c{BLS}.lua" in env.engine.probe.loaded_script_sha256
                 return
             if (choice == "banish" and effect_used and observation.turn == 3
