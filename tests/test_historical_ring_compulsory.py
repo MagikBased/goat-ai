@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 RING = 511000824
 COMPULSORY = 94192409
@@ -103,5 +105,27 @@ def test_compulsory_chained_to_ring_removes_target(tmp_path, chain_compulsory):
                 assert {f"pre-errata/c{RING}.lua",
                         f"official/c{COMPULSORY}.lua"} <= (
                             env.engine.probe.loaded_script_sha256.keys())
-                return
-    pytest.fail("Ring / Compulsory response did not resolve")
+                break
+        else:
+            pytest.fail("Ring / Compulsory response did not resolve")
+        if not chain_compulsory:
+            return
+        agents = (RandomAgent(316), RandomAgent(317))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            obs = env.step(agents[obs.acting_player].select_action(
+                obs, env.legal_actions()))
+        else:
+            pytest.fail("Ring / Compulsory duel exceeded 3000 decisions")
+        trajectory = env.trajectory()
+        assert trajectory.winner in (0, 1, None)
+        assert any(record.observation.viewer == 1
+                   and GEMINI_ELF in record.observation.known_opponent_hand_cards
+                   for record in trajectory.decisions)
+    path = tmp_path / "ring_compulsory.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, ExperimentalOcgcoreEngine(root)) == len(
+        trajectory.decisions)
