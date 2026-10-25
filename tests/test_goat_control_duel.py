@@ -15,12 +15,14 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 REPOSITORY = Path(__file__).resolve().parent.parent
 GOAT_CONTROL = REPOSITORY / "examples/decks/goat_control_lolmarcus_2020.ydk"
 CHAOS = REPOSITORY / "examples/decks/chaos_turbo_riclar_2020.ydk"
+WARRIOR = REPOSITORY / "examples/decks/warrior_montague_clash.ydk"
 RESTRICT = 504700102
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("seed,goat_seat", [(1, 0), (7, 1)])
-def test_full_goat_control_versus_chaos_duel_and_replay(tmp_path, seed, goat_seat):
+@pytest.mark.parametrize("opponent", [CHAOS, WARRIOR])
+def test_full_goat_control_duel_and_replay(tmp_path, seed, goat_seat, opponent):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     deck = read_ydk(GOAT_CONTROL)
     assert len(deck.main) == 40 and not deck.side
@@ -33,8 +35,8 @@ def test_full_goat_control_versus_chaos_duel_and_replay(tmp_path, seed, goat_sea
         deck, read_goat_whitelist(root / "banlist/GOAT.lflist.conf"),
         root / "database/cards.cdb", root / "database/goat-entries.cdb",
         root / "database/cards-unofficial.cdb")
-    decks = (str(GOAT_CONTROL), str(CHAOS)) if goat_seat == 0 \
-        else (str(CHAOS), str(GOAT_CONTROL))
+    decks = (str(GOAT_CONTROL), str(opponent)) if goat_seat == 0 \
+        else (str(opponent), str(GOAT_CONTROL))
     with GoatEnvironment(*decks, seed=seed,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
@@ -45,7 +47,7 @@ def test_full_goat_control_versus_chaos_duel_and_replay(tmp_path, seed, goat_sea
             if env.is_terminal():
                 break
         else:
-            pytest.fail("Goat Control versus Chaos Turbo exceeded 3000 decisions")
+            pytest.fail("Goat Control duel exceeded 3000 decisions")
         trajectory = env.trajectory()
         assert len(trajectory.decisions) > 100
         assert trajectory.deck_sha256 is not None

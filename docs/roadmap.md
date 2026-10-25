@@ -29,6 +29,8 @@ A [2020 championship Goat Control Main Deck](../examples/decks/goat_control_lolm
 
 A documented [competitive Warrior Main Deck](../examples/decks/warrior_montague_clash.ydk) adds an aggressive archetype and Reinforcement of the Army to the corpus. It passes the pinned whitelist/deck-size gate. Random-agent Warrior versus Chaos Turbo duels completed all 20 games on seeds 1–10 in both seats within 3,000 decisions; two seat-swapped full-duel trajectories serialize and replay-verify. This extends protocol coverage, not card-by-card ruling validation or a playing-strength claim.
 
+A further 60-duel random-agent sweep on seeds 21–30 covered all three pairings among the sourced Goat Control, Chaos Turbo, and Warrior lists in both seats. All reached terminal under a 3,000-decision cap, with 60,374 decisions total. Goat Control versus Warrior additionally has two complete seat-swapped trajectories that replay-verify. The measured two-worker runtime and limits are in [the evaluation log](evaluation.md). This widens M1 protocol coverage; M2 historical card correctness remains open.
+
 **Work**
 
 1. Implement `.ydk` parsing and April 2005 deck/card-pool validation. Begin with two small legal fixture decks and expand coverage.
