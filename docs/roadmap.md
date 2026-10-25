@@ -310,6 +310,13 @@ Dekoichi with three copies of either card in the defender's Deck. The attacker
 cannot distinguish them at target selection; only the Flip branch removes
 matching Deck copies and reveals Decks. Both complete duels replay-verify.
 
+A Metamorphosis fixture now checks the historical option to Tribute the
+player's own face-down Level 1 Dark Mimic for Thousand-Eyes Restrict, without
+triggering Mimic's Flip draw. With no matching Fusion in the Extra Deck,
+Metamorphosis is unavailable. The successful branch completes and
+replay-verifies; the distinct Soul Exchange rule for an opponent's face-down
+monster remains untested.
+
 The Chaos boss / Bottomless Trap Hole priority fixture now runs both official
 Chaos Sorcerer and the separate GOAT Black Luster Soldier script. For each,
 activating its banish effect before the Bottomless response removes the target
