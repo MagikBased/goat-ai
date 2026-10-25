@@ -700,3 +700,83 @@ PYTHONPATH=. OMP_NUM_THREADS=1 python scripts/audit_policy_agreement.py \
   replays/staple_audit_goat_chaos_15001/*.json \
   replays/staple_audit_chaos_goat_15001/*.json
 ```
+
+## Larger combat-teacher clone on shared GOAT staples (2026-10-25)
+
+A second feature-version-12, width-32 behavioral clone was trained from **16
+fresh replay-verified full duels** of CombatHeuristicAgent versus RandomAgent
+on the sourced Goat Control and Chaos Turbo Main Decks. Seeds 15100–15103
+covered both deck assignments and both teacher seats. The collector reported
+12 teacher wins in 16 games; 9,117 labeled teacher decisions entered training.
+Three CPU epochs with seed 17 and learning rate 0.001 produced mean losses
+**0.11753, 0.05777, 0.04557**. The ignored local checkpoint is
+`checkpoints/combat_bc_fv12_15100_15103.pt`, SHA-256
+`eeaeea739d47ea40c2488c3291dc120cfa018c6552150d33bb7bf337ab233484`.
+Its metadata records all 16 input trajectories, teacher provenance, seed, and
+feature version. These are agent demonstrations, not human games.
+
+On the separate seed-15000–15001 eight-duel audit, this clone matched
+**1,368/1,454** teacher decisions with multiple legal options, versus
+**1,339/1,454** for the earlier combat clone. Among the ten cards shared by
+all five sourced tournament Main Decks, teacher-selected Breaker actions
+matched **31/36** instead of **26/36**. Breaker attacks improved from **7/11**
+to **11/11**, while position changes remained **5/10**. These are off-policy
+agreement counts; they do not measure winning chances or identify optimal
+plays.
+
+Held-out tournaments used the separately sourced Chaos Control, Chaos Return,
+and Warrior Main Decks, both deck assignments and seats, the experimental GOAT
+adapter, and 3,000-decision limits. No game hit the limit. The new clone scored
+**37 wins, 25 losses, and 2 draws** directly against its parent on seeds
+15300–15307: score **59.4%**, with a matchup-seed clustered 95% bootstrap
+interval of **50.8–68.8%**. The deck splits still differed substantially, so
+this is evidence for this schedule, not general dominance across archetypes.
+
+Against CombatHeuristicAgent on the same seeds 15400–15407, the new clone
+scored **30–32 with 2 draws** (48.4%; paired interval 40.6–56.2%). Its parent
+scored **21–42 with 1 draw** (33.6%; 22.7–45.3%) on the identical schedule.
+The matched score difference was **+14.8 percentage points**, with a clustered
+95% bootstrap interval of **+4.7 to +25.8 points**. Against the original
+HeuristicAgent on fresh seeds 15500–15507, the new clone scored **32–31 with
+1 draw** (50.8%; 45.3–56.2%). Against RandomAgent it scored **45–19**
+(70.3%; 59.4–81.2%). The intervals for absolute performance against the two
+heuristic baselines include 50%; no claim that the clone beats either heuristic
+is supported. The five tournament decks used here remain an incomplete
+metagame sample, and their individual card rulings are still being audited.
+M4 remains open: it requires broader held-out families, stronger opponents,
+and a reproducible self-play gain. The larger imitation set gives a stronger
+starting checkpoint for that work.
+
+Reproduce with [pinned native assets](native_setup.md) and `OMP_NUM_THREADS=1`:
+
+```bash
+PYTHONPATH=. OMP_NUM_THREADS=1 python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher combat_heuristic \
+  --deck-a examples/decks/goat_control_lolmarcus_2020.ydk \
+  --deck-b examples/decks/chaos_turbo_riclar_2020.ydk \
+  --seed 15100 --seeds 4 --max-decisions 3000 \
+  --output-dir replays/combat_more_goat_chaos_15100_15103
+PYTHONPATH=. OMP_NUM_THREADS=1 python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher combat_heuristic \
+  --deck-a examples/decks/chaos_turbo_riclar_2020.ydk \
+  --deck-b examples/decks/goat_control_lolmarcus_2020.ydk \
+  --seed 15100 --seeds 4 --max-decisions 3000 \
+  --output-dir replays/combat_more_chaos_goat_15100_15103
+PYTHONPATH=. OMP_NUM_THREADS=1 python scripts/train_behavioral_clone.py \
+  replays/combat_more_goat_chaos_15100_15103/*.json \
+  replays/combat_more_chaos_goat_15100_15103/*.json \
+  --engine experimental --native-root .cache/goat-ai \
+  --feature-version 12 --epochs 3 --width 32 --seed 17 \
+  --learning-rate 0.001 \
+  --output checkpoints/combat_bc_fv12_15100_15103.pt
+```
+
+The ignored local JSON reports are named `combat_bc_more_vs_parent_15300_15303`,
+`combat_bc_more_vs_parent_15304_15307`, `combat_bc_more_vs_teacher_15400_15403`,
+`combat_bc_more_vs_teacher_15404_15407`, the corresponding `parent_vs_teacher`
+reports, and `combat_bc_more_vs_{heuristic,random}_15500_15507` under
+`.cache/goat-ai/`. Run `scripts/evaluate_policy.py` with the two matchups above,
+`--both-deck-assignments --require-unseen-main-decks --workers 2 --seeds 4`
+for each parent and teacher segment, or `--seeds 8` for the baseline segment.
+The action-audit command and fresh seed-15000–15001 trajectories are documented
+in the preceding section.
