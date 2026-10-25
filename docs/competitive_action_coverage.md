@@ -211,6 +211,11 @@ selected Torrential Tribute 38 times and chose it in response to Tsukuyomi
 four times. A paired native regression now tests that response against a
 pass control, then replay-verifies both complete duels; see
 [GOAT rules](goat_rules.md).
+Trap Dustshoot responded to Mystical Space Typhoon twice in this sample.
+Another paired native regression now compares that response with passing on
+the Trap, checks the recipient-scoped hand reveal, and replay-verifies both
+duels. These are fixture priorities from a deterministic baseline sample,
+not estimates of human usage.
 
 The random run first uncovered a valid zero-card `MSG_CONFIRM_DECKTOP` frame
 that the adapter incorrectly rejected. The pinned core permits this frame
