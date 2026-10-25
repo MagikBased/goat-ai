@@ -17,6 +17,7 @@ REINFORCEMENT = 504700055
 MYSTIC_SWORDSMAN = 504700077
 POT_OF_GREED = 55144522
 MYSTICAL_SPACE_TYPHOON = 5318639
+SOLEMN_JUDGMENT = 41420027
 
 
 def _reach_search(env):
@@ -201,3 +202,59 @@ def test_mst_chained_to_reinforcement_does_not_stop_warrior_search(tmp_path):
                             env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("MST/Reinforcement chain did not search a Warrior")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_solemn_negates_reinforcement_before_warrior_search(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"goat/c{REINFORCEMENT}.lua",
+                     f"official/c{SOLEMN_JUDGMENT}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    solemn_deck = tmp_path / "solemn.ydk"
+    solemn_deck.write_text("#main\n" + "\n".join(map(str, (
+        SOLEMN_JUDGMENT, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(WARRIOR), str(solemn_deck), seed=52,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert REINFORCEMENT in {c.code for c in obs.hand}
+        assert SOLEMN_JUDGMENT in {
+            c.code for c in env.engine.probe.observation(1).hand}
+        trap_set = reinforcement_used = solemn_chained = False
+        before_deck = before_hand = None
+        for _ in range(65):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1 and not trap_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SOLEMN_JUDGMENT), None)
+                trap_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not reinforcement_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == REINFORCEMENT), None)
+                if action is not None:
+                    before_deck = obs.deck_counts[0]
+                    before_hand = len(obs.hand)
+                    reinforcement_used = True
+            if reinforcement_used and obs.acting_player == 1 and not solemn_chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SOLEMN_JUDGMENT), action)
+                solemn_chained |= action is not None and action.kind == "chain"
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if solemn_chained and {REINFORCEMENT, SOLEMN_JUDGMENT}.issubset(
+                    {c.code for pile in obs.graveyards for c in pile}):
+                assert trap_set and reinforcement_used
+                assert obs.chain == () and obs.life_points == (8000, 4000)
+                assert obs.deck_counts[0] == before_deck
+                assert len(env.engine.probe.observation(0).hand) == before_hand - 1
+                opponent = env.engine.probe.observation(1)
+                assert not opponent.private_reveals
+                assert not opponent.known_opponent_hand_cards
+                assert {f"goat/c{REINFORCEMENT}.lua",
+                        f"official/c{SOLEMN_JUDGMENT}.lua"}.issubset(
+                            env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Solemn/Reinforcement chain did not negate the search")
