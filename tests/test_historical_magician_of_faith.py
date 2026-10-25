@@ -45,6 +45,8 @@ def test_magician_of_faith_returns_pot_with_or_without_book_response(
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
         pot_used = mof_set = mof_flipped = pot_targeted = False
+        pot_recovered_checked = second_pot_used = False
+        second_hand_before = second_deck_before = None
         book_set = book_used = False
         for _ in range(55):
             actions = env.legal_actions()
@@ -95,7 +97,8 @@ def test_magician_of_faith_returns_pot_with_or_without_book_response(
                     action = next((a for a in actions if a.parameters.get("code")
                                    == MAGICIAN_OF_FAITH
                                    and a.parameters.get("controller") == 0), action)
-            if pot_targeted and POT_OF_GREED in {c.code for c in observation.hand} \
+            if not pot_recovered_checked and pot_targeted \
+                    and POT_OF_GREED in {c.code for c in observation.hand} \
                     and any(a.kind == "normal_summon" for a in actions):
                 assert POT_OF_GREED not in {c.code for c in observation.graveyards[0]}
                 assert any(a.kind == "activate" and a.parameters.get("code")
@@ -106,6 +109,7 @@ def test_magician_of_faith_returns_pot_with_or_without_book_response(
                 assert any(reveal.recipient == 1 and
                            [c.code for c in reveal.cards] == [POT_OF_GREED]
                            for reveal in other.private_reveals)
+                assert other.known_opponent_hand_cards == (POT_OF_GREED,)
                 if book_response:
                     assert book_used
                     assert own_mof.position == "facedown"
@@ -121,12 +125,27 @@ def test_magician_of_faith_returns_pot_with_or_without_book_response(
                 assert f"official/c{MAGICIAN_OF_FAITH}.lua" in loaded
                 if book_response:
                     assert f"official/c{BOOK_OF_MOON}.lua" in loaded
-                return
+                pot_recovered_checked = True
+                second_hand_before = len(observation.hand)
+                second_deck_before = observation.deck_counts[0]
+                action = next(a for a in actions if a.kind == "activate"
+                              and a.parameters.get("code") == POT_OF_GREED)
+                second_pot_used = True
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_card", "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
-    pytest.fail("Magician of Faith did not return Pot of Greed")
+            if second_pot_used and observation.chain == () and POT_OF_GREED in {
+                    c.code for c in observation.graveyards[0]}:
+                other = env.engine.probe.observation(1)
+                assert observation.deck_counts[0] == second_deck_before - 2
+                assert len(env.engine.probe.observation(0).hand) == second_hand_before + 1
+                assert other.opponent_hand_count == second_hand_before + 1
+                assert other.known_opponent_hand_cards == ()
+                assert [[c.code for c in reveal.cards]
+                        for reveal in other.private_reveals] == [[POT_OF_GREED]]
+                return
+    pytest.fail("Magician of Faith did not recover and reuse Pot of Greed")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
