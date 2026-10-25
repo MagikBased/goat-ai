@@ -192,6 +192,13 @@ draw still occurs at Chain Link 1; the pass control leaves Dekoichi face-up.
 Both complete duels replay-verify. This tests one interaction between a card
 in all six Main Decks and one in five; see [GOAT rules](goat_rules.md).
 
+Another paired native regression has D.D. Warrior Lady attack a Set Dekoichi,
+both present in five tournament Main Decks. Choosing or declining Warrior
+Lady's Damage Step banish still lets Dekoichi draw; the two branches have
+different public destinations for the battling monsters. Both full duels
+replay-verify and pass the trajectory visibility audit; see
+[GOAT rules](goat_rules.md).
+
 Heavy Storm appears in all six tournament Main Decks and Trap Dustshoot in
 five. A paired native regression now checks Dustshoot chained to Heavy against
 passing, including the private hand reveal and destruction of another Set
