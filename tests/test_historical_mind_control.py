@@ -14,6 +14,9 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 MIND_CONTROL = 37520316
 CANNON_SOLDIER = 11384280
 BOOK_OF_MOON = 14087893
+METAMORPHOSIS = 46411259
+DARKFIRE_DRAGON = 17881964
+MYSTICAL_ELF = 15025844
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -235,3 +238,90 @@ def test_mind_control_targets_set_monster_without_revealing_its_target(tmp_path)
                     "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
     pytest.fail(f"Mind Control set-target return did not occur: {returned}")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_mind_control_prevents_metamorphosis_tribute_of_stolen_monster(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    scripts = {f"official/c{code}.lua" for code in (MIND_CONTROL, METAMORPHOSIS)}
+    if any(not (root / "scripts" / script).is_file() for script in scripts):
+        pytest.skip("Mind Control / Metamorphosis scripts not installed")
+    own = tmp_path / "mind_metamorphosis.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        CANNON_SOLDIER, MIND_CONTROL, METAMORPHOSIS, *VANILLA_DECK[3:])))
+                   + f"\n#extra\n{DARKFIRE_DRAGON}\n!side\n")
+
+    with GoatEnvironment(str(own), "examples/decks/vanilla_probe.ydk", seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {CANNON_SOLDIER, MIND_CONTROL, METAMORPHOSIS} <= {
+            c.code for c in obs.hand}
+        assert MYSTICAL_ELF in {
+            c.code for c in env.engine.probe.observation(1).hand}
+        cannon_summoned = elf_summoned = mind_used = mind_targeted = False
+        meta_used = own_tributed = fusion_selected = False
+        for _ in range(100):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not cannon_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == CANNON_SOLDIER), None)
+                cannon_summoned |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not elf_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == MYSTICAL_ELF), None)
+                elf_summoned |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not mind_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == MIND_CONTROL), None)
+                mind_used |= action is not None
+            if mind_used and not mind_targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               == MYSTICAL_ELF and a.parameters.get("controller") == 1),
+                              None)
+                assert action is not None
+                mind_targeted = True
+            if mind_targeted and not meta_used and obs.turn == 3 \
+                    and obs.acting_player == 0 and not obs.chain \
+                    and any(c.code == MYSTICAL_ELF and c.controller == 0
+                            for c in obs.field):
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == METAMORPHOSIS), None)
+                meta_used |= action is not None
+            if meta_used and not own_tributed and actions[0].kind == "select_card":
+                assert len(actions) == 1
+                assert actions[0].parameters.get("code") == CANNON_SOLDIER
+                assert actions[0].parameters.get("controller") == 0
+                assert MYSTICAL_ELF in {c.code for c in obs.field}
+                action = actions[0]
+                own_tributed = True
+            if own_tributed and not fusion_selected and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               == DARKFIRE_DRAGON), None)
+                fusion_selected |= action is not None
+            if fusion_selected and obs.turn == 3 and obs.acting_player == 0 \
+                    and obs.chain == () and any(c.code == DARKFIRE_DRAGON
+                                                for c in obs.field):
+                assert CANNON_SOLDIER in {c.code for c in obs.graveyards[0]}
+                assert METAMORPHOSIS in {c.code for c in obs.graveyards[0]}
+                assert any(c.code == MYSTICAL_ELF and c.controller == 0
+                           for c in obs.field)
+                assert obs.life_points == (8000, 8000)
+                assert scripts <= env.engine.probe.loaded_script_sha256.keys()
+                agents = (RandomAgent(100), RandomAgent(101))
+                for _ in range(5000):
+                    obs = env.step(agents[obs.acting_player].select_action(
+                        obs, env.legal_actions()))
+                    if env.is_terminal():
+                        path = tmp_path / "mind_metamorphosis.json"
+                        write_trajectory(path, env.trajectory())
+                        assert verify_trajectory(read_trajectory(path),
+                                                 ExperimentalOcgcoreEngine(root)) == len(
+                                                     env.trajectory().decisions)
+                        return
+                pytest.fail("Mind Control / Metamorphosis duel did not finish")
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail("Mind Control / Metamorphosis cost choice did not resolve")
