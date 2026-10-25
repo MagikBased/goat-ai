@@ -104,3 +104,67 @@ def test_solemn_response_to_mst_preserves_set_book(tmp_path, negate):
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
                 return
     pytest.fail("MST / Solemn response did not resolve")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_mst_target_choices_ignore_swapped_hidden_backrow_identities(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{MST}.lua").is_file():
+        pytest.skip("MST script not installed")
+    attacker = tmp_path / "mst.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        MST, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+
+    def reach_choice(first, second):
+        cards = list(VANILLA_DECK)
+        cards[0], cards[6] = first, second
+        defender = tmp_path / f"defender_{first}.ydk"
+        defender.write_text("#main\n" + "\n".join(map(str, cards))
+                            + "\n#extra\n!side\n")
+        with GoatEnvironment(str(attacker), str(defender), seed=52,
+                             engine=ExperimentalOcgcoreEngine(root)) as env:
+            obs = env.reset()
+            assert {SOLEMN, BOOK} <= {
+                c.code for c in env.engine.probe.observation(1).hand}
+            first_set = second_set = activated = False
+            for _ in range(75):
+                actions = env.legal_actions()
+                action = None
+                if obs.turn == 2 and obs.acting_player == 1:
+                    if not first_set:
+                        action = next((a for a in actions if a.kind == "set_spell_trap"
+                                       and a.parameters.get("code") == first), None)
+                        first_set = action is not None
+                    elif not second_set:
+                        action = next((a for a in actions if a.kind == "set_spell_trap"
+                                       and a.parameters.get("code") == second), None)
+                        second_set = action is not None
+                if obs.turn == 3 and obs.acting_player == 0 \
+                        and second_set and not activated:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == MST), None)
+                    activated = action is not None
+                if activated and actions[0].kind == "select_card":
+                    assert obs.viewer == obs.acting_player == 0
+                    assert len(actions) == 2
+                    assert {a.parameters.get("sequence") for a in actions} == {0, 1}
+                    assert all(a.parameters.get("controller") == 1
+                               and a.parameters.get("location") == 8
+                               and "code" not in a.parameters for a in actions)
+                    assert len([c for c in obs.field if c.controller == 1
+                                and c.zone == "spell_trap" and c.position == "facedown"
+                                and c.code is None]) == 2
+                    native_slots = env.engine.probe._query_location(1, 8)
+                    assert native_slots[0].code == first
+                    assert native_slots[1].code == second
+                    return obs, actions
+                if action is None:
+                    action = next((a for a in actions if a.kind in (
+                        "pass", "end_phase")), actions[0])
+                obs = env.step(action)
+        pytest.fail("MST did not reach two hidden backrow choices")
+
+    first_observation, first_actions = reach_choice(SOLEMN, BOOK)
+    second_observation, second_actions = reach_choice(BOOK, SOLEMN)
+    assert first_observation == second_observation
+    assert first_actions == second_actions
