@@ -11,6 +11,7 @@ from goat_ai.environments import GoatEnvironment
 
 TORRENTIAL_TRIBUTE = 53582587
 BOOK_OF_MOON = 14087893
+DEKOICHI = 87621407
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -78,3 +79,80 @@ def test_torrential_after_summon_destroys_faceup_and_book_facedown_monsters(tmp_
                 assert observation.life_points == (8000, 8000)
                 return
     pytest.fail("Torrential Tribute / Book of Moon chain did not resolve")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_torrential_chains_to_flip_effect_without_negating_dekoichi_draw(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (TORRENTIAL_TRIBUTE, DEKOICHI):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    own = tmp_path / "dekoichi.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        *([DEKOICHI] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    other = tmp_path / "torrential.ydk"
+    other.write_text("#main\n" + "\n".join(map(str, (
+        TORRENTIAL_TRIBUTE, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own), str(other), seed=15,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        dekoichi_set = trap_set = opponent_summoned = flipped = chained = False
+        opponent_code = None
+        hand_before = deck_before = None
+        for _ in range(75):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not dekoichi_set:
+                action = next((a for a in actions if a.kind == "set_monster"
+                               and a.parameters.get("code") == DEKOICHI), None)
+                dekoichi_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1:
+                if not trap_set:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == TORRENTIAL_TRIBUTE), None)
+                    trap_set |= action is not None
+                if trap_set and not opponent_summoned and action is None:
+                    action = next((a for a in actions if a.kind == "normal_summon"), None)
+                    if action is not None:
+                        opponent_code = action.parameters["code"]
+                        opponent_summoned = True
+            if obs.turn == 3 and obs.acting_player == 0 and trap_set \
+                    and not flipped:
+                action = next((a for a in actions if a.kind == "flip_summon"
+                               and a.parameters.get("code") == DEKOICHI), None)
+                if action is not None:
+                    hand_before = len(obs.hand)
+                    deck_before = obs.deck_counts[0]
+                    flipped = True
+            if flipped and obs.acting_player == 1 and not chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == TORRENTIAL_TRIBUTE), None)
+                if action is not None:
+                    assert len(obs.chain) == 1
+                    assert obs.chain[0].card_code == DEKOICHI
+                    chained = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "select_position", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if action.kind == "chain" and action.parameters.get("code") \
+                    == TORRENTIAL_TRIBUTE:
+                assert [link.card_code for link in obs.chain] == [
+                    DEKOICHI, TORRENTIAL_TRIBUTE]
+            if chained and TORRENTIAL_TRIBUTE in {
+                    c.code for c in obs.graveyards[1]} and obs.chain == ():
+                owner = env.engine.probe.observation(0)
+                assert opponent_summoned and opponent_code is not None
+                assert not any(c.zone == "monster" for c in owner.field)
+                assert DEKOICHI in {c.code for c in owner.graveyards[0]}
+                assert opponent_code in {c.code for c in owner.graveyards[1]}
+                assert len(owner.hand) == hand_before + 1
+                assert owner.deck_counts[0] == deck_before - 1
+                assert owner.life_points == (8000, 8000)
+                assert not env.engine.probe.observation(1).private_reveals
+                assert {f"official/c{code}.lua" for code in (
+                    TORRENTIAL_TRIBUTE, DEKOICHI)}.issubset(
+                        env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Torrential did not chain to Dekoichi's Flip Effect")
