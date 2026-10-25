@@ -5,13 +5,24 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 POT_OF_GREED = 55144522
 MYSTICAL_SPACE_TYPHOON = 5318639
 SOLEMN_JUDGMENT = 41420027
+
+
+def _verify_completed_duel(env, root, path):
+    assert env.is_terminal()
+    assert env.result() in (0, 1, None)
+    write_trajectory(path, env.trajectory())
+    assert verify_trajectory(read_trajectory(path),
+                             ExperimentalOcgcoreEngine(root)) == len(
+        env.trajectory().decisions)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -32,7 +43,13 @@ def test_mst_chained_to_pot_destroys_card_without_negating_draw(tmp_path):
         observation = env.reset()
         mst_set = pot_activated = mst_chained = pot_targeted = False
         before_hand = before_deck = None
-        for _ in range(55):
+        checked = False
+        agents = (RandomAgent(52), RandomAgent(53))
+        for _ in range(3000):
+            if env.is_terminal():
+                assert checked
+                _verify_completed_duel(env, root, tmp_path / "mst_pot.json")
+                return
             actions = env.legal_actions()
             action = None
             if observation.turn == 2 and observation.acting_player == 1 and not mst_set:
@@ -56,11 +73,14 @@ def test_mst_chained_to_pot_destroys_card_without_negating_draw(tmp_path):
                                and a.parameters.get("controller") == 0
                                and a.parameters.get("code") == POT_OF_GREED), action)
                 pot_targeted |= action is not None and action.kind == "select_card"
-            if action is None:
+            if action is None and not checked:
                 action = next((a for a in actions if a.kind in (
                     "place", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[observation.acting_player].select_action(
+                    observation, actions)
             observation = env.step(action)
-            if pot_targeted and {POT_OF_GREED, MYSTICAL_SPACE_TYPHOON}.issubset(
+            if not checked and pot_targeted and {POT_OF_GREED, MYSTICAL_SPACE_TYPHOON}.issubset(
                     {card.code for pile in observation.graveyards for card in pile}):
                 assert mst_set and pot_activated and mst_chained
                 assert observation.chain == ()
@@ -71,8 +91,8 @@ def test_mst_chained_to_pot_destroys_card_without_negating_draw(tmp_path):
                 loaded = env.engine.probe.loaded_script_sha256
                 assert f"official/c{POT_OF_GREED}.lua" in loaded
                 assert f"official/c{MYSTICAL_SPACE_TYPHOON}.lua" in loaded
-                return
-    pytest.fail("MST/Pot chain did not resolve")
+                checked = True
+    pytest.fail("MST/Pot duel did not complete")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -93,7 +113,13 @@ def test_solemn_negates_pot_activation_and_prevents_draw(tmp_path):
         obs = env.reset()
         solemn_set = pot_activated = solemn_chained = False
         hand_before = deck_before = None
-        for _ in range(55):
+        checked = False
+        agents = (RandomAgent(52), RandomAgent(53))
+        for _ in range(3000):
+            if env.is_terminal():
+                assert checked
+                _verify_completed_duel(env, root, tmp_path / "solemn_pot.json")
+                return
             actions = env.legal_actions()
             action = None
             if obs.turn == 2 and obs.acting_player == 1 and not solemn_set:
@@ -111,11 +137,13 @@ def test_solemn_negates_pot_activation_and_prevents_draw(tmp_path):
                 action = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == SOLEMN_JUDGMENT), action)
                 solemn_chained |= action is not None and action.kind == "chain"
-            if action is None:
+            if action is None and not checked:
                 action = next((a for a in actions if a.kind in (
                     "place", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
             obs = env.step(action)
-            if solemn_chained and {POT_OF_GREED, SOLEMN_JUDGMENT}.issubset(
+            if not checked and solemn_chained and {POT_OF_GREED, SOLEMN_JUDGMENT}.issubset(
                     {card.code for pile in obs.graveyards for card in pile}):
                 own = env.engine.probe.observation(0)
                 assert own.life_points == (8000, 4000)
@@ -126,5 +154,5 @@ def test_solemn_negates_pot_activation_and_prevents_draw(tmp_path):
                 loaded = env.engine.probe.loaded_script_sha256
                 assert f"official/c{POT_OF_GREED}.lua" in loaded
                 assert f"official/c{SOLEMN_JUDGMENT}.lua" in loaded
-                return
-    pytest.fail("Solemn Judgment did not negate Pot of Greed")
+                checked = True
+    pytest.fail("Solemn Judgment / Pot duel did not complete")
