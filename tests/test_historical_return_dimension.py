@@ -13,6 +13,7 @@ BLS = 504700118
 GRACEFUL = 79571449
 RETURN = 27174286
 BOOK_OF_MOON = 14087893
+MYSTICAL_SPACE_TYPHOON = 5318639
 LIGHT = 15025844
 DARK = 49881766
 
@@ -122,3 +123,101 @@ def test_return_revives_chaos_costs_with_book_end_phase_exception(
                 assert f"official/c{RETURN}.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail("Return did not revive and rebanish both Chaos cost monsters")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_mst_chained_to_return_destroys_trap_but_not_its_revival(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua",
+                     f"official/c{RETURN}.lua",
+                     f"official/c{MYSTICAL_SPACE_TYPHOON}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    lights = (LIGHT, 62651957)
+    darks = (DARK, 7359741)
+    filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
+    cards = (GRACEFUL, BLS,
+             *(code for code in lights for _ in range(3)),
+             *(code for code in darks for _ in range(3)),
+             *(RETURN if code == 23771716 else code for code in filler[:26]))
+    deck = tmp_path / "chaos_return.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, cards)) + "\n#extra\n!side\n")
+    opposing = tmp_path / "mst.ydk"
+    opposing.write_text("#main\n" + "\n".join(map(str, (
+        MYSTICAL_SPACE_TYPHOON, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(deck), str(opposing), seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {GRACEFUL, BLS, RETURN, LIGHT, DARK}.issubset(c.code for c in obs.hand)
+        assert MYSTICAL_SPACE_TYPHOON in {
+            c.code for c in env.engine.probe.observation(1).hand}
+        graceful = discarded = summoned = return_set = mst_set = return_used = False
+        mst_chained = mst_targeted = revived = False
+        costs = []
+        for _ in range(105):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not graceful:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL), None)
+                    graceful |= action is not None
+                if graceful and not discarded and actions[0].kind == "select_cards":
+                    action = next((a for a in actions if {c["code"] for c in
+                                   a.parameters["cards"]} == {LIGHT, DARK}), None)
+                    discarded |= action is not None
+                if discarded and not summoned and action is None:
+                    action = next((a for a in actions if a.kind == "special_summon"
+                                   and a.parameters.get("code") == BLS), None)
+                    summoned |= action is not None
+                if summoned and len(costs) < 2 and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   in ({LIGHT, DARK} - set(costs))), action)
+                    if action is not None and action.kind == "select_card":
+                        costs.append(action.parameters["code"])
+                if summoned and len(costs) == 2 and not return_set and action is None:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == RETURN), None)
+                    return_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not mst_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == MYSTICAL_SPACE_TYPHOON), None)
+                mst_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not return_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == RETURN), action)
+                return_used |= action is not None and action.kind == "activate"
+            if return_used and obs.acting_player == 1 and not mst_chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == MYSTICAL_SPACE_TYPHOON), action)
+                mst_chained |= action is not None and action.kind == "chain"
+                if mst_chained:
+                    assert obs.life_points == (4000, 8000)
+                    assert {LIGHT, DARK} == {c.code for c in obs.banished[0]}
+            if mst_chained and not mst_targeted and actions[0].kind == "select_card":
+                assert obs.acting_player == obs.viewer == 1
+                action = next((a for a in actions if a.parameters.get("code") == RETURN
+                               and a.parameters.get("controller") == 0), None)
+                mst_targeted |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_cards", "select_card", "place", "select_position",
+                    "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if mst_targeted and not revived and RETURN in {c.code for c in obs.graveyards[0]} \
+                    and MYSTICAL_SPACE_TYPHOON in {c.code for c in obs.graveyards[1]} \
+                    and not obs.chain:
+                assert obs.life_points == (4000, 8000)
+                assert {LIGHT, DARK} == {c.code for c in obs.field
+                                         if c.controller == 0 and c.zone == "monster"
+                                         and c.code != BLS}
+                assert not obs.banished[0]
+                revived = True
+            if revived and obs.turn >= 4:
+                assert {LIGHT, DARK} == {c.code for c in obs.banished[0]}
+                assert BLS in {c.code for c in obs.field}
+                assert f"official/c{RETURN}.lua" in env.engine.probe.loaded_script_sha256
+                assert f"official/c{MYSTICAL_SPACE_TYPHOON}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("MST/Return chain did not resolve into revival and End Phase banish")
