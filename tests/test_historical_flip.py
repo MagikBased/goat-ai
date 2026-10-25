@@ -10,6 +10,7 @@ from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 
 DEKOICHI = 87621407
+BOOK_OF_MOON = 14087893
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -53,3 +54,78 @@ def test_dekoichi_flip_summon_draws_one_without_bokoichi(tmp_path):
                            for card in observation.field)
                 return
         pytest.fail("Dekoichi Flip Effect did not resolve within 40 decisions")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_dekoichi_draws_again_after_book_of_moon_resets_it(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (DEKOICHI, BOOK_OF_MOON):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    cards = (DEKOICHI,) * 3 + (BOOK_OF_MOON,) * 3 + VANILLA_DECK[6:]
+    deck = tmp_path / "dekoichi_book.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, cards)) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        set_card = first_flip = book_used = second_flip = False
+        first_draw_count = None
+        before_first = before_second = None
+        for _ in range(100):
+            actions = env.legal_actions()
+            action = None
+            if observation.acting_player == 0:
+                if observation.turn == 1 and not set_card:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == DEKOICHI), None)
+                    set_card |= action is not None
+                elif observation.turn == 3:
+                    if not first_flip:
+                        action = next((a for a in actions if a.kind == "flip_summon"
+                                       and a.parameters.get("code") == DEKOICHI), None)
+                        if action is not None:
+                            first_flip = True
+                            before_first = observation.deck_counts[0]
+                    elif first_draw_count is None and observation.deck_counts[0] == before_first - 1:
+                        first_draw_count = observation.deck_counts[0]
+                    if first_draw_count is not None and not book_used and action is None:
+                        action = next((a for a in actions if a.kind == "activate"
+                                       and a.parameters.get("code") == BOOK_OF_MOON), None)
+                        book_used |= action is not None
+                elif observation.turn == 5 and book_used and not second_flip:
+                    action = next((a for a in actions if a.kind == "flip_summon"
+                                   and a.parameters.get("code") == DEKOICHI), None)
+                    if action is not None:
+                        second_flip = True
+                        before_second = observation.deck_counts[0]
+            if book_used and actions[0].kind == "select_card" and action is None:
+                action = next((a for a in actions if a.parameters.get("code") == DEKOICHI
+                               and a.parameters.get("controller") == 0), None)
+            if book_used and observation.turn == 3 and observation.acting_player == 0 \
+                    and BOOK_OF_MOON in {c.code for c in observation.graveyards[0]}:
+                own = next(c for c in observation.field if c.controller == 0
+                           and c.zone == "monster")
+                other = env.engine.probe.observation(1)
+                hidden = next(c for c in other.field if c.controller == 0
+                              and c.zone == "monster")
+                assert own.code == DEKOICHI and own.position == "facedown"
+                assert hidden.code is None and hidden.position == "facedown"
+                assert not any(a.kind == "flip_summon" and a.parameters.get("code")
+                               == DEKOICHI for a in actions)
+            if second_flip and before_second is not None \
+                    and observation.deck_counts[0] == before_second - 1:
+                assert first_draw_count == before_first - 1
+                assert observation.deck_counts[0] == first_draw_count - 2
+                assert any(c.code == DEKOICHI and c.position == "faceup"
+                           for c in observation.field)
+                loaded = env.engine.probe.loaded_script_sha256
+                assert f"official/c{DEKOICHI}.lua" in loaded
+                assert f"official/c{BOOK_OF_MOON}.lua" in loaded
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "select_position", "pass", "end_phase")),
+                              actions[0])
+            observation = env.step(action)
+    pytest.fail("Dekoichi did not draw twice after Book of Moon reset it")
