@@ -1,5 +1,22 @@
 # Baseline evaluation log
 
+## Chaos Return versus Warrior protocol sweep
+
+Simon “Dingosig” Guinhut's [first-place 2022 Worlds Chaos Return list](https://formatlibrary.com/decks/6540) was downloaded as a public YDK and converted to pinned GOAT/pre-errata IDs in [`chaos_return_dingosig_worlds_2022.ydk`](../examples/decks/chaos_return_dingosig_worlds_2022.ydk). The source has 40 Main, 15 Extra, and 15 Side cards; all three sections pass the pinned GOAT legality gate. Two seat-swapped full duels against the sourced Warrior list serialize and replay-verify exact trajectories.
+
+A random-agent schedule on seeds 1–10, with each deck in both seats, completed **20/20 terminal duels** under the 3,000-decision cap. It recorded 14,331 decisions, or 716.55 per duel; the longest took 1,281 decisions. Chaos Return's assigned RandomAgent won 5, lost 13, and drew 2. These outcomes measure protocol coverage, not relative deck strength. On the pinned Linux x86_64 assets with one worker, the tournament took 12.453 seconds, measuring 1.606 duels and 1,151 decisions per second. Generated results remain outside Git.
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai python scripts/evaluate_native.py \
+  --engine experimental \
+  --matchup examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+    examples/decks/warrior_montague_clash.ydk \
+  --agent-a random --agent-b random --seed 1 --seeds 10 \
+  --max-decisions 3000 --output artifacts/chaos_return_warrior_random_1_10.json
+```
+
+This run does not establish that Return from the Different Dimension activated or that its historical timing and End Phase behavior are correct; those require targeted source-backed fixtures.
+
 ## Chaos Control versus Chaos Turbo protocol sweep
 
 Dmitry “InsiDS” Summovsky’s [third-place 2022 Worlds Chaos Control list](https://www.formatlibrary.com/decks/6548) was downloaded as a public YDK and converted to the pinned GOAT/pre-errata IDs in [`chaos_control_insids_worlds_2022.ydk`](../examples/decks/chaos_control_insids_worlds_2022.ydk). The source has 40 Main, 15 Extra, and 15 Side cards; all three sections pass the pinned GOAT legality gate. Two seat-swapped full duels against the sourced Chaos Turbo list serialize and replay-verify exact trajectories.
