@@ -851,3 +851,75 @@ PYTHONPATH=. python scripts/evaluate_policy.py \
 
 The ignored local action-audit report is
 `.cache/goat-ai/combat_more_selfplay_agreement_15000_15001.json`.
+
+## Opt-in equip-target encoding probe
+
+Schema-v19 Goat Control / Chaos Turbo recordings with CombatHeuristicAgent in
+both seats on seeds 16000–16001 produced four replay-verified duels and 1,955
+teacher decisions. Of these, 239 had a visible Equip Spell target, including 75
+with multiple legal actions. The behavioral-cloning CLI now accepts
+replay-fingerprinted v19 recordings. With one epoch, width 16, learning rate
+0.001, and model seed 16000, feature version 12 ended at loss 0.2695023 and
+opt-in version 13 at 0.2692132. Common model layers start at exactly the same
+seeded weights; v13 adds a separate trainable equip-pair projection. The
+training checkpoints remain ignored local artifacts, with SHA-256 prefixes
+`907cea72b56e` (v12) and `640e2e773df1` (v13).
+
+The held-out direct comparison used sourced Chaos Control and Warrior Main
+Decks in both deck assignments and both player seats, seeds 16100–16103, with
+the 3,000-decision cap. Both Main Deck compositions and all seeds were absent
+from training. Version 13 scored **7–9** over 16 terminal games; its paired
+bootstrap 95% score interval was **31.25–50%**. The outcome was strongly
+deck-dependent: 0–8 with Chaos Control as deck A and 7–1 with Warrior as deck A.
+The tournament report is
+`.cache/goat-ai/equip_v13_matched_vs_v12_16100_16103.json` (SHA-256 prefix
+`c0027a88d86c`). This small result does not establish a strength gain.
+
+Four separately recorded and replay-verified Chaos Control teacher duels on
+seeds 16110–16111 gave v12 **615/771** and v13 **616/771** exact agreement on
+multi-option choices. In the 152 decisions that both had multiple options and
+exposed an Equip Spell target, the two checkpoints chose identically, matching
+the teacher on **127/152**. This off-policy audit is not a game-strength
+measure. Its report is
+`.cache/goat-ai/equip_v12_v13_matched_agreement_16110_16111.json` (SHA-256
+prefix `4624de930521`). More training data with meaningful equip choices and
+larger held-out tournaments are needed before selecting v13 as the default.
+
+Reproduce the matched experiment after [native setup](native_setup.md):
+
+```bash
+PYTHONPATH=. python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher combat_heuristic \
+  --deck-a examples/decks/goat_control_lolmarcus_2020.ydk \
+  --deck-b examples/decks/chaos_turbo_riclar_2020.ydk \
+  --seed 16000 --seeds 2 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/equip_v19_demos
+PYTHONPATH=. python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/equip_v19_demos/*.json --engine experimental \
+  --feature-version 12 --epochs 1 --width 16 --seed 16000 \
+  --output .cache/goat-ai/equip_v12_16000.pt
+PYTHONPATH=. python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/equip_v19_demos/*.json --engine experimental \
+  --feature-version 13 --epochs 1 --width 16 --seed 16000 \
+  --output .cache/goat-ai/equip_v13_matched_16000.pt
+PYTHONPATH=. python scripts/evaluate_policy.py \
+  .cache/goat-ai/equip_v13_matched_16000.pt \
+  --opponent-checkpoint .cache/goat-ai/equip_v12_16000.pt \
+  --engine experimental --both-deck-assignments --require-unseen-main-decks \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --seed 16100 --seeds 4 --max-decisions 3000 --workers 2 \
+  --output .cache/goat-ai/equip_v13_matched_vs_v12_16100_16103.json
+PYTHONPATH=. python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher combat_heuristic \
+  --deck-a examples/decks/chaos_control_insids_worlds_2022.ydk \
+  --deck-b examples/decks/warrior_montague_clash.ydk \
+  --seed 16110 --seeds 2 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/equip_v19_holdout
+PYTHONPATH=. python scripts/audit_policy_agreement.py \
+  --engine experimental \
+  --checkpoint .cache/goat-ai/equip_v12_16000.pt \
+  --checkpoint .cache/goat-ai/equip_v13_matched_16000.pt \
+  --output .cache/goat-ai/equip_v12_v13_matched_agreement_16110_16111.json \
+  .cache/goat-ai/equip_v19_holdout/*.json
+```

@@ -287,9 +287,6 @@ class LegalActionPolicy(nn.Module):
         if feature_version >= 8:
             self.card_numbers = nn.Sequential(nn.Linear(5, width), nn.ReLU(),
                                               nn.Linear(width, width))
-        if feature_version >= 13:
-            self.equip_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
-                                            nn.Linear(width, width))
         self.phase = nn.Embedding(len(PHASES) + 1, width, padding_idx=0)
         kind_count = (len(ACTION_KINDS)
                       + (len(ZONE_ACTION_KINDS) if feature_version >= 4 else 0)
@@ -312,6 +309,11 @@ class LegalActionPolicy(nn.Module):
             self.chain_encoder = nn.GRU(width, width, batch_first=True)
         self.score = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
                                    nn.Linear(width, 1))
+        # Construct the opt-in layer last so common layers keep identical
+        # seeded initial weights in v12/v13 comparison experiments.
+        if feature_version >= 13:
+            self.equip_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
+                                            nn.Linear(width, width))
 
     def forward(self, features: DecisionFeatures) -> Tensor:
         cards = features.state_cards

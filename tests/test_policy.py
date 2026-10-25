@@ -258,12 +258,15 @@ def test_feature_version_thirteen_binds_public_equip_to_monster_slot():
         [0, 0, -1], [0, 0, -1], [0, 0, -1], [1, 2, 0]]
     assert current_moved.state_equip_slots[-1].tolist() == [1, 2, 1]
     torch.manual_seed(13)
+    old_model = LegalActionPolicy(vocabulary.size, width=16, feature_version=12)
+    torch.manual_seed(13)
     model = LegalActionPolicy(vocabulary.size, width=16, feature_version=13)
+    for name, parameter in old_model.named_parameters():
+        assert torch.equal(parameter, dict(model.named_parameters())[name])
     assert not torch.allclose(model(current_first), model(current_moved))
     model(current_first).sum().backward()
     assert any(parameter.grad is not None and parameter.grad.abs().sum() > 0
                for parameter in model.equip_pair.parameters())
-    old_model = LegalActionPolicy(vocabulary.size, width=16, feature_version=12)
     assert torch.allclose(old_model(old_first), old_model(old_moved))
 
 
