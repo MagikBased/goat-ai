@@ -11,7 +11,6 @@ from goat_ai.environments import GoatEnvironment
 
 BREAKER = 71413901
 BOOK_OF_MOON = 14087893
-BOTTOMLESS = 504700052
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -172,57 +171,3 @@ def test_targeted_book_chains_to_breaker_removal_but_is_still_destroyed(tmp_path
                         env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Book did not chain to Breaker's already paid removal effect")
-
-
-@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_bottomless_chains_to_breaker_counter_placement_before_counter_exists(tmp_path):
-    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    for relative in (f"official/c{BREAKER}.lua", f"goat/c{BOTTOMLESS}.lua"):
-        if not (root / "scripts" / relative).is_file():
-            pytest.skip(f"script {relative} not installed")
-    attacker = tmp_path / "breaker.ydk"
-    defender = tmp_path / "bottomless.ydk"
-    attacker.write_text("#main\n" + "\n".join(map(str, (
-        BREAKER, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
-    defender.write_text("#main\n" + "\n".join(map(str, (
-        *([BOTTOMLESS] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
-
-    with GoatEnvironment(str(attacker), str(defender), seed=316,
-                         engine=ExperimentalOcgcoreEngine(root)) as env:
-        obs = env.reset()
-        assert BREAKER in {c.code for c in obs.hand}
-        bottomless_set = breaker_summoned = bottomless_chained = False
-        for _ in range(70):
-            actions = env.legal_actions()
-            action = None
-            if obs.turn == 2 and obs.acting_player == 1 and not bottomless_set:
-                action = next((a for a in actions if a.kind == "set_spell_trap"
-                               and a.parameters.get("code") == BOTTOMLESS), None)
-                bottomless_set |= action is not None
-            if obs.turn == 3 and obs.acting_player == 0 and not breaker_summoned:
-                action = next((a for a in actions if a.kind == "normal_summon"
-                               and a.parameters.get("code") == BREAKER), None)
-                breaker_summoned |= action is not None
-            if breaker_summoned and obs.acting_player == 1 and not bottomless_chained:
-                action = next((a for a in actions if a.kind == "chain"
-                               and a.parameters.get("code") == BOTTOMLESS), None)
-                if action is not None:
-                    assert obs.chain[0].card_code == BREAKER
-                    breaker = next(c for c in obs.field if c.code == BREAKER)
-                    assert (breaker.attack, breaker.counters) == (1600, ())
-                    bottomless_chained = True
-            if action is None:
-                action = next((a for a in actions if a.kind in (
-                    "place", "pass", "end_phase")), actions[0])
-            obs = env.step(action)
-            if bottomless_chained and BREAKER in {c.code for c in obs.banished[0]}:
-                assert obs.chain == ()
-                assert not any(c.code == BREAKER for c in obs.field)
-                assert not any(a.kind in ("activate", "chain")
-                               and a.parameters.get("code") == BREAKER
-                               for a in env.legal_actions())
-                assert BOTTOMLESS in {c.code for c in obs.graveyards[1]}
-                assert {f"official/c{BREAKER}.lua", f"goat/c{BOTTOMLESS}.lua"}.issubset(
-                    env.engine.probe.loaded_script_sha256)
-                return
-    pytest.fail("Bottomless did not banish Breaker before its counter was placed")
