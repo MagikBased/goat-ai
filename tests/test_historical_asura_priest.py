@@ -1,0 +1,92 @@
+"""Asura Priest's four Sheep Token attacks and Spirit return."""
+
+import os
+from pathlib import Path
+
+import pytest
+
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.engine.probe_deck import VANILLA_DECK
+from goat_ai.environments import GoatEnvironment
+
+ASURA_PRIEST = 2134346
+SCAPEGOAT = 504700123
+SHEEP_TOKENS = {73915052, 73915053, 73915054, 73915055}
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_asura_priest_attacks_four_sheep_then_returns_to_hand(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{ASURA_PRIEST}.lua").is_file():
+        pytest.skip("Asura Priest script not installed")
+    if not (root / f"scripts/goat/c{SCAPEGOAT}.lua").is_file():
+        pytest.skip("GOAT Scapegoat script not installed")
+    own_deck = tmp_path / "asura.ydk"
+    own_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([ASURA_PRIEST] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    other_deck = tmp_path / "scapegoat.ydk"
+    other_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([SCAPEGOAT] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own_deck), str(other_deck), seed=11,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        goat_used = asura_summoned = False
+        declared_attacks = []
+        targeted_tokens = set()
+        empty_field_checked = False
+        for _ in range(120):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 2 and observation.acting_player == 1 \
+                    and not goat_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == SCAPEGOAT), None)
+                goat_used = action is not None
+            if observation.turn == 3 and observation.acting_player == 0 \
+                    and goat_used:
+                if not asura_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == ASURA_PRIEST), None)
+                    if action is not None:
+                        assert {c.code for c in observation.field
+                                if c.code in SHEEP_TOKENS} == SHEEP_TOKENS
+                        asura_summoned = True
+                if asura_summoned and action is None:
+                    action = next((a for a in actions if a.kind == "battle_phase"), None)
+                if asura_summoned and action is None:
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == ASURA_PRIEST), None)
+                    if action is not None:
+                        remaining = {c.code for c in observation.field
+                                     if c.code in SHEEP_TOKENS}
+                        assert len(remaining) == 4 - len(declared_attacks)
+                        declared_attacks.append(action)
+            if asura_summoned and actions[0].kind == "select_card":
+                remaining = {a.parameters.get("code") for a in actions
+                             if a.kind == "select_card"}
+                assert remaining == SHEEP_TOKENS - targeted_tokens
+                action = next(a for a in actions if a.kind == "select_card")
+                targeted_tokens.add(action.parameters["code"])
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+            if len(targeted_tokens) == 4 and observation.turn == 3 \
+                    and observation.acting_player == 0 and observation.phase == "battle_step" \
+                    and any(a.kind == "main2" for a in env.legal_actions()):
+                assert len(declared_attacks) == 4
+                assert targeted_tokens == SHEEP_TOKENS
+                assert not any(c.code in SHEEP_TOKENS for c in observation.field)
+                assert not any(a.kind == "attack" for a in env.legal_actions())
+                assert observation.life_points == (8000, 8000)
+                assert not any(c.code in SHEEP_TOKENS for zone in (
+                    *observation.graveyards, *observation.banished) for c in zone)
+                empty_field_checked = True
+            if empty_field_checked and observation.turn == 3 \
+                    and ASURA_PRIEST in {c.code for c in observation.hand}:
+                assert not any(c.code == ASURA_PRIEST for c in observation.field)
+                assert "official/c2134346.lua" in env.engine.probe.loaded_script_sha256
+                assert "goat/c504700123.lua" in env.engine.probe.loaded_script_sha256
+                return
+    pytest.fail("Asura Priest did not clear all four Sheep Tokens and return")
