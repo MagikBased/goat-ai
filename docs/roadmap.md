@@ -27,6 +27,8 @@ A documented [2020 championship Chaos Turbo Main Deck](../examples/decks/chaos_t
 
 A [2020 championship Goat Control Main Deck](../examples/decks/goat_control_lolmarcus_2020.ydk), paired with three test-copy Thousand-Eyes Restricts, also completed seeds 1–20 against that Chaos Turbo list within 3,000 decisions. Two seat-swapped matchup fixtures serialize and replay-verify full trajectories. The source omits the Extra Deck, so its contents are a disclosed test choice.
 
+A documented [competitive Warrior Main Deck](../examples/decks/warrior_montague_clash.ydk) adds an aggressive archetype and Reinforcement of the Army to the corpus. It passes the pinned whitelist/deck-size gate. Random-agent Warrior versus Chaos Turbo duels completed all 20 games on seeds 1–10 in both seats within 3,000 decisions; two seat-swapped full-duel trajectories serialize and replay-verify. This extends protocol coverage, not card-by-card ruling validation or a playing-strength claim.
+
 **Work**
 
 1. Implement `.ydk` parsing and April 2005 deck/card-pool validation. Begin with two small legal fixture decks and expand coverage.
@@ -77,10 +79,11 @@ Keep training in Python. Define a versioned, game-independent decision boundary:
 
 ## Immediate next work item
 
-Prioritize M1 and M2 card work by competitive relevance. Use the sourced [Goat Control](../examples/decks/goat_control_lolmarcus_2020.ydk) and [Chaos Turbo](../examples/decks/chaos_turbo_riclar_2020.ydk) lists as the first concrete corpus; expand it with other documented tournament lists before treating it as a metagame frequency estimate.
+Prioritize M1 and M2 card work by competitive relevance. Use the sourced [Goat Control](../examples/decks/goat_control_lolmarcus_2020.ydk), [Chaos Turbo](../examples/decks/chaos_turbo_riclar_2020.ydk), and [Warrior](../examples/decks/warrior_montague_clash.ydk) lists as the first concrete corpus; expand it with other documented tournament lists before treating it as a metagame frequency estimate.
 
 1. Finish interaction and interruption coverage for cards shared by these lists, especially Black Luster Soldier, Nobleman of Crossout, Book of Moon, Pot of Greed, Graceful Charity, and common removal and traps. Existing single-line fixtures are a starting point, not a complete ruling audit.
 2. Expand deck-defining lines: Scapegoat, Metamorphosis, Thousand-Eyes Restrict, and Tsukuyomi for Goat Control; Chaos Sorcerer, Gravekeeper's Spy, Dekoichi, and LIGHT/DARK Graveyard setup for Chaos Turbo. Include chains, legal choices, and player-visible information at each decision.
-3. Cover other cards when they block a representative full duel, expose a general engine or observation defect, or appear in additional sourced competitive decks. Defer isolated low-play card edge cases until the staple paths work reliably.
+3. Audit Warrior's Reinforcement of the Army search, Mystic Swordsman LV2 versus set monsters, Blade Knight's combat modifiers, and Don Zaloog's battle-damage discard. These add high-use decisions absent from the two control/Chaos lists.
+4. Cover other cards when they block a representative full duel, expose a general engine or observation defect, or appear in additional sourced competitive decks. Defer isolated low-play card edge cases until the staple paths work reliably.
 
 For each fixture, record the historical source, native script and rules profile, expected outcome, and any unresolved discrepancy in [GOAT rules](goat_rules.md). Keep implementation changes small enough to demonstrate with a command, test, and documented limitation. Resume strength experiments after the audited deck corpus is broad enough to support meaningful evaluation.

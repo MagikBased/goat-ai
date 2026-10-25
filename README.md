@@ -108,6 +108,7 @@ python scripts/probe_control_deck.py --seed 0 --seeds 50
 python scripts/probe_control_deck.py --deck examples/decks/control_probe.ydk --opponent-deck examples/decks/chaos_probe.ydk --seed 0 --seeds 10
 python scripts/probe_control_deck.py --deck examples/decks/chaos_turbo_riclar_2020.ydk --opponent-deck examples/decks/control_probe.ydk --seed 1 --seeds 20
 python scripts/probe_control_deck.py --deck examples/decks/goat_control_lolmarcus_2020.ydk --opponent-deck examples/decks/chaos_turbo_riclar_2020.ydk --seed 1 --seeds 20
+python scripts/probe_control_deck.py --deck examples/decks/warrior_montague_clash.ydk --opponent-deck examples/decks/chaos_turbo_riclar_2020.ydk --seed 1 --seeds 10
 python scripts/probe_random_decks.py --seeds 10 --max-decisions 3000
 ```
 
