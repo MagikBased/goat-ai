@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 HEAVY_STORM = 19613556
 SCAPEGOAT = 504700123
@@ -100,5 +102,23 @@ def test_scapegoat_and_ring_chained_to_heavy_storm(tmp_path):
                         f"goat/c{SCAPEGOAT}.lua",
                         f"pre-errata/c{RING_OF_DESTRUCTION}.lua"} <= (
                             env.engine.probe.loaded_script_sha256.keys())
-                return
-    pytest.fail("Scapegoat and Ring did not both resolve before Heavy Storm")
+                break
+        else:
+            pytest.fail("Scapegoat and Ring did not both resolve before Heavy Storm")
+        agents = (RandomAgent(1), RandomAgent(1001))
+        for _ in range(3000):
+            action = agents[obs.acting_player].select_action(obs, env.legal_actions())
+            obs = env.step(action)
+            if env.is_terminal():
+                break
+        else:
+            pytest.fail("pro Heavy fixture exceeded 3000 decisions")
+        trajectory = env.trajectory()
+        assert trajectory.winner in (0, 1, None)
+        assert len(trajectory.decisions) > 50
+    path = tmp_path / "pro_heavy.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, ExperimentalOcgcoreEngine(root)) == len(
+        trajectory.decisions)
