@@ -39,6 +39,9 @@ def main() -> None:
     parser.add_argument("--entropy-coefficient", type=float, default=0.001)
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
+    parser.add_argument("--baseline-scope", choices=("global", "learner_deck"),
+                        default="global",
+                        help="track terminal-reward baseline globally or by learner deck")
     parser.add_argument("--max-decisions", type=int, default=5000)
     parser.add_argument("--skip-capped-games", action="store_true",
                         help="record over-cap duels as censored; exclude them from updates and provenance")
@@ -84,6 +87,7 @@ def main() -> None:
         snapshot_every=args.snapshot_every, max_snapshots=args.max_snapshots,
         entropy_coefficient=args.entropy_coefficient,
         learner_temperature=args.learner_temperature,
+        baseline_scope=args.baseline_scope,
         max_decisions=args.max_decisions, random_seed=args.seed,
         skip_capped_games=args.skip_capped_games,
         skip_unsupported_games=args.skip_unsupported_games,
@@ -109,6 +113,7 @@ def main() -> None:
               "snapshot_every": args.snapshot_every, "max_snapshots": args.max_snapshots,
               "entropy_coefficient": args.entropy_coefficient,
               "learner_temperature": args.learner_temperature,
+              "baseline_scope": args.baseline_scope,
               "max_decisions": args.max_decisions, "seed": args.seed,
               "skip_capped_games": args.skip_capped_games}
     config["skip_unsupported_games"] = args.skip_unsupported_games

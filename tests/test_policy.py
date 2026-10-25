@@ -887,6 +887,44 @@ def test_self_play_schedule_covers_each_deck_in_both_seats():
         episode_schedule((), (100,))
 
 
+def test_self_play_can_track_terminal_baseline_by_learner_deck(monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=16)
+    rewards = {100: 1.0, 101: 1.0, 102: -1.0, 103: -1.0}
+    seen = []
+
+    def run_episode(_model, _vocabulary, _opponent, _decks, seed, *_args):
+        return SimpleNamespace(
+            seed=seed, winner=None, reward=rewards[seed], decisions=2,
+            learner_records=(DecisionRecord(view(), actions(), actions()[0]),),
+            trajectory=SimpleNamespace(deck_sha256=("a", "b"),
+                                       asset_sha256={"core": "hash"},
+                                       rules_profile="goat"))
+
+    def update(_model, _vocabulary, _records, reward, baseline, _optimizer,
+               *_args, **_kwargs):
+        seen.append((reward, baseline))
+        return 0.0
+
+    monkeypatch.setattr("goat_ai.training.self_play.run_learning_episode", run_episode)
+    monkeypatch.setattr("goat_ai.training.self_play.policy_gradient_update", update)
+    matchups = (("goat", "chaos"), ("chaos", "goat"))
+    seeds = (100, 101, 102, 103)
+    reports = train_against_snapshot_pool(model, vocabulary, matchups, seeds,
+                                          lambda: None, baseline_scope="learner_deck")
+    assert [report["baseline"] for report in reports] == pytest.approx(
+        [0.0, 0.05, 0.0, -0.05])
+    assert seen == pytest.approx([(1.0, 0.0), (1.0, 0.05), (-1.0, 0.0), (-1.0, -0.05)])
+    seen.clear()
+    global_reports = train_against_snapshot_pool(model, vocabulary, matchups, seeds,
+                                                 lambda: None)
+    assert [report["baseline"] for report in global_reports] == pytest.approx(
+        [0.0, 0.05, 0.0975, 0.042625])
+    with pytest.raises(ValueError, match="hyperparameters"):
+        train_against_snapshot_pool(model, vocabulary, matchups, seeds,
+                                    lambda: None, baseline_scope="unknown")
+
+
 def test_self_play_can_censor_over_cap_game_without_learning_from_it(monkeypatch):
     vocabulary = CardVocabulary((10, 20))
     model = LegalActionPolicy(vocabulary.size, width=16)

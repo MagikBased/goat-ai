@@ -149,6 +149,7 @@ def train_against_snapshot_pool(
     max_snapshots: int = 8, entropy_coefficient: float = 0.001,
     max_decisions: int = 5000, random_seed: int = 0,
     learner_temperature: float = 1.0,
+    baseline_scope: str = "global",
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
@@ -160,13 +161,14 @@ def train_against_snapshot_pool(
     """
     if (not matchups or not seeds or learning_rate <= 0 or snapshot_every < 1
             or max_snapshots < 1 or learner_temperature <= 0
-            or not 0 <= historical_probability <= 1):
+            or not 0 <= historical_probability <= 1
+            or baseline_scope not in ("global", "learner_deck")):
         raise ValueError("invalid self-play schedule or hyperparameters")
     rng = random.Random(random_seed)
     generator = torch.Generator(device="cpu").manual_seed(random_seed)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     snapshots = [copy.deepcopy(model.state_dict())]
-    baseline = 0.0
+    baselines: dict[str, float] = {}
     reports = []
     for index, (seed, decks, learner_seat) in enumerate(episode_schedule(matchups, seeds)):
         if rng.random() < historical_probability:
@@ -203,12 +205,14 @@ def train_against_snapshot_pool(
             continue
         if record_episode is not None:
             record_episode(index, episode)
+        baseline_key = decks[learner_seat] if baseline_scope == "learner_deck" else "global"
+        baseline = baselines.get(baseline_key, 0.0)
         loss = (policy_gradient_update(model, vocabulary, episode.learner_records,
                                        episode.reward, baseline, optimizer,
                                        entropy_coefficient,
                                        temperature=learner_temperature)
                 if episode.learner_records else None)
-        baseline = 0.95 * baseline + 0.05 * episode.reward
+        baselines[baseline_key] = 0.95 * baseline + 0.05 * episode.reward
         reports.append({"seed": seed, "learner_seat": learner_seat,
                         "decks": decks, "opponent": opponent_name,
                         "status": "terminal",
@@ -216,6 +220,7 @@ def train_against_snapshot_pool(
                         "asset_sha256": episode.trajectory.asset_sha256,
                         "rules_profile": episode.trajectory.rules_profile,
                         "winner": episode.winner, "reward": episode.reward,
+                        "baseline": baseline,
                         "decisions": episode.decisions,
                         "learner_decisions": len(episode.learner_records),
                         "policy_loss": loss})

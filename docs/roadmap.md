@@ -303,6 +303,15 @@ including 50%. The higher rate corrected two held-out Restrict target
 choices and regressed on two others, leaving teacher agreement unchanged.
 Update size alone has not met M4's self-play gain gate; see [evaluation](evaluation.md).
 
+An opt-in learner-deck reward baseline was compared with the existing global
+baseline in 32-game matched snapshot-pool runs on four common tournament
+decks. Their 64 replay-verified trajectories contained identical actions,
+and the two children split 31–31 with two draws on unseen Chaos Control and
+Chaos Return lists. Both had identical 35–28–1 outcomes against the parent
+on another held-out schedule, with a paired interval including 50% and a
+large assigned-deck split. Per-deck reward centering alone has not met M4;
+see [evaluation](evaluation.md).
+
 An opt-in public-Flip-type combat teacher now tests the missing Flip Summons
 seen in the sourced-deck action audit. On a six-duel replay-verified probe it
 selected Dekoichi Flip Summon five times versus one for the current teacher,

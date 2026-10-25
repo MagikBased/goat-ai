@@ -2284,3 +2284,69 @@ OMP_NUM_THREADS=1 .venv/bin/python -m scripts.audit_policy_agreement \
   /tmp/goat_heuristic_replays_19600/*.json \
   > /tmp/goat_policy_v12_v16_by_deck_19600.stdout
 ```
+
+## Per-deck self-play reward baseline pilot (2026-10-25)
+
+The snapshot-pool trainer now has an opt-in `--baseline-scope learner_deck`.
+Its exponential terminal-reward baseline is tracked by the learner's deck
+path; `global` retains the previous single-baseline behavior. A matched
+pilot started both children from feature-v17 combat teacher v3 checkpoint
+`combat_fourdeck_fv17_v3_17000_17003.pt`. Each used the same four ordered
+Goat Control/Chaos Turbo and Warrior/Bazoo Return matchups, seeds
+19700–19731, learning rate 0.001, learner temperature 2, entropy coefficient
+0.001, and 3,000-decision cap. The only configuration difference was baseline
+scope. All 32 games in each run terminated. All 32 complete
+sampled trajectories were byte-identical between runs, though the final model
+weights differed. Both runs scored 17–15 against their evolving training
+pools; that count is not a strength evaluation.
+
+All 64 saved trajectories and **42,544** decisions replay-verified against
+fresh pinned native engines. The visibility audit passed, covering 250 hidden
+opposing field choices and 144 opposing hand choices. Its report SHA-256 is
+`9cd9564636ba969f4a9ab7d7f483d33e00b9b5d0b5661139046573e5061313c7`.
+The global child checkpoint SHA-256 is
+`edaa0364def2cbac5e7562f1d791dbd3b9d6e016963075fae25caac1e0983ad6`;
+the deck-baseline child's is
+`741e33cc9304f85872e7d01b1036608ed8b25fa10283e475d4b607a5bc7bb78b`.
+
+On unseen Chaos Control and Chaos Return Main Decks, 16 fresh seeds with both
+deck assignments and both agent seats gave the deck-baseline child **31–31–2**
+directly against the global child (report SHA-256
+`51b50cd298b2012ad1c08869558ecdfd3a8dacb32bfcaff4b94953d142cf9bb2`).
+On another 16-seed held-out schedule, **both** children scored **35–28–1**
+against the parent, with identical winners and duel lengths in all 64 paired
+games. Their paired 95% score interval was 49.2–61.7%, including 50%.
+The deck-baseline child's assigned-deck scores were 12–19–1 as Chaos Control
+and 23–9 as Chaos Return. The parent-comparison report SHA-256 values are
+`f9a57e77d85c7c554fd3d76834e4f54e0e639d873cc4b9b523c7fe3bfba2e941`
+for deck baseline and
+`b0b17034ea5f734665d0b1a3a230773d6af5bd0e367716be9ad656e3dc5c21dc`
+for global baseline. This pilot does not show a gain from per-deck reward
+centering or meet the M4 self-play exit gate. The opt-in switch remains for
+further controlled experiments; neither child replaces the parent.
+
+Reproduce each training run by setting `scope` to `global` and `learner_deck`
+in turn:
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_self_play.py \
+  checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/chaos_turbo_riclar_2020.ydk examples/decks/goat_control_lolmarcus_2020.ydk \
+  --matchup examples/decks/warrior_montague_clash.ydk examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/bazoo_return_weirdchamp_worlds.ydk examples/decks/warrior_montague_clash.ydk \
+  --seed 19700 --games 32 --learning-rate 0.001 --learner-temperature 2 \
+  --entropy-coefficient 0.001 --max-decisions 3000 \
+  --baseline-scope "$scope" \
+  --record-dir ".cache/goat-ai/combat_baseline_${scope}_19700" \
+  --output "checkpoints/combat_baseline_${scope}_19700.pt"
+```
+
+The direct and parent comparisons used `scripts/evaluate_policy.py` with
+`--engine experimental`, `--both-deck-assignments`,
+`--require-unseen-main-decks`, `--workers 4`, `--seeds 16`, and
+`--max-decisions 3000`, the Chaos Control/Chaos Return
+matchup, and seeds 19800 and 19850 respectively. Both checkpoints passed the
+Main Deck composition exclusion gate. The reported score intervals and
+throughput apply only to those schedules and pinned assets.
