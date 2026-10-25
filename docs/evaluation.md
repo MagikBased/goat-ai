@@ -1594,3 +1594,6 @@ legal choices, so multiple offered targets at one decision are counted
 separately. This checks the stated action/observation invariants over those
 recordings; it does not prove hidden-state noninterference or historical
 correctness for every card. The native differential tests remain necessary.
+A paired Nobleman regression now swaps two unknown opponent monster identities
+between field slots and verifies that its full observation and both target
+choices are unchanged at the decision boundary; see [GOAT rules](goat_rules.md).

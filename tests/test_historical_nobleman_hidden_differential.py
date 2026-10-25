@@ -70,3 +70,63 @@ def test_nobleman_target_observation_is_identical_for_hidden_flip_or_normal(tmp_
     assert any(c.code == VANILLA for c in normal_resolved.banished[1])
     assert flip_resolved.private_reveals
     assert not normal_resolved.private_reveals
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_two_hidden_targets_keep_nobleman_choices_identical_when_swapped(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/goat/c{NOBLEMAN}.lua").is_file():
+        pytest.skip("GOAT Nobleman script not installed")
+    normal = 97923414  # one-copy vanilla at the last probe-deck position
+    assert VANILLA_DECK[-1] == normal
+
+    def reach_target(first, second):
+        cards = [first, *VANILLA_DECK[1:-1], second]
+        opponent = tmp_path / f"opponent_{first}.ydk"
+        opponent.write_text("#main\n" + "\n".join(map(str, cards))
+                            + "\n#extra\n!side\n")
+        with GoatEnvironment("examples/decks/nobleman_probe.ydk", str(opponent),
+                             seed=52, engine=ExperimentalOcgcoreEngine(root)) as env:
+            obs = env.reset()
+            assert {DEKOICHI, normal} <= {
+                c.code for c in env.engine.probe.observation(1).hand}
+            first_set = second_set = activated = False
+            for _ in range(100):
+                actions = env.legal_actions()
+                action = None
+                if obs.turn == 2 and obs.acting_player == 1 and not first_set:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == first), None)
+                    first_set = action is not None
+                if obs.turn == 4 and obs.acting_player == 1 and not second_set:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == second), None)
+                    second_set = action is not None
+                if obs.turn == 5 and obs.acting_player == 0 \
+                        and second_set and not activated:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == NOBLEMAN), None)
+                    activated = action is not None
+                if activated and actions[0].kind == "select_card":
+                    assert obs.viewer == obs.acting_player == 0
+                    assert len(actions) == 2
+                    assert {a.parameters.get("sequence") for a in actions} == {0, 1}
+                    assert all(a.parameters.get("controller") == 1
+                               and a.parameters.get("location") == 4
+                               and "code" not in a.parameters for a in actions)
+                    assert len([c for c in obs.field if c.controller == 1
+                                and c.position == "facedown" and c.code is None]) == 2
+                    native_slots = env.engine.probe._query_location(1, 4)
+                    assert native_slots[0].code == first
+                    assert native_slots[1].code == second
+                    return obs, actions
+                if action is None:
+                    action = next((a for a in actions if a.kind in (
+                        "pass", "end_phase")), actions[0])
+                obs = env.step(action)
+        pytest.fail("two-set-monster Nobleman target choice was not reached")
+
+    first_observation, first_actions = reach_target(DEKOICHI, normal)
+    second_observation, second_actions = reach_target(normal, DEKOICHI)
+    assert first_observation == second_observation
+    assert first_actions == second_actions
