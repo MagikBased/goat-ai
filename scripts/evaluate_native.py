@@ -10,6 +10,7 @@ from pathlib import Path
 from time import perf_counter
 
 from goat_ai.agents import HeuristicAgent, RandomAgent
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import run_tournament, run_tournament_parallel
 
@@ -37,6 +38,8 @@ def make_heuristic(_seed: int) -> HeuristicAgent:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
+    parser.add_argument("--engine", choices=("restricted", "experimental"),
+                        default="restricted")
     parser.add_argument("--matchup", nargs=2, action="append", metavar=("DECK_A", "DECK_B"))
     parser.add_argument("--agent-a", choices=("random", "heuristic"), default="random")
     parser.add_argument("--agent-b", choices=("random", "heuristic"), default="random")
@@ -47,17 +50,19 @@ def main() -> None:
                         help="spawn independent native duel processes")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    if args.seeds < 1 or args.workers < 1:
-        parser.error("--seeds and --workers must be positive")
+    if args.seeds < 1 or args.workers < 1 or args.max_decisions < 1:
+        parser.error("--seeds, --workers, and --max-decisions must be positive")
     fixtures = Path(__file__).resolve().parent.parent / "examples/decks"
     matchups = args.matchup or [[str(fixtures / "vanilla_probe.ydk"),
                                   str(fixtures / "vanilla_reverse.ydk")]]
     seeds = list(range(args.seed, args.seed + args.seeds))
     runner = run_tournament_parallel if args.workers > 1 else run_tournament
+    engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
+                   else ExperimentalOcgcoreEngine)
     started = perf_counter()
     report = runner(
         matchups, seeds, agent_factory(args.agent_a), agent_factory(args.agent_b),
-        partial(RestrictedOcgcoreEngine, args.native_root), args.max_decisions,
+        partial(engine_type, args.native_root), args.max_decisions,
         **({"workers": args.workers} if args.workers > 1 else {}),
     )
     wall_seconds = perf_counter() - started
@@ -77,7 +82,7 @@ def main() -> None:
     }
     result = {
         "agent_a": args.agent_a, "agent_b": args.agent_b,
-        "ruleset_scope": "restricted GOAT-mode native adapter",
+        "ruleset_scope": f"{args.engine} GOAT-mode native adapter",
         "core": "edo9300/ygopro-core baa3881d0bae48e9994f915f5c931be53c1ba8ef",
         "platform": platform.platform(), "cpu": platform.processor(),
         "workers": args.workers, "wall_seconds_tournament": wall_seconds,

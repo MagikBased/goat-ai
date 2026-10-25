@@ -160,3 +160,24 @@ OMP_NUM_THREADS=1 python scripts/evaluate_policy.py checkpoints/ground_v5.pt \
   --matchup examples/decks/ground_collapse_probe.ydk examples/decks/vanilla_probe.ydk \
   --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk
 ```
+
+## Sourced Goat Control and Chaos Turbo baseline
+
+On 2026-10-24, the experimental GOAT-mode adapter completed a paired baseline tournament using the sourced [Goat Control](../examples/decks/goat_control_lolmarcus_2020.ydk) and [Chaos Turbo](../examples/decks/chaos_turbo_riclar_2020.ydk) Main Decks. Each deck was assigned to HeuristicAgent once per matchup, and each seed was played with the agent in both seats. Seeds 7000–7007 were unused by the documented training runs. The opponent was RandomAgent. The pinned core was `baa3881d0bae48e9994f915f5c931be53c1ba8ef` on Linux 6.8.0-146-generic x86_64. Deck and native asset SHA-256 hashes, individual game outcomes, and timing are in the ignored report `artifacts/heuristic_vs_random_sourced_7000_7007.json`, recreated by:
+
+```bash
+python scripts/evaluate_native.py --engine experimental \
+  --agent-a heuristic --agent-b random \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/chaos_turbo_riclar_2020.ydk examples/decks/goat_control_lolmarcus_2020.ydk \
+  --seed 7000 --seeds 8 --max-decisions 3000 \
+  --output artifacts/heuristic_vs_random_sourced_7000_7007.json
+```
+
+| Candidate deck | Heuristic wins | Losses | Paired score 95% bootstrap |
+| --- | ---: | ---: | ---: |
+| Goat Control | 11/16 | 5/16 | 43.75–93.75% |
+| Chaos Turbo | 13/16 | 3/16 | 62.5–93.75% |
+| Both | 24/32 | 8/32 | 59.375–87.5% |
+
+The heuristic won 15/16 in seat 0 and 9/16 in seat 1. Mean duel length was 865.28 decisions. The sequential tournament took 22.287 seconds for 32 duels and 27,689 decisions, or 1.436 duels and 1,242 decisions per wall-clock second in this one run. The strong seat split, small sample, weak opponent, unaudited full-card scripts, and partially reconstructed Goat Control Extra Deck limit interpretation. This is a reproducible baseline for future policies on the two high-play decks, not a competitive-strength claim.

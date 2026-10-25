@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from goat_ai.agents import RandomAgent
+from goat_ai.agents import HeuristicAgent, RandomAgent
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import GameResult, run_tournament, run_tournament_parallel, wilson_interval
 from goat_ai.evaluation.tournament import bootstrap_score_interval
@@ -60,3 +61,23 @@ def test_native_tournament_swaps_seats_and_reproduces_results():
     assert summary["overall"]["games"] == 4
     assert summary["a_first"]["games"] == summary["a_second"]["games"] == 2
     assert summary["overall"]["wins"] + summary["overall"]["losses"] == 4
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_sourced_goat_chaos_tournament_reproduces_seat_swaps():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    decks = Path(__file__).resolve().parent.parent / "examples/decks"
+    matchup = [(str(decks / "goat_control_lolmarcus_2020.ydk"),
+                str(decks / "chaos_turbo_riclar_2020.ydk"))]
+
+    def run():
+        return run_tournament(matchup, [7000], lambda _seed: HeuristicAgent(),
+                              RandomAgent, partial(ExperimentalOcgcoreEngine, root),
+                              max_decisions=3000)
+
+    report = run()
+    assert report == run()
+    assert [(game.seed, game.a_seat) for game in report.games] == [
+        (7000, 0), (7000, 1)]
+    assert all(game.decisions > 100 for game in report.games)
+    assert report.summary()["overall"]["games"] == 2
