@@ -13,6 +13,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 KYCOO = 88240808
 SORCERER = 9596126
+BLS = 504700118  # GOAT variant
 GRACEFUL = 79571449
 BOOK = 14087893
 SNATCH = 45986603
@@ -33,7 +34,7 @@ def _kycoo_deck(tmp_path):
     return _deck(tmp_path / "kycoo.ydk", (*([KYCOO] * 3), *VANILLA_DECK[3:]))
 
 
-def _chaos_deck(tmp_path, *, book=False, snatch=False):
+def _chaos_deck(tmp_path, *, book=False, snatch=False, boss=SORCERER):
     lights = (LIGHT, OTHER_LIGHT)
     darks = (49881766, DARK)
     filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
@@ -41,7 +42,9 @@ def _chaos_deck(tmp_path, *, book=False, snatch=False):
         filler = [BOOK if code == 69140098 else code for code in filler]
     if snatch:
         filler[filler.index(GEMINI_ELF)] = SNATCH
-    cards = (GRACEFUL, *([SORCERER] * 3),
+    bosses = ([SORCERER] * 3 if boss == SORCERER
+              else [BLS, *filler[24:26]])
+    cards = (GRACEFUL, *bosses,
              *(code for code in lights for _ in range(3)),
              *(code for code in darks for _ in range(3)), *filler[:24])
     assert len(cards) == 40
@@ -55,16 +58,30 @@ def _require_scripts(root, *codes):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_kycoo_blocks_chaos_graveyard_cost_until_book_sets_it(tmp_path):
+@pytest.mark.parametrize("boss", [SORCERER, BLS])
+def test_kycoo_blocks_chaos_graveyard_cost_until_book_sets_it(tmp_path, boss):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    _require_scripts(root, KYCOO, SORCERER, GRACEFUL, BOOK)
-    with GoatEnvironment(_chaos_deck(tmp_path, book=True), _kycoo_deck(tmp_path),
+    _require_scripts(root, KYCOO, GRACEFUL, BOOK)
+    boss_script = (f"goat/c{BLS}.lua" if boss == BLS
+                   else f"official/c{SORCERER}.lua")
+    if not (root / "scripts" / boss_script).is_file():
+        pytest.skip(f"script {boss_script} not installed")
+    with GoatEnvironment(_chaos_deck(tmp_path, book=True, boss=boss), _kycoo_deck(tmp_path),
                          seed=18, engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
         graceful = discarded = kycoo = book = targeted = summon_committed = False
-        lock_checked = False
+        lock_checked = checked = False
         costs = set()
-        for _ in range(55):
+        agents = (RandomAgent(18), RandomAgent(19))
+        for _ in range(5000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / f"kycoo_boss_{boss}.json"
+                write_trajectory(path, env.trajectory())
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                    env.trajectory().decisions)
+                return
             actions = env.legal_actions()
             action = None
             if observation.turn == 1 and observation.acting_player == 0 and not graceful:
@@ -86,9 +103,9 @@ def test_kycoo_blocks_chaos_graveyard_cost_until_book_sets_it(tmp_path):
                 assert {LIGHT, DARK}.issubset({c.code for c in observation.graveyards[0]})
                 assert any(c.code == KYCOO and c.position == "faceup"
                            for c in observation.field)
-                assert any(c.code == SORCERER for c in observation.hand)
+                assert any(c.code == boss for c in observation.hand)
                 assert not any(a.kind == "special_summon"
-                               and a.parameters.get("code") == SORCERER for a in actions)
+                               and a.parameters.get("code") == boss for a in actions)
                 lock_checked = True
             if lock_checked and not book and observation.acting_player == 0:
                 action = next((a for a in actions if a.kind == "activate"
@@ -101,7 +118,7 @@ def test_kycoo_blocks_chaos_graveyard_cost_until_book_sets_it(tmp_path):
             if targeted and not summon_committed and observation.turn == 3 \
                     and observation.acting_player == 0:
                 summon = next((a for a in actions if a.kind == "special_summon"
-                               and a.parameters.get("code") == SORCERER), None)
+                               and a.parameters.get("code") == boss), None)
                 if summon is not None:
                     assert any(c.code is None and c.position == "facedown"
                                and c.controller == 1 for c in observation.field)
@@ -116,17 +133,22 @@ def test_kycoo_blocks_chaos_graveyard_cost_until_book_sets_it(tmp_path):
                     action = choice
                     costs.add(choice.parameters["code"])
             if summon_committed and {c.code for c in observation.banished[0]} \
-                    == {LIGHT, DARK} and any(c.code == SORCERER for c in observation.field):
+                    == {LIGHT, DARK} and any(c.code == boss for c in observation.field) \
+                    and not checked:
                 assert costs == {LIGHT, DARK}
                 assert any(c.code is None and c.position == "facedown"
                            and c.controller == 1 for c in observation.field)
                 assert f"official/c{KYCOO}.lua" in env.engine.probe.loaded_script_sha256
-                return
-            if action is None:
+                assert boss_script in env.engine.probe.loaded_script_sha256
+                checked = True
+            if action is None and not checked:
                 action = next((a for a in actions if a.kind in (
                     "place", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[observation.acting_player].select_action(
+                    observation, actions)
             observation = env.step(action)
-    pytest.fail("Kycoo's Chaos lock did not release into a completed Sorcerer summon")
+    pytest.fail("Kycoo's Chaos lock did not release into a completed boss summon")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
