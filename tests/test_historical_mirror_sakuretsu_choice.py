@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 MIRROR = 44095762
 SAKURETSU = 56120475
@@ -87,7 +89,20 @@ def test_both_attack_traps_are_legal_with_distinct_outcomes(tmp_path, chosen_tra
                 assert observation.life_points == (8000, 8000)
                 assert f"official/c{chosen_trap}.lua" in (
                     env.engine.probe.loaded_script_sha256)
-                return
+                agents = (RandomAgent(7), RandomAgent(8))
+                for _ in range(5000):
+                    action = agents[observation.acting_player].select_action(
+                        observation, env.legal_actions())
+                    observation = env.step(action)
+                    if env.is_terminal():
+                        trajectory = env.trajectory()
+                        path = tmp_path / f"attack_choice_{chosen_trap}.json"
+                        write_trajectory(path, trajectory)
+                        assert verify_trajectory(read_trajectory(path),
+                                                 ExperimentalOcgcoreEngine(root)) == len(
+                                                     trajectory.decisions)
+                        return
+                pytest.fail("attack-choice duel did not reach terminal in 5000 decisions")
     pytest.fail(f"Attack-trap choice stalled: summons={summons} "
                 f"sets={mirror_set}/{sakuretsu_set} "
                 f"battle={battle}/{attacked} trap={trap_used}")
