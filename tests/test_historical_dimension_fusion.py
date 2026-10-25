@@ -16,6 +16,7 @@ LIGHT = 15025844
 DARK = 49881766
 DD_WARRIOR_LADY = 7572887
 GEMINI_ELF = 69140098
+TORRENTIAL_TRIBUTE = 53582587
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -172,3 +173,93 @@ def test_dimension_fusion_revives_one_banished_monster_for_each_player(tmp_path)
                         env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Dimension Fusion did not revive both players' banished monsters")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_torrential_responds_after_dimension_fusion_summons(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL_CHARITY}.lua",
+                     f"official/c{DIMENSION_FUSION}.lua",
+                     f"official/c{TORRENTIAL_TRIBUTE}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    lights = (LIGHT, 62651957)
+    darks = (DARK, 7359741)
+    filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
+    cards = (GRACEFUL_CHARITY, BLS,
+             *(code for code in lights for _ in range(3)),
+             *(code for code in darks for _ in range(3)),
+             *(DIMENSION_FUSION if code == 23771716 else code
+               for code in filler[:26]))
+    assert len(cards) == 40 and cards.count(DIMENSION_FUSION) == 3
+    own = tmp_path / "dimension_fusion.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, cards)) + "\n#extra\n!side\n")
+    other = tmp_path / "torrential.ydk"
+    other.write_text("#main\n" + "\n".join(map(str, (
+        TORRENTIAL_TRIBUTE, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own), str(other), seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {GRACEFUL_CHARITY, BLS, DIMENSION_FUSION, LIGHT, DARK} <= {
+            c.code for c in obs.hand}
+        assert TORRENTIAL_TRIBUTE in {
+            c.code for c in env.engine.probe.observation(1).hand}
+        graceful = discarded = summoned = trap_set = fusion_used = torrential_used = False
+        summon_costs = []
+        for _ in range(120):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not graceful:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL_CHARITY), None)
+                    graceful |= action is not None
+                if graceful and not discarded and actions[0].kind == "select_cards":
+                    action = next((a for a in actions if {c["code"] for c in
+                                   a.parameters["cards"]} == {LIGHT, DARK}), None)
+                    discarded = action is not None
+                if discarded and not summoned and action is None:
+                    action = next((a for a in actions if a.kind == "special_summon"
+                                   and a.parameters.get("code") == BLS), None)
+                    summoned = action is not None
+                if summoned and len(summon_costs) < 2 \
+                        and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   in ({LIGHT, DARK} - set(summon_costs))), action)
+                    if action is not None and action.kind == "select_card":
+                        summon_costs.append(action.parameters["code"])
+            if obs.turn == 2 and obs.acting_player == 1 and not trap_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == TORRENTIAL_TRIBUTE), None)
+                trap_set = action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not fusion_used:
+                assert trap_set and set(summon_costs) == {LIGHT, DARK}
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == DIMENSION_FUSION), None)
+                fusion_used = action is not None
+            if fusion_used and obs.acting_player == 1 and not torrential_used:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == TORRENTIAL_TRIBUTE), None)
+                if action is not None:
+                    assert obs.chain == ()
+                    assert DIMENSION_FUSION in {c.code for c in obs.graveyards[0]}
+                    assert {BLS, LIGHT, DARK} <= {c.code for c in obs.field
+                                                   if c.controller == 0
+                                                   and c.zone == "monster"}
+                    assert obs.life_points == (6000, 8000)
+                    torrential_used = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_cards", "select_card", "place", "select_position",
+                    "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if torrential_used and TORRENTIAL_TRIBUTE in {
+                    c.code for c in obs.graveyards[1]} and obs.chain == ():
+                assert not any(c.zone == "monster" for c in obs.field)
+                assert {BLS, LIGHT, DARK, DIMENSION_FUSION} <= {
+                    c.code for c in obs.graveyards[0]}
+                assert not obs.banished[0]
+                assert obs.life_points == (6000, 8000)
+                return
+    pytest.fail("Torrential was not offered after Dimension Fusion resolved")
