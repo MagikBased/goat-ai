@@ -5,32 +5,37 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 NOBLEMAN = 504700116
 DEKOICHI = 87621407
+KYCOO = 88240808
 VANILLA = VANILLA_DECK[0]
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_nobleman_target_observation_is_identical_for_hidden_flip_or_normal(tmp_path):
+def test_nobleman_target_observation_is_identical_for_hidden_flip_or_nonflip(tmp_path):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    for relative in (f"goat/c{NOBLEMAN}.lua", f"official/c{DEKOICHI}.lua"):
+    for relative in (f"goat/c{NOBLEMAN}.lua", f"official/c{DEKOICHI}.lua",
+                     f"official/c{KYCOO}.lua"):
         if not (root / "scripts" / relative).is_file():
             pytest.skip(f"script {relative} not installed")
 
     def run(hidden_code):
         opponent = tmp_path / f"hidden_{hidden_code}.ydk"
         opponent.write_text("#main\n" + "\n".join(map(str, (
-            hidden_code, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+            *([hidden_code] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
         with GoatEnvironment("examples/decks/nobleman_probe.ydk", str(opponent), seed=52,
                              engine=ExperimentalOcgcoreEngine(root)) as env:
             obs = env.reset()
             assert hidden_code in {c.code for c in env.engine.probe.observation(1).hand}
             set_done = activated = targeted = False
             decision = resolution = None
+            deck_count_at_target = None
             for _ in range(55):
                 actions = env.legal_actions()
                 action = None
@@ -48,6 +53,7 @@ def test_nobleman_target_observation_is_identical_for_hidden_flip_or_normal(tmp_
                     assert not obs.private_reveals
                     assert all("code" not in a.parameters for a in actions)
                     decision = (obs, actions)
+                    deck_count_at_target = obs.deck_counts
                     action = actions[0]
                     targeted = True
                 if action is None:
@@ -60,16 +66,35 @@ def test_nobleman_target_observation_is_identical_for_hidden_flip_or_normal(tmp_
             assert set_done and activated and targeted and resolution is not None
             assert decision is not None
             assert f"goat/c{NOBLEMAN}.lua" in env.engine.probe.loaded_script_sha256
-            return decision, resolution
+            owner_reveals = env.engine.probe.observation(1).private_reveals
+            agents = (RandomAgent(52), RandomAgent(53))
+            for _ in range(3000):
+                if env.is_terminal():
+                    break
+                legal = env.legal_actions()
+                obs = env.step(agents[obs.acting_player].select_action(obs, legal))
+            assert env.is_terminal(), "Nobleman duel did not terminate"
+            trajectory_path = tmp_path / f"nobleman_hidden_{hidden_code}.json"
+            write_trajectory(trajectory_path, env.trajectory())
+            assert verify_trajectory(read_trajectory(trajectory_path),
+                                     ExperimentalOcgcoreEngine(root)) == len(
+                                         env.trajectory().decisions)
+            return decision, resolution, deck_count_at_target, owner_reveals
 
-    (flip_obs, flip_actions), flip_resolved = run(DEKOICHI)
-    (normal_obs, normal_actions), normal_resolved = run(VANILLA)
+    (flip_obs, flip_actions), flip_resolved, flip_decks, flip_owner_reveals = run(DEKOICHI)
+    (normal_obs, normal_actions), normal_resolved, normal_decks, normal_owner_reveals = run(
+        KYCOO)
     assert flip_obs == normal_obs
     assert flip_actions == normal_actions
     assert any(c.code == DEKOICHI for c in flip_resolved.banished[1])
-    assert any(c.code == VANILLA for c in normal_resolved.banished[1])
+    assert any(c.code == KYCOO for c in normal_resolved.banished[1])
     assert flip_resolved.private_reveals
+    assert flip_owner_reveals
     assert not normal_resolved.private_reveals
+    assert not normal_owner_reveals
+    assert flip_resolved.deck_counts[1] < flip_decks[1]
+    assert normal_resolved.deck_counts == normal_decks
+    assert sum(c.code == KYCOO for c in normal_resolved.banished[1]) == 1
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
