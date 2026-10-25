@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,73 @@ from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.engine.protocol import RulesProfile
 from goat_ai.environments import GoatEnvironment
 from scripts.audit_card_pool import audit
+
+# Independently transcribed April 2005 limits from
+# https://www.goatformat.com/cardpool.html for cards appearing in at least
+# four of the five sourced tournament Main Deck examples below. Cards absent
+# from that page's Forbidden/Limited/Semi-Limited lists may use three copies.
+HISTORICAL_STAPLES = {
+    71413901: ("Breaker the Magical Warrior", 1),
+    44763025: ("Delinquent Duo", 1),
+    45986603: ("Snatch Steal", 1),
+    55144522: ("Pot of Greed", 1),
+    504700116: ("Nobleman of Crossout", 2),
+    14087893: ("Book of Moon", 3),
+    504700118: ("Black Luster Soldier - Envoy of the Beginning", 1),
+    19613556: ("Heavy Storm", 1),
+    511000824: ("Ring of Destruction", 1),
+    79571449: ("Graceful Charity", 1),
+    64697231: ("Trap Dustshoot", 3),
+    504700178: ("Sangan", 1),
+    44095762: ("Mirror Force", 1),
+    7572887: ("D.D. Warrior Lady", 1),
+    87621407: ("Dekoichi the Battlechanted Locomotive", 3),
+    53582587: ("Torrential Tribute", 1),
+    9596126: ("Chaos Sorcerer", 3),
+    5318639: ("Mystical Space Typhoon", 1),
+}
+
+SOURCED_TOURNAMENT_MAIN_DECKS = (
+    "goat_control_lolmarcus_2020.ydk",
+    "chaos_turbo_riclar_2020.ydk",
+    "warrior_montague_clash.ydk",
+    "chaos_control_insids_worlds_2022.ydk",
+    "chaos_return_dingosig_worlds_2022.ydk",
+)
+
+SHARED_STAPLE_IDS = frozenset({
+    71413901, 44763025, 45986603, 55144522, 504700116,
+    14087893, 504700118, 19613556, 511000824, 79571449,
+})
+
+
+@pytest.mark.skipif(not Path(".cache/goat-ai/banlist/GOAT.lflist.conf").exists(),
+                    reason="native assets not installed")
+def test_sourced_staple_limits_match_independent_april_2005_list():
+    limits = read_goat_whitelist(Path(".cache/goat-ai/banlist/GOAT.lflist.conf"))
+    deck_dir = Path("examples/decks")
+    main_sets = [set(read_ydk(deck_dir / name).main)
+                 for name in SOURCED_TOURNAMENT_MAIN_DECKS]
+    deck_counts = Counter(code for cards in main_sets for code in cards)
+    assert {code for code, count in deck_counts.items() if count == 5} \
+        == SHARED_STAPLE_IDS
+    assert {code for code, count in deck_counts.items() if count >= 4} \
+        == HISTORICAL_STAPLES.keys()
+    assert {code: limits.get(code) for code in HISTORICAL_STAPLES} == {
+        code: expected_limit for code, (_, expected_limit) in HISTORICAL_STAPLES.items()}
+
+    with sqlite3.connect(".cache/goat-ai/database/cards.cdb") as database:
+        database.execute("ATTACH DATABASE ? AS goat",
+                         (".cache/goat-ai/database/goat-entries.cdb",))
+        database.execute("ATTACH DATABASE ? AS unofficial",
+                         (".cache/goat-ai/database/cards-unofficial.cdb",))
+        for code, (expected_name, _) in HISTORICAL_STAPLES.items():
+            names = [row[0] for schema in ("goat", "main", "unofficial")
+                     if (row := database.execute(
+                         f"SELECT name FROM {schema}.texts WHERE id=?", (code,)).fetchone())]
+            assert len(names) == 1
+            assert names[0].removesuffix(" (GOAT)").removesuffix(" (Pre-Errata)") \
+                == expected_name
 
 
 def test_ydk_sections_and_errors(tmp_path):
