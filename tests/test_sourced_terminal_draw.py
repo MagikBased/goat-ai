@@ -33,6 +33,9 @@ def test_ring_double_knockout_returns_current_terminal_observation(tmp_path):
         else:
             pytest.fail("sourced duel exceeded 3000 decisions")
         assert env.result() is None
+        loaded = env.engine.probe.loaded_script_sha256
+        assert f"pre-errata/c{RING}.lua" in loaded
+        assert f"goat/c{BLS}.lua" in loaded
         assert observation.life_points == (0, 0)
         assert env.legal_actions() == ()
         trajectory = env.trajectory()
