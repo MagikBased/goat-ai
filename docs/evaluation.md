@@ -2124,3 +2124,59 @@ Run `scripts/verify_trajectory.py --experimental` on each saved JSON,
 matches used `scripts/evaluate_policy.py` with `--engine experimental`,
 `--both-deck-assignments`, `--require-unseen-main-decks`, `--seeds 16`,
 `--workers 4`, and `--max-decisions 3000`, with the seeds and matchups above.
+
+## Experimental Flip-type combat teacher
+
+The opt-in `CombatFlipHeuristicAgent` reads only a known card's public Flip
+type from the pinned card databases. It prefers an offered Flip Summon of a
+Flip monster before other actions, and uses the existing type-aware Set
+preference. The default `CombatHeuristicAgent` remains version 3; this
+candidate is version 1. It does not use deck-specific card scripts or the
+simulator's hidden state.
+
+On seed 9700's fixed three-pair, both-seat sourced-deck schedule, the
+candidate's six complete duels selected Dekoichi Flip Summon 5 times versus
+the baseline's 1, and Magician of Faith Flip Summon 6 times versus 0. The
+candidate selected Dekoichi Set 13 times versus 0. All six candidate duels
+(4,681 decisions) and six baseline duels (3,534 decisions) serialized and
+replay-verified against fresh native engines. Their ignored report SHA-256
+values are
+`f1ee74dd3f10a9337f7b4502095d6a2427e7f66af1c7bde979771ae64d65bbd5`
+and
+`881ffca7fc48a3ee950e29e8c254f5b213e975a80995d2da71bcb53c56d6aae8`.
+The trajectories differ in length, so these action counts establish behavior
+coverage, not a controlled win-rate effect.
+
+In a held-out paired tournament against combat version 3, seeds 11600–11603
+on Goat Control/Chaos Turbo and Chaos Control/Chaos Return with both deck
+assignments and agent seats, the candidate scored **14–17–1** in 32 complete
+games (45.3%; paired 95% score interval 31.3–60.9%). Its splits were 4–3–1
+as Goat Control, 2–6 as Chaos Turbo, 5–3 as Chaos Control, and 3–5 as Chaos
+Return. The report records two workers, 26,998 decisions, pinned native asset
+hashes, deck hashes, and source hash
+`521d0940bc57d923c8bbe534f16ce1f20e8281f0bd30c682f0cbaf26972fedad`;
+its ignored JSON SHA-256 is
+`08bcc896e59e9c8ec70bfaa635c3d6a0579e867fc4ab07f370413e5485e98f54`.
+The JSON digest identifies this local report; wall-clock fields mean an exact
+byte-for-byte digest is not expected on another run. Game outcomes and
+schedules are deterministic under the pinned assets and seed. This pilot does
+not establish a competitive improvement. Keep the original
+combat teacher as the default and do not use the candidate as a training
+teacher without a stronger held-out result.
+
+Reproduce the paired match after [native setup](native_setup.md):
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/evaluate_native.py \
+  --engine experimental --agent-a combat_flip --agent-b combat_heuristic \
+  --both-deck-assignments \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --seed 11600 --seeds 4 --max-decisions 3000 --workers 2 \
+  --output .cache/goat-ai/combat-flip-pilot-11600.json
+```
+
+For the action probe, use `scripts/probe_competitive_card_actions.py` with
+`--agent combat_flip` and again with `--agent combat_heuristic`, both with
+`--seed 9700 --seeds 1 --verify-replays` and separate `--record-dir` and
+`--output` paths.

@@ -11,7 +11,12 @@ from itertools import combinations
 from pathlib import Path
 from time import perf_counter
 
-from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
+from goat_ai.agents import (
+    CombatFlipHeuristicAgent,
+    CombatHeuristicAgent,
+    HeuristicAgent,
+    RandomAgent,
+)
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import both_deck_assignments, run_tournament, run_tournament_parallel
@@ -79,6 +84,9 @@ def agent_factory(name: str, native_root: Path):
         return make_heuristic
     if name == "combat_heuristic":
         return make_combat_heuristic
+    if name == "combat_flip":
+        return partial(make_combat_flip,
+                       flip_monster_codes=flip_monster_codes(native_root))
     if name == "flip_heuristic":
         return partial(make_flip_heuristic,
                        flip_monster_codes=flip_monster_codes(native_root))
@@ -91,6 +99,10 @@ def make_heuristic(_seed: int) -> HeuristicAgent:
 
 def make_combat_heuristic(_seed: int) -> CombatHeuristicAgent:
     return CombatHeuristicAgent()
+
+
+def make_combat_flip(_seed: int, *, flip_monster_codes: frozenset[int]) -> CombatFlipHeuristicAgent:
+    return CombatFlipHeuristicAgent(flip_monster_codes)
 
 
 def make_flip_heuristic(_seed: int, *, flip_monster_codes: frozenset[int]) -> HeuristicAgent:
@@ -110,10 +122,10 @@ def main() -> None:
     parser.add_argument("--both-deck-assignments", action="store_true",
                         help="evaluate each deck pair with either agent assigned either deck")
     parser.add_argument("--agent-a", choices=("random", "heuristic", "combat_heuristic",
-                                              "flip_heuristic"),
+                                              "combat_flip", "flip_heuristic"),
                         default="random")
     parser.add_argument("--agent-b", choices=("random", "heuristic", "combat_heuristic",
-                                              "flip_heuristic"),
+                                              "combat_flip", "flip_heuristic"),
                         default="random")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--seeds", type=int, default=2)
@@ -160,10 +172,14 @@ def main() -> None:
         "agent_a": args.agent_a, "agent_b": args.agent_b,
         "agent_a_version": (CombatHeuristicAgent.teacher_version
                             if args.agent_a == "combat_heuristic"
+                            else CombatFlipHeuristicAgent.teacher_version
+                            if args.agent_a == "combat_flip"
                             else HeuristicAgent.teacher_version
                             if args.agent_a in ("heuristic", "flip_heuristic") else 1),
         "agent_b_version": (CombatHeuristicAgent.teacher_version
                             if args.agent_b == "combat_heuristic"
+                            else CombatFlipHeuristicAgent.teacher_version
+                            if args.agent_b == "combat_flip"
                             else HeuristicAgent.teacher_version
                             if args.agent_b in ("heuristic", "flip_heuristic") else 1),
         "ruleset_scope": f"{args.engine} GOAT-mode native adapter",

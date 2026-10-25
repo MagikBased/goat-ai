@@ -4,7 +4,13 @@ from dataclasses import replace
 import pytest
 
 from goat_ai.actions import Action
-from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, HumanAgent, RandomAgent
+from goat_ai.agents import (
+    CombatFlipHeuristicAgent,
+    CombatHeuristicAgent,
+    HeuristicAgent,
+    HumanAgent,
+    RandomAgent,
+)
 from goat_ai.engine import Decision, RulesProfile, SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
 from goat_ai.observations import (
@@ -234,6 +240,20 @@ def test_flip_type_metadata_changes_generic_summon_preference():
     agent = HeuristicAgent(flip_monster_codes={flip_code})
     assert agent.select_action(view(), flip_actions) == flip_actions[1]
     assert agent.select_action(view(), ordinary_actions) == ordinary_actions[0]
+
+
+def test_combat_flip_candidate_prioritizes_public_flip_type():
+    flip = Action("0", "flip_summon", 0, {"code": 87621407})
+    activate = Action("1", "activate", 0, {"code": 55144522})
+    options = (activate, flip)
+    observation = view()
+    assert CombatHeuristicAgent().select_action(observation, options) == activate
+    assert CombatFlipHeuristicAgent({87621407}).select_action(observation, options) == flip
+    assert CombatFlipHeuristicAgent().select_action(observation, options) == activate
+    normal = Action("2", "normal_summon", 0, {"code": 87621407})
+    set_flip = Action("3", "set_monster", 0, {"code": 87621407})
+    assert CombatFlipHeuristicAgent({87621407}).select_action(
+        observation, (normal, set_flip)) == set_flip
 
 
 def test_combat_heuristic_uses_only_visible_battle_stats():

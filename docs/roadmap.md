@@ -291,6 +291,15 @@ including 50%. The higher rate corrected two held-out Restrict target
 choices and regressed on two others, leaving teacher agreement unchanged.
 Update size alone has not met M4's self-play gain gate; see [evaluation](evaluation.md).
 
+An opt-in public-Flip-type combat teacher now tests the missing Flip Summons
+seen in the sourced-deck action audit. On a six-duel replay-verified probe it
+selected Dekoichi Flip Summon five times versus one for the current teacher,
+and Magician of Faith six times versus zero. A separate 32-game held-out
+direct match scored 14–17–1 with a paired interval crossing 50%; the
+candidate stays experimental and the default teacher remains version 3.
+See [evaluation](evaluation.md) for the schedule, hashes, and reproduction
+commands.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

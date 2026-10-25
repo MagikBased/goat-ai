@@ -123,6 +123,20 @@ class CombatHeuristicAgent(HeuristicAgent):
         return super().select_action(observation, legal_actions)
 
 
+class CombatFlipHeuristicAgent(CombatHeuristicAgent):
+    """Experimental combat teacher that first uses known Flip Summons."""
+
+    teacher_version: ClassVar[int] = 1
+
+    def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
+        flip = next((action for action in legal_actions
+                     if action.kind == "flip_summon"
+                     and action.parameters.get("code") in self.flip_monster_codes), None)
+        if flip is not None:
+            return flip
+        return super().select_action(observation, legal_actions)
+
+
 class HumanAgent:
     def __init__(self, input_fn: Callable[[str], str] = input,
                  output_fn: Callable[[str], None] = print) -> None:
