@@ -1571,3 +1571,26 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
   --record-dir replays/combat_fv16_selfplay_18200_18263 \
   --output checkpoints/combat_fv16_selfplay_18200_18263.pt
 ```
+
+## Tournament-trajectory legal-choice visibility audit (2026-10-25)
+
+The read-only `scripts/audit_trajectory_visibility.py` checks schema-v17-or-newer
+decision records against each acting player's visible field and known opponent
+hand. A choice targeting an opposing face-down field slot must omit card ID and
+dynamic stats; a face-up field choice's ID must match the visible card; a
+choice naming an opponent hand card must name an already known card and omit
+the native hand slot. The audit also checks actor and viewer agreement.
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_trajectory_visibility.py \
+  replays/tournament_verified_18500
+```
+
+On the 30 locally saved, previously replay-verified sourced-tournament duels,
+the audit passed **16,979 decisions**, including **583 opponent-field target
+choices**, **55 face-down opposing field choices**, and **13 opponent-hand
+choices**. The directory contains schema-v21 trajectories. Counts refer to
+legal choices, so multiple offered targets at one decision are counted
+separately. This checks the stated action/observation invariants over those
+recordings; it does not prove hidden-state noninterference or historical
+correctness for every card. The native differential tests remain necessary.
