@@ -63,7 +63,8 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                 action = next((a for a in actions if {c["code"] for c in a.parameters["cards"]}
                                == {LIGHT, DARK}), None)
                 discarded |= action is not None
-            if discarded and observation.turn == 1 and observation.acting_player == 0 \
+            if action is None and discarded and observation.turn == 1 \
+                    and observation.acting_player == 0 \
                     and not summoned:
                 option = next((a for a in actions if a.kind == "special_summon"
                                and a.parameters.get("code") == BLS), None)

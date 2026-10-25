@@ -15,10 +15,13 @@ SCAPEGOAT = 504700123
 LIGHT = 15025844
 DARK = 7359741
 TOKEN_CODES = {73915052, 73915053, 73915054, 73915055}
+OTHER_ATTACKER = 49881766
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_bls_retargets_sheep_after_scapegoat_interrupts_direct_attack(tmp_path):
+@pytest.mark.parametrize("replay_choice", ["bls", "other_attacker_first"])
+def test_bls_retargets_sheep_after_scapegoat_interrupts_direct_attack(
+        tmp_path, replay_choice):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua",
                      f"goat/c{SCAPEGOAT}.lua"):
@@ -43,6 +46,7 @@ def test_bls_retargets_sheep_after_scapegoat_interrupts_direct_attack(tmp_path):
         observation = env.reset()
         graceful = discarded = summoned = goat_set = first_attack = False
         goat_chained = replay_chosen = second_attack = trigger_accepted = False
+        other_summoned = other_attack = False
         costs = []
         for _ in range(120):
             actions = env.legal_actions()
@@ -55,8 +59,11 @@ def test_bls_retargets_sheep_after_scapegoat_interrupts_direct_attack(tmp_path):
                 action = next((a for a in actions if {c["code"] for c in a.parameters["cards"]}
                                == {LIGHT, DARK}), None)
                 discarded |= action is not None
-            if discarded and observation.turn == 1 and observation.acting_player == 0 \
+            if action is None and discarded and observation.turn == 1 \
+                    and observation.acting_player == 0 \
                     and not summoned:
+                assert {c.code for c in observation.graveyards[0]} == {
+                    LIGHT, DARK, GRACEFUL}
                 action = next((a for a in actions if a.kind == "special_summon"
                                and a.parameters.get("code") == BLS), None)
                 summoned |= action is not None
@@ -65,6 +72,12 @@ def test_bls_retargets_sheep_after_scapegoat_interrupts_direct_attack(tmp_path):
                                in ({LIGHT, DARK} - set(costs))), action)
                 if action is not None:
                     costs.append(action.parameters["code"])
+            if replay_choice == "other_attacker_first" and len(costs) == 2 \
+                    and observation.turn == 1 and observation.acting_player == 0 \
+                    and not other_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == OTHER_ATTACKER), action)
+                other_summoned |= action is not None and action.kind == "normal_summon"
             if observation.turn == 2 and observation.acting_player == 1 and not goat_set:
                 action = next((a for a in actions if a.kind == "set_spell_trap"
                                and a.parameters.get("code") == SCAPEGOAT), None)
@@ -83,8 +96,16 @@ def test_bls_retargets_sheep_after_scapegoat_interrupts_direct_attack(tmp_path):
                 action = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == SCAPEGOAT), action)
                 goat_chained |= action is not None and action.kind == "chain"
-            if goat_chained and not replay_chosen and sum(
-                    c.code in TOKEN_CODES for c in observation.field) == 4:
+            token_count = sum(c.code in TOKEN_CODES for c in observation.field)
+            if replay_choice == "other_attacker_first" and goat_chained \
+                    and token_count == 4 and not other_attack:
+                action = next((a for a in actions if a.kind == "attack"
+                               and a.parameters.get("code") == OTHER_ATTACKER), action)
+                other_attack |= action is not None and action.kind == "attack"
+            if goat_chained and not replay_chosen and (
+                    (replay_choice == "bls" and token_count == 4) or
+                    (replay_choice == "other_attacker_first" and other_attack
+                     and token_count == 3)):
                 action = next((a for a in actions if a.kind == "attack"
                                and a.parameters.get("code") == BLS), action)
                 replay_chosen |= action is not None and action.kind == "attack"
@@ -102,10 +123,12 @@ def test_bls_retargets_sheep_after_scapegoat_interrupts_direct_attack(tmp_path):
                     "select_card", "place", "select_position", "pass", "end_phase")),
                     actions[0])
             observation = env.step(action)
+            expected_tokens = 2 if replay_choice == "bls" else 1
             if second_attack and observation.phase == "battle_step" and sum(
-                    c.code in TOKEN_CODES for c in observation.field) == 2:
+                    c.code in TOKEN_CODES for c in observation.field) == expected_tokens:
                 assert all((graceful, discarded, summoned, goat_set, first_attack,
                             goat_chained, replay_chosen, trigger_accepted))
+                assert replay_choice == "bls" or (other_summoned and other_attack)
                 assert observation.life_points == (8000, 8000)
                 assert not any(c.code in TOKEN_CODES for pile in observation.graveyards
                                for c in pile)
