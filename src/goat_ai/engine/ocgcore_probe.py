@@ -411,13 +411,16 @@ class OcgcoreProbe:
                            struct.unpack_from("<I", message, 17)[0])
                 known_code = self._known_facedown.pop(old_key, None)
                 self._known_facedown.pop(new_key, None)
-                if (known_code is not None and new_key[0] in (0, 1)
+                if (new_key[0] in (0, 1)
                         and new_key[1] in (LOCATION_MZONE, LOCATION_SZONE)
                         and struct.unpack_from("<I", message, 21)[0] & 0xA):
-                    # A known facedown card can change control without
-                    # exposing its current field identity. Carry only the
-                    # previous memory, never the raw code in MSG_MOVE.
-                    self._known_facedown[new_key] = known_code
+                    if known_code is not None:
+                        self._known_facedown[new_key] = known_code
+                    elif (old_key[0] in (0, 1) and old_key[0] != new_key[0]
+                          and old_key[1] in (LOCATION_MZONE, LOCATION_SZONE)):
+                        # The former controller already knew its field card,
+                        # and can identify it after a control change.
+                        self._known_facedown[new_key] = struct.unpack_from("<I", message, 1)[0]
             elif message[0] == MSG_POS_CHANGE:
                 if len(message) != 10:
                     raise ValueError("invalid MSG_POS_CHANGE length")
@@ -433,7 +436,23 @@ class OcgcoreProbe:
                 key = (message[5], message[6], struct.unpack_from("<I", message, 7)[0])
                 self._known_facedown.pop(key, None)
             elif message[0] == MSG_SWAP:
-                self._known_facedown.clear()
+                if len(message) != 29:
+                    raise ValueError("invalid MSG_SWAP length")
+                first_key = (message[5], message[6],
+                             struct.unpack_from("<I", message, 7)[0])
+                second_key = (message[19], message[20],
+                              struct.unpack_from("<I", message, 21)[0])
+                if (first_key[0] not in (0, 1) or second_key[0] not in (0, 1)
+                        or first_key[0] == second_key[0]
+                        or first_key[1] not in (LOCATION_MZONE, LOCATION_SZONE)
+                        or first_key[1] != second_key[1]):
+                    raise ValueError("unsupported MSG_SWAP locations")
+                self._known_facedown.pop(first_key, None)
+                self._known_facedown.pop(second_key, None)
+                if struct.unpack_from("<I", message, 11)[0] & 0xA:
+                    self._known_facedown[second_key] = struct.unpack_from("<I", message, 1)[0]
+                if struct.unpack_from("<I", message, 25)[0] & 0xA:
+                    self._known_facedown[first_key] = struct.unpack_from("<I", message, 15)[0]
             elif message[0] == MSG_SHUFFLE_SET_CARD:
                 if len(message) < 3:
                     raise ValueError("invalid MSG_SHUFFLE_SET_CARD length")

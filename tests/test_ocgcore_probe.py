@@ -16,6 +16,7 @@ from goat_ai.engine.ocgcore_probe import (
     MSG_MOVE,
     MSG_POS_CHANGE,
     MSG_SELECT_CHAIN,
+    MSG_SWAP,
     OcgcoreProbe,
     split_messages,
 )
@@ -118,7 +119,7 @@ def test_known_facedown_memory_requires_public_flip_and_clears_on_move():
     assert probe._known_facedown == {}
 
 
-def test_known_facedown_memory_follows_control_change_without_using_raw_code():
+def test_known_facedown_memory_follows_control_change_with_legal_identity():
     probe = object.__new__(OcgcoreProbe)
     probe._turn = 3
     probe._phase = "end"
@@ -133,7 +134,30 @@ def test_known_facedown_memory_follows_control_change_without_using_raw_code():
     assert probe._known_facedown == {(1, 4, 0): 12345678}
     probe._known_facedown.clear()
     probe._update_public_clock([move])
+    assert probe._known_facedown == {(1, 4, 0): 99999999}
+    probe._known_facedown.clear()
+    same_controller = (bytes((MSG_MOVE,)) + struct.pack("<I", 99999999)
+                       + struct.pack("<BBII", 0, 4, 2, 8)
+                       + struct.pack("<BBII", 0, 4, 0, 8)
+                       + struct.pack("<I", 0))
+    probe._update_public_clock([same_controller])
     assert probe._known_facedown == {}
+
+
+def test_swap_carries_former_controllers_own_facedown_identity():
+    probe = object.__new__(OcgcoreProbe)
+    probe._turn = 3
+    probe._phase = "main1"
+    probe._chain = []
+    probe._public_history = []
+    probe._known_facedown = {(1, 4, 3): 555}
+    swap = (bytes((MSG_SWAP,))
+            + struct.pack("<IBBII", 111, 0, 4, 0, 8)
+            + struct.pack("<IBBII", 222, 1, 4, 0, 1))
+    probe._update_public_clock([swap])
+    assert probe._known_facedown == {(1, 4, 0): 111, (1, 4, 3): 555}
+    with pytest.raises(ValueError, match="MSG_SWAP"):
+        probe._update_public_clock([swap[:-1]])
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

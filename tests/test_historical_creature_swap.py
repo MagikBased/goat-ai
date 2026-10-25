@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 CREATURE_SWAP = 31036355
 
@@ -93,3 +95,69 @@ def test_creature_swap_choices_after_chain_and_permanent_control(tmp_path):
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Creature Swap did not exchange the chosen monsters")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_swap_of_set_monster_keeps_former_controller_knowledge(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{CREATURE_SWAP}.lua").is_file():
+        pytest.skip("Creature Swap script not installed")
+    own = tmp_path / "swap.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        *([CREATURE_SWAP] * 2), *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(own), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        set_monster = opponent_summoned = swap_used = False
+        own_code = opponent_code = None
+        for _ in range(50):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 \
+                    and not set_monster:
+                action = next((a for a in actions if a.kind == "set_monster"), None)
+                if action is not None:
+                    set_monster = True
+                    own_code = action.parameters["code"]
+            if observation.turn == 2 and observation.acting_player == 1 \
+                    and not opponent_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"), None)
+                if action is not None:
+                    opponent_summoned = True
+                    opponent_code = action.parameters["code"]
+            if observation.turn == 3 and observation.acting_player == 0 and not swap_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == CREATURE_SWAP), None)
+                swap_used |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+            if swap_used and CREATURE_SWAP in {c.code for c in observation.graveyards[0]}:
+                hidden = next(c for c in observation.field if c.controller == 1
+                              and c.zone == "monster")
+                assert hidden.position == "facedown" and hidden.code is None
+                assert {(c.controller, c.zone, c.sequence, c.code)
+                        for c in observation.known_opponent_field_cards} == {
+                            (1, "monster", hidden.sequence, own_code)}
+                assert any(c.code == opponent_code and c.controller == 0
+                           for c in observation.field)
+                other = env.engine.probe.observation(1)
+                assert any(c.code == own_code and c.controller == 1
+                           and c.position == "facedown" for c in other.field)
+                agents = (RandomAgent(3), RandomAgent(4))
+                for _ in range(5000):
+                    action = agents[observation.acting_player].select_action(
+                        observation, env.legal_actions())
+                    observation = env.step(action)
+                    if env.is_terminal():
+                        trajectory = env.trajectory()
+                        assert trajectory.schema_version == 16
+                        path = tmp_path / "creature_swap_set.json"
+                        write_trajectory(path, trajectory)
+                        assert verify_trajectory(read_trajectory(path),
+                                                 ExperimentalOcgcoreEngine(root)) == len(
+                                                     trajectory.decisions)
+                        return
+                pytest.fail("set-monster Creature Swap duel did not finish")
+    pytest.fail("Creature Swap did not transfer the set monster")

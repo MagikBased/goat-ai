@@ -39,7 +39,7 @@ class Trajectory:
     winner: int | None
     source: str = "self_play"
     skill_metadata: dict | None = None
-    schema_version: int = 15
+    schema_version: int = 16
     rules_profile: dict | None = None
     deck_sha256: tuple[str, str] | None = None
     asset_sha256: dict[str, str] | None = None
@@ -52,7 +52,7 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     version = raw.get("schema_version")
-    if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15):
+    if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
