@@ -154,3 +154,65 @@ def test_nobleman_banishes_set_sangan_without_search(tmp_path):
                 assert f"goat/c{NOBLEMAN}.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail("Nobleman did not banish Sangan without its Deck search")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_sangan_search_view_ignores_hidden_deck_order(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/goat/c{SANGAN}.lua").is_file():
+        pytest.skip("GOAT Sangan script not installed")
+    cards = [SANGAN, *(c for c in VANILLA_DECK if c not in LOW_ATTACK_NORMALS),
+             BOOK_OF_MOON, BOOK_OF_MOON, BOOK_OF_MOON,
+             MYSTICAL_ELF, 13039848]
+    assert len(cards) == 40
+    reordered = cards.copy()
+    reordered[1], reordered[3] = reordered[3], reordered[1]
+
+    def run(name, deck_cards):
+        deck = tmp_path / f"{name}.ydk"
+        deck.write_text("#main\n" + "\n".join(map(str, deck_cards))
+                        + "\n#extra\n!side\n")
+        with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=3,
+                             engine=ExperimentalOcgcoreEngine(root)) as env:
+            obs = env.reset()
+            assert SANGAN in {c.code for c in obs.hand}
+            initial_hand = Counter(c.code for c in obs.hand)
+            sangan_set = summoned = attacked = False
+            for _ in range(65):
+                actions = env.legal_actions()
+                if (attacked and obs.acting_player == 0 and actions[0].kind == "select_card"
+                        and SANGAN in {c.code for c in obs.graveyards[0]}):
+                    assert {a.parameters.get("code") for a in actions} == {
+                        MYSTICAL_ELF, 13039848}
+                    assert all(a.parameters.get("location") == 1
+                               and "sequence" not in a.parameters for a in actions)
+                    raw_deck = tuple(c.code for c in
+                                     env.engine.probe._query_location(0, 1))
+                    return initial_hand, obs, actions, raw_deck
+                action = None
+                if obs.turn == 1 and obs.acting_player == 0 and not sangan_set:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == SANGAN), None)
+                    sangan_set |= action is not None
+                if obs.turn == 2 and obs.acting_player == 1:
+                    if not summoned:
+                        action = next((a for a in actions if a.kind == "normal_summon"
+                                       and a.parameters.get("code") not in LOW_ATTACK_NORMALS),
+                                      None)
+                        summoned |= action is not None
+                    if summoned and not attacked and action is None:
+                        action = next((a for a in actions if a.kind in (
+                            "battle_phase", "attack")), None)
+                        attacked |= action is not None and action.kind == "attack"
+                if action is None:
+                    action = next((a for a in actions if a.kind in (
+                        "select_card", "place", "pass", "end_phase")), actions[0])
+                obs = env.step(action)
+        pytest.fail("Sangan did not reach its Deck-search choice")
+
+    first = run("original", cards)
+    second = run("reordered", reordered)
+    assert first[0] == second[0]
+    assert first[3] != second[3]
+    assert first[1] == second[1]
+    assert first[2] == second[2]
