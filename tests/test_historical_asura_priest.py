@@ -90,3 +90,71 @@ def test_asura_priest_attacks_four_sheep_then_returns_to_hand(tmp_path):
                 assert "goat/c504700123.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail("Asura Priest did not clear all four Sheep Tokens and return")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_asura_cannot_attack_new_sheep_after_completed_direct_attack(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{ASURA_PRIEST}.lua").is_file() or not (
+        root / f"scripts/goat/c{SCAPEGOAT}.lua"
+    ).is_file():
+        pytest.skip("Asura Priest or GOAT Scapegoat script not installed")
+    own_deck = tmp_path / "asura.ydk"
+    own_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([ASURA_PRIEST] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    other_deck = tmp_path / "scapegoat.ydk"
+    other_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([SCAPEGOAT] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own_deck), str(other_deck), seed=11,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        goat_set = asura_summoned = battle = attacked = damage_dealt = False
+        goat_chained = False
+        for _ in range(100):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1 and not goat_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SCAPEGOAT), None)
+                goat_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0:
+                if not asura_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == ASURA_PRIEST), None)
+                    asura_summoned |= action is not None
+                if asura_summoned and not battle and action is None:
+                    action = next((a for a in actions if a.kind == "battle_phase"), None)
+                    battle |= action is not None
+                if battle and not attacked and obs.phase == "battle_start" \
+                        and action is None:
+                    assert not any(c.controller == 1 and c.zone == "monster"
+                                   for c in obs.field)
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == ASURA_PRIEST), None)
+                    attacked |= action is not None
+            if attacked and obs.life_points[1] == 6300:
+                damage_dealt = True
+            if damage_dealt and not goat_chained and obs.acting_player == 1:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SCAPEGOAT), None)
+                goat_chained |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            tokens = [c for c in obs.field if c.code in SHEEP_TOKENS]
+            if goat_chained and len(tokens) == 4 and obs.acting_player == 0 \
+                    and obs.phase == "battle_step" and any(
+                        a.kind == "main2" for a in env.legal_actions()):
+                assert damage_dealt and attacked and goat_set
+                assert {c.code for c in tokens} == SHEEP_TOKENS
+                assert obs.life_points == (8000, 6300)
+                assert not any(a.kind == "attack" and a.parameters.get("code")
+                               == ASURA_PRIEST for a in env.legal_actions())
+                assert f"official/c{ASURA_PRIEST}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                assert f"goat/c{SCAPEGOAT}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Asura attacked again after a completed direct attack")
