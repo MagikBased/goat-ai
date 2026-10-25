@@ -17,8 +17,8 @@ DARK = 7359741
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("negate", [False, True])
-def test_skill_drain_chained_to_bls_banish_keeps_attack_restriction(tmp_path, negate):
+@pytest.mark.parametrize("drain_timing", ["passed", "chained", "already_active"])
+def test_skill_drain_negates_bls_banish_but_keeps_attack_restriction(tmp_path, drain_timing):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = {f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua",
                f"official/c{SKILL_DRAIN}.lua"}
@@ -43,6 +43,7 @@ def test_skill_drain_chained_to_bls_banish_keeps_attack_restriction(tmp_path, ne
         assert SKILL_DRAIN in {c.code for c in env.engine.probe.observation(1).hand}
         graceful = discarded = summoned = monster_summoned = drain_set = False
         activated = targeted = response_made = resolved = battle_entered = False
+        drain_activated = False
         costs = set()
         monster_code = None
         for _ in range(120):
@@ -76,11 +77,22 @@ def test_skill_drain_chained_to_bls_banish_keeps_attack_restriction(tmp_path, ne
                     action = next((a for a in actions if a.kind == "set_spell_trap"
                                    and a.parameters.get("code") == SKILL_DRAIN), None)
                     drain_set |= action is not None
+            if drain_timing == "already_active" and obs.turn == 3 \
+                    and obs.acting_player == 1 and drain_set and not drain_activated:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SKILL_DRAIN), action)
+                drain_activated |= action is not None and action.kind == "chain" \
+                    and action.parameters.get("code") == SKILL_DRAIN
+                response_made |= drain_activated
             if obs.turn == 3 and obs.acting_player == 0 and drain_set:
                 if not activated:
-                    action = next((a for a in actions if a.kind == "activate"
-                                   and a.parameters.get("code") == BLS), None)
-                    activated |= action is not None
+                    if drain_timing != "already_active" or drain_activated:
+                        action = next((a for a in actions if a.kind == "activate"
+                                       and a.parameters.get("code") == BLS), None)
+                        if drain_timing == "already_active" and action is not None:
+                            assert any(c.code == SKILL_DRAIN and c.position == "faceup"
+                                       for c in obs.field)
+                        activated |= action is not None
                 if activated and not targeted and actions[0].kind == "select_card":
                     action = next((a for a in actions if a.parameters.get("code")
                                    == monster_code and a.parameters.get("controller") == 1), None)
@@ -90,17 +102,22 @@ def test_skill_drain_chained_to_bls_banish_keeps_attack_restriction(tmp_path, ne
                                and a.parameters.get("code") == SKILL_DRAIN), None)
                 if option is not None:
                     assert [link.card_code for link in obs.chain] == [BLS]
-                    action = option if negate else next(a for a in actions
-                                                       if a.kind == "pass")
+                    action = option if drain_timing == "chained" else next(
+                        a for a in actions if a.kind == "pass")
                     response_made = True
-            if response_made and not resolved and not obs.chain and obs.turn == 3:
+            if targeted and response_made and not resolved \
+                    and not obs.chain and obs.turn == 3:
                 resolved = True
                 assert {LIGHT, DARK} <= {c.code for c in obs.banished[0]}
                 assert any(c.code == BLS and c.position == "faceup" for c in obs.field)
-                assert (monster_code in {c.code for c in obs.banished[1]}) != negate
-                assert (monster_code in {c.code for c in obs.field}) == negate
-                assert (SKILL_DRAIN in {c.code for c in obs.field}) == negate
-                assert obs.life_points == ((8000, 7000) if negate else (8000, 8000))
+                assert (monster_code in {c.code for c in obs.banished[1]}) \
+                    == (drain_timing == "passed")
+                assert (monster_code in {c.code for c in obs.field}) \
+                    == (drain_timing != "passed")
+                assert (SKILL_DRAIN in {c.code for c in obs.field}) \
+                    == (drain_timing != "passed")
+                assert obs.life_points == ((8000, 8000) if drain_timing == "passed"
+                                           else (8000, 7000))
                 assert not any(a.kind == "activate" and a.parameters.get("code") == BLS
                                for a in actions)
             if resolved and obs.turn == 3 and obs.acting_player == 0 \
@@ -116,7 +133,7 @@ def test_skill_drain_chained_to_bls_banish_keeps_attack_restriction(tmp_path, ne
                 assert not any(a.kind == "attack" and a.parameters.get("code") == BLS
                                for a in env.legal_actions())
                 loaded = env.engine.probe.loaded_script_sha256
-                if negate:
+                if drain_timing != "passed":
                     assert scripts <= loaded.keys()
                 else:
                     assert {f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua"} <= loaded.keys()
