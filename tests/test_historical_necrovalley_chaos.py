@@ -11,6 +11,7 @@ from goat_ai.environments import GoatEnvironment
 
 NECROVALLEY = 511002998
 SORCERER = 9596126
+BLS = 504700118
 GRACEFUL = 79571449
 MST = 5318639
 LIGHT = 15025844
@@ -24,9 +25,11 @@ def _deck(path, cards):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_necrovalley_blocks_sorcerer_until_mst_destroys_it(tmp_path):
+@pytest.mark.parametrize("boss", [SORCERER, BLS])
+def test_necrovalley_blocks_chaos_summon_until_mst_destroys_it(tmp_path, boss):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    scripts = {f"official/c{code}.lua" for code in (SORCERER, GRACEFUL, MST)}
+    scripts = {f"official/c{code}.lua" for code in (GRACEFUL, MST)}
+    scripts.add(f"goat/c{BLS}.lua" if boss == BLS else f"official/c{SORCERER}.lua")
     scripts.add(f"pre-errata/c{NECROVALLEY}.lua")
     if any(not (root / "scripts" / script).is_file() for script in scripts):
         pytest.skip("required card scripts not installed")
@@ -34,7 +37,7 @@ def test_necrovalley_blocks_sorcerer_until_mst_destroys_it(tmp_path):
     darks = (49881766, DARK)
     filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
     filler[filler.index(69140098)] = MST
-    chaos_cards = (GRACEFUL, *([SORCERER] * 3),
+    chaos_cards = (GRACEFUL, boss, SORCERER, SORCERER,
                    *(code for code in lights for _ in range(3)),
                    *(code for code in darks for _ in range(3)), *filler[:24])
     assert len(chaos_cards) == 40
@@ -44,7 +47,7 @@ def test_necrovalley_blocks_sorcerer_until_mst_destroys_it(tmp_path):
     with GoatEnvironment(chaos, valley, seed=52,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
-        assert {GRACEFUL, SORCERER, MST} <= {c.code for c in obs.hand}
+        assert {GRACEFUL, boss, MST} <= {c.code for c in obs.hand}
         assert NECROVALLEY in {c.code for c in env.engine.probe.observation(1).hand}
         graceful = discarded = valley_active = locked = mst = targeted = summoned = False
         costs = set()
@@ -74,9 +77,9 @@ def test_necrovalley_blocks_sorcerer_until_mst_destroys_it(tmp_path):
                 assert cost_codes <= {c.code for c in obs.graveyards[0]}
                 assert any(c.code == NECROVALLEY and c.position == "faceup"
                            for c in obs.field)
-                assert SORCERER in {c.code for c in obs.hand}
+                assert boss in {c.code for c in obs.hand}
                 assert not any(a.kind == "special_summon"
-                               and a.parameters.get("code") == SORCERER for a in actions)
+                               and a.parameters.get("code") == boss for a in actions)
                 locked = True
             if locked and not mst and obs.acting_player == 0:
                 action = next((a for a in actions if a.kind == "activate"
@@ -88,7 +91,7 @@ def test_necrovalley_blocks_sorcerer_until_mst_destroys_it(tmp_path):
                 targeted |= action is not None
             if targeted and not summoned and obs.turn == 3 and obs.acting_player == 0:
                 summon = next((a for a in actions if a.kind == "special_summon"
-                               and a.parameters.get("code") == SORCERER), None)
+                               and a.parameters.get("code") == boss), None)
                 if summon is not None:
                     assert NECROVALLEY in {c.code for c in obs.graveyards[1]}
                     action = summon
@@ -100,7 +103,7 @@ def test_necrovalley_blocks_sorcerer_until_mst_destroys_it(tmp_path):
                 if action is not None:
                     costs.add(action.parameters["code"])
             if summoned and costs == cost_codes and any(
-                    c.code == SORCERER and c.controller == 0 for c in obs.field):
+                    c.code == boss and c.controller == 0 for c in obs.field):
                 assert {c.code for c in obs.banished[0]} == cost_codes
                 assert {GRACEFUL, MST} <= {c.code for c in obs.graveyards[0]}
                 assert NECROVALLEY in {c.code for c in obs.graveyards[1]}
