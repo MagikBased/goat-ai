@@ -13,11 +13,55 @@ import torch
 
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
-from goat_ai.replay import demonstrator_records, read_trajectory, verify_trajectory
+from goat_ai.actions import Action
+from goat_ai.replay import ReplayMismatch, demonstrator_records, read_trajectory, verify_trajectory
 from goat_ai.training import load_policy_agent
 
 SCOPES = ("all", "multi_option", "multiple_kinds", "known_hand",
           "known_hand_multi_option", "chain", "chain_multi_option")
+STAPLES = {
+    71413901: "Breaker the Magical Warrior",
+    44763025: "Delinquent Duo",
+    45986603: "Snatch Steal",
+    55144522: "Pot of Greed",
+    504700116: "Nobleman of Crossout",
+    14087893: "Book of Moon",
+    504700118: "Black Luster Soldier - Envoy of the Beginning",
+    19613556: "Heavy Storm",
+    511000824: "Ring of Destruction",
+    79571449: "Graceful Charity",
+}
+SOURCE_KINDS = frozenset((
+    "activate", "attack", "chain", "change_position", "flip_summon",
+    "normal_summon", "set_monster", "set_spell_trap", "special_summon",
+))
+
+
+def source_code(action: Action) -> int | None:
+    """A target-choice code identifies a target, not the played card."""
+    if action.kind not in SOURCE_KINDS:
+        return None
+    code = action.parameters.get("code")
+    return code if isinstance(code, int) else None
+
+
+def staple_context(record, staple_codes: set[int]) -> dict[str, set[int]]:
+    offered = {code for action in record.legal_actions
+               if (code := source_code(action)) in staple_codes}
+    selected = source_code(record.selected_action)
+    chain = record.observation.chain
+    return {
+        "offered": offered,
+        "teacher_selected": {selected} if selected in staple_codes else set(),
+        "chain_prompt": {chain[-1].card_code}
+        if chain and chain[-1].card_code in staple_codes else set(),
+    }
+
+
+def empty_staple_counts() -> dict:
+    return {context: {"exact": 0, "kind": 0, "total": 0,
+                      "multi_option_total": 0}
+            for context in ("offered", "teacher_selected", "chain_prompt")}
 
 
 def empty_counts() -> dict:
@@ -34,9 +78,15 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"),
                         default="restricted")
+    parser.add_argument("--staple-code", type=int, action="append",
+                        help="Audit this card ID; repeat to replace the ten shared GOAT staples")
     parser.add_argument("--output", type=Path)
     parser.add_argument("trajectories", nargs="+", type=Path)
     args = parser.parse_args()
+    staple_names = (STAPLES if args.staple_code is None else {
+        code: STAPLES.get(code, str(code)) for code in args.staple_code})
+    if any(code <= 0 for code in staple_names):
+        parser.error("staple card codes must be positive")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     checkpoints = []
@@ -49,6 +99,8 @@ def main() -> None:
 
     counts = {str(path): defaultdict(empty_counts)
               for path, _ in checkpoints}
+    staple_counts = {str(path): defaultdict(empty_staple_counts)
+                     for path, _ in checkpoints}
     verified = []
     for path in args.trajectories:
         trajectory = read_trajectory(path)
@@ -57,7 +109,10 @@ def main() -> None:
         for checkpoint, seeds in checkpoints:
             if trajectory.seed in seeds:
                 raise ValueError(f"{path}: seed {trajectory.seed} overlaps {checkpoint}")
-        count = verify_trajectory(trajectory, engine_type(args.native_root))
+        try:
+            count = verify_trajectory(trajectory, engine_type(args.native_root))
+        except ReplayMismatch as exc:
+            raise ReplayMismatch(f"{path}: {exc}") from exc
         records = demonstrator_records(trajectory)
         seat = (trajectory.skill_metadata or {}).get("demonstrator_seat")
         deck = trajectory.decks[seat] if seat is not None else "both seats"
@@ -70,6 +125,14 @@ def main() -> None:
             bucket = counts[str(checkpoint)][deck]
             for record in records:
                 chosen = agent.select_action(record.observation, record.legal_actions)
+                contexts = staple_context(record, set(staple_names))
+                for context, codes in contexts.items():
+                    for code in codes:
+                        card_bucket = staple_counts[str(checkpoint)][code][context]
+                        card_bucket["total"] += 1
+                        card_bucket["multi_option_total"] += len(record.legal_actions) > 1
+                        card_bucket["exact"] += chosen == record.selected_action
+                        card_bucket["kind"] += chosen.kind == record.selected_action.kind
                 scopes = ["all"]
                 if len(record.legal_actions) > 1:
                     scopes.append("multi_option")
@@ -95,10 +158,15 @@ def main() -> None:
                            for key in ("exact", "kind", "total")}
                    for scope in SCOPES}
         policies.append({"checkpoint": str(path), "sha256": sha256(path),
-                         "overall": overall, "by_deck": by_deck})
+                         "overall": overall, "by_deck": by_deck,
+                         "by_staple": {
+                             str(code): {"name": staple_names[code], **card_counts}
+                             for code, card_counts in sorted(
+                                 staple_counts[str(path)].items())}})
     result = {"engine": args.engine, "trajectories": verified, "policies": policies,
               "interpretation": "off-policy agreement on verified visible decisions; "
-              "not a playing-strength estimate"}
+              "staple contexts may overlap and omit choices without a card-source "
+              "action or active staple chain; not a playing-strength estimate"}
     payload = json.dumps(result, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

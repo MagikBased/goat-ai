@@ -623,3 +623,75 @@ OMP_NUM_THREADS=1 PYTHONPATH=. .venv/bin/python scripts/evaluate_policy.py check
 ```
 
 The next RL experiment needs a stronger credit-assignment or opponent-selection method, controlled hyperparameter comparisons, and larger held-out tournaments. Search work remains gated on simulator and policy reliability.
+
+## Replay-verified staple decision audit
+
+`audit_policy_agreement.py` now reports three card-specific contexts for the ten
+cards shared by all five sourced tournament Main Decks in the current corpus:
+when a source-card action is offered, when the teacher selects that action, and
+when the card is the latest link of a chain asking for a decision. Target-choice
+card codes are not counted as played cards. A decision can appear under more
+than one card and can be offered repeatedly as a turn progresses. These counts
+are an off-policy diagnostic against a heuristic teacher, not independent
+competitive decisions or a playing-strength estimate.
+
+On the pinned local assets, the version-12 combat behavioral clone
+(`checkpoints/combat_bc_fv12_11000_11001.pt`, SHA-256
+`5d78f23fb13f82efc63aee106e1c4d8812e6b65a3fe5d469333e5aad0504b2b4`)
+was audited against eight fresh CombatHeuristicAgent-versus-RandomAgent duels.
+Both deck assignments of sourced Goat Control and Chaos Turbo, both teacher
+seats, and seeds 15000–15001 were included. All eight trajectories
+replay-verified against the current core and assets: 8,483 total decisions and
+4,455 teacher decisions. The clone matched 1,339 of 1,454 teacher decisions
+with multiple legal actions. Card-specific exact matches were:
+
+| Staple | Offered | Teacher selected | Latest chain link |
+| --- | ---: | ---: | ---: |
+| Breaker the Magical Warrior | 38/49 | 26/36 | 16/16 |
+| Nobleman of Crossout | 33/38 | 18/20 | 33/33 |
+| Book of Moon | 31/33 | 23/23 | 55/60 |
+| Black Luster Soldier | 26/28 | 21/23 | 24/28 |
+| Ring of Destruction | 16/19 | 8/8 | 12/14 |
+| Snatch Steal | 16/17 | 14/14 | 25/25 |
+| Heavy Storm | 9/12 | 6/8 | 11/11 |
+| Delinquent Duo | 9/10 | 7/8 | 11/11 |
+| Graceful Charity | 7/8 | 7/7 | 18/20 |
+| Pot of Greed | 6/7 | 5/5 | 7/7 |
+
+The Breaker and BLS disagreements include card and target choices worth
+examining on larger held-out deck families. For example, in one visible state
+the teacher activated Heavy Storm while the clone chose Snatch Steal; in
+another, the teacher targeted a Sheep Token with Ring while the clone targeted
+its own Breaker. A small heuristic sample cannot establish which choice was
+stronger. An attempt to reuse the older seed-8600–8601 trajectories failed
+current replay verification (asset fingerprints or observations differed), so
+those files were excluded rather than mixed into this report.
+
+Reproduce after [native setup](native_setup.md), using `--teacher
+combat_heuristic --engine experimental --max-decisions 3000` in each collector
+command:
+
+```bash
+for seed in 15000 15001; do
+  PYTHONPATH=. OMP_NUM_THREADS=1 python scripts/collect_heuristic_demos.py \
+    --engine experimental --teacher combat_heuristic \
+    --deck-a examples/decks/goat_control_lolmarcus_2020.ydk \
+    --deck-b examples/decks/chaos_turbo_riclar_2020.ydk \
+    --seed "$seed" --seeds 1 --max-decisions 3000 \
+    --output-dir "replays/staple_audit_goat_chaos_$seed"
+  PYTHONPATH=. OMP_NUM_THREADS=1 python scripts/collect_heuristic_demos.py \
+    --engine experimental --teacher combat_heuristic \
+    --deck-a examples/decks/chaos_turbo_riclar_2020.ydk \
+    --deck-b examples/decks/goat_control_lolmarcus_2020.ydk \
+    --seed "$seed" --seeds 1 --max-decisions 3000 \
+    --output-dir "replays/staple_audit_chaos_goat_$seed"
+done
+PYTHONPATH=. OMP_NUM_THREADS=1 python scripts/audit_policy_agreement.py \
+  --engine experimental --native-root .cache/goat-ai \
+  --checkpoint checkpoints/combat_bc_fv12_11000_11001.pt \
+  --output .cache/goat-ai/staple-agreement-combat-15000-15001.json \
+  replays/staple_audit_goat_chaos_15000/*.json \
+  replays/staple_audit_chaos_goat_15000/*.json \
+  replays/staple_audit_goat_chaos_15001/*.json \
+  replays/staple_audit_chaos_goat_15001/*.json
+```

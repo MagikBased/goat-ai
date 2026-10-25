@@ -2,12 +2,14 @@
 
 from dataclasses import replace
 from functools import partial
+from pathlib import Path
 
 import pytest
 
 torch = pytest.importorskip("torch")
 
 from goat_ai.actions import Action
+from goat_ai.engine.decks import read_ydk
 from goat_ai.observations import (
     CardView,
     ChainLinkView,
@@ -36,6 +38,7 @@ from scripts.evaluate_policy import (
     validate_unseen_deck_hashes,
     validate_unseen_main_decks,
 )
+from scripts.audit_policy_agreement import STAPLES, staple_context
 
 
 def view() -> Observation:
@@ -52,6 +55,28 @@ def actions() -> tuple[Action, ...]:
     return (Action("native-0", "normal_summon", 0, {"code": 10, "location": 2}),
             Action("native-1", "set_monster", 0, {"code": 10, "location": 2}),
             Action("native-2", "end_phase", 0))
+
+
+def test_staple_audit_distinguishes_played_cards_from_target_codes():
+    played = Action("play", "activate", 0, {"code": 10})
+    target = Action("target", "select_card", 0, {"code": 20})
+    end = Action("end", "end_phase", 0)
+    active_chain = replace(view(), chain=(ChainLinkView(1, 30, 1, 8, 0),))
+    selected_play = DecisionRecord(view(), (played, end), played)
+    selected_target = DecisionRecord(active_chain, (target,), target)
+    assert staple_context(selected_play, {10, 20, 30}) == {
+        "offered": {10}, "teacher_selected": {10}, "chain_prompt": set()}
+    assert staple_context(selected_target, {10, 20, 30}) == {
+        "offered": set(), "teacher_selected": set(), "chain_prompt": {30}}
+
+
+def test_staple_audit_matches_shared_tournament_main_deck_cards():
+    root = Path(__file__).resolve().parents[1] / "examples" / "decks"
+    names = ("goat_control_lolmarcus_2020.ydk", "chaos_turbo_riclar_2020.ydk",
+             "warrior_montague_clash.ydk", "chaos_control_insids_worlds_2022.ydk",
+             "chaos_return_dingosig_worlds_2022.ydk")
+    shared = set.intersection(*(set(read_ydk(root / name).main) for name in names))
+    assert set(STAPLES) == shared
 
 
 def test_variable_legal_actions_and_permutation_equivariance():
