@@ -780,3 +780,70 @@ reports, and `combat_bc_more_vs_{heuristic,random}_15500_15507` under
 for each parent and teacher segment, or `--seeds 8` for the baseline segment.
 The action-audit command and fresh seed-15000–15001 trajectories are documented
 in the preceding section.
+
+## Self-play from the larger combat clone (2026-10-25)
+
+The larger combat-teacher clone above initialized a bounded, 64-game
+REINFORCE-style self-play run on seeds 15600–15663. Goat Control and Chaos Turbo
+alternated deck assignments, and the learner alternated seats. The trainer used
+learning rate 0.0003, sampling temperature 2.0, entropy coefficient 0.01, a
+snapshot every eight games, at most eight snapshots, and a 3,000-decision game
+cap. Nineteen opponents were RandomAgent; the other 45 were checkpoint
+snapshots. The learner went 32–32 in training, contributing 7,404 decisions.
+The ignored local child checkpoint is
+`checkpoints/combat_more_selfplay_15600_15663.pt`, SHA-256
+`0af7784a27a5b7df1e7deeca531ced8285a7a58784308a628b5ae0bd46a40c9b`.
+All 64 recorded training duels, containing **50,620 total decisions**,
+replay-verified against the pinned native assets. No training game reached the
+decision cap. The training win fraction is not an independent strength measure.
+
+On fresh seeds 15700–15707, the child played its parent across Chaos Control,
+Chaos Return, and Warrior, with both deck assignments and both seats. None of
+those Main Deck compositions was used in training. The child scored **32 wins,
+31 losses, and 1 draw** in 64 games (50.8%). The paired matchup-seed bootstrap
+interval was **50.0–52.3%**; the much wider decisive-game Wilson interval was
+**38.8–62.7%**. The score interval is unusually tight because paired seat and
+deck outcomes mostly cancel in this direct comparison; it should not be read as
+evidence of broader deck strength. The child was 13–19 going first and 19–12
+with one draw going second. This schedule does not establish a self-play gain.
+
+On the separate eight-duel seed-15000–15001 combat-teacher audit, exact
+agreement on choices with multiple legal options was **1,369/1,454** for the
+child versus **1,368/1,454** for its parent. Teacher-selected Breaker actions
+remained **31/36**, and the other shared staples showed no meaningful change.
+These are off-policy agreement counts, not game outcomes. The experiment
+reinforces the current M4 gate: more self-play updates with the present trainer
+do not by themselves demonstrate stronger play. Prioritize validated
+competitive-card rulings and stronger evaluation opponents before claiming a
+training advance.
+
+Reproduce after [native setup](native_setup.md) with `OMP_NUM_THREADS=1`:
+
+```bash
+PYTHONPATH=. python scripts/train_self_play.py \
+  checkpoints/combat_bc_fv12_15100_15103.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/chaos_turbo_riclar_2020.ydk \
+            examples/decks/goat_control_lolmarcus_2020.ydk \
+  --seed 15600 --games 64 --learning-rate 0.0003 \
+  --learner-temperature 2.0 --entropy-coefficient 0.01 \
+  --snapshot-every 8 --max-snapshots 8 --max-decisions 3000 \
+  --record-dir replays/combat_more_selfplay_15600_15663 \
+  --output checkpoints/combat_more_selfplay_15600_15663.pt
+PYTHONPATH=. python scripts/evaluate_policy.py \
+  checkpoints/combat_more_selfplay_15600_15663.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --opponent-checkpoint checkpoints/combat_bc_fv12_15100_15103.pt \
+  --both-deck-assignments --require-unseen-main-decks \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --matchup examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --seed 15700 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output .cache/goat-ai/combat_more_selfplay_vs_parent_15700_15707.json
+```
+
+The ignored local action-audit report is
+`.cache/goat-ai/combat_more_selfplay_agreement_15000_15001.json`.

@@ -107,6 +107,8 @@ The combat-clone checkpoint also underwent two snapshot-pool self-play runs. Six
 
 A larger 9,117-decision combat-teacher clone trained from 16 freshly replay-verified Goat Control/Chaos Turbo duels improves held-out staple-decision agreement and wins a 64-game direct match against its smaller parent 37–25 with two draws on unseen Chaos Control, Chaos Return, and Warrior Main Decks. Its matched score improvement over the parent against CombatHeuristicAgent is positive on eight held-out seeds, but its absolute combat-teacher score is 30–32 with two draws and its original-HeuristicAgent score is 32–31 with one draw. Both absolute heuristic intervals include 50%; M4 remains open. See [the evaluation log](evaluation.md) for the full schedule, intervals, and ignored checkpoint provenance.
 
+A 64-game self-play continuation from that larger clone produced 64 replay-verified trajectories (50,620 decisions), but scored only 32–31 with one draw directly against its parent on held-out deck families and changed just one of 1,454 multi-option decisions in the separate teacher audit. This does not satisfy M4's strength-gain gate. The next priority is source-backed interaction coverage for the high-play GOAT staples listed below, followed by stronger held-out policy evaluation; see [the evaluation log](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
