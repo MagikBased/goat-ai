@@ -209,8 +209,9 @@ def test_public_scapegoat_restriction_replays_in_new_and_old_schemas(
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("negate", [False, True])
 def test_negated_scapegoat_activation_restores_summon_permission(
-    scapegoat_deck, tmp_path,
+    scapegoat_deck, tmp_path, negate,
 ):
     root = _native_root()
     if not (root / f"scripts/official/c{SOLEMN_JUDGMENT}.lua").is_file():
@@ -221,46 +222,68 @@ def test_negated_scapegoat_activation_restores_summon_permission(
     with GoatEnvironment(str(scapegoat_deck), str(opponent), seed=52,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
-        trap_set = scapegoat_activated = solemn_chained = saw_restriction = False
-        for _ in range(50):
+        trap_set = scapegoat_activated = response_made = saw_restriction = False
+        checked = False
+        agents = (RandomAgent(52), RandomAgent(53))
+        for _ in range(3000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / f"solemn_scapegoat_{negate}.json"
+                write_trajectory(path, env.trajectory())
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                    env.trajectory().decisions)
+                return
             choices = env.legal_actions()
             if scapegoat_activated and SCAPEGOAT_RESTRICTION in observation.restrictions:
                 saw_restriction = True
-            if (solemn_chained and observation.turn == 3
+            if (response_made and not checked and observation.turn == 3
                     and observation.acting_player == 0
-                    and any(item.kind == "normal_summon" for item in choices)):
+                    and observation.phase == "main1" and not observation.chain
+                    and any(item.kind == "battle_phase" for item in choices)
+                    and SCAPEGOAT in {card.code for card in observation.graveyards[0]}):
                 assert trap_set and scapegoat_activated and saw_restriction
-                assert observation.restrictions == ()
-                assert observation.life_points == (8000, 4000)
-                assert any(card.code == SCAPEGOAT for card in observation.graveyards[0])
-                assert any(card.code == SOLEMN_JUDGMENT
-                           for card in observation.graveyards[1])
-                assert not any(card.code in TOKEN_CODES for card in observation.field)
-                return
+                assert observation.life_points == ((8000, 4000) if negate
+                                                   else (8000, 8000))
+                assert (SOLEMN_JUDGMENT in {card.code for card in
+                                            observation.graveyards[1]}) == negate
+                assert (SCAPEGOAT_RESTRICTION in observation.restrictions) != negate
+                assert any(item.kind == "normal_summon" for item in choices) == negate
+                assert sum(card.code in TOKEN_CODES for card in observation.field) \
+                    == (0 if negate else 4)
+                checked = True
             action = None
-            if observation.acting_player == 1 and observation.turn == 2 and not trap_set:
+            if not checked and observation.acting_player == 1 \
+                    and observation.turn == 2 and not trap_set:
                 action = next((item for item in choices if item.kind == "set_spell_trap"
                                and item.parameters.get("code") == SOLEMN_JUDGMENT), None)
                 trap_set |= action is not None
-            if (action is None and observation.acting_player == 0
+            if (not checked and action is None and observation.acting_player == 0
                     and observation.turn == 3 and observation.phase == "main1"
                     and not scapegoat_activated):
                 action = next((item for item in choices if item.kind == "activate"
                                and item.parameters.get("code") == SCAPEGOAT), None)
                 scapegoat_activated |= action is not None
-            if (action is None and observation.acting_player == 1
-                    and scapegoat_activated and not solemn_chained):
-                action = next((item for item in choices if item.kind == "chain"
+            if (not checked and action is None and observation.acting_player == 1
+                    and scapegoat_activated and not response_made):
+                option = next((item for item in choices if item.kind == "chain"
                                and item.parameters.get("code") == SOLEMN_JUDGMENT), None)
-                solemn_chained |= action is not None
-            if action is None:
+                if option is not None:
+                    assert [link.card_code for link in observation.chain] == [SCAPEGOAT]
+                    action = option if negate else next(
+                        item for item in choices if item.kind == "pass")
+                    response_made = True
+            if action is None and not checked:
                 action = next((item for item in choices if item.kind == "place"), None)
-            if action is None:
+            if action is None and not checked:
                 action = next((item for item in choices if item.kind == "end_phase"), None)
-            if action is None:
+            if action is None and not checked:
                 action = next((item for item in choices if item.kind == "pass"), choices[0])
+            if action is None:
+                action = agents[observation.acting_player].select_action(
+                    observation, choices)
             observation = env.step(action)
-        pytest.fail("Solemn did not negate Scapegoat before the next summon decision")
+        pytest.fail("Solemn / Scapegoat duel did not complete")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

@@ -433,3 +433,6 @@ Dust Tornado responded to Nobleman of Crossout twice in this sample. A paired
 native [ruling fixture](goat_rules.md) now checks that response and the pass
 branch. These are baseline-agent action counts, not historical play rates or
 evidence that untested card interactions are correct.
+Solemn Judgment responded to GOAT Scapegoat three times. Its existing
+activation-negation fixture now has a pass control and replay-verifies both
+complete duels, including the opposite same-turn Summon permissions.
