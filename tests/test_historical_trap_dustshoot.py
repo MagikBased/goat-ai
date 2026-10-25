@@ -14,6 +14,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 DUSTSHOOT = 64697231
 BOOK_OF_MOON = 14087893
+MYSTICAL_SPACE_TYPHOON = 5318639
 NONMONSTER_CARDS = (12607053, BOOK_OF_MOON, 4178474, 56120475, 60082869)
 
 
@@ -288,3 +289,81 @@ def test_dustshoot_still_resolves_after_book_reduces_hand_below_four(tmp_path):
                         f"official/c{BOOK_OF_MOON}.lua"}.issubset(loaded)
                 return
     pytest.fail("Dustshoot did not resolve after Book reduced the hand to three")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_dustshoot_resolves_after_chained_mst_destroys_it(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (DUSTSHOOT, MYSTICAL_SPACE_TYPHOON):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    own = tmp_path / "dustshoot.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        *([DUSTSHOOT] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    opposing = tmp_path / "mst_book.ydk"
+    opposing.write_text("#main\n" + "\n".join(map(str, (
+        *([BOOK_OF_MOON] * 3), MYSTICAL_SPACE_TYPHOON,
+        *VANILLA_DECK[4:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own), str(opposing), seed=157,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        trap_set = monster_summoned = book_set = dust_activated = False
+        mst_chained = mst_targeted = selected = False
+        before_deck = None
+        for _ in range(75):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 \
+                    and not trap_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == DUSTSHOOT), None)
+                trap_set |= action is not None
+            if observation.turn == 2 and observation.acting_player == 1:
+                if not monster_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"), None)
+                    monster_summoned |= action is not None
+                if monster_summoned and action is None and not book_set:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == BOOK_OF_MOON), None)
+                    book_set |= action is not None
+            if book_set and observation.acting_player == 0 and not dust_activated:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == DUSTSHOOT), None)
+                if action is not None:
+                    assert observation.opponent_hand_count == 4
+                    before_deck = observation.deck_counts[1]
+                    dust_activated = True
+            if dust_activated and observation.acting_player == 1 and not mst_chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == MYSTICAL_SPACE_TYPHOON
+                               and a.parameters.get("location") == 2), None)
+                mst_chained |= action is not None
+            if mst_chained and not mst_targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("controller") == 0
+                               and a.parameters.get("code") == DUSTSHOOT), None)
+                mst_targeted |= action is not None
+            if mst_targeted and not selected and observation.acting_player == 0 \
+                    and actions[0].kind == "select_card":
+                assert observation.opponent_hand_count == 3
+                assert DUSTSHOOT in {c.code for c in observation.graveyards[0]}
+                assert len([c for event in observation.private_reveals
+                            for c in event.cards if c.controller == 1]) == 3
+                assert not env.engine.probe.observation(1).private_reveals
+                action = actions[0]
+                selected = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "select_position", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+            if selected and observation.deck_counts[1] == before_deck + 1:
+                assert env.engine.probe.observation(0).opponent_hand_count == 2
+                assert MYSTICAL_SPACE_TYPHOON in {
+                    c.code for c in observation.graveyards[1]}
+                assert observation.life_points == (8000, 8000)
+                loaded = env.engine.probe.loaded_script_sha256
+                assert {f"official/c{DUSTSHOOT}.lua",
+                        f"official/c{MYSTICAL_SPACE_TYPHOON}.lua"}.issubset(loaded)
+                return
+    pytest.fail("Dustshoot did not resolve after chained MST destroyed it")
