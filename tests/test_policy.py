@@ -37,13 +37,18 @@ from goat_ai.training.self_play import (
     sample_legal_action,
     train_against_snapshot_pool,
 )
+from scripts.audit_policy_agreement import (
+    STAPLES,
+    decision_deck,
+    decision_scopes,
+    staple_context,
+)
 from scripts.evaluate_policy import (
     make_policy_agent,
     validate_heldout_seeds,
     validate_unseen_deck_hashes,
     validate_unseen_main_decks,
 )
-from scripts.audit_policy_agreement import STAPLES, decision_scopes, staple_context
 from scripts.train_behavioral_clone import focus_opportunity
 
 
@@ -74,6 +79,18 @@ def test_staple_audit_distinguishes_played_cards_from_target_codes():
         "offered": {10}, "teacher_selected": {10}, "chain_prompt": set()}
     assert staple_context(selected_target, {10, 20, 30}) == {
         "offered": set(), "teacher_selected": set(), "chain_prompt": {30}}
+
+
+def test_policy_audit_attributes_each_decision_to_its_acting_deck():
+    left = DecisionRecord(view(), (actions()[0],), actions()[0])
+    right_view = replace(view(), viewer=1, acting_player=1, hand=(
+        CardView(1, "hand", "hidden", 20, 0),))
+    right_action = Action("right", "end_phase", 1)
+    right = DecisionRecord(right_view, (right_action,), right_action)
+    trajectory = Trajectory("goat", ("left.ydk", "right.ydk"), 7,
+                            (left, right), 0)
+    assert decision_deck(trajectory, left) == "left.ydk"
+    assert decision_deck(trajectory, right) == "right.ydk"
 
 
 def test_focus_opportunity_uses_card_source_or_public_chain():

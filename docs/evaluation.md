@@ -2180,3 +2180,43 @@ For the action probe, use `scripts/probe_competitive_card_actions.py` with
 `--agent combat_flip` and again with `--agent combat_heuristic`, both with
 `--seed 9700 --seeds 1 --verify-replays` and separate `--record-dir` and
 `--output` paths.
+
+## Deck-attributed policy agreement on six tournament decks (2026-10-25)
+
+The policy agreement audit now attributes each recorded decision to the
+acting player's deck, including trajectories where both seats are
+demonstrators. Previously those decisions were grouped under `both seats`,
+which hid deck-specific errors. The corrected audit replay-verified all
+30 [heuristic corpus trajectories](competitive_action_coverage.md), then
+compared the existing combat-teacher feature-v12 clone (checkpoint SHA-256
+`5d78f23fb13f82efc63aee106e1c4d8812e6b65a3fe5d469333e5aad0504b2b4`)
+against those basic-heuristic choices. Its exact agreement on decisions with
+multiple legal actions was **4,059/4,323** overall:
+
+| Acting Main Deck | Exact / multi-option decisions |
+| --- | ---: |
+| Goat Control | 892 / 921 |
+| Chaos Turbo | 660 / 688 |
+| Chaos Control | 807 / 861 |
+| Bazoo Return | 681 / 721 |
+| Chaos Return | 551 / 608 |
+| Warrior | 468 / 524 |
+
+The saved audit report's SHA-256 is
+`4bc4a37cec9197db3d67ecbf32b8f86f8924c1f51de6a0f9c9f2513fb549c8c3`.
+Reproduce it with the ignored checkpoint and replay files:
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python -m scripts.audit_policy_agreement \
+  --checkpoint checkpoints/combat_bc_fv12_11000_11001.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --output /tmp/goat_policy_by_deck_19600.json \
+  /tmp/goat_heuristic_replays_19600/*.json \
+  > /tmp/goat_policy_by_deck_19600.stdout
+```
+
+These are choices by a different, weaker heuristic than the combat teacher
+used to train the checkpoint. Agreement cannot establish competitive
+strength, and the denominator varies by deck. The lower Warrior and Chaos
+Return agreement identifies where to inspect decision classes and collect
+stronger, source-backed demonstrations before another model comparison.

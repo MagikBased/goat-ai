@@ -11,10 +11,17 @@ from pathlib import Path
 
 import torch
 
+from goat_ai.actions import Action
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
-from goat_ai.actions import Action
-from goat_ai.replay import ReplayMismatch, demonstrator_records, read_trajectory, verify_trajectory
+from goat_ai.replay import (
+    DecisionRecord,
+    ReplayMismatch,
+    Trajectory,
+    demonstrator_records,
+    read_trajectory,
+    verify_trajectory,
+)
 from goat_ai.training import load_policy_agent
 
 SCOPES = ("all", "multi_option", "multiple_kinds", "known_hand",
@@ -95,6 +102,11 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def decision_deck(trajectory: Trajectory, record: DecisionRecord) -> str:
+    """Attribute each visible decision to the acting player's Main Deck."""
+    return trajectory.decks[record.observation.acting_player]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, action="append", required=True)
@@ -102,7 +114,7 @@ def main() -> None:
     parser.add_argument("--engine", choices=("restricted", "experimental"),
                         default="restricted")
     parser.add_argument("--staple-code", type=int, action="append",
-                        help="Audit this card ID; repeat to replace the ten shared GOAT staples")
+                        help="Audit this card ID; repeat to replace the default high-play cards")
     parser.add_argument("--output", type=Path)
     parser.add_argument("trajectories", nargs="+", type=Path)
     args = parser.parse_args()
@@ -147,8 +159,8 @@ def main() -> None:
                          "teacher_decisions": len(records)})
         for checkpoint, _ in checkpoints:
             agent = load_policy_agent(checkpoint)
-            bucket = counts[str(checkpoint)][deck]
             for record in records:
+                bucket = counts[str(checkpoint)][decision_deck(trajectory, record)]
                 chosen = agent.select_action(record.observation, record.legal_actions)
                 contexts = staple_context(record, set(staple_names))
                 for context, codes in contexts.items():
