@@ -20,6 +20,8 @@ The pinned Pot of Greed script has upstream SHA-256 `c827d7f30d746cdd74bdcbdd9ef
 
 The pinned Graceful Charity script has upstream SHA-256 `12b5a5730b6dea2c1bf3eb379f0d436263786c1ac882e197580e4c72dede3eb5`. The same GOAT overdraw correction changes its activation gate to `Duel.IsPlayerCanDraw(tp,0)` without changing the draw/discard operation. Its loaded-script SHA-256 is `5ab8c1b6aa3dfca5e5409926115089f9a12584f260c1a7e2d31867040e30f89d`. Older replay manifests that loaded Graceful likewise require fresh recordings for exact verification.
 
+The pinned Dekoichi script has upstream SHA-256 `567bbe75ff84936c93419f54fa2f5cea8ba311921403fb5b85f3ea23263c24ba`. A SHA-guarded in-memory correction moves its Bokoichi count from Flip Effect activation to resolution, as required by the [historical Dekoichi FAQ](https://www.goatformat.com/rulings2.html). The loaded-script SHA-256 is `abe2c94e465d1b5a7ed4e3afb0fd5865577767f74f6671aa253f392f3a3e8880`. Existing replay manifests that loaded Dekoichi have the earlier effective hash and need fresh recordings for exact verification. The pinned script's activation-time draw-count metadata is unchanged; the correction governs the actual number drawn on resolution.
+
 Requires Linux, Git, a C++17 compiler, Python 3.10+, Meson 1.7+, and Ninja. From a clean clone:
 
 ```bash

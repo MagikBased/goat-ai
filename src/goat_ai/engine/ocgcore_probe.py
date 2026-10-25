@@ -43,6 +43,12 @@ POT_DRAW_CHECK_GOAT = b"return Duel.IsPlayerCanDraw(tp,0) end"
 UPSTREAM_GRACEFUL_SHA256 = "12b5a5730b6dea2c1bf3eb379f0d436263786c1ac882e197580e4c72dede3eb5"
 GRACEFUL_DRAW_CHECK_OLD = b"return Duel.IsPlayerCanDraw(tp,3) end"
 GRACEFUL_DRAW_CHECK_GOAT = b"return Duel.IsPlayerCanDraw(tp,0) end"
+UPSTREAM_DEKOICHI_SHA256 = "567bbe75ff84936c93419f54fa2f5cea8ba311921403fb5b85f3ea23263c24ba"
+DEKOICHI_DRAW_OLD = b"Duel.Draw(p,d,REASON_EFFECT)"
+DEKOICHI_DRAW_HISTORICAL = (
+    b"Duel.Draw(p,Duel.GetMatchingGroupCount(s.filter,tp,LOCATION_ONFIELD,0,nil)+1,"
+    b"REASON_EFFECT)"
+)
 GOAT_RESTRICT_EFFECT_MARKER = b"\tc:RegisterEffect(e5)\nend\n"
 GOAT_RESTRICT_EQUIP_MARKER = (
     b"\tif not c:EquipByEffectAndLimitRegister(e,tp,tc,id) then return end\n"
@@ -401,6 +407,15 @@ class OcgcoreProbe:
                 return 0
             contents = contents.replace(GRACEFUL_DRAW_CHECK_OLD,
                                         GRACEFUL_DRAW_CHECK_GOAT)
+        if path.relative_to(self.scripts) == Path("official/c87621407.lua"):
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_DEKOICHI_SHA256 \
+                    or contents.count(DEKOICHI_DRAW_OLD) != 1:
+                self.errors.append("pinned Dekoichi script changed; historical draw patch not applied")
+                return 0
+            # The historical FAQ counts face-up Bokoichi at resolution, not
+            # when Dekoichi's Flip Effect enters the chain.
+            contents = contents.replace(DEKOICHI_DRAW_OLD,
+                                        DEKOICHI_DRAW_HISTORICAL)
         self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
             hashlib.sha256(contents).hexdigest()
         )
