@@ -15,7 +15,7 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai python scripts/evaluate_native.py \
   --max-decisions 3000 --output artifacts/chaos_return_warrior_random_1_10.json
 ```
 
-This run does not establish that Return from the Different Dimension activated or that its historical timing and End Phase behavior are correct; those require targeted source-backed fixtures.
+This protocol run alone does not establish that Return from the Different Dimension activated. Separate [source-backed native fixtures](goat_rules.md) now cover a basic Chaos-cost revival, End Phase rebanish, and the historical Book of Moon exception; other Return interactions remain unaudited.
 
 ## Chaos Control versus Chaos Turbo protocol sweep
 
