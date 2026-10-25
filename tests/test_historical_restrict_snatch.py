@@ -10,6 +10,7 @@ from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
+from goat_ai.training.policy import CardVocabulary, LegalActionPolicy, encode_decision
 
 SCAPEGOAT = 504700123
 METAMORPHOSIS = 46411259
@@ -139,6 +140,19 @@ def test_snatch_steals_equipped_restrict(tmp_path, book_timing):
                 assert any(c.code == SNATCH and c.zone == "spell_trap"
                            and c.controller == 1
                            and c.equipped_to == (1, restrict.sequence) for c in obs.field)
+                vocabulary = CardVocabulary(tuple(sorted({
+                    c.code for c in (*obs.hand, *obs.field) if c.code is not None})))
+                features = encode_decision(obs, env.legal_actions(), vocabulary,
+                                           feature_version=13)
+                for equip_code in (defender_code, SNATCH):
+                    equip = next(c for c in obs.field if c.code == equip_code
+                                 and c.zone == "spell_trap")
+                    index = len(obs.hand) + obs.field.index(equip)
+                    assert features.state_equip_slots[index].tolist() == [
+                        1, 2, restrict.sequence]
+                assert LegalActionPolicy(vocabulary.size, width=8,
+                                         feature_version=13)(features).shape == (
+                                             len(env.legal_actions()),)
                 assert obs.life_points == (8000, 8000)
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
                 control_checked = True

@@ -886,6 +886,10 @@ measure. Its report is
 `.cache/goat-ai/equip_v12_v13_matched_agreement_16110_16111.json` (SHA-256
 prefix `4624de930521`). More training data with meaningful equip choices and
 larger held-out tournaments are needed before selecting v13 as the default.
+A later pinned-native Snatch Steal / Thousand-Eyes Restrict regression checks that
+version 13 binds two Equip Cards in opposite players' Spell/Trap Zones to the
+same newly stolen monster slot and scores the resulting legal action set. This
+validates the cross-control feature path; it is not playing-strength evidence.
 
 Reproduce the matched experiment after [native setup](native_setup.md):
 
