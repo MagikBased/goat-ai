@@ -14,6 +14,8 @@ GRACEFUL = 79571449
 RETURN = 27174286
 FIRST = 62651957
 SECOND = 97590747
+THIRD = 51934376
+MECHANICALCHASER = 7359741
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -101,3 +103,98 @@ def test_bazoo_banish_cost_boost_and_return_revival(tmp_path):
                 f"phase={obs.phase} flags={graceful, discarded, summoned, bazoo_used, cost_paid, trap_set, boosted, expired, return_used, return_resolved} "
                 f"field={[(c.code, c.attack) for c in obs.field]} "
                 f"banished={[c.code for c in obs.banished[0]]}")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_bazoo_three_graveyard_cost_persists_through_opponent_turn(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (BAZOO, GRACEFUL):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    own = tmp_path / "bazoo_three.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        GRACEFUL, *([BAZOO] * 3), *([RETURN] * 3), *VANILLA_DECK[7:])))
+                   + "\n#extra\n!side\n")
+    opposing = tmp_path / "chaser.ydk"
+    opposing.write_text("#main\n" + "\n".join(map(str, (
+        *([69140098] * 3), *(c for c in VANILLA_DECK if c != 69140098))))
+                        + "\n#extra\n!side\n")
+    with GoatEnvironment(str(own), str(opposing), seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {GRACEFUL, BAZOO, FIRST, SECOND, THIRD}.issubset(c.code for c in obs.hand)
+        assert MECHANICALCHASER in {
+            c.code for c in env.engine.probe.observation(1).hand}
+        graceful = discarded = third_summoned = chaser_summoned = False
+        battle = attacked = target = bazoo_summoned = bazoo_used = cost_paid = False
+        boosted = opponent_turn_checked = False
+        for _ in range(100):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not graceful:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL), None)
+                    graceful |= action is not None
+                if graceful and not discarded and actions[0].kind == "select_cards":
+                    action = next((a for a in actions if {c["code"] for c in
+                                   a.parameters["cards"]} == {FIRST, SECOND}), None)
+                    discarded |= action is not None
+                if discarded and not third_summoned and action is None:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == THIRD), None)
+                    third_summoned |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1:
+                if not chaser_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == MECHANICALCHASER), None)
+                    chaser_summoned |= action is not None
+                if chaser_summoned and obs.phase == "main1" and not battle \
+                        and action is None:
+                    action = next((a for a in actions if a.kind == "battle_phase"), None)
+                    battle |= action is not None
+                if battle and obs.phase == "battle_start" and not attacked:
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == MECHANICALCHASER), None)
+                    attacked |= action is not None
+                if attacked and not target and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code") == THIRD
+                                   and a.parameters.get("controller") == 0), None)
+                    target |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0:
+                if not bazoo_summoned:
+                    assert obs.life_points == (7850, 8000)
+                    assert {FIRST, SECOND, THIRD}.issubset(
+                        c.code for c in obs.graveyards[0])
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == BAZOO), None)
+                    bazoo_summoned |= action is not None
+                if bazoo_summoned and not bazoo_used and action is None:
+                    action = next((a for a in actions if a.kind in ("activate", "chain")
+                                   and a.parameters.get("code") == BAZOO), None)
+                    bazoo_used |= action is not None
+                if bazoo_used and not cost_paid:
+                    action = next((a for a in actions if a.kind == "select_cards"
+                                   and {c["code"] for c in a.parameters["cards"]}
+                                   == {FIRST, SECOND, THIRD}), action)
+                    cost_paid |= action is not None and action.kind == "select_cards"
+            if obs.turn == 4 and obs.acting_player == 1 and obs.phase == "main1" \
+                    and not opponent_turn_checked:
+                assert any(c.code == BAZOO and c.attack == 2500 for c in obs.field)
+                assert {c.code for c in obs.banished[0]} == {FIRST, SECOND, THIRD}
+                opponent_turn_checked = True
+            if obs.turn == 5 and obs.acting_player == 0 and obs.phase == "main1":
+                assert boosted and opponent_turn_checked and cost_paid
+                assert any(c.code == BAZOO and c.attack == 1600 for c in obs.field)
+                assert {c.code for c in obs.banished[0]} == {FIRST, SECOND, THIRD}
+                assert f"official/c{BAZOO}.lua" in env.engine.probe.loaded_script_sha256
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_cards", "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if cost_paid and not boosted and any(
+                    c.code == BAZOO and c.attack == 2500 for c in obs.field):
+                assert {c.code for c in obs.banished[0]} == {FIRST, SECOND, THIRD}
+                boosted = True
+    pytest.fail("Bazoo three-card cost and ATK duration did not finish")
