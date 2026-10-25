@@ -35,9 +35,12 @@ def test_goat_control_token_restrict_equip_and_tsukuyomi_reset(tmp_path):
         activated_goat = activated_meta = activated_restrict = False
         paid_token = chosen_fusion = chosen_target = False
         equipped = summoned_tsukuyomi = targeted_restrict = False
+        reset_restrict = opponent_second_summoned = flipped_restrict = False
+        reactivated_restrict = chosen_second_target = False
+        second_target_code = None
         saw_same_turn_block = False
         opponent_summoned = False
-        for _ in range(70):
+        for _ in range(130):
             actions = env.legal_actions()
             if (observation.turn == 1 and observation.acting_player == 0
                     and sum(card.code in SHEEP_CODES for card in observation.field) == 4
@@ -54,6 +57,11 @@ def test_goat_control_token_restrict_equip_and_tsukuyomi_reset(tmp_path):
             if observation.turn == 2 and observation.acting_player == 1 and not opponent_summoned:
                 action = next((a for a in actions if a.kind == "normal_summon"), None)
                 opponent_summoned |= action is not None
+            if observation.turn == 4 and observation.acting_player == 1 and not opponent_second_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"), None)
+                opponent_second_summoned |= action is not None
+                if action is not None:
+                    second_target_code = action.parameters["code"]
             if observation.turn == 3 and observation.acting_player == 0 and not activated_meta:
                 action = next((a for a in actions if a.kind == "activate"
                                and a.parameters.get("code") == METAMORPHOSIS), None)
@@ -83,6 +91,20 @@ def test_goat_control_token_restrict_equip_and_tsukuyomi_reset(tmp_path):
                 action = next((a for a in actions if a.kind == "select_card"
                                and a.parameters.get("code") == RESTRICT), action)
                 targeted_restrict |= action is not None and action.kind == "select_card"
+            if (reset_restrict and observation.turn == 5 and observation.acting_player == 0
+                    and not flipped_restrict):
+                action = next((a for a in actions if a.kind == "flip_summon"
+                               and a.parameters.get("code") == RESTRICT), action)
+                flipped_restrict |= action is not None and action.kind == "flip_summon"
+            if flipped_restrict and not reactivated_restrict:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == RESTRICT), action)
+                reactivated_restrict |= action is not None and action.kind == "chain"
+            if reactivated_restrict and not chosen_second_target:
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("controller") == 1
+                               and a.parameters.get("location") == 4), action)
+                chosen_second_target |= action is not None and action.kind == "select_card"
             if action is None:
                 action = next((a for a in actions if a.kind in ("place", "select_position")), None)
             if action is None:
@@ -110,7 +132,7 @@ def test_goat_control_token_restrict_equip_and_tsukuyomi_reset(tmp_path):
                 assert not any(card.code in SHEEP_CODES
                                for pile in observation.graveyards for card in pile)
                 equipped = True
-            if targeted_restrict and equipped:
+            if targeted_restrict and equipped and not reset_restrict:
                 own = env.engine.probe.observation(0)
                 set_restrict = next((card for card in own.field
                                      if card.controller == 0 and card.zone == "monster"
@@ -123,5 +145,19 @@ def test_goat_control_token_restrict_equip_and_tsukuyomi_reset(tmp_path):
                     assert hidden.code is None and hidden.position == "facedown"
                     assert any(card.code == 49003308 for card in own.graveyards[1])
                     assert any(card.code == TSUKUYOMI for card in own.field)
-                    return
+                    reset_restrict = True
+            if chosen_second_target and not any(
+                    card.controller == 1 for card in monsters):
+                own = env.engine.probe.observation(0)
+                opponent = env.engine.probe.observation(1)
+                assert opponent_second_summoned and flipped_restrict and reactivated_restrict
+                assert any(card.code == RESTRICT and card.position != "facedown"
+                           for card in own.field)
+                assert any(card.code == second_target_code and card.zone == "spell_trap"
+                           for card in own.field)
+                assert not any(card.code == TSUKUYOMI for card in own.field)
+                assert any(card.code == TSUKUYOMI for card in own.hand)
+                assert any(card.code == RESTRICT and card.position != "facedown"
+                           for card in opponent.field)
+                return
     pytest.fail("GOAT Control Restrict/Tsukuyomi line did not resolve")
