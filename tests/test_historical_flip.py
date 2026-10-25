@@ -11,6 +11,7 @@ from goat_ai.environments import GoatEnvironment
 
 DEKOICHI = 87621407
 BOOK_OF_MOON = 14087893
+TSUKUYOMI = 34853266
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -129,3 +130,83 @@ def test_dekoichi_draws_again_after_book_of_moon_resets_it(tmp_path):
                               actions[0])
             observation = env.step(action)
     pytest.fail("Dekoichi did not draw twice after Book of Moon reset it")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_tsukuyomi_resets_dekoichi_then_returns_for_another_flip(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (DEKOICHI, TSUKUYOMI):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    deck = tmp_path / "dekoichi_tsukuyomi.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        *([DEKOICHI] * 3), *([TSUKUYOMI] * 3),
+        *VANILLA_DECK[6:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        dekoichi_set = first_flip = tsuk_summoned = tsuk_targeted = False
+        tsuk_returned = second_flip = False
+        deck_before_first = deck_before_second = None
+        for _ in range(115):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not dekoichi_set:
+                action = next((a for a in actions if a.kind == "set_monster"
+                               and a.parameters.get("code") == DEKOICHI), None)
+                dekoichi_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0:
+                if not first_flip:
+                    action = next((a for a in actions if a.kind == "flip_summon"
+                                   and a.parameters.get("code") == DEKOICHI), None)
+                    if action is not None:
+                        deck_before_first = obs.deck_counts[0]
+                        first_flip = True
+                if first_flip and not tsuk_summoned \
+                        and obs.deck_counts[0] == deck_before_first - 1 \
+                        and action is None:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == TSUKUYOMI), None)
+                    tsuk_summoned |= action is not None
+            if tsuk_summoned and not tsuk_targeted and actions[0].kind == "select_card":
+                assert any(link.card_code == TSUKUYOMI for link in obs.chain)
+                action = next((a for a in actions if a.parameters.get("code") == DEKOICHI
+                               and a.parameters.get("controller") == 0), None)
+                tsuk_targeted |= action is not None
+            if tsuk_targeted and obs.turn == 3 and obs.acting_player == 0 \
+                    and any(c.code == DEKOICHI and c.position == "facedown"
+                            for c in obs.field):
+                assert not any(a.kind == "flip_summon" and a.parameters.get("code")
+                               == DEKOICHI for a in actions)
+                opponent = env.engine.probe.observation(1)
+                assert any(c.controller == 0 and c.zone == "monster" and c.code is None
+                           for c in opponent.field)
+            if tsuk_targeted and obs.turn >= 4 and not tsuk_returned:
+                own = env.engine.probe.observation(0)
+                assert TSUKUYOMI in {c.code for c in own.hand}
+                assert not any(c.code == TSUKUYOMI for c in own.field)
+                tsuk_returned = True
+            if obs.turn == 5 and obs.acting_player == 0 and tsuk_returned \
+                    and not second_flip:
+                action = next((a for a in actions if a.kind == "flip_summon"
+                               and a.parameters.get("code") == DEKOICHI), None)
+                if action is not None:
+                    deck_before_second = obs.deck_counts[0]
+                    second_flip = True
+            if second_flip and obs.deck_counts[0] == deck_before_second - 1:
+                assert first_flip and tsuk_summoned and tsuk_targeted and tsuk_returned
+                assert deck_before_second == deck_before_first - 2
+                assert any(c.code == DEKOICHI and c.position == "faceup"
+                           for c in obs.field)
+                assert TSUKUYOMI in {c.code for c in env.engine.probe.observation(0).hand}
+                assert {f"official/c{code}.lua" for code in (
+                    DEKOICHI, TSUKUYOMI)}.issubset(
+                        env.engine.probe.loaded_script_sha256)
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "select_position", "pass", "end_phase")),
+                    actions[0])
+            obs = env.step(action)
+    pytest.fail("Tsukuyomi/Dekoichi repeat-Flip line did not finish")
