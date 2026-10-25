@@ -11,6 +11,7 @@ from goat_ai.environments import GoatEnvironment
 
 DON_ZALOOG = 76922029
 MYSTICAL_ELF = 15025844
+SETTABLE_BACKROW = (12607053, 14087893, 4178474, 56120475, 60082869)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -162,6 +163,85 @@ def test_don_triggers_when_weaker_monster_attacks_it(tmp_path):
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Don did not trigger after being attacked by Mystical Elf")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_don_with_empty_opponent_hand_only_mills_deck(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{DON_ZALOOG}.lua").is_file():
+        pytest.skip("Don Zaloog script not installed")
+    attacker = tmp_path / "don.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        *([DON_ZALOOG] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    defender = tmp_path / "empty_hand.ydk"
+    filler = [code for code in VANILLA_DECK if code != MYSTICAL_ELF]
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        *([MYSTICAL_ELF] * 3),
+        *(code for code in SETTABLE_BACKROW for _ in range(3)),
+        *filler[:22]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(attacker), str(defender), seed=3174,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        assert DON_ZALOOG in {c.code for c in observation.hand}
+        don_summoned = elf_summoned = attacked = offered = False
+        before_deck = None
+        for _ in range(100):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 \
+                    and not don_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == DON_ZALOOG), None)
+                don_summoned |= action is not None
+            if observation.turn == 2 and observation.acting_player == 1 \
+                    and observation.phase == "main1":
+                if not elf_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == MYSTICAL_ELF), None)
+                    elf_summoned |= action is not None
+                if elf_summoned and action is None:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"), None)
+            if observation.turn == 3 and observation.acting_player == 0 \
+                    and observation.phase == "main1":
+                action = next((a for a in actions if a.kind == "battle_phase"), action)
+            if observation.turn == 3 and observation.acting_player == 0 \
+                    and observation.phase == "battle_start" and not attacked:
+                assert observation.opponent_hand_count == 0
+                assert sum(c.controller == 1 and c.zone == "spell_trap"
+                           for c in observation.field) == 5
+                before_deck = observation.deck_counts[1]
+                action = next((a for a in actions if a.kind == "attack"
+                               and a.parameters.get("code") == DON_ZALOOG), None)
+                attacked |= action is not None
+            if attacked and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("code") == MYSTICAL_ELF), None)
+            if attacked and not offered and any(a.kind == "yes"
+                                                and a.parameters.get("code") == DON_ZALOOG
+                                                for a in actions):
+                assert observation.life_points == (8000, 7400)
+                action = next(a for a in actions if a.kind == "yes"
+                              and a.parameters.get("code") == DON_ZALOOG)
+                offered = True
+            if offered and actions[0].kind == "select_option":
+                assert len(actions) == 1  # No random-discard mode is legal.
+                action = actions[0]
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "select_position", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+            if offered and observation.phase == "battle_step" \
+                    and observation.acting_player == 0:
+                assert observation.opponent_hand_count == 0
+                assert observation.deck_counts[1] == before_deck - 2
+                assert observation.life_points == (8000, 7400)
+                assert any(c.code == MYSTICAL_ELF for c in observation.graveyards[1])
+                assert len(observation.graveyards[1]) == 3
+                assert f"official/c{DON_ZALOOG}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Don did not mill when opponent had no hand cards")
 
 
 def _reach_mode_choice(env):
