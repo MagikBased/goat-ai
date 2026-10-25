@@ -1,4 +1,4 @@
-"""D.D. Warrior Lady removes BLS before its second-attack opportunity."""
+"""D.D. Warrior Lady's choice controls BLS's second-attack opportunity."""
 
 import os
 from pathlib import Path
@@ -17,7 +17,8 @@ DARK = 7359741
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_warrior_lady_banishes_bls_before_second_attack(tmp_path):
+@pytest.mark.parametrize("banish", [False, True])
+def test_warrior_lady_choice_controls_bls_second_attack(tmp_path, banish):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua",
                      f"official/c{DD_WARRIOR_LADY}.lua"):
@@ -43,8 +44,9 @@ def test_warrior_lady_banishes_bls_before_second_attack(tmp_path):
         assert DD_WARRIOR_LADY in {
             c.code for c in env.engine.probe.observation(1).hand}
         graceful_used = discarded = bls_summoned = warrior_summoned = False
-        battle = attacked = targeted = warrior_effect_used = False
+        battle = attacked = targeted = warrior_choice_made = False
         both_banished = False
+        second_attack_enabled = second_attack = False
         costs = []
         for _ in range(85):
             actions = env.legal_actions()
@@ -86,20 +88,48 @@ def test_warrior_lady_banishes_bls_before_second_attack(tmp_path):
                                    == DD_WARRIOR_LADY and a.parameters.get("controller")
                                    == 1), None)
                     targeted |= action is not None
-            if targeted and obs.acting_player == 1 and not warrior_effect_used:
-                action = next((a for a in actions if a.kind in ("yes", "chain")
-                               and a.parameters.get("code") == DD_WARRIOR_LADY), None)
-                warrior_effect_used |= action is not None
-                if action is not None:
+            if targeted and obs.acting_player == 0 and not second_attack_enabled:
+                option = next((a for a in actions if a.kind == "yes"
+                               and a.parameters.get("code") == BLS), None)
+                if option is not None:
                     assert obs.phase == "damage_step"
+                    assert not warrior_choice_made
+                    action = option
+                    second_attack_enabled = True
+            if targeted and obs.acting_player == 1 and not warrior_choice_made:
+                option = next((a for a in actions if a.kind in ("yes", "chain")
+                               and a.parameters.get("code") == DD_WARRIOR_LADY), None)
+                if option is not None:
+                    assert obs.phase == "damage_step"
+                    action = option if banish else next(a for a in actions
+                                                       if a.kind in ("no", "pass"))
+                    warrior_choice_made = True
+            if warrior_choice_made and not banish and obs.acting_player == 0 \
+                    and second_attack_enabled and not second_attack \
+                    and obs.phase == "battle_step":
+                action = next((a for a in actions if a.kind == "attack"
+                               and a.parameters.get("code") == BLS), action)
+                second_attack |= action is not None and action.kind == "attack"
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_card", "place", "pass", "main2", "end_phase")), actions[0])
             obs = env.step(action)
-            if warrior_effect_used and {BLS, DD_WARRIOR_LADY}.issubset(
+            if warrior_choice_made and banish and {BLS, DD_WARRIOR_LADY}.issubset(
                     {c.code for zone in obs.banished for c in zone}):
                 both_banished = True
+            if not banish and second_attack and obs.life_points == (8000, 3500) \
+                    and obs.phase == "battle_step" and obs.acting_player == 0:
+                assert DD_WARRIOR_LADY in {c.code for c in obs.graveyards[1]}
+                assert BLS in {c.code for c in obs.field}
+                assert BLS not in {c.code for c in obs.banished[0]}
+                assert not any(a.kind == "attack" and a.parameters.get("code") == BLS
+                               for a in env.legal_actions())
+                loaded = env.engine.probe.loaded_script_sha256
+                assert {f"goat/c{BLS}.lua",
+                        f"official/c{DD_WARRIOR_LADY}.lua"}.issubset(loaded)
+                return
             if both_banished:
+                assert second_attack_enabled
                 assert BLS in {c.code for c in obs.banished[0]}
                 assert DD_WARRIOR_LADY in {c.code for c in obs.banished[1]}
                 assert obs.life_points == (8000, 6500)
@@ -112,4 +142,4 @@ def test_warrior_lady_banishes_bls_before_second_attack(tmp_path):
                     assert {f"goat/c{BLS}.lua",
                             f"official/c{DD_WARRIOR_LADY}.lua"}.issubset(loaded)
                     return
-    pytest.fail("Warrior Lady did not banish BLS after battle")
+    pytest.fail(f"Warrior Lady / BLS choice did not resolve (banish={banish})")
