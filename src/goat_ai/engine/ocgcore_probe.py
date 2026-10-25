@@ -405,10 +405,19 @@ class OcgcoreProbe:
             if message[0] == MSG_MOVE:
                 if len(message) != 29:
                     raise ValueError("invalid MSG_MOVE length")
-                for offset in (5, 15):
-                    key = (message[offset], message[offset + 1],
-                           struct.unpack_from("<I", message, offset + 2)[0])
-                    self._known_facedown.pop(key, None)
+                old_key = (message[5], message[6],
+                           struct.unpack_from("<I", message, 7)[0])
+                new_key = (message[15], message[16],
+                           struct.unpack_from("<I", message, 17)[0])
+                known_code = self._known_facedown.pop(old_key, None)
+                self._known_facedown.pop(new_key, None)
+                if (known_code is not None and new_key[0] in (0, 1)
+                        and new_key[1] in (LOCATION_MZONE, LOCATION_SZONE)
+                        and struct.unpack_from("<I", message, 21)[0] & 0xA):
+                    # A known facedown card can change control without
+                    # exposing its current field identity. Carry only the
+                    # previous memory, never the raw code in MSG_MOVE.
+                    self._known_facedown[new_key] = known_code
             elif message[0] == MSG_POS_CHANGE:
                 if len(message) != 10:
                     raise ValueError("invalid MSG_POS_CHANGE length")

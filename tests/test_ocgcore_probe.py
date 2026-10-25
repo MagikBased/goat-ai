@@ -108,12 +108,30 @@ def test_known_facedown_memory_requires_public_flip_and_clears_on_move():
     probe._update_public_clock([bytes((MSG_POS_CHANGE,))
                                 + struct.pack("<IBBBBB", code, 1, 4, 2, 4, 8)])
     assert probe._known_facedown == {key: code}
-    # MSG_MOVE contains the raw identity even for private moves. Only its public
-    # old/new locations are used to invalidate memory.
+    # MSG_MOVE contains the raw identity even for private moves. A move out
+    # of the field invalidates memory without trusting that raw code.
     move = (bytes((MSG_MOVE,)) + struct.pack("<I", 99999999)
             + struct.pack("<BBII", 1, 4, 2, 8)
             + struct.pack("<BBII", 1, 16, 0, 1)
             + struct.pack("<I", 0))
+    probe._update_public_clock([move])
+    assert probe._known_facedown == {}
+
+
+def test_known_facedown_memory_follows_control_change_without_using_raw_code():
+    probe = object.__new__(OcgcoreProbe)
+    probe._turn = 3
+    probe._phase = "end"
+    probe._chain = []
+    probe._public_history = []
+    probe._known_facedown = {(0, 4, 2): 12345678}
+    move = (bytes((MSG_MOVE,)) + struct.pack("<I", 99999999)
+            + struct.pack("<BBII", 0, 4, 2, 8)
+            + struct.pack("<BBII", 1, 4, 0, 8)
+            + struct.pack("<I", 0))
+    probe._update_public_clock([move])
+    assert probe._known_facedown == {(1, 4, 0): 12345678}
+    probe._known_facedown.clear()
     probe._update_public_clock([move])
     assert probe._known_facedown == {}
 
