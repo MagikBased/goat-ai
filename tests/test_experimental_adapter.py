@@ -110,15 +110,20 @@ def test_native_announcement_resolves_in_real_duel(tmp_path, code, kind, paramet
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_question_card_name_prompt_hides_graveyard_and_resolves():
+@pytest.mark.parametrize("seed,correct_name,bottom_card", [
+    (6, 22609617, 22609617),
+    (11, 76812113, 54415063),
+])
+def test_question_card_name_prompt_hides_graveyard_and_resolves(
+        seed, correct_name, bottom_card):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     if not (root / "scripts/official/c38723936.lua").is_file():
         pytest.skip("Question script not installed")
     deck = "examples/decks/question_probe.ydk"
-    with GoatEnvironment(deck, deck, seed=6,
+    with GoatEnvironment(deck, deck, seed=seed,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
-        agent = RandomAgent(seed=6)
+        agent = RandomAgent(seed=seed)
         for _ in range(300):
             actions = env.legal_actions()
             if any(link.card_code == 38723936 and link.controller != observation.viewer
@@ -126,13 +131,16 @@ def test_question_card_name_prompt_hides_graveyard_and_resolves():
                 assert all(card.code is None for card in observation.graveyards[1])
             if actions[0].kind == "announce_card":
                 assert observation.acting_player == 0
-                assert len(actions) > 800
+                assert len(actions) > 1000
                 assert all(card.code is None for card in observation.graveyards[1])
-                assert any(card.code is not None for card in observation.graveyards[0])
+                assert all(card.code is not None for card in observation.graveyards[0])
+                announced_names = {action.parameters["code"] for action in actions}
+                assert 47507260 in announced_names  # Original ID of a GOAT variant.
+                assert 504700077 not in announced_names  # Alias variant is not a name.
                 correct = next(action for action in actions
-                               if action.parameters["code"] == 22609617)
+                               if action.parameters["code"] == correct_name)
                 observation = env.step(correct)
-                assert any(card.code == 22609617 for card in observation.banished[1])
+                assert any(card.code == bottom_card for card in observation.banished[1])
                 assert env.legal_actions()
                 return
             observation = env.step(agent.select_action(observation, actions))

@@ -259,8 +259,15 @@ class OcgcoreProbe:
             pool = read_goat_whitelist(
                 self.db_path.parent.parent / "banlist/GOAT.lflist.conf")
             # A historical card name may be Forbidden, so use all listed IDs.
+            # GOAT variants report their alias as GetCode(); include the
+            # original printed-name ID even when only its variant is listed.
+            names = set(pool)
+            for code in pool:
+                row = self._card_row(code, "alias, type")
+                if row is not None and row[1] & 1 and row[0]:
+                    names.add(row[0])
             # The core rejects aliases and Tokens for this expression.
-            self._announcement_codes = tuple(code for code in sorted(pool)
+            self._announcement_codes = tuple(code for code in sorted(names)
                 if (row := self._card_row(code, "alias, type")) is not None
                 and row[0] == 0 and row[1] & 1 and not row[1] & 0x4000)
         return decode_decision(self._pending_message, self._announcement_codes)

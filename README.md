@@ -106,7 +106,15 @@ python scripts/setup_native.py --full-card-scripts
 python scripts/probe_control_deck.py --seed 42
 python scripts/probe_control_deck.py --seed 0 --seeds 50
 python scripts/probe_control_deck.py --deck examples/decks/control_probe.ydk --opponent-deck examples/decks/chaos_probe.ydk --seed 0 --seeds 10
+python scripts/probe_random_decks.py --seeds 10 --max-decisions 3000
 ```
+
+The random-deck probe deterministically generates whitelist-legal 40-card
+decks and writes its deck files and JSON report under ignored `.cache/goat-ai/random-probe/`.
+It is a native protocol coverage check, not a historical correctness or playing-strength test.
+On the pinned assets, seeds 0–9 completed 10/10 duels in 12,382 decisions;
+repeating the command produced the same report SHA-256
+`8709934ca9d23d88cc0fb8b73fcfccb387d2eaa9097374660bcf6c9a68c730f9`.
 
 The sample is a synthetic control-style protocol probe, not a sourced
 tournament decklist. On pinned assets, seeds 0–49 all reached terminal states

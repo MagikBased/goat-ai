@@ -106,6 +106,18 @@ class RestrictedOcgcoreEngine:
                         sequence: int) -> int | None:
             if controller == native.player:
                 return code
+            if (location == 0x02
+                    and any(link.card_code == 5556668 for link in observation.chain)):
+                # Exchange privately confirms each hand to the player who
+                # chooses from it. Use only the latest addressed reveal from
+                # this turn; never query the opponent's current hand identity.
+                reveal = next((event for event in reversed(observation.private_reveals)
+                               if event.turn == observation.turn and any(
+                                   card.controller == controller and card.location == location
+                                   for card in event.cards)), None)
+                if reveal is not None and any(card.code == code for card in reveal.cards):
+                    return code
+                raise SimulatorUnavailable("Exchange hand choice lacks a recipient-scoped reveal")
             visible = next((card for card in visible_cards
                             if card.controller == controller
                             and card.zone == zones.get(location)
@@ -135,8 +147,9 @@ class RestrictedOcgcoreEngine:
             if choice.cards:
                 cards = []
                 for code, controller, location, sequence in choice.cards:
-                    target = {"controller": controller, "location": location,
-                              "sequence": sequence}
+                    target = {"controller": controller, "location": location}
+                    if not (location == 0x02 and controller != native.player):
+                        target["sequence"] = sequence
                     visible_code = public_code(code, controller, location, sequence)
                     if visible_code is not None:
                         target["code"] = visible_code
@@ -161,7 +174,8 @@ class RestrictedOcgcoreEngine:
                 parameters["code"] = choice.announced_card
             if choice.prompt_id is not None:
                 parameters["prompt_id"] = choice.prompt_id
-            if choice.sequence is not None:
+            if (choice.sequence is not None
+                    and not (choice.location == 0x02 and choice.controller != native.player)):
                 parameters["sequence"] = choice.sequence
             if choice.controller is not None:
                 parameters["controller"] = choice.controller
