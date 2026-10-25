@@ -235,7 +235,8 @@ def test_return_chain_distinguishes_mst_destruction_from_solemn_negation(tmp_pat
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_return_with_one_open_monster_zone_revives_only_chosen_monster(tmp_path):
+@pytest.mark.parametrize("destroy_token", [False, True])
+def test_return_monster_zone_capacity(tmp_path, destroy_token):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"official/c{GRACEFUL}.lua", f"official/c{BAZOO}.lua",
                      f"official/c{RETURN}.lua", f"goat/c{SCAPEGOAT}.lua"):
@@ -296,7 +297,8 @@ def test_return_with_one_open_monster_zone_revives_only_chosen_monster(tmp_path)
                     action = next((a for a in actions if a.kind == "normal_summon"
                                    and a.parameters.get("code") == CHASER), None)
                     chaser_summoned |= action is not None
-                if chaser_summoned and obs.phase == "main1" and action is None:
+                if destroy_token and chaser_summoned and obs.phase == "main1" \
+                        and action is None:
                     action = next((a for a in actions if a.kind == "battle_phase"), None)
                 if goat_used and obs.phase == "battle_start" and not attacked:
                     action = next((a for a in actions if a.kind == "attack"
@@ -307,12 +309,21 @@ def test_return_with_one_open_monster_zone_revives_only_chosen_monster(tmp_path)
                                    in SHEEP_CODES and a.parameters.get("controller") == 0),
                                   None)
                     target_chosen |= action is not None
-            if obs.turn == 3 and obs.acting_player == 0:
+            if obs.turn == 3 and obs.acting_player == 0 and obs.phase == "main1":
                 if not return_used:
                     assert sum(c.controller == 0 and c.zone == "monster"
-                               for c in obs.field) == 4
-                    assert sum(c.code in SHEEP_CODES for c in obs.field) == 3
+                               for c in obs.field) == (4 if destroy_token else 5)
+                    assert sum(c.code in SHEEP_CODES for c in obs.field) == (
+                        3 if destroy_token else 4)
                     assert {first, second} == {c.code for c in obs.banished[0]}
+                    if not destroy_token:
+                        assert goat_used and chaser_summoned and return_set
+                        assert not any(a.kind == "activate" and
+                                       a.parameters.get("code") == RETURN for a in actions)
+                        assert obs.life_points == (8000, 8000)
+                        assert f"official/c{RETURN}.lua" in (
+                            env.engine.probe.loaded_script_sha256)
+                        return
                     action = next((a for a in actions if a.kind == "activate"
                                    and a.parameters.get("code") == RETURN), None)
                     return_used |= action is not None
@@ -343,4 +354,4 @@ def test_return_with_one_open_monster_zone_revives_only_chosen_monster(tmp_path)
                 assert BAZOO in {c.code for c in obs.field}
                 assert f"official/c{RETURN}.lua" in env.engine.probe.loaded_script_sha256
                 return
-    pytest.fail("Return's one-open-zone line did not finish")
+    pytest.fail("Return's Monster Zone capacity line did not finish")
