@@ -96,6 +96,9 @@
           <button id="previous" title="Left arrow">Previous</button>
           <button id="play">Play</button>
           <button id="next" title="Right arrow">Next</button>
+          <button id="previous-common" type="button">Prev common</button>
+          <button id="next-common" type="button">Next common</button>
+          <span id="common-count" class="muted" title="Reviewable decisions involving cards in at least five of six sourced tournament Main Decks"></span>
           <input id="slider" type="range" min="0" value="0" aria-label="Decision position">
           <label class="decision-jump">Frame <input id="jump" type="number" min="1" value="1"> <span id="total"></span></label>
           <label class="skip-label"><input id="skip" type="checkbox" checked> Skip passes and placement</label>
@@ -160,6 +163,13 @@
     let legalShown = 100;
     let sourceSha256 = "";
     let annotations = new Map();
+    let commonFrames = [];
+    // Card IDs in >=5 of the six sourced tournament Main Decks; tests pin this list.
+    const COMMON_CARD_CODES = new Set([
+      14087893, 504700116, 44763025, 19613556, 71413901,
+      55144522, 511000824, 504700118, 79571449, 87621407,
+      64697231, 7572887, 44095762, 53582587, 45986603
+    ]);
     const byId = id => document.getElementById(id);
     const phaseName = phase => String(phase || "unknown").replaceAll("_", " ");
     const locationName = location => ({1: "Deck", 2: "Hand", 4: "Monster", 8: "Spell/Trap", 16: "Graveyard", 32: "Banished", 64: "Extra"})[location] || `zone ${location}`;
@@ -192,6 +202,22 @@
       const code = visibleCode(observation, card, known);
       if (code == null) return card.zone === "monster" || card.location === 4 ? "Set Monster" : "Set Spell/Trap";
       return nameOf(code);
+    };
+    const commonDecision = record => {
+      if (record.legal_actions.length < 2) return false;
+      if ((record.observation.chain || []).some(link => COMMON_CARD_CODES.has(link.card_code))) return true;
+      return record.legal_actions.some(action => {
+        const params = action.parameters || {};
+        return COMMON_CARD_CODES.has(params.code) || (params.cards || []).some(
+          card => COMMON_CARD_CODES.has(card.code));
+      });
+    };
+    const nearbyCommon = direction => {
+      if (direction > 0) return commonFrames.find(frame => frame > index);
+      for (let cursor = commonFrames.length - 1; cursor >= 0; cursor--) {
+        if (commonFrames[cursor] < index) return commonFrames[cursor];
+      }
+      return undefined;
     };
     function cardElement(observation, card, known) {
       const code = visibleCode(observation, card, known);
@@ -303,6 +329,9 @@
       byId("total").textContent = `/ ${lastIndex + 1}`;
       byId("previous").disabled = index === 0;
       byId("next").disabled = index === lastIndex;
+      byId("previous-common").disabled = nearbyCommon(-1) == null;
+      byId("next-common").disabled = nearbyCommon(1) == null;
+      byId("common-count").textContent = `${commonFrames.length} common-card choices`;
       byId("turn").textContent = `Turn ${observation.turn} · ${phaseName(observation.phase)}`;
       byId("viewpoint").textContent = terminal
         ? `Final state · Player ${observation.viewer}'s visible view`
@@ -382,10 +411,17 @@
       index = candidate;
       render();
     }
+    function moveCommon(direction) {
+      if (!replay) return;
+      const candidate = nearbyCommon(direction);
+      if (candidate == null) return;
+      stop(); index = candidate; render();
+    }
     function stop() { if (timer) clearInterval(timer); timer = null; byId("play").textContent = "Play"; }
     function setReplay(data, label, hash) {
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
       stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map();
+      commonFrames = data.decisions.flatMap((record, frame) => commonDecision(record) ? [frame] : []);
       const requested = Number(location.hash.match(/^#decision=(\d+)$/)?.[1] || 1);
       index = Math.max(0, Math.min(data.decisions.length - 1 + Number(Boolean(data.terminal_observation)), requested - 1));
       byId("file-name").textContent = label; render();
@@ -404,6 +440,8 @@
     });
     byId("previous").addEventListener("click", () => move(-1));
     byId("next").addEventListener("click", () => move(1));
+    byId("previous-common").addEventListener("click", () => moveCommon(-1));
+    byId("next-common").addEventListener("click", () => moveCommon(1));
     byId("legal-more").addEventListener("click", () => { legalShown += 100; render(); });
     byId("label-recorded").addEventListener("click", () => {
       if (!replay || index >= replay.decisions.length) return;

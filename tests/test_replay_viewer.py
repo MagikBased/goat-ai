@@ -1,10 +1,15 @@
 """The offline viewer embeds validated visible decisions and escapes replay text."""
 
 import hashlib
+import re
 import sqlite3
+from collections import Counter
 from dataclasses import replace
+from pathlib import Path
 
 from goat_ai.actions import Action
+from goat_ai.engine.decks import read_ydk
+from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
 from goat_ai.observations import (
     CardView,
     DisabledZoneView,
@@ -15,6 +20,20 @@ from goat_ai.observations import (
 )
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
 from scripts.render_replay import render_replay
+
+
+def test_common_card_navigation_matches_sourced_main_decks():
+    root = Path(__file__).resolve().parent.parent
+    template = (root / "examples/replay_viewer.html").read_text(encoding="utf-8")
+    match = re.search(r"const COMMON_CARD_CODES = new Set\(\[([^\]]+)\]\);", template)
+    assert match is not None
+    viewer_codes = {int(code) for code in re.findall(r"\d+", match.group(1))}
+    deck_counts = Counter()
+    for filename in TOURNAMENT_MAIN_DECKS:
+        deck_counts.update(set(read_ydk(root / "examples/decks" / filename).main))
+    assert viewer_codes == {code for code, count in deck_counts.items() if count >= 5}
+    assert 'id="previous-common"' in template
+    assert 'id="next-common"' in template
 
 
 def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
