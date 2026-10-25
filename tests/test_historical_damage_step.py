@@ -11,25 +11,32 @@ from goat_ai.environments import GoatEnvironment
 
 BOOK_OF_MOON = 14087893
 COMPULSORY = 94192409
+RING = 511000824
 DEKOICHI = 87621407
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("trap_code", [BOOK_OF_MOON, COMPULSORY])
+@pytest.mark.parametrize("trap_code", [BOOK_OF_MOON, COMPULSORY, RING])
 def test_battle_step_response_unavailable_after_defender_flips(tmp_path, trap_code):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    if any(not (root / f"scripts/official/c{code}.lua").is_file()
-           for code in (DEKOICHI, trap_code)):
+    trap_script = (f"pre-errata/c{RING}.lua" if trap_code == RING
+                   else f"official/c{trap_code}.lua")
+    if not (root / f"scripts/official/c{DEKOICHI}.lua").is_file() or not (
+            root / "scripts" / trap_script).is_file():
         pytest.skip("full card script checkout not installed")
     decks = Path(__file__).resolve().parent.parent / "examples/decks"
     defender = list(read_ydk(decks / "book_three_probe.ydk").main)
-    defender[:3] = [trap_code] * 3
-    defender[3] = DEKOICHI
+    if trap_code == RING:
+        defender[:4] = [RING, DEKOICHI, DEKOICHI, DEKOICHI]
+    else:
+        defender[:3] = [trap_code] * 3
+        defender[3] = DEKOICHI
     defender_path = tmp_path / "defender.ydk"
     defender_path.write_text("#main\n" + "\n".join(map(str, defender)) + "\n")
 
     with GoatEnvironment(str(decks / "vanilla_probe.ydk"), str(defender_path),
-                         seed=48, engine=ExperimentalOcgcoreEngine(root)) as env:
+                         seed=7 if trap_code == RING else 48,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
         summoned = set_monster = set_trap = attacked = False
         trap_available_on_attack = trap_barred_after_flip = False
@@ -54,7 +61,11 @@ def test_battle_step_response_unavailable_after_defender_flips(tmp_path, trap_co
                     assert observation.phase == "damage_step"
                     assert any(card.controller == 1 and card.zone == "spell_trap"
                                and card.code == trap_code for card in observation.field)
+                    if trap_code == RING:
+                        assert any(card.controller == 0 and card.zone == "monster"
+                                   and card.position == "faceup" for card in observation.field)
                     assert trap is None
+                    assert trap_script in env.engine.probe.loaded_script_sha256
                     trap_barred_after_flip = True
                     defender_deck_before_flip = observation.deck_counts[1]
             if (trap_barred_after_flip and defender_deck_before_flip is not None
