@@ -14,6 +14,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 DUSTSHOOT = 64697231
 BOOK_OF_MOON = 14087893
+NONMONSTER_CARDS = (12607053, BOOK_OF_MOON, 4178474, 56120475, 60082869)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -144,3 +145,62 @@ def test_dustshoot_requires_at_least_four_opponent_hand_cards(tmp_path):
                     "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("Dustshoot hand-size threshold was not exercised")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_dustshoot_reveals_nonmonster_hand_without_return_target(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{DUSTSHOOT}.lua").is_file():
+        pytest.skip("Trap Dustshoot script not installed")
+    own = tmp_path / "dustshoot.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        *([DUSTSHOOT] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    opposing = tmp_path / "nonmonsters.ydk"
+    opposing.write_text("#main\n" + "\n".join(map(str, (
+        *(code for code in NONMONSTER_CARDS for _ in range(3)),
+        *VANILLA_DECK[:25]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own), str(opposing), seed=2078,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        assert DUSTSHOOT in {c.code for c in observation.hand}
+        set_trap = activated = False
+        before_deck = None
+        for _ in range(35):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 \
+                    and not set_trap:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == DUSTSHOOT), None)
+                set_trap |= action is not None
+            if set_trap and observation.turn == 2 and observation.acting_player == 0 \
+                    and not activated:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == DUSTSHOOT), None)
+                if action is not None:
+                    assert observation.opponent_hand_count == 6
+                    own_hand = env.engine.probe.observation(1).hand
+                    assert len(own_hand) == 6
+                    assert all(c.code in NONMONSTER_CARDS for c in own_hand)
+                    before_deck = observation.deck_counts[1]
+                    activated = True
+            if activated:
+                assert actions[0].kind != "select_card"
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+            if activated and any(c.code == DUSTSHOOT for c in observation.graveyards[0]):
+                chooser = env.engine.probe.observation(0)
+                opponent = env.engine.probe.observation(1)
+                assert chooser.opponent_hand_count == 6
+                assert chooser.deck_counts[1] == before_deck
+                assert Counter(c.code for event in chooser.private_reveals
+                               for c in event.cards) == Counter(c.code for c in opponent.hand)
+                assert all(event.recipient == 0 for event in chooser.private_reveals)
+                assert not opponent.private_reveals
+                assert f"official/c{DUSTSHOOT}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Dustshoot did not finish resolving against a nonmonster hand")
