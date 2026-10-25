@@ -91,3 +91,57 @@ def test_don_zaloog_battle_damage_choices_keep_hand_hidden(tmp_path, choice):
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail(f"Don Zaloog did not complete {choice} battle-damage line")
+
+
+def _reach_mode_choice(env):
+    observation = env.reset()
+    summoned = False
+    for _ in range(40):
+        actions = env.legal_actions()
+        if actions[0].kind == "select_option":
+            return observation, actions, tuple(
+                c.code for c in env.engine.probe.observation(1).hand)
+        action = None
+        if observation.turn == 1 and observation.acting_player == 0 and not summoned:
+            action = next((a for a in actions if a.kind == "normal_summon"
+                           and a.parameters.get("code") == DON_ZALOOG), None)
+            summoned |= action is not None
+        if observation.turn == 3 and observation.phase == "main1" \
+                and observation.acting_player == 0:
+            action = next((a for a in actions if a.kind == "battle_phase"), action)
+        if observation.turn == 3 and observation.phase == "battle_start" \
+                and observation.acting_player == 0:
+            action = next((a for a in actions if a.kind == "attack"
+                           and a.parameters.get("code") == DON_ZALOOG), action)
+        if action is None:
+            action = next((a for a in actions if a.kind == "yes"
+                           and a.parameters.get("code") == DON_ZALOOG), None)
+        if action is None:
+            action = next((a for a in actions if a.kind in (
+                "place", "pass", "end_phase")), actions[0])
+        observation = env.step(action)
+    pytest.fail("Don Zaloog did not offer its two effect modes")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_don_choice_is_identical_when_opponent_private_hand_changes(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{DON_ZALOOG}.lua").is_file():
+        pytest.skip("Don Zaloog script not installed")
+    attacker = tmp_path / "don.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        *([DON_ZALOOG] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    changed = list(VANILLA_DECK)
+    changed[3] = 97923414  # Replace a privately held La Jinn with a second Inpachi.
+    defender = tmp_path / "changed_private_hand.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, changed)) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(attacker), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as original:
+        observation, actions, hidden_hand = _reach_mode_choice(original)
+    with GoatEnvironment(str(attacker), str(defender), seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as alternate:
+        changed_observation, changed_actions, changed_hand = _reach_mode_choice(alternate)
+    assert hidden_hand != changed_hand
+    assert observation == changed_observation
+    assert actions == changed_actions
+    assert observation.opponent_hand_count == len(hidden_hand)
