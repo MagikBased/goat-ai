@@ -432,8 +432,13 @@ class OcgcoreProbe:
                             if code in known_hand[old_controller]:
                                 known_hand[old_controller].remove(code)
                         else:
-                            # A Set or other hidden exit may be any hand card.
-                            known_hand[old_controller].clear()
+                            # A hidden exit may consume one known copy of any
+                            # identity. Retain only the copies guaranteed to
+                            # remain for every possible choice of that card.
+                            known_hand[old_controller] = [
+                                code for code, count in Counter(
+                                    known_hand[old_controller]).items()
+                                for _ in range(max(0, count - 1))]
                     public_source = (old_location == LOCATION_GRAVE or
                                      (old_location in (LOCATION_MZONE, LOCATION_SZONE)
                                       and struct.unpack_from("<I", message, 11)[0] & 0x5))
