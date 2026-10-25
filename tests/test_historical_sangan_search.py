@@ -16,6 +16,7 @@ POT_OF_GREED = 55144522
 HEAVY_STORM = 19613556
 LOW_ATTACK_NORMALS = {15025844, 13039848}
 MYSTICAL_ELF = 15025844
+NOBLEMAN = 504700116
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -94,3 +95,60 @@ def test_sangan_search_reveals_only_to_opponent(tmp_path, has_target):
                 assert f"goat/c{SANGAN}.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail("Sangan search did not reveal the correct information to the opponent")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_nobleman_banishes_set_sangan_without_search(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"goat/c{SANGAN}.lua", f"goat/c{NOBLEMAN}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    defender = tmp_path / "sangan.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        SANGAN, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment("examples/decks/nobleman_probe.ydk", str(defender), seed=52,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert NOBLEMAN in {c.code for c in obs.hand}
+        assert SANGAN in {c.code for c in env.engine.probe.observation(1).hand}
+        set_sangan = nobleman_used = target_selected = False
+        deck_before = hand_before = None
+        for _ in range(55):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1 and not set_sangan:
+                action = next((a for a in actions if a.kind == "set_monster"
+                               and a.parameters.get("code") == SANGAN), None)
+                set_sangan |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not nobleman_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == NOBLEMAN), None)
+                nobleman_used |= action is not None
+                if nobleman_used:
+                    defender_view = env.engine.probe.observation(1)
+                    deck_before = defender_view.deck_counts[1]
+                    hand_before = len(defender_view.hand)
+            if nobleman_used and not target_selected and actions[0].kind == "select_card":
+                assert any(c.controller == 1 and c.position == "facedown"
+                           and c.code is None for c in obs.field)
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("controller") == 1
+                               and "code" not in a.parameters), None)
+                target_selected = action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if target_selected and SANGAN in {c.code for c in obs.banished[1]}:
+                owner = env.engine.probe.observation(1)
+                assert SANGAN not in {c.code for c in owner.graveyards[1]}
+                assert owner.deck_counts[1] == deck_before
+                assert len(owner.hand) == hand_before
+                assert any(c.code == MYSTICAL_ELF for c in
+                           env.engine.probe._query_location(1, 1))
+                assert not any(link.card_code == SANGAN for link in owner.chain)
+                assert not owner.private_reveals
+                assert not obs.private_reveals
+                assert f"goat/c{NOBLEMAN}.lua" in env.engine.probe.loaded_script_sha256
+                return
+    pytest.fail("Nobleman did not banish Sangan without its Deck search")
