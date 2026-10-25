@@ -16,7 +16,7 @@ DARK = 7359741  # Mechanicalchaser
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("choice", ["double_attack", "banish"])
+@pytest.mark.parametrize("choice", ["double_attack", "banish", "attack_then_main2"])
 def test_bls_historical_turn_choices(tmp_path, choice):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for script in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua"):
@@ -85,11 +85,15 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                                    and a.parameters.get("code") == opponent_code
                                    and a.parameters.get("location") == 4), action)
                 if observation.phase == "main1" and (
-                        choice == "double_attack" or (
+                        choice in ("double_attack", "attack_then_main2") or (
                             effect_used and any(c.code == opponent_code
                                                 for c in observation.banished[1]))):
+                    if choice == "attack_then_main2":
+                        assert any(a.kind == "activate" and a.parameters.get("code") == BLS
+                                   for a in actions)
                     action = next((a for a in actions if a.kind == "battle_phase"), action)
-                if choice == "double_attack" and observation.phase == "battle_start" \
+                if choice in ("double_attack", "attack_then_main2") \
+                        and observation.phase == "battle_start" \
                         and not first_attack:
                     assert set(costs) == {LIGHT, DARK}
                     assert {c.code for c in observation.banished[0]} == {LIGHT, DARK}
@@ -103,14 +107,26 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                                         for a in actions):
                     assert observation.phase == "damage_step"
                     assert observation.life_points == (8000, 6800)
-                    action = next(a for a in actions if a.kind == "yes"
+                    response = "yes" if choice == "double_attack" else "no"
+                    action = next(a for a in actions if a.kind == response
                                   and a.parameters.get("code") == BLS)
-                    trigger_accepted = True
+                    trigger_accepted = response == "yes"
                 if trigger_accepted and not second_attack \
                         and observation.phase == "battle_step":
                     action = next((a for a in actions if a.kind == "attack"
                                    and a.parameters.get("code") == BLS), action)
                     second_attack = action is not None and action.kind == "attack"
+                if choice == "attack_then_main2" and first_attack \
+                        and observation.phase == "battle_step" \
+                        and observation.life_points == (8000, 6800):
+                    action = next((a for a in actions if a.kind == "main2"), action)
+            if choice == "attack_then_main2" and observation.turn == 3 \
+                    and observation.phase == "main2" and observation.acting_player == 0:
+                assert any(c.code == BLS for c in observation.field)
+                assert not any(a.kind == "activate" and a.parameters.get("code") == BLS
+                               for a in actions)
+                assert f"goat/c{BLS}.lua" in env.engine.probe.loaded_script_sha256
+                return
             if (choice == "banish" and effect_used and observation.turn == 3
                     and observation.phase == "battle_start"
                     and any(c.code == opponent_code for c in observation.banished[1])):
