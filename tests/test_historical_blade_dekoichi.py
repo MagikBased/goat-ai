@@ -1,4 +1,4 @@
-"""Blade Knight negates Dekoichi's draw only while attacking alone."""
+"""A face-up or Set ally turns off Blade Knight's Dekoichi negation."""
 
 import os
 from pathlib import Path
@@ -21,7 +21,7 @@ def _deck(path, cards):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("ally", [False, True])
+@pytest.mark.parametrize("ally", ["none", "faceup", "facedown"])
 def test_blade_knight_lone_monster_condition_against_dekoichi(tmp_path, ally):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = {f"official/c{code}.lua" for code in (BLADE, DEKOICHI)}
@@ -62,8 +62,9 @@ def test_blade_knight_lone_monster_condition_against_dekoichi(tmp_path, ally):
                                and a.parameters.get("code") == DEKOICHI), None)
                 dekoichi_set = action is not None
             if obs.turn == 3 and obs.acting_player == 0 and dekoichi_set:
-                if ally and not ally_summoned:
-                    action = next((a for a in actions if a.kind == "normal_summon"
+                if ally != "none" and not ally_summoned:
+                    kind = "set_monster" if ally == "facedown" else "normal_summon"
+                    action = next((a for a in actions if a.kind == kind
                                    and a.parameters.get("code") != BLADE), None)
                     ally_summoned = action is not None
                 if obs.phase == "main1" and not battle and action is None:
@@ -71,7 +72,11 @@ def test_blade_knight_lone_monster_condition_against_dekoichi(tmp_path, ally):
                     battle = action is not None
                 elif obs.phase == "battle_start" and not attacked:
                     assert sum(c.controller == 0 and c.zone == "monster"
-                               for c in obs.field) == (2 if ally else 1)
+                               for c in obs.field) == (2 if ally != "none" else 1)
+                    if ally == "facedown":
+                        hidden = [c for c in env.engine.probe.observation(1).field
+                                  if c.controller == 0 and c.position == "facedown"]
+                        assert len(hidden) == 1 and hidden[0].code is None
                     action = next((a for a in actions if a.kind == "attack"
                                    and a.parameters.get("code") == BLADE), None)
                     attacked = action is not None
@@ -92,8 +97,8 @@ def test_blade_knight_lone_monster_condition_against_dekoichi(tmp_path, ally):
             if target_chosen and not checked and DEKOICHI in {
                     c.code for c in obs.graveyards[1]} and obs.phase == "battle_step":
                 owner = env.engine.probe.observation(1)
-                assert owner.deck_counts[1] == deck_before - int(ally)
-                assert len(owner.hand) == hand_before + int(ally)
+                assert owner.deck_counts[1] == deck_before - int(ally != "none")
+                assert len(owner.hand) == hand_before + int(ally != "none")
                 assert obs.life_points == (8000, 8000)
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
                 checked = True
