@@ -15,6 +15,7 @@ BOOK_OF_MOON = 14087893
 GEMINI_ELF = 69140098
 NECROVALLEY = 511002998
 MYSTICAL_SPACE_TYPHOON = 5318639
+SOLEMN_JUDGMENT = 41420027
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -126,6 +127,77 @@ def test_magician_of_faith_returns_pot_with_or_without_book_response(
                     "select_card", "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("Magician of Faith did not return Pot of Greed")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_solemn_negates_magician_of_faith_flip_summon_before_flip_effect(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (POT_OF_GREED, MAGICIAN_OF_FAITH, SOLEMN_JUDGMENT):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    attacker = tmp_path / "mof.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        POT_OF_GREED, MAGICIAN_OF_FAITH, *VANILLA_DECK[2:])))
+                        + "\n#extra\n!side\n")
+    defender = tmp_path / "solemn.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        *([SOLEMN_JUDGMENT] * 3), *VANILLA_DECK[3:])))
+                        + "\n#extra\n!side\n")
+    with GoatEnvironment(str(attacker), str(defender), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {POT_OF_GREED, MAGICIAN_OF_FAITH}.issubset(c.code for c in obs.hand)
+        assert SOLEMN_JUDGMENT in {
+            c.code for c in env.engine.probe.observation(1).hand}
+        pot_used = mof_set = solemn_set = flipped = negated = False
+        for _ in range(55):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not pot_used:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == POT_OF_GREED), None)
+                    pot_used |= action is not None
+                elif not mof_set:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == MAGICIAN_OF_FAITH), None)
+                    mof_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not solemn_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SOLEMN_JUDGMENT), None)
+                solemn_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and mof_set and not flipped:
+                action = next((a for a in actions if a.kind == "flip_summon"
+                               and a.parameters.get("code") == MAGICIAN_OF_FAITH), None)
+                flipped |= action is not None
+            if flipped and obs.turn == 3 and obs.acting_player == 1 and not negated:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SOLEMN_JUDGMENT), None)
+                if action is not None:
+                    assert POT_OF_GREED in {c.code for c in obs.graveyards[0]}
+                    assert not any(link.card_code == MAGICIAN_OF_FAITH
+                                   for link in obs.chain)
+                    negated = True
+            if negated and obs.acting_player == 0 and obs.phase == "main1" \
+                    and any(a.kind == "end_phase" for a in actions):
+                assert obs.life_points == (8000, 4000)
+                assert {POT_OF_GREED, MAGICIAN_OF_FAITH}.issubset(
+                    c.code for c in obs.graveyards[0])
+                assert not any(c.code == POT_OF_GREED for c in obs.hand)
+                assert not any(c.code == MAGICIAN_OF_FAITH for c in obs.field)
+                assert SOLEMN_JUDGMENT in {c.code for c in obs.graveyards[1]}
+                assert not any(link.card_code == MAGICIAN_OF_FAITH for link in obs.chain)
+                assert not obs.private_reveals
+                assert not env.engine.probe.observation(1).private_reveals
+                loaded = env.engine.probe.loaded_script_sha256
+                assert {f"official/c{MAGICIAN_OF_FAITH}.lua",
+                        f"official/c{SOLEMN_JUDGMENT}.lua"}.issubset(loaded)
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail("Solemn did not negate Magician of Faith's Flip Summon")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
