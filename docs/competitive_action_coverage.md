@@ -52,3 +52,43 @@ Force was offered as a response three times but never selected. For fixture
 planning, combine this measured decision exposure with the sourced deck-list
 prevalence in [the roadmap](roadmap.md), then verify each candidate against
 [historical rulings](goat_rules.md).
+
+## Expanded competitive-deck sample and chain responses
+
+The probe now also counts a selected `chain` card against the latest card in
+the player-visible chain. This is an observed response pair, not a claim that
+every activation or ruling for either card is correct. Re-running the original
+seed-9700 sample with this additional field left every earlier report field
+unchanged.
+
+On the same pinned assets and six deck files, seeds 9710–9719 produced **60
+terminal duels** with **55,009 decisions**, under the 3,000-decision cap for
+each duel. Of 64 card identities appearing in the deck files or legal source
+actions, 40 had an `activate` or `chain` action offered and 39 had one selected.
+The sample contained **171 selected card responses** across 95 distinct
+ordered response pairs. The report JSON SHA-256 was
+`32798a2ff89b9c4795bed19485518c05e48f1fa26b90ce278b04315aa6ae50fb`.
+
+| Selected response to preceding chain link | Decisions |
+| --- | ---: |
+| Solemn Judgment → Book of Moon | 9 |
+| Solemn Judgment → Mystical Space Typhoon | 7 |
+| Solemn Judgment → Compulsory Evacuation Device | 6 |
+| Solemn Judgment → Nobleman of Crossout | 6 |
+| Dust Tornado → Book of Moon | 5 |
+
+The sample also observed four Torrential Tribute responses to Breaker the
+Magical Warrior, which already have a [historical fixture](goat_rules.md).
+Solemn Judgment responding to Book of Moon is a high-exposure gap for the next
+source-backed regression. These counts are from random-agent choices; they do
+not estimate tournament play rates or policy quality.
+
+Reproduce the expanded sample after [native setup](native_setup.md):
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --seed 9710 --seeds 10 \
+  --max-decisions 3000 \
+  --output .cache/goat-ai/competitive-actions-9710-9719.json \
+  > .cache/goat-ai/competitive-actions-9710-9719.stdout
+```

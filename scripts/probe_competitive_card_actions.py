@@ -51,6 +51,16 @@ def count_source_actions(legal_actions, selected_action,
         selected[choice] += 1
 
 
+def count_chain_response(observation, selected_action,
+                         responses: Counter) -> None:
+    """Count a chosen card response to the currently latest public chain link."""
+    if selected_action.kind != "chain" or not observation.chain:
+        return
+    code = selected_action.parameters.get("code")
+    if isinstance(code, int):
+        responses[code, observation.chain[-1].card_code] += 1
+
+
 def card_names(native_root: Path, codes: set[int]) -> dict[int, str]:
     database = native_root / "database/cards.cdb"
     names = {}
@@ -75,6 +85,7 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
         raise ValueError("positive seeds/max_decisions and nonempty matchups required")
     offered: Counter[tuple[int, str]] = Counter()
     selected: Counter[tuple[int, str]] = Counter()
+    responses: Counter[tuple[int, int]] = Counter()
     deck_paths = sorted({path.resolve() for matchup in matchups for path in matchup})
     prevalence: Counter[int] = Counter()
     copies: Counter[int] = Counter()
@@ -115,10 +126,13 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
                     for record in trajectory.decisions:
                         count_source_actions(record.legal_actions,
                                              record.selected_action, offered, selected)
+                        count_chain_response(record.observation,
+                                             record.selected_action, responses)
                     games.append({"decks": [deck_label(path) for path in decks],
                                   "seed": seed, "decisions": len(trajectory.decisions),
                                   "winner": env.result()})
-    names = card_names(native_root, set(prevalence) | {code for code, _ in offered})
+    names = card_names(native_root, set(prevalence) | {code for code, _ in offered}
+                       | {code for pair in responses for code in pair})
     cards = []
     for code in sorted(set(prevalence) | {code for code, _ in offered},
                        key=lambda value: (-prevalence[value],
@@ -153,6 +167,15 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
         "deck_sha256": {deck_label(path): sha256_file(path) for path in deck_paths},
         "games": games,
         "cards": cards,
+        "chain_responses": [
+            {"responder_code": responder,
+             "responder_name": names.get(responder),
+             "preceding_link_code": preceding,
+             "preceding_link_name": names.get(preceding),
+             "selected_decisions": count}
+            for (responder, preceding), count in sorted(
+                responses.items(), key=lambda item: (-item[1], item[0]))
+        ],
     }
 
 
