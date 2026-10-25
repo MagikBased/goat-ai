@@ -1694,3 +1694,57 @@ Control, and Chaos Return versus Warrior. Across 64 terminal games v3 scored
 **46.9–56.2%**). This small comparison does not establish stronger play.
 The correction is retained because the target rule now executes at the
 documented prompt and the selected action uses only visible information.
+
+## Competitive-deck combat-teacher v3 clone pilot (2026-10-25)
+
+To test the corrected teacher on cards found in sourced GOAT lists, the
+four-deck v2 collection schedule above was rerun with CombatHeuristicAgent
+v3: Goat Control/Chaos Turbo and Warrior/Bazoo Return in both deck orders,
+seeds 17000–17003, and both teacher seats. The experimental native adapter
+replayed and verified all **32** complete schema-v22 duels: **19,483** total
+decisions, **10,164** teacher decisions, and **118** multi-option attack-target
+choices. The teacher won 28/32 collection games; v2 had won 29/32 on the
+same schedule. Collection wins against RandomAgent do not establish a better
+teacher. The v3 trajectories are ignored under
+`.cache/goat-ai/combat_v3_17000_17003/`, separate from the v2 recordings.
+
+A width-32 feature-v17 clone used the same three CPU epochs, learning rate
+0.001, and initialization seed 17 as the v2 feature-v17 pilot. Mean losses
+were 0.12108, 0.05110, and 0.03322. The ignored checkpoint is
+`checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt`, SHA-256
+`63f300c568a2270510210cf7bd919b94c4519480270caadd7d6890316b807023`.
+Its metadata records version-3 teacher provenance and trajectory hashes.
+These are synthetic demonstrations, not human decisions.
+
+Four new held-out v3 teacher duels on Chaos Control/Chaos Return in both
+orders and seats at seed 17200 replay-verified **3,432** decisions, including
+1,770 teacher decisions and 611 multi-option teacher choices. The v3 clone
+matched **593/611** multi-option choices and **16/16** attack-target choices;
+the previously trained v2 feature-v17 clone matched **581/611** and **11/16**
+on those *same* v3 decisions. This is off-policy teacher agreement, not
+playing strength. The agreement report SHA-256 is
+`7ec439096dd6187f8c2e80d9acbd52ddf8193c2889ffa68c9391937db9294efb`.
+
+In a held-out direct match on seeds 18450–18481, both Chaos Control/Chaos
+Return deck assignments and both seats, the v3 clone scored **72–56** against
+the v2 feature-v17 clone over **128 terminal games** (56.25% score; paired
+matchup-seed bootstrap 95% interval **49.2–62.5%**). Its Chaos Control split
+was **27–37** and its Chaos Return split **45–19**. The four-worker tournament
+took 64.55 seconds on the host described in the report; its ignored JSON
+SHA-256 is
+`d67d93478f6433161f130d1b6550e831a3341eff915731eae09b5a3dbc8f88a7`.
+The interval crosses 50% and the deck split is uneven, so this does not
+establish a cross-deck strength gain or satisfy M4.
+
+Reproduce collection with the four deck orders in the command above,
+`--teacher combat_heuristic --seed 17000 --seeds 4 --engine experimental`,
+writing to a distinct v3 directory. Run `scripts/verify_trajectory.py
+--experimental` on every resulting JSON before training. Train with
+`scripts/train_behavioral_clone.py --engine experimental --feature-version
+17 --width 32 --epochs 3 --learning-rate 0.001 --seed 17`. Audit the separate
+held-out v3 recordings with `scripts/audit_policy_agreement.py` and both
+feature-v17 checkpoints. Run `scripts/evaluate_policy.py` with the v3
+checkpoint, `--opponent-checkpoint` set to the v2 feature-v17 checkpoint,
+`--engine experimental --both-deck-assignments --require-unseen-main-decks`,
+the Chaos Control/Chaos Return matchup, `--seed 18450 --seeds 32 --workers 4`,
+and `--max-decisions 3000`.

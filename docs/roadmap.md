@@ -238,6 +238,14 @@ collection should use version 3 on common GOAT decks, with a fresh held-out
 competitive comparison before replacing any policy checkpoint. See
 [evaluation](evaluation.md).
 
+That collection and comparison are now complete. All 32 competitive-deck v3
+teacher duels and four held-out duels replay-verified. A matched feature-v17
+clone matched all 16 held-out teacher attack-target choices, then scored
+72–56 against the v2 clone in 128 direct games. The paired interval includes
+50% and Chaos Control worsened, so v17 remains experimental and M4 stays
+open. Next work should improve cross-deck consistency and test a distinct
+self-play update on unseen decks; see [evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
