@@ -14,6 +14,7 @@ from goat_ai.evaluation import (
     paired_score_difference,
     run_tournament,
     run_tournament_parallel,
+    TournamentReport,
     wilson_interval,
 )
 from goat_ai.evaluation.tournament import bootstrap_score_interval
@@ -34,6 +35,20 @@ def test_both_deck_assignments_deduplicates_reverse_pairs():
     assert both_deck_assignments((("goat", "chaos"), ("chaos", "goat"),
                                   ("warrior", "warrior"))) == (
         ("goat", "chaos"), ("chaos", "goat"), ("warrior", "warrior"))
+
+
+def test_summary_reports_candidate_deck_splits_across_opponents_and_seats():
+    report = TournamentReport((
+        GameResult("goat", "chaos", 1, 0, 0, 10),
+        GameResult("goat", "chaos", 1, 1, 0, 20),
+        GameResult("goat", "warrior", 2, 0, None, 30),
+        GameResult("chaos", "goat", 1, 1, 1, 40),
+    ))
+    splits = {entry["deck_a"]: entry for entry in report.summary()["by_deck_a"]}
+    assert (splits["goat"]["games"], splits["goat"]["wins"],
+            splits["goat"]["losses"], splits["goat"]["draws"]) == (3, 1, 1, 1)
+    assert splits["goat"]["score_rate"] == 0.5
+    assert (splits["chaos"]["games"], splits["chaos"]["wins"]) == (1, 1)
 
 
 def test_paired_bootstrap_scores_complete_wins_and_draws():

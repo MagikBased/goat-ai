@@ -1189,3 +1189,69 @@ against the unweighted `--opponent-checkpoint`, `--engine experimental`,
 Control/Warrior and Chaos Return/Warrior matchups, `--seed 16810 --seeds 4
 --max-decisions 3000 --workers 2`. Use the pinned assets in
 [native setup](native_setup.md) and `OMP_NUM_THREADS=1`.
+
+## Six tournament-deck baseline, October 2026
+
+The [six sourced tournament Main Decks](card_priorities.md) form a balanced
+baseline schedule for future policies. This is a small project corpus, not an
+estimate of historical metagame frequencies or playing strength against
+humans. All 15 unordered deck pairs were played in both deck assignments and
+both seats. The experimental GOAT-mode adapter, pinned core
+`baa3881d0bae48e9994f915f5c931be53c1ba8ef`, and
+`--max-decisions 3000` were used. The host was Linux x86_64 on an Intel
+Core i7-10700K; the reported wall times measure only the tournament portion
+of each script run.
+
+With `CombatHeuristicAgent` as agent A and `HeuristicAgent` as agent B, a
+four-worker pilot on seeds 9800–9801 finished 120/120 games: 67 wins, 50
+losses, 3 draws for A, or a 57.1% score (paired bootstrap 95% interval
+52.9–62.1%). It took 15.69 seconds and 62,651 decisions. Repeating the
+identical schedule with one worker produced exactly the same ordered games,
+summary, deck hashes, core hashes, and script hashes; its tournament wall time
+was 56.44 seconds. The differing JSON files retain their worker counts and
+measured runtimes. Their SHA-256 values are respectively
+`e33b8699a6b6f1f67332b79e9a91d2fe0ca0ed6eb4f856d5748b4f1837411cd5`
+and `c3cd63dbc4c6bb1c174d2ce592ca3f797208c6f6951e02d8da7fe2f0b5618a24`.
+
+A separate four-worker run on seeds 9810–9817 finished 480/480 games under
+the same decision cap. A scored **269 wins, 205 losses, and 6 draws**: 56.7%
+score, with a paired bootstrap 95% interval of 54.6–59.0%. It took 63.87
+seconds for 263,038 decisions (7.52 duels and 4,118 decisions per second in
+this run); the longest duel had 2,066 decisions. A scored 60.6% in the first
+seat and 52.7% in the second. The report SHA-256 is
+`c5ab0708789cd588975ebde80e25a433f62f5e873a19d0f0547cceb15cdfccb6`.
+Its source-code fingerprint is
+`58d5344601591d2916fe2071ae7e2cfdd728a7d5852aef2e626f94e4395a40f0`
+and loaded-card-script fingerprint is
+`f886f54c419d3792fd69888d74190c070992609caad8f5737e3f563bd736b71c`.
+
+Agent A's score also varied strongly with its assigned deck, averaged over
+all five opposing deck files and both seats: Warrior 81.2% (64–14–2), Goat
+Control 76.2% (61–19–0), Bazoo Return 72.5% (58–22–0), Chaos Return 43.8%
+(35–45–0), Chaos Turbo 40.0% (31–47–2), and Chaos Control 26.2%
+(20–58–2). Each deck has 80 games. The evaluator now includes a `by_deck_a`
+summary for this split in future reports; these measured counts were computed
+from the saved older report's per-game records because adding the summary did
+not change any game. The mixed deck results warrant policy evaluation across
+all six archetypes rather than assuming the aggregate gain applies to every
+deck. This result supports CombatHeuristicAgent as a provisional baseline or
+demonstration teacher, but it does not establish human-level play, historical
+correctness of every card, or a learned-policy improvement.
+
+Reproduce the schedules after [native setup](native_setup.md) with:
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/evaluate_native.py \
+  --native-root .cache/goat-ai --engine experimental \
+  --tournament-corpus --both-deck-assignments \
+  --agent-a combat_heuristic --agent-b heuristic \
+  --seed 9810 --seeds 8 --workers 4 --max-decisions 3000 \
+  --output .cache/goat-ai/competitive-combat-heuristic-9810-9817.json
+```
+
+Use `--seed 9800 --seeds 2` for the pilot, and change only `--workers` to
+`1` for its deterministic cross-worker check. Generated reports stay in the
+ignored `.cache` directory. Later report JSON will include `by_deck_a` and
+therefore have a different whole-file hash from the one above, while the
+ordered game outcomes should remain the same with the pinned assets and agent
+versions.

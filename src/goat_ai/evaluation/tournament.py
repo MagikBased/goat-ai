@@ -66,10 +66,16 @@ class TournamentReport:
             }
 
         matchups = sorted({(game.deck_a, game.deck_b) for game in self.games})
+        decks_a = sorted({game.deck_a for game in self.games})
         return {
             "overall": summarize(self.games),
             "a_first": summarize([g for g in self.games if g.a_seat == 0]),
             "a_second": summarize([g for g in self.games if g.a_seat == 1]),
+            "by_deck_a": [
+                {"deck_a": deck, **summarize([g for g in self.games
+                                              if g.deck_a == deck])}
+                for deck in decks_a
+            ],
             "matchups": [
                 {"deck_a": a, "deck_b": b,
                  **summarize([g for g in self.games if (g.deck_a, g.deck_b) == (a, b)])}
