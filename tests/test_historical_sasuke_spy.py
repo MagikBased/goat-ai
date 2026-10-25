@@ -15,14 +15,18 @@ SASUKE = 4041838
 ENEMY_CONTROLLER = 98045062
 SPY = 504700044
 BOOK_OF_MOON = 14087893
+DD_WARRIOR_LADY = 7572887
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("scenario", ["set", "faceup", "book"])
-def test_sasuke_attack_on_spy_depends_on_faceup_defense(tmp_path, scenario):
+@pytest.mark.parametrize("scenario", ["set", "faceup", "book", "warrior_lady"])
+def test_sasuke_damage_step_target_condition(tmp_path, scenario):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    defender_code = DD_WARRIOR_LADY if scenario == "warrior_lady" else SPY
     faceup_defender = scenario != "set"
-    for relative in (f"official/c{SASUKE}.lua", f"goat/c{SPY}.lua",
+    for relative in (f"official/c{SASUKE}.lua",
+                     (f"official/c{DD_WARRIOR_LADY}.lua" if scenario == "warrior_lady"
+                      else f"goat/c{SPY}.lua"),
                      f"official/c{ENEMY_CONTROLLER}.lua",
                      *((f"official/c{BOOK_OF_MOON}.lua",) if scenario == "book" else ())):
         if not (root / "scripts" / relative).is_file():
@@ -31,16 +35,18 @@ def test_sasuke_attack_on_spy_depends_on_faceup_defense(tmp_path, scenario):
     attacker.write_text("#main\n" + "\n".join(map(str, (
         *([SASUKE] * 3), *([ENEMY_CONTROLLER] * 3),
         *VANILLA_DECK[6:]))) + "\n#extra\n!side\n")
-    defender = tmp_path / "spy.ydk"
+    defender = tmp_path / "defender.ydk"
     defender.write_text("#main\n" + "\n".join(map(str, (
-        *([SPY] * 3), *(([BOOK_OF_MOON] * 3) if scenario == "book" else ()),
-        *VANILLA_DECK[6 if scenario == "book" else 3:]))) + "\n#extra\n!side\n")
+        *([defender_code] * (1 if scenario == "warrior_lady" else 3)),
+        *(([BOOK_OF_MOON] * 3) if scenario == "book" else ()),
+        *VANILLA_DECK[6 if scenario == "book" else (
+            1 if scenario == "warrior_lady" else 3):]))) + "\n#extra\n!side\n")
     with GoatEnvironment(str(attacker), str(defender),
                          seed=18 if scenario == "book" else 15,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
         assert {SASUKE, ENEMY_CONTROLLER}.issubset(c.code for c in obs.hand)
-        assert SPY in {c.code for c in env.engine.probe.observation(1).hand}
+        assert defender_code in {c.code for c in env.engine.probe.observation(1).hand}
         sasuke_summoned = spy_played = controller_used = mode_chosen = False
         spy_targeted = battle = attacked = attack_targeted = False
         book_set = book_chained = book_targeted = book_concealed = False
@@ -56,7 +62,7 @@ def test_sasuke_attack_on_spy_depends_on_faceup_defense(tmp_path, scenario):
                 if not spy_played:
                     kind = "normal_summon" if faceup_defender else "set_monster"
                     action = next((a for a in actions if a.kind == kind
-                                   and a.parameters.get("code") == SPY), None)
+                                   and a.parameters.get("code") == defender_code), None)
                     spy_played |= action is not None
                 elif scenario == "book" and not book_set:
                     action = next((a for a in actions if a.kind == "set_spell_trap"
@@ -74,7 +80,8 @@ def test_sasuke_attack_on_spy_depends_on_faceup_defense(tmp_path, scenario):
                     mode_chosen = True
                 if mode_chosen and not spy_targeted \
                         and actions[0].kind == "select_card":
-                    action = next((a for a in actions if a.parameters.get("code") == SPY
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == defender_code
                                    and a.parameters.get("controller") == 1), None)
                     spy_targeted |= action is not None
                 if obs.phase == "main1" and not battle and action is None \
@@ -86,7 +93,7 @@ def test_sasuke_attack_on_spy_depends_on_faceup_defense(tmp_path, scenario):
                     spy_view = next(c for c in obs.field if c.controller == 1
                                     and c.zone == "monster")
                     assert spy_view.orientation == "defense"
-                    assert spy_view.code == (SPY if faceup_defender else None)
+                    assert spy_view.code == (defender_code if faceup_defender else None)
                     action = next((a for a in actions if a.kind == "attack"
                                    and a.parameters.get("code") == SASUKE), None)
                     attacked |= action is not None
@@ -94,6 +101,9 @@ def test_sasuke_attack_on_spy_depends_on_faceup_defense(tmp_path, scenario):
                 action = next((a for a in actions if a.parameters.get("controller") == 1
                                and a.parameters.get("location") == 4), None)
                 attack_targeted |= action is not None
+            if scenario == "warrior_lady" and attack_targeted:
+                assert not any(a.parameters.get("code") == DD_WARRIOR_LADY
+                               and a.kind in ("yes", "chain") for a in actions)
             if scenario == "book" and attack_targeted and obs.acting_player == 1:
                 if not book_chained:
                     action = next((a for a in actions if a.kind == "chain"
@@ -120,10 +130,15 @@ def test_sasuke_attack_on_spy_depends_on_faceup_defense(tmp_path, scenario):
                 saw_damage_step = True
             if saw_damage_step and obs.phase == "battle_step" \
                     and obs.acting_player == 0:
-                if scenario == "faceup":
-                    assert SPY in {c.code for c in obs.graveyards[1]}
-                    assert not any(c.code == SPY for c in obs.field)
+                if scenario in ("faceup", "warrior_lady"):
+                    assert defender_code in {c.code for c in obs.graveyards[1]}
+                    assert not any(c.code == defender_code for c in obs.field)
                     assert obs.life_points == (8000, 8000)
+                    if scenario == "warrior_lady":
+                        assert DD_WARRIOR_LADY not in {
+                            c.code for c in obs.banished[1]}
+                        assert f"official/c{DD_WARRIOR_LADY}.lua" in (
+                            env.engine.probe.loaded_script_sha256)
                     assert f"official/c{ENEMY_CONTROLLER}.lua" in (
                         env.engine.probe.loaded_script_sha256)
                 else:
@@ -154,4 +169,4 @@ def test_sasuke_attack_on_spy_depends_on_faceup_defense(tmp_path, scenario):
                         loaded, ExperimentalOcgcoreEngine(root)) == len(
                             trajectory.decisions)
                 return
-    pytest.fail(f"Sasuke/Spy attack did not finish (scenario={scenario})")
+    pytest.fail(f"Sasuke attack did not finish (scenario={scenario})")
