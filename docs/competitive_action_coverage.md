@@ -439,3 +439,6 @@ complete duels, including the opposite same-turn Summon permissions.
 Torrential Tribute responded to Book of Moon once. A paired native fixture now
 checks that order in the immediate Summon response window, complementing the
 earlier fixture where Book responds to Torrential.
+Dust Tornado responded to Graceful Charity once. A paired native fixture now
+checks that destroying Graceful on the Chain does not suppress its private draw
+and two-card discard, with the pass branch as a control.
