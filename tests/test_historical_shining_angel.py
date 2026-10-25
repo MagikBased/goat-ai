@@ -166,3 +166,78 @@ def test_angel_recruit_can_attack_in_same_battle_phase(tmp_path):
                     "select_card", "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("Shining Angel's recruited Warrior Lady could not attack before Main Phase 2")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_angel_empty_search_verifies_deck_only_to_opponent(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/goat/c{ANGEL}.lua").is_file():
+        pytest.skip("GOAT Shining Angel script not installed")
+    # Remove the fixture's other eligible LIGHT monsters; keep the Angel as
+    # the only target and use legal unrestricted Spells/Traps for 40 cards.
+    book = 14087893
+    sakuretsu = 56120475
+    remaining = [c for c in VANILLA_DECK if c not in (15025844, 62651957)]
+    defender = _deck(tmp_path / "only_angel.ydk", (
+        ANGEL, *remaining, *([book] * 3), *([sakuretsu] * 2)))
+    attacker = _deck(tmp_path / "gemini.ydk", (
+        *([GEMINI_ELF] * 3), *(c for c in VANILLA_DECK if c != GEMINI_ELF)))
+    with GoatEnvironment(attacker, defender, seed=15,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert ANGEL in {c.code for c in env.engine.probe.observation(1).hand}
+        gemini = set_angel = battle = attacked = target = accepted = False
+        deck_before = None
+        for _ in range(65):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not gemini:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == GEMINI_ELF), None)
+                gemini |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not set_angel:
+                action = next((a for a in actions if a.kind == "set_monster"
+                               and a.parameters.get("code") == ANGEL), None)
+                set_angel |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 \
+                    and obs.phase == "main1" and not battle:
+                action = next((a for a in actions if a.kind == "battle_phase"), None)
+                battle |= action is not None
+            if battle and obs.turn == 3 and obs.acting_player == 0 \
+                    and obs.phase == "battle_start" and not attacked:
+                action = next((a for a in actions if a.kind == "attack"
+                               and a.parameters.get("code") == GEMINI_ELF), None)
+                attacked |= action is not None
+            if attacked and not target and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("controller") == 1),
+                              None)
+                assert action is not None and "code" not in action.parameters
+                target = True
+            if target and not accepted and any(a.kind == "yes" for a in actions):
+                assert obs.acting_player == obs.viewer == 1
+                assert obs.phase == "damage_step"
+                deck_before = obs.deck_counts[1]
+                action = next(a for a in actions if a.kind == "yes")
+                accepted = True
+            if accepted:
+                owner = env.engine.probe.observation(1)
+                opponent = env.engine.probe.observation(0)
+                if opponent.private_reveals:
+                    assert not owner.private_reveals
+                    assert not any(a.kind == "select_card" for a in actions)
+                    assert owner.deck_counts[1] == deck_before
+                    assert not any(c.controller == 1 for c in owner.field)
+                    reveal = opponent.private_reveals[0]
+                    assert reveal.recipient == 0 and reveal.turn == 3
+                    assert len(reveal.cards) == deck_before
+                    assert all(c.controller == 1 and c.location == 1
+                               for c in reveal.cards)
+                    assert Counter(c.code for c in reveal.cards) == Counter(
+                        c.code for c in env.engine.probe._query_location(1, 1))
+                    assert f"goat/c{ANGEL}.lua" in env.engine.probe.loaded_script_sha256
+                    return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail("Shining Angel's empty search did not verify the Deck")
