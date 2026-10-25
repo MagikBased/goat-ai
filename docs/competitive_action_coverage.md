@@ -180,6 +180,11 @@ Heavy Storm appears in all six tournament Main Decks and Trap Dustshoot in
 five. A paired native regression now checks Dustshoot chained to Heavy against
 passing, including the private hand reveal and destruction of another Set
 Dustshoot. Both complete duels replay-verify; see [GOAT rules](goat_rules.md).
+Another paired regression tests Set Dustshoot answering Delinquent Duo, which
+also appears in every tournament Main Deck: Dustshoot's addressed hand reveal
+and Deck return occur before Duo's two discards. The pass branch has no reveal.
+Both full duels replay-verify; the combined timing is documented as an
+inference from the card texts and chain order in [GOAT rules](goat_rules.md).
 
 ## Same-schedule random and combat-baseline exposure
 
