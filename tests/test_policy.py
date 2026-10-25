@@ -523,16 +523,40 @@ def test_terminal_reward_moves_selected_action_probability():
     vocabulary = CardVocabulary((10, 20))
     record = DecisionRecord(view(), actions(), actions()[1])
     features = encode_decision(view(), actions(), vocabulary)
-    for reward, direction in ((1.0, 1), (-1.0, -1)):
-        torch.manual_seed(8)
-        model = LegalActionPolicy(vocabulary.size, width=16)
-        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-        before = torch.softmax(model(features), 0)[1].item()
-        policy_gradient_update(model, vocabulary, [record], reward, 0.0, optimizer)
-        after = torch.softmax(model(features), 0)[1].item()
-        assert (after - before) * direction > 0
+    for temperature in (1.0, 2.0):
+        for reward, direction in ((1.0, 1), (-1.0, -1)):
+            torch.manual_seed(8)
+            model = LegalActionPolicy(vocabulary.size, width=16)
+            optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+            before = torch.softmax(model(features) / temperature, 0)[1].item()
+            policy_gradient_update(model, vocabulary, [record], reward, 0.0,
+                                   optimizer, temperature=temperature)
+            after = torch.softmax(model(features) / temperature, 0)[1].item()
+            assert (after - before) * direction > 0
+    with pytest.raises(ValueError, match="temperature"):
+        policy_gradient_update(model, vocabulary, [record], 1.0, 0.0,
+                               optimizer, temperature=0)
     generator = torch.Generator().manual_seed(9)
     assert sample_legal_action(model, vocabulary, view(), actions(), generator) in actions()
+
+
+def test_policy_gradient_uses_sampling_temperature_in_log_probability():
+    class TwoLogitPolicy(torch.nn.Module):
+        feature_version = 1
+
+        def __init__(self):
+            super().__init__()
+            self.logits = torch.nn.Parameter(torch.zeros(2))
+
+        def forward(self, _features):
+            return self.logits
+
+    model = TwoLogitPolicy()
+    optimizer = torch.optim.SGD(model.parameters(), lr=1.0)
+    record = DecisionRecord(view(), actions(), actions()[1])
+    policy_gradient_update(model, CardVocabulary((10, 20)), [record], 1.0, 0.0,
+                           optimizer, temperature=2.0, max_gradient_norm=10.0)
+    assert torch.allclose(model.logits.detach(), torch.tensor([-0.25, 0.25]))
 
 
 def test_self_play_schedule_covers_each_deck_in_both_seats():

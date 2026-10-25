@@ -75,9 +75,9 @@ def run_learning_episode(
     model: LegalActionPolicy, vocabulary: CardVocabulary, opponent: Agent,
     decks: tuple[str, str], seed: int, learner_seat: int,
     engine_factory: Callable[[], RulesEngine], generator: torch.Generator,
-    max_decisions: int = 5000,
+    max_decisions: int = 5000, learner_temperature: float = 1.0,
 ) -> EpisodeResult:
-    if learner_seat not in (0, 1) or max_decisions < 1:
+    if learner_seat not in (0, 1) or max_decisions < 1 or learner_temperature <= 0:
         raise ValueError("invalid learner seat or decision cap")
     records = []
     with GoatEnvironment(*decks, seed=seed, engine=engine_factory()) as env:
@@ -86,7 +86,8 @@ def run_learning_episode(
             legal_actions = env.legal_actions()
             if observation.acting_player == learner_seat:
                 action = sample_legal_action(model, vocabulary, observation,
-                                             legal_actions, generator)
+                                             legal_actions, generator,
+                                             temperature=learner_temperature)
                 if len(legal_actions) > 1:
                     records.append(DecisionRecord(observation, legal_actions, action))
             else:
@@ -104,10 +105,12 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
                            records: Sequence[DecisionRecord], reward: float,
                            baseline: float, optimizer: torch.optim.Optimizer,
                            entropy_coefficient: float = 0.0,
-                           max_gradient_norm: float = 1.0) -> float:
+                           max_gradient_norm: float = 1.0,
+                           temperature: float = 1.0) -> float:
     """Apply one terminal-return score-function update; return mean loss."""
-    if not records or entropy_coefficient < 0 or max_gradient_norm <= 0:
-        raise ValueError("update needs decisions and valid regularization limits")
+    if (not records or entropy_coefficient < 0 or max_gradient_norm <= 0
+            or temperature <= 0):
+        raise ValueError("update needs decisions, positive temperature, and valid regularization")
     optimizer.zero_grad()
     device = next(model.parameters()).device
     advantage = reward - baseline
@@ -115,7 +118,7 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
     for record in records:
         features = encode_decision(record.observation, record.legal_actions,
                                    vocabulary, model.feature_version).to(device)
-        logits = model(features)
+        logits = model(features) / temperature
         log_probabilities = torch.log_softmax(logits, dim=0)
         probabilities = log_probabilities.exp()
         selected = record.legal_actions.index(record.selected_action)
@@ -135,6 +138,7 @@ def train_against_snapshot_pool(
     historical_probability: float = 0.75, snapshot_every: int = 4,
     max_snapshots: int = 8, entropy_coefficient: float = 0.001,
     max_decisions: int = 5000, random_seed: int = 0,
+    learner_temperature: float = 1.0,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
 ) -> tuple[dict, ...]:
     """Train one learner seat per duel against random or frozen past policies.
@@ -143,7 +147,8 @@ def train_against_snapshot_pool(
     This is an initial REINFORCE-style experiment, not PPO or league training.
     """
     if (not matchups or not seeds or learning_rate <= 0 or snapshot_every < 1
-            or max_snapshots < 1 or not 0 <= historical_probability <= 1):
+            or max_snapshots < 1 or learner_temperature <= 0
+            or not 0 <= historical_probability <= 1):
         raise ValueError("invalid self-play schedule or hyperparameters")
     rng = random.Random(random_seed)
     generator = torch.Generator(device="cpu").manual_seed(random_seed)
@@ -166,12 +171,13 @@ def train_against_snapshot_pool(
             opponent_name = "random"
         episode = run_learning_episode(model, vocabulary, opponent, decks, seed,
                                        learner_seat, engine_factory, generator,
-                                       max_decisions)
+                                       max_decisions, learner_temperature)
         if record_episode is not None:
             record_episode(index, episode)
         loss = (policy_gradient_update(model, vocabulary, episode.learner_records,
                                        episode.reward, baseline, optimizer,
-                                       entropy_coefficient)
+                                       entropy_coefficient,
+                                       temperature=learner_temperature)
                 if episode.learner_records else None)
         baseline = 0.95 * baseline + 0.05 * episode.reward
         reports.append({"seed": seed, "learner_seat": learner_seat,

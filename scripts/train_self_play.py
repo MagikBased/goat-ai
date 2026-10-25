@@ -37,6 +37,8 @@ def main() -> None:
     parser.add_argument("--snapshot-every", type=int, default=4)
     parser.add_argument("--max-snapshots", type=int, default=8)
     parser.add_argument("--entropy-coefficient", type=float, default=0.001)
+    parser.add_argument("--learner-temperature", type=float, default=1.0,
+                        help="softmax temperature for learner sampling and its policy update")
     parser.add_argument("--max-decisions", type=int, default=5000)
     parser.add_argument("--record-dir", type=Path,
                         help="optional ignored directory for exact self-play trajectories")
@@ -44,6 +46,7 @@ def main() -> None:
     if (args.games < 1 or args.learning_rate <= 0 or args.snapshot_every < 1
             or args.max_snapshots < 1 or args.max_decisions < 1
             or args.entropy_coefficient < 0
+            or args.learner_temperature <= 0
             or not 0 <= args.historical_probability <= 1):
         parser.error("invalid training schedule or hyperparameters")
     parent = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
@@ -76,6 +79,7 @@ def main() -> None:
         historical_probability=args.historical_probability,
         snapshot_every=args.snapshot_every, max_snapshots=args.max_snapshots,
         entropy_coefficient=args.entropy_coefficient,
+        learner_temperature=args.learner_temperature,
         max_decisions=args.max_decisions, random_seed=args.seed,
         record_episode=record,
     )
@@ -95,6 +99,7 @@ def main() -> None:
               "historical_probability": args.historical_probability,
               "snapshot_every": args.snapshot_every, "max_snapshots": args.max_snapshots,
               "entropy_coefficient": args.entropy_coefficient,
+              "learner_temperature": args.learner_temperature,
               "max_decisions": args.max_decisions, "seed": args.seed}
     source_decisions = dict(parent.get("source_decisions", {}))
     source_decisions["self_play_rl"] = (source_decisions.get("self_play_rl", 0)
