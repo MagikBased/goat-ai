@@ -16,7 +16,8 @@ from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.replay import demonstrator_records, read_trajectory, verify_trajectory
 from goat_ai.training import load_policy_agent
 
-SCOPES = ("all", "multi_option", "multiple_kinds")
+SCOPES = ("all", "multi_option", "multiple_kinds", "known_hand",
+          "known_hand_multi_option")
 
 
 def empty_counts() -> dict:
@@ -74,6 +75,10 @@ def main() -> None:
                     scopes.append("multi_option")
                 if len({action.kind for action in record.legal_actions}) > 1:
                     scopes.append("multiple_kinds")
+                if record.observation.known_opponent_hand_cards:
+                    scopes.append("known_hand")
+                    if len(record.legal_actions) > 1:
+                        scopes.append("known_hand_multi_option")
                 for scope in scopes:
                     bucket[scope]["total"] += 1
                     bucket[scope]["exact"] += chosen == record.selected_action
