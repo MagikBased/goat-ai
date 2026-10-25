@@ -14,6 +14,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 GRACEFUL_CHARITY = 79571449
 DELINQUENT_DUO = 44763025
+DUSTSHOOT = 64697231
 SINISTER_SERPENT = 511000818
 
 
@@ -256,3 +257,75 @@ def test_duo_one_card_hand_activation_boundary(tmp_path, empty_hand):
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("one-card Delinquent Duo branch did not resolve")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_duo_updates_dustshoot_known_hand_after_both_discards(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (DUSTSHOOT, DELINQUENT_DUO):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    deck = tmp_path / "dustshoot_duo.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        *([DUSTSHOOT] * 3), DELINQUENT_DUO, *VANILLA_DECK[4:])))
+                    + "\n#extra\n!side\n")
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=15,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {DUSTSHOOT, DELINQUENT_DUO}.issubset(c.code for c in obs.hand)
+        trap_set = dustshoot_used = returned = duo_used = second_discard = False
+        revealed = Counter()
+        before_duo = Counter()
+        for _ in range(65):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not trap_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == DUSTSHOOT), None)
+                trap_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 0 and trap_set \
+                    and not dustshoot_used:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == DUSTSHOOT), None)
+                dustshoot_used |= action is not None
+            if dustshoot_used and not returned and actions[0].kind == "select_card":
+                assert obs.acting_player == 0
+                revealed = Counter(obs.known_opponent_hand_cards)
+                assert revealed == Counter(c.code for c in
+                                           env.engine.probe.observation(1).hand)
+                action = actions[0]
+                returned = True
+            if obs.turn == 3 and obs.phase == "main1" and obs.acting_player == 0 \
+                    and returned and not duo_used:
+                before_duo = Counter(obs.known_opponent_hand_cards)
+                assert before_duo == Counter(c.code for c in
+                                             env.engine.probe.observation(1).hand)
+                assert sum(before_duo.values()) == 5
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == DELINQUENT_DUO), None)
+                duo_used |= action is not None
+            if duo_used and obs.acting_player == 1 \
+                    and actions[0].kind == "select_card" and not second_discard:
+                remaining = Counter(c.code for c in obs.hand)
+                assert sum(remaining.values()) == 4
+                assert Counter(env.engine.probe.observation(0)
+                               .known_opponent_hand_cards) == remaining
+                assert sum(before_duo.values()) == sum(remaining.values()) + 1
+                action = actions[0]
+                second_discard = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if second_discard and DELINQUENT_DUO in {c.code for c in obs.graveyards[0]}:
+                other = env.engine.probe.observation(1)
+                assert Counter(env.engine.probe.observation(0)
+                               .known_opponent_hand_cards) == Counter(
+                                   c.code for c in other.hand)
+                assert len(other.hand) == 3
+                assert obs.life_points == (7000, 8000)
+                assert {f"official/c{DUSTSHOOT}.lua",
+                        f"official/c{DELINQUENT_DUO}.lua"}.issubset(
+                            env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Dustshoot/Duo known-hand sequence did not resolve")
