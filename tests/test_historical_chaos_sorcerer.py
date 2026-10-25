@@ -16,6 +16,7 @@ GRACEFUL_CHARITY = 79571449
 LIGHT = 62651957  # X-Head Cannon
 DARK = 7359741  # Mechanicalchaser
 SCAPEGOAT = 504700123
+SOLEMN = 41420027
 SHEEP_TOKENS = {73915052, 73915053, 73915054, 73915055}
 
 
@@ -334,6 +335,102 @@ def test_sorcerer_declined_replay_still_blocks_main2_banish(tmp_path):
                 action = agents[obs.acting_player].select_action(obs, actions)
             obs = env.step(action)
     pytest.fail("Sorcerer / Scapegoat replay duel did not finish")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("solemn_response", [False, True])
+def test_solemn_on_sorcerer_inherent_summon_keeps_light_dark_cost(
+        tmp_path, solemn_response):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    scripts = {f"official/c{code}.lua" for code in (
+        CHAOS_SORCERER, GRACEFUL_CHARITY, SOLEMN)}
+    if any(not (root / "scripts" / relative).is_file() for relative in scripts):
+        pytest.skip("required card script not installed")
+    defender = tmp_path / "solemn.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        *([SOLEMN] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(chaos_deck(tmp_path)), str(defender), seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {GRACEFUL_CHARITY, CHAOS_SORCERER, LIGHT, DARK} <= {
+            c.code for c in obs.hand}
+        assert SOLEMN in {c.code for c in env.engine.probe.observation(1).hand}
+        graceful = discarded = trap_set = attempted = responded = checked = False
+        costs = set()
+        agents = (RandomAgent(100), RandomAgent(101))
+        for _ in range(5000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / f"sorcerer_solemn_{solemn_response}.json"
+                write_trajectory(path, env.trajectory())
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                    env.trajectory().decisions)
+                return
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not graceful:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL_CHARITY), None)
+                    graceful |= action is not None
+                if graceful and not discarded and actions[0].kind == "select_cards":
+                    action = next((a for a in actions if {c["code"]
+                                   for c in a.parameters["cards"]} == {LIGHT, DARK}), None)
+                    assert action is not None
+                    discarded = True
+            if obs.turn == 2 and obs.acting_player == 1 and not trap_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SOLEMN), None)
+                trap_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not attempted:
+                assert discarded and trap_set
+                assert {LIGHT, DARK} <= {c.code for c in obs.graveyards[0]}
+                action = next((a for a in actions if a.kind == "special_summon"
+                               and a.parameters.get("code") == CHAOS_SORCERER), None)
+                attempted |= action is not None
+            if attempted and costs != {LIGHT, DARK} and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               in {LIGHT, DARK} - costs and a.parameters.get("location") == 16),
+                              action)
+                if action is not None:
+                    costs.add(action.parameters["code"])
+            if attempted and costs == {LIGHT, DARK} and obs.acting_player == 1 \
+                    and not responded:
+                assert {LIGHT, DARK} <= {c.code for c in obs.banished[0]}
+                assert any(a.kind == "chain" and a.parameters.get("code") == SOLEMN
+                           for a in actions)
+                if solemn_response:
+                    action = next(a for a in actions if a.kind == "chain"
+                                  and a.parameters.get("code") == SOLEMN)
+                else:
+                    action = next(a for a in actions if a.kind == "pass")
+                responded = True
+            if action is None and not checked:
+                action = next((a for a in actions if a.kind in (
+                    "place", "select_position", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+            if responded and not checked and obs.acting_player == 0 \
+                    and obs.phase == "main1" and not obs.chain and (
+                        SOLEMN in {c.code for c in obs.graveyards[1]}
+                        or any(c.code == CHAOS_SORCERER for c in obs.field)):
+                assert {LIGHT, DARK} <= {c.code for c in obs.banished[0]}
+                if solemn_response:
+                    assert CHAOS_SORCERER in {c.code for c in obs.graveyards[0]}
+                    assert not any(c.code == CHAOS_SORCERER for c in obs.field)
+                    assert obs.life_points == (8000, 4000)
+                else:
+                    assert any(c.code == CHAOS_SORCERER and c.controller == 0
+                               for c in obs.field)
+                    assert SOLEMN not in {c.code for c in obs.graveyards[1]}
+                    assert obs.life_points == (8000, 8000)
+                required = (scripts if solemn_response
+                            else scripts - {f"official/c{SOLEMN}.lua"})
+                assert required <= env.engine.probe.loaded_script_sha256.keys()
+                checked = True
+    pytest.fail("Sorcerer / Solemn duel did not finish")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
