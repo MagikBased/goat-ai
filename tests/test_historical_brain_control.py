@@ -125,7 +125,7 @@ def test_brain_control_and_book_timing(tmp_path, book_timing):
                         observation = env.step(action)
                         if env.is_terminal():
                             trajectory = env.trajectory()
-                            assert trajectory.schema_version == 21
+                            assert trajectory.schema_version == 22
                             path = tmp_path / "brain_control.json"
                             write_trajectory(path, trajectory)
                             assert verify_trajectory(read_trajectory(path),

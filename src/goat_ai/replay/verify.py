@@ -68,6 +68,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                 compared_observation = without_facedown_equips(compared_observation)
             if trajectory.schema_version < 21:
                 compared_observation = without_chain_targets(compared_observation)
+            if trajectory.schema_version < 22:
+                compared_observation = replace(compared_observation, pending_attack=None)
             if trajectory.schema_version < 17:
                 compared_observation = replace(compared_observation,
                                                known_opponent_hand_cards=())
@@ -124,6 +126,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                                 if trajectory.schema_version == 19 else observation)
         if trajectory.schema_version < 21:
             terminal_observation = without_chain_targets(terminal_observation)
+        if trajectory.schema_version < 22:
+            terminal_observation = replace(terminal_observation, pending_attack=None)
         if (trajectory.schema_version >= 18
                 and trajectory.terminal_observation is not None
                 and terminal_observation != trajectory.terminal_observation):

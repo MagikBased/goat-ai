@@ -196,6 +196,33 @@ def test_feature_version_sixteen_exposes_visible_attack_margin():
         encoded[0]).shape == (2,)
 
 
+def test_feature_version_seventeen_scores_attack_targets_from_visible_stats():
+    vocabulary = CardVocabulary((10, 20, 30))
+    attacker = CardView(0, "monster", "faceup", 20, 2, "attack", 1500, 1000)
+    stronger = CardView(1, "monster", "faceup", 10, 0, "attack", 1900, 1000)
+    weaker = CardView(1, "monster", "faceup", 30, 1, "defense", 1000, 1200)
+    hidden = CardView(1, "monster", "facedown", None, 3, "defense")
+    state = replace(view(), phase="battle_start", field=(attacker, stronger, weaker, hidden),
+                    pending_attack=TargetSlotView(0, "monster", 2))
+    choices = tuple(Action(str(index), "select_card", 0,
+                           {"code": card.code, "controller": 1,
+                            "location": 4, "sequence": card.sequence}
+                           if card.code is not None else
+                           {"controller": 1, "location": 4, "sequence": card.sequence})
+                    for index, card in enumerate((stronger, weaker, hidden)))
+    features = encode_decision(state, choices, vocabulary, feature_version=17)
+    assert features.action_numbers.shape == (3, 19)
+    assert torch.allclose(features.action_numbers[:, -4:], torch.tensor([
+        [1500 / 8000, 1900 / 8000, -400 / 8000, 1],
+        [1500 / 8000, 1200 / 8000, 300 / 8000, 1],
+        [1500 / 8000, 0, 0, 0],
+    ]))
+    assert LegalActionPolicy(vocabulary.size, width=16, feature_version=17)(
+        features).shape == (3,)
+    with pytest.raises(ValueError, match="pending attack"):
+        replace(state, pending_attack=TargetSlotView(1, "monster", 0))
+
+
 def test_feature_version_nine_uses_only_publicly_known_opponent_hand_cards():
     vocabulary = CardVocabulary((10, 20, 30))
     known = replace(view(), known_opponent_hand_cards=(20,))

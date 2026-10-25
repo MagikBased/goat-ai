@@ -223,6 +223,14 @@ over-cap games separately without assigning them a terminal reward or losing
 the other completed updates. See [evaluation](evaluation.md). This does not
 satisfy the self-play gain gate.
 
+Schema v22 now carries the acting player's own attacker slot during target
+selection, and an opt-in feature-v17 clone can compare that attacker's public
+ATK with visible target stats. On 16 held-out teacher target choices it matched
+15 versus v16's 13, but a 128-game held-out direct match scored 68–59–1 with a
+paired interval crossing 50% and a weaker Chaos Control split. Keep v17
+experimental and continue measuring competitive strength; see
+[evaluation](evaluation.md). This does not close M4.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

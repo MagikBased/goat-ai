@@ -15,6 +15,7 @@ from goat_ai.engine.decks import Decklist, read_goat_whitelist, read_ydk, valida
 from goat_ai.engine.native_messages import NativeChoice
 from goat_ai.engine.ocgcore_probe import OcgcoreProbe
 from goat_ai.engine.protocol import Decision, RulesProfile, SimulatorUnavailable
+from goat_ai.observations import TargetSlotView
 from goat_ai.replay.fingerprint import sha256_file
 
 
@@ -81,7 +82,7 @@ class RestrictedOcgcoreEngine:
             self.close()
             raise
 
-    def _decision(self) -> Decision:
+    def _decision(self, pending_attack: TargetSlotView | None = None) -> Decision:
         if self.probe is None or self.probe._pending_message is None:
             raise RuntimeError("no pending native decision")
         try:
@@ -89,6 +90,10 @@ class RestrictedOcgcoreEngine:
         except NotImplementedError as exc:
             raise SimulatorUnavailable(f"native request unsupported by restricted adapter: {exc}") from exc
         observation = self.probe.observation(native.player)
+        if pending_attack is not None and native.player == pending_attack.controller \
+                and any(choice.kind == "select_card" and choice.location == 0x04
+                        for choice in native.choices):
+            observation = replace(observation, pending_attack=pending_attack)
         if any(link.card_code == 38723936 and link.controller != native.player
                for link in observation.chain):
             # Question forbids inspecting its controller's Graveyard at the
@@ -217,7 +222,9 @@ class RestrictedOcgcoreEngine:
                     self._last_observation.viewer, terminal=True)
                 return Decision(self._last_observation, (), terminal=True,
                                 winner=transition.winner)
-            return self._decision()
+            attack = (TargetSlotView(action.actor, "monster", action.parameters["sequence"])
+                      if action.kind == "attack" else None)
+            return self._decision(attack)
         except Exception:
             self.close()
             raise

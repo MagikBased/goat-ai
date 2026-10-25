@@ -104,12 +104,22 @@ class Observation:
     private_reveals: tuple[PrivateRevealView, ...] = ()
     own_main_deck: tuple[int, ...] = ()  # Initial card multiset, never shuffled order.
     known_opponent_hand_cards: tuple[int, ...] = ()  # Publicly tracked multiset, no hand slots.
+    pending_attack: TargetSlotView | None = None  # Own attacker while choosing its target.
 
     def __post_init__(self) -> None:
         if self.viewer not in (0, 1) or self.acting_player not in (0, 1):
             raise ValueError("viewer and acting player must be 0 or 1")
         if any(card.controller != self.viewer for card in self.hand):
             raise ValueError("observation hand must contain viewer's cards only")
+        if self.pending_attack is not None and (
+                self.viewer != self.acting_player
+                or self.pending_attack.controller != self.viewer
+                or self.pending_attack.zone != "monster"
+                or not 0 <= self.pending_attack.sequence < 7
+                or not any(card.controller == self.viewer and card.zone == "monster"
+                           and card.sequence == self.pending_attack.sequence
+                           and card.position == "faceup" for card in self.field)):
+            raise ValueError("pending attack must identify the acting player's face-up monster")
         if any(target.controller not in (0, 1)
                or target.zone not in ("monster", "spell_trap")
                or not 0 <= target.sequence < (7 if target.zone == "monster" else 8)

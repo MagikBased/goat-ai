@@ -1615,3 +1615,55 @@ Older trajectory schemas are excluded by this command because the known-hand
 field needed for the hand-choice check was added in schema v17. This remains a
 recorded-choice audit, not proof that arbitrary hidden-state changes cannot
 influence all future observations or action ordering.
+
+## Attack-target observation and feature-v17 pilot (2026-10-25)
+
+Schema v22 now records the acting player's **own attacker field slot** at the
+attack-target prompt. It is derived from that player's preceding legal attack
+action and is absent at other decisions. Opt-in policy feature v17 uses that
+slot to pair the attacker's public ATK with each candidate target's visible
+ATK or DEF. A face-down target contributes no hidden battle stat. The default
+policy feature remains v10; the evaluated v16 checkpoint is unchanged.
+
+The original four-deck CombatHeuristicAgent v2 training schedule was replayed
+on the pinned core with seeds 17000–17003 and both teacher seats. All **32**
+schema-v22 duels matched the earlier recordings in selected action sequence,
+decision count, and result: **20,031 decisions** in all, including **154
+multi-option attack-target prompts**. The teacher supplied **10,449** training
+decisions. A width-32 v17 clone trained for three CPU epochs at learning rate
+0.001 and seed 17; mean losses were 0.12618, 0.05376, and 0.03646. Its ignored
+checkpoint SHA-256 is
+`f2584edd823d054c23c2f08fe49307b049fa8b7b9edf8611866ee4a3d6941deb`.
+The data are synthetic teacher demonstrations, not human gameplay.
+
+Four regenerated held-out Chaos Control/Chaos Return teacher duels at seed
+17200 replay-verified **4,067 decisions**. On the **16** teacher attack-target
+choices, v17 matched 15 and v16 matched 13. Across all 718 multi-option
+teacher choices, v17 matched 687 and v16 matched 689. The agreement report
+SHA-256 is
+`329f37ebc292218fad163e0e94187b6019e4f5be6a31d437fe87f9eaaf44693f`.
+These small action counts are diagnostic, not evidence of stronger play.
+
+The predeclared direct match used held-out seeds 18400–18431, both deck
+assignments and seats, and exact Main Deck composition exclusion from training.
+V17 scored **68–59–1** against v16 over **128 terminal games** (53.5% score;
+matchup-seed paired 95% bootstrap interval **48.4–58.2%**). Chaos Control
+scored 28–36; Chaos Return scored 40–23–1. The four-worker CPU tournament took
+73.85 seconds; report SHA-256 is
+`515c14db598a9dc725fb494bf7ef7ef99fde8d1c69d7694e789995d5eca53a95`.
+The interval crosses 50% and the Chaos Control split worsened, so this pilot
+does not establish a competitive gain or close M4. It does establish that the
+previously omitted attacker context reaches the policy without hidden state.
+
+Reproduce the v22 collection with `scripts/collect_heuristic_demos.py` using
+the four deck orders and seeds in the earlier four-deck collection command,
+writing to separate ignored directories. Train with
+`scripts/train_behavioral_clone.py --feature-version 17 --width 32 --epochs 3
+--learning-rate 0.001 --seed 17`; v17 requires schema-v22 input. Run the
+off-policy audit on both checkpoints and the four regenerated seed-17200
+trajectories. For the direct match, run `scripts/evaluate_policy.py` with the
+v17 checkpoint, `--opponent-checkpoint` pointing to the v16 checkpoint,
+`--engine experimental --both-deck-assignments --require-unseen-main-decks`,
+the Chaos Control/Chaos Return matchup, `--seed 18400 --seeds 32 --workers 4`,
+and `--max-decisions 3000`. Generated trajectories, checkpoints, and reports
+remain ignored outside Git.

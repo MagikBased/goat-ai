@@ -32,6 +32,7 @@ POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
 POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experiments
 # Version 16 branches from v12 so its combat relation can be tested without
 # the separate v13-v15 equip, chain-target, and occupancy experiments.
+# Version 17 adds attacker-to-target combat stats using schema-v22 context.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 
@@ -99,7 +100,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 17):
+    if feature_version not in range(1, 18):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -256,7 +257,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
             numeric += (int(params.get("attribute", 0)) / 127,
                         min(announced, 8000) / 8000,
                         log1p(announced) / log1p((1 << 64) - 1))
-        if feature_version == 16:
+        if feature_version >= 16:
             attacker = own_field_monsters.get((action.actor, params.get("sequence"))) \
                 if action.kind == "attack" else None
             attack = attacker.attack if attacker is not None else None
@@ -272,6 +273,22 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                         margin / 8000,
                         float(action.kind == "attack" and fully_visible),
                         float(action.kind == "attack" and not opponent_monsters))
+        if feature_version == 17:
+            pending = observation.pending_attack
+            attacker = (own_field_monsters.get((own, pending.sequence))
+                        if pending is not None else None)
+            target = next((card for card in opponent_monsters
+                           if card.sequence == params.get("sequence")), None) \
+                if action.kind == "select_card" and params.get("controller") == opponent \
+                and params.get("location") == 0x04 else None
+            attack = attacker.attack if attacker is not None else None
+            defense = (target.attack if target.orientation == "attack" else target.defense) \
+                if target is not None and target.position == "faceup" else None
+            numeric += (attack / 8000 if attack is not None and target is not None else 0.0,
+                        defense / 8000 if defense is not None else 0.0,
+                        (attack - defense) / 8000 if attack is not None
+                        and defense is not None else 0.0,
+                        float(attack is not None and defense is not None))
         action_numbers.append(numeric)
     width = max(1, *(len(row) for row in targets))
     padded_targets = [row + [0] * (width - len(row)) for row in targets]
@@ -329,7 +346,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 17):
+        if feature_version not in range(1, 18):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -348,7 +365,9 @@ class LegalActionPolicy(nn.Module):
         number_width = 54 if feature_version == 15 else 42 if feature_version >= 4 else 10
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
-        action_number_width = 15 if feature_version == 16 else 11 if feature_version >= 6 else 8
+        action_number_width = (19 if feature_version == 17 else 15
+                               if feature_version == 16 else 11
+                               if feature_version >= 6 else 8)
         self.action_numbers = nn.Sequential(nn.Linear(action_number_width, width), nn.ReLU(),
                                             nn.Linear(width, width))
         if feature_version >= 2:

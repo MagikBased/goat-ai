@@ -1,3 +1,4 @@
+import json
 import os
 from dataclasses import replace
 from pathlib import Path
@@ -45,7 +46,7 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     trajectory = play()
     assert trajectory == play()
     assert trajectory.winner == 1
-    assert trajectory.schema_version == 21
+    assert trajectory.schema_version == 22
     assert trajectory.rules_profile == vars(RestrictedOcgcoreEngine(root).ruleset)
     assert trajectory.deck_sha256 is not None
     assert trajectory.asset_sha256 is not None
@@ -56,6 +57,16 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
         "turn:1", "phase:draw")
     assert any("attack" in record.observation.public_history
                for record in trajectory.decisions)
+    target_prompts = [record for record in trajectory.decisions
+                      if record.observation.pending_attack is not None]
+    assert target_prompts
+    for record in target_prompts:
+        view = record.observation
+        assert view.viewer == view.acting_player == view.pending_attack.controller
+        assert any(card.controller == view.viewer and card.zone == "monster"
+                   and card.sequence == view.pending_attack.sequence
+                   and card.position == "faceup" for card in view.field)
+        assert any(action.kind == "select_card" for action in record.legal_actions)
     assert any(
         any(card.controller != record.observation.viewer and card.position == "facedown"
             for card in record.observation.field)
@@ -68,10 +79,20 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     assert read_trajectory(path) == trajectory
     assert verify_trajectory(read_trajectory(path), RestrictedOcgcoreEngine(root)) == len(
         trajectory.decisions)
+    older = json.loads(path.read_text())
+    older["schema_version"] = 21
+    for view in [*(row["observation"] for row in older["decisions"]),
+                 older["terminal_observation"]]:
+        view.pop("pending_attack")
+    older_path = tmp_path / "duel_v21.json"
+    older_path.write_text(json.dumps(older))
+    assert verify_trajectory(read_trajectory(older_path),
+                             RestrictedOcgcoreEngine(root)) == len(trajectory.decisions)
     previous = replace(trajectory, schema_version=4,
                        decisions=tuple(_old_position_actions(replace(record, observation=replace(
                            record.observation, known_opponent_cards=(),
-                           known_opponent_field_cards=(), own_main_deck=())))
+                           known_opponent_field_cards=(), own_main_deck=(),
+                           pending_attack=None)))
                                        for record in trajectory.decisions))
     assert verify_trajectory(previous, RestrictedOcgcoreEngine(root)) == len(
         previous.decisions)

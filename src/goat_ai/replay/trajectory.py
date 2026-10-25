@@ -54,7 +54,7 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     version = raw.get("schema_version")
-    if version not in range(1, 22):
+    if version not in range(1, 23):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
@@ -110,6 +110,10 @@ def read_trajectory(path: str | Path) -> Trajectory:
             view["known_opponent_hand_cards"] = tuple(view["known_opponent_hand_cards"])
         else:
             view.pop("known_opponent_hand_cards", None)
+        if version >= 22 and view.get("pending_attack") is not None:
+            view["pending_attack"] = TargetSlotView(**view["pending_attack"])
+        else:
+            view.pop("pending_attack", None)
         if version >= 2:
             view["chain"] = tuple(ChainLinkView(
                 link["index"], link["card_code"], link["controller"],
