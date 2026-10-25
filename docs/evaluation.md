@@ -1597,3 +1597,21 @@ correctness for every card. The native differential tests remain necessary.
 A paired Nobleman regression now swaps two unknown opponent monster identities
 between field slots and verifies that its full observation and both target
 choices are unchanged at the decision boundary; see [GOAT rules](goat_rules.md).
+A complementary Mystical Space Typhoon differential swaps Set Solemn Judgment
+and Book of Moon between two backrow slots and finds the same observation and
+target choices. The native queries confirm both underlying swaps.
+
+The audit also passed all **128 locally saved schema-v21 trajectories** found
+under `replays/`: **92,478 decisions**, **3,016 opponent-field choices**, **569
+opposing face-down field choices**, and **234 opponent-hand choices**. Reproduce
+the wider audit with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_trajectory_visibility.py \
+  --schema 21 replays
+```
+
+Older trajectory schemas are excluded by this command because the known-hand
+field needed for the hand-choice check was added in schema v17. This remains a
+recorded-choice audit, not proof that arbitrary hidden-state changes cannot
+influence all future observations or action ordering.
