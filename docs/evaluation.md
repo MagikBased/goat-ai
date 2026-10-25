@@ -2247,3 +2247,40 @@ Exact deduplication removes repeated states but does not make the remaining
 decisions statistically independent. Inspect Heavy Storm activation timing and
 Breaker combat choices on held-out decks before changing training weights;
 neither agent's choice is treated as ground truth for strategic quality.
+
+### Checking the stronger combat model before retraining
+
+The same 30 trajectories were replay-verified against both the older
+feature-v12 clone and the saved four-deck feature-v16 combat clone. The report
+SHA-256 is
+`fc669b666c3e53318b83f7f9892d26b357111d4b7203c94844e814bcbae214d7`.
+On the two Main Decks absent from **both** checkpoints' training games, exact
+agreement with the basic heuristic was:
+
+| Selected card and acting deck | v12 | v16 |
+| --- | ---: | ---: |
+| Heavy Storm, Chaos Control | 6/11 | 6/11 |
+| Heavy Storm, Chaos Return | 2/5 | 5/5 |
+| Breaker, Chaos Control | 2/2 | 2/2 |
+| Breaker, Chaos Return | 18/21 | 20/21 |
+
+Across all six decks, the v16 clone matched 23/25 Heavy Storm activations
+versus 17/25 for v12, and 25/27 Breaker attacks versus 21/27. It matched all
+17 Breaker position changes versus v12's 13/17. The remaining five Heavy
+Storm Set mismatches repeat a Chaos Control opening in which the basic
+heuristic Sets Storm while both clones Set another Trap; they are only three
+distinct exact demonstrations. This evidence gives no reason to train toward
+those Set choices. The checkpoints differ in training data and architecture,
+so the comparison cannot attribute any difference to the feature version.
+It is an off-policy diagnostic, not a competitive strength result.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python -m scripts.audit_policy_agreement \
+  --checkpoint checkpoints/combat_bc_fv12_11000_11001.pt \
+  --checkpoint checkpoints/combat_fourdeck_fv16_17000_17003.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --staple-code 19613556 --staple-code 71413901 \
+  --output /tmp/goat_policy_v12_v16_by_deck_19600.json \
+  /tmp/goat_heuristic_replays_19600/*.json \
+  > /tmp/goat_policy_v12_v16_by_deck_19600.stdout
+```

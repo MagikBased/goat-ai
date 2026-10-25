@@ -150,6 +150,8 @@ def main() -> None:
         lambda: {"exact": 0, "total": 0, "chosen_kinds": defaultdict(int),
                  "fingerprints": set(), "mismatch_fingerprints": set()}))
                              for path, _ in checkpoints}
+    staple_selected_decks = {str(path): defaultdict(lambda: defaultdict(
+        lambda: {"exact": 0, "total": 0})) for path, _ in checkpoints}
     verified = []
     for path in args.trajectories:
         trajectory = read_trajectory(path)
@@ -187,6 +189,10 @@ def main() -> None:
                                 record.selected_action.kind]
                             kind_bucket["total"] += 1
                             kind_bucket["exact"] += chosen == record.selected_action
+                            deck_bucket = staple_selected_decks[str(checkpoint)][code][
+                                decision_deck(trajectory, record)]
+                            deck_bucket["total"] += 1
+                            deck_bucket["exact"] += chosen == record.selected_action
                             kind_bucket["chosen_kinds"][chosen.kind] += 1
                             fingerprint = decision_fingerprint(record)
                             kind_bucket["fingerprints"].add(fingerprint)
@@ -218,6 +224,8 @@ def main() -> None:
                                                 bucket["mismatch_fingerprints"])}
                                      for kind, bucket in
                                      staple_selected_kinds[str(path)][code].items()},
+                                 "teacher_selected_by_deck": dict(sorted(
+                                     staple_selected_decks[str(path)][code].items())),
                              }
                              for code, card_counts in sorted(
                                  staple_counts[str(path)].items())}})
