@@ -13,6 +13,10 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 BRAIN_CONTROL = 511002995  # pre-errata GOAT whitelist entry
 BOOK_OF_MOON = 14087893
+SCAPEGOAT = 504700123
+METAMORPHOSIS = 46411259
+RESTRICT = 504700102  # GOAT Fusion variant
+SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 def _deck(path, cards):
@@ -135,3 +139,76 @@ def test_brain_control_and_book_timing(tmp_path, book_timing):
             pytest.fail(f"Brain Control line did not finish ({book_timing})")
         assert f"pre-errata/c{BRAIN_CONTROL}.lua" in (
             env.engine.probe.loaded_script_sha256)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_pre_errata_brain_control_can_take_fusion_monster(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    scripts = (f"scripts/pre-errata/c{BRAIN_CONTROL}.lua",
+               f"scripts/goat/c{SCAPEGOAT}.lua",
+               f"scripts/official/c{METAMORPHOSIS}.lua",
+               f"scripts/goat/c{RESTRICT}.lua")
+    if not all((root / script).is_file() for script in scripts):
+        pytest.skip("Brain Control/Fusion line scripts not installed")
+    attacker = _deck(tmp_path / "brain.ydk", (
+        *([BRAIN_CONTROL] * 3), *VANILLA_DECK[3:]))
+    defender = tmp_path / "metamorphosis.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        *([SCAPEGOAT] * 3), *([METAMORPHOSIS] * 3), *VANILLA_DECK[6:])))
+        + f"\n#extra\n{RESTRICT}\n!side\n")
+    with GoatEnvironment(attacker, str(defender), seed=11,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        goat = metamorphosis = paid_token = selected_fusion = False
+        brain = selected_target = False
+        for _ in range(70):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 2 and observation.acting_player == 1 and not goat:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == SCAPEGOAT), None)
+                goat |= action is not None
+            if action is None and observation.turn == 4 \
+                    and observation.acting_player == 1 and not metamorphosis:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == METAMORPHOSIS), None)
+                metamorphosis |= action is not None
+            if action is None and metamorphosis and not paid_token:
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("code") in SHEEP_CODES), None)
+                paid_token |= action is not None
+            if action is None and paid_token and not selected_fusion:
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("code") == RESTRICT), None)
+                selected_fusion |= action is not None
+                if action is not None:
+                    assert action.parameters["location"] == 64
+                    assert "sequence" not in action.parameters
+            if action is None and observation.turn == 5 \
+                    and observation.acting_player == 0 and not brain:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == BRAIN_CONTROL), None)
+                brain |= action is not None
+            if action is None and brain and not selected_target \
+                    and actions[0].kind == "select_card":
+                assert observation.life_points == (7200, 8000)
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("code") == RESTRICT), None)
+                selected_target |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "select_position", "pass", "end_phase")),
+                    actions[0])
+            observation = env.step(action)
+            if selected_target and any(c.code == RESTRICT and c.controller == 0
+                                       for c in observation.field):
+                assert observation.life_points == (7200, 8000)
+                assert observation.extra_deck_counts == (0, 0)
+                assert sum(c.code in SHEEP_CODES for c in observation.field) == 3
+                loaded = env.engine.probe.loaded_script_sha256
+                assert f"pre-errata/c{BRAIN_CONTROL}.lua" in loaded
+                assert f"official/c{METAMORPHOSIS}.lua" in loaded
+                assert f"goat/c{SCAPEGOAT}.lua" in loaded
+                assert f"goat/c{RESTRICT}.lua" in loaded
+                return
+    pytest.fail("pre-errata Brain Control did not take Thousand-Eyes Restrict")
