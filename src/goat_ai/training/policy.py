@@ -29,7 +29,7 @@ ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
 SORT_ACTION_KINDS = ("sort_cards",)
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
-POLICY_FEATURE_VERSION = 10  # ordered public chain links; v11 is an unordered ablation
+POLICY_FEATURE_VERSION = 10  # v11/v12 are opt-in representation experiments
 
 
 @dataclass(frozen=True)
@@ -77,6 +77,9 @@ class DecisionFeatures:
     deck_cards: Tensor  # [D]: sorted initial own Main Deck card IDs, or [0] before v5
     known_hand_cards: Tensor  # [H]: publicly known opponent hand IDs, or [0] before v9
     chain_cards: Tensor  # [L, 2]: ordered public chain card and relative controller, or [[0, 0]]
+    state_card_sequences: Tensor  # [N]: field sequence, -1 for non-field cards
+    action_field_slots: Tensor  # [A, 3]: relative controller, zone, sequence
+    action_multi_field_slots: Tensor  # [A, T, 3]: field slots in variable target sets
 
     def to(self, device: torch.device | str) -> "DecisionFeatures":
         return DecisionFeatures(*(value.to(device) for value in self.__dict__.values()))
@@ -90,7 +93,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 12):
+    if feature_version not in range(1, 13):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -106,6 +109,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
 
     cards = []
     card_numbers = []
+    card_sequences = []
     for card in (*observation.hand, *observation.field, *observation.graveyards[0],
                  *observation.graveyards[1], *observation.banished[0],
                  *observation.banished[1], *observation.own_extra_deck):
@@ -116,6 +120,8 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         cards.append((vocabulary.index(code), ZONES.index(card.zone) + 1,
                       int(card.controller != observation.viewer) + 1,
                       POSITIONS.index(card.position) + 1))
+        card_sequences.append(card.sequence if card.zone in ("monster", "spell_trap")
+                              and card.sequence is not None else -1)
         spell_count = sum(count for kind, count in card.counters if kind == 1)
         card_numbers.append((card.attack / 8000 if card.attack is not None else 0.0,
                              card.defense / 8000 if card.defense is not None else 0.0,
@@ -127,9 +133,11 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         cards.append((vocabulary.index(link.card_code), ZONES.index("chain") + 1,
                       int(link.controller != observation.viewer) + 1, 3))
         card_numbers.append((0.0,) * 5)
+        card_sequences.append(-1)
     if not cards:
         cards.append((0, 0, 0, 0))
         card_numbers.append((0.0,) * 5)
+        card_sequences.append(-1)
 
     own = observation.viewer
     opponent = 1 - own
@@ -155,11 +163,24 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
     targets = []
     target_context = []
     action_numbers = []
+    action_field_slots = []
+    action_multi_field_slots = []
     kinds = ACTION_KINDS + ZONE_ACTION_KINDS if feature_version >= 4 else ACTION_KINDS
     if feature_version >= 6:
         kinds += ANNOUNCE_ACTION_KINDS
     if feature_version >= 7:
         kinds += SORT_ACTION_KINDS
+
+    def field_slot(params: dict) -> tuple[int, int, int]:
+        location = params.get("location")
+        sequence = params.get("sequence")
+        controller = params.get("controller")
+        zone = {4: "monster", 8: "spell_trap"}.get(location)
+        if (zone is None or not isinstance(sequence, int)
+                or controller not in (0, 1)):
+            return (0, 0, -1)
+        return (int(controller != own) + 1, ZONES.index(zone) + 1, sequence)
+
     for action in legal_actions:
         params = action.parameters
         kind_indices.append(kinds.index(action.kind) + 1
@@ -169,6 +190,8 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
             params.get("sequence"))))
         selected = (params.get("cards", params.get("zones", ()))
                     if feature_version >= 4 else params.get("cards", ()))
+        action_field_slots.append(field_slot(params))
+        action_multi_field_slots.append([field_slot(card) for card in selected])
         targets.append([vocabulary.index(visible_code(
             card.get("code"), card.get("controller"), card.get("location"),
             card.get("sequence"))) for card in selected])
@@ -207,6 +230,8 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
     padded_context = [row + [empty_context] * (width - len(row))
                       for row in target_context]
     target_masks = [[1] * len(row) + [0] * (width - len(row)) for row in targets]
+    padded_field_slots = [row + [(0, 0, -1)] * (width - len(row))
+                          for row in action_multi_field_slots]
     phase = PHASES.index(observation.phase) + 1 if observation.phase in PHASES else 0
     chain_links = [(vocabulary.index(link.card_code),
                     int(link.controller != observation.viewer) + 1)
@@ -231,6 +256,9 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                      dtype=torch.long),
         torch.tensor(chain_links if feature_version >= 10 and chain_links else [(0, 0)],
                      dtype=torch.long),
+        torch.tensor(card_sequences, dtype=torch.long),
+        torch.tensor(action_field_slots, dtype=torch.long),
+        torch.tensor(padded_field_slots, dtype=torch.long),
     )
 
 
@@ -240,7 +268,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 12):
+        if feature_version not in range(1, 13):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -312,6 +340,25 @@ class LegalActionPolicy(nn.Module):
                 1).clamp(min=1)
         action = (self.kind(features.action_kinds) + self.card(features.action_cards)
                   + target_mean + self.action_numbers(features.action_numbers))
+        if self.feature_version >= 12:
+            # Bind each selected field slot to its visible card. A pooled state
+            # alone loses which known face-down identity occupies which slot.
+            slots = features.action_field_slots
+            direct_match = ((slots[:, None, 0] == cards[None, :, 2])
+                            & (slots[:, None, 1] == cards[None, :, 1])
+                            & (slots[:, None, 2] ==
+                               features.state_card_sequences[None, :])
+                            & (slots[:, None, 1] != 0))
+            action = action + direct_match.to(visible.dtype) @ visible
+            multi_slots = features.action_multi_field_slots
+            multi_match = ((multi_slots[:, :, None, 0] == cards[None, None, :, 2])
+                           & (multi_slots[:, :, None, 1] == cards[None, None, :, 1])
+                           & (multi_slots[:, :, None, 2] ==
+                              features.state_card_sequences[None, None, :])
+                           & (multi_slots[:, :, None, 1] != 0))
+            matched = (multi_match.to(visible.dtype) @ visible)
+            multi_mask = (multi_slots[:, :, 1] != 0).unsqueeze(-1)
+            action = action + (matched * multi_mask).sum(1) / multi_mask.sum(1).clamp(min=1)
         return self.score(torch.cat((state.expand(len(action), -1), action), dim=1)).squeeze(1)
 
 

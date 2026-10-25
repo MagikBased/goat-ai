@@ -155,6 +155,64 @@ def test_feature_version_eleven_keeps_chain_capacity_without_order():
     assert torch.allclose(unordered(first_features), unordered(second_features))
 
 
+def test_feature_version_twelve_binds_visible_stats_to_selected_field_slot():
+    vocabulary = CardVocabulary((10, 20))
+    first = replace(view(), field=(
+        CardView(1, "monster", "faceup", 20, 0, "attack", 1600, 1000),
+        CardView(1, "monster", "faceup", 20, 1, "attack", 1900, 1000),
+    ))
+    swapped = replace(first, field=(
+        replace(first.field[0], attack=1900),
+        replace(first.field[1], attack=1600),
+    ))
+    choices = (
+        Action("slot-0", "select_card", 0,
+               {"code": 20, "controller": 1, "location": 4, "sequence": 0}),
+        Action("slot-1", "select_card", 0,
+               {"code": 20, "controller": 1, "location": 4, "sequence": 1}),
+    )
+    torch.manual_seed(12)
+    old_model = LegalActionPolicy(vocabulary.size, width=16, feature_version=10)
+    torch.manual_seed(12)
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=12)
+    assert all(torch.equal(left, right) for left, right in zip(
+        old_model.parameters(), model.parameters(), strict=True))
+    before = encode_decision(first, choices, vocabulary, feature_version=12)
+    after = encode_decision(swapped, choices, vocabulary, feature_version=12)
+    assert before.action_field_slots.tolist() == [[2, 2, 0], [2, 2, 1]]
+    assert before.state_card_sequences.tolist() == [-1, 0, 1]
+    assert torch.allclose(old_model(before), old_model(after))
+    assert not torch.allclose(model(before), model(after))
+    selected = (Action("multi-slot", "select_cards", 0, {"cards": [
+        {"code": 20, "controller": 1, "location": 4, "sequence": 0}]}),)
+    multi_before = encode_decision(first, selected, vocabulary, feature_version=12)
+    multi_after = encode_decision(swapped, selected, vocabulary, feature_version=12)
+    assert multi_before.action_field_slots.tolist() == [[0, 0, -1]]
+    assert multi_before.action_multi_field_slots.tolist() == [[[2, 2, 0]]]
+    assert torch.allclose(old_model(multi_before), old_model(multi_after))
+    assert not torch.allclose(model(multi_before), model(multi_after))
+
+
+def test_feature_version_twelve_uses_only_visible_field_cards():
+    vocabulary = CardVocabulary((10, 20))
+    observation = replace(view(), field=(
+        CardView(1, "monster", "facedown", None, 0, "defense"),
+        CardView(1, "monster", "facedown", None, 1, "defense"),
+    ))
+    choices = (Action("a", "select_card", 0,
+                      {"controller": 1, "location": 4, "sequence": 0}),)
+    features = encode_decision(observation, choices, vocabulary, feature_version=12)
+    assert features.state_cards[1:3, 0].tolist() == [0, 0]
+    assert features.action_cards.tolist() == [0]
+    assert features.action_field_slots.tolist() == [[2, 2, 0]]
+    known = replace(observation, known_opponent_field_cards=(
+        KnownCardView(1, "monster", 0, 20),))
+    known_features = encode_decision(known, choices, vocabulary, feature_version=12)
+    assert known_features.state_cards[1:3, 0].tolist() == [vocabulary.index(20), 0]
+    assert known_features.action_cards.tolist() == [vocabulary.index(20)]
+    assert LegalActionPolicy(vocabulary.size, width=16, feature_version=12)(features).shape == (1,)
+
+
 def test_action_ids_are_not_features_but_public_card_and_controller_are():
     vocabulary = CardVocabulary((10, 20))
     original = encode_decision(view(), actions(), vocabulary)

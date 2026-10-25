@@ -28,7 +28,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--width", type=int, default=64)
-    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 12)),
+    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 13)),
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
@@ -44,10 +44,10 @@ def main() -> None:
     for path in args.trajectories:
         raw = path.read_bytes()
         trajectory = read_trajectory(path)
-        if trajectory.schema_version not in (3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17) or not trajectory.deck_sha256 or not (
+        if trajectory.schema_version not in range(3, 19) or not trajectory.deck_sha256 or not (
             trajectory.asset_sha256
         ):
-            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v17")
+            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v18")
         count = verify_trajectory(trajectory, engine_type(args.native_root))
         selected = demonstrator_records(trajectory)
         records.extend(selected)
