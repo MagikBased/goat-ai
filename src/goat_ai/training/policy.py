@@ -30,6 +30,10 @@ ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card
 SORT_ACTION_KINDS = ("sort_cards",)
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
 POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experiments
+# Version 16 branches from v12 so its combat relation can be tested without
+# the separate v13-v15 equip, chain-target, and occupancy experiments.
+EQUIP_FEATURE_VERSIONS = (13, 14, 15)
+CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 
 
 @dataclass(frozen=True)
@@ -95,7 +99,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 16):
+    if feature_version not in range(1, 17):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -127,7 +131,8 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                               and card.sequence is not None else -1)
         equip_slots.append((int(card.equipped_to[0] != observation.viewer) + 1,
                             ZONES.index("monster") + 1, card.equipped_to[1])
-                           if feature_version >= 13 and card.equipped_to is not None
+                           if feature_version in EQUIP_FEATURE_VERSIONS
+                           and card.equipped_to is not None
                            else (0, 0, -1))
         spell_count = sum(count for kind, count in card.counters if kind == 1)
         card_numbers.append((card.attack / 8000 if card.attack is not None else 0.0,
@@ -167,7 +172,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
             for zone in ("monster", "spell_trap")
             for sequence in range(8)
         )
-    if feature_version >= 15:
+    if feature_version == 15:
         # The average card embedding does not retain how many cards occupy
         # each public zone. Counts are available to either player, including
         # for face-down cards whose identities stay hidden.
@@ -188,6 +193,11 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
     action_numbers = []
     action_field_slots = []
     action_multi_field_slots = []
+    own_field_monsters = {(card.controller, card.sequence): card
+                          for card in observation.field
+                          if card.zone == "monster" and card.controller == own}
+    opponent_monsters = tuple(card for card in observation.field
+                              if card.zone == "monster" and card.controller == opponent)
     kinds = ACTION_KINDS + ZONE_ACTION_KINDS if feature_version >= 4 else ACTION_KINDS
     if feature_version >= 6:
         kinds += ANNOUNCE_ACTION_KINDS
@@ -246,6 +256,22 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
             numeric += (int(params.get("attribute", 0)) / 127,
                         min(announced, 8000) / 8000,
                         log1p(announced) / log1p((1 << 64) - 1))
+        if feature_version == 16:
+            attacker = own_field_monsters.get((action.actor, params.get("sequence"))) \
+                if action.kind == "attack" else None
+            attack = attacker.attack if attacker is not None else None
+            fully_visible = all(card.position == "faceup"
+                                and (card.attack if card.orientation == "attack"
+                                     else card.defense) is not None
+                                for card in opponent_monsters)
+            opposing_stats = tuple(card.attack if card.orientation == "attack"
+                                   else card.defense for card in opponent_monsters)
+            margin = (attack - min(opposing_stats)
+                      if attack is not None and opposing_stats and fully_visible else 0)
+            numeric += (attack / 8000 if attack is not None else 0.0,
+                        margin / 8000,
+                        float(action.kind == "attack" and fully_visible),
+                        float(action.kind == "attack" and not opponent_monsters))
         action_numbers.append(numeric)
     width = max(1, *(len(row) for row in targets))
     padded_targets = [row + [0] * (width - len(row)) for row in targets]
@@ -261,10 +287,13 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                    for link in observation.chain]
     if feature_version == 11:
         chain_links.sort()
-    chain_targets = [[(int(target.controller != observation.viewer) + 1,
-                       ZONES.index(target.zone) + 1, target.sequence)
-                      for target in link.targets]
-                     for link in observation.chain] if feature_version >= 14 else []
+    chain_targets = (
+        [[(int(target.controller != observation.viewer) + 1,
+           ZONES.index(target.zone) + 1, target.sequence)
+          for target in link.targets]
+         for link in observation.chain]
+        if feature_version in CHAIN_TARGET_FEATURE_VERSIONS else []
+    )
     target_width = max(1, max((len(row) for row in chain_targets), default=0))
     chain_targets = ([row + [(0, 0, -1)] * (target_width - len(row))
                       for row in chain_targets] if chain_targets else [[(0, 0, -1)]])
@@ -300,7 +329,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 16):
+        if feature_version not in range(1, 17):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -316,10 +345,11 @@ class LegalActionPolicy(nn.Module):
                       + (len(ANNOUNCE_ACTION_KINDS) if feature_version >= 6 else 0)
                       + (len(SORT_ACTION_KINDS) if feature_version >= 7 else 0))
         self.kind = nn.Embedding(kind_count + 1, width, padding_idx=0)
-        number_width = 54 if feature_version >= 15 else 42 if feature_version >= 4 else 10
+        number_width = 54 if feature_version == 15 else 42 if feature_version >= 4 else 10
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
-        self.action_numbers = nn.Sequential(nn.Linear(11 if feature_version >= 6 else 8, width), nn.ReLU(),
+        action_number_width = 15 if feature_version == 16 else 11 if feature_version >= 6 else 8
+        self.action_numbers = nn.Sequential(nn.Linear(action_number_width, width), nn.ReLU(),
                                             nn.Linear(width, width))
         if feature_version >= 2:
             self.target_context = nn.Sequential(nn.Linear(
@@ -335,10 +365,10 @@ class LegalActionPolicy(nn.Module):
                                    nn.Linear(width, 1))
         # Construct the opt-in layer last so common layers keep identical
         # seeded initial weights in v12/v13 comparison experiments.
-        if feature_version >= 13:
+        if feature_version in EQUIP_FEATURE_VERSIONS:
             self.equip_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
                                             nn.Linear(width, width))
-        if feature_version >= 14:
+        if feature_version in CHAIN_TARGET_FEATURE_VERSIONS:
             self.chain_target_sequence = nn.Embedding(8, width)
             self.chain_target_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
                                                    nn.Linear(width, width))
@@ -349,7 +379,7 @@ class LegalActionPolicy(nn.Module):
                    + self.owner(cards[:, 2]) + self.position(cards[:, 3]))
         if self.feature_version >= 8:
             visible = visible + self.card_numbers(features.state_card_numbers)
-        if self.feature_version >= 13:
+        if self.feature_version in EQUIP_FEATURE_VERSIONS:
             slots = features.state_equip_slots
             target_match = ((slots[:, None, 0] == cards[None, :, 2])
                             & (slots[:, None, 1] == cards[None, :, 1])
@@ -376,7 +406,7 @@ class LegalActionPolicy(nn.Module):
         if self.feature_version >= 10:
             chain = features.chain_cards
             chain_input = self.card(chain[:, 0]) + self.owner(chain[:, 1])
-            if self.feature_version >= 14:
+            if self.feature_version in CHAIN_TARGET_FEATURE_VERSIONS:
                 slots = features.chain_target_slots
                 slot_mask = slots[:, :, 0] != 0
                 field_match = ((slots[:, :, None, 0] == cards[None, None, :, 2])

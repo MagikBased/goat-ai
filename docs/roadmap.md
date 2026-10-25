@@ -169,6 +169,16 @@ v12 on unseen Chaos Control/Chaos Return Main Decks. This negative pilot is
 documented in [the evaluation log](evaluation.md); keep the default model
 unchanged and do not count it as the M4 strength exit.
 
+A targeted feature-v16 branch from v12 adds only public attack margin and
+visibility to offered attack actions. It reduced held-out attack-versus-Main-2
+teacher mistakes from ten to three. An independent 128-game match favored
+v16 over v12 (79–48–1; paired interval above 50%), and held-out tournaments
+favored v16 over RandomAgent and HeuristicAgent. A 256-game match against the
+stronger CombatHeuristicAgent scored 139–114–3, but its paired interval still
+includes 50% and the Chaos Control split was below 50%. See [evaluation](evaluation.md).
+The M4 exit remains open pending stronger cross-deck competitive evidence and
+a demonstrated self-play gain.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

@@ -162,6 +162,37 @@ def test_feature_version_fifteen_counts_public_occupancy_without_card_identity()
         second).shape == (3,)
 
 
+def test_feature_version_sixteen_exposes_visible_attack_margin():
+    vocabulary = CardVocabulary((10, 20))
+    own = CardView(0, "monster", "faceup", 20, 0, "attack", 1500, 1000)
+    strong = CardView(1, "monster", "faceup", 10, 0, "attack", 1900, 1000)
+    weak = replace(strong, attack=1000)
+    hidden = CardView(1, "monster", "facedown", None, 0, "defense")
+    attack = Action("attack", "attack", 0, {"code": 20, "controller": 0,
+                                              "location": 4, "sequence": 0})
+    choices = (attack, Action("main2", "main2", 0))
+    views = [replace(view(), field=(own, opposing))
+             for opposing in (strong, weak, hidden)]
+    views.append(replace(view(), field=(own,)))
+    encoded = [encode_decision(state, choices, vocabulary, feature_version=16)
+               for state in views]
+    assert encoded[0].action_numbers.shape == (2, 15)
+    assert torch.allclose(torch.stack([features.action_numbers[0, -4:]
+                                       for features in encoded]), torch.tensor([
+        [1500 / 8000, -400 / 8000, 1, 0],
+        [1500 / 8000, 500 / 8000, 1, 0],
+        [1500 / 8000, 0, 0, 0],
+        [1500 / 8000, 0, 1, 1],
+    ]))
+    assert encoded[0].action_numbers[1, -4:].tolist() == [0, 0, 0, 0]
+    assert torch.equal(encode_decision(views[0], choices, vocabulary,
+                                       feature_version=12).action_numbers,
+                       encode_decision(views[1], choices, vocabulary,
+                                       feature_version=12).action_numbers)
+    assert LegalActionPolicy(vocabulary.size, width=16, feature_version=16)(
+        encoded[0]).shape == (2,)
+
+
 def test_feature_version_nine_uses_only_publicly_known_opponent_hand_cards():
     vocabulary = CardVocabulary((10, 20, 30))
     known = replace(view(), known_opponent_hand_cards=(20,))

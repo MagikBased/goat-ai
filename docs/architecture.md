@@ -36,6 +36,13 @@ face-up/face-down monster and Spell/Trap counts, plus each player's Graveyard
 and banished counts. Field counts use only visible zones and positions; they
 do not include hidden card identities. The default remains version 10 so old
 checkpoints keep their exact feature width.
+Opt-in version 16 branches from version 12 and adds four action-specific
+combat numbers for an offered attack: the attacker's public ATK, its margin
+against the weakest visible opposing battle stat, whether all opposing
+monsters have visible battle stats, and whether the opposing field is empty.
+The margin is zero when a hidden monster prevents that comparison. It is
+computed from the same redacted observation and legal action available to
+every agent; no native private query or hidden opponent card ID is used.
 Schemas v3–v21 verify deck contents and native asset fingerprints as well as the
 recorded path. Callers must retain the original deck files and native assets;
 the recording stores hashes, not copies. Older v1/v2 recordings can still be
