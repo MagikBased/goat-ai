@@ -13,6 +13,7 @@ POT_OF_GREED = 55144522
 MAGICIAN_OF_FAITH = 31560081
 BOOK_OF_MOON = 14087893
 GEMINI_ELF = 69140098
+NECROVALLEY = 511002998
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -296,3 +297,71 @@ def test_magician_of_faith_battle_flip_recovers_pot_before_destruction(tmp_path)
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("battle-flipped Magician of Faith did not recover Pot")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_pre_errata_necrovalley_negates_magician_of_faith_recovery(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"official/c{POT_OF_GREED}.lua",
+                     f"official/c{MAGICIAN_OF_FAITH}.lua",
+                     f"pre-errata/c{NECROVALLEY}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    faith_deck = tmp_path / "faith.ydk"
+    faith_deck.write_text("#main\n" + "\n".join(map(str, (
+        POT_OF_GREED, *([MAGICIAN_OF_FAITH] * 3), *VANILLA_DECK[4:])))
+                          + "\n#extra\n!side\n")
+    valley_deck = tmp_path / "valley.ydk"
+    valley_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([NECROVALLEY] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(faith_deck), str(valley_deck), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {POT_OF_GREED, MAGICIAN_OF_FAITH}.issubset(c.code for c in obs.hand)
+        assert NECROVALLEY in {c.code for c in env.engine.probe.observation(1).hand}
+        pot_used = faith_set = valley_used = faith_flipped = pot_targeted = False
+        for _ in range(65):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not pot_used:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == POT_OF_GREED), None)
+                    pot_used |= action is not None
+                elif not faith_set:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == MAGICIAN_OF_FAITH), None)
+                    faith_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not valley_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == NECROVALLEY), None)
+                valley_used |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and valley_used:
+                if not faith_flipped:
+                    action = next((a for a in actions if a.kind == "flip_summon"
+                                   and a.parameters.get("code") == MAGICIAN_OF_FAITH), None)
+                    faith_flipped |= action is not None
+                elif not pot_targeted and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == POT_OF_GREED and a.parameters.get("location") == 16),
+                                  None)
+                    pot_targeted |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if pot_targeted and obs.turn == 3 and obs.acting_player == 0 \
+                    and not obs.chain and any(a.kind == "normal_summon"
+                                              for a in env.legal_actions()):
+                assert POT_OF_GREED in {c.code for c in obs.graveyards[0]}
+                assert POT_OF_GREED not in {c.code for c in obs.hand}
+                assert any(c.code == MAGICIAN_OF_FAITH and c.position == "faceup"
+                           for c in obs.field)
+                assert any(c.code == NECROVALLEY and c.position == "faceup"
+                           for c in obs.field)
+                assert not env.engine.probe.observation(1).private_reveals
+                loaded = env.engine.probe.loaded_script_sha256
+                assert {f"official/c{MAGICIAN_OF_FAITH}.lua",
+                        f"pre-errata/c{NECROVALLEY}.lua"}.issubset(loaded)
+                return
+    pytest.fail("Necrovalley did not negate Magician of Faith's recovery")
