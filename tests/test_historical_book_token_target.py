@@ -17,7 +17,8 @@ TOKENS = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_book_target_choices_exclude_sheep_tokens(tmp_path):
+@pytest.mark.parametrize("summon_own_monster", [False, True])
+def test_book_target_choices_exclude_sheep_tokens(tmp_path, summon_own_monster):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"official/c{BOOK}.lua", f"goat/c{SCAPEGOAT}.lua"):
         if not (root / "scripts" / relative).is_file():
@@ -40,7 +41,7 @@ def test_book_target_choices_exclude_sheep_tokens(tmp_path):
         for _ in range(5000):
             if env.is_terminal():
                 assert checked
-                path = tmp_path / "book_token_target.json"
+                path = tmp_path / f"book_token_target_{summon_own_monster}.json"
                 write_trajectory(path, env.trajectory())
                 assert verify_trajectory(read_trajectory(path),
                                          ExperimentalOcgcoreEngine(root)) == len(
@@ -48,7 +49,8 @@ def test_book_target_choices_exclude_sheep_tokens(tmp_path):
                 return
             actions = env.legal_actions()
             action = None
-            if obs.turn == 1 and obs.acting_player == 0 and own_monster is None:
+            if summon_own_monster and obs.turn == 1 and obs.acting_player == 0 \
+                    and own_monster is None:
                 action = next((a for a in actions if a.kind == "normal_summon"
                                and a.parameters.get("code") not in (BOOK, SCAPEGOAT)), None)
                 if action is not None:
@@ -63,10 +65,19 @@ def test_book_target_choices_exclude_sheep_tokens(tmp_path):
                 goat_used |= action is not None and action.kind == "chain"
             token_count = sum(c.code in TOKENS for c in obs.field)
             if goat_used and token_count == 4 and obs.acting_player == 0 \
-                    and obs.phase == "main1" and not book_used:
-                action = next((a for a in actions if a.kind == "activate"
-                               and a.parameters.get("code") == BOOK), action)
-                book_used |= action is not None and action.kind == "activate"
+                    and obs.phase == "main1" and not book_used and not checked:
+                book_option = next((a for a in actions if a.kind == "activate"
+                                    and a.parameters.get("code") == BOOK), None)
+                if summon_own_monster:
+                    action = book_option
+                    book_used = book_option is not None
+                else:
+                    assert BOOK in {c.code for c in obs.hand}
+                    assert not any(c.zone == "monster" and c.controller == 0
+                                   for c in obs.field)
+                    assert book_option is None
+                    assert obs.life_points == (8000, 8000)
+                    checked = True
             if book_used and not checked and actions[0].kind == "select_card":
                 assert token_count == 4
                 assert len(actions) == 1
