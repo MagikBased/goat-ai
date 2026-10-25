@@ -63,6 +63,8 @@ A first sourced-deck baseline now evaluates HeuristicAgent versus RandomAgent on
 
 A feature-version-8 checkpoint trained on 6,999 replay-verified heuristic decisions from the sourced Goat Control/Chaos Turbo decks improved held-out teacher-action agreement on decisions with alternatives, but split 16–16 against the vanilla-trained version-2 checkpoint and won only 18/32 versus RandomAgent on separate seeds. The [evaluation log](evaluation.md) records the direct comparison and deck asymmetry. M4 remains open: imitation accuracy has not produced a measured strength gain.
 
+An additional held-out Warrior-versus-Chaos check yielded 14/16 for that checkpoint against HeuristicAgent, but Warrior also won 13/16 when both decks used HeuristicAgent. The deck effect prevents a strength or generalization claim from this sample. Continue the competitive-card ruling audit before expanding training claims; details and reproduction commands are in the [evaluation log](evaluation.md).
+
 The sourced-deck self-play schedule now covers both learner seats per matchup. A 16-game REINFORCE-style update from the sourced imitation checkpoint replay-verified four deck/seat trajectories but won only 17/32 directly against its parent on fresh paired seeds, with no changed choices on the separate held-out action audit. M4 remains open; see [the evaluation log](evaluation.md).
 
 **Work:** Implement a PyTorch policy that scores variable-length legal actions from visible observations. Establish random and heuristic baselines first. Train behavioral cloning on verified demonstrations, then self-play with a historical checkpoint pool and held-out deck families. Compare PPO or other algorithms on win rate and stability rather than selecting one in advance.
