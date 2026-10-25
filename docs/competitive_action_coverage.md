@@ -482,3 +482,38 @@ three. A paired native fixture now checks Book responding to Graceful,
 including the face-down field-memory boundary and Graceful's private draw;
 both complete duels replay-verify. The sample counts are not historical
 frequency estimates.
+
+## Six-deck heuristic action and replay probe (seed 19600)
+
+The basic `HeuristicAgent` completed all 30 seat-swapped games across the 15
+pairings of the six sourced tournament Main Decks under a 3,000-decision cap.
+They used 15,549 decisions, with 1,369 in the longest game. A second run
+produced the same ordered winners and decision counts; fresh pinned engines
+replay-verified all 15,549 decisions from 30 serialized schema-v22
+trajectories. The generated JSON report has SHA-256
+`ccbbac08f1121b02b126931022ed5ccfd9b923aabeb55e370b98219300a7d50e`;
+the ignored trajectory files total 119,244,171 bytes. This is adapter and
+replay coverage, not competitive strength or historical correctness evidence.
+
+```bash
+.venv/bin/python -m scripts.probe_competitive_card_actions \
+  --native-root .cache/goat-ai --tournament-corpus --agent heuristic \
+  --seed 19600 --seeds 1 --max-decisions 3000 --verify-replays \
+  --record-dir /tmp/goat_heuristic_replays_19600 \
+  --output /tmp/goat_heuristic_verified_19600.json \
+  > /tmp/goat_heuristic_probe_stdout_19600.txt
+.venv/bin/python -m scripts.audit_trajectory_visibility \
+  /tmp/goat_heuristic_replays_19600
+```
+
+The read-only visibility audit passed all 15,549 recorded decisions. It
+checked 597 opposing field choices, including 114 hidden field slots, and 36
+opposing hand choices against its selection invariants. These checks do not
+prove full information isolation for every native message or card effect.
+
+The source-action counter saw 100 selected Breaker actions, 92 Book of Moon,
+73 Dekoichi, 51 pre-errata Ring, and 50 GOAT Nobleman actions. It also saw a
+Ring response to Tsukuyomi. A separate paired native fixture now checks that
+response when Ring targets either Tsukuyomi or Tsukuyomi's intended target;
+see [GOAT rules](goat_rules.md). These counts describe this agent and seed
+schedule only.
