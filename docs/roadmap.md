@@ -257,6 +257,15 @@ Thunder Dragon regressions check that boundary, and a local Return replay
 matched its flat native result. Other request types may still exceed their
 bounds; see [evaluation](evaluation.md).
 
+An enlarged feature-v17 v3 clone trained from 64 replay-verified synthetic
+teacher duels (21,799 teacher decisions) matched two more of 611 held-out
+multi-option teacher choices than the 32-duel parent, but scored 57–68–3
+directly against that parent over 128 games on unseen Chaos Control/Chaos
+Return Main Decks. The paired interval includes 50% and the Chaos Control
+split is much worse. This negative pilot argues against simply adding more
+same-deck teacher games; investigate source-aware target choices and broader
+cross-deck evaluation before another promotion. See [evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

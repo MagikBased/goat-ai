@@ -1884,3 +1884,84 @@ visibility-audit section.
 Replay equivalence establishes reproducibility for these pinned assets and
 seeds; the action audit enforces its listed selection invariants. Neither
 establishes historical correctness or general hidden-state noninterference.
+
+## Doubling combat-teacher v3 demonstrations (2026-10-25)
+
+The feature-v17 v3 clone above missed several held-out card selections,
+including repeated Metamorphosis Tribute choices. To test whether more
+ordinary competitive-deck demonstrations would help, four ordered training
+matchups (Goat Control/Chaos Turbo and Warrior/Bazoo Return, each in both
+orders) were collected again on seeds 17004–17007 with CombatHeuristicAgent
+v3 against RandomAgent in both teacher seats. The 32 additional terminal
+duels contain **22,164** decisions and **11,635** labeled teacher decisions.
+The read-only visibility audit passed all 32, including 231 hidden-field
+choices and 67 opponent-hand choices. The collector labels these as synthetic
+heuristic demonstrations, not authorized human play.
+
+A matched width-32 feature-v17 clone was initialized with seed 17 and trained
+for three CPU epochs at learning rate 0.001 on the original and additional
+records. The training CLI replay-verified all **64** fingerprinted duels
+(41,647 decisions) before fitting the **21,799** teacher decisions from four
+training Main Deck compositions. Mean training losses were 0.09234, 0.03859,
+and 0.02814. The ignored checkpoint is
+`checkpoints/combat_fourdeck_fv17_v3_17000_17007.pt`, SHA-256
+`66c311d17b833fd06381e26d3383ac667bc3fdf7281b78228dd6d21f0abf2263`.
+
+On the same four replay-verified held-out seed-17200 teacher duels used above,
+the enlarged clone matched **595/611** multi-option teacher choices versus
+**593/611** for the original v3 clone. It matched **77/89** multi-option chain
+choices versus **73/89**. These are off-policy agreement counts, not playing
+strength; the paired agreement report SHA-256 is
+`1d920871c16005bba86ae2634b18715c6bc373d8f93a96ae8a89419006176f13`.
+
+On fresh seeds 19050–19081, unseen Chaos Control and Chaos Return Main Decks,
+both deck assignments, and both policy seats, the enlarged clone scored
+**57–68–3** against the original over 128 terminal games: **45.7%** score,
+with a paired bootstrap 95% interval of **40.6–50.8%**. It scored 16–46–2
+when assigned Chaos Control and 41–22–1 with Chaos Return. The four-worker
+match took 63.86 seconds on the hardware recorded in the report; the ignored
+JSON SHA-256 is
+`2d629a58bb38254cadafd562c435b7316f807e83eb6715c7cdaf4826524951bb`.
+The interval includes 50% and the deck splits diverge. More demonstrations
+from the same four training decks did **not** establish a general strength
+gain. Keep the smaller v3 clone as the reference and investigate source-aware
+target choices and cross-deck evaluation before promoting another model.
+
+Reproduce collection and evaluation with:
+
+```bash
+while read -r matchup_name deck_one deck_two; do
+  OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_heuristic_demos.py \
+    --native-root .cache/goat-ai --engine experimental \
+    --teacher combat_heuristic \
+    --deck-a "examples/decks/$deck_one" --deck-b "examples/decks/$deck_two" \
+    --seed 17004 --seeds 4 --max-decisions 3000 \
+    --output-dir ".cache/goat-ai/combat_v3_extra_17004_17007/$matchup_name"
+done <<'MATCHUPS'
+gc_ct goat_control_lolmarcus_2020.ydk chaos_turbo_riclar_2020.ydk
+ct_gc chaos_turbo_riclar_2020.ydk goat_control_lolmarcus_2020.ydk
+war_baz warrior_montague_clash.ydk bazoo_return_weirdchamp_worlds.ydk
+baz_war bazoo_return_weirdchamp_worlds.ydk warrior_montague_clash.ydk
+MATCHUPS
+PYTHONPATH=src:. .venv/bin/python scripts/audit_trajectory_visibility.py \
+  .cache/goat-ai/combat_v3_extra_17004_17007
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/combat_v3_17000_17003/*/*.json \
+  .cache/goat-ai/combat_v3_extra_17004_17007/*/*.json \
+  --native-root .cache/goat-ai --engine experimental \
+  --output checkpoints/combat_fourdeck_fv17_v3_17000_17007.pt \
+  --epochs 3 --width 32 --feature-version 17 --learning-rate 0.001 --seed 17
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_agreement.py \
+  --checkpoint checkpoints/combat_fourdeck_fv17_v3_17000_17007.pt \
+  --checkpoint checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  .cache/goat-ai/combat_v3_heldout_17200/*/*.json
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+  checkpoints/combat_fourdeck_fv17_v3_17000_17007.pt \
+  --opponent-checkpoint checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+  examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 19050 --seeds 32 --workers 4 --max-decisions 3000
+```
