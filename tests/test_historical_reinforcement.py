@@ -18,6 +18,7 @@ MYSTIC_SWORDSMAN = 504700077
 POT_OF_GREED = 55144522
 MYSTICAL_SPACE_TYPHOON = 5318639
 SOLEMN_JUDGMENT = 41420027
+EXILED_FORCE = 74131780
 
 
 def _reach_search(env):
@@ -81,6 +82,76 @@ def test_reinforcement_search_hides_deck_order_and_reveals_chosen_warrior(tmp_pa
         assert opponent.known_opponent_hand_cards == (MYSTIC_SWORDSMAN,)
         assert not observation.private_reveals
         assert f"goat/c{REINFORCEMENT}.lua" in env.engine.probe.loaded_script_sha256
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_reinforcement_search_into_exiled_force_updates_public_memory(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"goat/c{REINFORCEMENT}.lua",
+                     f"official/c{EXILED_FORCE}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    with GoatEnvironment(str(WARRIOR), "examples/decks/vanilla_probe.ydk", seed=2,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert REINFORCEMENT in {c.code for c in obs.hand}
+        opponent_set = rota_used = searched = summoned = effect_used = targeted = False
+        target_code = None
+        for _ in range(75):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1 and not opponent_set:
+                action = next((a for a in actions if a.kind == "set_monster"), None)
+                if action is not None:
+                    opponent_set = True
+                    target_code = action.parameters["code"]
+            if obs.turn == 3 and obs.acting_player == 0:
+                if opponent_set and not rota_used:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == REINFORCEMENT), None)
+                    rota_used |= action is not None
+                elif searched and not summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == EXILED_FORCE), None)
+                    summoned |= action is not None
+                elif summoned and not effect_used:
+                    action = next((a for a in actions if a.kind == "chain"
+                                   and a.parameters.get("code") == EXILED_FORCE), None)
+                    effect_used |= action is not None
+            if rota_used and not searched and actions[0].kind == "select_card":
+                assert all(a.parameters.get("location") == 1
+                           and "sequence" not in a.parameters for a in actions)
+                action = next((a for a in actions if a.parameters.get("code")
+                               == EXILED_FORCE), None)
+                searched |= action is not None
+            if effect_used and not targeted and actions[0].kind == "select_card":
+                assert [a.parameters for a in actions] == [
+                    {"location": 4, "sequence": 0, "controller": 1}]
+                assert EXILED_FORCE in {c.code for c in obs.graveyards[0]}
+                action = actions[0]
+                targeted = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            opponent = env.engine.probe.observation(1)
+            if searched and not summoned and rota_used and obs.chain == () \
+                    and EXILED_FORCE in {c.code for c in obs.hand}:
+                assert opponent.known_opponent_hand_cards == (EXILED_FORCE,)
+                assert [(r.recipient, [c.code for c in r.cards])
+                        for r in opponent.private_reveals] == [(1, [EXILED_FORCE])]
+            if summoned and not effect_used and any(c.code == EXILED_FORCE
+                                                    for c in obs.field):
+                assert opponent.known_opponent_hand_cards == ()
+            if targeted and target_code in {c.code for c in obs.graveyards[1]}:
+                assert opponent.known_opponent_hand_cards == ()
+                assert EXILED_FORCE in {c.code for c in obs.graveyards[0]}
+                assert not [c for c in obs.field if c.zone == "monster"]
+                assert {f"goat/c{REINFORCEMENT}.lua",
+                        f"official/c{EXILED_FORCE}.lua"}.issubset(
+                            env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Reinforcement/Exiled Force line did not destroy the set monster")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
