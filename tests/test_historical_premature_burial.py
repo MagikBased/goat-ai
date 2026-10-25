@@ -99,3 +99,75 @@ def test_premature_equip_break_by_flip_or_destruction(tmp_path, response):
                     "select_card", "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("Premature Burial response did not reach its final state")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_mst_chained_to_premature_activation_prevents_revive_but_cost_is_paid(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (GRACEFUL_CHARITY, PREMATURE_BURIAL, MYSTICAL_SPACE_TYPHOON):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    deck = tmp_path / "premature_chain.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        GRACEFUL_CHARITY, PREMATURE_BURIAL, MYSTICAL_SPACE_TYPHOON,
+        *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        graceful = discarded = premature = targeted = mst_chained = False
+        for _ in range(35):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0:
+                if not graceful:
+                    option = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL_CHARITY), None)
+                    if option is not None:
+                        action = option
+                        graceful = True
+                if graceful and not discarded and actions[0].kind == "select_cards":
+                    action = next((a for a in actions if {c["code"]
+                                   for c in a.parameters["cards"]} == {
+                                       MYSTICAL_ELF, SECOND_DISCARD}), None)
+                    discarded = action is not None
+                if discarded and not premature:
+                    option = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == PREMATURE_BURIAL), None)
+                    if option is not None:
+                        action = option
+                        premature = True
+                if premature and not targeted and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == MYSTICAL_ELF and a.parameters.get("location") == 16),
+                                  action)
+                    targeted = action is not None and action.kind == "select_card"
+                if targeted and not mst_chained:
+                    option = next((a for a in actions if a.kind == "chain"
+                                   and a.parameters.get("code") == MYSTICAL_SPACE_TYPHOON),
+                                  None)
+                    if option is not None:
+                        assert observation.life_points == (7200, 8000)
+                        assert MYSTICAL_ELF in {c.code for c in observation.graveyards[0]}
+                        assert not any(c.zone == "monster" for c in observation.field)
+                        action = option
+                        mst_chained = True
+                if mst_chained and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == PREMATURE_BURIAL and a.parameters.get("controller") == 0),
+                                  action)
+            grave = {c.code for c in observation.graveyards[0]}
+            if mst_chained and {PREMATURE_BURIAL, MYSTICAL_SPACE_TYPHOON}.issubset(grave) \
+                    and any(a.kind == "normal_summon" for a in actions):
+                assert observation.life_points == (7200, 8000)
+                assert MYSTICAL_ELF in grave
+                assert not any(c.zone == "monster" for c in observation.field)
+                loaded = env.engine.probe.loaded_script_sha256
+                assert f"official/c{PREMATURE_BURIAL}.lua" in loaded
+                assert f"official/c{MYSTICAL_SPACE_TYPHOON}.lua" in loaded
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+    pytest.fail("chained MST did not resolve before Premature Burial")
