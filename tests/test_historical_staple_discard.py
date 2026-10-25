@@ -179,3 +179,65 @@ def test_duo_discards_serpent_then_opponent_recovers_it_at_standby(tmp_path):
                     "select_card", "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
     pytest.fail("Duo discard and Serpent's Standby Phase return did not resolve")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_duo_can_activate_against_one_card_hand_without_second_choice(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{DELINQUENT_DUO}.lua").is_file():
+        pytest.skip("Delinquent Duo script not installed")
+    backrow = (14087893, 60082869, 12607053, 56120475, 94192409,
+               4178474, 35316708)
+    attacker = tmp_path / "duo.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        DELINQUENT_DUO, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    defender = tmp_path / "set_five.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        *(code for code in backrow for _ in range(3)), *VANILLA_DECK[:19])))
+                        + "\n#extra\n!side\n")
+    with GoatEnvironment(str(attacker), str(defender), seed=260,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert DELINQUENT_DUO in {card.code for card in obs.hand}
+        set_count = 0
+        activated = False
+        hand_before = None
+        grave_before = None
+        for _ in range(65):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1 and set_count < 5:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") in backrow), None)
+                if action is not None:
+                    set_count += 1
+            if obs.turn == 3 and obs.phase == "main1" and obs.acting_player == 0 \
+                    and set_count == 5 \
+                    and not activated:
+                assert obs.opponent_hand_count == 1
+                assert len([c for c in obs.field if c.controller == 1
+                            and c.zone == "spell_trap"]) == 5
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == DELINQUENT_DUO), None)
+                assert action is not None
+                hand_before = len(env.engine.probe.observation(1).hand)
+                grave_before = len(obs.graveyards[1])
+                activated = True
+            if activated and obs.acting_player == 1:
+                assert not any(a.kind == "select_card" for a in actions)
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if activated and DELINQUENT_DUO in {c.code for c in obs.graveyards[0]}:
+                owner = env.engine.probe.observation(1)
+                assert hand_before == 1
+                assert len(owner.hand) == obs.opponent_hand_count == 0
+                assert len(obs.graveyards[1]) == grave_before + 1
+                assert obs.life_points == (7000, 8000)
+                assert not obs.private_reveals
+                assert not owner.private_reveals
+                assert f"official/c{DELINQUENT_DUO}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("one-card Delinquent Duo branch did not resolve")
