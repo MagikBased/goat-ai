@@ -208,7 +208,9 @@ The two agents induce different game lengths, so raw action counts are not
 comparable play rates. Book of Moon was the most selected activate/chain
 staple in both samples (58 combat, 117 random). The combat sample also
 selected Torrential Tribute 38 times and chose it in response to Tsukuyomi
-four times, making that pair a candidate for a historical ruling fixture.
+four times. A paired native regression now tests that response against a
+pass control, then replay-verifies both complete duels; see
+[GOAT rules](goat_rules.md).
 
 The random run first uncovered a valid zero-card `MSG_CONFIRM_DECKTOP` frame
 that the adapter incorrectly rejected. The pinned core permits this frame
