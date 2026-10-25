@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 CHAOS_SORCERER = 9596126
 GRACEFUL_CHARITY = 79571449
@@ -238,6 +240,100 @@ def test_sorcerer_cannot_use_banish_effect_in_main2_after_attacking(tmp_path):
                     "select_card", "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
     pytest.fail("Sorcerer attack did not block its Main Phase 2 effect")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_sorcerer_declined_replay_still_blocks_main2_banish(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"official/c{CHAOS_SORCERER}.lua",
+                     f"official/c{GRACEFUL_CHARITY}.lua", f"goat/c{SCAPEGOAT}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    opponent = tmp_path / "scapegoat.ydk"
+    opponent.write_text("#main\n" + "\n".join(map(str, (
+        *([SCAPEGOAT] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(chaos_deck(tmp_path)), str(opponent), seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        graceful = discarded = summoned = goat_set = attacked = chained = checked = False
+        costs = set()
+        agents = (RandomAgent(100), RandomAgent(101))
+        for _ in range(5000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / "sorcerer_goat_replay.json"
+                write_trajectory(path, env.trajectory())
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                    env.trajectory().decisions)
+                return
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not graceful:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == GRACEFUL_CHARITY), None)
+                graceful |= action is not None
+            if graceful and not discarded and actions[0].kind == "select_cards":
+                action = next((a for a in actions if {c["code"] for c in a.parameters["cards"]}
+                               == {LIGHT, DARK}), None)
+                assert action is not None
+                discarded = True
+            if discarded and obs.turn == 1 and obs.acting_player == 0 \
+                    and not summoned and action is None:
+                action = next((a for a in actions if a.kind == "special_summon"
+                               and a.parameters.get("code") == CHAOS_SORCERER), None)
+                summoned |= action is not None
+            if summoned and costs != {LIGHT, DARK} and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               in {LIGHT, DARK} - costs and a.parameters.get("location") == 16),
+                              action)
+                if action is not None:
+                    costs.add(action.parameters["code"])
+            if obs.turn == 2 and obs.acting_player == 1 and not goat_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SCAPEGOAT), None)
+                goat_set |= action is not None
+            if goat_set and obs.turn == 3 and obs.acting_player == 0:
+                if obs.phase == "main1":
+                    assert any(a.kind == "activate"
+                               and a.parameters.get("code") == CHAOS_SORCERER
+                               for a in actions)
+                    action = next((a for a in actions if a.kind == "battle_phase"), action)
+                if obs.phase == "battle_start" and not attacked:
+                    assert not any(c.controller == 1 and c.zone == "monster"
+                                   for c in obs.field)
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == CHAOS_SORCERER), action)
+                    attacked |= action is not None and action.kind == "attack"
+            if attacked and obs.acting_player == 1 and not chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SCAPEGOAT), action)
+                chained |= action is not None and action.kind == "chain"
+            tokens = sum(c.code in SHEEP_TOKENS for c in obs.field)
+            if chained and tokens == 4 and obs.turn == 3 and obs.acting_player == 0 \
+                    and obs.phase == "battle_step" and not checked and any(
+                        a.kind == "attack" and a.parameters.get("code") == CHAOS_SORCERER
+                        for a in actions):
+                action = next((a for a in actions if a.kind == "main2"), None)
+                assert action is not None
+            if chained and obs.turn == 3 and obs.acting_player == 0 \
+                    and obs.phase == "main2" and not checked:
+                assert tokens == 4
+                assert not any(a.kind == "activate"
+                               and a.parameters.get("code") == CHAOS_SORCERER
+                               for a in actions)
+                assert obs.life_points == (8000, 8000)
+                assert {f"official/c{CHAOS_SORCERER}.lua",
+                        f"goat/c{SCAPEGOAT}.lua"} <= (
+                    env.engine.probe.loaded_script_sha256.keys())
+                checked = True
+            if action is None and not checked:
+                action = next((a for a in actions if a.kind in (
+                    "place", "select_position", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+    pytest.fail("Sorcerer / Scapegoat replay duel did not finish")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
