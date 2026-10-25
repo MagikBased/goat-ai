@@ -30,6 +30,20 @@ class EpisodeResult:
         return 1.0 if self.winner == self.learner_seat else -1.0
 
 
+def episode_schedule(matchups: Sequence[tuple[str, str]],
+                     seeds: Sequence[int]) -> tuple[tuple[int, tuple[str, str], int], ...]:
+    """Cycle matchups after both learner seats have been assigned."""
+    if not matchups:
+        raise ValueError("at least one matchup required")
+    schedule = []
+    for index, seed in enumerate(seeds):
+        a, b = matchups[(index // 2) % len(matchups)]
+        seat = index % 2
+        decks = (a, b) if seat == 0 else (b, a)
+        schedule.append((seed, decks, seat))
+    return tuple(schedule)
+
+
 def sample_legal_action(model: LegalActionPolicy, vocabulary: CardVocabulary,
                         observation, legal_actions, generator: torch.Generator,
                         temperature: float = 1.0):
@@ -137,10 +151,7 @@ def train_against_snapshot_pool(
     snapshots = [copy.deepcopy(model.state_dict())]
     baseline = 0.0
     reports = []
-    for index, seed in enumerate(seeds):
-        a, b = matchups[index % len(matchups)]
-        learner_seat = index % 2
-        decks = (a, b) if learner_seat == 0 else (b, a)
+    for index, (seed, decks, learner_seat) in enumerate(episode_schedule(matchups, seeds)):
         if rng.random() < historical_probability:
             snapshot_index = rng.randrange(len(snapshots))
             frozen = LegalActionPolicy(vocabulary.size, width=model.card.embedding_dim,

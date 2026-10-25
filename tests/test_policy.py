@@ -19,7 +19,11 @@ from goat_ai.training import (
     load_policy_agent,
 )
 from goat_ai.training.policy import ACTION_KINDS
-from goat_ai.training.self_play import policy_gradient_update, sample_legal_action
+from goat_ai.training.self_play import (
+    episode_schedule,
+    policy_gradient_update,
+    sample_legal_action,
+)
 from scripts.evaluate_policy import make_policy_agent, validate_heldout_seeds
 
 
@@ -336,6 +340,21 @@ def test_terminal_reward_moves_selected_action_probability():
         assert (after - before) * direction > 0
     generator = torch.Generator().manual_seed(9)
     assert sample_legal_action(model, vocabulary, view(), actions(), generator) in actions()
+
+
+def test_self_play_schedule_covers_each_deck_in_both_seats():
+    matchups = (("goat", "chaos"), ("chaos", "goat"))
+    schedule = episode_schedule(matchups, (100, 101, 102, 103))
+    assert schedule == (
+        (100, ("goat", "chaos"), 0),
+        (101, ("chaos", "goat"), 1),
+        (102, ("chaos", "goat"), 0),
+        (103, ("goat", "chaos"), 1),
+    )
+    assert [(decks[seat], seat) for _, decks, seat in schedule] == [
+        ("goat", 0), ("goat", 1), ("chaos", 0), ("chaos", 1)]
+    with pytest.raises(ValueError, match="matchup"):
+        episode_schedule((), (100,))
 
 
 def test_demonstration_seat_filters_verified_duel_labels():

@@ -61,6 +61,8 @@ A first sourced-deck baseline now evaluates HeuristicAgent versus RandomAgent on
 
 A feature-version-8 checkpoint trained on 6,999 replay-verified heuristic decisions from the sourced Goat Control/Chaos Turbo decks improved held-out teacher-action agreement on decisions with alternatives, but split 16–16 against the vanilla-trained version-2 checkpoint and won only 18/32 versus RandomAgent on separate seeds. The [evaluation log](evaluation.md) records the direct comparison and deck asymmetry. M4 remains open: imitation accuracy has not produced a measured strength gain.
 
+The sourced-deck self-play schedule now covers both learner seats per matchup. A 16-game REINFORCE-style update from the sourced imitation checkpoint replay-verified four deck/seat trajectories but won only 17/32 directly against its parent on fresh paired seeds, with no changed choices on the separate held-out action audit. M4 remains open; see [the evaluation log](evaluation.md).
+
 **Work:** Implement a PyTorch policy that scores variable-length legal actions from visible observations. Establish random and heuristic baselines first. Train behavioral cloning on verified demonstrations, then self-play with a historical checkpoint pool and held-out deck families. Compare PPO or other algorithms on win rate and stability rather than selecting one in advance.
 
 **Exit:** A versioned model beats the baseline agents over held-out seeds and decks with confidence intervals, and its decisions use no hidden engine state. Record training compute, data provenance, and evaluation protocol.
@@ -75,4 +77,10 @@ Keep training in Python. Define a versioned, game-independent decision boundary:
 
 ## Immediate next work item
 
-Prioritize M1 and M2 fixtures for cards central to 2005 Goat Control and Chaos decks, continuing with the remaining high-play control and Chaos staples after the Metamorphosis, Thousand-Eyes Restrict, and Tsukuyomi fixture. Audit their legal choices, prompt semantics, and hidden-information boundaries, including Extra Deck interactions. Continue M2 with source-backed timing and ruling fixtures before training. Keep each implementation change small enough to demonstrate with a command, test, and documented limitation.
+Prioritize M1 and M2 card work by competitive relevance. Use the sourced [Goat Control](../examples/decks/goat_control_lolmarcus_2020.ydk) and [Chaos Turbo](../examples/decks/chaos_turbo_riclar_2020.ydk) lists as the first concrete corpus; expand it with other documented tournament lists before treating it as a metagame frequency estimate.
+
+1. Finish interaction and interruption coverage for cards shared by these lists, especially Black Luster Soldier, Nobleman of Crossout, Book of Moon, Pot of Greed, Graceful Charity, and common removal and traps. Existing single-line fixtures are a starting point, not a complete ruling audit.
+2. Expand deck-defining lines: Scapegoat, Metamorphosis, Thousand-Eyes Restrict, and Tsukuyomi for Goat Control; Chaos Sorcerer, Gravekeeper's Spy, Dekoichi, and LIGHT/DARK Graveyard setup for Chaos Turbo. Include chains, legal choices, and player-visible information at each decision.
+3. Cover other cards when they block a representative full duel, expose a general engine or observation defect, or appear in additional sourced competitive decks. Defer isolated low-play card edge cases until the staple paths work reliably.
+
+For each fixture, record the historical source, native script and rules profile, expected outcome, and any unresolved discrepancy in [GOAT rules](goat_rules.md). Keep implementation changes small enough to demonstrate with a command, test, and documented limitation. Resume strength experiments after the audited deck corpus is broad enough to support meaningful evaluation.
