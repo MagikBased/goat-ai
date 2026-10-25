@@ -110,3 +110,84 @@ def test_compulsory_return_destination_and_hidden_hand(tmp_path, fusion):
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Compulsory did not return the selected monster")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("bounce_attacker", [False, True])
+def test_compulsory_battle_step_bounce_and_replay(tmp_path, bounce_attacker):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{COMPULSORY}.lua").is_file():
+        pytest.skip("Compulsory script not installed")
+    attacker = _deck(tmp_path / "attacker.ydk", VANILLA_DECK)
+    defender = _deck(tmp_path / "defender.ydk",
+                     (*([COMPULSORY] * 3), *VANILLA_DECK[3:]))
+    with GoatEnvironment(attacker, defender, seed=11,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        first_summoned = second_summoned = trap_set = battle = attacked = False
+        activated = targeted = resolved = False
+        attacker_code = defender_code = None
+        for _ in range(90):
+            actions = env.legal_actions()
+            action = None
+            if obs.acting_player == 0 and obs.turn == 1 and not first_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"), None)
+                if action is not None:
+                    attacker_code = action.parameters["code"]
+                    first_summoned = True
+            if obs.acting_player == 1 and obs.turn == 2:
+                if not trap_set and action is None:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == COMPULSORY), None)
+                    trap_set |= action is not None
+                if trap_set and not second_summoned and action is None:
+                    action = next((a for a in actions if a.kind == "normal_summon"), None)
+                    if action is not None:
+                        defender_code = action.parameters["code"]
+                        second_summoned = True
+            if obs.acting_player == 0 and obs.turn == 3:
+                if obs.phase == "main1" and not battle:
+                    action = next((a for a in actions if a.kind == "battle_phase"), None)
+                    battle |= action is not None
+                if battle and not attacked and obs.phase == "battle_start":
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == attacker_code), None)
+                    attacked |= action is not None
+            if attacked and obs.acting_player == 1 and not activated:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == COMPULSORY), None)
+                if action is not None:
+                    assert obs.phase == "battle_step"
+                    activated = True
+            if activated and not targeted and actions[0].kind == "select_card":
+                target = attacker_code if bounce_attacker else defender_code
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("code") == target
+                               and a.parameters.get("controller")
+                               == (0 if bounce_attacker else 1)), None)
+                targeted = action is not None
+            if resolved and not bounce_attacker:
+                assert obs.phase == "battle_step"
+                if any(a.kind == "attack" and a.parameters.get("code")
+                       == attacker_code for a in actions):
+                    assert obs.acting_player == 0
+                    return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "select_position", "pass", "end_phase")),
+                    actions[0])
+            obs = env.step(action)
+            if targeted and not resolved and COMPULSORY in {
+                    c.code for c in obs.graveyards[1]}:
+                resolved = True
+                bounced_player = 0 if bounce_attacker else 1
+                bounced_code = attacker_code if bounce_attacker else defender_code
+                bounced = env.engine.probe.observation(bounced_player)
+                assert bounced_code in {c.code for c in bounced.hand}
+                assert not any(c.controller == bounced_player and c.zone == "monster"
+                               for c in obs.field)
+                assert obs.life_points == (8000, 8000)
+                if bounce_attacker:
+                    assert not any(a.kind == "attack" for a in env.legal_actions())
+                    return
+    pytest.fail("Compulsory Battle Step bounce did not resolve")
