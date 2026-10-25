@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 SASUKE = 4041838
 ENEMY_CONTROLLER = 98045062
@@ -132,5 +134,24 @@ def test_sasuke_attack_on_spy_depends_on_faceup_defense(tmp_path, scenario):
                     assert obs.life_points == (7800, 8000)
                 assert f"official/c{SASUKE}.lua" in (
                     env.engine.probe.loaded_script_sha256)
+                if scenario == "book":
+                    agents = (RandomAgent(1015), RandomAgent(2015))
+                    for _ in range(3000):
+                        if env.is_terminal():
+                            break
+                        selected = agents[obs.acting_player].select_action(
+                            obs, env.legal_actions())
+                        obs = env.step(selected)
+                    else:
+                        pytest.fail("Sasuke / Book duel exceeded 3000 decisions")
+                    trajectory = env.trajectory()
+                    assert trajectory.winner in (0, 1, None)
+                    path = tmp_path / "sasuke_book_spy.json"
+                    write_trajectory(path, trajectory)
+                    loaded = read_trajectory(path)
+                    assert loaded == trajectory
+                    assert verify_trajectory(
+                        loaded, ExperimentalOcgcoreEngine(root)) == len(
+                            trajectory.decisions)
                 return
     pytest.fail(f"Sasuke/Spy attack did not finish (scenario={scenario})")
