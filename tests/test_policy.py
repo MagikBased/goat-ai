@@ -224,6 +224,31 @@ def test_feature_version_seventeen_scores_attack_targets_from_visible_stats():
         replace(state, pending_attack=TargetSlotView(1, "monster", 0))
 
 
+def test_feature_version_eighteen_binds_public_chain_source_to_target():
+    vocabulary = CardVocabulary((10, 20, 30, 40))
+    state = replace(view(), field=(
+        CardView(1, "monster", "faceup", 20, 0, "attack", 1600, 1000),
+        CardView(1, "monster", "faceup", 30, 1, "attack", 1900, 1000),
+    ), chain=(ChainLinkView(1, 40, 0, 8, 0),))
+    choices = tuple(Action(str(index), "select_card", 0,
+                           {"code": code, "controller": 1, "location": 4,
+                            "sequence": index}) for index, code in enumerate((20, 30)))
+    with_chain = encode_decision(state, choices, vocabulary, feature_version=18)
+    without_chain = encode_decision(replace(state, chain=()), choices, vocabulary,
+                                    feature_version=18)
+    assert with_chain.chain_cards[-1, 0].item() == vocabulary.index(40)
+    assert with_chain.action_cards.tolist() == [vocabulary.index(20),
+                                                vocabulary.index(30)]
+    assert with_chain.action_numbers.shape == (2, 19)
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=18)
+    plain_before = model(without_chain).detach().clone()
+    chained_before = model(with_chain).detach().clone()
+    with torch.no_grad():
+        model.source_target_pair[-1].bias.add_(1)
+    assert torch.allclose(model(without_chain), plain_before)
+    assert not torch.allclose(model(with_chain), chained_before)
+
+
 def test_feature_version_nine_uses_only_publicly_known_opponent_hand_cards():
     vocabulary = CardVocabulary((10, 20, 30))
     known = replace(view(), known_opponent_hand_cards=(20,))

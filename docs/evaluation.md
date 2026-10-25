@@ -1990,3 +1990,58 @@ seats, completed all games under 3,000 decisions and scored **3–5–0**. The
 sample is too small to estimate a strength change. The machine-readable
 report is stored locally at
 `.cache/goat-ai/thunder_cancel_inference_v3_eval.json` and is not committed.
+
+## Chain-source/target feature pilot (2026-10-25)
+
+The 32-duel feature-v17 combat clone missed a Metamorphosis Tribute choice
+and a later Chaos Sorcerer target choice in the held-out Chaos Control game:
+both teacher actions selected Thousand-Eyes Restrict, while the policy chose
+Kycoo. Feature version 18 adds an opt-in learned pair between the last
+player-visible chain card and each candidate action card. It retains v17's
+schema-v22 combat inputs and does not read native hidden state. When no chain
+is present, the pair contributes nothing. The same 32 replay-verified
+synthetic teacher duels, width 32, seed 17, three epochs, and learning rate
+0.001 were used to isolate the feature. All **10,164** teacher decisions were
+verified before fitting. The ignored checkpoint is
+`checkpoints/combat_fourdeck_fv18_v3_17000_17003.pt`, SHA-256
+`cc8481c00a538f0b13934ccf5079f08f9d61e4df278b1e188685605f1f026600`.
+Its epoch losses were 0.11968, 0.04905, and 0.03572.
+
+On four replay-verified held-out teacher duels (seed 17200), v18 matched
+**591/611** multi-option actions and **72/89** multi-option chain actions.
+The matched v17 checkpoint under inference version 3 matched **595/611** and
+**75/89**. V18 did not recover either motivating Thousand-Eyes Restrict
+choice. The ignored agreement report SHA-256 is
+`1ba568854a51f1d8c7d81efc77c7f9ec309e1a572f9df7cd788daca71381758d`.
+
+On fresh seeds 19200–19215 with unseen Chaos Control and Chaos Return Main
+Decks, both deck assignments, and both seats, v18 scored **34–29–1** directly
+against v17 over **64 terminal duels**: 53.9% score with a paired bootstrap
+95% interval of 47.7–60.9%. Its split was 14–18–0 as Chaos Control and
+20–11–1 as Chaos Return. This interval includes 50%; the pilot does not
+establish a strength gain. The ignored match report SHA-256 is
+`e09bd5745047b258677689d171a8ed8f9a41bbbe63022cc87e953a965f594735`.
+V18 remains an opt-in experiment; v17 remains the reference checkpoint.
+
+Reproduce the pilot with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/combat_v3_17000_17003/*/*.json \
+  --native-root .cache/goat-ai --engine experimental \
+  --output checkpoints/combat_fourdeck_fv18_v3_17000_17003.pt \
+  --epochs 3 --width 32 --feature-version 18 --learning-rate 0.001 --seed 17
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_agreement.py \
+  --checkpoint checkpoints/combat_fourdeck_fv18_v3_17000_17003.pt \
+  --checkpoint checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  .cache/goat-ai/combat_v3_heldout_17200/*/*.json
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+  checkpoints/combat_fourdeck_fv18_v3_17000_17003.pt \
+  --opponent-checkpoint checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+  examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 19200 --seeds 16 --workers 4 --max-decisions 3000
+```

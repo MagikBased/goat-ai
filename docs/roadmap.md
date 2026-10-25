@@ -273,6 +273,14 @@ held-out teacher choices; a small native smoke run completed. Continue with
 other high-play cards and their interaction paths before treating clone
 agreement as competitive strength. See [evaluation](evaluation.md).
 
+An opt-in feature-v18 pilot paired the active public chain card with each
+candidate action card, targeting Metamorphosis and other effect-choice errors.
+It matched fewer held-out teacher actions than matched feature v17, including
+both motivating Thousand-Eyes Restrict choices. Its 34–29–1 direct score on
+64 unseen-deck duels has an interval spanning 50%, so it is not promoted.
+Future policy work should inspect source/target labels and broader deck
+coverage before adding more relation layers. See [evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

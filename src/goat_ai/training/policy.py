@@ -33,6 +33,7 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # Version 16 branches from v12 so its combat relation can be tested without
 # the separate v13-v15 equip, chain-target, and occupancy experiments.
 # Version 17 adds attacker-to-target combat stats using schema-v22 context.
+# Version 18 adds an explicit public chain-source/candidate-card relation.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 
@@ -100,7 +101,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 18):
+    if feature_version not in range(1, 19):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -273,7 +274,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                         margin / 8000,
                         float(action.kind == "attack" and fully_visible),
                         float(action.kind == "attack" and not opponent_monsters))
-        if feature_version == 17:
+        if feature_version >= 17:
             pending = observation.pending_attack
             attacker = (own_field_monsters.get((own, pending.sequence))
                         if pending is not None else None)
@@ -346,7 +347,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 18):
+        if feature_version not in range(1, 19):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -365,7 +366,7 @@ class LegalActionPolicy(nn.Module):
         number_width = 54 if feature_version == 15 else 42 if feature_version >= 4 else 10
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
-        action_number_width = (19 if feature_version == 17 else 15
+        action_number_width = (19 if feature_version >= 17 else 15
                                if feature_version == 16 else 11
                                if feature_version >= 6 else 8)
         self.action_numbers = nn.Sequential(nn.Linear(action_number_width, width), nn.ReLU(),
@@ -391,6 +392,11 @@ class LegalActionPolicy(nn.Module):
             self.chain_target_sequence = nn.Embedding(8, width)
             self.chain_target_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
                                                    nn.Linear(width, width))
+        if feature_version >= 18:
+            # Directly bind the active effect to each candidate target instead
+            # of requiring the pooled state scorer to discover that relation.
+            self.source_target_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
+                                                    nn.Linear(width, width))
 
     def forward(self, features: DecisionFeatures) -> Tensor:
         cards = features.state_cards
@@ -457,6 +463,12 @@ class LegalActionPolicy(nn.Module):
                 1).clamp(min=1)
         action = (self.kind(features.action_kinds) + self.card(features.action_cards)
                   + target_mean + self.action_numbers(features.action_numbers))
+        if self.feature_version >= 18:
+            source = features.chain_cards[-1, 0]
+            source_embedding = self.card(source).expand(len(action), -1)
+            target_embedding = self.card(features.action_cards)
+            action = action + self.source_target_pair(torch.cat(
+                (source_embedding, target_embedding), dim=1)) * (source != 0)
         if self.feature_version >= 12:
             # Bind each selected field slot to its visible card. A pooled state
             # alone loses which known face-down identity occupies which slot.
