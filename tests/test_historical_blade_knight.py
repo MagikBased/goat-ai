@@ -69,8 +69,8 @@ def test_blade_knight_attack_bonus_is_visible_when_hand_reaches_one(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("other_monster", [False, True])
-def test_blade_knight_negates_destroyed_flip_only_while_alone(tmp_path, other_monster):
+@pytest.mark.parametrize("ally_position", ["none", "faceup", "facedown"])
+def test_blade_knight_negates_destroyed_flip_only_while_alone(tmp_path, ally_position):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for code in (BLADE_KNIGHT, DEKOICHI):
         if not (root / f"scripts/official/c{code}.lua").is_file():
@@ -98,14 +98,15 @@ def test_blade_knight_negates_destroyed_flip_only_while_alone(tmp_path, other_mo
                 action = next((a for a in actions if a.kind == "set_monster"
                                and a.parameters.get("code") == DEKOICHI), None)
                 dekoichi_set |= action is not None
-            if (other_monster and observation.turn == 3
+            if (ally_position != "none" and observation.turn == 3
                     and observation.acting_player == 0 and not ally_summoned):
-                action = next((a for a in actions if a.kind == "normal_summon"
+                ally_kind = "set_monster" if ally_position == "facedown" else "normal_summon"
+                action = next((a for a in actions if a.kind == ally_kind
                                and a.parameters.get("code") != BLADE_KNIGHT), action)
-                ally_summoned |= action is not None and action.kind == "normal_summon"
+                ally_summoned |= action is not None and action.kind == ally_kind
             if observation.turn == 3 and observation.acting_player == 0 \
                     and observation.phase == "main1" and not battle \
-                    and action is None and (not other_monster or (
+                    and action is None and (ally_position == "none" or (
                         ally_summoned and sum(c.controller == 0 and c.zone == "monster"
                                                 for c in observation.field) == 2)):
                 action = next((a for a in actions if a.kind == "battle_phase"), action)
@@ -115,7 +116,15 @@ def test_blade_knight_negates_destroyed_flip_only_while_alone(tmp_path, other_mo
                 assert any(c.code == BLADE_KNIGHT and c.attack == 1600
                            for c in observation.field)
                 assert sum(c.controller == 0 and c.zone == "monster"
-                           for c in observation.field) == (2 if other_monster else 1)
+                           for c in observation.field) == (1 if ally_position == "none" else 2)
+                if ally_position == "facedown":
+                    ally = next(c for c in observation.field if c.controller == 0
+                                and c.zone == "monster" and c.code != BLADE_KNIGHT)
+                    assert ally.position == "facedown"
+                    other_view = env.engine.probe.observation(1)
+                    assert any(c.controller == 0 and c.zone == "monster"
+                               and c.sequence == ally.sequence and c.code is None
+                               for c in other_view.field)
                 before = env.engine.probe.observation(1)
                 before_hand = len(before.hand)
                 before_deck = before.deck_counts[1]
@@ -137,10 +146,11 @@ def test_blade_knight_negates_destroyed_flip_only_while_alone(tmp_path, other_mo
                     and observation.acting_player == 0
                     and any(c.code == DEKOICHI for c in observation.graveyards[1])):
                 other = env.engine.probe.observation(1)
-                assert len(other.hand) == before_hand + int(other_monster)
-                assert other.deck_counts[1] == before_deck - int(other_monster)
+                expected_draw = int(ally_position != "none")
+                assert len(other.hand) == before_hand + expected_draw
+                assert other.deck_counts[1] == before_deck - expected_draw
                 assert observation.life_points == (8000, 8000)
                 assert f"official/c{BLADE_KNIGHT}.lua" in (
                     env.engine.probe.loaded_script_sha256)
                 return
-    pytest.fail(f"Blade Knight/Dekoichi line failed (ally={other_monster})")
+    pytest.fail(f"Blade Knight/Dekoichi line failed (ally={ally_position})")
