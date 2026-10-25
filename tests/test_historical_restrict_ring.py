@@ -1,4 +1,4 @@
-"""A chained Ring removes Thousand-Eyes Restrict's equip target."""
+"""A chained Ring can remove Restrict or the monster it tries to equip."""
 
 import os
 from pathlib import Path
@@ -17,7 +17,8 @@ SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_ring_chained_to_restrict_removes_equip_target(tmp_path):
+@pytest.mark.parametrize("ring_hits_restrict", [False, True])
+def test_ring_chained_to_restrict_removes_source_or_equip_target(tmp_path, ring_hits_restrict):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                      f"goat/c{RESTRICT}.lua", f"pre-errata/c{RING}.lua"):
@@ -83,12 +84,15 @@ def test_ring_chained_to_restrict_removes_equip_target(tmp_path):
                     chained_ring = True
             if chained_ring and not ring_target:
                 action = next((a for a in actions if a.kind == "select_card"
-                               and a.parameters.get("controller") == 1
-                               and a.parameters.get("code") == target_code), action)
+                               and a.parameters.get("controller") == (0 if ring_hits_restrict else 1)
+                               and a.parameters.get("code") == (
+                                   RESTRICT if ring_hits_restrict else target_code)), action)
                 ring_target |= action is not None and action.kind == "select_card"
                 if ring_target:
                     target_attack = next(card.attack for card in observation.field
-                                         if card.controller == 1 and card.code == target_code)
+                                         if card.controller == (0 if ring_hits_restrict else 1)
+                                         and card.code == (
+                                             RESTRICT if ring_hits_restrict else target_code))
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "place", "select_position", "pass", "end_phase")), actions[0])
@@ -102,13 +106,19 @@ def test_ring_chained_to_restrict_removes_equip_target(tmp_path):
             if ring_target and any(card.code == RING for card in observation.graveyards[1]):
                 assert goat and meta and token and fusion and restrict and target
                 assert summoned and set_ring and chained_ring
-                assert any(card.code == target_code for card in observation.graveyards[1])
-                assert any(card.code == RESTRICT and card.controller == 0
-                           for card in observation.field)
                 assert observation.chain == ()
                 assert observation.life_points == (8000 - target_attack,) * 2
-                assert not any(card.zone == "spell_trap" and card.code == target_code
+                if ring_hits_restrict:
+                    assert any(card.code == RESTRICT for card in observation.graveyards[0])
+                    assert any(card.code == target_code and card.controller == 1
+                               and card.zone == "monster" for card in observation.field)
+                else:
+                    assert any(card.code == target_code for card in observation.graveyards[1])
+                    assert any(card.code == RESTRICT and card.controller == 0
                                for card in observation.field)
+                    assert not any(card.zone == "spell_trap" and card.code == target_code
+                                   for card in observation.field)
+                assert f"goat/c{RESTRICT}.lua" in env.engine.probe.loaded_script_sha256
                 assert f"pre-errata/c{RING}.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail(f"Ring line stalled: turn={observation.turn} phase={observation.phase} "
