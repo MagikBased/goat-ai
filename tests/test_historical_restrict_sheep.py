@@ -16,7 +16,8 @@ SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path):
+@pytest.mark.parametrize("battle_substitution", [False, True])
+def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path, battle_substitution):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                      f"goat/c{RESTRICT}.lua"):
@@ -36,9 +37,10 @@ def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path):
         assert {SCAPEGOAT, METAMORPHOSIS}.issubset({c.code for c in obs.hand})
         assert SCAPEGOAT in {c.code for c in env.engine.probe.observation(1).hand}
         own_goat = other_goat = meta = own_token = fusion = restrict = False
-        target = False
-        target_code = None
-        for _ in range(95):
+        target = equip_checked = opponent_summoned = battle = attacked = False
+        attack_target_chosen = False
+        target_code = attack_target_code = attack_target_atk = None
+        for _ in range(145):
             actions = env.legal_actions()
             action = None
             if obs.turn == 1 and obs.acting_player == 0 and not own_goat:
@@ -73,11 +75,38 @@ def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path):
                 action = options[0]
                 target_code = action.parameters["code"]
                 target = True
+            if battle_substitution and equip_checked:
+                if obs.turn == 4 and obs.acting_player == 1 and not opponent_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"),
+                                  action)
+                    if action is not None and action.kind == "normal_summon":
+                        attack_target_code = action.parameters["code"]
+                        opponent_summoned = True
+                if obs.turn == 5 and obs.acting_player == 0 and opponent_summoned:
+                    if obs.phase == "main1" and not battle:
+                        attack_target_atk = next(c.attack for c in obs.field
+                                                 if c.code == attack_target_code
+                                                 and c.controller == 1)
+                        assert attack_target_atk > 0
+                        action = next((a for a in actions if a.kind == "battle_phase"),
+                                      action)
+                        battle |= action is not None and action.kind == "battle_phase"
+                    elif obs.phase == "battle_start" and not attacked:
+                        action = next((a for a in actions if a.kind == "attack"
+                                       and a.parameters.get("code") == RESTRICT), action)
+                        attacked |= action is not None and action.kind == "attack"
+                    elif attacked and not attack_target_chosen \
+                            and actions[0].kind == "select_card":
+                        action = next((a for a in actions if a.parameters.get("code")
+                                       == attack_target_code and a.parameters.get(
+                                           "controller") == 1), action)
+                        attack_target_chosen |= action is not None \
+                            and action.kind == "select_card"
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_card", "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if target and obs.turn == 3 and obs.phase == "main1" \
+            if target and not equip_checked and obs.turn == 3 and obs.phase == "main1" \
                     and obs.acting_player == 0 and not obs.chain:
                 assert own_goat and other_goat and meta and own_token and fusion
                 assert sum(c.code in SHEEP_CODES and c.controller == 0
@@ -94,5 +123,21 @@ def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path):
                 assert {f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                         f"goat/c{RESTRICT}.lua"} \
                     <= env.engine.probe.loaded_script_sha256.keys()
+                equip_checked = True
+                if not battle_substitution:
+                    return
+            if battle_substitution and attack_target_chosen \
+                    and obs.turn == 5 and obs.phase == "battle_step" \
+                    and obs.life_points[0] == 8000 - attack_target_atk:
+                assert equip_checked and opponent_summoned and battle and attacked
+                assert obs.life_points[1] == 8000
+                assert any(c.code == RESTRICT and c.zone == "monster"
+                           and c.controller == 0 for c in obs.field)
+                assert not any(c.code == target_code and c.zone == "spell_trap"
+                               for c in obs.field)
+                assert not any(c.code in SHEEP_CODES for pile in obs.graveyards
+                               for c in pile)
+                assert any(c.code == attack_target_code and c.zone == "monster"
+                           and c.controller == 1 for c in obs.field)
                 return
-    pytest.fail("Restrict did not equip the opponent's Sheep Token")
+    pytest.fail("Restrict token-equip or battle substitution did not resolve")
