@@ -12,6 +12,7 @@ from goat_ai.environments import GoatEnvironment
 POT_OF_GREED = 55144522
 MAGICIAN_OF_FAITH = 31560081
 BOOK_OF_MOON = 14087893
+GEMINI_ELF = 69140098
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -220,3 +221,78 @@ def test_magician_of_faith_recovers_pot_then_book_after_book_resets_it(tmp_path)
                     "select_card", "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
     pytest.fail("Magician of Faith did not recover both Spells across two flips")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_magician_of_faith_battle_flip_recovers_pot_before_destruction(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (POT_OF_GREED, MAGICIAN_OF_FAITH):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    deck = tmp_path / "mof_battle.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        POT_OF_GREED, *([MAGICIAN_OF_FAITH] * 3), *VANILLA_DECK[4:])))
+                    + "\n#extra\n!side\n")
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=5,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {POT_OF_GREED, MAGICIAN_OF_FAITH}.issubset(c.code for c in obs.hand)
+        assert GEMINI_ELF in {c.code for c in env.engine.probe.observation(1).hand}
+        pot_used = mof_set = elf_summoned = battle = attacked = targeted = False
+        pot_selected = False
+        for _ in range(70):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not pot_used:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == POT_OF_GREED), None)
+                    pot_used |= action is not None
+                elif not mof_set:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == MAGICIAN_OF_FAITH), None)
+                    mof_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1:
+                if not elf_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == GEMINI_ELF), None)
+                    elf_summoned |= action is not None
+                elif obs.phase == "main1" and not battle:
+                    action = next((a for a in actions if a.kind == "battle_phase"), None)
+                    battle |= action is not None
+                elif obs.phase == "battle_start" and not attacked:
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == GEMINI_ELF), None)
+                    attacked |= action is not None
+            if attacked and not targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("controller") == 0
+                               and a.parameters.get("location") == 4
+                               and "code" not in a.parameters), None)
+                targeted |= action is not None
+            if targeted and not pot_selected and actions[0].kind == "select_card" \
+                    and obs.acting_player == 0:
+                assert obs.chain[0].card_code == MAGICIAN_OF_FAITH
+                action = next((a for a in actions if a.parameters.get("code")
+                               == POT_OF_GREED and a.parameters.get("location") == 16),
+                              None)
+                pot_selected |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if pot_selected and MAGICIAN_OF_FAITH in {
+                    c.code for c in obs.graveyards[0]}:
+                owner = env.engine.probe.observation(0)
+                assert POT_OF_GREED in {c.code for c in owner.hand}
+                assert POT_OF_GREED not in {c.code for c in owner.graveyards[0]}
+                assert obs.life_points == (8000, 8000)
+                assert any(c.code == GEMINI_ELF and c.controller == 1
+                           for c in obs.field)
+                assert not any(c.controller == 0 and c.zone == "monster"
+                               for c in obs.field)
+                assert [[c.code for c in reveal.cards] for reveal in
+                        env.engine.probe.observation(1).private_reveals] == [[POT_OF_GREED]]
+                assert f"official/c{MAGICIAN_OF_FAITH}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("battle-flipped Magician of Faith did not recover Pot")
