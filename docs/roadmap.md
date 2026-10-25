@@ -360,8 +360,10 @@ A Metamorphosis fixture now checks the historical option to Tribute the
 player's own face-down Level 1 Dark Mimic for Thousand-Eyes Restrict, without
 triggering Mimic's Flip draw. With no matching Fusion in the Extra Deck,
 Metamorphosis is unavailable. The successful branch completes and
-replay-verifies; the distinct Soul Exchange rule for an opponent's face-down
-monster remains untested.
+replay-verifies. A paired Soul Exchange fixture now confirms the distinct
+restriction: an opposing face-down Dark Mimic cannot pay Metamorphosis's cost,
+while a face-up opposing Mimic can. The pinned modern script required a
+SHA-guarded, in-memory historical correction; both full duels replay-verify.
 
 A tournament-described Goat Control line now activates Scapegoat in the
 opponent's End Phase, confirms its Summon restriction ends with that turn,

@@ -49,6 +49,14 @@ DEKOICHI_DRAW_HISTORICAL = (
     b"Duel.Draw(p,Duel.GetMatchingGroupCount(s.filter,tp,LOCATION_ONFIELD,0,nil)+1,"
     b"REASON_EFFECT)"
 )
+UPSTREAM_METAMORPHOSIS_SHA256 = "6fb8fa7c0e20bd4f8ab0a9b1f80c19c37bfc99d101febac13ad9f2e285299520"
+METAMORPHOSIS_COST_FILTER_OLD = b"function s.costfilter(c,e,tp)\n\tlocal lv=c:GetLevel()"
+METAMORPHOSIS_COST_FILTER_GOAT = (
+    b"function s.costfilter(c,e,tp)\n"
+    b"\t-- Soul Exchange cannot use an opponent's face-down monster for this cost.\n"
+    b"\tif not c:IsControler(tp) and not c:IsFaceup() then return false end\n"
+    b"\tlocal lv=c:GetLevel()"
+)
 GOAT_RESTRICT_EFFECT_MARKER = b"\tc:RegisterEffect(e5)\nend\n"
 GOAT_RESTRICT_EQUIP_MARKER = (
     b"\tif not c:EquipByEffectAndLimitRegister(e,tp,tc,id) then return end\n"
@@ -416,6 +424,13 @@ class OcgcoreProbe:
             # when Dekoichi's Flip Effect enters the chain.
             contents = contents.replace(DEKOICHI_DRAW_OLD,
                                         DEKOICHI_DRAW_HISTORICAL)
+        if path.relative_to(self.scripts) == Path("official/c46411259.lua"):
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_METAMORPHOSIS_SHA256 \
+                    or contents.count(METAMORPHOSIS_COST_FILTER_OLD) != 1:
+                self.errors.append("pinned Metamorphosis script changed; historical cost patch not applied")
+                return 0
+            contents = contents.replace(METAMORPHOSIS_COST_FILTER_OLD,
+                                        METAMORPHOSIS_COST_FILTER_GOAT)
         self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
             hashlib.sha256(contents).hexdigest()
         )
