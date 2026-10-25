@@ -19,6 +19,16 @@ The sixth list is [Weirdchamp's sixth-place World Championship Bazoo Return](../
 measured action-coverage reports below still use their original six duel deck
 schedule; adding a list to the priority report does not change those results.
 
+For the current M2 audit, prefer interactions among cards appearing in at
+least three of these six Main Decks. Start with the shared staples and then
+cover frequent matchup cards such as Dekoichi, Trap Dustshoot, D.D. Warrior
+Lady, Chaos Sorcerer, Thunder Dragon, and Kycoo. The paired
+[Warrior Lady versus Kycoo regression](goat_rules.md) applies this rule to a
+historically sourced Damage Step interaction. Keep a lower-presence card in
+scope when it is needed to test a common card's ruling, but do not expand the
+card audit solely because the engine has a script for it. Deck-list prevalence
+is a prioritization proxy, not a measured 2005 metagame play rate.
+
 This probe counts card-source actions in complete native duels played by seeded
 `RandomAgent`s. It helps prioritize GOAT ruling fixtures. It does **not**
 measure historical play rates, card correctness, or agent strength. A card code
