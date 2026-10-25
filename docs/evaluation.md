@@ -967,3 +967,57 @@ PYTHONPATH=. OMP_NUM_THREADS=1 .venv/bin/python scripts/train_behavioral_clone.p
   --feature-version 14 --epochs 1 --width 8 --seed 16300 \
   --output .cache/goat-ai/v21_chain_target_policy.pt
 ```
+
+## Matched public chain-target feature comparison
+
+A controlled opt-in feature-v13/v14 comparison used eight fresh, schema-v21,
+replay-verified CombatHeuristicAgent-versus-RandomAgent duels: Goat Control and
+Chaos Turbo in both deck orders, teacher in both seats, seeds 16300–16301. The
+8 games had 3,201 teacher decisions. Of those, 108 had an active public chain
+target and only 5 also had multiple legal options. Both models used one epoch,
+width 16, learning rate 0.001, and seed 16300; their common layers had the
+same seeded initialization. Version 14 adds target-slot embeddings and a
+chain-link target projection. Epoch losses were 0.2840725670557589 for v13
+and 0.2850415981427779 for v14. This training set cannot establish the value
+of target-aware decisions given only five relevant multi-option examples.
+
+A direct 32-game tournament on seeds 16400–16403 used sourced Chaos Control
+versus Warrior and Chaos Return versus Warrior, both deck assignments and
+both seats. Neither evaluation Main Deck composition appeared in training.
+Feature v14 scored **16 wins, 15 losses, 1 draw** against v13: 51.6% score,
+with matchup-seed paired 95% bootstrap interval 50.0–54.7%. It scored 6–10
+when moving first and 10–5 with one draw when moving second. The outcome was
+strongly deck-dependent: v14 scored 0–7 with one draw when assigned Chaos
+Control against Warrior and 8–0 with Warrior against Chaos Control. A separate
+off-policy audit on eight replay-verified Chaos Control/Warrior teacher duels,
+seeds 16410–16411 in both deck orders and seats, covered 3,268 teacher
+decisions. V13 matched 3,085 overall; v14 matched 3,089. There were 106 targeted-chain decisions, including 10 with multiple legal
+options. Both models matched all 10 of those teacher choices. These results do not show a target-specific or competitive strength
+gain, so feature v14 remains opt-in.
+
+The v13 and v14 checkpoint SHA-256 hashes are
+`6e9468be7371d634a0200ce096d3630e2b90aa7e705719eee72c508159f8bb9b`
+and `9172ac6fc565149a3130027adf20d8c83bd91df94de7142e10ba6b3b66634b9f`.
+The tournament report hash is
+`f987b31b6a50a9a7324fb6d74554afb4c1f70bf0c4550f181ccccc647e42d34a`;
+the off-policy audit report hash is
+`ccbe7cdf97cfc40fcecc5beaadd87b13cf728e107e8b2b189c38712cd2fe7033`.
+These local artifacts are ignored under `.cache/goat-ai/`. The tournament took
+24.39 seconds with two workers on the reported machine, measuring 1.31 complete
+duels and 596 decisions per second; this is the full policy-vs-policy schedule,
+not a standalone simulator throughput benchmark.
+
+To reproduce, use the pinned [native setup](native_setup.md), then run the
+collector twice on seeds 16300–16301 with `--engine experimental --teacher
+combat_heuristic --seeds 2 --max-decisions 3000`, swapping Goat Control and
+Chaos Turbo as `--deck-a` and `--deck-b` and using separate output directories.
+Train `scripts/train_behavioral_clone.py` on all eight JSON files with
+`--engine experimental --epochs 1 --width 16 --seed 16300
+--learning-rate 0.001`, once with `--feature-version 13` and once with
+`--feature-version 14`. Evaluate with `scripts/evaluate_policy.py` using
+`--opponent-checkpoint` for v13, `--both-deck-assignments`,
+`--require-unseen-main-decks`, the two matchups above, `--seed 16400 --seeds 4
+--max-decisions 3000 --workers 2`. Collect the two Chaos Control/Warrior deck
+orders at seeds 16410–16411 with the same teacher schedule, then pass all
+eight JSON files and both checkpoints to `scripts/audit_policy_agreement.py
+--engine experimental`. Use `OMP_NUM_THREADS=1` for the measured schedule.

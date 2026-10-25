@@ -39,7 +39,7 @@ from scripts.evaluate_policy import (
     validate_unseen_deck_hashes,
     validate_unseen_main_decks,
 )
-from scripts.audit_policy_agreement import STAPLES, staple_context
+from scripts.audit_policy_agreement import STAPLES, decision_scopes, staple_context
 
 
 def view() -> Observation:
@@ -69,6 +69,22 @@ def test_staple_audit_distinguishes_played_cards_from_target_codes():
         "offered": {10}, "teacher_selected": {10}, "chain_prompt": set()}
     assert staple_context(selected_target, {10, 20, 30}) == {
         "offered": set(), "teacher_selected": set(), "chain_prompt": {30}}
+
+
+def test_audit_scopes_isolate_public_target_decisions():
+    untargeted = replace(view(), chain=(ChainLinkView(1, 30, 1, 8, 0),))
+    targeted = replace(view(), chain=(ChainLinkView(
+        1, 30, 1, 8, 0, (TargetSlotView(0, "monster", 0),)),))
+    single = (Action("pass", "pass", 0),)
+    multiple = (single[0], Action("chain", "chain", 0, {"code": 10}))
+    assert "chain_target" not in decision_scopes(DecisionRecord(
+        untargeted, multiple, multiple[0]))
+    assert "chain_target" in decision_scopes(DecisionRecord(
+        targeted, single, single[0]))
+    assert "chain_target_multi_option" not in decision_scopes(DecisionRecord(
+        targeted, single, single[0]))
+    assert "chain_target_multi_option" in decision_scopes(DecisionRecord(
+        targeted, multiple, multiple[0]))
 
 
 def test_staple_audit_matches_shared_tournament_main_deck_cards():

@@ -18,7 +18,8 @@ from goat_ai.replay import ReplayMismatch, demonstrator_records, read_trajectory
 from goat_ai.training import load_policy_agent
 
 SCOPES = ("all", "multi_option", "multiple_kinds", "known_hand",
-          "known_hand_multi_option", "chain", "chain_multi_option")
+          "known_hand_multi_option", "chain", "chain_multi_option",
+          "chain_target", "chain_target_multi_option")
 STAPLES = {
     71413901: "Breaker the Magical Warrior",
     44763025: "Delinquent Duo",
@@ -66,6 +67,28 @@ def empty_staple_counts() -> dict:
 
 def empty_counts() -> dict:
     return {scope: {"exact": 0, "kind": 0, "total": 0} for scope in SCOPES}
+
+
+def decision_scopes(record) -> tuple[str, ...]:
+    scopes = ["all"]
+    multiple = len(record.legal_actions) > 1
+    if multiple:
+        scopes.append("multi_option")
+    if len({action.kind for action in record.legal_actions}) > 1:
+        scopes.append("multiple_kinds")
+    if record.observation.known_opponent_hand_cards:
+        scopes.append("known_hand")
+        if multiple:
+            scopes.append("known_hand_multi_option")
+    if record.observation.chain:
+        scopes.append("chain")
+        if multiple:
+            scopes.append("chain_multi_option")
+    if any(link.targets for link in record.observation.chain):
+        scopes.append("chain_target")
+        if multiple:
+            scopes.append("chain_target_multi_option")
+    return tuple(scopes)
 
 
 def sha256(path: Path) -> str:
@@ -140,20 +163,7 @@ def main() -> None:
                                 record.selected_action.kind]
                             kind_bucket["total"] += 1
                             kind_bucket["exact"] += chosen == record.selected_action
-                scopes = ["all"]
-                if len(record.legal_actions) > 1:
-                    scopes.append("multi_option")
-                if len({action.kind for action in record.legal_actions}) > 1:
-                    scopes.append("multiple_kinds")
-                if record.observation.known_opponent_hand_cards:
-                    scopes.append("known_hand")
-                    if len(record.legal_actions) > 1:
-                        scopes.append("known_hand_multi_option")
-                if record.observation.chain:
-                    scopes.append("chain")
-                    if len(record.legal_actions) > 1:
-                        scopes.append("chain_multi_option")
-                for scope in scopes:
+                for scope in decision_scopes(record):
                     bucket[scope]["total"] += 1
                     bucket[scope]["exact"] += chosen == record.selected_action
                     bucket[scope]["kind"] += chosen.kind == record.selected_action.kind
