@@ -29,7 +29,7 @@ ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
 SORT_ACTION_KINDS = ("sort_cards",)
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
-POLICY_FEATURE_VERSION = 10  # ordered public chain links
+POLICY_FEATURE_VERSION = 10  # ordered public chain links; v11 is an unordered ablation
 
 
 @dataclass(frozen=True)
@@ -90,7 +90,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10):
+    if feature_version not in range(1, 12):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -208,6 +208,11 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                       for row in target_context]
     target_masks = [[1] * len(row) + [0] * (width - len(row)) for row in targets]
     phase = PHASES.index(observation.phase) + 1 if observation.phase in PHASES else 0
+    chain_links = [(vocabulary.index(link.card_code),
+                    int(link.controller != observation.viewer) + 1)
+                   for link in observation.chain]
+    if feature_version == 11:
+        chain_links.sort()
     return DecisionFeatures(
         torch.tensor(cards, dtype=torch.long), torch.tensor(card_numbers, dtype=torch.float32),
         torch.tensor(numbers, dtype=torch.float32),
@@ -224,10 +229,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                       for code in observation.known_opponent_hand_cards]
                      if feature_version >= 9 and observation.known_opponent_hand_cards else [0],
                      dtype=torch.long),
-        torch.tensor([(vocabulary.index(link.card_code),
-                       int(link.controller != observation.viewer) + 1)
-                      for link in observation.chain]
-                     if feature_version >= 10 and observation.chain else [(0, 0)],
+        torch.tensor(chain_links if feature_version >= 10 and chain_links else [(0, 0)],
                      dtype=torch.long),
     )
 
@@ -238,7 +240,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10):
+        if feature_version not in range(1, 12):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)

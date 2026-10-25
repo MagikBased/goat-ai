@@ -134,6 +134,27 @@ def test_feature_version_ten_distinguishes_public_chain_order():
     assert torch.allclose(legacy_model(legacy_first), legacy_model(legacy_second))
 
 
+def test_feature_version_eleven_keeps_chain_capacity_without_order():
+    vocabulary = CardVocabulary((10, 20))
+    first = replace(view(), chain=(ChainLinkView(1, 10, 0, 8, 0),
+                                   ChainLinkView(2, 20, 1, 8, 0)))
+    reversed_chain = replace(view(), chain=(ChainLinkView(1, 20, 1, 8, 0),
+                                            ChainLinkView(2, 10, 0, 8, 0)))
+    first_features = encode_decision(first, actions(), vocabulary, feature_version=11)
+    second_features = encode_decision(reversed_chain, actions(), vocabulary,
+                                      feature_version=11)
+    assert torch.equal(first_features.chain_cards, second_features.chain_cards)
+    torch.manual_seed(41)
+    ordered = LegalActionPolicy(vocabulary.size, width=16, feature_version=10)
+    torch.manual_seed(41)
+    unordered = LegalActionPolicy(vocabulary.size, width=16, feature_version=11)
+    assert sum(p.numel() for p in ordered.parameters()) == sum(
+        p.numel() for p in unordered.parameters())
+    assert all(torch.equal(left, right) for left, right in zip(
+        ordered.parameters(), unordered.parameters(), strict=True))
+    assert torch.allclose(unordered(first_features), unordered(second_features))
+
+
 def test_action_ids_are_not_features_but_public_card_and_controller_are():
     vocabulary = CardVocabulary((10, 20))
     original = encode_decision(view(), actions(), vocabulary)
