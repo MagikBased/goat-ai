@@ -17,7 +17,7 @@ from goat_ai.replay import demonstrator_records, read_trajectory, verify_traject
 from goat_ai.training import load_policy_agent
 
 SCOPES = ("all", "multi_option", "multiple_kinds", "known_hand",
-          "known_hand_multi_option")
+          "known_hand_multi_option", "chain", "chain_multi_option")
 
 
 def empty_counts() -> dict:
@@ -79,6 +79,10 @@ def main() -> None:
                     scopes.append("known_hand")
                     if len(record.legal_actions) > 1:
                         scopes.append("known_hand_multi_option")
+                if record.observation.chain:
+                    scopes.append("chain")
+                    if len(record.legal_actions) > 1:
+                        scopes.append("chain_multi_option")
                 for scope in scopes:
                     bucket[scope]["total"] += 1
                     bucket[scope]["exact"] += chosen == record.selected_action

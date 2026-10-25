@@ -66,6 +66,10 @@ python scripts/evaluate_policy.py checkpoints/vanilla_rl.pt --seed 200 --seeds 8
 
 This is an experiment, not a selected final RL algorithm. Terminal reward is sparse; no value function, PPO update, opponent league, or checkpoint selection by held-out win rate exists. Runs from random imitation and from the stronger heuristic imitation checkpoint did not demonstrate an improvement in greedy playing strength; see [the evaluation log](evaluation.md). Future work should compare a richer action encoder, value baselines and PPO under the same held-out schedule, while keeping training opponents separate from evaluation opponents.
 
+## Ordered-chain feature check
+
+A feature-version-10 checkpoint trained on the same 4,630 replay-verified teacher decisions as version 9 won 20–11 with one draw in 32 paired, seat-swapped duels on sourced Chaos Return and Warrior lists. On separate held-out teacher decisions with a nonempty chain and multiple legal actions, it matched 116/135 choices versus version 9's 114/135; overall teacher agreement was slightly lower (4,073/4,139 versus 4,075/4,139). The small tournament and mixed agreement result are recorded in [the evaluation log](evaluation.md); they do not establish a general strength gain or isolate chain-order encoding from model-capacity changes.
+
 ## Sourced-deck imitation check
 
 A feature-version-8 checkpoint was trained on 6,999 replay-verified HeuristicAgent decisions from 16 sourced Goat Control/Chaos Turbo duels. On separate verified trajectories with real choices, exact teacher-action agreement rose from 737/891 for the prior vanilla-trained version-2 checkpoint to 859/891. On held-out paired duels, the new checkpoint split 16–16 against that prior checkpoint and won only 18/32 against RandomAgent. The protocol, hashes, deck splits, and confidence intervals are in [the evaluation log](evaluation.md). This is evidence that the imitation pipeline can learn the teacher on these decks; it is not evidence of improved competitive strength. Authorized expert demonstrations and stronger self-play updates remain necessary for M4.
