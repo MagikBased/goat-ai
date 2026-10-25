@@ -317,6 +317,11 @@ Metamorphosis is unavailable. The successful branch completes and
 replay-verifies; the distinct Soul Exchange rule for an opponent's face-down
 monster remains untested.
 
+A tournament-described Goat Control line now activates Scapegoat in the
+opponent's End Phase, confirms its Summon restriction ends with that turn,
+and Tributes a Sheep Token for Metamorphosis on the controller's next turn.
+The full seeded native duel replay-verifies. See [GOAT rules](goat_rules.md).
+
 The Chaos boss / Bottomless Trap Hole priority fixture now runs both official
 Chaos Sorcerer and the separate GOAT Black Luster Soldier script. For each,
 activating its banish effect before the Bottomless response removes the target
