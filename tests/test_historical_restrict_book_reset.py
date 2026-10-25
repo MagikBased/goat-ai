@@ -19,7 +19,9 @@ SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_book_reset_allows_second_restrict_equip_same_turn(tmp_path):
+@pytest.mark.parametrize("manual_change_before_book", [False, True])
+def test_book_reset_respects_prior_manual_position_change(tmp_path,
+                                                          manual_change_before_book):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = {f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                f"goat/c{RESTRICT}.lua", f"official/c{BOOK}.lua"}
@@ -39,8 +41,26 @@ def test_book_reset_allows_second_restrict_equip_same_turn(tmp_path):
         assert {SCAPEGOAT, METAMORPHOSIS, BOOK} <= {card.code for card in obs.hand}
         own_goat = other_goat = meta = own_token = fusion = False
         first_effect = first_target = first_equipped = book = book_target = False
-        flipped = second_effect = second_target = False
+        manually_changed = locked = flipped = second_effect = second_target = False
         first_slot = second_slot = None
+
+        def finish_and_verify(observation):
+            agents = (RandomAgent(70), RandomAgent(71))
+            for _ in range(3000):
+                if env.is_terminal():
+                    break
+                observation = env.step(agents[observation.acting_player].select_action(
+                    observation, env.legal_actions()))
+            else:
+                pytest.fail("Restrict / Book continuation exceeded 3000 decisions")
+            trajectory = env.trajectory()
+            assert trajectory.schema_version == 21
+            path = tmp_path / f"restrict_book_reset_{manual_change_before_book}.json"
+            write_trajectory(path, trajectory)
+            assert verify_trajectory(read_trajectory(path),
+                                     ExperimentalOcgcoreEngine(root)) == len(
+                                         trajectory.decisions)
+
         for _ in range(160):
             actions = env.legal_actions()
             action = None
@@ -86,7 +106,13 @@ def test_book_reset_allows_second_restrict_equip_same_turn(tmp_path):
                         assert not any(a.kind in ("activate", "chain")
                                        and a.parameters.get("code") == RESTRICT
                                        for a in actions)
-                if first_equipped and not book:
+                if first_equipped and manual_change_before_book \
+                        and not manually_changed and action is None:
+                    action = next((a for a in actions if a.kind == "change_position"
+                                   and a.parameters.get("code") == RESTRICT), None)
+                    manually_changed |= action is not None
+                if first_equipped and (not manual_change_before_book or manually_changed) \
+                        and not book and action is None:
                     action = next((a for a in actions if a.kind == "activate"
                                    and a.parameters.get("code") == BOOK), None)
                     book |= action is not None
@@ -94,7 +120,7 @@ def test_book_reset_allows_second_restrict_equip_same_turn(tmp_path):
                     action = next((a for a in actions if a.parameters.get("code") == RESTRICT
                                    and a.parameters.get("controller") == 0), None)
                     book_target |= action is not None
-                if book_target and not obs.chain and not flipped:
+                if book_target and not obs.chain and not flipped and not locked:
                     restrict = next(c for c in obs.field if c.code == RESTRICT)
                     assert restrict.position == "facedown"
                     assert BOOK in {c.code for c in obs.graveyards[0]}
@@ -102,9 +128,14 @@ def test_book_reset_allows_second_restrict_equip_same_turn(tmp_path):
                         0, restrict.sequence) for c in obs.field)
                     assert sum(c.code in SHEEP_CODES for c in obs.field
                                if c.controller == 1 and c.zone == "monster") == 3
-                    action = next((a for a in actions if a.kind == "flip_summon"
-                                   and a.parameters.get("code") == RESTRICT), None)
-                    flipped |= action is not None
+                    flip_option = next((a for a in actions if a.kind == "flip_summon"
+                                        and a.parameters.get("code") == RESTRICT), None)
+                    if manual_change_before_book:
+                        assert manually_changed and flip_option is None
+                        locked = True
+                    else:
+                        action = flip_option
+                        flipped |= action is not None
                 if flipped and not second_effect and action is None:
                     action = next((a for a in actions if a.kind in ("activate", "chain")
                                    and a.parameters.get("code") == RESTRICT), None)
@@ -120,6 +151,15 @@ def test_book_reset_allows_second_restrict_equip_same_turn(tmp_path):
                 action = next((a for a in actions if a.kind in (
                     "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
+            if locked and obs.turn == 5 and not obs.chain:
+                own = env.engine.probe.observation(0)
+                restrict = next(c for c in own.field if c.code == RESTRICT)
+                assert restrict.position == "facedown"
+                assert sum(c.code in SHEEP_CODES for c in own.field
+                           if c.controller == 1 and c.zone == "monster") == 3
+                assert scripts <= env.engine.probe.loaded_script_sha256.keys()
+                finish_and_verify(obs)
+                return
             if second_target and not obs.chain and obs.turn == 5:
                 assert first_equipped and book and book_target and flipped
                 assert first_slot != second_slot
@@ -130,24 +170,11 @@ def test_book_reset_allows_second_restrict_equip_same_turn(tmp_path):
                 assert sum(c.code in SHEEP_CODES for c in obs.field
                            if c.controller == 1 and c.zone == "monster") == 2
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
-                agents = (RandomAgent(70), RandomAgent(71))
-                for _ in range(3000):
-                    if env.is_terminal():
-                        break
-                    obs = env.step(agents[obs.acting_player].select_action(
-                        obs, env.legal_actions()))
-                else:
-                    pytest.fail("Restrict / Book continuation exceeded 3000 decisions")
-                trajectory = env.trajectory()
-                assert trajectory.schema_version == 21
-                path = tmp_path / "restrict_book_reset.json"
-                write_trajectory(path, trajectory)
-                assert verify_trajectory(read_trajectory(path),
-                                         ExperimentalOcgcoreEngine(root)) == len(
-                                             trajectory.decisions)
+                finish_and_verify(obs)
                 return
     pytest.fail(f"Restrict reset stalled: turn={obs.turn} phase={obs.phase} "
                 f"goats={own_goat}/{other_goat} meta={meta}/{own_token}/{fusion} "
                 f"first={first_effect}/{first_target}/{first_equipped} "
-                f"book={book}/{book_target} flip={flipped} "
+                f"book={book}/{book_target} change={manually_changed} "
+                f"lock={locked} flip={flipped} "
                 f"second={second_effect}/{second_target}")
