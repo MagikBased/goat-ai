@@ -27,7 +27,9 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     observation = Observation(
         viewer=0, acting_player=0, turn=1, phase="main1", life_points=(8000, 8000),
         hand=(CardView(0, "hand", "hidden", 10, 0),),
-        field=(CardView(1, "monster", "facedown", None, 0, "defense"),),
+        field=(CardView(0, "monster", "faceup", 10, 0, "attack", 1900, 1000,
+                        ((1, 1),)),
+               CardView(1, "monster", "facedown", None, 0, "defense")),
         graveyards=((), ()), banished=((), ()), opponent_hand_count=5,
         deck_counts=(34, 35), extra_deck_counts=(0, 0),
         public_reveals=(PublicRevealView(1, 1, "deck_top", (11,)),),
@@ -56,6 +58,8 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     assert '"private_reveals"' in html
     assert '"own_main_deck":[10,10,13]' in html
     assert '"opponent_hand_count":5' in html
+    assert '"attack":1900' in html
+    assert '"counters":[[1,1]]' in html
     assert '"code":null' in html
     assert "window.injected=true" in html
     assert "</script><script>window.injected" not in html

@@ -511,9 +511,19 @@ class OcgcoreProbe:
                 self._public_history.append("chain:end")
 
     def _query_location(self, player: int, location: int):
-        from goat_ai.engine.native_queries import decode_location
+        from goat_ai.engine.native_queries import (
+            QUERY_ATTACK,
+            QUERY_CODE,
+            QUERY_COUNTERS,
+            QUERY_DEFENSE,
+            QUERY_POSITION,
+            decode_location,
+        )
 
-        query = QueryInfo(0x1 | 0x2, player, location, 0, 0)
+        flags = QUERY_CODE | QUERY_POSITION
+        if location == LOCATION_MZONE:
+            flags |= QUERY_ATTACK | QUERY_DEFENSE | QUERY_COUNTERS
+        query = QueryInfo(flags, player, location, 0, 0)
         length = c.c_uint32()
         pointer = self.lib.OCG_DuelQueryLocation(self._duel, c.byref(length), c.byref(query))
         if not pointer or not length.value:
@@ -558,7 +568,10 @@ class OcgcoreProbe:
                     orientation = "defense"
                 else:
                     raise ValueError(f"unexpected monster position {card.position:#x}")
-            return CardView(player, zone, position, visible_code, sequence, orientation)
+            return CardView(player, zone, position, visible_code, sequence, orientation,
+                            card.attack if location == LOCATION_MZONE and faceup else None,
+                            card.defense if location == LOCATION_MZONE and faceup else None,
+                            card.counters if location == LOCATION_MZONE and faceup else ())
 
         field = tuple(view_card(player, location, sequence, card)
                       for player in (0, 1) for location in (LOCATION_MZONE, LOCATION_SZONE)

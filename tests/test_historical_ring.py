@@ -111,6 +111,10 @@ def test_ring_after_breaker_cost_uses_1600_and_breaker_still_destroys_target(tmp
                 effect = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == BREAKER), None)
                 if effect is not None:
+                    breaker = next(card for card in observation.field
+                                   if card.code == BREAKER)
+                    assert (breaker.attack, breaker.defense, breaker.counters) == (
+                        1900, 1000, ((1, 1),))
                     action = effect
                     breaker_used = True
             if breaker_used and observation.acting_player == 1 and not ring_chained:
@@ -122,6 +126,10 @@ def test_ring_after_breaker_cost_uses_1600_and_breaker_still_destroys_target(tmp
             if (action is None and breaker_used and not ring_chained
                     and observation.acting_player == 0
                     and actions[0].kind == "select_card"):
+                breaker = next(card for card in observation.field
+                               if card.code == BREAKER)
+                assert (breaker.attack, breaker.defense, breaker.counters) == (
+                    1600, 1000, ())
                 # Player 0 chooses a field slot; the set Book identity is hidden.
                 assert {a.parameters.get("sequence") for a in actions} == {0, 1}
                 assert all("code" not in a.parameters for a in actions)

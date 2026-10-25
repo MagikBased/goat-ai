@@ -168,7 +168,9 @@
       const element = node("div", `card ${card.zone} ${card.position === "facedown" ? "facedown" : ""} ${card.code == null && code != null ? "known" : ""}`);
       element.append(node("strong", "", cardLabel(observation, card, known)));
       const status = card.position === "facedown" ? (code == null ? "Hidden" : "Previously revealed") : "Face-up";
-      element.append(node("small", "", `${status}${card.orientation ? ` · ${card.orientation.toUpperCase()}` : ""}`));
+      const stats = card.attack == null ? "" : ` · ${card.attack}/${card.defense}`;
+      const counters = (card.counters || []).map(([type, count]) => `${count}× counter ${type}`).join(", ");
+      element.append(node("small", "", `${status}${card.orientation ? ` · ${card.orientation.toUpperCase()}` : ""}${stats}${counters ? ` · ${counters}` : ""}`));
       return element;
     }
     function zoneRow(observation, player, zone, known) {

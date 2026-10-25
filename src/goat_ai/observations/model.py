@@ -11,6 +11,9 @@ class CardView:
     code: int | None = None  # None means identity is hidden from this viewer.
     sequence: int | None = None
     orientation: str | None = None  # attack/defense for monsters on the field.
+    attack: int | None = None  # Current visible ATK; never set for face-down cards.
+    defense: int | None = None  # Current visible DEF.
+    counters: tuple[tuple[int, int], ...] = ()  # (counter type, count) on face-up monsters.
 
 
 @dataclass(frozen=True)
@@ -103,6 +106,15 @@ class Observation:
         if any(card.controller != self.viewer and card.position == "facedown" and card.code is not None
                for card in self.field):
             raise ValueError("opponent facedown identity must be hidden")
+        for card in (*self.hand, *self.field, *self.graveyards[0], *self.graveyards[1],
+                     *self.banished[0], *self.banished[1], *self.own_extra_deck):
+            if (card.zone != "monster" or card.position != "faceup") and (
+                    card.attack is not None or card.defense is not None or card.counters):
+                raise ValueError("dynamic stats and counters require a face-up monster")
+            if ((card.attack is None) != (card.defense is None)
+                    or any(kind <= 0 or count <= 0 for kind, count in card.counters)
+                    or tuple(sorted(card.counters)) != card.counters):
+                raise ValueError("invalid visible monster stats or counters")
         facedown_slots = {(card.controller, card.zone, card.sequence)
                           for card in self.field if card.controller != self.viewer
                           and card.position == "facedown"}

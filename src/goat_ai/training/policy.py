@@ -29,7 +29,7 @@ ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
 SORT_ACTION_KINDS = ("sort_cards",)
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
-POLICY_FEATURE_VERSION = 7  # preserve ordered card choices
+POLICY_FEATURE_VERSION = 8  # visible current monster stats and counters
 
 
 @dataclass(frozen=True)
@@ -65,6 +65,7 @@ class CardVocabulary:
 @dataclass(frozen=True)
 class DecisionFeatures:
     state_cards: Tensor  # [N, 4]: card, zone, owner, position
+    state_card_numbers: Tensor  # [N, 5]: ATK, DEF, counters, Spell Counters, visible
     state_numbers: Tensor  # [10] for v1-v3, [42] for v4
     phase: Tensor  # scalar
     action_kinds: Tensor  # [A]
@@ -87,7 +88,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in (1, 2, 3, 4, 5, 6, 7):
+    if feature_version not in (1, 2, 3, 4, 5, 6, 7, 8):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -102,6 +103,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         return known_codes.get((controller, location, sequence))
 
     cards = []
+    card_numbers = []
     for card in (*observation.hand, *observation.field, *observation.graveyards[0],
                  *observation.graveyards[1], *observation.banished[0],
                  *observation.banished[1], *observation.own_extra_deck):
@@ -112,11 +114,20 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         cards.append((vocabulary.index(code), ZONES.index(card.zone) + 1,
                       int(card.controller != observation.viewer) + 1,
                       POSITIONS.index(card.position) + 1))
+        spell_count = sum(count for kind, count in card.counters if kind == 1)
+        card_numbers.append((card.attack / 8000 if card.attack is not None else 0.0,
+                             card.defense / 8000 if card.defense is not None else 0.0,
+                             sum(count for _, count in card.counters) / 10,
+                             spell_count / 10,
+                             float(card.attack is not None))
+                            if feature_version >= 8 else (0.0,) * 5)
     for link in observation.chain:
         cards.append((vocabulary.index(link.card_code), ZONES.index("chain") + 1,
                       int(link.controller != observation.viewer) + 1, 3))
+        card_numbers.append((0.0,) * 5)
     if not cards:
         cards.append((0, 0, 0, 0))
+        card_numbers.append((0.0,) * 5)
 
     own = observation.viewer
     opponent = 1 - own
@@ -196,7 +207,8 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
     target_masks = [[1] * len(row) + [0] * (width - len(row)) for row in targets]
     phase = PHASES.index(observation.phase) + 1 if observation.phase in PHASES else 0
     return DecisionFeatures(
-        torch.tensor(cards, dtype=torch.long), torch.tensor(numbers, dtype=torch.float32),
+        torch.tensor(cards, dtype=torch.long), torch.tensor(card_numbers, dtype=torch.float32),
+        torch.tensor(numbers, dtype=torch.float32),
         torch.tensor(phase, dtype=torch.long), torch.tensor(kind_indices, dtype=torch.long),
         torch.tensor(card_indices, dtype=torch.long),
         torch.tensor(padded_targets, dtype=torch.long),
@@ -215,13 +227,16 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in (1, 2, 3, 4, 5, 6, 7):
+        if feature_version not in (1, 2, 3, 4, 5, 6, 7, 8):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
         self.zone = nn.Embedding(len(ZONES) + 1, width, padding_idx=0)
         self.owner = nn.Embedding(3, width, padding_idx=0)
         self.position = nn.Embedding(len(POSITIONS) + 1, width, padding_idx=0)
+        if feature_version >= 8:
+            self.card_numbers = nn.Sequential(nn.Linear(5, width), nn.ReLU(),
+                                              nn.Linear(width, width))
         self.phase = nn.Embedding(len(PHASES) + 1, width, padding_idx=0)
         kind_count = (len(ACTION_KINDS)
                       + (len(ZONE_ACTION_KINDS) if feature_version >= 4 else 0)
@@ -245,6 +260,8 @@ class LegalActionPolicy(nn.Module):
         cards = features.state_cards
         visible = (self.card(cards[:, 0]) + self.zone(cards[:, 1])
                    + self.owner(cards[:, 2]) + self.position(cards[:, 3]))
+        if self.feature_version >= 8:
+            visible = visible + self.card_numbers(features.state_card_numbers)
         mask = (cards[:, 1] != 0).unsqueeze(1)
         pooled = (visible * mask).sum(0) / mask.sum().clamp(min=1)
         state = pooled + self.phase(features.phase) + self.state_numbers(

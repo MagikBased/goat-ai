@@ -52,6 +52,25 @@ def test_variable_legal_actions_and_permutation_equivariance():
     assert PolicyAgent(policy, vocabulary).select_action(view(), actions()) in actions()
 
 
+def test_feature_version_eight_uses_visible_monster_stats_and_counters():
+    vocabulary = CardVocabulary((10, 20))
+    visible = replace(view(), field=(CardView(
+        0, "monster", "faceup", 20, 0, "attack", 1900, 1000, ((1, 1),)),))
+    spent = replace(visible, field=(replace(visible.field[0], attack=1600, counters=()),))
+    before = encode_decision(visible, actions(), vocabulary, feature_version=8)
+    after = encode_decision(spent, actions(), vocabulary, feature_version=8)
+    assert before.state_card_numbers.shape == (2, 5)
+    assert before.state_card_numbers[1, 0].item() == pytest.approx(1900 / 8000)
+    assert before.state_card_numbers[1, 3].item() == pytest.approx(0.1)
+    assert after.state_card_numbers[1, 0].item() == pytest.approx(1600 / 8000)
+    assert after.state_card_numbers[1, 3].item() == 0
+    assert not torch.equal(before.state_card_numbers, after.state_card_numbers)
+    assert LegalActionPolicy(vocabulary.size, width=16, feature_version=8)(before).shape == (3,)
+    legacy_before = encode_decision(visible, actions(), vocabulary, feature_version=7)
+    legacy_after = encode_decision(spent, actions(), vocabulary, feature_version=7)
+    assert torch.equal(legacy_before.state_card_numbers, legacy_after.state_card_numbers)
+
+
 def test_action_ids_are_not_features_but_public_card_and_controller_are():
     vocabulary = CardVocabulary((10, 20))
     original = encode_decision(view(), actions(), vocabulary)

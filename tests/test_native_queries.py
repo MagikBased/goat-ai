@@ -57,3 +57,6 @@ def test_native_observation_redacts_opponent_facedown_monster():
         assert opponent.field[0].code is None
         assert opponent.field[0].position == "facedown"
         assert opponent.field[0].orientation == "defense"
+        assert opponent.field[0].attack is None
+        assert opponent.field[0].defense is None
+        assert opponent.field[0].counters == ()

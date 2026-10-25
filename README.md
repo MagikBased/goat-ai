@@ -10,14 +10,14 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
 | Complete headless duel | Restricted native adapter reaches terminal through `GoatEnvironment`; general card support unfinished |
 | Environment contract and illegal-action validation | Implemented |
-| Player-visible observation schema | Own hand, initial Main Deck composition, and Extra Deck; public zones, battle position, chain links, bounded public events, known opponent field cards, public Deck-top reveals, recipient-scoped card reveals, disabled zones, and the public Scapegoat summon restriction; broader reveal and restriction coverage pending |
+| Player-visible observation schema | Own hand, initial Main Deck composition, and Extra Deck; public zones, battle position, face-up monster ATK/DEF/counters, chain links, bounded public events, known opponent field cards, public Deck-top reveals, recipient-scoped card reveals, disabled zones, and the public Scapegoat summon restriction; broader reveal and restriction coverage pending |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
-| JSON trajectory round trip | Schema v11 records the player's initial Main Deck as a sorted card multiset alongside recipient-scoped and public reveals; earlier schemas remain readable and replay-verifiable |
+| JSON trajectory round trip | Schema v12 adds visible current monster ATK, DEF, and counters to the prior player-visible fields; earlier schemas remain readable and replay-verifiable |
 | Tournaments | Seeded, seat-swapped sequential and spawned-process runners; paired score intervals and Wilson intervals for supported decks |
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
 | Experimental control probe | One seeded 40-card synthetic control-style deck reaches a native terminal state with full scripts; behavior and visibility unaudited |
-| PyTorch policy | Version-3 visible-state action scorer uses public known-card slots; seat-labeled verified imitation, snapshot-pool self-play experiment, and held-out evaluation exist; heuristic imitation is a measured baseline, not a strength claim |
+| PyTorch policy | Version-8 visible-state action scorer also encodes current face-up monster ATK, DEF, and counters; seat-labeled verified imitation, snapshot-pool self-play experiment, and held-out evaluation exist; heuristic imitation is a measured baseline, not a strength claim |
 
 The selected direction is [Project Ignis/edo9300 ocgcore](https://github.com/edo9300/ygopro-core), configured with its `DUEL_MODE_GOAT` flag, historical card data and scripts, and an audited Python-facing decision adapter. A 2005 banlist alone is insufficient. See [research](docs/research.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md).
 

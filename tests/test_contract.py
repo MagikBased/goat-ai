@@ -83,6 +83,26 @@ def test_visible_schema_excludes_hidden_opponent_cards():
     assert all(card.controller == 0 for card in view().hand)
     with pytest.raises(ValueError, match="viewer"):
         replace(view(), hand=(CardView(1, "hand", "hidden", 999),))
+    with pytest.raises(ValueError, match="face-up monster"):
+        replace(view(), field=(CardView(1, "monster", "facedown", None, 0,
+                                        "defense", 1900, 1000),))
+
+
+def test_schema_twelve_round_trips_visible_stats_and_legacy_reader_strips_them(tmp_path):
+    observation = replace(view(), field=(CardView(
+        0, "monster", "faceup", 71413901, 0, "attack", 1900, 1000, ((1, 1),)),))
+    action = Action("0", "pass", 0)
+    trajectory = Trajectory("goat", ("a", "b"), 7,
+                            (DecisionRecord(observation, (action,), action),), 0)
+    path = tmp_path / "stats.json"
+    write_trajectory(path, trajectory)
+    assert read_trajectory(path) == trajectory
+    raw = json.loads(path.read_text())
+    raw["schema_version"] = 11
+    path.write_text(json.dumps(raw))
+    old = read_trajectory(path)
+    assert old.decisions[0].observation.field[0].attack is None
+    assert old.decisions[0].observation.field[0].counters == ()
     with pytest.raises(ValueError, match="facedown"):
         replace(view(), field=(CardView(1, "monster", "facedown", 999),))
     with pytest.raises(ValueError, match="Extra Deck"):

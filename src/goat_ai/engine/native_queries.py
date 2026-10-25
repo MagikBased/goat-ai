@@ -5,6 +5,9 @@ from dataclasses import dataclass
 
 QUERY_CODE = 0x1
 QUERY_POSITION = 0x2
+QUERY_ATTACK = 0x100
+QUERY_DEFENSE = 0x200
+QUERY_COUNTERS = 0x20000
 QUERY_IS_PUBLIC = 0x100000
 QUERY_END = 0x80000000
 
@@ -14,6 +17,9 @@ class QueriedCard:
     code: int
     position: int
     is_public: bool
+    attack: int | None = None
+    defense: int | None = None
+    counters: tuple[tuple[int, int], ...] = ()
 
 
 def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
@@ -34,6 +40,7 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
             offset += 2
             continue
         values: dict[int, int] = {}
+        counters: tuple[tuple[int, int], ...] = ()
         while True:
             if offset + 2 > len(buffer):
                 raise ValueError("truncated card query record")
@@ -50,10 +57,21 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
                 break
             if flag in values:
                 raise ValueError("duplicate query flag")
-            if flag in (QUERY_CODE, QUERY_POSITION):
+            if flag in (QUERY_CODE, QUERY_POSITION, QUERY_ATTACK, QUERY_DEFENSE):
                 if len(payload) != 4:
                     raise ValueError("invalid query uint32")
-                values[flag] = struct.unpack("<I", payload)[0]
+                values[flag] = struct.unpack("<i" if flag in (QUERY_ATTACK, QUERY_DEFENSE)
+                                             else "<I", payload)[0]
+            elif flag == QUERY_COUNTERS:
+                if len(payload) < 4:
+                    raise ValueError("invalid counter query")
+                count = struct.unpack_from("<I", payload)[0]
+                if len(payload) != 4 + count * 4:
+                    raise ValueError("counter query length mismatch")
+                counters = tuple(sorted((packed & 0xFFFF, packed >> 16)
+                                        for packed in struct.unpack_from(
+                                            f"<{count}I", payload, 4)))
+                values[flag] = count
             elif flag == QUERY_IS_PUBLIC:
                 if len(payload) != 1:
                     raise ValueError("invalid public query flag")
@@ -63,7 +81,9 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
         if QUERY_CODE not in values or QUERY_POSITION not in values:
             raise ValueError("card query omits code or position")
         cards.append(QueriedCard(values[QUERY_CODE], values[QUERY_POSITION],
-                                 bool(values.get(QUERY_IS_PUBLIC, 0))))
+                                 bool(values.get(QUERY_IS_PUBLIC, 0)),
+                                 values.get(QUERY_ATTACK), values.get(QUERY_DEFENSE),
+                                 counters))
     return tuple(cards)
 
 

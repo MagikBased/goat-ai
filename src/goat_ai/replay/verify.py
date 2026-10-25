@@ -41,6 +41,22 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             if env.is_terminal():
                 raise ReplayMismatch(f"decision {index}: engine terminated early")
             compared_observation = observation
+            recorded_observation = record.observation
+            if trajectory.schema_version < 12:
+                def old_cards(cards):
+                    return tuple(replace(card, attack=None, defense=None, counters=())
+                                 for card in cards)
+
+                def old_view(view):
+                    return replace(
+                        view, hand=old_cards(view.hand), field=old_cards(view.field),
+                        graveyards=tuple(old_cards(zone) for zone in view.graveyards),
+                        banished=tuple(old_cards(zone) for zone in view.banished),
+                        own_extra_deck=old_cards(view.own_extra_deck),
+                    )
+
+                compared_observation = old_view(compared_observation)
+                recorded_observation = old_view(recorded_observation)
             if trajectory.schema_version < 11:
                 compared_observation = replace(compared_observation, own_main_deck=())
             if trajectory.schema_version < 10:
@@ -58,7 +74,7 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                 compared_observation = replace(compared_observation, known_opponent_cards=())
             if trajectory.schema_version < 4:
                 compared_observation = replace(compared_observation, public_history=())
-            if compared_observation != record.observation:
+            if compared_observation != recorded_observation:
                 raise ReplayMismatch(f"decision {index}: observation differs")
             current_actions = env.legal_actions()
             compared_actions = (tuple(replace(action, kind="change_position")
