@@ -210,3 +210,57 @@ def test_tsukuyomi_resets_dekoichi_then_returns_for_another_flip(tmp_path):
                     actions[0])
             obs = env.step(action)
     pytest.fail("Tsukuyomi/Dekoichi repeat-Flip line did not finish")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_tsukuyomi_only_faceup_monster_must_set_itself_and_stays(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{TSUKUYOMI}.lua").is_file():
+        pytest.skip("Tsukuyomi script not installed")
+    deck = tmp_path / "tsukuyomi_self.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        *([TSUKUYOMI] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert TSUKUYOMI in {c.code for c in obs.hand}
+        summoned = targeted = set_self = False
+        for _ in range(40):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == TSUKUYOMI), None)
+                summoned |= action is not None
+            if summoned and not targeted and actions[0].kind == "select_card":
+                assert [link.card_code for link in obs.chain] == [TSUKUYOMI]
+                assert len(actions) == 1
+                assert actions[0].parameters["code"] == TSUKUYOMI
+                assert actions[0].parameters["controller"] == 0
+                action = actions[0]
+                targeted = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "select_position", "pass", "end_phase")),
+                    actions[0])
+            obs = env.step(action)
+            own = env.engine.probe.observation(0)
+            facedown = next((c for c in own.field if c.code == TSUKUYOMI
+                             and c.zone == "monster" and c.position == "facedown"), None)
+            if targeted and facedown is not None and not set_self:
+                other = env.engine.probe.observation(1)
+                hidden = next(c for c in other.field if c.controller == 0
+                              and c.zone == "monster" and c.sequence == facedown.sequence)
+                assert hidden.code is None and hidden.position == "facedown"
+                assert (0, "monster", facedown.sequence, TSUKUYOMI) in {
+                    (c.controller, c.zone, c.sequence, c.code)
+                    for c in other.known_opponent_field_cards}
+                set_self = True
+            if obs.turn == 2 and obs.phase == "main1" and set_self:
+                assert facedown is not None
+                assert not any(c.code == TSUKUYOMI and c.position == "faceup"
+                               for c in own.field)
+                assert f"official/c{TSUKUYOMI}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Tsukuyomi self-target did not persist through End Phase")
