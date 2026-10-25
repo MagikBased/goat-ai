@@ -30,6 +30,11 @@ GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
 UPSTREAM_UTILITY_SHA256 = "59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a"
 GOAT_DECK_CONFIRM_OLD = b"Duel.ConfirmCards(tp,dg)"
 GOAT_DECK_CONFIRM_HISTORICAL = b"Duel.ConfirmCards(1-tp,dg)"
+GOAT_FIXED_LP_COST_OLD = b"if chk==0 then return Duel.CheckLPCost(tp,lp_value) end"
+GOAT_FIXED_LP_COST_HISTORICAL = (
+    b"if chk==0 then return Duel.GetLP(tp)>lp_value "
+    b"and Duel.CheckLPCost(tp,lp_value) end"
+)
 UPSTREAM_GOAT_RESTRICT_SHA256 = "579c13c4afff6a581360b221ed79867b7b7d75c57870d9953dc2f21711c0670a"
 GOAT_RESTRICT_EFFECT_MARKER = b"\tc:RegisterEffect(e5)\nend\n"
 GOAT_RESTRICT_EQUIP_MARKER = (
@@ -350,13 +355,18 @@ class OcgcoreProbe:
         contents = path.read_bytes()
         if relative == Path("utility.lua"):
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_UTILITY_SHA256 \
-                    or contents.count(GOAT_DECK_CONFIRM_OLD) != 1:
-                self.errors.append("pinned GOAT utility script changed; deck-confirm patch not applied")
+                    or contents.count(GOAT_DECK_CONFIRM_OLD) != 1 \
+                    or contents.count(GOAT_FIXED_LP_COST_OLD) != 1:
+                self.errors.append("pinned GOAT utility script changed; historical patches not applied")
                 return 0
             # Project Ignis' online variant confirms Deck contents to the
             # searching player. Historical verification addresses the opponent.
             contents = contents.replace(GOAT_DECK_CONFIRM_OLD,
                                         GOAT_DECK_CONFIRM_HISTORICAL)
+            # In GOAT a fixed activation cost cannot consume the player's
+            # remaining LP. The modern core's CheckLPCost permits equality.
+            contents = contents.replace(GOAT_FIXED_LP_COST_OLD,
+                                        GOAT_FIXED_LP_COST_HISTORICAL)
         if path.relative_to(self.scripts) == Path("goat/c504700102.lua"):
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RESTRICT_SHA256 \
                     or contents.count(GOAT_RESTRICT_EFFECT_MARKER) != 1 \
