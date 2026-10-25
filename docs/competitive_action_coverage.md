@@ -217,6 +217,14 @@ demonstrate deterministic reconstruction for this agent, decks, and seed;
 they do not independently validate the historical correctness of every card
 effect or estimate human card usage.
 
+The verified sample selected Raigeki Break in response to another Raigeki
+Break ten times, tied for the most frequent ordered card-response pair. A
+paired native regression now checks a Break that destroys an activated Break
+against passing: the first Break's already activated monster-destruction
+effect still resolves, and both activated cards retain their discard costs.
+Both complete duels replay-verify. See [GOAT rules](goat_rules.md) for the
+source and historical-evidence limit.
+
 ## Same-schedule random and combat-baseline exposure
 
 The probe also accepts `--agent combat_heuristic` (or `heuristic`). This
