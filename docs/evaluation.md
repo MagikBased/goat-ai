@@ -474,3 +474,53 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_native.py --engine experimen
 ```
 
 The generated JSON reports are local benchmark artifacts and are excluded from Git.
+
+## Balanced six-deck heuristic baseline (2026-10-25)
+
+The generic `HeuristicAgent` and `RandomAgent` were evaluated on all 15 unordered pairings of the six sourced Main Deck examples, with **both deck assignments**, **both agent seats**, and seeds 9800–9801: 120 games per report. The exact same schedule and pinned asset/deck hashes were used for a RandomAgent-versus-RandomAgent control. All 240 games reached terminal outcomes below the 3,000-decision cap. The control matters because even with both seats swapped, a fixed candidate deck assignment can dominate a short result; the schedule also reverses which deck candidate A receives.
+
+| Candidate A | Wins | Losses | Draws | Score | Paired score 95% bootstrap interval |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HeuristicAgent vs RandomAgent | 76 | 44 | 0 | 63.3% | 53.3–72.5% |
+| RandomAgent vs RandomAgent control | 58 | 58 | 4 | 50.0% | 40.8–59.2% |
+
+The new `paired_score_difference` helper matches reports by deck assignment, seed, and seat, then resamples each unordered deck pair and seed as a unit, keeping both assignments and seats together. The measured heuristic-minus-control score difference is **+13.3 percentage points**, with a **95% paired bootstrap interval of +3.3 to +23.3 points**. This is evidence of an advantage over RandomAgent on this small native schedule, not a claim about strong human play or historically complete card rules. Only two seeds per deck pairing were tested, and the heuristic's card choices remain very simple.
+
+The heuristic's candidate-deck wins out of 20 were Goat Control 17, Chaos Turbo 11, Warrior 16, Chaos Control 14, Chaos Return 15, and Flip Control 3. The same deck slots in the random control won 15, 12, 11, 10, 9, and 1 games respectively, with two draws each for Chaos Return and Flip Control. This variation is why policy comparisons need deck and seat splits. The four-worker heuristic tournament used 74,391 decisions in 16.95 seconds; the random control used 104,646 decisions in 27.31 seconds. Throughput differs because the agents produced different game lengths, so these times should not be read as an engine speed comparison.
+
+Reproduce with the pinned native setup and project environment:
+
+```bash
+decks=(examples/decks/goat_control_lolmarcus_2020.ydk examples/decks/chaos_turbo_riclar_2020.ydk examples/decks/warrior_montague_clash.ydk examples/decks/chaos_control_insids_worlds_2022.ydk examples/decks/chaos_return_dingosig_worlds_2022.ydk examples/decks/flip_control_goatformat_guide.ydk)
+args=()
+for ((i=0; i<${#decks[@]}; i++)); do
+  for ((j=i+1; j<${#decks[@]}; j++)); do
+    args+=(--matchup "${decks[i]}" "${decks[j]}" --matchup "${decks[j]}" "${decks[i]}")
+  done
+done
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_native.py --engine experimental "${args[@]}" --agent-a heuristic --agent-b random --seed 9800 --seeds 2 --max-decisions 3000 --workers 4 --output artifacts/sourced_balanced_heuristic_random_9800_9801.json > /dev/null
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_native.py --engine experimental "${args[@]}" --agent-a random --agent-b random --seed 9800 --seeds 2 --max-decisions 3000 --workers 4 --output artifacts/sourced_balanced_random_random_9800_9801.json > /dev/null
+```
+
+The reports are ignored local artifacts. Reproduce the paired interval after both reports exist:
+
+```bash
+.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+from goat_ai.evaluation import GameResult, paired_score_difference
+
+def load(name):
+    report = json.loads(Path('artifacts', name).read_text())
+    fields = ('deck_a', 'deck_b', 'seed', 'a_seat', 'winner', 'decisions')
+    games = [GameResult(**{key: row[key] for key in fields})
+             for row in report['games']]
+    return report, games
+
+candidate, candidate_games = load('sourced_balanced_heuristic_random_9800_9801.json')
+control, control_games = load('sourced_balanced_random_random_9800_9801.json')
+assert candidate['asset_sha256'] == control['asset_sha256']
+assert candidate['deck_sha256'] == control['deck_sha256']
+print(paired_score_difference(candidate_games, control_games))
+PY
+```
