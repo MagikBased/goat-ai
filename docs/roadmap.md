@@ -61,6 +61,19 @@ A [sixth sourced tournament Main Deck](../examples/decks/bazoo_return_weirdchamp
 
 A previous six-deck pairwise random-agent sweep covered all 15 distinct pairings among the then-current deck corpus, both seats, and seeds 9500–9501. All 60 games reached native terminal outcomes below 3,000 decisions; the ordered game results and decision counts reproduced exactly. The later Bazoo Return list was not part of that sweep. A seeded Ring/BLS mutual-lethal draw exposed a stale terminal `step()` observation, which now refreshes the native public state and shows 0/0 LP. The draw trajectory replay-verifies. This is protocol coverage, not a full-deck historical-ruling audit; see [the evaluation log](evaluation.md).
 
+A tournament-pool random-deck mode now mixes only Main Deck cards from the
+six sourced tournament lists within pinned copy limits, with a sourced Extra
+Deck. Seeds 18600–18649 produced 50 distinct legal decks and 50 terminal
+duels; all 46,875 decisions replay-verified against fresh pinned engines.
+The report fingerprints source decks and 103 loaded native assets. This
+expands common-card protocol coverage while leaving broader whitelist and
+individual historical-ruling coverage open; see
+[competitive action coverage](competitive_action_coverage.md).
+The older full-whitelist seeds-0–9 report cited above no longer reproduces its
+12,382-decision count in this worktree: both the pre-change and current probe
+scripts now record 12,006 decisions. The difference remains unexplained and
+the [README](../README.md) records the current report hash.
+
 An expanded 300-duel, four-worker sweep on seeds 9600–9609 also reached native terminal outcomes in every game. A 60-duel subset reproduced exact ordered outcomes and decision counts in a separate one-worker run. Measured rates, hardware, pins, and reproduction commands are in [the evaluation log](evaluation.md). This broadens M1 protocol evidence while M1 and the M2 card audit remain open.
 
 The current six-tournament-deck corpus, now including Bazoo Return in place of the earlier guide-list slot, has its own complete pairwise protocol sweep: all 15 matchups, both seats, and seeds 9750–9751 reached terminal in **60/60 games** below 3,000 decisions. Ordered results and counts matched between one and four native workers; source-code and Lua-script-tree fingerprints now accompany the report. See [the evaluation log](evaluation.md). This tests the published deck corpus used to prioritize card rulings, not competitive agent strength.

@@ -124,9 +124,16 @@ The Flip Control Main Deck follows the [GoatFormat guide list](https://www.goatf
 The random-deck probe deterministically generates whitelist-legal 40-card
 decks and writes its deck files and JSON report under ignored `.cache/goat-ai/random-probe/`.
 It is a native protocol coverage check, not a historical correctness or playing-strength test.
-On the pinned assets, seeds 0–9 completed 10/10 duels in 12,382 decisions;
-repeating the command produced the same report SHA-256
-`8709934ca9d23d88cc0fb8b73fcfccb387d2eaa9097374660bcf6c9a68c730f9`.
+On the currently pinned local assets, seeds 0–9 completed 10/10 duels in
+12,006 decisions; the report SHA-256 is
+`de9e1d0aa4695fe223d6a1b7fa4690958374ba632f58431dde706ec5e6149d01`.
+The previously reported 12,382-decision result was an earlier recorded run;
+the cause of the difference has not been isolated. The unchanged pre-change
+probe script produces the current 12,006-decision result, so the older hash
+is retained only as historical data.
+For generated decks made entirely from sourced tournament cards, use
+`--card-pool tournament --verify-replays`; see
+[competitive action coverage](docs/competitive_action_coverage.md).
 
 The sample is a synthetic control-style protocol probe, not a sourced
 tournament decklist. On pinned assets, seeds 0–49 all reached terminal states

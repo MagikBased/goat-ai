@@ -260,6 +260,37 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
   --output .cache/goat-ai/tournament_random_verified_18500.json
 ```
 
+## Randomized decks from the tournament card pool
+
+The random-deck probe also accepts `--card-pool tournament`. It shuffles the
+Main Deck card copies from the six sourced tournament lists, takes 40 cards
+without exceeding the pinned GOAT copy limits, and uses one sourced Extra Deck
+chosen by seed. Every generated list passes the normal deck validator. These
+are synthetic mixtures of frequently represented cards, not submitted
+tournament lists or realistic strategy models. The original full-whitelist
+generator remains the default. `--verify-replays` checks each terminal duel
+against a fresh engine and fails the command if any game hits the decision cap
+or encounters an adapter or replay error.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/probe_random_decks.py --native-root .cache/goat-ai \
+  --card-pool tournament --seed 18600 --seeds 50 \
+  --max-decisions 3000 --verify-replays \
+  --output .cache/goat-ai/tournament-mix-18600-18649
+```
+
+On the pinned local assets, **50/50 distinct generated decks** reached a
+terminal native result and **46,875/46,875 decisions** replay-verified, with
+no cap or recorded adapter error. The longest duel had **1,310 decisions**.
+The decks used **59 distinct Main Deck card identities** from the six-list
+corpus; the report records **27 legal action kinds**, six source-deck hashes,
+six pinned asset hashes, and **103 loaded asset hashes**. Its SHA-256 is
+`e79bbd9951dc7fa6a9f91822ea09b58210665c877d2e0080bbe408e742674cd5`.
+The generated YDK files and report stay under ignored `.cache/goat-ai/`.
+This checks deterministic execution of these newly combined cards, not
+historical legality of every interaction or playing strength.
+
 ## Same-schedule random and combat-baseline exposure
 
 The probe also accepts `--agent combat_heuristic` (or `heuristic`). This

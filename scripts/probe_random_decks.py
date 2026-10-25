@@ -8,12 +8,17 @@ import argparse
 import json
 import random
 import sqlite3
+from collections import Counter
 from pathlib import Path
 
 from goat_ai.agents import RandomAgent
-from goat_ai.engine.decks import Decklist, read_goat_whitelist, validate_goat_deck
+from goat_ai.engine.decks import (
+    Decklist, read_goat_whitelist, read_ydk, validate_goat_deck,
+)
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
+from goat_ai.replay import verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 
 
@@ -56,14 +61,48 @@ def generate_deck(root: Path, seed: int) -> Decklist:
     return deck
 
 
+def generate_tournament_mix(root: Path, seed: int) -> Decklist:
+    """Sample legal 40-card lists from copies in six sourced tournament decks."""
+    limits = read_goat_whitelist(root / "banlist/GOAT.lflist.conf")
+    fixtures = Path(__file__).resolve().parents[1] / "examples/decks"
+    sources = tuple(read_ydk(fixtures / name) for name in TOURNAMENT_MAIN_DECKS)
+    candidates = [code for deck in sources for code in deck.main]
+    random.Random(seed).shuffle(candidates)
+    chosen = []
+    counts: Counter[int] = Counter()
+    for code in candidates:
+        if counts[code] >= limits.get(code, 0):
+            continue
+        chosen.append(code)
+        counts[code] += 1
+        if len(chosen) == 40:
+            break
+    if len(chosen) != 40:
+        raise ValueError("tournament corpus cannot supply a legal 40-card Main Deck")
+    deck = Decklist(tuple(chosen), sources[seed % len(sources)].extra)
+    validate_goat_deck(deck, limits, root / "database/cards.cdb",
+                       root / "database/goat-entries.cdb",
+                       root / "database/cards-unofficial.cdb")
+    return deck
+
+
 def probe(root: Path, output: Path, first_seed: int, seeds: int,
-          max_decisions: int) -> dict:
+          max_decisions: int, card_pool: str = "whitelist",
+          verify_replays: bool = False) -> dict:
+    if card_pool not in ("whitelist", "tournament"):
+        raise ValueError("unknown card pool")
     output.mkdir(parents=True, exist_ok=True)
     games = []
+    loaded_assets: dict[str, str] = {}
+    rules_profile = None
     for seed in range(first_seed, first_seed + seeds):
-        deck = generate_deck(root, seed)
+        deck = (generate_deck(root, seed) if card_pool == "whitelist"
+                else generate_tournament_mix(root, seed))
         path = output / f"seed_{seed}.ydk"
-        path.write_text("#main\n" + "\n".join(map(str, deck.main)) + "\n#extra\n!side\n")
+        path.write_text("#main\n" + "\n".join(map(str, deck.main))
+                        + "\n#extra\n"
+                        + "".join(f"{code}\n" for code in deck.extra)
+                        + "!side\n")
         decisions = 0
         kinds = set()
         try:
@@ -78,14 +117,61 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
                     decisions += 1
                 terminal = env.is_terminal()
                 winner = env.result() if terminal else None
+                trajectory = env.trajectory() if terminal else None
+                verified = (verify_trajectory(trajectory,
+                                              ExperimentalOcgcoreEngine(root))
+                            if trajectory is not None and verify_replays else None)
+                if verified is not None and verified != decisions:
+                    raise RuntimeError("replay verifier returned a partial decision count")
+                if trajectory is not None and (card_pool == "tournament"
+                                               or verify_replays):
+                    if rules_profile is None:
+                        rules_profile = trajectory.rules_profile
+                    elif rules_profile != trajectory.rules_profile:
+                        raise RuntimeError("rules profile changed within probe")
+                    for asset, digest in (trajectory.asset_sha256 or {}).items():
+                        if asset in loaded_assets and loaded_assets[asset] != digest:
+                            raise RuntimeError(f"native asset changed within probe: {asset}")
+                        loaded_assets[asset] = digest
             error = None
         except (OSError, RuntimeError, ValueError) as exc:
             terminal, winner = False, None
             error = f"{type(exc).__name__}: {exc}"
-        games.append({"seed": seed, "deck": str(path), "deck_sha256": sha256_file(path),
-                      "decisions": decisions, "terminal": terminal, "winner": winner,
-                      "action_kinds": sorted(kinds), "error": error})
+        game = {"seed": seed, "deck": str(path), "deck_sha256": sha256_file(path),
+                "decisions": decisions, "terminal": terminal, "winner": winner,
+                "action_kinds": sorted(kinds), "error": error}
+        if verify_replays:
+            game["replay_verified_decisions"] = verified if error is None else None
+        games.append(game)
     report = {"max_decisions": max_decisions, "games": games}
+    if card_pool != "whitelist":
+        report["card_pool"] = card_pool
+    if card_pool == "tournament" or verify_replays:
+        report["rules_profile"] = rules_profile
+        report["loaded_asset_sha256"] = dict(sorted(loaded_assets.items()))
+        report["asset_sha256"] = {
+            name: sha256_file(root / relative)
+            for name, relative in {
+                "core_library": "build/libocgcore.so",
+                "cards_database": "database/cards.cdb",
+                "goat_database": "database/goat-entries.cdb",
+                "goat_whitelist": "banlist/GOAT.lflist.conf",
+                "global_constants": "scripts/constant.lua",
+                "global_utility": "scripts/utility.lua",
+            }.items()
+        }
+    if card_pool == "tournament":
+        source_root = Path(__file__).resolve().parents[1] / "examples/decks"
+        report["source_deck_sha256"] = {
+            name: sha256_file(source_root / name) for name in TOURNAMENT_MAIN_DECKS
+        }
+    if verify_replays:
+        report["replay_verification"] = {
+            "verified_games": sum(game["replay_verified_decisions"] is not None
+                                  for game in games),
+            "verified_decisions": sum(game["replay_verified_decisions"] or 0
+                                      for game in games),
+        }
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     return report
 
@@ -97,17 +183,21 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--seeds", type=int, default=10)
     parser.add_argument("--max-decisions", type=int, default=500)
+    parser.add_argument("--card-pool", choices=("whitelist", "tournament"),
+                        default="whitelist")
+    parser.add_argument("--verify-replays", action="store_true")
     args = parser.parse_args()
     if args.seeds < 1 or args.max_decisions < 1:
         parser.error("--seeds and --max-decisions must be positive")
     report = probe(args.native_root, args.output, args.seed, args.seeds,
-                   args.max_decisions)
+                   args.max_decisions, args.card_pool, args.verify_replays)
     for game in report["games"]:
         status = "error" if game["error"] else "terminal" if game["terminal"] else "limit"
         suffix = f" error={game['error']}" if game["error"] else ""
         print(f"seed={game['seed']} decisions={game['decisions']} status={status}{suffix}")
     print(f"report={args.output / 'report.json'}")
-    if any(game["error"] for game in report["games"]):
+    if any(game["error"] or (args.verify_replays and not game["terminal"])
+           for game in report["games"]):
         raise SystemExit(1)
 
 
