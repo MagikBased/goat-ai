@@ -116,6 +116,36 @@ def test_scapegoat_and_ring_chained_to_heavy_storm(tmp_path):
         trajectory = env.trajectory()
         assert trajectory.winner in (0, 1, None)
         assert len(trajectory.decisions) > 50
+        storm_record = next(record for record in trajectory.decisions
+                            if record.selected_action.kind == "activate"
+                            and record.selected_action.parameters.get("code")
+                            == HEAVY_STORM)
+        assert storm_record.observation.viewer == 0
+        assert len([c for c in storm_record.observation.field
+                    if c.controller == 1 and c.zone == "spell_trap"
+                    and c.position == "facedown" and c.code is None]) == 2
+        assert not ({SCAPEGOAT, RING_OF_DESTRUCTION}
+                    & set(storm_record.observation.known_opponent_cards))
+        assert not storm_record.observation.known_opponent_field_cards
+        assert not any(a.parameters.get("code") in (SCAPEGOAT, RING_OF_DESTRUCTION)
+                       for a in storm_record.legal_actions)
+        goat_index = next(index for index, record in enumerate(trajectory.decisions)
+                          if record.selected_action.kind == "chain"
+                          and record.selected_action.parameters.get("code") == SCAPEGOAT)
+        ring_index = next(index for index, record in enumerate(trajectory.decisions)
+                          if record.selected_action.kind == "chain"
+                          and record.selected_action.parameters.get("code")
+                          == RING_OF_DESTRUCTION)
+        assert goat_index < ring_index
+        intervening = [record for record in trajectory.decisions[
+            goat_index + 1:ring_index] if record.observation.viewer == 0]
+        assert intervening
+        assert all(RING_OF_DESTRUCTION not in
+                   [link.card_code for link in record.observation.chain]
+                   and any(c.controller == 1 and c.zone == "spell_trap"
+                           and c.position == "facedown" and c.code is None
+                           for c in record.observation.field)
+                   for record in intervening)
     path = tmp_path / "pro_heavy.json"
     write_trajectory(path, trajectory)
     loaded = read_trajectory(path)
