@@ -19,7 +19,7 @@ BOOK_OF_MOON = 14087893
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("choice", [
     "double_attack", "banish", "banish_book", "attack_then_main2", "attack_book",
-    "self_banish"])
+    "self_banish", "banish_set"])
 def test_bls_historical_turn_choices(tmp_path, choice):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for script in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua"):
@@ -94,7 +94,8 @@ def test_bls_historical_turn_choices(tmp_path, choice):
             if choice != "attack_book" and observation.turn == 2 \
                     and observation.acting_player == 1 \
                     and not opponent_summoned:
-                option = next((a for a in actions if a.kind == "normal_summon"), None)
+                summon_kind = "set_monster" if choice == "banish_set" else "normal_summon"
+                option = next((a for a in actions if a.kind == summon_kind), None)
                 if option is not None:
                     action = option
                     opponent_summoned = True
@@ -107,17 +108,25 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                                and a.parameters.get("code") == BOOK_OF_MOON), None)
                 book_set |= action is not None
             if observation.turn == 3 and observation.acting_player == 0:
-                if choice in ("banish", "banish_book") and not effect_used:
+                if choice in ("banish", "banish_book", "banish_set") and not effect_used:
                     option = next((a for a in actions if a.kind == "activate"
                                    and a.parameters.get("code") == BLS), None)
                     if option is not None:
                         action = option
                         effect_used = True
-                if (choice in ("banish", "banish_book") and effect_used
+                if (choice in ("banish", "banish_book", "banish_set") and effect_used
                         and not effect_targeted and actions[0].kind == "select_card"):
-                    action = next((a for a in actions if a.parameters.get("controller") == 1
-                                   and a.parameters.get("code") == opponent_code
-                                   and a.parameters.get("location") == 4), action)
+                    if choice == "banish_set":
+                        assert any(c.controller == 1 and c.zone == "monster"
+                                   and c.position == "facedown" and c.code is None
+                                   for c in observation.field)
+                        action = next((a for a in actions if a.parameters.get("controller")
+                                       == 1 and a.parameters.get("location") == 4
+                                       and "code" not in a.parameters), action)
+                    else:
+                        action = next((a for a in actions if a.parameters.get("controller")
+                                       == 1 and a.parameters.get("code") == opponent_code
+                                       and a.parameters.get("location") == 4), action)
                     effect_targeted |= action is not None and action.kind == "select_card"
                 if observation.phase == "main1" and (
                         choice in ("double_attack", "attack_then_main2", "attack_book") or (
@@ -231,9 +240,11 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                 assert observation.life_points == (8000, 8000)
                 assert f"goat/c{BLS}.lua" in env.engine.probe.loaded_script_sha256
                 return
-            if (choice == "banish" and effect_used and observation.turn == 3
+            if (choice in ("banish", "banish_set") and effect_used and observation.turn == 3
                     and observation.phase == "battle_start"
                     and any(c.code == opponent_code for c in observation.banished[1])):
+                assert any(c.code == opponent_code and c.position == "faceup"
+                           for c in observation.banished[1])
                 assert not any(a.kind == "attack" and a.parameters.get("code") == BLS
                                for a in actions)
                 assert not any(a.kind == "activate" and a.parameters.get("code") == BLS
