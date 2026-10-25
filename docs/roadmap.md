@@ -69,6 +69,8 @@ A pre-errata Sinister Serpent fixture now checks two returns within one Standby 
 
 A Morphing Jar / pre-errata Night Assailant fixture now checks two discard triggers after both players draw their replacement hands, including the opponent-only reveals of the two recovered cards. Its complete duel replay-verifies; see [GOAT rules](goat_rules.md).
 
+Paired Morphing Jar / Solemn Judgment fixtures verify that Solemn can negate Jar's Flip Summon before either hand is reset, while passing allows Jar's discard and five-card draws. Both full duels replay-verify; see [GOAT rules](goat_rules.md).
+
 Four Morphing Jar deck-out fixtures now verify the historical five-card draw boundary for either player: with four Deck cards the effect ends the duel, while with five it resolves and the next required draw ends the duel. Two additional native fixtures check equal Deck counts: four each gives a draw, while five each resolves and the next required draw determines the loser. All six terminal trajectories replay-verify. A contemporaneous 2005 TCG source for the simultaneous failed-draw outcome remains to be located, so that historical interpretation is provisional. See [GOAT rules](goat_rules.md).
 
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
