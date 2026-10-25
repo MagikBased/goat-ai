@@ -2,6 +2,7 @@
 
 import os
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -125,3 +126,69 @@ def test_dustshoot_response_to_mst_targeting_it_resolves_before_destruction(
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
                 checked = True
     pytest.fail("Dustshoot / Typhoon response duel did not finish")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_dustshoot_response_options_ignore_unrevealed_opponent_hand_card(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    dust_deck = tmp_path / "dustshoot.ydk"
+    dust_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([DUSTSHOOT] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    def run(hidden_code):
+        opponent_cards = [MST, *VANILLA_DECK[1:]]
+        opponent_cards[6] = hidden_code
+        opponent_deck = tmp_path / f"mst_hidden_{hidden_code}.ydk"
+        opponent_deck.write_text("#main\n" + "\n".join(map(str, opponent_cards))
+                                 + "\n#extra\n!side\n")
+        with GoatEnvironment(str(dust_deck), str(opponent_deck), seed=52,
+                             engine=ExperimentalOcgcoreEngine(root)) as env:
+            obs = env.reset()
+            assert hidden_code in {c.code for c in env.engine.probe.observation(1).hand}
+            trap_set = mst_used = target_chosen = False
+            before = after = None
+            for _ in range(35):
+                actions = env.legal_actions()
+                action = None
+                if obs.turn == 1 and obs.acting_player == 0 and not trap_set:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == DUSTSHOOT), None)
+                    trap_set |= action is not None
+                if obs.turn == 2 and obs.acting_player == 1 and trap_set and not mst_used:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == MST), None)
+                    mst_used |= action is not None
+                if mst_used and not target_chosen and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("controller") == 0
+                                   and a.parameters.get("location") == 8
+                                   and "code" not in a.parameters), None)
+                    target_chosen |= action is not None
+                if target_chosen and obs.acting_player == 0 and before is None:
+                    assert obs.known_opponent_hand_cards == ()
+                    assert not obs.private_reveals
+                    assert any(a.kind == "chain" and a.parameters.get("code") == DUSTSHOOT
+                               for a in actions)
+                    before = (obs, actions)
+                    action = next(a for a in actions if a.kind == "chain"
+                                  and a.parameters.get("code") == DUSTSHOOT)
+                if action is None:
+                    action = next((a for a in actions if a.kind in (
+                        "place", "pass", "end_phase")), actions[0])
+                obs = env.step(action)
+                if before is not None and obs.private_reveals:
+                    after = obs
+                    assert [link.card_code for link in obs.chain] == [MST, DUSTSHOOT]
+                    assert not env.engine.probe.observation(1).private_reveals
+                    break
+            assert trap_set and mst_used and target_chosen
+            assert before is not None and after is not None
+            return before, after
+
+    (before_a, after_a) = run(VANILLA_DECK[6])
+    (before_b, after_b) = run(VANILLA_DECK[0])
+    assert before_a == before_b
+    assert after_a != after_b
+    assert replace(after_a, private_reveals=(), known_opponent_hand_cards=()) == replace(
+        after_b, private_reveals=(), known_opponent_hand_cards=())
+    assert VANILLA_DECK[6] in after_a.known_opponent_hand_cards
+    assert VANILLA_DECK[0] in after_b.known_opponent_hand_cards

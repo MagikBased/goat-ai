@@ -25,6 +25,12 @@ The repository has a Python environment contract, observation and action types, 
 
 A Book of Moon / Compulsory native fixture found and fixed lost opponent-hand knowledge when a previously public, now face-down monster returns to hand. A never-revealed Set monster remains unknown in the paired control fixture; the known-card duel serializes and replay-verifies. See [GOAT rules](goat_rules.md).
 
+A paired Trap Dustshoot/Mystical Space Typhoon fixture now changes one
+unrevealed opposing hand card and confirms that the Trap controller's
+observation and legal responses are identical before Dustshoot activates.
+Only its addressed reveal and known-hand memory differ afterward. Both
+respond/pass full duels replay-verify; see [GOAT rules](goat_rules.md).
+
 A documented [2020 championship Chaos Turbo Main Deck](../examples/decks/chaos_turbo_riclar_2020.ydk) now exercises a real archetype rather than only synthetic probes. With the experimental adapter and random agents, seeds 1–20 all reached terminal against `control_probe.ydk` within 3,000 decisions. Two seat-swapped, full-deck fixtures also serialize and replay-verify complete trajectories. These are protocol-coverage results; the random plays and current scripts do not establish historical correctness or playing strength.
 
 A [2020 championship Goat Control Main Deck](../examples/decks/goat_control_lolmarcus_2020.ydk), paired with three test-copy Thousand-Eyes Restricts, also completed seeds 1–20 against that Chaos Turbo list within 3,000 decisions. Two seat-swapped matchup fixtures serialize and replay-verify full trajectories. The source omits the Extra Deck, so its contents are a disclosed test choice.
