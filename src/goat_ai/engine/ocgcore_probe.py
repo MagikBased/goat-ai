@@ -447,13 +447,21 @@ class OcgcoreProbe:
                 if len(message) != 6 + count * 10:
                     raise ValueError("invalid MSG_CONFIRM_CARDS card count")
                 if count:
+                    recipient = message[1]
                     cards = tuple(sorted((RevealedCardView(
                         struct.unpack_from("<I", message, 6 + index * 10)[0],
                         message[10 + index * 10], message[11 + index * 10])
                         for index in range(count)),
                         key=lambda card: (card.controller, card.location, card.code)))
                     self._private_reveals.append(PrivateRevealView(
-                        self._turn, message[1], cards))
+                        self._turn, recipient, cards))
+                    for index in range(count):
+                        controller = message[10 + index * 10]
+                        location = message[11 + index * 10]
+                        if controller != recipient and location in (LOCATION_MZONE, LOCATION_SZONE):
+                            sequence = struct.unpack_from("<I", message, 12 + index * 10)[0]
+                            code = struct.unpack_from("<I", message, 6 + index * 10)[0]
+                            self._known_facedown[(controller, location, sequence)] = code
             elif message[0] == MSG_FIELD_DISABLED:
                 if len(message) != 5:
                     raise ValueError("invalid MSG_FIELD_DISABLED length")
