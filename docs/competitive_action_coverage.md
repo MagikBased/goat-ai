@@ -436,3 +436,6 @@ evidence that untested card interactions are correct.
 Solemn Judgment responded to GOAT Scapegoat three times. Its existing
 activation-negation fixture now has a pass control and replay-verifies both
 complete duels, including the opposite same-turn Summon permissions.
+Torrential Tribute responded to Book of Moon once. A paired native fixture now
+checks that order in the immediate Summon response window, complementing the
+earlier fixture where Book responds to Torrential.
