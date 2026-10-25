@@ -104,6 +104,28 @@ def test_audit_checks_single_and_multi_tribute_choices():
         "opponent_field_choices": 1, "hidden_field_choices": 1}
 
 
+def test_audit_limits_duplicate_opponent_hand_choices_per_action():
+    observation = _observation()
+    duplicate = {"cards": [
+        {"controller": 1, "location": 2, "code": 321},
+        {"controller": 1, "location": 2, "code": 321},
+    ]}
+    with pytest.raises(VisibilityViolation, match="exceeds known copies"):
+        audit_decision_visibility(_record(observation, duplicate, "select_cards"))
+    staged = {"controller": 1, "location": 2, "code": 321,
+              "cards": [{"controller": 1, "location": 2, "code": 321}]}
+    with pytest.raises(VisibilityViolation, match="exceeds known copies"):
+        audit_decision_visibility(_record(observation, staged))
+    # Separate alternatives may each offer the same known card.
+    first = Action("0", "select_card", 0, {"controller": 1, "location": 2,
+                                            "code": 321})
+    second = Action("1", "select_card", 0, {"controller": 1, "location": 2,
+                                             "code": 321})
+    assert audit_decision_visibility(DecisionRecord(observation,
+                                                     (first, second), first)) == {
+        "opponent_hand_choices": 2}
+
+
 def test_legacy_trajectory_cannot_claim_complete_hand_audit():
     observation = _observation()
     record = _record(observation, {"controller": 1, "location": 2, "code": 321})

@@ -1579,7 +1579,9 @@ decision records against each acting player's visible field and known opponent
 hand. A choice targeting an opposing face-down field slot must omit card ID and
 dynamic stats; a face-up field choice's ID must match the visible card; a
 choice naming an opponent hand card must name an already known card and omit
-the native hand slot. The audit also checks actor and viewer agreement.
+the native hand slot. Within one grouped or staged action, the number of named
+copies cannot exceed the known hand multiset; separate legal alternatives are
+checked independently. The audit also checks actor and viewer agreement.
 
 ```bash
 PYTHONPATH=src:. .venv/bin/python scripts/audit_trajectory_visibility.py \
@@ -1871,6 +1873,14 @@ opposing hand choices. The auditor now also checks single and grouped Tribute
 choices; a focused regression verifies that a grouped Tribute payload cannot
 name a hidden opposing monster. This sample contained no opposing Tribute
 choice, so the aggregate counts did not change when that check was added.
+The hand-choice audit also now checks multiplicity within each legal action:
+one known copy cannot justify a two-copy grouped selection or a staged prefix
+plus candidate. Reauditing these 30 trajectories gave the same counts above;
+the duplicate-copy case has a focused regression. The wider saved schema-v21
+set also passed this stricter audit: 128 trajectories, 92,478 decisions,
+3,016 opposing field choices, 569 face-down opposing field choices, and 234
+opposing hand choices. This is the same set and count reported in the earlier
+visibility-audit section.
 Replay equivalence establishes reproducibility for these pinned assets and
 seeds; the action audit enforces its listed selection invariants. Neither
 establishes historical correctness or general hidden-state noninterference.

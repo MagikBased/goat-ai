@@ -3,6 +3,7 @@
 from collections import Counter
 from collections.abc import Iterable
 
+from goat_ai.actions import Action
 from goat_ai.replay import DecisionRecord, Trajectory
 
 
@@ -10,16 +11,12 @@ class VisibilityViolation(ValueError):
     """A recorded legal choice discloses information absent from its observation."""
 
 
-def _choice_cards(record: DecisionRecord) -> Iterable[dict]:
-    for action in record.legal_actions:
-        if action.actor != record.observation.acting_player:
-            raise VisibilityViolation("legal action actor differs from acting player")
-        if action.kind in ("select_card", "tribute"):
-            yield action.parameters
-        if action.kind in ("select_card", "select_cards", "finish_selection",
-                           "tribute_cards"):
-            for card in action.parameters.get("cards", ()):
-                yield card
+def _choice_cards(action: Action) -> Iterable[dict]:
+    if action.kind in ("select_card", "tribute"):
+        yield action.parameters
+    if action.kind in ("select_card", "select_cards", "finish_selection",
+                       "tribute_cards"):
+        yield from action.parameters.get("cards", ())
 
 
 def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
@@ -31,31 +28,41 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
              for card in observation.field}
     known_hand = Counter(observation.known_opponent_hand_cards)
     counts: Counter[str] = Counter()
-    for choice in _choice_cards(record):
-        controller = choice.get("controller")
-        location = choice.get("location")
-        if controller == observation.viewer:
-            continue
-        if location in (4, 8):
-            zone = "monster" if location == 4 else "spell_trap"
-            card = field.get((controller, zone, choice.get("sequence")))
-            if card is None:
-                raise VisibilityViolation("opponent field choice has no visible slot")
-            counts["opponent_field_choices"] += 1
-            if card.position == "facedown":
-                counts["hidden_field_choices"] += 1
-                if "code" in choice or any(
-                        key in choice for key in ("attack", "defense", "counters")):
-                    raise VisibilityViolation("face-down opponent choice reveals card data")
-            elif choice.get("code") != card.code:
-                raise VisibilityViolation("face-up opponent choice disagrees with observation")
-        elif location == 2:
-            counts["opponent_hand_choices"] += 1
-            if "sequence" in choice:
-                raise VisibilityViolation("opponent hand choice exposes native slot")
-            code = choice.get("code")
-            if code is not None and not known_hand[code]:
-                raise VisibilityViolation("opponent hand choice reveals unknown identity")
+    for action in record.legal_actions:
+        if action.actor != observation.acting_player:
+            raise VisibilityViolation("legal action actor differs from acting player")
+        hand_choices: Counter[int] = Counter()
+        for choice in _choice_cards(action):
+            controller = choice.get("controller")
+            location = choice.get("location")
+            if controller == observation.viewer:
+                continue
+            if location in (4, 8):
+                zone = "monster" if location == 4 else "spell_trap"
+                card = field.get((controller, zone, choice.get("sequence")))
+                if card is None:
+                    raise VisibilityViolation("opponent field choice has no visible slot")
+                counts["opponent_field_choices"] += 1
+                if card.position == "facedown":
+                    counts["hidden_field_choices"] += 1
+                    if "code" in choice or any(
+                            key in choice for key in ("attack", "defense", "counters")):
+                        raise VisibilityViolation("face-down opponent choice reveals card data")
+                elif choice.get("code") != card.code:
+                    raise VisibilityViolation("face-up opponent choice disagrees with observation")
+            elif location == 2:
+                counts["opponent_hand_choices"] += 1
+                if "sequence" in choice:
+                    raise VisibilityViolation("opponent hand choice exposes native slot")
+                code = choice.get("code")
+                if code is not None:
+                    if not known_hand[code]:
+                        raise VisibilityViolation(
+                            "opponent hand choice reveals unknown identity")
+                    hand_choices[code] += 1
+                    if hand_choices[code] > known_hand[code]:
+                        raise VisibilityViolation(
+                            "opponent hand choice exceeds known copies")
     return counts
 
 
