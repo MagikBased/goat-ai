@@ -14,6 +14,7 @@ CALL_OF_THE_HAUNTED = 97077563
 HEAVY_STORM = 19613556
 JINZO = 77585513
 MAD_DOG_OF_DARKNESS = 79182538
+BOOK_OF_MOON = 14087893
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -21,7 +22,8 @@ MAD_DOG_OF_DARKNESS = 79182538
 def test_call_chained_to_heavy_keeps_jinzo_but_loses_normal_monster(
         tmp_path, revived_code):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    for code in (GRACEFUL_CHARITY, CALL_OF_THE_HAUNTED, HEAVY_STORM, JINZO):
+    for code in (GRACEFUL_CHARITY, CALL_OF_THE_HAUNTED,
+                 HEAVY_STORM, JINZO, BOOK_OF_MOON):
         if not (root / f"scripts/official/c{code}.lua").is_file():
             pytest.skip(f"script for {code} not installed")
     caller = tmp_path / "caller.ydk"
@@ -29,17 +31,21 @@ def test_call_chained_to_heavy_keeps_jinzo_but_loses_normal_monster(
         GRACEFUL_CHARITY, CALL_OF_THE_HAUNTED, JINZO,
         *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
     storm = tmp_path / "storm.ydk"
-    storm.write_text("#main\n" + "\n".join(map(str, (
-        HEAVY_STORM, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    storm_cards = [HEAVY_STORM, *(BOOK_OF_MOON if code == 51934376 else code
+                                   for code in VANILLA_DECK[1:])]
+    storm.write_text("#main\n" + "\n".join(map(str, storm_cards))
+                     + "\n#extra\n!side\n")
 
     with GoatEnvironment(str(caller), str(storm), seed=100,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
         assert {GRACEFUL_CHARITY, CALL_OF_THE_HAUNTED, JINZO,
                 MAD_DOG_OF_DARKNESS}.issubset(c.code for c in obs.hand)
-        assert HEAVY_STORM in {
-            c.code for c in env.engine.probe.observation(1).hand}
+        assert {HEAVY_STORM, BOOK_OF_MOON}.issubset(
+            c.code for c in env.engine.probe.observation(1).hand)
         graceful = discarded = call_set = heavy = call_chained = targeted = False
+        book_unavailable_during_chain = False
+        book_used = book_targeted = False
         for _ in range(70):
             actions = env.legal_actions()
             action = None
@@ -74,6 +80,15 @@ def test_call_chained_to_heavy_keeps_jinzo_but_loses_normal_monster(
                 action = next((a for a in actions if a.parameters.get("code")
                                == revived_code and a.parameters.get("location") == 16), None)
                 targeted = action is not None
+            if targeted and obs.chain and obs.acting_player == 1:
+                assert not any(a.kind == "chain" and a.parameters.get("code")
+                               == BOOK_OF_MOON for a in actions)
+                book_unavailable_during_chain = True
+            if book_used and not book_targeted and actions[0].kind == "select_card" \
+                    and obs.acting_player == 1:
+                action = next((a for a in actions if a.parameters.get("code") == JINZO
+                               and a.parameters.get("controller") == 0), None)
+                book_targeted = action is not None
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_card", "place", "select_position", "pass", "end_phase")),
@@ -82,10 +97,32 @@ def test_call_chained_to_heavy_keeps_jinzo_but_loses_normal_monster(
             if targeted and HEAVY_STORM in {c.code for c in obs.graveyards[1]} \
                     and not obs.chain:
                 assert CALL_OF_THE_HAUNTED in {c.code for c in obs.graveyards[0]}
+                assert book_unavailable_during_chain
                 if revived_code == JINZO:
+                    if not book_used:
+                        assert any(c.code == JINZO and c.controller == 0
+                                   and c.position == "faceup" for c in obs.field)
+                        assert JINZO not in {c.code for c in obs.graveyards[0]}
+                        book = next((a for a in env.legal_actions()
+                                     if a.kind in ("activate", "chain")
+                                     and a.parameters.get("code") == BOOK_OF_MOON), None)
+                        assert book is not None
+                        book_used = True
+                        obs = env.step(book)
+                        continue
+                    if BOOK_OF_MOON not in {c.code for c in obs.graveyards[1]}:
+                        continue
+                    assert book_targeted
+                    owner = env.engine.probe.observation(0)
                     assert any(c.code == JINZO and c.controller == 0
-                               and c.position == "faceup" for c in obs.field)
-                    assert JINZO not in {c.code for c in obs.graveyards[0]}
+                               and c.position == "facedown" for c in owner.field)
+                    other = env.engine.probe.observation(1)
+                    assert any(c.controller == 0 and c.zone == "monster"
+                               and c.code is None and c.position == "facedown"
+                               for c in other.field)
+                    assert any(c.controller == 0 and c.zone == "monster"
+                               and c.code == JINZO
+                               for c in other.known_opponent_field_cards)
                 else:
                     assert not any(c.code == MAD_DOG_OF_DARKNESS for c in obs.field)
                     assert MAD_DOG_OF_DARKNESS in {
@@ -97,6 +134,8 @@ def test_call_chained_to_heavy_keeps_jinzo_but_loses_normal_monster(
                         env.engine.probe.loaded_script_sha256)
                 if revived_code == JINZO:
                     assert f"official/c{JINZO}.lua" in (
+                        env.engine.probe.loaded_script_sha256)
+                    assert f"official/c{BOOK_OF_MOON}.lua" in (
                         env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Call/Heavy chain did not reach the comparison")
