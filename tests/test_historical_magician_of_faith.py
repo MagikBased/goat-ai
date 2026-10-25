@@ -123,3 +123,100 @@ def test_magician_of_faith_returns_pot_with_or_without_book_response(
                     "select_card", "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("Magician of Faith did not return Pot of Greed")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_magician_of_faith_recovers_pot_then_book_after_book_resets_it(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (POT_OF_GREED, MAGICIAN_OF_FAITH, BOOK_OF_MOON):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    deck = tmp_path / "mof_book.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        POT_OF_GREED, *([MAGICIAN_OF_FAITH] * 3), *([BOOK_OF_MOON] * 3),
+        *VANILLA_DECK[7:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {POT_OF_GREED, MAGICIAN_OF_FAITH, BOOK_OF_MOON}.issubset(
+            c.code for c in obs.hand)
+        pot_used = mof_set = first_flip = first_targeted = False
+        book_used = book_targeted = second_flip = second_targeted = False
+        for _ in range(100):
+            actions = env.legal_actions()
+            action = None
+            if obs.acting_player == 0 and obs.turn == 1:
+                if not pot_used:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == POT_OF_GREED), None)
+                    pot_used |= action is not None
+                if pot_used and not mof_set and action is None:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == MAGICIAN_OF_FAITH), None)
+                    mof_set |= action is not None
+            if obs.acting_player == 0 and obs.turn == 3 and mof_set:
+                if not first_flip:
+                    action = next((a for a in actions if a.kind == "flip_summon"
+                                   and a.parameters.get("code") == MAGICIAN_OF_FAITH), None)
+                    first_flip |= action is not None
+                if first_flip and not first_targeted and actions[0].kind == "select_card" \
+                        and action is None:
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == POT_OF_GREED and a.parameters.get("location") == 16),
+                                  None)
+                    first_targeted |= action is not None
+                if first_targeted and POT_OF_GREED in {c.code for c in obs.hand} \
+                        and not book_used and action is None:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == BOOK_OF_MOON), None)
+                    book_used |= action is not None
+                if book_used and not book_targeted and actions[0].kind == "select_card" \
+                        and action is None:
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == MAGICIAN_OF_FAITH and a.parameters.get("controller")
+                                   == 0), None)
+                    book_targeted |= action is not None
+            if book_targeted and obs.turn == 3 \
+                    and BOOK_OF_MOON in {c.code for c in obs.graveyards[0]}:
+                own_view = env.engine.probe.observation(0)
+                own_mof = next(c for c in own_view.field if c.controller == 0
+                               and c.zone == "monster")
+                other = env.engine.probe.observation(1)
+                hidden = next(c for c in other.field if c.controller == 0
+                              and c.zone == "monster")
+                assert own_mof.code == MAGICIAN_OF_FAITH and own_mof.position == "facedown"
+                assert hidden.code is None and hidden.position == "facedown"
+                if obs.acting_player == 0:
+                    assert not any(a.kind == "flip_summon" and a.parameters.get("code")
+                                   == MAGICIAN_OF_FAITH for a in actions)
+            if obs.acting_player == 0 and obs.turn == 5 and book_targeted:
+                if not second_flip:
+                    action = next((a for a in actions if a.kind == "flip_summon"
+                                   and a.parameters.get("code") == MAGICIAN_OF_FAITH), None)
+                    second_flip |= action is not None
+                if second_flip and not second_targeted and actions[0].kind == "select_card" \
+                        and action is None:
+                    assert BOOK_OF_MOON in {c.code for c in obs.graveyards[0]}
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == BOOK_OF_MOON and a.parameters.get("location") == 16),
+                                  None)
+                    second_targeted |= action is not None
+            if second_targeted and BOOK_OF_MOON not in {
+                    c.code for c in obs.graveyards[0]}:
+                own_view = env.engine.probe.observation(0)
+                assert BOOK_OF_MOON in {c.code for c in own_view.hand}
+                assert POT_OF_GREED in {c.code for c in own_view.hand}
+                other = env.engine.probe.observation(1)
+                assert [[c.code for c in reveal.cards] for reveal in
+                        other.private_reveals] == [[POT_OF_GREED], [BOOK_OF_MOON]]
+                assert not own_view.private_reveals
+                loaded = env.engine.probe.loaded_script_sha256
+                assert all(f"official/c{code}.lua" in loaded for code in (
+                    POT_OF_GREED, MAGICIAN_OF_FAITH, BOOK_OF_MOON))
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail("Magician of Faith did not recover both Spells across two flips")
