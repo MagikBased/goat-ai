@@ -13,6 +13,7 @@ KYCOO = 88240808
 SORCERER = 9596126
 GRACEFUL = 79571449
 BOOK = 14087893
+NOBLEMAN = 504700116  # GOAT variant
 LIGHT = 15025844  # Mystical Elf
 DARK = 7359741  # Mechanicalchaser
 OTHER_LIGHT = 62651957  # X-Head Cannon
@@ -183,3 +184,60 @@ def test_kycoo_direct_damage_offers_one_or_two_graveyard_monsters_to_banish(tmp_
                     "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("Kycoo did not offer its two-monster battle-damage choice")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_kycoo_does_not_block_nobleman_banishing_a_field_monster(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    _require_scripts(root, KYCOO)
+    if not (root / f"scripts/goat/c{NOBLEMAN}.lua").is_file():
+        pytest.skip("GOAT Nobleman script not installed")
+    nobleman_deck = _deck(tmp_path / "nobleman.ydk", (NOBLEMAN, *VANILLA_DECK[1:]))
+    with GoatEnvironment(nobleman_deck, _kycoo_deck(tmp_path), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        monster_set = kycoo_summoned = nobleman_activated = target_selected = False
+        set_code = None
+        for _ in range(45):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 \
+                    and not monster_set:
+                action = next((a for a in actions if a.kind == "set_monster"), None)
+                if action is not None:
+                    set_code = action.parameters["code"]
+                    monster_set = True
+            if observation.turn == 2 and observation.acting_player == 1 \
+                    and not kycoo_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == KYCOO), None)
+                kycoo_summoned |= action is not None
+            if observation.turn == 3 and observation.acting_player == 0 \
+                    and observation.phase == "main1" and not nobleman_activated:
+                assert monster_set and kycoo_summoned
+                assert any(c.code == KYCOO and c.position == "faceup"
+                           for c in observation.field)
+                opposing_view = env.engine.probe.observation(1)
+                assert any(c.code is None and c.controller == 0
+                           and c.position == "facedown" for c in opposing_view.field)
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == NOBLEMAN), None)
+                assert action is not None
+                nobleman_activated = True
+            if nobleman_activated and not target_selected \
+                    and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("controller") == 0
+                               and a.parameters.get("code") == set_code), None)
+                assert action is not None
+                target_selected = True
+            if target_selected and any(c.code == set_code for c in observation.banished[0]):
+                assert not any(c.code == set_code for c in observation.graveyards[0])
+                assert any(c.code == KYCOO and c.position == "faceup"
+                           for c in observation.field)
+                assert f"goat/c{NOBLEMAN}.lua" in env.engine.probe.loaded_script_sha256
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+    pytest.fail("Nobleman did not banish a field monster while opposing Kycoo was active")
