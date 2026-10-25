@@ -17,7 +17,8 @@ DARK = 7359741
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_bls_banishes_opponents_sangan_without_search(tmp_path):
+@pytest.mark.parametrize("set_sangan", [False, True])
+def test_bls_banishes_opponents_sangan_without_search(tmp_path, set_sangan):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = (f"goat/c{BLS}.lua", f"goat/c{SANGAN}.lua",
                f"official/c{GRACEFUL}.lua")
@@ -59,7 +60,8 @@ def test_bls_banishes_opponents_sangan_without_search(tmp_path):
                                    a.parameters["cards"]} == {LIGHT, DARK}), None)
                     discarded |= action is not None
             if obs.turn == 2 and obs.acting_player == 1 and not sangan_summoned:
-                action = next((a for a in actions if a.kind == "normal_summon"
+                action = next((a for a in actions if a.kind == (
+                                   "set_monster" if set_sangan else "normal_summon")
                                and a.parameters.get("code") == SANGAN), None)
                 if action is not None:
                     sangan_summoned = True
@@ -81,8 +83,17 @@ def test_bls_banishes_opponents_sangan_without_search(tmp_path):
                         action = option
                         bls_used = True
                 if bls_used and not sangan_targeted and actions[0].kind == "select_card":
-                    action = next((a for a in actions if a.parameters.get("controller") == 1
-                                   and a.parameters.get("code") == SANGAN), None)
+                    if set_sangan:
+                        assert any(c.controller == 1 and c.zone == "monster"
+                                   and c.position == "facedown" and c.code is None
+                                   for c in obs.field)
+                        action = next((a for a in actions if a.parameters.get(
+                            "controller") == 1 and a.parameters.get("location") == 4
+                            and "code" not in a.parameters), None)
+                    else:
+                        action = next((a for a in actions if a.parameters.get(
+                                       "controller") == 1 and a.parameters.get(
+                                       "code") == SANGAN), None)
                     sangan_targeted |= action is not None
             if action is None:
                 action = next((a for a in actions if a.kind in (
