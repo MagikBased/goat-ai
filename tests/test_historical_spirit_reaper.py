@@ -14,6 +14,7 @@ BOOK_OF_MOON = 14087893
 ENEMY_CONTROLLER = 98045062
 MYSTICAL_SPACE_TYPHOON = 5318639
 SNATCH_STEAL = 45986603
+WABOKU = 12607053
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -182,3 +183,71 @@ def test_goat_reaper_snatch_target_survives_only_if_mst_breaks_equip(tmp_path,
                 assert "goat/c504700038.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail("GOAT Spirit Reaper / Snatch Steal chain did not resolve")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("use_waboku", [False, True])
+def test_reaper_direct_damage_discards_only_without_waboku(tmp_path, use_waboku):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/goat/c{SPIRIT_REAPER}.lua").is_file():
+        pytest.skip("GOAT Spirit Reaper script not installed")
+    if not (root / f"scripts/official/c{WABOKU}.lua").is_file():
+        pytest.skip("Waboku script not installed")
+    own_deck = tmp_path / "reaper.ydk"
+    own_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([SPIRIT_REAPER] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    other_deck = tmp_path / "waboku.ydk"
+    other_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([WABOKU] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own_deck), str(other_deck), seed=11,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        summoned = waboku_set = attacked = waboku_used = False
+        opponent_hand_before_attack = None
+        for _ in range(54):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 \
+                    and not summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == SPIRIT_REAPER), None)
+                summoned = action is not None
+            if use_waboku and observation.turn == 2 \
+                    and observation.acting_player == 1 and not waboku_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == WABOKU), None)
+                waboku_set = action is not None
+            if observation.turn == 3 and observation.acting_player == 0 \
+                    and summoned and not attacked:
+                action = next((a for a in actions if a.kind in (
+                    "battle_phase", "attack")), None)
+                if action is not None and action.kind == "attack":
+                    assert not any(c.zone == "monster" and c.controller == 1
+                                   for c in observation.field)
+                    opponent_hand_before_attack = observation.opponent_hand_count
+                    assert opponent_hand_before_attack == (5 if use_waboku else 6)
+                    attacked = True
+            if use_waboku and attacked and observation.acting_player == 1 \
+                    and not waboku_used:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == WABOKU), action)
+                waboku_used = action is not None and action.kind == "chain"
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "main2", "end_phase")), actions[0])
+            observation = env.step(action)
+            if attacked and observation.turn == 3 and observation.phase == "main2":
+                assert waboku_used == use_waboku
+                assert observation.life_points == (
+                    8000, 8000 if use_waboku else 7700)
+                assert observation.opponent_hand_count == (
+                    opponent_hand_before_attack - (0 if use_waboku else 1))
+                opposing_graveyard = {c.code for c in observation.graveyards[1]}
+                assert (WABOKU in opposing_graveyard) == use_waboku
+                assert len(observation.graveyards[1]) == 1
+                assert not any(c.zone == "monster" and c.controller == 1
+                               for c in observation.field)
+                assert "goat/c504700038.lua" in env.engine.probe.loaded_script_sha256
+                return
+    pytest.fail("Spirit Reaper direct attack did not finish")
