@@ -186,6 +186,37 @@ and Deck return occur before Duo's two discards. The pass branch has no reveal.
 Both full duels replay-verify; the combined timing is documented as an
 inference from the card texts and chain order in [GOAT rules](goat_rules.md).
 
+## Full-duel replay verification across the tournament corpus
+
+The action probe now accepts `--verify-replays` and `--record-dir`. With both
+options, it serializes each complete native duel, reads the JSON back, and
+checks every player-visible observation, complete legal-action list, selected
+action, terminal result, and recorded native-asset fingerprint against a fresh
+engine. A capped or mismatching game fails the probe rather than entering the
+report. Without `--record-dir`, verification uses the in-memory trajectory.
+Generated trajectories and reports stay outside Git.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --tournament-corpus \
+  --agent combat_heuristic --seed 18500 --seeds 1 \
+  --max-decisions 3000 --verify-replays \
+  --record-dir replays/tournament_verified_18500 \
+  --output .cache/goat-ai/tournament_verified_18500.json
+```
+
+On the pinned local assets, all **30** both-seat duels across the 15 pairs of
+six sourced tournament Main Decks terminated and replay-verified after JSON
+round trip. The report records **16,979 decisions**, a maximum of **1,448**
+in one duel, **103 loaded asset hashes**, and **64 selected card responses**
+to a public chain link. The report SHA-256 is
+`861dc028cb8b93f557c08ab6054150aa6b8d7e39bf044671fcefebbef1176ab2`.
+The 30 ignored JSON trajectories occupy 118,957,204 bytes. These results
+demonstrate deterministic reconstruction for this agent, decks, and seed;
+they do not independently validate the historical correctness of every card
+effect or estimate human card usage.
+
 ## Same-schedule random and combat-baseline exposure
 
 The probe also accepts `--agent combat_heuristic` (or `heuristic`). This

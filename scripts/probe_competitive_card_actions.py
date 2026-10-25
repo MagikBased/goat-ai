@@ -16,6 +16,7 @@ from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,7 +100,8 @@ def card_names(native_root: Path, codes: set[int]) -> dict[int, str]:
 
 def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
           first_seed: int, seeds: int, max_decisions: int,
-          agent_name: str = "random") -> dict:
+          agent_name: str = "random", *, verify_replays: bool = False,
+          record_dir: Path | None = None) -> dict:
     if seeds < 1 or max_decisions < 1 or not matchups:
         raise ValueError("positive seeds/max_decisions and nonempty matchups required")
     offered: Counter[tuple[int, str]] = Counter()
@@ -113,6 +115,9 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
         prevalence.update(main.keys())
         copies.update(main)
     games = []
+    verified_decisions = 0
+    if record_dir is not None:
+        record_dir.mkdir(parents=True, exist_ok=True)
     loaded_assets: dict[str, str] = {}
     rules_profile = None
     for left, right in matchups:
@@ -142,6 +147,30 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
                             raise RuntimeError(f"duel exceeded {max_decisions} decisions: "
                                                f"{decks}, seed={seed}")
                     trajectory = env.trajectory()
+                    game = {"decks": [deck_label(path) for path in decks],
+                            "seed": seed, "decisions": len(trajectory.decisions),
+                            "winner": env.result()}
+                    if record_dir is not None:
+                        trajectory_path = record_dir / (
+                            f"game_{len(games):05d}_seed_{seed}.json")
+                        write_trajectory(trajectory_path, trajectory)
+                        game["trajectory_file"] = trajectory_path.name
+                        game["trajectory_sha256"] = sha256_file(trajectory_path)
+                    if verify_replays:
+                        replay = (read_trajectory(trajectory_path)
+                                  if record_dir is not None else trajectory)
+                        try:
+                            count = verify_trajectory(
+                                replay, ExperimentalOcgcoreEngine(native_root))
+                        except Exception as error:
+                            raise RuntimeError(
+                                f"replay verification failed: "
+                                f"decks={tuple(map(deck_label, decks))}, seed={seed}, "
+                                f"game={len(games)}") from error
+                        if count != len(trajectory.decisions):
+                            raise RuntimeError("replay verifier returned a partial decision count")
+                        game["replay_verified_decisions"] = count
+                        verified_decisions += count
                     if rules_profile is None:
                         rules_profile = trajectory.rules_profile
                     elif trajectory.rules_profile != rules_profile:
@@ -155,9 +184,7 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
                                              record.selected_action, offered, selected)
                         count_chain_response(record.observation,
                                              record.selected_action, responses)
-                    games.append({"decks": [deck_label(path) for path in decks],
-                                  "seed": seed, "decisions": len(trajectory.decisions),
-                                  "winner": env.result()})
+                    games.append(game)
     names = card_names(native_root, set(prevalence) | {code for code, _ in offered}
                        | {code for pair in responses for code in pair})
     cards = []
@@ -207,6 +234,11 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
     }
     if agent_name != "random":
         result["agent"] = agent_name
+    if verify_replays:
+        result["replay_verification"] = {
+            "verified_games": len(games), "verified_decisions": verified_decisions,
+            "serialized_round_trip": record_dir is not None,
+        }
     return result
 
 
@@ -223,6 +255,10 @@ def main() -> None:
                         default="random")
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--max-decisions", type=int, default=3000)
+    parser.add_argument("--verify-replays", action="store_true",
+                        help="replay every complete duel against fresh pinned native engines")
+    parser.add_argument("--record-dir", type=Path,
+                        help="optional ignored directory for exact duel trajectories")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     fixtures = ROOT / "examples/decks"
@@ -233,7 +269,8 @@ def main() -> None:
     else:
         matchups = tuple(tuple(pair) for pair in args.matchup)
     report = probe(args.native_root, matchups, args.seed, args.seeds,
-                   args.max_decisions, args.agent)
+                   args.max_decisions, args.agent,
+                   verify_replays=args.verify_replays, record_dir=args.record_dir)
     payload = json.dumps(report, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

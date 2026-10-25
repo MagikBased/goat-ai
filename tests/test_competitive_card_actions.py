@@ -1,15 +1,19 @@
 """Source-card coverage must not count target-selection identities as card use."""
 
+import os
 from collections import Counter
 from itertools import combinations
+from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from goat_ai.actions import Action
 from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
 from scripts.probe_competitive_card_actions import (
     ROOT, count_chain_response, count_source_actions, deck_label, make_agent,
-    tournament_matchups,
+    probe, tournament_matchups,
 )
 
 
@@ -62,3 +66,25 @@ def test_chain_response_uses_latest_public_link_and_ignores_nonresponses():
     count_chain_response(observation, target, responses)
     count_chain_response(SimpleNamespace(chain=()), ring, responses)
     assert responses == {(511000824, 14087893): 1}
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_sourced_deck_probe_records_and_replay_verifies_full_duels(tmp_path):
+    fixtures = ROOT / "examples/decks"
+    report = probe(
+        Path(os.environ["GOAT_AI_NATIVE_ROOT"]),
+        ((fixtures / "goat_control_lolmarcus_2020.ydk",
+          fixtures / "chaos_turbo_riclar_2020.ydk"),),
+        first_seed=18500, seeds=1, max_decisions=3000,
+        agent_name="combat_heuristic", verify_replays=True,
+        record_dir=tmp_path / "replays",
+    )
+    assert report["replay_verification"] == {
+        "verified_games": 2,
+        "verified_decisions": sum(game["decisions"] for game in report["games"]),
+        "serialized_round_trip": True,
+    }
+    assert all(game["replay_verified_decisions"] == game["decisions"]
+               and (tmp_path / "replays" / game["trajectory_file"]).is_file()
+               and len(game["trajectory_sha256"]) == 64
+               for game in report["games"])

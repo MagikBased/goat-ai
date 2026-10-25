@@ -111,6 +111,14 @@ Four Morphing Jar deck-out fixtures now verify the historical five-card draw bou
 
 **Exit:** Every required fixture passes with pinned engine assets, or is marked as a known incompatibility that blocks a GOAT-correct claim. Run differential checks against documented examples or independently observed duels where practical. Expand the legal-card test corpus beyond the initial fixture decks.
 
+The six-deck tournament action probe can now save and replay-verify complete
+JSON trajectories. One seeded CombatHeuristicAgent schedule covered all 15
+unordered pairs with both seats: all 30 duels and 16,979 decisions verified
+against fresh pinned native engines after serialization. This broadens
+end-to-end adapter coverage of commonly played cards, while individual
+historical effect claims still require source-backed ruling fixtures. See
+[competitive action coverage](competitive_action_coverage.md).
+
 ## M3 — Evaluation and data
 
 **Status: in progress.** Seeded tournament runners swap seats for each deck matchup, record individual outcomes, report seat and matchup splits, and give paired score and Wilson intervals. A spawned-process runner reproduces the sequential results on a native fixture and has a measured two-worker throughput example. A restricted-fixture baseline report is in [the evaluation log](evaluation.md). Schema v18 trajectories add a final player-visible terminal observation to the v17 decision records, which record face-up monster ATK, DEF, and counters alongside bounded public events, field-slot known-card memory, conservative opponent-hand knowledge from public returns and addressed hand reveals, a public Scapegoat restriction, public Deck-top reveals, active disabled zones, recipient-scoped private reveals, and the player's initial Main Deck composition; they can be replayed against the native engine with exact observation, legal-action, result, deck-content, rules-profile, and loaded-asset comparisons. An offline browser viewer renders these player-visible decisions without card art or intermediate animations. Earlier fingerprinted recordings without affected Deck-search choices, addressed face-down field reveals, or face-down control returns, or transferred set cards remain verifiable; affected recordings need re-recording for exact comparison. Broader deck families, held-out opponents, authorized human replay reconstruction, training/evaluation separation, and parallel-worker memory measurement remain outstanding.
