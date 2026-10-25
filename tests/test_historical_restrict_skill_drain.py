@@ -13,15 +13,19 @@ SCAPEGOAT = 504700123
 METAMORPHOSIS = 46411259
 RESTRICT = 504700102
 SKILL_DRAIN = 82732705
+MST = 5318639
 SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("timing", ["chain_to_equip", "after_equip"])
+@pytest.mark.parametrize("timing", ["chain_to_equip", "after_equip",
+                                      "remove_after_equip"])
 def test_skill_drain_timing_on_restrict_equip(tmp_path, timing):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = (f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                f"goat/c{RESTRICT}.lua", f"official/c{SKILL_DRAIN}.lua")
+    if timing == "remove_after_equip":
+        scripts += (f"official/c{MST}.lua",)
     for relative in scripts:
         if not (root / "scripts" / relative).is_file():
             pytest.skip(f"script {relative} not installed")
@@ -30,16 +34,22 @@ def test_skill_drain_timing_on_restrict_equip(tmp_path, timing):
         *((SCAPEGOAT, METAMORPHOSIS) * 3), *VANILLA_DECK[6:])))
         + f"\n#extra\n{RESTRICT}\n!side\n")
     other = tmp_path / "skill_drain.ydk"
-    other.write_text("#main\n" + "\n".join(map(str, (
-        SKILL_DRAIN, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    other_cards = ((SKILL_DRAIN, MST, *VANILLA_DECK[2:])
+                   if timing == "remove_after_equip"
+                   else (SKILL_DRAIN, *VANILLA_DECK[1:]))
+    other.write_text("#main\n" + "\n".join(map(str, other_cards))
+                     + "\n#extra\n!side\n")
 
-    with GoatEnvironment(str(own), str(other), seed=52,
+    with GoatEnvironment(str(own), str(other),
+                         seed=72 if timing == "remove_after_equip" else 52,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
         assert SKILL_DRAIN in {c.code for c in env.engine.probe.observation(1).hand}
+        if timing == "remove_after_equip":
+            assert MST in {c.code for c in env.engine.probe.observation(1).hand}
         goat = summoned = drain_set = meta = token = fusion = restrict = target = False
-        drain_used = equip_seen = False
-        target_code = None
+        drain_used = equip_seen = drain_confirmed = mst_used = mst_targeted = False
+        target_code = original_attack = original_defense = None
         for _ in range(110):
             actions = env.legal_actions()
             action = None
@@ -77,6 +87,11 @@ def test_skill_drain_timing_on_restrict_equip(tmp_path, timing):
                 action = next((a for a in actions if a.parameters.get("code")
                                == target_code and a.parameters.get("controller") == 1), action)
                 target |= action is not None and action.kind == "select_card"
+                if target:
+                    target_card = next(c for c in obs.field if c.code == target_code
+                                       and c.controller == 1)
+                    original_attack, original_defense = (target_card.attack,
+                                                         target_card.defense)
             if timing == "chain_to_equip" and target and obs.acting_player == 1 \
                     and not drain_used:
                 assert [link.card_code for link in obs.chain] == [RESTRICT]
@@ -84,7 +99,7 @@ def test_skill_drain_timing_on_restrict_equip(tmp_path, timing):
                                and a.parameters.get("code") == SKILL_DRAIN), None)
                 drain_used |= action is not None
                 assert drain_used
-            if timing == "after_equip" and target and obs.turn == 3 \
+            if timing != "chain_to_equip" and target and obs.turn == 3 \
                     and obs.phase == "main1" and not obs.chain:
                 equip_seen = any(c.code == target_code and c.zone == "spell_trap"
                                  and c.controller == 0 for c in obs.field)
@@ -93,12 +108,21 @@ def test_skill_drain_timing_on_restrict_equip(tmp_path, timing):
                 action = next((a for a in actions if a.kind == "activate"
                                and a.parameters.get("code") == SKILL_DRAIN), action)
                 drain_used |= action is not None and action.kind == "activate"
+            if drain_confirmed and obs.turn == 4 and obs.acting_player == 1:
+                if not mst_used:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == MST), action)
+                    mst_used |= action is not None and action.kind == "activate"
+                if mst_used and not mst_targeted and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == SKILL_DRAIN), action)
+                    mst_targeted |= action is not None and action.kind == "select_card"
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_card", "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if drain_used and not obs.chain and any(c.code == SKILL_DRAIN
-                                                    for c in obs.field):
+            if drain_used and not drain_confirmed and not obs.chain \
+                    and any(c.code == SKILL_DRAIN for c in obs.field):
                 own_view = env.engine.probe.observation(0)
                 restrict_card = next(c for c in own_view.field if c.code == RESTRICT)
                 assert restrict_card.position == "faceup"
@@ -115,5 +139,20 @@ def test_skill_drain_timing_on_restrict_equip(tmp_path, timing):
                     assert not any(c.code == target_code and c.zone == "monster"
                                    for c in own_view.field)
                 assert set(scripts) <= env.engine.probe.loaded_script_sha256.keys()
+                drain_confirmed = True
+                if timing != "remove_after_equip":
+                    return
+            if mst_targeted and not obs.chain and any(c.code == MST
+                                                       for c in obs.graveyards[1]):
+                assert drain_confirmed
+                assert any(c.code == SKILL_DRAIN for c in obs.graveyards[1])
+                assert not any(c.code == SKILL_DRAIN for c in obs.field)
+                restored = next(c for c in obs.field if c.code == RESTRICT)
+                assert (restored.attack, restored.defense) == (
+                    original_attack, original_defense)
+                assert any(c.code == target_code and c.zone == "spell_trap"
+                           and c.controller == 0 for c in obs.field)
+                assert obs.life_points == (8000, 7000)
+                assert f"official/c{MST}.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail(f"Skill Drain timing did not resolve: {timing}")
