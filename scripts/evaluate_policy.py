@@ -11,11 +11,11 @@ from time import perf_counter
 
 import torch
 
-from goat_ai.agents import HeuristicAgent, RandomAgent
+from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
-from goat_ai.evaluation import run_tournament, run_tournament_parallel
+from goat_ai.evaluation import both_deck_assignments, run_tournament, run_tournament_parallel
 from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION
 
@@ -26,6 +26,10 @@ def make_policy_agent(_seed: int, checkpoint: str):
 
 def make_heuristic_agent(_seed: int):
     return HeuristicAgent()
+
+
+def make_combat_heuristic_agent(_seed: int):
+    return CombatHeuristicAgent()
 
 
 def validate_heldout_seeds(checkpoint: dict, seeds: list[int]) -> None:
@@ -87,8 +91,11 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--matchup", nargs=2, action="append", metavar=("DECK_A", "DECK_B"))
+    parser.add_argument("--both-deck-assignments", action="store_true",
+                        help="evaluate either policy with each deck in every pair")
     opponents = parser.add_mutually_exclusive_group()
-    opponents.add_argument("--opponent", choices=("random", "heuristic"), default="random")
+    opponents.add_argument("--opponent", choices=("random", "heuristic",
+                                                  "combat_heuristic"), default="random")
     opponents.add_argument("--opponent-checkpoint", type=Path,
                            help="evaluate directly against another saved policy")
     parser.add_argument("--seed", type=int, default=43)
@@ -118,6 +125,8 @@ def main() -> None:
     fixtures = Path(__file__).resolve().parent.parent / "examples/decks"
     matchups = args.matchup or [[str(fixtures / "vanilla_probe.ydk"),
                                   str(fixtures / "vanilla_reverse.ydk")]]
+    if args.both_deck_assignments:
+        matchups = both_deck_assignments(matchups)
     if args.reject_training_deck_hashes:
         validate_unseen_deck_hashes(checkpoint, matchups)
         if args.opponent_checkpoint:
@@ -130,8 +139,11 @@ def main() -> None:
                    else ExperimentalOcgcoreEngine)
     runner = run_tournament_parallel if args.workers > 1 else run_tournament
     opponent = (partial(make_policy_agent, checkpoint=str(args.opponent_checkpoint))
-                if args.opponent_checkpoint else
-                RandomAgent if args.opponent == "random" else make_heuristic_agent)
+                if args.opponent_checkpoint else {
+                    "random": RandomAgent,
+                    "heuristic": make_heuristic_agent,
+                    "combat_heuristic": make_combat_heuristic_agent,
+                }[args.opponent])
     started = perf_counter()
     report = runner(
         matchups, seeds, partial(make_policy_agent, checkpoint=str(args.checkpoint)),
@@ -158,6 +170,7 @@ def main() -> None:
         "asset_sha256": assets,
         "training_games": checkpoint["training_games"],
         "evaluation_seeds": seeds,
+        "both_deck_assignments": args.both_deck_assignments,
         "opponent": "checkpoint" if args.opponent_checkpoint else args.opponent,
         "opponent_checkpoint_sha256": (sha256(args.opponent_checkpoint)
                                         if args.opponent_checkpoint else None),

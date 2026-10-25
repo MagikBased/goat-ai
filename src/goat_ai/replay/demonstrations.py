@@ -8,7 +8,7 @@ def demonstrator_records(trajectory: Trajectory) -> tuple[DecisionRecord, ...]:
     metadata = trajectory.skill_metadata or {}
     seat = metadata.get("demonstrator_seat")
     if seat is None:
-        if trajectory.source in ("heuristic", "human_cli"):
+        if trajectory.source in ("heuristic", "combat_heuristic", "human_cli"):
             raise ValueError(f"{trajectory.source} trajectory lacks demonstrator_seat")
         return trajectory.decisions
     if type(seat) is not int or seat not in (0, 1):

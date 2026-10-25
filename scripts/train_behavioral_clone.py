@@ -61,6 +61,8 @@ def main() -> None:
                                "source": trajectory.source,
                                "demonstrator_seat": (trajectory.skill_metadata or {}).get(
                                    "demonstrator_seat"),
+                               "teacher": (trajectory.skill_metadata or {}).get("teacher"),
+                               "opponent": (trajectory.skill_metadata or {}).get("opponent"),
                                "verified_decisions": count,
                                "selected_decisions": len(selected)})
     vocabulary = CardVocabulary.from_goat_whitelist(

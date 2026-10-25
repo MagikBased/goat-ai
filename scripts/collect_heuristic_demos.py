@@ -5,7 +5,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from goat_ai.agents import HeuristicAgent, RandomAgent
+from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
@@ -16,6 +16,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
+    parser.add_argument("--teacher", choices=("heuristic", "combat_heuristic"),
+                        default="heuristic")
     parser.add_argument("--deck-a", type=Path)
     parser.add_argument("--deck-b", type=Path)
     parser.add_argument("--seed", type=int, default=1000)
@@ -30,6 +32,8 @@ def main() -> None:
     deck_b = args.deck_b or fixtures / "vanilla_reverse.ydk"
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
+    teacher_type = (HeuristicAgent if args.teacher == "heuristic"
+                    else CombatHeuristicAgent)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     games = []
     for seed in range(args.seed, args.seed + args.seeds):
@@ -38,17 +42,17 @@ def main() -> None:
             with GoatEnvironment(*(str(deck) for deck in decks), seed=seed,
                                  engine=engine_type(args.native_root)) as env:
                 observation = env.reset()
-                agents = (HeuristicAgent() if teacher_seat == 0 else RandomAgent(seed),
-                          HeuristicAgent() if teacher_seat == 1 else RandomAgent(seed))
+                agents = (teacher_type() if teacher_seat == 0 else RandomAgent(seed),
+                          teacher_type() if teacher_seat == 1 else RandomAgent(seed))
                 for _ in range(args.max_decisions):
                     action = agents[observation.acting_player].select_action(
                         observation, env.legal_actions())
                     observation = env.step(action)
                     if env.is_terminal():
                         trajectory = replace(
-                            env.trajectory(), source="heuristic",
+                            env.trajectory(), source=args.teacher,
                             skill_metadata={"demonstrator_seat": teacher_seat,
-                                            "teacher": "HeuristicAgent",
+                                            "teacher": teacher_type.__name__,
                                             "opponent": "RandomAgent"},
                         )
                         path = args.output_dir / f"seed_{seed}_seat_{teacher_seat}.json"
