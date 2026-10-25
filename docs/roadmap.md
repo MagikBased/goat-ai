@@ -281,6 +281,16 @@ both motivating Thousand-Eyes Restrict choices. Its 34–29–1 direct score on
 Future policy work should inspect source/target labels and broader deck
 coverage before adding more relation layers. See [evaluation](evaluation.md).
 
+A matched 32-game snapshot-pool self-play pilot compared learning rates
+0.001 and 0.0001 on the same four high-play-deck pairings and seeds. All 64
+training trajectories replay-verified and passed the visibility audit. Both
+children scored 32–32 against their parent on an unseen Chaos Control/Chaos
+Return schedule; their direct match also split 32–32. A second unseen guide
+deck matchup gave the higher-rate child 32–30–2, with a paired interval
+including 50%. The higher rate corrected two held-out Restrict target
+choices and regressed on two others, leaving teacher agreement unchanged.
+Update size alone has not met M4's self-play gain gate; see [evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

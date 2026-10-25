@@ -2045,3 +2045,82 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
   --both-deck-assignments --require-unseen-main-decks \
   --seed 19200 --seeds 16 --workers 4 --max-decisions 3000
 ```
+
+## Matched combat-clone self-play learning-rate pilot (2026-10-25)
+
+To test whether small updates explained the earlier self-play plateau, two
+feature-v17 children started from the same 32-duel combat clone (SHA-256
+`63f300c568a2270510210cf7bd919b94c4519480270caadd7d6890316b807023`).
+Both used the same four ordered Goat Control/Chaos Turbo and Warrior/Bazoo
+Return matchups, seeds 19300–19331, both learner seats, snapshot probability
+0.75, temperature 2, entropy coefficient 0.001, and 3,000-decision cap. Only
+the learning rate differed: **0.001** versus **0.0001**. Because policy weights
+change after each game, their later sampled games diverged despite matching
+seeds; training win counts are therefore not a paired strength comparison.
+
+At rate 0.001, all **32** games terminated (17–15 against the training pool),
+and a fresh pinned engine replay-verified **19,958** recorded decisions. The
+visibility audit passed all decisions, including 129 hidden opposing field
+choices and 51 opposing hand choices. The child checkpoint SHA-256 is
+`7b6f2b1036e58e26e81709f284b879a51a916a6ae218d4ac6a0b1e3d6aaa72a7`.
+At rate 0.0001, all **32** games terminated (20–12 against its diverged pool),
+and **20,829** decisions replay-verified. Its visibility audit passed,
+including 124 hidden opposing field choices and 45 opposing hand choices.
+That child SHA-256 is
+`b40adcad805418da5b4ecf8aea5bdd9546877573c6a175e465d0494d3e35219b`.
+The ignored training-output SHA-256 values are respectively
+`f18c5210bd696b415e7592cd82e425cd645853349f8130eeda4edad4ccd6d937`
+and `dd879bb8254bdbf16b899c08736098b9f45effee86effac0563f774831f62914`.
+
+On four replay-verified held-out teacher duels (seed 17200), both children
+and their parent matched **595/611** multi-option choices and **75/89** chain
+choices. The higher-rate child changed four greedy choices: it recovered two
+Thousand-Eyes Restrict choices under Metamorphosis and Chaos Sorcerer, but
+regressed on two other targets. The lower-rate child changed none. The
+agreement report SHA-256 is
+`d8f3fb70ec435f490a1a36a6c181e1a3b14ca67faa9ad9d7ac5e7cd38ce4377d`.
+
+On fresh unseen Chaos Control/Chaos Return Main Decks, seeds 19400–19415 with
+both deck assignments and policy seats, **each child scored 32–32** against
+the parent over 64 terminal games. The higher-rate child's paired 95% score
+interval was 43.8–56.3%; its split was 10–22 as Chaos Control and 22–10 as
+Chaos Return. The lower-rate split was 11–21 and 21–11. On separate fresh
+seeds 19500–19515, the higher-rate child also split **32–32** directly with
+the lower-rate child on that Chaos pair. On a second unseen, whitelist-legal
+guide-deck matchup, Flip Control versus Dimension Fusion Turbo, seeds
+19600–19615, the higher-rate child scored **32–30–2** against the lower-rate
+child (51.6%; paired 95% interval 44.5–58.6%). Those guide lists are not
+tournament submissions. The four ignored evaluation report SHA-256 values,
+in the same order, are
+`1376504e6dabc92b723b3626d9732d152f2637b2e10bb11204a0ada5be350237`,
+`892f3afd8fb3a2780fed48bd3e12d394abe22485085039a960dc8c5d3ed3ba36`,
+`1a492935f319644f8c2b12220afad0e9ce34e128552e35f4ca74b99a58c0228d`,
+and `8fcab9a7847490a7e90e3d9fdf76f115861194395e1ea17ebb4a424bc472757b`.
+No tested schedule establishes a self-play strength gain. Increasing the
+learning rate alone produced a few offsetting held-out choice changes and did
+not solve the deck-assignment imbalance. The original clone remains the
+reference checkpoint.
+
+Reproduce both training runs by setting `rate` to `0.001` and `0.0001` in
+turn; use a distinct output and record directory for each:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/chaos_turbo_riclar_2020.ydk examples/decks/goat_control_lolmarcus_2020.ydk \
+  --matchup examples/decks/warrior_montague_clash.ydk examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/bazoo_return_weirdchamp_worlds.ydk examples/decks/warrior_montague_clash.ydk \
+  --seed 19300 --games 32 --learning-rate "$rate" --learner-temperature 2 \
+  --entropy-coefficient 0.001 --max-decisions 3000 \
+  --record-dir ".cache/goat-ai/combat_v3_sp_${rate}_19300_19331" \
+  --output "checkpoints/combat_v3_sp_${rate}_19300_19331.pt"
+```
+
+Run `scripts/verify_trajectory.py --experimental` on each saved JSON,
+`scripts/audit_trajectory_visibility.py` on each record directory, then
+`scripts/audit_policy_agreement.py` on the seed-17200 holdout. The direct
+matches used `scripts/evaluate_policy.py` with `--engine experimental`,
+`--both-deck-assignments`, `--require-unseen-main-decks`, `--seeds 16`,
+`--workers 4`, and `--max-decisions 3000`, with the seeds and matchups above.
