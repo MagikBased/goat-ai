@@ -18,6 +18,7 @@ GRACEFUL = 79571449
 LIGHT = 15025844
 DARK = 7359741
 PREMATURE_BURIAL = 70828912
+RING_OF_DESTRUCTION = 511000824
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -230,3 +231,105 @@ def test_solemn_negates_bls_inherent_special_summon_after_cost(tmp_path):
                         f"official/c{SOLEMN_JUDGMENT}.lua"}.issubset(loaded)
                 return
     pytest.fail("Solemn did not negate BLS after its Graveyard cost")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_properly_summoned_bls_can_be_revived_after_ring_destroys_it(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"scripts/goat/c{BLS}.lua",
+                     f"scripts/official/c{GRACEFUL}.lua",
+                     f"scripts/official/c{PREMATURE_BURIAL}.lua",
+                     f"scripts/pre-errata/c{RING_OF_DESTRUCTION}.lua"):
+        if not (root / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    lights = (LIGHT, 62651957)
+    darks = (49881766, DARK)
+    filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
+    bls_cards = [GRACEFUL, BLS,
+                 *(code for code in lights for _ in range(3)),
+                 *(code for code in darks for _ in range(3)), *filler[:26]]
+    bls_cards[17] = PREMATURE_BURIAL
+    attacker = tmp_path / "bls.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, bls_cards))
+                        + "\n#extra\n!side\n")
+    defender = tmp_path / "ring.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        RING_OF_DESTRUCTION, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(attacker), str(defender), seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {BLS, GRACEFUL, LIGHT, DARK, PREMATURE_BURIAL}.issubset(
+            c.code for c in obs.hand)
+        assert RING_OF_DESTRUCTION in {
+            c.code for c in env.engine.probe.observation(1).hand}
+        graceful_used = discarded = ring_set = bls_summoned = False
+        ring_used = ring_targeted = premature_used = revive_targeted = False
+        costs = []
+        for _ in range(85):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not graceful_used:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL), None)
+                    graceful_used |= action is not None
+                elif not discarded and actions[0].kind == "select_cards":
+                    action = next((a for a in actions if {c["code"] for c in
+                                   a.parameters["cards"]} == {LIGHT, DARK}), None)
+                    discarded |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not ring_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == RING_OF_DESTRUCTION), None)
+                ring_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and discarded \
+                    and not bls_summoned:
+                action = next((a for a in actions if a.kind == "special_summon"
+                               and a.parameters.get("code") == BLS), None)
+                bls_summoned |= action is not None
+            if bls_summoned and len(costs) < 2 \
+                    and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               in ({LIGHT, DARK} - set(costs))
+                               and a.parameters.get("location") == 16), action)
+                if action is not None and action.kind == "select_card":
+                    costs.append(action.parameters["code"])
+            if bls_summoned and len(costs) == 2 and obs.acting_player == 1 \
+                    and not ring_used:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == RING_OF_DESTRUCTION), action)
+                ring_used |= action is not None and action.kind == "chain"
+            if ring_used and not ring_targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code") == BLS
+                               and a.parameters.get("controller") == 0), action)
+                ring_targeted |= action is not None and action.kind == "select_card"
+            if ring_targeted and RING_OF_DESTRUCTION in {
+                    c.code for c in obs.graveyards[1]} and obs.acting_player == 0 \
+                    and obs.phase == "main1":
+                if not premature_used:
+                    assert BLS in {c.code for c in obs.graveyards[0]}
+                    assert obs.life_points == (5000, 5000)
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == PREMATURE_BURIAL), None)
+                    premature_used |= action is not None
+                elif not revive_targeted and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code") == BLS
+                                   and a.parameters.get("location") == 16), None)
+                    revive_targeted |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "select_position", "pass", "end_phase")),
+                    actions[0])
+            obs = env.step(action)
+            if revive_targeted and any(c.code == BLS and c.controller == 0
+                                       for c in obs.field):
+                assert set(costs) == {LIGHT, DARK}
+                assert {c.code for c in obs.banished[0]} == {LIGHT, DARK}
+                assert obs.life_points == (4200, 5000)
+                assert BLS not in {c.code for c in obs.graveyards[0]}
+                assert PREMATURE_BURIAL in {c.code for c in obs.field}
+                loaded = env.engine.probe.loaded_script_sha256
+                assert {f"goat/c{BLS}.lua",
+                        f"official/c{PREMATURE_BURIAL}.lua",
+                        f"pre-errata/c{RING_OF_DESTRUCTION}.lua"}.issubset(loaded)
+                return
+    pytest.fail("properly Summoned BLS could not be revived by Premature Burial")
