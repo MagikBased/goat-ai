@@ -8,7 +8,13 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from goat_ai.actions import Action
-from goat_ai.observations import CardView, DisabledZoneView, KnownCardView, Observation
+from goat_ai.observations import (
+    CardView,
+    ChainLinkView,
+    DisabledZoneView,
+    KnownCardView,
+    Observation,
+)
 from goat_ai.replay import DecisionRecord, Trajectory, demonstrator_records
 from goat_ai.training import (
     CardVocabulary,
@@ -101,6 +107,31 @@ def test_feature_version_nine_uses_only_publicly_known_opponent_hand_cards():
     legacy_unknown = encode_decision(unknown, actions(), vocabulary, feature_version=8)
     assert legacy_known.known_hand_cards.tolist() == [0]
     assert torch.equal(legacy_known.known_hand_cards, legacy_unknown.known_hand_cards)
+
+
+def test_feature_version_ten_distinguishes_public_chain_order():
+    vocabulary = CardVocabulary((10, 20))
+    first = replace(view(), chain=(ChainLinkView(1, 10, 0, 8, 0),
+                                   ChainLinkView(2, 20, 1, 8, 0)))
+    reversed_chain = replace(view(), chain=(ChainLinkView(1, 20, 1, 8, 0),
+                                            ChainLinkView(2, 10, 0, 8, 0)))
+    first_features = encode_decision(first, actions(), vocabulary, feature_version=10)
+    second_features = encode_decision(reversed_chain, actions(), vocabulary,
+                                      feature_version=10)
+    assert first_features.chain_cards.tolist() == [
+        [vocabulary.index(10), 1], [vocabulary.index(20), 2]]
+    assert second_features.chain_cards.tolist() == [
+        [vocabulary.index(20), 2], [vocabulary.index(10), 1]]
+    assert encode_decision(view(), actions(), vocabulary,
+                           feature_version=10).chain_cards.tolist() == [[0, 0]]
+    torch.manual_seed(41)
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=10)
+    assert not torch.allclose(model(first_features), model(second_features))
+    legacy_model = LegalActionPolicy(vocabulary.size, width=16, feature_version=9)
+    legacy_first = encode_decision(first, actions(), vocabulary, feature_version=9)
+    legacy_second = encode_decision(reversed_chain, actions(), vocabulary,
+                                    feature_version=9)
+    assert torch.allclose(legacy_model(legacy_first), legacy_model(legacy_second))
 
 
 def test_action_ids_are_not_features_but_public_card_and_controller_are():
