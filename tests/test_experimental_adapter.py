@@ -51,6 +51,15 @@ def test_new_native_choice_formats():
         decode_decision(b"\x8f\x00\x02" + struct.pack("<Q", 1000))
     with pytest.raises(ValueError, match="invalid attribute"):
         decode_decision(b"\x8d\x00\x01" + struct.pack("<I", 0x80))
+    card_prompt = b"\x8e\x00\x02" + struct.pack("<QQ", 1, 0x4000010200000000)
+    announced = decode_decision(card_prompt, (100, 200))
+    assert [(choice.kind, choice.announced_card, choice.response)
+            for choice in announced.choices] == [
+                ("announce_card", 100, 100), ("announce_card", 200, 200)]
+    with pytest.raises(NotImplementedError, match="catalog"):
+        decode_decision(card_prompt)
+    with pytest.raises(NotImplementedError, match="expression"):
+        decode_decision(b"\x8e\x00\x01" + struct.pack("<Q", 1), (100,))
     tribute = (b"\x14\x00\x01" + struct.pack("<III", 1, 2, 2)
                + struct.pack("<IBBIB", 111, 0, 4, 0, 1)
                + struct.pack("<IBBIB", 222, 0, 4, 1, 1))
@@ -98,6 +107,36 @@ def test_native_announcement_resolves_in_real_duel(tmp_path, code, kind, paramet
                                  if action.kind in ("pass", "end_phase")), actions[0])
             observation = env.step(selected)
     pytest.fail(f"{kind} prompt was not reached")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_question_card_name_prompt_hides_graveyard_and_resolves():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / "scripts/official/c38723936.lua").is_file():
+        pytest.skip("Question script not installed")
+    deck = "examples/decks/question_probe.ydk"
+    with GoatEnvironment(deck, deck, seed=6,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        agent = RandomAgent(seed=6)
+        for _ in range(300):
+            actions = env.legal_actions()
+            if any(link.card_code == 38723936 and link.controller != observation.viewer
+                   for link in observation.chain):
+                assert all(card.code is None for card in observation.graveyards[1])
+            if actions[0].kind == "announce_card":
+                assert observation.acting_player == 0
+                assert len(actions) > 800
+                assert all(card.code is None for card in observation.graveyards[1])
+                assert any(card.code is not None for card in observation.graveyards[0])
+                correct = next(action for action in actions
+                               if action.parameters["code"] == 22609617)
+                observation = env.step(correct)
+                assert any(card.code == 22609617 for card in observation.banished[1])
+                assert env.legal_actions()
+                return
+            observation = env.step(agent.select_action(observation, actions))
+    pytest.fail("Question did not reach a card-name announcement")
 
 
 def test_native_multi_zone_selection_uses_exact_three_byte_locations():

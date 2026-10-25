@@ -147,6 +147,7 @@ class OcgcoreProbe:
 
     def __init__(self, library: Path, database: Path, scripts: Path) -> None:
         self.lib = c.CDLL(str(library.resolve()))
+        self.db_path = database.resolve()
         self.db = sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True)
         goat_database = database.parent / "goat-entries.cdb"
         self._has_goat_database = goat_database.is_file()
@@ -173,6 +174,7 @@ class OcgcoreProbe:
         self._public_reveals: list[PublicRevealView] = []
         self._private_reveals: list[PrivateRevealView] = []
         self._initial_main_decks: tuple[tuple[int, ...], tuple[int, ...]] = ((), ())
+        self._announcement_codes: tuple[int, ...] | None = None
         self._disabled_zones: tuple[DisabledZoneView, ...] = ()
         self._bind()
         major, minor = c.c_int(), c.c_int()
@@ -242,6 +244,26 @@ class OcgcoreProbe:
             row = self.db.execute(f"SELECT {columns} FROM unofficial.datas WHERE id=?",
                                   (code,)).fetchone()
         return row
+
+    def decode_pending(self):
+        """Decode the native prompt using the pinned historical card-name catalog."""
+        from goat_ai.engine.native_messages import decode_decision
+
+        if self._pending_message is None:
+            raise RuntimeError("no pending native decision")
+        if self._pending_message[0] != 142:
+            return decode_decision(self._pending_message)
+        if self._announcement_codes is None:
+            from goat_ai.engine.decks import read_goat_whitelist
+
+            pool = read_goat_whitelist(
+                self.db_path.parent.parent / "banlist/GOAT.lflist.conf")
+            # A historical card name may be Forbidden, so use all listed IDs.
+            # The core rejects aliases and Tokens for this expression.
+            self._announcement_codes = tuple(code for code in sorted(pool)
+                if (row := self._card_row(code, "alias, type")) is not None
+                and row[0] == 0 and row[1] & 1 and not row[1] & 0x4000)
+        return decode_decision(self._pending_message, self._announcement_codes)
 
     def _read_script(self, _payload: int, duel: int, name: bytes) -> int:
         relative = Path(name.decode("utf-8"))
@@ -495,7 +517,6 @@ class OcgcoreProbe:
         """Build a redacted view; only audited fields are requested or returned."""
         if self._pending_message is None or viewer not in (0, 1):
             raise RuntimeError("observation requires a pending decision and valid viewer")
-        from goat_ai.engine.native_messages import decode_decision
         from goat_ai.engine.native_queries import decode_life_points
 
         locations = {}
@@ -544,7 +565,7 @@ class OcgcoreProbe:
                                if card is not None)
                          for player in (0, 1))
         return Observation(
-            viewer=viewer, acting_player=decode_decision(self._pending_message).player,
+            viewer=viewer, acting_player=self.decode_pending().player,
             turn=self._turn, phase=self._phase, life_points=lp,
             hand=tuple(CardView(viewer, "hand", "hidden", card.code, sequence)
                        for sequence, card in enumerate(hand) if card is not None),
@@ -602,9 +623,7 @@ class OcgcoreProbe:
         """Send one native response and process until another decision or terminal."""
         if self._pending_message is None:
             raise RuntimeError("no pending native decision")
-        from goat_ai.engine.native_messages import decode_decision
-
-        choices = decode_decision(self._pending_message).choices
+        choices = self.decode_pending().choices
         if response_value not in {choice.response for choice in choices}:
             raise ValueError("illegal native response")
         if isinstance(response_value, int):

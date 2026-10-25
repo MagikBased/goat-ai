@@ -26,7 +26,7 @@ ACTION_KINDS = (
     "unselect_card", "yes",
 )
 ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
-ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number")
+ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
 POLICY_FEATURE_VERSION = 6  # distinguish Attribute and number announcements
 

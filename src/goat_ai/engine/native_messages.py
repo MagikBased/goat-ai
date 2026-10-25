@@ -27,6 +27,7 @@ class NativeChoice:
     zones: tuple[tuple[int, int, int], ...] = ()
     attribute: int | None = None
     number: int | None = None
+    announced_card: int | None = None
 
 
 @dataclass(frozen=True)
@@ -52,7 +53,8 @@ class _Reader:
             raise ValueError("trailing bytes in native decision")
 
 
-def decode_decision(message: bytes) -> NativeDecision:
+def decode_decision(message: bytes,
+                    announcement_codes: tuple[int, ...] | None = None) -> NativeDecision:
     """Decode supported native choices; fail on every other request type."""
     reader = _Reader(message)
     kind = reader.integer(1)
@@ -101,6 +103,18 @@ def decode_decision(message: bytes) -> NativeDecision:
                         for index in range(count))
         reader.finish()
         return NativeDecision(player, choices)
+    if kind == 142:  # MSG_ANNOUNCE_CARD
+        player = reader.integer(1)
+        count = reader.integer(1)
+        options = tuple(reader.integer(8) for _ in range(count))
+        reader.finish()
+        if player not in (0, 1) or options != (1, 0x4000010200000000):
+            raise NotImplementedError("card announcement expression is not supported")
+        if not announcement_codes:
+            raise NotImplementedError("historical card announcement catalog is unavailable")
+        return NativeDecision(player, tuple(
+            NativeChoice("announce_card", code, announced_card=code)
+            for code in announcement_codes))
     if kind == 19:  # MSG_SELECT_POSITION
         player = reader.integer(1)
         reader.integer(4)  # card identity is not needed to choose a position

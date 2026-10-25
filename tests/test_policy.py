@@ -78,17 +78,20 @@ def test_announced_attribute_and_number_are_distinct_policy_features():
         Action("b", "announce_attribute", 0, {"attribute": 32}),
         Action("c", "announce_number", 0, {"number": 1000}),
         Action("d", "announce_number", 0, {"number": 2000}),
+        Action("e", "announce_card", 0, {"code": 10}),
     )
     features = encode_decision(view(), choices, vocabulary)
-    assert features.action_numbers.shape == (4, 11)
+    assert features.action_numbers.shape == (5, 11)
     assert features.action_kinds[0] == features.action_kinds[1]
     assert features.action_kinds[0] != features.action_kinds[2]
+    assert features.action_kinds[4] not in features.action_kinds[:4]
+    assert features.action_cards[4] == vocabulary.index(10)
     assert not torch.equal(features.action_numbers[0], features.action_numbers[1])
     assert not torch.equal(features.action_numbers[2], features.action_numbers[3])
-    assert LegalActionPolicy(vocabulary.size, width=16)(features).shape == (4,)
+    assert LegalActionPolicy(vocabulary.size, width=16)(features).shape == (5,)
     legacy = encode_decision(view(), choices, vocabulary, feature_version=5)
-    assert legacy.action_numbers.shape == (4, 8)
-    assert legacy.action_kinds.tolist() == [0, 0, 0, 0]
+    assert legacy.action_numbers.shape == (5, 8)
+    assert legacy.action_kinds.tolist() == [0, 0, 0, 0, 0]
 
 
 def test_multi_target_features_preserve_visible_slots_without_hidden_codes():

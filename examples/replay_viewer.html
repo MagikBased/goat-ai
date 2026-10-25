@@ -5,46 +5,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GOAT AI Replay Viewer</title>
   <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101a22; color: #eef5f3; }
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0b111b; color: #eef5f3; }
     * { box-sizing: border-box; }
-    body { margin: 0; }
-    header { padding: 18px max(20px, calc((100vw - 1260px) / 2)); background: #172832; border-bottom: 1px solid #34505a; }
-    h1 { margin: 0 0 4px; font-size: 1.45rem; }
-    h2 { margin: 0 0 10px; font-size: 1rem; color: #bde0d1; }
+    body { margin: 0; height: 100dvh; overflow: hidden; }
+    .topbar { height: 64px; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #14232f; border-bottom: 1px solid #3e5c67; }
+    h1 { margin: 0; font-size: 1.2rem; }
+    h2 { margin: 0 0 9px; font-size: .95rem; color: #bde0d1; }
     p { margin: 4px 0; }
     .muted { color: #9bb5bc; }
-    main { max-width: 1260px; margin: 0 auto; padding: 18px; }
-    .toolbar, .summary, .player-header, .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .toolbar { margin-bottom: 14px; }
+    .subtitle { margin: 1px 0 0; font-size: .78rem; }
+    main { height: calc(100dvh - 64px); padding: 10px; min-width: 0; overflow: hidden; }
+    #viewer { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 350px); gap: 10px; }
+    .toolbar, .summary, .player-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .toolbar { justify-content: flex-end; min-width: 0; }
+    #file-name { max-width: 185px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; }
     button, input[type=file], input[type=number] { font: inherit; }
     button { padding: 7px 13px; color: #eef5f3; background: #234854; border: 1px solid #4f7980; border-radius: 7px; cursor: pointer; }
     button:hover, button:focus-visible { background: #306575; }
     button:disabled { opacity: .4; cursor: default; }
     input[type=number] { width: 82px; padding: 6px; color: inherit; background: #14242d; border: 1px solid #4f7980; border-radius: 6px; }
     input[type=range] { flex: 1; min-width: 170px; accent-color: #7dcab1; }
-    input[type=file] { max-width: 280px; }
+    input[type=file] { max-width: 225px; font-size: .78rem; }
     label { display: inline-flex; align-items: center; gap: 5px; }
-    .panel { background: #182b35; border: 1px solid #35515a; border-radius: 12px; padding: 14px; margin: 12px 0; }
+    .panel { background: #172731; border: 1px solid #36535e; border-radius: 10px; padding: 12px; margin: 0 0 10px; }
     .summary { justify-content: space-between; }
-    .board { background: #19372f; border-color: #547765; }
-    .player-header { justify-content: space-between; margin: 4px 0 10px; }
-    .player-header strong { font-size: 1.1rem; }
-    .zones { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 6px 0 12px; }
-    .slot { min-height: 99px; border: 1px dashed #62836f; border-radius: 8px; padding: 5px; display: flex; flex-direction: column; justify-content: center; }
+    .board { margin: 0; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 10px; background: radial-gradient(circle at 50% 50%, #153d42 0%, #102b35 45%, #101b2a 100%); border-color: #537884; }
+    .duel-side { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
+    .player-header { flex: 0 0 auto; justify-content: space-between; padding: 2px 5px; }
+    .player-header strong { font-size: 1rem; }
+    .player-header .zone-counts { font-size: .78rem; }
+    .life { font-size: 1.1rem; font-weight: 700; color: #fff0b1; }
+    .zone-line { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 10%); gap: 6px; }
+    .zones { min-height: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+    .slot { min-height: 0; min-width: 0; border: 2px solid #627e6d; border-radius: 7px; padding: 4px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+    .opponent .slot { border-color: #749555; }
+    .viewer-side .slot { border-color: #a95a9e; }
     .slot.disabled { border-color: #b86b6b; background: #4d2f35; }
-    .slot-label { font-size: .68rem; color: #afc9b7; margin-bottom: 3px; }
-    .card { min-height: 65px; border-radius: 6px; padding: 7px; display: flex; flex-direction: column; justify-content: space-between; font-size: .82rem; overflow-wrap: anywhere; box-shadow: 0 2px 7px #0005; }
+    .slot-label { font-size: .63rem; color: #c5dcc9; margin-bottom: 3px; }
+    .card { min-height: 0; min-width: 0; flex: 1; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; justify-content: space-between; font-size: .8rem; overflow-wrap: anywhere; overflow: hidden; box-shadow: 0 2px 7px #0005; }
     .monster { background: #b18b50; color: #201709; }
     .spell_trap { background: #457d85; color: #08181b; }
     .facedown { background: repeating-linear-gradient(35deg, #644e87, #644e87 8px, #4e3b70 8px, #4e3b70 16px); color: #fff; }
     .known { outline: 2px solid #e5cb6d; }
     .card small { opacity: .8; }
-    .divider { border: 0; border-top: 2px solid #638471; margin: 18px 0; }
-    .hand { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 7px; }
-    .hand .card { width: 115px; min-height: 70px; }
-    .hand-back { width: 35px; height: 53px; border: 2px solid #947bb4; border-radius: 5px; background: #55436e; }
-    .zone-counts { display: flex; gap: 18px; flex-wrap: wrap; color: #c1d7d3; font-size: .85rem; }
-    .details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+    .field-zone { border-color: #ce9c52 !important; }
+    .centerline { flex: 0 0 36px; display: flex; justify-content: center; align-items: center; border-top: 1px solid #678a86; border-bottom: 1px solid #678a86; color: #e8edd4; font-weight: 700; letter-spacing: .03em; }
+    .hand { flex: 0 0 55px; min-width: 0; display: flex; gap: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+    .hand .card { flex: 0 0 105px; }
+    .hand-back { flex: 0 0 35px; height: 49px; border: 2px solid #947bb4; border-radius: 5px; background: repeating-linear-gradient(35deg, #55436e, #55436e 7px, #3c3156 7px, #3c3156 14px); }
+    .zone-counts { display: flex; gap: 8px; flex-wrap: wrap; color: #c1d7d3; }
+    .sidebar { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 3px; }
+    .controls { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; background: #203744; }
+    .controls button { padding: 7px 3px; }
+    .controls #slider, .controls .decision-jump, .controls .skip-label { grid-column: 1 / -1; }
+    .controls .decision-jump { justify-content: space-between; }
+    .details-grid { display: block; }
     .detail-box { padding: 10px; background: #11232b; border-radius: 8px; }
     .detail-box h3 { margin: 0 0 5px; font-size: .9rem; }
     .detail-box ul { margin: 4px 0 0; padding-left: 19px; }
@@ -53,36 +68,35 @@
     .legal-list li { margin: 3px 0; }
     .notice { padding: 10px 12px; border-left: 3px solid #e5cb6d; background: #293734; margin: 12px 0; }
     [hidden] { display: none !important; }
-    @media (max-width: 650px) { main { padding: 10px; } .zones { gap: 4px; } .slot { min-height: 80px; padding: 3px; } .card { font-size: .68rem; padding: 4px; } }
+    @media (max-width: 900px) { body { height: auto; overflow: auto; } .topbar { height: auto; flex-wrap: wrap; } main { height: auto; overflow: visible; } #viewer { display: block; } .board { height: min(760px, 75dvh); min-height: 550px; margin-bottom: 10px; } .sidebar { overflow: visible; } .controls { position: static; } }
+    @media (max-width: 650px) { .topbar { padding: 8px; } .toolbar { justify-content: flex-start; } main { padding: 6px; } .board { padding: 5px; } .zones, .zone-line { gap: 3px; } .slot { padding: 2px; } .slot-label { font-size: .55rem; } .card { font-size: .65rem; padding: 3px; } .player-header { gap: 4px; } .player-header .zone-counts { font-size: .65rem; } }
   </style>
 </head>
 <body>
-  <header>
-    <h1>GOAT AI Replay Viewer</h1>
-    <p class="muted">Player-visible decision snapshots from a saved GOAT AI trajectory</p>
-  </header>
-  <main>
+  <header class="topbar">
+    <div><h1>GOAT AI Replay Viewer</h1><p class="muted subtitle">Player-visible decision snapshots</p></div>
     <div class="toolbar">
       <label>Open trajectory <input id="file" type="file" accept=".json,application/json"></label>
       <span id="file-name" class="muted">No replay loaded</span>
     </div>
+  </header>
+  <main>
     <div id="notice" class="notice">Choose a GOAT AI trajectory JSON file, or open an HTML replay generated by <code>scripts/render_replay.py</code>.</div>
     <section id="viewer" hidden>
-      <div class="panel controls">
-        <button id="previous" title="Left arrow">Previous</button>
-        <button id="next" title="Right arrow">Next</button>
-        <button id="play">Play</button>
-        <input id="slider" type="range" min="0" value="0" aria-label="Decision position">
-        <label>Decision <input id="jump" type="number" min="1" value="1"></label>
-        <span id="total"></span>
-        <label><input id="skip" type="checkbox" checked> Skip passes and placement</label>
-      </div>
-      <div class="panel summary">
-        <div><strong id="turn"></strong><p id="viewpoint" class="muted"></p></div>
-        <div id="result" class="muted"></div>
-      </div>
-      <div class="panel board" id="board"></div>
-      <div class="details-grid">
+      <div class="panel board" id="board" aria-label="Duel field"></div>
+      <aside class="sidebar" aria-label="Replay controls and details">
+        <div class="panel controls">
+          <button id="previous" title="Left arrow">Previous</button>
+          <button id="play">Play</button>
+          <button id="next" title="Right arrow">Next</button>
+          <input id="slider" type="range" min="0" value="0" aria-label="Decision position">
+          <label class="decision-jump">Decision <input id="jump" type="number" min="1" value="1"> <span id="total"></span></label>
+          <label class="skip-label"><input id="skip" type="checkbox" checked> Skip passes and placement</label>
+        </div>
+        <div class="panel summary">
+          <div><strong id="turn"></strong><p id="viewpoint" class="muted"></p></div>
+          <div id="result" class="muted"></div>
+        </div>
         <div class="panel">
           <h2>Selected action</h2>
           <div id="action" class="action"></div>
@@ -104,7 +118,8 @@
           <h2>Own starting Main Deck</h2>
           <div id="decklist" class="muted"></div>
         </div>
-      </div>
+        <div class="panel" id="piles"></div>
+      </aside>
     </section>
   </main>
   <script id="embedded-replay" type="application/json">__EMBEDDED_REPLAY__</script>
@@ -172,38 +187,48 @@
     function listZone(title, cards) {
       const box = node("div", "detail-box");
       box.append(node("h3", "", `${title} (${cards.length})`));
-      if (cards.length) box.append(node("p", "muted", cards.map(card => card.code == null ? "Face-down" : nameOf(card.code)).join(" · ")));
+      if (cards.length) box.append(node("p", "muted", cards.map(card => card.code == null ? "Concealed" : nameOf(card.code)).join(" · ")));
       return box;
     }
-    function playerBoard(observation, player, known) {
-      const section = node("section");
-      const playerHeader = node("div", "player-header");
-      playerHeader.append(node("strong", "", `Player ${player}${player === observation.viewer ? " · current view" : ""}`));
-      playerHeader.append(node("span", "", `${observation.life_points[player]} LP`));
-      section.append(playerHeader);
-      section.append(zoneRow(observation, player, "monster", known));
-      section.append(zoneRow(observation, player, "spell_trap", known));
-      const fieldSpell = observation.field.find(card => card.controller === player && card.zone === "spell_trap" && card.sequence === 5);
-      if (fieldSpell) {
-        const line = node("div", "hand");
-        line.append(node("span", "muted", "Field Zone:"));
-        line.append(cardElement(observation, fieldSpell, known));
-        section.append(line);
+    function zoneLine(observation, player, zone, known) {
+      const line = node("div", "zone-line");
+      line.append(zoneRow(observation, player, zone, known));
+      const auxiliary = node("div", "slot field-zone");
+      if (zone === "spell_trap") {
+        auxiliary.append(node("span", "slot-label", "Field Spell"));
+        const fieldSpell = observation.field.find(card => card.controller === player && card.zone === "spell_trap" && card.sequence === 5);
+        if (fieldSpell) auxiliary.append(cardElement(observation, fieldSpell, known));
+      } else {
+        auxiliary.append(node("span", "slot-label", "Deck"));
+        auxiliary.append(node("strong", "", observation.deck_counts[player]));
       }
-      const handCount = player === observation.viewer ? observation.hand.length : observation.opponent_hand_count;
-      section.append(node("p", "muted", `Hand ${handCount} · Deck ${observation.deck_counts[player]} · Extra ${observation.extra_deck_counts[player]}`));
+      line.append(auxiliary);
+      return line;
+    }
+    function playerBoard(observation, player, known) {
+      const own = player === observation.viewer;
+      const section = node("section", `duel-side ${own ? "viewer-side" : "opponent"}`);
+      const playerHeader = node("div", "player-header");
+      playerHeader.append(node("strong", "", `Player ${player}${own ? " · your view" : " · opponent"}`));
+      const handCount = own ? observation.hand.length : observation.opponent_hand_count;
+      playerHeader.append(node("span", "zone-counts", `Hand ${handCount} · Extra ${observation.extra_deck_counts[player]} · GY ${observation.graveyards[player].length} · Banished ${observation.banished[player].length}`));
+      playerHeader.append(node("span", "life", `${observation.life_points[player]} LP`));
+      section.append(playerHeader);
       const hand = node("div", "hand");
-      if (player === observation.viewer) {
+      if (own) {
         for (const card of observation.hand) hand.append(node("div", "card monster", nameOf(card.code)));
       } else {
-        for (let i = 0; i < Math.min(handCount, 10); i++) hand.append(node("div", "hand-back"));
-        if (handCount > 10) hand.append(node("span", "muted", `+${handCount - 10} cards`));
+        for (let i = 0; i < handCount; i++) hand.append(node("div", "hand-back"));
       }
-      section.append(hand);
-      const details = node("div", "details-grid");
-      details.append(listZone("Graveyard", observation.graveyards[player]));
-      details.append(listZone("Banished", observation.banished[player]));
-      section.append(details);
+      if (!own) section.append(hand);
+      if (own) {
+        section.append(zoneLine(observation, player, "monster", known));
+        section.append(zoneLine(observation, player, "spell_trap", known));
+      } else {
+        section.append(zoneLine(observation, player, "spell_trap", known));
+        section.append(zoneLine(observation, player, "monster", known));
+      }
+      if (own) section.append(hand);
       return section;
     }
     function actionLabel(observation, action, known) {
@@ -245,7 +270,14 @@
         ? `Seed ${replay.seed} · ${replay.winner == null ? "Draw" : `Winner: Player ${replay.winner}`}`
         : `Seed ${replay.seed} · Outcome hidden`;
       const board = byId("board");
-      board.replaceChildren(playerBoard(observation, 1, known), node("hr", "divider"), playerBoard(observation, 0, known));
+      board.replaceChildren(playerBoard(observation, 1 - observation.viewer, known),
+                            node("div", "centerline", `TURN ${observation.turn} · ${phaseName(observation.phase).toUpperCase()} · PLAYER ${observation.acting_player} TO ACT`),
+                            playerBoard(observation, observation.viewer, known));
+      byId("piles").replaceChildren(node("h2", "", "Graveyards and banished cards"),
+        listZone("Opponent Graveyard", observation.graveyards[1 - observation.viewer]),
+        listZone("Opponent Banished", observation.banished[1 - observation.viewer]),
+        listZone("Your Graveyard", observation.graveyards[observation.viewer]),
+        listZone("Your Banished", observation.banished[observation.viewer]));
       byId("action").textContent = actionLabel(observation, record.selected_action, known);
       byId("legal-count").textContent = `${record.legal_actions.length} legal actions at this decision`;
       const legal = byId("legal");

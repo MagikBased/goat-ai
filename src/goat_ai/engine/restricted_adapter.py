@@ -6,11 +6,12 @@ General GOAT card/effect support remains M1 work.
 """
 
 import sqlite3
+from dataclasses import replace
 from pathlib import Path
 
 from goat_ai.actions import Action
 from goat_ai.engine.decks import Decklist, read_goat_whitelist, read_ydk, validate_goat_deck
-from goat_ai.engine.native_messages import NativeChoice, decode_decision
+from goat_ai.engine.native_messages import NativeChoice
 from goat_ai.engine.ocgcore_probe import OcgcoreProbe
 from goat_ai.engine.protocol import Decision, RulesProfile, SimulatorUnavailable
 from goat_ai.replay.fingerprint import sha256_file
@@ -83,10 +84,20 @@ class RestrictedOcgcoreEngine:
         if self.probe is None or self.probe._pending_message is None:
             raise RuntimeError("no pending native decision")
         try:
-            native = decode_decision(self.probe._pending_message)
+            native = self.probe.decode_pending()
         except NotImplementedError as exc:
             raise SimulatorUnavailable(f"native request unsupported by restricted adapter: {exc}") from exc
         observation = self.probe.observation(native.player)
+        if any(link.card_code == 38723936 and link.controller != native.player
+               for link in observation.chain):
+            # Question forbids inspecting its controller's Graveyard at the
+            # announcement. Previously visible cards remain available to an
+            # agent only through its own memory of earlier decisions.
+            hidden = 1 - native.player
+            graveyards = list(observation.graveyards)
+            graveyards[hidden] = tuple(replace(card, code=None, position="hidden")
+                                       for card in graveyards[hidden])
+            observation = replace(observation, graveyards=tuple(graveyards))
         zones = {0x04: "monster", 0x08: "spell_trap", 0x10: "graveyard", 0x20: "banished"}
         visible_cards = (*observation.field, *observation.graveyards[0],
                          *observation.graveyards[1], *observation.banished[0],
@@ -146,6 +157,8 @@ class RestrictedOcgcoreEngine:
                 parameters["attribute"] = choice.attribute
             if choice.number is not None:
                 parameters["number"] = choice.number
+            if choice.announced_card is not None:
+                parameters["code"] = choice.announced_card
             if choice.prompt_id is not None:
                 parameters["prompt_id"] = choice.prompt_id
             if choice.sequence is not None:
