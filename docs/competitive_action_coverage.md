@@ -129,3 +129,47 @@ PYTHONPATH=. .venv/bin/python scripts/probe_competitive_card_actions.py \
   --output .cache/goat-ai/competitive-actions-9710-9719.json \
   > .cache/goat-ai/competitive-actions-9710-9719.stdout
 ```
+
+## Tournament-list-only sample for the next audit queue
+
+Use `--tournament-corpus` to pair every two lists in the six-list sourced
+tournament corpus, with both seat assignments. This produces 30 games per seed
+and excludes the Flip Control guide deck used by the earlier default schedule.
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --tournament-corpus \
+  --seed 9830 --seeds 2 --max-decisions 3000 \
+  --output .cache/goat-ai/competitive-actions-tournament-9830-9831.json \
+  > .cache/goat-ai/competitive-actions-tournament-9830-9831.stdout
+```
+
+On the pinned local assets, all **60 duels terminated** in **54,322
+decisions** (maximum 1,325 per duel). The report includes six deck hashes
+and 103 loaded native asset hashes. Its JSON SHA-256 is
+`8bd4f449225ffbfc7851e28c2357ded741682b6f402449d4f47e9599d778d3f2`.
+Of 68 card identities in the deck files or legal source actions, 41 had an
+`activate` or `chain` action offered and 40 had one selected. The random
+agents selected 164 card responses to a public chain link.
+
+| Card present in all six Main Decks | Copies across lists | Activate/chain offered | Activate/chain selected |
+| --- | ---: | ---: | ---: |
+| Nobleman of Crossout | 12 | 838 | 155 |
+| Heavy Storm | 6 | 564 | 88 |
+| Delinquent Duo | 6 | 543 | 74 |
+| Book of Moon | 14 | 517 | 237 |
+| Pot of Greed | 6 | 510 | 83 |
+| Graceful Charity | 6 | 503 | 90 |
+| Black Luster Soldier | 6 | 287 | 91 |
+| Ring of Destruction | 6 | 153 | 80 |
+| Breaker the Magical Warrior | 6 | 93 | 32 |
+
+The next card-specific audit work should start with these shared staples and
+their interactions, then the cards present in five lists: Dekoichi, Trap
+Dustshoot, D.D. Warrior Lady, Mirror Force, Snatch Steal, and Torrential
+Tribute. Check existing fixtures before adding one: a fixture file count is
+not a count of independently validated rulings. For example, the top response
+pair Solemn Judgment to Trap Dustshoot (nine decisions) and Torrential Tribute
+to Dekoichi (eight) already have native regressions. The random-policy action
+counts express decision exposure in this small sample, not actual tournament
+play frequency, historical correctness, or strategic value.

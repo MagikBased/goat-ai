@@ -1,11 +1,14 @@
 """Source-card coverage must not count target-selection identities as card use."""
 
 from collections import Counter
+from itertools import combinations
 from types import SimpleNamespace
 
 from goat_ai.actions import Action
+from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
 from scripts.probe_competitive_card_actions import (
     ROOT, count_chain_response, count_source_actions, deck_label,
+    tournament_matchups,
 )
 
 
@@ -31,6 +34,14 @@ def test_coverage_counts_source_options_once_and_ignores_target_choices():
 def test_report_uses_checkout_independent_example_deck_path():
     path = ROOT / "examples/decks/goat_control_lolmarcus_2020.ydk"
     assert deck_label(path) == "examples/decks/goat_control_lolmarcus_2020.ydk"
+
+
+def test_tournament_probe_pairs_every_sourced_list_and_no_guide_deck():
+    fixtures = ROOT / "examples/decks"
+    expected = tuple(combinations((fixtures / name for name in TOURNAMENT_MAIN_DECKS), 2))
+    assert tournament_matchups(fixtures) == expected
+    assert len(expected) == 15
+    assert all("guide" not in str(path) for pair in expected for path in pair)
 
 
 def test_chain_response_uses_latest_public_link_and_ignores_nonresponses():

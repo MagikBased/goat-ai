@@ -8,12 +8,14 @@ import argparse
 import json
 import sqlite3
 from collections import Counter
+from itertools import combinations
 from pathlib import Path
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
 from goat_ai.replay.fingerprint import sha256_file
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +25,11 @@ DEFAULT_MATCHUPS = (
     ("chaos_return_dingosig_worlds_2022.ydk",
      "flip_control_goatformat_guide.ydk"),
 )
+
+
+def tournament_matchups(fixtures: Path) -> tuple[tuple[Path, Path], ...]:
+    """Pair each of the six sourced tournament Main Decks once."""
+    return tuple(combinations((fixtures / name for name in TOURNAMENT_MAIN_DECKS), 2))
 SOURCE_KINDS = frozenset({
     "activate", "chain", "normal_summon", "flip_summon", "special_summon",
     "set_monster", "set_spell_trap", "attack", "change_position",
@@ -182,16 +189,23 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
-    parser.add_argument("--matchup", nargs=2, action="append", type=Path,
-                        metavar=("DECK_A", "DECK_B"))
+    schedule = parser.add_mutually_exclusive_group()
+    schedule.add_argument("--matchup", nargs=2, action="append", type=Path,
+                          metavar=("DECK_A", "DECK_B"))
+    schedule.add_argument("--tournament-corpus", action="store_true",
+                          help="probe all 15 pairs of six sourced tournament decks")
     parser.add_argument("--seed", type=int, default=9700)
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--max-decisions", type=int, default=3000)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     fixtures = ROOT / "examples/decks"
-    matchups = tuple((fixtures / a, fixtures / b) for a, b in DEFAULT_MATCHUPS) \
-        if args.matchup is None else tuple(tuple(pair) for pair in args.matchup)
+    if args.tournament_corpus:
+        matchups = tournament_matchups(fixtures)
+    elif args.matchup is None:
+        matchups = tuple((fixtures / a, fixtures / b) for a, b in DEFAULT_MATCHUPS)
+    else:
+        matchups = tuple(tuple(pair) for pair in args.matchup)
     report = probe(args.native_root, matchups, args.seed, args.seeds,
                    args.max_decisions)
     payload = json.dumps(report, indent=2) + "\n"
