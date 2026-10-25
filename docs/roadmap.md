@@ -330,6 +330,12 @@ and remembered field identity are checked. The complete duel replay-verifies;
 Vampire Lord's own effect remains outside this general-rule fixture. See
 [GOAT rules](goat_rules.md).
 
+A linked Black Luster Soldier fixture now takes an opponent-Summoned BLS with
+Snatch, uses its banish effect, then has Tsukuyomi Set it. After Snatch leaves,
+the stolen BLS can be Flip Summoned and banish a second opposing monster that
+same turn. The original owner's hidden field view retains only public memory
+of BLS's identity. The full duel replay-verifies; see [GOAT rules](goat_rules.md).
+
 The Chaos boss / Bottomless Trap Hole priority fixture now runs both official
 Chaos Sorcerer and the separate GOAT Black Luster Soldier script. For each,
 activating its banish effect before the Bottomless response removes the target
