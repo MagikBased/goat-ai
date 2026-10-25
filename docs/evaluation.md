@@ -1108,3 +1108,61 @@ larger-batch checkpoint as the first argument, the batch-1 checkpoint as
 `scripts/audit_policy_agreement.py --engine experimental` with the batch-1
 and comparison checkpoints on the eight previously collected Chaos
 Control/Warrior trajectories at seeds 16410–16411.
+
+## Opt-in shared-staple decision sampling
+
+The behavioral-cloning CLI now accepts repeated `--focus-card` IDs and a
+`--focus-weight`. When the weight exceeds one, it samples with replacement for
+the same number of decisions per epoch. A decision qualifies only if it has
+multiple legal actions and a focused card is the source of an offered action,
+or that card appears in a public chain link. A target card ID alone does not
+qualify. The unweighted trainer still shuffles all records once per epoch.
+This is an exposure experiment, not a card-specific policy rule.
+
+On the current experimental engine, 16 fresh CombatHeuristicAgent versus
+RandomAgent duels on sourced Goat Control and Chaos Turbo Main Decks at seeds
+16700–16703 produced 16,866 total decisions and 8,763 teacher decisions.
+All 16 trajectories replay-verified before training. Of the teacher decisions,
+379 qualified for the ten card IDs shared by the five tournament Main Decks
+in `tests/test_policy.py`: Breaker (71413901), Delinquent Duo (44763025),
+Snatch Steal (45986603), Pot of Greed (55144522), Nobleman of Crossout
+(504700116), Book of Moon (14087893), Black Luster Soldier (504700118), Heavy
+Storm (19613556), Ring of Destruction (511000824), and Graceful Charity
+(79571449). The two width-16, feature-v12 clones used
+the same initialization seed 16700, one epoch, batch size one, and 8,763
+optimizer decisions. Only the sampling weight differed: one or four. Their
+epoch losses were 0.1681214 and 0.1830156, respectively; losses under
+different sampling distributions are not a strength comparison. Checkpoint
+SHA-256: `304eb5dbd4d95d9958e9c3d785e5cbbbb37405d8557a9c4199000e36c1b666b3`
+and `bd7e5e99eb72786955516d4d2600cfeed8ac86c51cbb53a0719cc0fb86c54047`.
+
+An eight-duel, replay-verified CombatHeuristicAgent audit on unseen Chaos
+Control and Warrior Main Decks at seeds 16800–16801 contained 2,728 teacher
+decisions. Exact agreement on 947 multi-option decisions rose from 839 to
+851; offered-staple agreement rose from 79/86 to 80/86. Teacher-selected
+staple agreement stayed 59/63, public staple-chain agreement stayed 108/114,
+and multi-option chain-target agreement stayed 14/15. These overlapping
+contexts are off-policy diagnostics. In 32 direct games on unseen Chaos
+Control, Chaos Return, and Warrior Main Decks at seeds 16810–16813, both deck
+assignments and seats, the weighted clone scored **16–16** against the
+unweighted clone (50.0%; paired matchup-seed 95% bootstrap interval
+37.5–62.5%). The experiment does not establish a playing-strength gain;
+focused sampling remains opt-in. The audit and tournament JSON are ignored
+local artifacts with SHA-256
+`7df56577e11922eb0c252ac452f1f0f98e6ac7f8a9d17fbdee2e9b606aa7868f`
+and `c3e06758d9fc8d3bf13e95fd13dcad972c93dac431d9cc524a7e28f0849e5e7b`.
+
+To reproduce, collect the two training deck orders with
+`scripts/collect_heuristic_demos.py --engine experimental --teacher
+combat_heuristic --seed 16700 --seeds 4 --max-decisions 3000`; collect both
+Chaos Control/Warrior orders with seeds 16800–16801 for the separate audit.
+Train both checkpoints with `scripts/train_behavioral_clone.py --engine
+experimental --feature-version 12 --epochs 1 --width 16 --seed 16700`, adding
+`--focus-weight 4` and one `--focus-card` per ID above only to the weighted
+run. Audit with `scripts/audit_policy_agreement.py --engine experimental` and
+both checkpoints. Run `scripts/evaluate_policy.py` with the weighted checkpoint
+against the unweighted `--opponent-checkpoint`, `--engine experimental`,
+`--both-deck-assignments`, `--require-unseen-main-decks`, the Chaos
+Control/Warrior and Chaos Return/Warrior matchups, `--seed 16810 --seeds 4
+--max-decisions 3000 --workers 2`. Use the pinned assets in
+[native setup](native_setup.md) and `OMP_NUM_THREADS=1`.

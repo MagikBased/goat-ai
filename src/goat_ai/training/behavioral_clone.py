@@ -2,6 +2,7 @@
 
 import random
 from collections.abc import Sequence
+from math import isfinite
 
 import torch
 from torch import nn
@@ -13,7 +14,8 @@ from goat_ai.training.policy import CardVocabulary, LegalActionPolicy, encode_de
 def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
                          records: Sequence[DecisionRecord], *, epochs: int = 1,
                          learning_rate: float = 1e-3, seed: int = 0,
-                         batch_size: int = 1) -> tuple[float, ...]:
+                         batch_size: int = 1,
+                         sampling_weights: Sequence[float] | None = None) -> tuple[float, ...]:
     """Return mean per-decision cross-entropy for each epoch.
 
     This function trains on its input as supplied. Callers must verify source,
@@ -22,6 +24,10 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
     """
     if not records or epochs < 1 or learning_rate <= 0 or batch_size < 1:
         raise ValueError("training needs records, positive epochs, learning rate, and batch size")
+    if sampling_weights is not None and (len(sampling_weights) != len(records)
+                                         or any(not isfinite(weight) or weight <= 0
+                                                for weight in sampling_weights)):
+        raise ValueError("sampling weights must be finite, positive, and match records")
     device = next(model.parameters()).device
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     losses = []
@@ -29,8 +35,15 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
                                  model.feature_version),
                  record.legal_actions.index(record.selected_action)) for record in records]
     for epoch in range(epochs):
-        order = list(range(len(examples)))
-        random.Random(seed + epoch).shuffle(order)
+        rng = random.Random(seed + epoch)
+        if sampling_weights is None:
+            order = list(range(len(examples)))
+            rng.shuffle(order)
+        else:
+            # Keep the number of optimizer decisions fixed while exposing the
+            # policy more often to the requested, rare decision contexts.
+            order = rng.choices(range(len(examples)), weights=sampling_weights,
+                                k=len(examples))
         model.train()
         total = 0.0
         for start in range(0, len(order), batch_size):

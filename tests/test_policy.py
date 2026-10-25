@@ -40,6 +40,7 @@ from scripts.evaluate_policy import (
     validate_unseen_main_decks,
 )
 from scripts.audit_policy_agreement import STAPLES, decision_scopes, staple_context
+from scripts.train_behavioral_clone import focus_opportunity
 
 
 def view() -> Observation:
@@ -69,6 +70,17 @@ def test_staple_audit_distinguishes_played_cards_from_target_codes():
         "offered": {10}, "teacher_selected": {10}, "chain_prompt": set()}
     assert staple_context(selected_target, {10, 20, 30}) == {
         "offered": set(), "teacher_selected": set(), "chain_prompt": {30}}
+
+
+def test_focus_opportunity_uses_card_source_or_public_chain():
+    played = Action("play", "activate", 0, {"code": 10})
+    target = Action("target", "select_card", 0, {"code": 10})
+    end = Action("end", "end_phase", 0)
+    assert focus_opportunity(DecisionRecord(view(), (played, end), end), {10})
+    assert not focus_opportunity(DecisionRecord(view(), (target, end), end), {10})
+    assert not focus_opportunity(DecisionRecord(view(), (played,), played), {10})
+    active_chain = replace(view(), chain=(ChainLinkView(1, 10, 1, 8, 0),))
+    assert focus_opportunity(DecisionRecord(active_chain, (target, end), end), {10})
 
 
 def test_audit_scopes_isolate_public_target_decisions():
@@ -549,6 +561,29 @@ def test_behavioral_clone_minibatch_matches_mean_gradient():
                for a, b in zip(actual.parameters(), expected.parameters(), strict=True))
     with pytest.raises(ValueError, match="batch size"):
         fit_behavioral_clone(actual, vocabulary, records, batch_size=0)
+
+
+def test_behavioral_clone_weighted_sampling_keeps_update_count_and_is_reproducible():
+    vocabulary = CardVocabulary((10, 20))
+    records = (DecisionRecord(view(), actions(), actions()[0]),
+               DecisionRecord(view(), actions(), actions()[1]))
+    torch.manual_seed(72)
+    weighted = LegalActionPolicy(vocabulary.size, width=8)
+    torch.manual_seed(72)
+    expected = LegalActionPolicy(vocabulary.size, width=8)
+    sampled = (records[1], records[1])
+    weighted_loss = fit_behavioral_clone(weighted, vocabulary, records, epochs=1,
+                                         learning_rate=0.01, seed=72, batch_size=2,
+                                         sampling_weights=(1.0, 100.0))
+    expected_loss = fit_behavioral_clone(expected, vocabulary, sampled, epochs=1,
+                                         learning_rate=0.01, seed=72, batch_size=2)
+    assert weighted_loss == expected_loss
+    assert all(torch.equal(a, b) for a, b in zip(
+        weighted.parameters(), expected.parameters(), strict=True))
+    for bad_weights in ((1.0,), (1.0, float("nan")), (1.0, 0.0)):
+        with pytest.raises(ValueError, match="sampling weights"):
+            fit_behavioral_clone(weighted, vocabulary, records,
+                                 sampling_weights=bad_weights)
 
 
 def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):

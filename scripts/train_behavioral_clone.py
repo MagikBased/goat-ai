@@ -19,6 +19,19 @@ from goat_ai.training import (
 )
 from goat_ai.training.policy import POLICY_FEATURE_VERSION
 
+SOURCE_KINDS = frozenset((
+    "activate", "attack", "chain", "change_position", "flip_summon",
+    "normal_summon", "set_monster", "set_spell_trap", "special_summon",
+))
+
+
+def focus_opportunity(record, codes: set[int]) -> bool:
+    """A visible option or public chain link involves a selected card ID."""
+    return (len(record.legal_actions) > 1 and (
+        any(action.kind in SOURCE_KINDS and action.parameters.get("code") in codes
+            for action in record.legal_actions)
+        or any(link.card_code in codes for link in record.observation.chain)))
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -34,9 +47,16 @@ def main() -> None:
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--focus-card", type=int, action="append", default=[],
+                        help="increase exposure of decisions offering or responding to this card")
+    parser.add_argument("--focus-weight", type=float, default=1.0,
+                        help="relative sampling weight for focus-card opportunities")
     args = parser.parse_args()
-    if args.epochs < 1 or args.width < 1 or args.learning_rate <= 0 or args.batch_size < 1:
-        parser.error("epochs, width, learning rate, and batch size must be positive")
+    if (args.epochs < 1 or args.width < 1 or args.learning_rate <= 0
+            or args.batch_size < 1 or not 1 <= args.focus_weight < float("inf")
+            or any(code <= 0 for code in args.focus_card)
+            or args.focus_weight > 1 and not args.focus_card):
+        parser.error("training parameters must be positive; focus weight needs focus cards")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     records = []
@@ -74,9 +94,15 @@ def main() -> None:
     torch.manual_seed(args.seed)
     model = LegalActionPolicy(vocabulary.size, width=args.width,
                               feature_version=args.feature_version)
+    focus_codes = set(args.focus_card)
+    focus_count = sum(focus_opportunity(record, focus_codes) for record in records)
+    sampling_weights = ([args.focus_weight if focus_opportunity(record, focus_codes) else 1.0
+                         for record in records]
+                        if args.focus_weight > 1 else None)
     losses = fit_behavioral_clone(model, vocabulary, records, epochs=args.epochs,
                                   learning_rate=args.learning_rate, seed=args.seed,
-                                  batch_size=args.batch_size)
+                                  batch_size=args.batch_size,
+                                  sampling_weights=sampling_weights)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     checkpoint = {
         "schema_version": 1, "model_state": model.state_dict(),
@@ -86,11 +112,16 @@ def main() -> None:
         "training_games": training_games,
         "seed": args.seed, "torch_version": str(torch.__version__),
         "batch_size": args.batch_size,
+        "focus_cards": tuple(sorted(focus_codes)),
+        "focus_weight": args.focus_weight,
+        "focus_opportunity_decisions": focus_count,
+        "sampling_mode": "weighted_with_replacement" if sampling_weights else "shuffle",
         "losses": losses,
     }
     torch.save(checkpoint, args.output)
     print(json.dumps({"output": str(args.output), "decisions": len(records),
-                      "sources": sources, "epoch_loss": losses}, indent=2))
+                      "sources": sources, "epoch_loss": losses,
+                      "focus_opportunity_decisions": focus_count}, indent=2))
 
 
 if __name__ == "__main__":
