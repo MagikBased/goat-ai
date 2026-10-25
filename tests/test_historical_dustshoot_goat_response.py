@@ -129,3 +129,80 @@ def test_dustshoot_four_card_gate_survives_chained_scapegoat(tmp_path, chain_goa
     pytest.fail(f"Dustshoot / Scapegoat reverse chain stalled: turn={obs.turn} "
                 f"phase={obs.phase} setup={backrow_set}/{dust_set}/{dust_used} "
                 f"response={goat_responded}/{selected}/{checked}")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_scapegoat_before_dustshoot_prevents_four_card_activation(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    scripts = {f"goat/c{GOAT}.lua", f"official/c{DUSTSHOOT}.lua"}
+    if any(not (root / "scripts" / script).is_file() for script in scripts):
+        pytest.skip("required card scripts not installed")
+    own_cards = [GOAT, BOOK, BOOK, *VANILLA_DECK[3:]]
+    own_cards = [BOTTOMLESS if code == 49003308 else
+                 SAKURETSU if code == 49881766 else code for code in own_cards]
+    own = tmp_path / "scapegoat.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, own_cards)) + "\n#extra\n!side\n")
+    other = tmp_path / "dustshoot.ydk"
+    other.write_text("#main\n" + "\n".join(map(str, (
+        DUSTSHOOT, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own), str(other), seed=52,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        backrow_set = 0
+        dust_set = goat_used = dust_blocked = False
+        agents = (RandomAgent(52), RandomAgent(53))
+        for _ in range(3000):
+            if env.is_terminal():
+                assert dust_blocked
+                path = tmp_path / "scapegoat_preempts_dustshoot.json"
+                write_trajectory(path, env.trajectory())
+                trajectory = read_trajectory(path)
+                assert audit_trajectory_visibility(trajectory)["decisions"] == len(
+                    trajectory.decisions)
+                assert verify_trajectory(trajectory,
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                                             trajectory.decisions)
+                return
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and backrow_set < 3:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") in
+                               {BOOK, BOTTOMLESS, SAKURETSU}), None)
+                backrow_set += action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not dust_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == DUSTSHOOT), None)
+                dust_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and dust_set \
+                    and not goat_used:
+                option = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == GOAT), None)
+                if option is not None:
+                    assert len(obs.hand) == 4
+                    assert obs.chain == ()
+                    action = option
+                    goat_used = True
+            if goat_used and obs.acting_player == 1 and not dust_blocked:
+                assert obs.opponent_hand_count == 3
+                assert not any(a.kind == "chain" and a.parameters.get("code")
+                               == DUSTSHOOT for a in actions)
+                assert any(c.controller == 1 and c.zone == "spell_trap"
+                           and c.code == DUSTSHOOT and c.position == "facedown"
+                           for c in obs.field)
+                dust_blocked = True
+            if action is None and not dust_blocked:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+            if dust_blocked and obs.turn == 3 and GOAT in {
+                    c.code for c in obs.graveyards[0]} and not obs.chain:
+                assert sum(c.code in SHEEP for c in obs.field) == 4
+                assert DUSTSHOOT not in {c.code for c in obs.graveyards[1]}
+                assert scripts <= env.engine.probe.loaded_script_sha256.keys()
+    pytest.fail(f"Scapegoat did not preempt Dustshoot: turn={obs.turn} "
+                f"phase={obs.phase} setup={backrow_set}/{dust_set}/{goat_used}/"
+                f"{dust_blocked}")
