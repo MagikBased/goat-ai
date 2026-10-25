@@ -39,6 +39,9 @@ UPSTREAM_GOAT_RESTRICT_SHA256 = "579c13c4afff6a581360b221ed79867b7b7d75c57870d99
 UPSTREAM_POT_SHA256 = "c827d7f30d746cdd74bdcbdd9ef5d1612fd6fdb6cc07d981b7a780c7231ba6f7"
 POT_DRAW_CHECK_OLD = b"return Duel.IsPlayerCanDraw(tp,2) end"
 POT_DRAW_CHECK_GOAT = b"return Duel.IsPlayerCanDraw(tp,0) end"
+UPSTREAM_GRACEFUL_SHA256 = "12b5a5730b6dea2c1bf3eb379f0d436263786c1ac882e197580e4c72dede3eb5"
+GRACEFUL_DRAW_CHECK_OLD = b"return Duel.IsPlayerCanDraw(tp,3) end"
+GRACEFUL_DRAW_CHECK_GOAT = b"return Duel.IsPlayerCanDraw(tp,0) end"
 GOAT_RESTRICT_EFFECT_MARKER = b"\tc:RegisterEffect(e5)\nend\n"
 GOAT_RESTRICT_EQUIP_MARKER = (
     b"\tif not c:EquipByEffectAndLimitRegister(e,tp,tc,id) then return end\n"
@@ -389,6 +392,13 @@ class OcgcoreProbe:
             # Keep draw-prohibition effects, but permit an attempted draw
             # beyond the Deck, which loses the duel under GOAT rules.
             contents = contents.replace(POT_DRAW_CHECK_OLD, POT_DRAW_CHECK_GOAT)
+        if path.relative_to(self.scripts) == Path("official/c79571449.lua"):
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_GRACEFUL_SHA256 \
+                    or contents.count(GRACEFUL_DRAW_CHECK_OLD) != 1:
+                self.errors.append("pinned Graceful script changed; GOAT overdraw patch not applied")
+                return 0
+            contents = contents.replace(GRACEFUL_DRAW_CHECK_OLD,
+                                        GRACEFUL_DRAW_CHECK_GOAT)
         self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
             hashlib.sha256(contents).hexdigest()
         )

@@ -18,6 +18,8 @@ The pinned CardScripts `utility.lua` has upstream SHA-256 `59ebe317dbec0ef5134f4
 
 The pinned Pot of Greed script has upstream SHA-256 `c827d7f30d746cdd74bdcbdd9ef5d1612fd6fdb6cc07d981b7a780c7231ba6f7`. Its in-memory GOAT draw gate checks `Duel.IsPlayerCanDraw(tp,0)` so a draw-prohibiting effect still blocks activation while too few cards in Deck do not. The loaded-script SHA-256 is `f5fe5f873c46953ff998c04558dfdc0546856e683041204feb647f91bfec9065`. The modification follows [GOAT Rule #16's overdraw clause](https://www.goatformat.com/basics.html). Replay manifests made before this correction have a different effective Pot hash and require fresh recordings for exact verification.
 
+The pinned Graceful Charity script has upstream SHA-256 `12b5a5730b6dea2c1bf3eb379f0d436263786c1ac882e197580e4c72dede3eb5`. The same GOAT overdraw correction changes its activation gate to `Duel.IsPlayerCanDraw(tp,0)` without changing the draw/discard operation. Its loaded-script SHA-256 is `5ab8c1b6aa3dfca5e5409926115089f9a12584f260c1a7e2d31867040e30f89d`. Older replay manifests that loaded Graceful likewise require fresh recordings for exact verification.
+
 Requires Linux, Git, a C++17 compiler, Python 3.10+, Meson 1.7+, and Ninja. From a clean clone:
 
 ```bash
