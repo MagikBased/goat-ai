@@ -412,10 +412,19 @@ class OcgcoreProbe:
                 known_hand = getattr(self, "_known_hand", None)
                 if known_hand is not None:
                     if old_controller in (0, 1) and old_location == LOCATION_HAND:
-                        # A hand slot leaving can be private (for example a Set).
-                        # Without a public identity, no remaining known-card
-                        # assignment is safe, so forget this hand's multiset.
-                        known_hand[old_controller].clear()
+                        public_exit = (new_location == LOCATION_GRAVE or
+                                       (new_location in (LOCATION_MZONE, LOCATION_SZONE,
+                                                        LOCATION_REMOVED)
+                                        and struct.unpack_from("<I", message, 21)[0] & 0x5))
+                        if public_exit:
+                            # A publicly identified exit removes at most one
+                            # known copy; other known cards stay in hand.
+                            code = struct.unpack_from("<I", message, 1)[0]
+                            if code in known_hand[old_controller]:
+                                known_hand[old_controller].remove(code)
+                        else:
+                            # A Set or other hidden exit may be any hand card.
+                            known_hand[old_controller].clear()
                     public_source = (old_location == LOCATION_GRAVE or
                                      (old_location in (LOCATION_MZONE, LOCATION_SZONE)
                                       and struct.unpack_from("<I", message, 11)[0] & 0x5))

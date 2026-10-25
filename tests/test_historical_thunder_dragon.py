@@ -92,6 +92,7 @@ def test_thunder_dragon_two_then_zero_and_opponent_verification(tmp_path):
                 assert sum(c.code == THUNDER_DRAGON
                            for c in own.graveyards[0]) == 2
                 assert len([c for c in own.hand if c.code == THUNDER_DRAGON]) == 1
+                assert other.known_opponent_hand_cards == (THUNDER_DRAGON,)
                 assert own.deck_counts[0] == 32
                 assert other.opponent_hand_count == len(own.hand)
                 assert [len(reveal.cards) for reveal in other.private_reveals] == [2, 32]
