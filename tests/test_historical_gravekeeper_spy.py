@@ -11,6 +11,7 @@ from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
+from goat_ai.replay.fingerprint import sha256_file
 
 SPY = 504700044  # GOAT variant
 GUARD = 37101832
@@ -168,3 +169,50 @@ def test_spy_can_recruit_another_spy_with_necrovalley_active(tmp_path):
                     "place", "select_position", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("Spy did not recruit another Spy under pre-errata Necrovalley")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_spy_empty_search_verifies_deck_only_to_opponent(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/goat/c{SPY}.lua").is_file():
+        pytest.skip("GOAT Spy script not installed")
+    deck = _write_deck(tmp_path / "only_spy.ydk", (SPY, *VANILLA_DECK[1:]))
+    with GoatEnvironment(deck, "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        set_spy = flipped = False
+        assert not env.engine.probe.observation(1).private_reveals
+        for _ in range(35):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 and not set_spy:
+                action = next((a for a in actions if a.kind == "set_monster"
+                               and a.parameters.get("code") == SPY), None)
+                set_spy |= action is not None
+            if observation.turn == 3 and observation.acting_player == 0 and not flipped:
+                action = next((a for a in actions if a.kind == "flip_summon"
+                               and a.parameters.get("code") == SPY), None)
+                flipped |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "select_position", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+            owner_view = env.engine.probe.observation(0)
+            opponent_view = env.engine.probe.observation(1)
+            if opponent_view.private_reveals:
+                assert flipped
+                assert not owner_view.private_reveals
+                assert len(opponent_view.private_reveals) == 1
+                reveal = opponent_view.private_reveals[0]
+                assert reveal.recipient == 1 and reveal.turn == 3
+                assert len(reveal.cards) == owner_view.deck_counts[0] == 33
+                assert all(c.controller == 0 and c.location == 1 for c in reveal.cards)
+                native_deck = env.engine.probe._query_location(0, 1)
+                assert Counter(c.code for c in reveal.cards) == Counter(
+                    c.code for c in native_deck)
+                assert sum(c.code == SPY for c in owner_view.field) == 1
+                assert not any(c.code == SPY for c in owner_view.graveyards[0])
+                assert env.engine.probe.loaded_script_sha256["utility.lua"] != (
+                    sha256_file(root / "scripts/utility.lua"))
+                return
+    pytest.fail("empty Spy search did not reveal its Deck to the opponent")

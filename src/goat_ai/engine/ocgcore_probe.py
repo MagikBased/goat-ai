@@ -26,6 +26,9 @@ from goat_ai.observations import (
 
 CORE_API_VERSION = (11, 0)
 GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
+UPSTREAM_UTILITY_SHA256 = "59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a"
+GOAT_DECK_CONFIRM_OLD = b"Duel.ConfirmCards(tp,dg)"
+GOAT_DECK_CONFIRM_HISTORICAL = b"Duel.ConfirmCards(1-tp,dg)"
 LOCATION_DECK = 0x01
 LOCATION_HAND = 0x02
 LOCATION_MZONE = 0x04
@@ -301,6 +304,15 @@ class OcgcoreProbe:
                 self.errors.append(f"missing script: {relative}")
             return 0
         contents = path.read_bytes()
+        if relative == Path("utility.lua"):
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_UTILITY_SHA256 \
+                    or contents.count(GOAT_DECK_CONFIRM_OLD) != 1:
+                self.errors.append("pinned GOAT utility script changed; deck-confirm patch not applied")
+                return 0
+            # Project Ignis' online variant confirms Deck contents to the
+            # searching player. Historical verification addresses the opponent.
+            contents = contents.replace(GOAT_DECK_CONFIRM_OLD,
+                                        GOAT_DECK_CONFIRM_HISTORICAL)
         self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
             hashlib.sha256(contents).hexdigest()
         )

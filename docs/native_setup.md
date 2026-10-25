@@ -14,6 +14,8 @@ The probe in `goat_ai.engine.ocgcore_probe` calls the native C API through Pytho
 
 The `cards.cdb` SHA-256 is `d5166c35296a6c65dcc0230c7bc0e9f25721639159b80fa78bf724be61183a6a`; `goat-entries.cdb` is `042ffc3de692245d13d144656a79a34cb114d291ddd0c93a21bee9c0e607b4b4`; `cards-unofficial.cdb` is `7753f01785fbf174be2ec3833610306b02a8ce2cb45ac09339ea50afe164bb6a`; `GOAT.lflist.conf` is `2159b6eb0868816860c4913571b514c27fd777755a09c358f250e6cc7cc5db37`. The GOAT flag value for the pinned API is `34226374444` (`DUEL_MODE_GOAT`). Setup checks all asset hashes and the binding checks API version 11.0. The pinned Lua submodule revision is supplied by the core commit.
 
+The pinned CardScripts `utility.lua` has upstream SHA-256 `59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a`. At load time the native binding checks that exact hash, then changes the GOAT Deck-confirm recipient from the searching player to the opponent. The resulting loaded-script SHA-256 is `6d4daf942ccfc26c3a92becb755b185b05ae537697a764e9844df324b1d1f1a2` and is recorded in every replay manifest. The upstream checkout stays unchanged; a different upstream utility script fails closed. This is a modification of an [AGPL-3.0 CardScripts file](https://github.com/ProjectIgnis/CardScripts/blob/master/COPYING), separate from the MIT license for GOAT AI's original code. The recipient choice follows [GoatFormat's historical verification rule](https://www.goatformat.com/basics.html); a Spy-specific primary ruling is still being sought.
+
 Requires Linux, Git, a C++17 compiler, Python 3.10+, Meson 1.7+, and Ninja. From a clean clone:
 
 ```bash
@@ -56,7 +58,7 @@ cards, requiring 0 or 15 by default; a community policy allows 0–15. Side
 cards are unused in a single duel. The adapter still fails on unsupported native
 decisions. Its synthetic control-style probe exercises effect cards, generated Sheep Tokens, yes/no,
 tribute, position, and race selections. `python scripts/probe_control_deck.py
---seed 42` completes one pinned random duel in 1,251 decisions, winner seat
+--seed 42` completes one pinned random duel in 1,116 decisions, winner seat
 1. The same synthetic deck completed seeds 0–49 with random actions after
 decoding `MSG_SELECT_EFFECTYN`. The 50-seed protocol probe was run in two
 batches (0–11 and 12–49); all 50 reached terminal states, with 550–1,454
