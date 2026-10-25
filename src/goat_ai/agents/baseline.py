@@ -25,6 +25,7 @@ class RandomAgent:
 class HeuristicAgent:
     """Simple generic action preference; optional public Flip type metadata."""
 
+    teacher_version: ClassVar[int] = 1
     _scores: ClassVar[dict[str, int]] = {
         "attack": 5, "activate": 4, "special_summon": 3,
         "normal_summon": 2, "flip_summon": 2, "set": 1,
@@ -49,9 +50,11 @@ class HeuristicAgent:
 class CombatHeuristicAgent(HeuristicAgent):
     """Generic visible-stat combat choices; never consults native private state."""
 
+    teacher_version: ClassVar[int] = 2  # consume attack target context only once
+
     def __init__(self, flip_monster_codes: Collection[int] = ()) -> None:
         super().__init__(flip_monster_codes)
-        self._attacker: tuple[int, int] | None = None
+        self._pending_attack: tuple[int, int, int] | None = None
 
     @staticmethod
     def _battle_stat(card: CardView) -> int | None:
@@ -60,6 +63,8 @@ class CombatHeuristicAgent(HeuristicAgent):
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
             raise ValueError("no legal actions")
+        pending_attack = self._pending_attack
+        self._pending_attack = None
         opponents = [card for card in observation.field
                      if card.zone == "monster" and card.controller != observation.viewer]
         own = {(card.controller, card.sequence): card for card in observation.field
@@ -77,13 +82,17 @@ class CombatHeuristicAgent(HeuristicAgent):
                            for card in opponents)]
             if safe:
                 chosen = max(safe, key=attack_power)
-                self._attacker = (chosen.actor, chosen.parameters["sequence"])
+                self._pending_attack = (observation.turn, chosen.actor,
+                                        chosen.parameters["sequence"])
                 return chosen
             transition = next((action for action in legal_actions
                                if action.kind in ("main2", "end_phase")), None)
             if transition is not None:
                 return transition
-        if (self._attacker in own and observation.phase == "battle_step"
+        if (pending_attack is not None
+                and pending_attack[:2] == (observation.turn, observation.viewer)
+                and (pending_attack[1], pending_attack[2]) in own
+                and observation.phase == "battle_step"
                 and not observation.chain and legal_actions[0].kind == "select_card"):
             candidates = [action for action in legal_actions
                           if action.kind == "select_card"
@@ -98,7 +107,7 @@ class CombatHeuristicAgent(HeuristicAgent):
                                if (card := target_card(action))
                                is not None and card.position == "faceup"
                                and card.attack is not None and card.defense is not None]
-            attacker = own[self._attacker]
+            attacker = own[(pending_attack[1], pending_attack[2])]
             favorable = [action for action in visible_targets
                          if attacker.attack is not None
                          and attacker.attack >= self._battle_stat(target_card(action))]

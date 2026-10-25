@@ -259,6 +259,8 @@ def test_combat_heuristic_uses_only_visible_battle_stats():
     mixed = replace(battle, phase="battle_step", field=field[:2] + (
         CardView(1, "monster", "faceup", 3, 0, "attack", 2200, 1000),
         CardView(1, "monster", "facedown", None, 3, "defense")))
+    assert agent.select_action(mixed, (target, hidden_target)) == target
+    assert agent.select_action(mixed, (weak, strong, main2)) == strong
     assert agent.select_action(mixed, (target, hidden_target)) == hidden_target
     blocked = replace(battle, field=field[:2] + (
         CardView(1, "monster", "faceup", 3, 0, "attack", 2200, 1000),))

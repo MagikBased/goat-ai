@@ -62,6 +62,8 @@ def main() -> None:
                                "demonstrator_seat": (trajectory.skill_metadata or {}).get(
                                    "demonstrator_seat"),
                                "teacher": (trajectory.skill_metadata or {}).get("teacher"),
+                               "teacher_version": (trajectory.skill_metadata or {}).get(
+                                   "teacher_version"),
                                "opponent": (trajectory.skill_metadata or {}).get("opponent"),
                                "verified_decisions": count,
                                "selected_decisions": len(selected)})

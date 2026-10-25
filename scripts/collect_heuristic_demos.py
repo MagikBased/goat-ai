@@ -53,6 +53,7 @@ def main() -> None:
                             env.trajectory(), source=args.teacher,
                             skill_metadata={"demonstrator_seat": teacher_seat,
                                             "teacher": teacher_type.__name__,
+                                            "teacher_version": teacher_type.teacher_version,
                                             "opponent": "RandomAgent"},
                         )
                         path = args.output_dir / f"seed_{seed}_seat_{teacher_seat}.json"
