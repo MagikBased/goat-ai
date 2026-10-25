@@ -16,12 +16,15 @@ RYU_SENSHI = 49868263
 TORRENTIAL = 53582587
 BOOK_OF_MOON = 14087893
 ROYAL_DECREE = 51452091
+MIRROR_FORCE = 44095762
 LIGHT = 62651957
 DARK = 49881766
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("interaction", [TORRENTIAL, BOOK_OF_MOON, ROYAL_DECREE])
+@pytest.mark.parametrize("interaction", [
+    TORRENTIAL, BOOK_OF_MOON, ROYAL_DECREE, MIRROR_FORCE,
+])
 def test_ryu_senshi_common_spell_and_trap_interactions(tmp_path, interaction):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for code in (SORCERER, GRACEFUL, METAMORPHOSIS, RYU_SENSHI, interaction):
@@ -51,7 +54,7 @@ def test_ryu_senshi_common_spell_and_trap_interactions(tmp_path, interaction):
         graceful = discarded = summoned = trap_set = meta = False
         sorcerer_costs = []
         meta_paid = fusion_chosen = interaction_used = ryu_chained = False
-        book_targeted = False
+        book_targeted = battle_started = attacked = False
         for _ in range(95):
             actions = env.legal_actions()
             action = None
@@ -73,7 +76,8 @@ def test_ryu_senshi_common_spell_and_trap_interactions(tmp_path, interaction):
                                in ({LIGHT, DARK} - set(sorcerer_costs))), action)
                 if action is not None and action.kind == "select_card":
                     sorcerer_costs.append(action.parameters["code"])
-            if (interaction in (TORRENTIAL, ROYAL_DECREE) and obs.turn == 2
+            if (interaction in (TORRENTIAL, ROYAL_DECREE, MIRROR_FORCE)
+                    and obs.turn == 2
                     and obs.acting_player == 1 and not trap_set):
                 action = next((a for a in actions if a.kind == "set_spell_trap"
                                and a.parameters.get("code") == interaction), None)
@@ -95,6 +99,22 @@ def test_ryu_senshi_common_spell_and_trap_interactions(tmp_path, interaction):
                     and obs.acting_player == 1 and not interaction_used):
                 action = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == TORRENTIAL), action)
+                interaction_used |= action is not None and action.kind == "chain"
+            if (fusion_chosen and interaction == MIRROR_FORCE
+                    and obs.turn == 3 and obs.acting_player == 0
+                    and not battle_started and action is None):
+                action = next((a for a in actions if a.kind == "battle_phase"), None)
+                battle_started |= action is not None
+            if (battle_started and interaction == MIRROR_FORCE
+                    and obs.phase == "battle_start" and obs.acting_player == 0
+                    and not attacked):
+                action = next((a for a in actions if a.kind == "attack"
+                               and a.parameters.get("code") == RYU_SENSHI), action)
+                attacked |= action is not None and action.kind == "attack"
+            if (attacked and interaction == MIRROR_FORCE
+                    and obs.acting_player == 1 and not interaction_used):
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == MIRROR_FORCE), action)
                 interaction_used |= action is not None and action.kind == "chain"
             if (fusion_chosen and interaction in (BOOK_OF_MOON, ROYAL_DECREE)
                     and obs.turn == 4 and obs.acting_player == 1
@@ -125,6 +145,8 @@ def test_ryu_senshi_common_spell_and_trap_interactions(tmp_path, interaction):
                     for c in obs.field))
             if interaction_used and interaction_resolved \
                     and not obs.chain:
+                if interaction == MIRROR_FORCE and obs.life_points[1] != 6000:
+                    continue
                 assert {LIGHT, DARK} == set(sorcerer_costs)
                 assert {c.code for c in obs.banished[0]} == {LIGHT, DARK}
                 assert any(c.code == SORCERER for c in obs.graveyards[0])
@@ -136,6 +158,9 @@ def test_ryu_senshi_common_spell_and_trap_interactions(tmp_path, interaction):
                 elif interaction == BOOK_OF_MOON:
                     assert book_targeted and not ryu_chained
                     assert obs.life_points == (8000, 8000)
+                elif interaction == MIRROR_FORCE:
+                    assert trap_set and attacked and ryu_chained
+                    assert obs.life_points == (7000, 6000)
                 else:
                     assert trap_set and not ryu_chained
                     assert obs.life_points == (8000, 8000)
