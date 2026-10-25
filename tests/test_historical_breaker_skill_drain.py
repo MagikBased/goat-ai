@@ -14,7 +14,8 @@ SKILL_DRAIN = 82732705
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("timing", ["counter_placement", "removal_after_cost"])
+@pytest.mark.parametrize("timing", ["already_active", "counter_placement",
+                                    "removal_after_cost"])
 def test_skill_drain_breaker_counter_timing(tmp_path, timing):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for code in (BREAKER, SKILL_DRAIN):
@@ -41,9 +42,19 @@ def test_skill_drain_breaker_counter_timing(tmp_path, timing):
                 action = next((a for a in actions if a.kind == "set_spell_trap"
                                and a.parameters.get("code") == SKILL_DRAIN), None)
                 drain_set |= action is not None
-            if obs.turn == 3 and obs.acting_player == 0 and not breaker_summoned:
+            if timing == "already_active" and obs.turn == 3 \
+                    and obs.acting_player == 1 and drain_set and not drain_chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SKILL_DRAIN), action)
+                drain_chained |= action is not None and action.kind == "chain" \
+                    and action.parameters.get("code") == SKILL_DRAIN
+            if obs.turn == 3 and obs.acting_player == 0 and not breaker_summoned \
+                    and (timing != "already_active" or drain_chained):
                 action = next((a for a in actions if a.kind == "normal_summon"
                                and a.parameters.get("code") == BREAKER), None)
+                if timing == "already_active" and action is not None:
+                    assert any(c.code == SKILL_DRAIN and c.position == "faceup"
+                               for c in obs.field)
                 breaker_summoned |= action is not None
             if breaker_summoned and timing == "counter_placement" \
                     and obs.acting_player == 1 and not drain_chained:
@@ -84,8 +95,9 @@ def test_skill_drain_breaker_counter_timing(tmp_path, timing):
                 action = next((a for a in actions if a.kind in (
                     "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if drain_chained and not obs.chain \
-                    and any(c.code == SKILL_DRAIN for c in obs.field):
+            if breaker_summoned and drain_chained and not obs.chain \
+                    and any(c.code == SKILL_DRAIN for c in obs.field) \
+                    and any(c.code == BREAKER for c in obs.field):
                 breaker = next(c for c in obs.field if c.code == BREAKER)
                 assert breaker.position == "faceup"
                 assert (breaker.attack, breaker.counters) == (1600, ())
