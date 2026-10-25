@@ -37,6 +37,22 @@ def validate_heldout_seeds(checkpoint: dict, seeds: list[int]) -> None:
         raise ValueError(f"evaluation seeds overlap training seeds: {sorted(overlap)}")
 
 
+def validate_unseen_deck_hashes(checkpoint: dict,
+                                matchups: list[list[str]]) -> None:
+    """Reject exact training YDK file bytes in an evaluation schedule."""
+    games = checkpoint.get("training_games")
+    if not isinstance(games, list) or not games or any(
+            not isinstance(game, dict)
+            or not isinstance(game.get("deck_sha256"), (list, tuple))
+            or len(game["deck_sha256"]) != 2 for game in games):
+        raise ValueError("checkpoint lacks training deck-hash provenance")
+    training_hashes = {digest for game in games for digest in game["deck_sha256"]}
+    evaluation_hashes = {sha256(Path(deck)) for pair in matchups for deck in pair}
+    overlap = training_hashes & evaluation_hashes
+    if overlap:
+        raise ValueError(f"evaluation deck file hash overlaps training: {sorted(overlap)}")
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as source:
@@ -58,6 +74,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=43)
     parser.add_argument("--seeds", type=int, default=4)
     parser.add_argument("--max-decisions", type=int, default=5000)
+    parser.add_argument("--reject-training-deck-hashes", action="store_true",
+                        help="reject exact YDK file bytes present in checkpoint training games")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -78,6 +96,10 @@ def main() -> None:
     fixtures = Path(__file__).resolve().parent.parent / "examples/decks"
     matchups = args.matchup or [[str(fixtures / "vanilla_probe.ydk"),
                                   str(fixtures / "vanilla_reverse.ydk")]]
+    if args.reject_training_deck_hashes:
+        validate_unseen_deck_hashes(checkpoint, matchups)
+        if args.opponent_checkpoint:
+            validate_unseen_deck_hashes(opponent_checkpoint, matchups)
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     runner = run_tournament_parallel if args.workers > 1 else run_tournament

@@ -24,7 +24,11 @@ from goat_ai.training.self_play import (
     policy_gradient_update,
     sample_legal_action,
 )
-from scripts.evaluate_policy import make_policy_agent, validate_heldout_seeds
+from scripts.evaluate_policy import (
+    make_policy_agent,
+    validate_heldout_seeds,
+    validate_unseen_deck_hashes,
+)
 
 
 def view() -> Observation:
@@ -352,6 +356,26 @@ def test_evaluation_rejects_training_seed_overlap():
         validate_heldout_seeds(checkpoint, [42, 43])
     with pytest.raises(ValueError, match="provenance"):
         validate_heldout_seeds({}, [43])
+
+
+def test_evaluation_deck_hash_gate_rejects_training_file_bytes(tmp_path):
+    training = tmp_path / "training.ydk"
+    identical = tmp_path / "same_cards_elsewhere.ydk"
+    unseen = tmp_path / "unseen.ydk"
+    training.write_text("#main\n123\n")
+    identical.write_bytes(training.read_bytes())
+    unseen.write_text("#main\n456\n")
+    from scripts.evaluate_policy import sha256
+
+    checkpoint = {"training_games": [{"deck_sha256": (sha256(training), sha256(unseen))}]}
+    with pytest.raises(ValueError, match="overlaps training"):
+        validate_unseen_deck_hashes(checkpoint, [[str(identical), str(unseen)]])
+    another = tmp_path / "another.ydk"
+    another.write_text("#main\n789\n")
+    validate_unseen_deck_hashes(checkpoint, [[str(another), str(another)]])
+    with pytest.raises(ValueError, match="provenance"):
+        validate_unseen_deck_hashes({"training_games": [{"seed": 1}]},
+                                    [[str(another), str(another)]])
 
 
 def test_checkpoint_opponent_uses_common_agent_contract(tmp_path):

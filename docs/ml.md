@@ -51,7 +51,7 @@ python scripts/evaluate_policy.py checkpoints/vanilla_bc.pt --seed 43 --seeds 4 
   --opponent random --output artifacts/vanilla_bc_eval.json
 ```
 
-The evaluator refuses seeds present in checkpoint training-game metadata. It uses paired seat swaps and reports individual results, seat splits, a paired score interval, and core/deck/checkpoint hashes. `--opponent-checkpoint PATH` compares two saved policies and checks both checkpoints' training seeds. `--workers 2` uses spawned native and policy workers; `--matchup DECK_A DECK_B` accepts additional deck pairs, and `--engine experimental` selects the broader unaudited adapter. A held-out seed on the same fixture decks is a protocol and baseline check; it is not held-out deck-family evaluation. See [the measured evaluation log](evaluation.md).
+The evaluator refuses seeds present in checkpoint training-game metadata. `--reject-training-deck-hashes` additionally rejects exact evaluation YDK file bytes found in either checkpoint's training-game Deck hashes and requires Deck-hash provenance; changed comments or reordered but otherwise identical lists are not detected. It uses paired seat swaps and reports individual results, seat splits, a paired score interval, and core/deck/checkpoint hashes. `--opponent-checkpoint PATH` compares two saved policies and checks both checkpoints' training seeds. `--workers 2` uses spawned native and policy workers; `--matchup DECK_A DECK_B` accepts additional deck pairs, and `--engine experimental` selects the broader unaudited adapter. A held-out seed on the same fixture decks is a protocol and baseline check; it is not held-out deck-family evaluation. See [the measured evaluation log](evaluation.md).
 
 ## Initial self-play experiment
 
