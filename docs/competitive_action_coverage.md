@@ -1,5 +1,20 @@
 # Competitive-deck action coverage probe
 
+## Main Deck priority report
+
+Run `PYTHONPATH=. .venv/bin/python scripts/report_competitive_card_priorities.py
+--native-root .cache/goat-ai --top 30` from the repository root. The report
+counts each card's presence and copies in the five sourced tournament Main
+Decks linked in [the roadmap](roadmap.md), then lists historical test files
+containing its exact numeric card ID. Use `--json` to inspect every row and the
+individual fixture paths. Extra and Side Deck cards do not enter the ranking.
+
+This is a planning index. A numeric reference can be only a test setup card,
+and several references can exercise the same ruling; zero references does not
+prove the engine lacks a card script. Review the cited fixture and a historical
+ruling before treating any card or interaction as audited. The five sourced
+lists are a small convenience sample, not a metagame play-rate estimate.
+
 This probe counts card-source actions in complete native duels played by seeded
 `RandomAgent`s. It helps prioritize GOAT ruling fixtures. It does **not**
 measure historical play rates, card correctness, or agent strength. A card code
