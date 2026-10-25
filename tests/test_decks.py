@@ -4,7 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from goat_ai.engine.decks import Decklist, read_goat_whitelist, read_ydk, validate_goat_deck
+from goat_ai.engine.decks import (
+    Decklist,
+    main_deck_composition_sha256,
+    read_goat_whitelist,
+    read_ydk,
+    validate_goat_deck,
+)
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.engine.protocol import RulesProfile
@@ -19,6 +25,17 @@ def test_ydk_sections_and_errors(tmp_path):
     path.write_text("#main\nnot-a-card\n")
     with pytest.raises(ValueError, match="line 2"):
         read_ydk(path)
+
+
+def test_main_deck_fingerprint_ignores_order_comments_and_side(tmp_path):
+    first = tmp_path / "first.ydk"
+    second = tmp_path / "second.ydk"
+    first.write_text("#main\n123\n456\n123\n#extra\n777\n!side\n888\n")
+    second.write_text("#changed comment\n#main\n456\n123\n123\n#extra\n999\n!side\n666\n")
+    expected = main_deck_composition_sha256(read_ydk(first))
+    assert expected == main_deck_composition_sha256(read_ydk(second))
+    second.write_text("#main\n456\n123\n456\n")
+    assert expected != main_deck_composition_sha256(read_ydk(second))
 
 
 def test_whitelist_parsing(tmp_path):

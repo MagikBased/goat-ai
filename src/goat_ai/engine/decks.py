@@ -1,5 +1,7 @@
 """Strict YDK loading and GOAT whitelist validation before native play."""
 
+import hashlib
+import json
 import sqlite3
 from collections import Counter
 from dataclasses import dataclass
@@ -12,6 +14,13 @@ class Decklist:
     main: tuple[int, ...]
     extra: tuple[int, ...] = ()
     side: tuple[int, ...] = ()
+
+
+def main_deck_composition_sha256(deck: Decklist) -> str:
+    """Fingerprint the Main Deck multiset, independent of YDK order/comments."""
+    counts = sorted(Counter(deck.main).items())
+    payload = json.dumps(["goat-ai-main-v1", counts], separators=(",", ":"))
+    return hashlib.sha256(payload.encode("ascii")).hexdigest()
 
 
 def read_ydk(path: str | Path) -> Decklist:

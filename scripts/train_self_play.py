@@ -7,6 +7,7 @@ from pathlib import Path
 
 import torch
 
+from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.replay import write_trajectory
@@ -83,6 +84,9 @@ def main() -> None:
         training_games.append({
             "seed": report["seed"],
             "deck_sha256": report["deck_sha256"],
+            "main_deck_composition_sha256": tuple(
+                main_deck_composition_sha256(read_ydk(deck))
+                for deck in report["decks"]),
             "asset_sha256": report["asset_sha256"],
             "rules_profile": report["rules_profile"],
             "source": "self_play_rl", "opponent": report["opponent"],

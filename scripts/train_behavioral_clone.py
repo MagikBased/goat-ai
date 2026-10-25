@@ -8,6 +8,7 @@ from pathlib import Path
 
 import torch
 
+from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.replay import demonstrator_records, read_trajectory, verify_trajectory
@@ -54,6 +55,9 @@ def main() -> None:
         trajectory_hashes[str(path)] = hashlib.sha256(raw).hexdigest()
         training_games.append({"seed": trajectory.seed,
                                "deck_sha256": trajectory.deck_sha256,
+                               "main_deck_composition_sha256": tuple(
+                                   main_deck_composition_sha256(read_ydk(deck))
+                                   for deck in trajectory.decks),
                                "source": trajectory.source,
                                "demonstrator_seat": (trajectory.skill_metadata or {}).get(
                                    "demonstrator_seat"),

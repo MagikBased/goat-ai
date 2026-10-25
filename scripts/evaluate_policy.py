@@ -12,6 +12,7 @@ from time import perf_counter
 import torch
 
 from goat_ai.agents import HeuristicAgent, RandomAgent
+from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import run_tournament, run_tournament_parallel
@@ -53,6 +54,25 @@ def validate_unseen_deck_hashes(checkpoint: dict,
         raise ValueError(f"evaluation deck file hash overlaps training: {sorted(overlap)}")
 
 
+def validate_unseen_main_decks(checkpoint: dict,
+                               matchups: list[list[str]]) -> None:
+    """Reject any Main Deck multiset used in checkpoint training games."""
+    games = checkpoint.get("training_games")
+    if not isinstance(games, list) or not games or any(
+            not isinstance(game, dict)
+            or not isinstance(game.get("main_deck_composition_sha256"), (list, tuple))
+            or len(game["main_deck_composition_sha256"]) != 2 for game in games):
+        raise ValueError("checkpoint lacks Main Deck composition provenance")
+    training = {digest for game in games
+                for digest in game["main_deck_composition_sha256"]}
+    evaluation = {main_deck_composition_sha256(read_ydk(deck))
+                  for pair in matchups for deck in pair}
+    overlap = training & evaluation
+    if overlap:
+        raise ValueError(f"evaluation Main Deck composition overlaps training: "
+                         f"{sorted(overlap)}")
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as source:
@@ -76,6 +96,8 @@ def main() -> None:
     parser.add_argument("--max-decisions", type=int, default=5000)
     parser.add_argument("--reject-training-deck-hashes", action="store_true",
                         help="reject exact YDK file bytes present in checkpoint training games")
+    parser.add_argument("--require-unseen-main-decks", action="store_true",
+                        help="reject Main Deck multisets present in checkpoint training games")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -100,6 +122,10 @@ def main() -> None:
         validate_unseen_deck_hashes(checkpoint, matchups)
         if args.opponent_checkpoint:
             validate_unseen_deck_hashes(opponent_checkpoint, matchups)
+    if args.require_unseen_main_decks:
+        validate_unseen_main_decks(checkpoint, matchups)
+        if args.opponent_checkpoint:
+            validate_unseen_main_decks(opponent_checkpoint, matchups)
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     runner = run_tournament_parallel if args.workers > 1 else run_tournament
@@ -141,6 +167,9 @@ def main() -> None:
         "duels_per_second": len(report.games) / wall,
         "decisions_per_second": sum(game.decisions for game in report.games) / wall,
         "deck_sha256": {deck: sha256(Path(deck)) for matchup in matchups for deck in matchup},
+        "main_deck_composition_sha256": {
+            deck: main_deck_composition_sha256(read_ydk(deck))
+            for matchup in matchups for deck in matchup},
         "summary": report.summary(),
         "games": [asdict(game) | {"a_outcome": game.a_outcome} for game in report.games],
     }
