@@ -10,6 +10,7 @@ from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 
 EXILED_FORCE = 74131780
+DEKOICHI = 87621407
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -102,3 +103,66 @@ def test_exiled_force_cannot_use_effect_without_another_monster(tmp_path):
                     "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("did not reach an empty-board Exiled Force main phase")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_exiled_force_target_decision_does_not_reveal_set_monster(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    scripts = (f"official/c{EXILED_FORCE}.lua", f"official/c{DEKOICHI}.lua")
+    if any(not (root / "scripts" / script).is_file() for script in scripts):
+        pytest.skip("required card script not installed")
+    attacker = tmp_path / "exiled.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        EXILED_FORCE, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+
+    def run(hidden_code):
+        defender = tmp_path / f"hidden_{hidden_code}.ydk"
+        defender.write_text("#main\n" + "\n".join(map(str, (
+            hidden_code, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+        with GoatEnvironment(str(attacker), str(defender), seed=52,
+                             engine=ExperimentalOcgcoreEngine(root)) as env:
+            obs = env.reset()
+            assert EXILED_FORCE in {c.code for c in obs.hand}
+            assert hidden_code in {c.code for c in env.engine.probe.observation(1).hand}
+            set_done = summoned = activated = targeted = False
+            decision = None
+            for _ in range(55):
+                actions = env.legal_actions()
+                action = None
+                if obs.turn == 2 and obs.acting_player == 1 and not set_done:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == hidden_code), None)
+                    set_done |= action is not None
+                if obs.turn == 3 and obs.acting_player == 0:
+                    if not summoned:
+                        action = next((a for a in actions if a.kind == "normal_summon"
+                                       and a.parameters.get("code") == EXILED_FORCE), None)
+                        summoned |= action is not None
+                    if summoned and not activated and action is None:
+                        action = next((a for a in actions if a.kind == "chain"
+                                       and a.parameters.get("code") == EXILED_FORCE), None)
+                        activated |= action is not None
+                if activated and not targeted and actions[0].kind == "select_card":
+                    assert obs.viewer == obs.acting_player == 0
+                    assert EXILED_FORCE in {c.code for c in obs.graveyards[0]}
+                    assert obs.known_opponent_field_cards == ()
+                    assert not obs.private_reveals
+                    assert [a.parameters for a in actions] == [
+                        {"location": 4, "sequence": 0, "controller": 1}]
+                    decision = (obs, actions)
+                    action = actions[0]
+                    targeted = True
+                if action is None:
+                    action = next((a for a in actions if a.kind in (
+                        "place", "pass", "end_phase")), actions[0])
+                obs = env.step(action)
+                if targeted and hidden_code in {c.code for c in obs.graveyards[1]}:
+                    assert all((set_done, summoned, activated, targeted))
+                    assert f"official/c{EXILED_FORCE}.lua" in \
+                        env.engine.probe.loaded_script_sha256
+                    return decision
+        pytest.fail(f"Exiled target line stalled for {hidden_code}")
+
+    flip_decision = run(DEKOICHI)
+    vanilla_decision = run(VANILLA_DECK[0])
+    assert flip_decision is not None and flip_decision == vanilla_decision
