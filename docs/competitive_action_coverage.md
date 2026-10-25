@@ -79,8 +79,8 @@ ordered response pairs. The report JSON SHA-256 was
 
 The sample also observed four Torrential Tribute responses to Breaker the
 Magical Warrior, which already have a [historical fixture](goat_rules.md).
-Solemn Judgment responding to Book of Moon is a high-exposure gap for the next
-source-backed regression. These counts are from random-agent choices; they do
+Solemn Judgment responding to Book of Moon now has a source-backed native
+regression. These counts are from random-agent choices; they do
 not estimate tournament play rates or policy quality.
 
 Reproduce the expanded sample after [native setup](native_setup.md):
