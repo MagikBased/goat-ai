@@ -75,6 +75,8 @@ Paired Morphing Jar / Skill Drain fixtures verify a distinct response window: Sk
 
 Paired three-card fixtures now check Morphing Jar's Flip Effect with chained Skill Drain and a Book of Moon response: Book sets Jar face-down before Drain resolves, so Jar's already activated effect still resets both hands. The control branch without Book stays negated. Both full duels replay-verify; see [GOAT rules](goat_rules.md).
 
+Paired D.D. Warrior Lady / Skill Drain fixtures check a Damage Step effect after Skill Drain is activated in the Battle Step: Warrior Lady can still choose her effect, but Drain negates the banish; without Drain, both battling monsters are banished. Both full duels replay-verify; see [GOAT rules](goat_rules.md).
+
 Four Morphing Jar deck-out fixtures now verify the historical five-card draw boundary for either player: with four Deck cards the effect ends the duel, while with five it resolves and the next required draw ends the duel. Two additional native fixtures check equal Deck counts: four each gives a draw, while five each resolves and the next required draw determines the loser. All six terminal trajectories replay-verify. A contemporaneous 2005 TCG source for the simultaneous failed-draw outcome remains to be located, so that historical interpretation is provisional. See [GOAT rules](goat_rules.md).
 
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
