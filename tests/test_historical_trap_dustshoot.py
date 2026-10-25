@@ -32,6 +32,7 @@ def test_trap_dustshoot_reveals_hand_only_to_chooser_and_returns_monster(tmp_pat
         set_trap = activated = selected = False
         chosen_code = before_count = before_deck_count = None
         before_hand = None
+        revealed_hand = None
         for _ in range(35):
             actions = env.legal_actions()
             action = None
@@ -61,6 +62,8 @@ def test_trap_dustshoot_reveals_hand_only_to_chooser_and_returns_monster(tmp_pat
                             if card.controller == 1 and card.location == 2]
                 assert Counter(a.parameters["code"] for a in actions) == Counter(revealed)
                 assert len(revealed) == before_count
+                revealed_hand = Counter(revealed)
+                assert Counter(observation.known_opponent_hand_cards) == revealed_hand
                 assert all(a.parameters["location"] == 2
                            and "sequence" not in a.parameters for a in actions)
                 other = env.engine.probe.observation(1)
@@ -74,6 +77,10 @@ def test_trap_dustshoot_reveals_hand_only_to_chooser_and_returns_monster(tmp_pat
                 assert len(other.hand) == before_count - 1
                 assert before_hand - Counter(c.code for c in other.hand) == {
                     chosen_code: 1}
+                remaining = revealed_hand - Counter((chosen_code,))
+                assert Counter(env.engine.probe.observation(0)
+                               .known_opponent_hand_cards) == remaining
+                assert not other.known_opponent_hand_cards
                 assert f"official/c{DUSTSHOOT}.lua" in (
                     env.engine.probe.loaded_script_sha256)
                 agents = (RandomAgent(3), RandomAgent(4))
@@ -201,6 +208,9 @@ def test_dustshoot_reveals_nonmonster_hand_without_return_target(tmp_path):
                                for c in event.cards) == Counter(c.code for c in opponent.hand)
                 assert all(event.recipient == 0 for event in chooser.private_reveals)
                 assert not opponent.private_reveals
+                assert Counter(chooser.known_opponent_hand_cards) == Counter(
+                    c.code for c in opponent.hand)
+                assert not opponent.known_opponent_hand_cards
                 assert f"official/c{DUSTSHOOT}.lua" in (
                     env.engine.probe.loaded_script_sha256)
                 return

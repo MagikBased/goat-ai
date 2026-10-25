@@ -41,6 +41,8 @@ POSITION_FACEDOWN_DEFENSE = 0x08
 MSG_SELECT_IDLECMD = 11
 MSG_SELECT_CHAIN = 16
 MSG_CHAINING = 70
+MSG_CHAIN_SOLVING = 72
+MSG_CHAIN_SOLVED = 73
 MSG_CHAIN_END = 74
 MSG_DRAW = 90
 MSG_MOVE = 50
@@ -172,6 +174,7 @@ class OcgcoreProbe:
         self._turn = 0
         self._phase = "unknown"
         self._chain: list[ChainLinkView] = []
+        self._resolving_chain_index: int | None = None
         self._public_history: list[str] = []
         self._known_facedown: dict[tuple[int, int, int], int] = {}
         self._known_hand: dict[int, list[int]] = {0: [], 1: []}
@@ -416,9 +419,15 @@ class OcgcoreProbe:
                                        (new_location in (LOCATION_MZONE, LOCATION_SZONE,
                                                         LOCATION_REMOVED)
                                         and struct.unpack_from("<I", message, 21)[0] & 0x5))
-                        if public_exit:
+                        dustshoot_return = (new_location == LOCATION_DECK
+                                            and any(link.index == self._resolving_chain_index
+                                                    and link.card_code == 64697231
+                                                    and link.controller != old_controller
+                                                    for link in self._chain))
+                        if public_exit or dustshoot_return:
                             # A publicly identified exit removes at most one
-                            # known copy; other known cards stay in hand.
+                            # known copy; Dustshoot's chooser also identifies
+                            # the selected card before it returns to the Deck.
                             code = struct.unpack_from("<I", message, 1)[0]
                             if code in known_hand[old_controller]:
                                 known_hand[old_controller].remove(code)
@@ -596,10 +605,19 @@ class OcgcoreProbe:
                     sequence=struct.unpack_from("<I", message, 17)[0],
                 ))
                 self._public_history.append(f"chain:{index}:start")
+            elif message[0] == MSG_CHAIN_SOLVING:
+                if len(message) != 2 or not (1 <= message[1] <= len(self._chain)):
+                    raise ValueError("invalid MSG_CHAIN_SOLVING")
+                self._resolving_chain_index = message[1]
+            elif message[0] == MSG_CHAIN_SOLVED:
+                if len(message) != 2 or message[1] != self._resolving_chain_index:
+                    raise ValueError("invalid MSG_CHAIN_SOLVED")
+                self._resolving_chain_index = None
             elif message[0] == MSG_CHAIN_END:
                 if len(message) != 1:
                     raise ValueError("invalid MSG_CHAIN_END length")
                 self._chain.clear()
+                self._resolving_chain_index = None
                 self._public_history.append("chain:end")
 
     def _query_location(self, player: int, location: int):
