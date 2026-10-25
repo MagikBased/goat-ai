@@ -13,6 +13,8 @@ CHAOS_SORCERER = 9596126
 GRACEFUL_CHARITY = 79571449
 LIGHT = 62651957  # X-Head Cannon
 DARK = 7359741  # Mechanicalchaser
+SCAPEGOAT = 504700123
+SHEEP_TOKENS = {73915052, 73915053, 73915054, 73915055}
 
 
 def chaos_deck(tmp_path):
@@ -155,6 +157,87 @@ def test_sorcerer_cannot_pay_its_cost_with_light_and_dark_only_on_field(tmp_path
                     "place", "select_position", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("did not reach the LIGHT/DARK field-only control state")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_sorcerer_cannot_use_banish_effect_in_main2_after_attacking(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"official/c{CHAOS_SORCERER}.lua",
+                     f"official/c{GRACEFUL_CHARITY}.lua", f"goat/c{SCAPEGOAT}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    opponent = tmp_path / "scapegoat.ydk"
+    opponent.write_text("#main\n" + "\n".join(map(str, (
+        *([SCAPEGOAT] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(chaos_deck(tmp_path)), str(opponent), seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        graceful = discarded = summoned = goat_used = battle = attacked = False
+        targeted = False
+        costs = set()
+        for _ in range(85):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not graceful:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == GRACEFUL_CHARITY), None)
+                graceful |= action is not None
+            if graceful and not discarded and actions[0].kind == "select_cards":
+                action = next((a for a in actions if {c["code"] for c in
+                               a.parameters["cards"]} == {LIGHT, DARK}), None)
+                discarded |= action is not None
+            if discarded and obs.turn == 1 and obs.acting_player == 0 \
+                    and not summoned and action is None:
+                action = next((a for a in actions if a.kind == "special_summon"
+                               and a.parameters.get("code") == CHAOS_SORCERER), None)
+                summoned |= action is not None
+            if summoned and len(costs) < 2 and actions[0].kind == "select_card" \
+                    and action is None:
+                action = next((a for a in actions if a.parameters.get("code")
+                               in {LIGHT, DARK} - costs and a.parameters.get("location")
+                               == 16), None)
+                if action is not None:
+                    costs.add(action.parameters["code"])
+            if obs.turn == 2 and obs.acting_player == 1 and not goat_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == SCAPEGOAT), None)
+                goat_used |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and goat_used:
+                if not battle and action is None:
+                    action = next((a for a in actions if a.kind == "battle_phase"), None)
+                    if action is not None:
+                        assert any(a.kind == "activate" and a.parameters.get("code")
+                                   == CHAOS_SORCERER for a in actions)
+                    battle |= action is not None
+                if battle and obs.phase == "battle_start" and not attacked \
+                        and action is None:
+                    assert {c.code for c in obs.field if c.controller == 1
+                            and c.code in SHEEP_TOKENS} == SHEEP_TOKENS
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == CHAOS_SORCERER), None)
+                    attacked |= action is not None
+                if attacked and targeted and obs.phase == "battle_step" and action is None \
+                        and sum(c.controller == 1 and c.code in SHEEP_TOKENS
+                                for c in obs.field) == 3:
+                    action = next((a for a in actions if a.kind == "main2"), None)
+            if attacked and not targeted and actions[0].kind == "select_card" \
+                    and action is None:
+                action = next((a for a in actions if a.parameters.get("code")
+                               in SHEEP_TOKENS), None)
+                targeted |= action is not None
+            if targeted and obs.acting_player == 0 and obs.phase == "main2":
+                assert set(costs) == {LIGHT, DARK}
+                assert sum(c.controller == 1 and c.code in SHEEP_TOKENS
+                           for c in obs.field) == 3
+                assert not any(a.kind == "activate" and a.parameters.get("code")
+                               == CHAOS_SORCERER for a in actions)
+                assert obs.life_points == (8000, 8000)
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail("Sorcerer attack did not block its Main Phase 2 effect")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
