@@ -16,6 +16,9 @@ GRACEFUL_CHARITY = 79571449
 CALL_OF_THE_HAUNTED = 97077563
 MYSTICAL_ELF = 15025844
 SECOND_DISCARD = 79182538
+MYSTIC_TOMATO = 504700142
+SANGAN = 504700178
+GEMINI_ELF = 69140098
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -252,3 +255,89 @@ def test_torrential_answers_completed_call_of_the_haunted_summon(tmp_path):
                         env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Torrential was not offered after Call's effect Summon")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_torrential_unavailable_for_mystic_tomato_damage_step_recruit(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"official/c{TORRENTIAL_TRIBUTE}.lua",
+                     f"goat/c{MYSTIC_TOMATO}.lua", f"goat/c{SANGAN}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    attacker = tmp_path / "attacker.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        TORRENTIAL_TRIBUTE, *([GEMINI_ELF] * 3),
+        *tuple(c for c in VANILLA_DECK if c != GEMINI_ELF)[:36])))
+        + "\n#extra\n!side\n")
+    defender = tmp_path / "defender.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        *([MYSTIC_TOMATO] * 3), SANGAN,
+        *VANILLA_DECK[4:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(attacker), str(defender), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        trap_set = gemini_summoned = tomato_set = battle = attacked = False
+        attack_targeted = recruited = sangan_selected = False
+        damage_step_choices = 0
+        deck_before = None
+        for _ in range(85):
+            actions = env.legal_actions()
+            action = None
+            if trap_set and obs.phase == "damage_step" and obs.acting_player == 0:
+                damage_step_choices += 1
+                assert not any(a.parameters.get("code") == TORRENTIAL_TRIBUTE
+                               and a.kind in ("activate", "chain") for a in actions)
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not trap_set:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == TORRENTIAL_TRIBUTE), None)
+                    trap_set |= action is not None
+                if trap_set and not gemini_summoned and action is None:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == GEMINI_ELF), None)
+                    gemini_summoned |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not tomato_set:
+                action = next((a for a in actions if a.kind == "set_monster"
+                               and a.parameters.get("code") == MYSTIC_TOMATO), None)
+                tomato_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and tomato_set:
+                if obs.phase == "main1" and not battle:
+                    action = next((a for a in actions if a.kind == "battle_phase"), None)
+                    battle |= action is not None
+                if obs.phase == "battle_start" and not attacked:
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == GEMINI_ELF), None)
+                    attacked |= action is not None
+            if attacked and not attack_targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("controller") == 1
+                               and "code" not in a.parameters), None)
+                attack_targeted |= action is not None
+            if attack_targeted and not recruited and any(a.kind == "yes" for a in actions):
+                assert obs.phase == "damage_step" and obs.acting_player == 1
+                deck_before = obs.deck_counts[1]
+                action = next(a for a in actions if a.kind == "yes")
+                recruited = True
+            if recruited and not sangan_selected and actions[0].kind == "select_card":
+                assert obs.phase == "damage_step" and obs.acting_player == 1
+                action = next((a for a in actions if a.parameters.get("code") == SANGAN),
+                              None)
+                sangan_selected |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if sangan_selected and obs.phase == "battle_step":
+                attacker_view = env.engine.probe.observation(0)
+                assert attacker_view.deck_counts[1] == deck_before - 1
+                assert any(c.code == SANGAN and c.controller == 1
+                           and c.zone == "monster" for c in attacker_view.field)
+                assert any(c.code == TORRENTIAL_TRIBUTE and c.controller == 0
+                           and c.zone == "spell_trap" for c in attacker_view.field)
+                assert any(c.code == MYSTIC_TOMATO
+                           for c in attacker_view.graveyards[1])
+                assert damage_step_choices > 0
+                assert f"goat/c{MYSTIC_TOMATO}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Mystic Tomato did not recruit during the Damage Step")
