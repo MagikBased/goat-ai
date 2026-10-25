@@ -478,5 +478,7 @@ from this policy, not deliberate strategy choices or metagame frequencies.
 The leading selected response pairs were Book of Moon to Graceful Charity,
 Solemn Judgment to Nobleman, Torrential Tribute to Breaker, and Trap Dustshoot
 to Thunder Dragon, each three times. Existing native fixtures cover the last
-three; Book responding to Graceful is a possible next combined chain and
-visibility case, without treating its sample count as historical frequency.
+three. A paired native fixture now checks Book responding to Graceful,
+including the face-down field-memory boundary and Graceful's private draw;
+both complete duels replay-verify. The sample counts are not historical
+frequency estimates.
