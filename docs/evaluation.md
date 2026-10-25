@@ -1512,3 +1512,62 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
   --seed 17900 --seeds 32 --workers 2 --max-decisions 3000 \
   --output .cache/goat-ai/combat_fourdeck_fv16_vs_v12_17900_17931.json
 ```
+
+## Feature-v16 self-play continuation (2026-10-25)
+
+The snapshot-pool trainer now has an opt-in `--skip-capped-games` mode. A duel
+that reaches `--max-decisions` is recorded as `decision_limit`, receives no
+reward label or gradient update, produces no trajectory, and is excluded from
+the child checkpoint's training-game provenance. It is not a draw. The default
+still raises an error so a capped game cannot silently enter an experiment.
+
+Starting from the v16 checkpoint above, a 64-seed continuation used the four
+training Main Decks (Goat Control, Chaos Turbo, Warrior, Bazoo Return), both
+learner seats, temperature 2, learning rate 0.0003, entropy coefficient 0.01,
+and a 10,000-decision cap. **62 games terminated** (36 learner wins, 26 losses);
+seeds 18248 and 18252 were censored at the cap. The terminal games contain
+51,401 decisions, all replay-verified against the pinned experimental core;
+6,938 learner decisions had legal alternatives for policy updates. The
+longest terminal game had 8,842 decisions. The child checkpoint SHA-256 is
+`add7930ab17798df4445a742f1315bc893d60bf999ce9962e1f3980edd81e074`;
+the training report SHA-256 is
+`bcbfe0c76495923262946844dc314230a41ef7db2b729d4bc21f0bbe66a05a1a`.
+The high cap and two censored games show that this policy can produce very long
+duels; the training win fraction is conditional on termination and is not an
+evaluation score.
+
+On fresh seeds 18300–18331, both assignments and seats of held-out Chaos
+Control and Chaos Return, the child scored **62–66** directly against its v16
+parent (48.4%, matchup-seed paired 95% interval **45.3–51.6%**). It scored
+22–42 with Chaos Control and 40–24 with Chaos Return. All 128 evaluation
+duels terminated under 3,000 decisions; the four-worker tournament took
+64.06 seconds on the recorded CPU. The report SHA-256 is
+`8eb5c23c5fca48a99efa633f16b77349d8f5989cc9a1a8650b81294083724458`.
+Exact Main Deck composition and seed gates excluded the training games from
+evaluation. This update does not demonstrate a self-play strength gain or fix
+the Chaos Control weakness.
+
+Reproduce training with this command, then use `scripts/evaluate_policy.py`
+with the parent checkpoint as `--opponent-checkpoint` and
+`--both-deck-assignments --require-unseen-main-decks --seed 18300 --seeds 32
+--workers 4 --max-decisions 3000` on the held-out Chaos Control/Chaos Return
+pair. The reports include the exact deck and native-asset fingerprints.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  checkpoints/combat_fourdeck_fv16_17000_17003.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+    examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/chaos_turbo_riclar_2020.ydk \
+    examples/decks/goat_control_lolmarcus_2020.ydk \
+  --matchup examples/decks/warrior_montague_clash.ydk \
+    examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+    examples/decks/warrior_montague_clash.ydk \
+  --seed 18200 --games 64 --learning-rate 0.0003 \
+  --learner-temperature 2.0 --entropy-coefficient 0.01 \
+  --max-decisions 10000 --skip-capped-games \
+  --record-dir replays/combat_fv16_selfplay_18200_18263 \
+  --output checkpoints/combat_fv16_selfplay_18200_18263.pt
+```

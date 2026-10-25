@@ -179,6 +179,14 @@ includes 50% and the Chaos Control split was below 50%. See [evaluation](evaluat
 The M4 exit remains open pending stronger cross-deck competitive evidence and
 a demonstrated self-play gain.
 
+A 64-seed feature-v16 snapshot-pool continuation completed 62 replay-verified
+training duels and censored two that exceeded 10,000 decisions. Its held-out
+128-game direct match against the parent scored 62–66, with a paired interval
+crossing 50%; the Chaos Control split worsened. The trainer can now record
+over-cap games separately without assigning them a terminal reward or losing
+the other completed updates. See [evaluation](evaluation.md). This does not
+satisfy the self-play gain gate.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

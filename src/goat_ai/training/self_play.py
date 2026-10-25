@@ -30,6 +30,15 @@ class EpisodeResult:
         return 1.0 if self.winner == self.learner_seat else -1.0
 
 
+class EpisodeDecisionLimit(RuntimeError):
+    """A duel did not terminate within the declared decision budget."""
+
+    def __init__(self, seed: int, max_decisions: int) -> None:
+        self.seed = seed
+        self.max_decisions = max_decisions
+        super().__init__(f"self-play duel exceeded {max_decisions} decisions: seed={seed}")
+
+
 def episode_schedule(matchups: Sequence[tuple[str, str]],
                      seeds: Sequence[int]) -> tuple[tuple[int, tuple[str, str], int], ...]:
     """Cycle matchups after both learner seats have been assigned."""
@@ -98,7 +107,7 @@ def run_learning_episode(
                                      skill_metadata={"learner_seat": learner_seat})
                 return EpisodeResult(seed, learner_seat, env.result(), count,
                                      tuple(records), trajectory)
-    raise RuntimeError(f"self-play duel exceeded {max_decisions} decisions: seed={seed}")
+    raise EpisodeDecisionLimit(seed, max_decisions)
 
 
 def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
@@ -139,6 +148,7 @@ def train_against_snapshot_pool(
     max_snapshots: int = 8, entropy_coefficient: float = 0.001,
     max_decisions: int = 5000, random_seed: int = 0,
     learner_temperature: float = 1.0,
+    skip_capped_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
 ) -> tuple[dict, ...]:
     """Train one learner seat per duel against random or frozen past policies.
@@ -169,9 +179,18 @@ def train_against_snapshot_pool(
         else:
             opponent = RandomAgent(seed)
             opponent_name = "random"
-        episode = run_learning_episode(model, vocabulary, opponent, decks, seed,
-                                       learner_seat, engine_factory, generator,
-                                       max_decisions, learner_temperature)
+        try:
+            episode = run_learning_episode(model, vocabulary, opponent, decks, seed,
+                                           learner_seat, engine_factory, generator,
+                                           max_decisions, learner_temperature)
+        except EpisodeDecisionLimit:
+            if not skip_capped_games:
+                raise
+            reports.append({"seed": seed, "learner_seat": learner_seat,
+                            "decks": decks, "opponent": opponent_name,
+                            "status": "decision_limit", "decisions": max_decisions,
+                            "learner_decisions": 0, "policy_loss": None})
+            continue
         if record_episode is not None:
             record_episode(index, episode)
         loss = (policy_gradient_update(model, vocabulary, episode.learner_records,
@@ -182,6 +201,7 @@ def train_against_snapshot_pool(
         baseline = 0.95 * baseline + 0.05 * episode.reward
         reports.append({"seed": seed, "learner_seat": learner_seat,
                         "decks": decks, "opponent": opponent_name,
+                        "status": "terminal",
                         "deck_sha256": episode.trajectory.deck_sha256,
                         "asset_sha256": episode.trajectory.asset_sha256,
                         "rules_profile": episode.trajectory.rules_profile,

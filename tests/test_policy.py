@@ -3,6 +3,7 @@
 from dataclasses import replace
 from functools import partial
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -29,9 +30,11 @@ from goat_ai.training import (
 )
 from goat_ai.training.policy import ACTION_KINDS
 from goat_ai.training.self_play import (
+    EpisodeDecisionLimit,
     episode_schedule,
     policy_gradient_update,
     sample_legal_action,
+    train_against_snapshot_pool,
 )
 from scripts.evaluate_policy import (
     make_policy_agent,
@@ -801,6 +804,35 @@ def test_self_play_schedule_covers_each_deck_in_both_seats():
         ("goat", 0), ("goat", 1), ("chaos", 0), ("chaos", 1)]
     with pytest.raises(ValueError, match="matchup"):
         episode_schedule((), (100,))
+
+
+def test_self_play_can_censor_over_cap_game_without_learning_from_it(monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=16)
+    saved = []
+
+    def run_episode(_model, _vocabulary, _opponent, _decks, seed, *_args):
+        if seed == 100:
+            raise EpisodeDecisionLimit(seed, 5)
+        return SimpleNamespace(
+            seed=seed, winner=0, reward=1.0, decisions=3,
+            learner_records=(), trajectory=SimpleNamespace(
+                deck_sha256=("a", "b"), asset_sha256={"core": "hash"},
+                rules_profile="goat"))
+
+    monkeypatch.setattr("goat_ai.training.self_play.run_learning_episode", run_episode)
+    kwargs = dict(max_decisions=5, random_seed=7,
+                  record_episode=lambda index, episode: saved.append((index, episode.seed)))
+    with pytest.raises(EpisodeDecisionLimit, match="seed=100"):
+        train_against_snapshot_pool(model, vocabulary, (("a", "b"),), (100, 101),
+                                    lambda: None, **kwargs)
+    reports = train_against_snapshot_pool(
+        model, vocabulary, (("a", "b"),), (100, 101), lambda: None,
+        skip_capped_games=True, **kwargs)
+    assert [report["status"] for report in reports] == ["decision_limit", "terminal"]
+    assert reports[0]["learner_decisions"] == 0
+    assert "reward" not in reports[0]
+    assert saved == [(1, 101)]
 
 
 def test_demonstration_seat_filters_verified_duel_labels():

@@ -40,6 +40,8 @@ def main() -> None:
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
     parser.add_argument("--max-decisions", type=int, default=5000)
+    parser.add_argument("--skip-capped-games", action="store_true",
+                        help="record over-cap duels as censored; exclude them from updates and provenance")
     parser.add_argument("--record-dir", type=Path,
                         help="optional ignored directory for exact self-play trajectories")
     args = parser.parse_args()
@@ -81,10 +83,14 @@ def main() -> None:
         entropy_coefficient=args.entropy_coefficient,
         learner_temperature=args.learner_temperature,
         max_decisions=args.max_decisions, random_seed=args.seed,
+        skip_capped_games=args.skip_capped_games,
         record_episode=record,
     )
+    terminal_reports = [report for report in reports if report["status"] == "terminal"]
+    if not terminal_reports:
+        parser.error("no terminal self-play games; checkpoint was not written")
     training_games = list(previous)
-    for report in reports:
+    for report in terminal_reports:
         training_games.append({
             "seed": report["seed"],
             "deck_sha256": report["deck_sha256"],
@@ -100,7 +106,8 @@ def main() -> None:
               "snapshot_every": args.snapshot_every, "max_snapshots": args.max_snapshots,
               "entropy_coefficient": args.entropy_coefficient,
               "learner_temperature": args.learner_temperature,
-              "max_decisions": args.max_decisions, "seed": args.seed}
+              "max_decisions": args.max_decisions, "seed": args.seed,
+              "skip_capped_games": args.skip_capped_games}
     source_decisions = dict(parent.get("source_decisions", {}))
     source_decisions["self_play_rl"] = (source_decisions.get("self_play_rl", 0)
                                         + sum(report["learner_decisions"] for report in reports))
@@ -118,12 +125,15 @@ def main() -> None:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     torch.save(checkpoint, args.output)
-    wins = sum(report["reward"] > 0 for report in reports)
-    losses = sum(report["reward"] < 0 for report in reports)
-    print(json.dumps({"output": str(args.output), "games": len(reports),
+    wins = sum(report["reward"] > 0 for report in terminal_reports)
+    losses = sum(report["reward"] < 0 for report in terminal_reports)
+    print(json.dumps({"output": str(args.output), "games": len(terminal_reports),
+                      "scheduled_games": len(reports),
+                      "censored_games": len(reports) - len(terminal_reports),
                       "wins": wins, "losses": losses,
-                      "draws": len(reports) - wins - losses,
-                      "learner_decisions": sum(report["learner_decisions"] for report in reports),
+                      "draws": len(terminal_reports) - wins - losses,
+                      "learner_decisions": sum(report["learner_decisions"]
+                                               for report in terminal_reports),
                       "reports": reports}, indent=2))
 
 
