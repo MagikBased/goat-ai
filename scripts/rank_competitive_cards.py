@@ -1,4 +1,4 @@
-"""Rank Main Deck cards across the six documented competitive example lists.
+"""Rank Main Deck cards across the sourced tournament example lists.
 
 This counts local examples, not tournament usage or metagame share.
 """
@@ -11,16 +11,9 @@ from collections import Counter
 from pathlib import Path
 
 from goat_ai.engine.decks import read_ydk
+from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
 
 ROOT = Path(__file__).resolve().parents[1]
-DECKS = (
-    "goat_control_lolmarcus_2020.ydk",
-    "chaos_turbo_riclar_2020.ydk",
-    "warrior_montague_clash.ydk",
-    "chaos_control_insids_worlds_2022.ydk",
-    "flip_control_goatformat_guide.ydk",
-    "chaos_return_dingosig_worlds_2022.ydk",
-)
 
 
 def main() -> None:
@@ -37,7 +30,7 @@ def main() -> None:
 
     prevalence: Counter[int] = Counter()
     copies: Counter[int] = Counter()
-    for name in DECKS:
+    for name in TOURNAMENT_MAIN_DECKS:
         main_cards = Counter(read_ydk(ROOT / "examples" / "decks" / name).main)
         prevalence.update(main_cards.keys())
         copies.update(main_cards)

@@ -26,6 +26,32 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def file_set_sha256(root: Path, paths) -> str:
+    """Fingerprint a file set, including relative names as well as contents."""
+    digest = hashlib.sha256()
+    for path in sorted(paths):
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        contents = path.read_bytes()
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        digest.update(len(contents).to_bytes(8, "big"))
+        digest.update(contents)
+    return digest.hexdigest()
+
+
+def source_code_sha256(repository: Path) -> str:
+    """Fingerprint the evaluator and installed project Python source."""
+    sources = list((repository / "src/goat_ai").rglob("*.py"))
+    sources.extend((repository / "scripts/evaluate_native.py",
+                    repository / "pyproject.toml"))
+    return file_set_sha256(repository, sources)
+
+
+def card_scripts_sha256(native_root: Path) -> str:
+    """Fingerprint pinned Lua scripts; card scripts affect native outcomes."""
+    return file_set_sha256(native_root, (native_root / "scripts").rglob("*.lua"))
+
+
 def flip_monster_codes(native_root: Path) -> frozenset[int]:
     """Read public card type metadata from the pinned databases."""
     codes = set()
@@ -134,6 +160,8 @@ def main() -> None:
         "duels_per_second": len(report.games) / wall_seconds,
         "decisions_per_second": sum(game.decisions for game in report.games) / wall_seconds,
         "asset_sha256": assets, "deck_sha256": deck_hashes,
+        "source_code_sha256": source_code_sha256(Path(__file__).resolve().parents[1]),
+        "card_scripts_sha256": card_scripts_sha256(args.native_root),
         "seeds": seeds, "both_deck_assignments": args.both_deck_assignments,
         "summary": report.summary(),
         "games": [asdict(game) | {"a_outcome": game.a_outcome} for game in report.games],

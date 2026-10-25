@@ -11,17 +11,10 @@ from collections import Counter
 from pathlib import Path
 
 from goat_ai.engine.decks import read_ydk
+from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
 from scripts.probe_competitive_card_actions import card_names
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DECKS = (
-    "goat_control_lolmarcus_2020.ydk",
-    "chaos_turbo_riclar_2020.ydk",
-    "warrior_montague_clash.ydk",
-    "chaos_control_insids_worlds_2022.ydk",
-    "chaos_return_dingosig_worlds_2022.ydk",
-    "bazoo_return_weirdchamp_worlds.ydk",
-)
 
 
 def priority_rows(deck_paths: tuple[Path, ...], fixture_paths: tuple[Path, ...],
@@ -60,14 +53,16 @@ def main() -> None:
     args = parser.parse_args()
     if args.top < 1:
         parser.error("--top must be positive")
-    deck_paths = tuple(ROOT / "examples/decks" / name for name in DEFAULT_DECKS)
+    deck_paths = tuple(ROOT / "examples/decks" / name
+                       for name in TOURNAMENT_MAIN_DECKS)
     codes = {code for path in deck_paths for code in read_ydk(path).main}
     names = card_names(args.native_root, codes)
     fixtures = tuple(sorted((ROOT / "tests").glob("test_historical_*.py")))
     rows = priority_rows(deck_paths, fixtures, names)
     if args.json:
-        print(json.dumps({"scope": "six sourced tournament Main Decks; numeric fixture "
-                                    "references are not historical correctness evidence",
+        print(json.dumps({"scope": f"{len(TOURNAMENT_MAIN_DECKS)} sourced tournament "
+                                    "Main Decks; numeric fixture references are not "
+                                    "historical correctness evidence",
                           "decks": [str(path.relative_to(ROOT)) for path in deck_paths],
                           "cards": rows}, indent=2))
         return
