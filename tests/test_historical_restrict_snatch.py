@@ -15,13 +15,17 @@ SCAPEGOAT = 504700123
 METAMORPHOSIS = 46411259
 RESTRICT = 504700102
 SNATCH = 45986603
+BOOK = 14087893
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_snatch_steals_equipped_restrict(tmp_path):
+@pytest.mark.parametrize("book_after_snatch", [False, True])
+def test_snatch_steals_equipped_restrict(tmp_path, book_after_snatch):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = {f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                f"goat/c{RESTRICT}.lua", f"official/c{SNATCH}.lua"}
+    if book_after_snatch:
+        scripts.add(f"official/c{BOOK}.lua")
     if any(not (root / "scripts" / script).is_file() for script in scripts):
         pytest.skip("required card script not installed")
     owner = tmp_path / "restrict.ydk"
@@ -29,16 +33,22 @@ def test_snatch_steals_equipped_restrict(tmp_path):
         *((SCAPEGOAT, METAMORPHOSIS) * 3), *VANILLA_DECK[6:])))
         + f"\n#extra\n{RESTRICT}\n!side\n")
     stealer = tmp_path / "snatch.ydk"
-    stealer.write_text("#main\n" + "\n".join(map(str, (
-        SNATCH, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    stealer_cards = [SNATCH, *VANILLA_DECK[1:]]
+    if book_after_snatch:
+        stealer_cards[6] = BOOK
+    stealer.write_text("#main\n" + "\n".join(map(str, stealer_cards))
+                       + "\n#extra\n!side\n")
 
     with GoatEnvironment(str(owner), str(stealer), seed=52,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
         assert {SCAPEGOAT, METAMORPHOSIS} <= {c.code for c in obs.hand}
         assert SNATCH in {c.code for c in env.engine.probe.observation(1).hand}
+        if book_after_snatch:
+            assert BOOK in {c.code for c in env.engine.probe.observation(1).hand}
         goat = defender_summoned = meta = token = fusion = effect = target = False
         equipped = snatch = snatch_target = False
+        control_checked = book_used = book_targeted = False
         defender_code = None
         for _ in range(130):
             actions = env.legal_actions()
@@ -86,11 +96,19 @@ def test_snatch_steals_equipped_restrict(tmp_path):
                     action = next((a for a in actions if a.parameters.get("code") == RESTRICT
                                    and a.parameters.get("controller") == 0), action)
                     snatch_target |= action is not None and action.kind == "select_card"
+                if book_after_snatch and control_checked and not book_used:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == BOOK), action)
+                    book_used |= action is not None and action.kind == "activate"
+                if book_used and not book_targeted and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code") == RESTRICT
+                                   and a.parameters.get("controller") == 1), action)
+                    book_targeted |= action is not None and action.kind == "select_card"
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_card", "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if snatch_target and not obs.chain and obs.turn == 4:
+            if snatch_target and not control_checked and not obs.chain and obs.turn == 4:
                 restrict = next(c for c in obs.field if c.code == RESTRICT)
                 assert restrict.controller == 1 and restrict.position == "faceup"
                 assert any(c.code == defender_code and c.zone == "spell_trap"
@@ -101,6 +119,25 @@ def test_snatch_steals_equipped_restrict(tmp_path):
                            and c.equipped_to == (1, restrict.sequence) for c in obs.field)
                 assert obs.life_points == (8000, 8000)
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
+                control_checked = True
+            if control_checked and (not book_after_snatch or book_targeted
+                                    and not obs.chain and obs.turn == 4):
+                if book_after_snatch:
+                    stealer_view = env.engine.probe.observation(1)
+                    restrict = next(c for c in stealer_view.field if c.code == RESTRICT)
+                    assert restrict.controller == 1 and restrict.position == "facedown"
+                    assert SNATCH in {c.code for c in stealer_view.graveyards[1]}
+                    assert BOOK in {c.code for c in stealer_view.graveyards[1]}
+                    assert defender_code in {c.code for c in stealer_view.graveyards[1]}
+                    assert not any(c.code == defender_code and c.zone == "spell_trap"
+                                   for c in stealer_view.field)
+                    owner_view = env.engine.probe.observation(0)
+                    hidden = next(c for c in owner_view.field if c.zone == "monster"
+                                  and c.controller == 1 and c.sequence == restrict.sequence)
+                    assert hidden.code is None and hidden.position == "facedown"
+                    assert (1, "monster", hidden.sequence, RESTRICT) in {
+                        (c.controller, c.zone, c.sequence, c.code)
+                        for c in owner_view.known_opponent_field_cards}
                 agents = (RandomAgent(52), RandomAgent(53))
                 for _ in range(3000):
                     if env.is_terminal():
@@ -110,7 +147,7 @@ def test_snatch_steals_equipped_restrict(tmp_path):
                 else:
                     pytest.fail("Restrict / Snatch continuation exceeded 3000 decisions")
                 trajectory = env.trajectory()
-                path = tmp_path / "restrict_snatch.json"
+                path = tmp_path / f"restrict_snatch_{book_after_snatch}.json"
                 write_trajectory(path, trajectory)
                 assert verify_trajectory(read_trajectory(path),
                                          ExperimentalOcgcoreEngine(root)) == len(
@@ -119,4 +156,5 @@ def test_snatch_steals_equipped_restrict(tmp_path):
         pytest.fail(f"Restrict / Snatch line stalled: goat={goat} "
                     f"summon={defender_summoned} meta={meta}/{token}/{fusion} "
                     f"effect={effect}/{target}/{equipped} snatch={snatch}/{snatch_target} "
+                    f"book={book_used}/{book_targeted} "
                     f"turn={obs.turn} phase={obs.phase}")
