@@ -170,6 +170,8 @@ Dustshoot, D.D. Warrior Lady, Mirror Force, Snatch Steal, and Torrential
 Tribute. Check existing fixtures before adding one: a fixture file count is
 not a count of independently validated rulings. For example, the top response
 pair Solemn Judgment to Trap Dustshoot (nine decisions) and Torrential Tribute
-to Dekoichi (eight) already have native regressions. The random-policy action
+to Dekoichi (eight) already have native regressions. The four Mirror Force
+responses to Sakuretsu Armor now have a two-order native chain regression
+with full-duel replay verification. The random-policy action
 counts express decision exposure in this small sample, not actual tournament
 play frequency, historical correctness, or strategic value.

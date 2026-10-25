@@ -106,3 +106,82 @@ def test_both_attack_traps_are_legal_with_distinct_outcomes(tmp_path, chosen_tra
     pytest.fail(f"Attack-trap choice stalled: summons={summons} "
                 f"sets={mirror_set}/{sakuretsu_set} "
                 f"battle={battle}/{attacked} trap={trap_used}")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("first_trap", [MIRROR, SAKURETSU])
+def test_mirror_and_sakuretsu_can_share_an_attack_response_chain(tmp_path, first_trap):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    scripts = {f"official/c{code}.lua" for code in (MIRROR, SAKURETSU)}
+    if any(not (root / "scripts" / relative).is_file() for relative in scripts):
+        pytest.skip("Mirror Force or Sakuretsu script not installed")
+    defender = tmp_path / "defender.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        MIRROR, *([SAKURETSU] * 3), *VANILLA_DECK[4:])))
+                        + "\n#extra\n!side\n")
+
+    with GoatEnvironment("examples/decks/vanilla_probe.ydk", str(defender), seed=7,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        summons = 0
+        mirror_set = sakuretsu_set = attacked = False
+        chain_choices = []
+        checked = False
+        agents = (RandomAgent(7), RandomAgent(8))
+        for _ in range(5000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / f"mirror_sakuretsu_chain_{first_trap}.json"
+                write_trajectory(path, env.trajectory())
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                                             env.trajectory().decisions)
+                return
+            actions = env.legal_actions()
+            action = None
+            if obs.acting_player == 0 and obs.turn in (1, 3) \
+                    and summons < (1 if obs.turn == 1 else 2):
+                action = next((a for a in actions if a.kind == "normal_summon"), None)
+                summons += action is not None
+            if obs.turn == 2 and obs.acting_player == 1:
+                if not mirror_set:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == MIRROR), None)
+                    mirror_set |= action is not None
+                if mirror_set and not sakuretsu_set and action is None:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == SAKURETSU), None)
+                    sakuretsu_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and summons == 2 \
+                    and not attacked and action is None:
+                action = next((a for a in actions if a.kind in ("battle_phase", "attack")),
+                              None)
+                attacked |= action is not None and action.kind == "attack"
+            if attacked and not checked:
+                if obs.acting_player == 1 and len(chain_choices) < 2:
+                    wanted = first_trap if not chain_choices else (
+                        SAKURETSU if first_trap == MIRROR else MIRROR)
+                    action = next((a for a in actions if a.kind == "chain"
+                                   and a.parameters.get("code") == wanted), None)
+                    if action is not None:
+                        assert obs.phase == "battle_step"
+                        if chain_choices:
+                            assert [link.card_code for link in obs.chain] == [first_trap]
+                        chain_choices.append(wanted)
+            if action is None and not checked:
+                action = next((a for a in actions if a.kind in (
+                    "place", "select_position", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+            if not checked and {MIRROR, SAKURETSU}.issubset(
+                    {c.code for c in obs.graveyards[1]}):
+                assert chain_choices == [first_trap, SAKURETSU if first_trap == MIRROR
+                                          else MIRROR]
+                assert not obs.chain
+                assert not any(c.controller == 0 and c.zone == "monster" for c in obs.field)
+                assert sum(c.code in VANILLA_DECK for c in obs.graveyards[0]) == 2
+                assert obs.life_points == (8000, 8000)
+                assert scripts <= env.engine.probe.loaded_script_sha256.keys()
+                checked = True
+    pytest.fail("Mirror Force / Sakuretsu response chain did not finish")
