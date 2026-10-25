@@ -79,6 +79,7 @@ ordered response pairs. The report JSON SHA-256 was
 | Solemn Judgment → Ring of Destruction | 5 |
 | Solemn Judgment → Dust Tornado | 5 |
 | Dust Tornado → Book of Moon | 5 |
+| Raigeki Break → Book of Moon | 3 |
 
 The sample also observed four Torrential Tribute responses to Breaker the
 Magical Warrior, which already have a [historical fixture](goat_rules.md).
