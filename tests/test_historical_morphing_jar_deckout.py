@@ -84,3 +84,60 @@ def test_morphing_jar_near_empty_deck_terminal_timing(
                 assert not env.is_terminal()
                 emptied = True
     pytest.fail("Morphing Jar did not reach the deck-out boundary")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("remaining,expected_winner", [(4, None), (5, 0)])
+def test_morphing_jar_equal_decks_terminal_order(tmp_path, remaining, expected_winner):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    script = f"official/c{MORPHING_JAR}.lua"
+    if not (root / "scripts" / script).is_file():
+        pytest.skip("Morphing Jar script not installed")
+    jar_deck = tmp_path / "jar_41.ydk"
+    jar_deck.write_text("#main\n" + "\n".join(map(str, (
+        MORPHING_JAR, *VANILLA_DECK))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(jar_deck), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert MORPHING_JAR in {card.code for card in obs.hand}
+        assert obs.deck_counts == (35, 35)
+        jar_set = jar_flipped = emptied = False
+        for _ in range(700):
+            if env.is_terminal():
+                assert jar_flipped
+                assert env.result() == expected_winner
+                assert obs.deck_counts == (0, 0)
+                assert obs.life_points == (8000, 8000)
+                assert obs.phase == ("main1" if remaining == 4 else "draw")
+                assert emptied == (remaining == 5)
+                assert script in env.engine.probe.loaded_script_sha256
+                path = tmp_path / f"jar_equal_decks_{remaining}.json"
+                write_trajectory(path, env.trajectory())
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                                             env.trajectory().decisions)
+                return
+            actions = env.legal_actions()
+            action = None
+            if obs.acting_player == 0 and obs.phase == "main1":
+                if not jar_set:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == MORPHING_JAR), None)
+                    jar_set |= action is not None
+                if jar_set and not jar_flipped \
+                        and obs.deck_counts == (remaining, remaining) \
+                        and action is None \
+                        and any(a.kind == "end_phase" for a in actions):
+                    action = next((a for a in actions if a.kind == "flip_summon"
+                                   and a.parameters.get("code") == MORPHING_JAR), None)
+                    assert action is not None
+                    jar_flipped = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "end_phase", "pass")), actions[0])
+            obs = env.step(action)
+            if jar_flipped and remaining == 5 and obs.deck_counts == (0, 0) \
+                    and not emptied:
+                assert not env.is_terminal()
+                emptied = True
+    pytest.fail("Morphing Jar did not reach the equal-Deck draw boundary")
