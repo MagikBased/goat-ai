@@ -79,11 +79,13 @@ def test_confirm_cards_preserves_recipient_and_discards_native_card_order():
     probe._public_history = []
     probe._known_facedown = {}
     probe._private_reveals = []
+    probe._decision_private_reveals = []
     message = (bytes((MSG_CONFIRM_CARDS, 0)) + struct.pack("<I", 2)
                + struct.pack("<IBBI", 200, 1, 1, 7)
                + struct.pack("<IBBI", 100, 1, 1, 2))
     probe._update_public_clock([message])
     reveal = probe._private_reveals[0]
+    assert probe._decision_private_reveals == [reveal]
     assert reveal.recipient == 0 and reveal.turn == 3
     assert [(card.code, card.controller, card.location) for card in reveal.cards] == [
         (100, 1, 1), (200, 1, 1)]

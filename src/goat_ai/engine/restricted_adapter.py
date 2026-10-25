@@ -107,18 +107,22 @@ class RestrictedOcgcoreEngine:
                         sequence: int) -> int | None:
             if controller == native.player:
                 return code
-            if (location == 0x02
-                    and any(link.card_code == 5556668 for link in observation.chain)):
-                # Exchange privately confirms each hand to the player who
-                # chooses from it. Use only the latest addressed reveal from
-                # this turn; never query the opponent's current hand identity.
-                reveal = next((event for event in reversed(observation.private_reveals)
-                               if event.turn == observation.turn and any(
+            if location == 0x02 and any(
+                    link.card_code in (5556668, 64697231) for link in observation.chain):
+                # Dustshoot reveals immediately before its only hand choice.
+                # Exchange has two choices after its one pair of reveals, so
+                # the second choice must retain the earlier addressed reveal.
+                exchange = any(link.card_code == 5556668 for link in observation.chain)
+                reveals = (observation.private_reveals if exchange else
+                           self.probe._decision_private_reveals)
+                reveal = next((event for event in reversed(reveals)
+                               if event.recipient == native.player
+                               and event.turn == observation.turn and any(
                                    card.controller == controller and card.location == location
                                    for card in event.cards)), None)
                 if reveal is not None and any(card.code == code for card in reveal.cards):
                     return code
-                raise SimulatorUnavailable("Exchange hand choice lacks a recipient-scoped reveal")
+                raise SimulatorUnavailable("hand choice lacks a recipient-scoped reveal")
             visible = next((card for card in visible_cards
                             if card.controller == controller
                             and card.zone == zones.get(location)

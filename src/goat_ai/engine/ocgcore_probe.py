@@ -176,6 +176,7 @@ class OcgcoreProbe:
         self._restriction_hints: dict[tuple[int, int], int] = {}
         self._public_reveals: list[PublicRevealView] = []
         self._private_reveals: list[PrivateRevealView] = []
+        self._decision_private_reveals: list[PrivateRevealView] = []
         self._initial_main_decks: tuple[tuple[int, ...], tuple[int, ...]] = ((), ())
         self._announcement_codes: tuple[int, ...] | None = None
         self._disabled_zones: tuple[DisabledZoneView, ...] = ()
@@ -453,8 +454,9 @@ class OcgcoreProbe:
                         message[10 + index * 10], message[11 + index * 10])
                         for index in range(count)),
                         key=lambda card: (card.controller, card.location, card.code)))
-                    self._private_reveals.append(PrivateRevealView(
-                        self._turn, recipient, cards))
+                    reveal = PrivateRevealView(self._turn, recipient, cards)
+                    self._private_reveals.append(reveal)
+                    self._decision_private_reveals.append(reveal)
                     for index in range(count):
                         controller = message[10 + index * 10]
                         location = message[11 + index * 10]
@@ -666,6 +668,7 @@ class OcgcoreProbe:
         choices = self.decode_pending().choices
         if response_value not in {choice.response for choice in choices}:
             raise ValueError("illegal native response")
+        self._decision_private_reveals.clear()
         if isinstance(response_value, int):
             response = c.c_int32(response_value)
             self.lib.OCG_DuelSetResponse(self._duel, c.byref(response), c.sizeof(response))
