@@ -17,8 +17,8 @@ SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("battle_substitution", [False, True])
-def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path, battle_substitution):
+@pytest.mark.parametrize("battle_case", ["equip_only", "attack_position", "set_defender"])
+def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path, battle_case):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                      f"goat/c{RESTRICT}.lua"):
@@ -76,19 +76,24 @@ def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path, battle_substit
                 action = options[0]
                 target_code = action.parameters["code"]
                 target = True
-            if battle_substitution and equip_checked:
+            if battle_case != "equip_only" and equip_checked:
                 if obs.turn == 4 and obs.acting_player == 1 and not opponent_summoned:
-                    action = next((a for a in actions if a.kind == "normal_summon"),
-                                  action)
-                    if action is not None and action.kind == "normal_summon":
+                    summon_kind = ("set_monster" if battle_case == "set_defender"
+                                   else "normal_summon")
+                    action = next((a for a in actions if a.kind == summon_kind), action)
+                    if action is not None and action.kind == summon_kind:
                         attack_target_code = action.parameters["code"]
                         opponent_summoned = True
                 if obs.turn == 5 and obs.acting_player == 0 and opponent_summoned:
                     if obs.phase == "main1" and not battle:
-                        attack_target_atk = next(c.attack for c in obs.field
-                                                 if c.code == attack_target_code
-                                                 and c.controller == 1)
-                        assert attack_target_atk > 0
+                        if battle_case == "attack_position":
+                            attack_target_atk = next(c.attack for c in obs.field
+                                                     if c.code == attack_target_code
+                                                     and c.controller == 1)
+                            assert attack_target_atk > 0
+                        else:
+                            assert all(c.code != attack_target_code for c in obs.field
+                                       if c.controller == 1)
                         action = next((a for a in actions if a.kind == "battle_phase"),
                                       action)
                         battle |= action is not None and action.kind == "battle_phase"
@@ -98,9 +103,10 @@ def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path, battle_substit
                         attacked |= action is not None and action.kind == "attack"
                     elif attacked and not attack_target_chosen \
                             and actions[0].kind == "select_card":
-                        action = next((a for a in actions if a.parameters.get("code")
-                                       == attack_target_code and a.parameters.get(
-                                           "controller") == 1), action)
+                        action = next((a for a in actions if a.parameters.get("controller") == 1
+                                       and (a.parameters.get("code") == attack_target_code
+                                            if battle_case == "attack_position"
+                                            else a.parameters.get("code") is None)), action)
                         attack_target_chosen |= action is not None \
                             and action.kind == "select_card"
             if action is None:
@@ -127,17 +133,27 @@ def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path, battle_substit
                 assert env.engine.probe.loaded_script_sha256[f"goat/c{RESTRICT}.lua"] \
                     != UPSTREAM_GOAT_RESTRICT_SHA256
                 equip_checked = True
-                if not battle_substitution:
+                if battle_case == "equip_only":
                     return
-            if battle_substitution and attack_target_chosen \
+            if battle_case != "equip_only" and attack_target_chosen \
                     and obs.turn == 5 and obs.phase == "battle_step" \
-                    and obs.life_points[0] == 8000 - attack_target_atk:
+                    and obs.life_points[0] < 8000:
                 assert equip_checked and opponent_summoned and battle and attacked
-                assert obs.life_points[1] == 8000 - attack_target_atk
+                if battle_case == "set_defender":
+                    defender = next(c for c in obs.field if c.code == attack_target_code
+                                    and c.controller == 1)
+                    assert defender.defense is not None and defender.defense > 0
+                    expected_damage = defender.defense
+                    assert defender.position == "faceup" and defender.orientation == "defense"
+                else:
+                    expected_damage = attack_target_atk
+                assert obs.life_points == (8000 - expected_damage,
+                                           8000 - expected_damage)
                 assert any(c.code == RESTRICT and c.zone == "monster"
                            and c.controller == 0 for c in obs.field)
-                assert not any(c.code == target_code and c.zone == "spell_trap"
-                               for c in obs.field)
+                token_equipped = any(c.code == target_code and c.zone == "spell_trap"
+                                     for c in obs.field)
+                assert token_equipped == (battle_case == "set_defender")
                 assert not any(c.code in SHEEP_CODES for pile in obs.graveyards
                                for c in pile)
                 assert any(c.code == attack_target_code and c.zone == "monster"
