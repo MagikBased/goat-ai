@@ -1021,3 +1021,35 @@ Train `scripts/train_behavioral_clone.py` on all eight JSON files with
 orders at seeds 16410–16411 with the same teacher schedule, then pass all
 eight JSON files and both checkpoints to `scripts/audit_policy_agreement.py
 --engine experimental`. Use `OMP_NUM_THREADS=1` for the measured schedule.
+
+## Behavioral-clone optimizer minibatches
+
+The cloning trainer now accepts `--batch-size N` while keeping the original
+per-decision update at the default `N=1`. It still encodes and scores one
+variable-length decision at a time, accumulates the mean gradient over `N`
+records, and takes one optimizer step per group. This reduces optimizer
+updates; it is not batched model inference or GPU collation. A gradient test
+matches an explicit two-decision mean-loss update.
+
+On the eight replay-verified sourced Goat Control/Chaos Turbo trajectories from
+the matched chain-target comparison, a local one-epoch CPU measurement used
+3,201 teacher decisions, width 16, feature version 10, model and shuffle seed
+16600, learning rate 0.001, and `OMP_NUM_THREADS=1`. With records already
+loaded, batch size 1 took **16.33 s** (196.0 decisions/s; epoch loss
+0.2497902); batch size 16 took **9.90 s** (323.4 decisions/s; epoch loss
+0.3543973). These losses are from different numbers of optimizer updates and
+are not a quality comparison. The CLI also replay-verified two schema-v21
+competitive-deck duels and trained a width-8 feature-v14 batch-16 checkpoint
+from 522 teacher decisions; its epoch loss was 0.3834609. The checkpoint
+loaded with `batch_size=16` and `feature_version=14` metadata. No held-out
+strength evaluation has been run for the minibatch checkpoint.
+
+The timing measurement loaded the eight ignored JSON files under
+`.cache/goat-ai/v21_chain_target_train_goat_chaos/` and
+`.cache/goat-ai/v21_chain_target_train_chaos_goat/` via `read_trajectory` and
+`demonstrator_records`, then timed only `fit_behavioral_clone` for batch sizes
+1 and 16 with the configuration above. It excludes replay verification,
+loading, and checkpoint writing. The CLI smoke used
+`--batch-size 16 --feature-version 14 --epochs 1 --width 8 --seed 16600`
+on `.cache/goat-ai/v21_chain_target_demos/*.json`, with the experimental
+engine and output `.cache/goat-ai/v21_batch16_smoke.pt`.

@@ -523,6 +523,34 @@ def test_behavioral_clone_records_and_checkpoint_round_trip(tmp_path):
         fit_behavioral_clone(policy, vocabulary, [])
 
 
+def test_behavioral_clone_minibatch_matches_mean_gradient():
+    vocabulary = CardVocabulary((10, 20))
+    records = (DecisionRecord(view(), actions(), actions()[0]),
+               DecisionRecord(view(), actions(), actions()[1]))
+    torch.manual_seed(72)
+    expected = LegalActionPolicy(vocabulary.size, width=8)
+    torch.manual_seed(72)
+    actual = LegalActionPolicy(vocabulary.size, width=8)
+    optimizer = torch.optim.Adam(expected.parameters(), lr=0.01)
+    losses = []
+    for record in records:
+        features = encode_decision(record.observation, record.legal_actions,
+                                   vocabulary, expected.feature_version)
+        logits = expected(features).unsqueeze(0)
+        target = torch.tensor([record.legal_actions.index(record.selected_action)])
+        losses.append(torch.nn.functional.cross_entropy(logits, target))
+    optimizer.zero_grad()
+    torch.stack(losses).mean().backward()
+    optimizer.step()
+    reported = fit_behavioral_clone(actual, vocabulary, records, epochs=1,
+                                    learning_rate=0.01, seed=72, batch_size=2)
+    assert reported[0] == pytest.approx(torch.stack(losses).detach().mean().item())
+    assert all(torch.allclose(a, b, atol=1e-6, rtol=1e-6)
+               for a, b in zip(actual.parameters(), expected.parameters(), strict=True))
+    with pytest.raises(ValueError, match="batch size"):
+        fit_behavioral_clone(actual, vocabulary, records, batch_size=0)
+
+
 def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):
     vocabulary = CardVocabulary((10, 20))
     legacy = LegalActionPolicy(vocabulary.size, width=16, feature_version=1)

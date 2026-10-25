@@ -27,14 +27,16 @@ def main() -> None:
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--batch-size", type=int, default=1,
+                        help="decisions per optimizer update; forward passes remain individual")
     parser.add_argument("--width", type=int, default=64)
     parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 15)),
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
-    if args.epochs < 1 or args.width < 1 or args.learning_rate <= 0:
-        parser.error("epochs, width, and learning rate must be positive")
+    if args.epochs < 1 or args.width < 1 or args.learning_rate <= 0 or args.batch_size < 1:
+        parser.error("epochs, width, learning rate, and batch size must be positive")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     records = []
@@ -73,7 +75,8 @@ def main() -> None:
     model = LegalActionPolicy(vocabulary.size, width=args.width,
                               feature_version=args.feature_version)
     losses = fit_behavioral_clone(model, vocabulary, records, epochs=args.epochs,
-                                  learning_rate=args.learning_rate, seed=args.seed)
+                                  learning_rate=args.learning_rate, seed=args.seed,
+                                  batch_size=args.batch_size)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     checkpoint = {
         "schema_version": 1, "model_state": model.state_dict(),
@@ -82,6 +85,7 @@ def main() -> None:
         "trajectory_sha256": trajectory_hashes, "source_decisions": dict(sources),
         "training_games": training_games,
         "seed": args.seed, "torch_version": str(torch.__version__),
+        "batch_size": args.batch_size,
         "losses": losses,
     }
     torch.save(checkpoint, args.output)
