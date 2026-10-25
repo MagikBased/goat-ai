@@ -105,7 +105,8 @@ def run_learning_episode(
             observation = env.step(action)
             if env.is_terminal():
                 trajectory = replace(env.trajectory(), source="self_play_rl",
-                                     skill_metadata={"learner_seat": learner_seat})
+                                     skill_metadata={"learner_seat": learner_seat,
+                                                     "demonstrator_seat": learner_seat})
                 return EpisodeResult(seed, learner_seat, env.result(), count,
                                      tuple(records), trajectory)
     raise EpisodeDecisionLimit(seed, max_decisions)

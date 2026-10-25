@@ -312,6 +312,14 @@ on another held-out schedule, with a paired interval including 50% and a
 large assigned-deck split. Per-deck reward centering alone has not met M4;
 see [evaluation](evaluation.md).
 
+The cloning input selector now filters legacy `self_play_rl` trajectories by
+their recorded learner seat and rejects missing or contradictory seat metadata.
+New self-play recordings include the explicit demonstrator seat. A 64-duel
+legacy corpus check excluded 20,940 opponent decisions that would otherwise
+have been mislabeled; a native replay and cloning smoke test confirmed the
+corrected path. This repairs training-data provenance without claiming a
+policy strength gain; see [evaluation](evaluation.md).
+
 An opt-in public-Flip-type combat teacher now tests the missing Flip Summons
 seen in the sourced-deck action audit. On a six-duel replay-verified probe it
 selected Dekoichi Flip Summon five times versus one for the current teacher,

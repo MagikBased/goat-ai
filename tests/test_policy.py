@@ -20,7 +20,12 @@ from goat_ai.observations import (
     Observation,
     TargetSlotView,
 )
-from goat_ai.replay import DecisionRecord, Trajectory, demonstrator_records
+from goat_ai.replay import (
+    DecisionRecord,
+    Trajectory,
+    demonstrator_records,
+    demonstrator_seat,
+)
 from goat_ai.training import (
     CardVocabulary,
     LegalActionPolicy,
@@ -1000,6 +1005,22 @@ def test_demonstration_seat_filters_verified_duel_labels():
         trajectory, skill_metadata={"demonstrator_seat": 1})) == (second,)
     assert demonstrator_records(replace(
         trajectory, source="self_play", skill_metadata=None)) == (first, second)
+    legacy_rl = replace(trajectory, source="self_play_rl",
+                        skill_metadata={"learner_seat": 1})
+    assert demonstrator_seat(legacy_rl) == 1
+    assert demonstrator_records(legacy_rl) == (second,)
+    assert demonstrator_records(replace(
+        legacy_rl, skill_metadata={"learner_seat": 0,
+                                   "demonstrator_seat": 0})) == (first,)
+    with pytest.raises(ValueError, match="conflicts"):
+        demonstrator_records(replace(
+            legacy_rl, skill_metadata={"learner_seat": 1,
+                                       "demonstrator_seat": 0}))
+    with pytest.raises(ValueError, match="learner_seat"):
+        demonstrator_records(replace(legacy_rl, skill_metadata=None))
+    with pytest.raises(ValueError, match="learner_seat"):
+        demonstrator_records(replace(
+            legacy_rl, skill_metadata={"learner_seat": True}))
     with pytest.raises(ValueError, match="demonstrator_seat"):
         demonstrator_records(replace(trajectory, skill_metadata=None))
     with pytest.raises(ValueError, match="demonstrator_seat"):

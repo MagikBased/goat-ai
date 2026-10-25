@@ -2350,3 +2350,28 @@ The direct and parent comparisons used `scripts/evaluate_policy.py` with
 matchup, and seeds 19800 and 19850 respectively. Both checkpoints passed the
 Main Deck composition exclusion gate. The reported score intervals and
 throughput apply only to those schedules and pinned assets.
+
+## Self-play demonstration-seat correction (2026-10-25)
+
+The saved `self_play_rl` trajectories used `skill_metadata.learner_seat`,
+whereas the behavioral-cloning selector previously recognized only
+`demonstrator_seat`. If those files had been reused for cloning, it would
+have labeled both the learner and the opponent's moves as demonstrations.
+The selector now uses the learner seat for legacy `self_play_rl` files,
+requires valid seat metadata, and rejects conflicting seat fields. New
+self-play recordings carry both fields. The policy-agreement audit and cloning
+checkpoint provenance use the same resolved seat.
+
+Across the two 32-game baseline-pilot recording directories above, the
+corrected selector returned **21,604 learner decisions** from **42,544**
+replay-verified total decisions and excluded **20,940 opponent decisions**.
+The old selector would have returned all 42,544. A fresh native self-play
+smoke duel recorded `learner_seat=demonstrator_seat=0`, replay-verified all
+1,063 decisions, and selected 578 learner labels. A cloning CLI smoke run on
+one legacy file replay-verified 1,261 decisions and fitted only its 669
+learner decisions; the saved checkpoint recorded demonstrator seat 0.
+Inspection of saved checkpoints found no behavioral-cloning checkpoint whose
+training-game provenance lists `self_play_rl`; existing RL continuations
+already updated from their in-memory learner-only decision records. This
+corrects a future data-ingestion hazard and does not itself change any
+previous competitive result.

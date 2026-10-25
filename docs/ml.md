@@ -29,6 +29,14 @@ The training CLI accepts `--feature-version` for controlled encoder comparisons.
 
 A full-duel trajectory can name `skill_metadata.demonstrator_seat` as 0 or 1. Behavioral cloning verifies the **entire** native replay, then uses only that seat's selected actions as labels. This prevents an opponent's random decisions from contaminating a heuristic or human demonstration. The CLI human player in `examples/play_vanilla.py --human-seat 0` records `source=human_cli`, `authorization=self_recorded`, and the selected seat when a trajectory path is supplied. This is a local interactive recording path; it does not parse tournament videos or third-party replays.
 
+For `source=self_play_rl`, the learner is the only demonstrator. New recordings
+store both `learner_seat` and matching `demonstrator_seat`; older recordings
+with only `learner_seat` are filtered by that seat when reused for cloning or
+policy agreement. Missing, invalid, or contradictory self-play seat metadata
+is rejected. A `source=self_play` trajectory without a labeled seat still
+represents both players' decisions. The training checkpoint records the
+resolved demonstrator seat for each source game.
+
 For a controlled baseline, collect heuristic decisions against RandomAgent in both seats and train on only those decisions:
 
 ```bash

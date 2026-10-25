@@ -20,6 +20,7 @@ from goat_ai.replay import (
     ReplayMismatch,
     Trajectory,
     demonstrator_records,
+    demonstrator_seat,
     read_trajectory,
     verify_trajectory,
 )
@@ -165,7 +166,7 @@ def main() -> None:
         except ReplayMismatch as exc:
             raise ReplayMismatch(f"{path}: {exc}") from exc
         records = demonstrator_records(trajectory)
-        seat = (trajectory.skill_metadata or {}).get("demonstrator_seat")
+        seat = demonstrator_seat(trajectory)
         deck = trajectory.decks[seat] if seat is not None else "both seats"
         verified.append({"path": str(path), "sha256": sha256(path),
                          "seed": trajectory.seed, "deck": deck,

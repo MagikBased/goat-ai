@@ -11,7 +11,12 @@ import torch
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
-from goat_ai.replay import demonstrator_records, read_trajectory, verify_trajectory
+from goat_ai.replay import (
+    demonstrator_records,
+    demonstrator_seat,
+    read_trajectory,
+    verify_trajectory,
+)
 from goat_ai.training import (
     CardVocabulary,
     LegalActionPolicy,
@@ -84,8 +89,7 @@ def main() -> None:
                                    main_deck_composition_sha256(read_ydk(deck))
                                    for deck in trajectory.decks),
                                "source": trajectory.source,
-                               "demonstrator_seat": (trajectory.skill_metadata or {}).get(
-                                   "demonstrator_seat"),
+                               "demonstrator_seat": demonstrator_seat(trajectory),
                                "teacher": (trajectory.skill_metadata or {}).get("teacher"),
                                "teacher_version": (trajectory.skill_metadata or {}).get(
                                    "teacher_version"),
