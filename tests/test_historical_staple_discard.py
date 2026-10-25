@@ -12,6 +12,7 @@ from goat_ai.environments import GoatEnvironment
 
 GRACEFUL_CHARITY = 79571449
 DELINQUENT_DUO = 44763025
+SINISTER_SERPENT = 511000818
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -89,3 +90,72 @@ def test_graceful_and_duo_discard_choices_keep_hands_private(tmp_path):
                 action = next((a for a in actions if a.kind == "end_phase"), actions[0])
             observation = env.step(action)
     pytest.fail("Graceful Charity and Delinquent Duo did not reach both discard choices")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_duo_discards_serpent_then_opponent_recovers_it_at_standby(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"official/c{DELINQUENT_DUO}.lua",
+                     f"pre-errata/c{SINISTER_SERPENT}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    attacker = tmp_path / "duo.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        DELINQUENT_DUO, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    defender = tmp_path / "serpent.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        SINISTER_SERPENT, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(attacker), str(defender), seed=52,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert DELINQUENT_DUO in {c.code for c in obs.hand}
+        assert SINISTER_SERPENT in {
+            c.code for c in env.engine.probe.observation(1).hand}
+        duo_used = discarded = recovered = False
+        defender_hand_before_return = None
+        for _ in range(45):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not duo_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == DELINQUENT_DUO), None)
+                duo_used |= action is not None
+            if duo_used and not discarded and obs.acting_player == 1 \
+                    and actions[0].kind == "select_card":
+                assert obs.viewer == 1
+                assert obs.life_points == (7000, 8000)
+                assert not env.engine.probe.observation(0).private_reveals
+                if SINISTER_SERPENT in {c.code for c in obs.hand}:
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == SINISTER_SERPENT), None)
+                else:
+                    action = actions[0]
+                discarded = True
+            if discarded and obs.turn == 2 and obs.phase == "standby" \
+                    and obs.acting_player == 1 and not recovered:
+                choices = {a.kind: a for a in actions
+                           if a.parameters.get("code") == SINISTER_SERPENT}
+                assert {"yes", "no"}.issubset(choices)
+                assert SINISTER_SERPENT in {c.code for c in obs.graveyards[1]}
+                assert SINISTER_SERPENT not in {c.code for c in obs.hand}
+                defender_hand_before_return = len(obs.hand)
+                action = choices["yes"]
+                recovered = True
+            if recovered and obs.turn == 2 and obs.phase == "main1" \
+                    and obs.acting_player == 1:
+                assert obs.life_points == (7000, 8000)
+                assert SINISTER_SERPENT in {c.code for c in obs.hand}
+                assert SINISTER_SERPENT not in {c.code for c in obs.graveyards[1]}
+                assert len(obs.hand) == defender_hand_before_return + 1
+                attacker_view = env.engine.probe.observation(0)
+                assert attacker_view.opponent_hand_count == len(obs.hand)
+                assert not attacker_view.private_reveals
+                assert {f"official/c{DELINQUENT_DUO}.lua",
+                        f"pre-errata/c{SINISTER_SERPENT}.lua"}.issubset(
+                    env.engine.probe.loaded_script_sha256)
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail("Duo discard and Serpent's Standby Phase return did not resolve")
