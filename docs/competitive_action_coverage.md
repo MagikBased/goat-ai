@@ -291,6 +291,31 @@ The generated YDK files and report stay under ignored `.cache/goat-ai/`.
 This checks deterministic execution of these newly combined cards, not
 historical legality of every interaction or playing strength.
 
+The probe also accepts `--distinct-opponents`, which gives each generated
+deck an independent opponent mix using seed plus 1,000,000. It retains the
+same seeded duel and verification protocol and writes both YDK files under
+the ignored output directory. This tests cross-deck effects that mirror
+matches may never present.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/probe_random_decks.py --native-root .cache/goat-ai \
+  --card-pool tournament --distinct-opponents \
+  --seed 18650 --seeds 50 --max-decisions 3000 \
+  --verify-replays \
+  --output .cache/goat-ai/tournament-cross-18650-18699
+```
+
+On the pinned local assets, **50/50 cross-deck duels** terminated and
+**48,248 decisions** replay-verified. The 100 generated Main Deck
+compositions were distinct, including within each pair. The longest duel
+had **1,482 decisions**; no cap or adapter error was recorded. The report
+contains both YDK hashes per game, the six source-deck hashes, the GOAT
+rules profile, and **103 loaded native asset hashes**. Its SHA-256 is
+`54d74a091a9dfa1d32526afab3697215ac6e28b0507149d92ca09800eb8738ee`.
+This strengthens protocol coverage across common-card combinations without
+proving every historical interaction correct.
+
 ## Same-schedule random and combat-baseline exposure
 
 The probe also accepts `--agent combat_heuristic` (or `heuristic`). This

@@ -132,7 +132,8 @@ the cause of the difference has not been isolated. The unchanged pre-change
 probe script produces the current 12,006-decision result, so the older hash
 is retained only as historical data.
 For generated decks made entirely from sourced tournament cards, use
-`--card-pool tournament --verify-replays`; see
+`--card-pool tournament --verify-replays`. Add `--distinct-opponents` to pair
+two independently generated legal decks in each duel; see
 [competitive action coverage](docs/competitive_action_coverage.md).
 
 The sample is a synthetic control-style protocol probe, not a sourced

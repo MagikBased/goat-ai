@@ -86,9 +86,17 @@ def generate_tournament_mix(root: Path, seed: int) -> Decklist:
     return deck
 
 
+def write_deck(path: Path, deck: Decklist) -> None:
+    path.write_text("#main\n" + "\n".join(map(str, deck.main))
+                    + "\n#extra\n"
+                    + "".join(f"{code}\n" for code in deck.extra)
+                    + "!side\n")
+
+
 def probe(root: Path, output: Path, first_seed: int, seeds: int,
           max_decisions: int, card_pool: str = "whitelist",
-          verify_replays: bool = False) -> dict:
+          verify_replays: bool = False,
+          distinct_opponents: bool = False) -> dict:
     if card_pool not in ("whitelist", "tournament"):
         raise ValueError("unknown card pool")
     output.mkdir(parents=True, exist_ok=True)
@@ -96,17 +104,18 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
     loaded_assets: dict[str, str] = {}
     rules_profile = None
     for seed in range(first_seed, first_seed + seeds):
-        deck = (generate_deck(root, seed) if card_pool == "whitelist"
-                else generate_tournament_mix(root, seed))
+        generator = generate_deck if card_pool == "whitelist" else generate_tournament_mix
+        deck = generator(root, seed)
         path = output / f"seed_{seed}.ydk"
-        path.write_text("#main\n" + "\n".join(map(str, deck.main))
-                        + "\n#extra\n"
-                        + "".join(f"{code}\n" for code in deck.extra)
-                        + "!side\n")
+        write_deck(path, deck)
+        opponent_path = path
+        if distinct_opponents:
+            opponent_path = output / f"seed_{seed}_opponent.ydk"
+            write_deck(opponent_path, generator(root, seed + 1_000_000))
         decisions = 0
         kinds = set()
         try:
-            with GoatEnvironment(str(path), str(path), seed,
+            with GoatEnvironment(str(path), str(opponent_path), seed,
                                  ExperimentalOcgcoreEngine(root)) as env:
                 observation = env.reset()
                 agent = RandomAgent(seed)
@@ -140,12 +149,18 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
         game = {"seed": seed, "deck": str(path), "deck_sha256": sha256_file(path),
                 "decisions": decisions, "terminal": terminal, "winner": winner,
                 "action_kinds": sorted(kinds), "error": error}
+        if distinct_opponents:
+            game["opponent_deck"] = str(opponent_path)
+            game["opponent_deck_sha256"] = sha256_file(opponent_path)
         if verify_replays:
             game["replay_verified_decisions"] = verified if error is None else None
         games.append(game)
     report = {"max_decisions": max_decisions, "games": games}
     if card_pool != "whitelist":
         report["card_pool"] = card_pool
+    if distinct_opponents:
+        report["distinct_opponents"] = True
+        report["opponent_seed_offset"] = 1_000_000
     if card_pool == "tournament" or verify_replays:
         report["rules_profile"] = rules_profile
         report["loaded_asset_sha256"] = dict(sorted(loaded_assets.items()))
@@ -186,11 +201,14 @@ def main() -> None:
     parser.add_argument("--card-pool", choices=("whitelist", "tournament"),
                         default="whitelist")
     parser.add_argument("--verify-replays", action="store_true")
+    parser.add_argument("--distinct-opponents", action="store_true",
+                        help="generate an independent legal opponent deck per seed")
     args = parser.parse_args()
     if args.seeds < 1 or args.max_decisions < 1:
         parser.error("--seeds and --max-decisions must be positive")
     report = probe(args.native_root, args.output, args.seed, args.seeds,
-                   args.max_decisions, args.card_pool, args.verify_replays)
+                   args.max_decisions, args.card_pool, args.verify_replays,
+                   args.distinct_opponents)
     for game in report["games"]:
         status = "error" if game["error"] else "terminal" if game["terminal"] else "limit"
         suffix = f" error={game['error']}" if game["error"] else ""
