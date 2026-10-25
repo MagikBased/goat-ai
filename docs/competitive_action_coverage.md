@@ -176,6 +176,11 @@ with full-duel replay verification. The random-policy action
 counts express decision exposure in this small sample, not actual tournament
 play frequency, historical correctness, or strategic value.
 
+Heavy Storm appears in all six tournament Main Decks and Trap Dustshoot in
+five. A paired native regression now checks Dustshoot chained to Heavy against
+passing, including the private hand reveal and destruction of another Set
+Dustshoot. Both complete duels replay-verify; see [GOAT rules](goat_rules.md).
+
 ## Same-schedule random and combat-baseline exposure
 
 The probe also accepts `--agent combat_heuristic` (or `heuristic`). This
