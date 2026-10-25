@@ -442,3 +442,41 @@ earlier fixture where Book responds to Torrential.
 Dust Tornado responded to Graceful Charity once. A paired native fixture now
 checks that destroying Graceful on the Chain does not suppress its private draw
 and two-card discard, with the pass branch as a control.
+
+## Fresh random-agent tournament replay and visibility audit
+
+A separate seed-28700 run used RandomAgent on the same 15 tournament-deck
+pairs in both seat orders. All 30 duels terminated within the 3,000-decision
+cap, with 414–1,156 decisions each and 26,980 decisions total. Every saved
+trajectory serialized and replay-verified against a fresh pinned native
+engine. The generated report is ignored at
+`.cache/goat-ai/tournament_random_28700.json` and has SHA-256
+`0b7e2a530dfee17e9d5451a7a1318a9e5356962173e3a4d5dadc9aec706c9189`.
+The separate visibility audit passed over all 30 saved trajectories and
+26,980 decisions, including 333 hidden-field choices and 112 opponent-hand
+choices. This checks the auditor's stated invariants, not all possible hidden
+information leaks or historical card rulings.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --tournament-corpus --agent random \
+  --seed 28700 --seeds 1 --max-decisions 3000 --verify-replays \
+  --record-dir .cache/goat-ai/tournament_random_28700_replays \
+  --output .cache/goat-ai/tournament_random_28700.json \
+  > .cache/goat-ai/tournament_random_28700.stdout
+PYTHONPATH=src:. .venv/bin/python scripts/audit_trajectory_visibility.py \
+  .cache/goat-ai/tournament_random_28700_replays
+```
+
+Among the nine cards present in all six tournament Main Decks, the sample
+selected 119 Book of Moon activate/chain actions, 72 Nobleman activations,
+47 each for Heavy Storm and Graceful Charity, 41 Delinquent Duo activations,
+38 Ring activate/chain actions, 32 Pot activations, 19 BLS activate/chain
+actions, and 15 Breaker activate/chain actions. The source-action counter also
+includes triggered effects recorded as `chain`, so these are exposure counts
+from this policy, not deliberate strategy choices or metagame frequencies.
+The leading selected response pairs were Book of Moon to Graceful Charity,
+Solemn Judgment to Nobleman, Torrential Tribute to Breaker, and Trap Dustshoot
+to Thunder Dragon, each three times. Existing native fixtures cover the last
+three; Book responding to Graceful is a possible next combined chain and
+visibility case, without treating its sample count as historical frequency.
