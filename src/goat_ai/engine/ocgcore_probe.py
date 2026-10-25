@@ -30,6 +30,30 @@ GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
 UPSTREAM_UTILITY_SHA256 = "59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a"
 GOAT_DECK_CONFIRM_OLD = b"Duel.ConfirmCards(tp,dg)"
 GOAT_DECK_CONFIRM_HISTORICAL = b"Duel.ConfirmCards(1-tp,dg)"
+UPSTREAM_GOAT_RESTRICT_SHA256 = "579c13c4afff6a581360b221ed79867b7b7d75c57870d9953dc2f21711c0670a"
+GOAT_RESTRICT_EFFECT_MARKER = b"\tc:RegisterEffect(e5)\nend\n"
+GOAT_RESTRICT_DAMAGE_EFFECT = b"""\tc:RegisterEffect(e5)
+\t-- Historical PSV-084 ruling: reflect battle damage while equipped.
+\tlocal e6=Effect.CreateEffect(c)
+\te6:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+\te6:SetCode(EVENT_DAMAGE)
+\te6:SetRange(LOCATION_MZONE)
+\te6:SetCondition(s.damcon)
+\te6:SetOperation(s.damop)
+\tc:RegisterEffect(e6)
+end
+"""
+GOAT_RESTRICT_DAMAGE_FUNCTIONS = b"""
+function s.damcon(e,tp,eg,ep,ev,re,r,rp)
+\tlocal c=e:GetHandler()
+\tlocal g=c:GetEquipGroup():Filter(s.eqfilter,nil)
+\treturn #g>0 and ep==tp and r&REASON_BATTLE~=0
+\t\tand (Duel.GetAttacker()==c or Duel.GetAttackTarget()==c)
+end
+function s.damop(e,tp,eg,ep,ev,re,r,rp)
+\tDuel.Damage(1-tp,ev,REASON_EFFECT)
+end
+"""
 LOCATION_DECK = 0x01
 LOCATION_HAND = 0x02
 LOCATION_MZONE = 0x04
@@ -319,6 +343,14 @@ class OcgcoreProbe:
             # searching player. Historical verification addresses the opponent.
             contents = contents.replace(GOAT_DECK_CONFIRM_OLD,
                                         GOAT_DECK_CONFIRM_HISTORICAL)
+        if path.relative_to(self.scripts) == Path("goat/c504700102.lua"):
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RESTRICT_SHA256 \
+                    or contents.count(GOAT_RESTRICT_EFFECT_MARKER) != 1:
+                self.errors.append("pinned GOAT Restrict script changed; battle-damage patch not applied")
+                return 0
+            contents = (contents.replace(GOAT_RESTRICT_EFFECT_MARKER,
+                                         GOAT_RESTRICT_DAMAGE_EFFECT)
+                        + GOAT_RESTRICT_DAMAGE_FUNCTIONS)
         self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
             hashlib.sha256(contents).hexdigest()
         )

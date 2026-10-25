@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.engine.ocgcore_probe import UPSTREAM_GOAT_RESTRICT_SHA256
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 
@@ -123,6 +124,8 @@ def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path, battle_substit
                 assert {f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                         f"goat/c{RESTRICT}.lua"} \
                     <= env.engine.probe.loaded_script_sha256.keys()
+                assert env.engine.probe.loaded_script_sha256[f"goat/c{RESTRICT}.lua"] \
+                    != UPSTREAM_GOAT_RESTRICT_SHA256
                 equip_checked = True
                 if not battle_substitution:
                     return
@@ -130,7 +133,7 @@ def test_restrict_equips_opponents_sheep_as_token_equip(tmp_path, battle_substit
                     and obs.turn == 5 and obs.phase == "battle_step" \
                     and obs.life_points[0] == 8000 - attack_target_atk:
                 assert equip_checked and opponent_summoned and battle and attacked
-                assert obs.life_points[1] == 8000
+                assert obs.life_points[1] == 8000 - attack_target_atk
                 assert any(c.code == RESTRICT and c.zone == "monster"
                            and c.controller == 0 for c in obs.field)
                 assert not any(c.code == target_code and c.zone == "spell_trap"
