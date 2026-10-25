@@ -264,3 +264,84 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                     "select_card", "place", "select_position", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail(f"BLS did not complete its historical {choice} line")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_bls_set_target_choice_is_invariant_to_private_identity(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for script in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua"):
+        if not (root / "scripts" / script).is_file():
+            pytest.skip(f"script {script} not installed")
+    lights = (LIGHT, 62651957)
+    darks = (49881766, DARK)
+    filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
+    cards = (GRACEFUL, BLS, *(code for code in lights for _ in range(3)),
+             *(code for code in darks for _ in range(3)), *filler[:26])
+    own_deck = tmp_path / "bls.ydk"
+    own_deck.write_text("#main\n" + "\n".join(map(str, cards))
+                        + "\n#extra\n!side\n")
+
+    def run(hidden_code):
+        opponent_cards = list(VANILLA_DECK)
+        opponent_cards[4] = hidden_code
+        opponent_deck = tmp_path / f"set_{hidden_code}.ydk"
+        opponent_deck.write_text("#main\n" + "\n".join(map(str, opponent_cards))
+                                 + "\n#extra\n!side\n")
+        with GoatEnvironment(str(own_deck), str(opponent_deck), seed=100,
+                             engine=ExperimentalOcgcoreEngine(root)) as env:
+            obs = env.reset()
+            graceful = discarded = summoned = set_monster = effect_used = False
+            costs = set()
+            for _ in range(85):
+                actions = env.legal_actions()
+                if effect_used and obs.acting_player == 0 \
+                        and actions[0].kind == "select_card":
+                    assert obs.viewer == 0
+                    assert any(c.controller == 1 and c.zone == "monster"
+                               and c.position == "facedown" and c.code is None
+                               for c in obs.field)
+                    targets = [a for a in actions if a.parameters.get("controller") == 1
+                               and a.parameters.get("location") == 4]
+                    assert len(targets) == 1
+                    assert "code" not in targets[0].parameters
+                    return obs, actions, env.engine.probe.observation(1)
+                action = None
+                if obs.turn == 1 and obs.acting_player == 0:
+                    if not graceful:
+                        action = next((a for a in actions if a.kind == "activate"
+                                       and a.parameters.get("code") == GRACEFUL), None)
+                        graceful |= action is not None
+                    if graceful and not discarded and actions[0].kind == "select_cards":
+                        action = next((a for a in actions if {c["code"] for c in
+                                       a.parameters["cards"]} == {LIGHT, DARK}), None)
+                        discarded |= action is not None
+                    if discarded and not summoned and action is None:
+                        action = next((a for a in actions if a.kind == "special_summon"
+                                       and a.parameters.get("code") == BLS), None)
+                        summoned |= action is not None
+                if summoned and len(costs) < 2 and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   in ({LIGHT, DARK} - costs)), action)
+                    if action is not None and action.kind == "select_card":
+                        costs.add(action.parameters["code"])
+                if obs.turn == 2 and obs.acting_player == 1 and not set_monster:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == hidden_code), None)
+                    set_monster |= action is not None
+                if obs.turn == 3 and obs.acting_player == 0 and set_monster \
+                        and not effect_used:
+                    action = next((a for a in actions if a.kind in ("activate", "chain")
+                                   and a.parameters.get("code") == BLS), action)
+                    effect_used |= action is not None and action.parameters.get("code") == BLS
+                if action is None:
+                    action = next((a for a in actions if a.kind in (
+                        "place", "pass", "end_phase")), actions[0])
+                obs = env.step(action)
+        pytest.fail("BLS did not reach its set-monster target decision")
+
+    first = run(23771716)
+    second = run(97923414)
+    assert first[0] == second[0]
+    assert first[1] == second[1]
+    assert {c.code for c in first[2].field if c.controller == 1} != {
+        c.code for c in second[2].field if c.controller == 1}
