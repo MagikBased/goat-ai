@@ -182,7 +182,8 @@ def test_duo_discards_serpent_then_opponent_recovers_it_at_standby(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_duo_can_activate_against_one_card_hand_without_second_choice(tmp_path):
+@pytest.mark.parametrize("empty_hand", [False, True])
+def test_duo_one_card_hand_activation_boundary(tmp_path, empty_hand):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     if not (root / f"scripts/official/c{DELINQUENT_DUO}.lua").is_file():
         pytest.skip("Delinquent Duo script not installed")
@@ -206,17 +207,31 @@ def test_duo_can_activate_against_one_card_hand_without_second_choice(tmp_path):
         for _ in range(65):
             actions = env.legal_actions()
             action = None
-            if obs.turn == 2 and obs.acting_player == 1 and set_count < 5:
-                action = next((a for a in actions if a.kind == "set_spell_trap"
-                               and a.parameters.get("code") in backrow), None)
-                if action is not None:
-                    set_count += 1
+            if obs.turn == 2 and obs.acting_player == 1:
+                if set_count < 5:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") in backrow), None)
+                    if action is not None:
+                        set_count += 1
+                elif empty_hand and obs.hand:
+                    action = next((a for a in actions if a.kind == "set_monster"), None)
             if obs.turn == 3 and obs.phase == "main1" and obs.acting_player == 0 \
                     and set_count == 5 \
                     and not activated:
-                assert obs.opponent_hand_count == 1
+                assert obs.opponent_hand_count == (0 if empty_hand else 1)
                 assert len([c for c in obs.field if c.controller == 1
                             and c.zone == "spell_trap"]) == 5
+                if empty_hand:
+                    assert any(c.controller == 1 and c.zone == "monster"
+                               and c.position == "facedown" and c.code is None
+                               for c in obs.field)
+                    assert DELINQUENT_DUO in {c.code for c in obs.hand}
+                    assert not any(a.kind == "activate"
+                                   and a.parameters.get("code") == DELINQUENT_DUO
+                                   for a in actions)
+                    assert obs.life_points == (8000, 8000)
+                    assert not obs.graveyards[1]
+                    return
                 action = next((a for a in actions if a.kind == "activate"
                                and a.parameters.get("code") == DELINQUENT_DUO), None)
                 assert action is not None
