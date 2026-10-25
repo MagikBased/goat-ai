@@ -181,3 +181,54 @@ python scripts/evaluate_native.py --engine experimental \
 | Both | 24/32 | 8/32 | 59.375–87.5% |
 
 The heuristic won 15/16 in seat 0 and 9/16 in seat 1. Mean duel length was 865.28 decisions. The sequential tournament took 22.287 seconds for 32 duels and 27,689 decisions, or 1.436 duels and 1,242 decisions per wall-clock second in this one run. The strong seat split, small sample, weak opponent, unaudited full-card scripts, and partially reconstructed Goat Control Extra Deck limit interpretation. This is a reproducible baseline for future policies on the two high-play decks, not a competitive-strength claim.
+
+## Heuristic imitation on sourced GOAT decks
+
+A controlled behavioral-cloning run used 16 real native duels at seeds 8000–8003: four seeds with each deck assignment, and the heuristic teacher in each seat. The teacher won 9/16 against RandomAgent. The 16 complete trajectories contain 13,428 decisions; replay verification passed before training, and `demonstrator_seat` filtering selected 6,999 heuristic decisions. Feature-version-8, width-32 training ran for three epochs with seed 17 and learning rate 0.001. Mean decision losses were 0.09133, 0.03901, and 0.02767. With PyTorch CPU and `OMP_NUM_THREADS=1`, the verification-plus-training command took 102.47 seconds wall time, 101.53 user CPU seconds, and 565,320 KB peak RSS. The ignored checkpoint `checkpoints/heuristic_bc_sourced_8000_8003.pt` has SHA-256 `b8c51e5e129175a35eb142c7dc48d81056a2f948ee4d3ffc3af893cc36185992`.
+
+On fresh seeds 9000–9007, both sourced deck assignments and both seats were tested under the experimental adapter:
+
+| Candidate versus opponent | Wins | Losses | Paired score 95% bootstrap |
+| --- | ---: | ---: | ---: |
+| Sourced imitation versus RandomAgent | 18/32 | 14/32 | 37.5–75% |
+| Sourced imitation versus HeuristicAgent | 21/32 | 11/32 | 43.75–84.375% |
+| Sourced imitation versus vanilla-trained version-2 checkpoint | 16/32 | 16/32 | 31.25–68.75% |
+| HeuristicAgent versus RandomAgent | 23/32 | 9/32 | 56.25–87.5% |
+
+The direct checkpoint comparison shows no gain. The sourced policy won 15/16 when assigned Goat Control but only 6/16 with Chaos Turbo against the heuristic, so the aggregate 21/32 masks substantial deck dependence. The parent and child also use different feature versions, so this is an operational comparison rather than a causal estimate of the added training data.
+
+A separate off-policy audit used eight newly collected, replay-verified heuristic duels at seeds 9100–9101, totaling 5,500 full-duel decisions and 2,860 teacher decisions. Of those, 891 had more than one legal action. The vanilla-trained version-2 checkpoint agreed exactly with the teacher on 737/891; the sourced version-8 checkpoint agreed on 859/891. Across all 2,860 decisions, exact agreements were 2,706 and 2,828 respectively, but 1,969 decisions had only one legal action. This improvement in imitation did not translate into a measured competitive gain. The audit follows recorded teacher states, so its agreement rates cannot replace head-to-head duels.
+
+Reproduce after native setup with generated outputs under ignored `replays/`, `checkpoints/`, and `artifacts/`:
+
+```bash
+python scripts/collect_heuristic_demos.py --engine experimental \
+  --deck-a examples/decks/goat_control_lolmarcus_2020.ydk \
+  --deck-b examples/decks/chaos_turbo_riclar_2020.ydk \
+  --seed 8000 --seeds 4 --output-dir replays/sourced_heuristic_goat_chaos_8000_8003
+python scripts/collect_heuristic_demos.py --engine experimental \
+  --deck-a examples/decks/chaos_turbo_riclar_2020.ydk \
+  --deck-b examples/decks/goat_control_lolmarcus_2020.ydk \
+  --seed 8000 --seeds 4 --output-dir replays/sourced_heuristic_chaos_goat_8000_8003
+OMP_NUM_THREADS=1 python scripts/train_behavioral_clone.py \
+  replays/sourced_heuristic_goat_chaos_8000_8003/*.json \
+  replays/sourced_heuristic_chaos_goat_8000_8003/*.json \
+  --engine experimental --feature-version 8 \
+  --output checkpoints/heuristic_bc_sourced_8000_8003.pt \
+  --epochs 3 --width 32 --seed 17 --learning-rate 0.001
+OMP_NUM_THREADS=1 python scripts/evaluate_policy.py checkpoints/heuristic_bc_sourced_8000_8003.pt \
+  --engine experimental --opponent-checkpoint checkpoints/heuristic_bc_v2_1000_1003.pt \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/chaos_turbo_riclar_2020.ydk examples/decks/goat_control_lolmarcus_2020.ydk \
+  --seed 9000 --seeds 8 --max-decisions 3000
+```
+
+Use the same evaluator command with `--opponent random` or `--opponent heuristic` for the other two policy schedules. Generate audit trajectories with `collect_heuristic_demos.py` at seeds 9100–9101 in separate directories for each deck assignment, then run `scripts/audit_policy_agreement.py` with both `--checkpoint` paths and those trajectory files. The next training experiment needs stronger demonstrations or a learning update that improves decisions across both decks; a lower imitation loss alone is insufficient.
+
+```bash
+OMP_NUM_THREADS=1 python scripts/audit_policy_agreement.py --engine experimental \
+  --checkpoint checkpoints/heuristic_bc_v2_1000_1003.pt \
+  --checkpoint checkpoints/heuristic_bc_sourced_8000_8003.pt \
+  replays/sourced_audit_goat_chaos_9100_9101/*.json \
+  replays/sourced_audit_chaos_goat_9100_9101/*.json
+```

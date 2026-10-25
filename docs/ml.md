@@ -65,3 +65,7 @@ python scripts/evaluate_policy.py checkpoints/vanilla_rl.pt --seed 200 --seeds 8
 ```
 
 This is an experiment, not a selected final RL algorithm. Terminal reward is sparse; no value function, PPO update, opponent league, or checkpoint selection by held-out win rate exists. Runs from random imitation and from the stronger heuristic imitation checkpoint did not demonstrate an improvement in greedy playing strength; see [the evaluation log](evaluation.md). Future work should compare a richer action encoder, value baselines and PPO under the same held-out schedule, while keeping training opponents separate from evaluation opponents.
+
+## Sourced-deck imitation check
+
+A feature-version-8 checkpoint was trained on 6,999 replay-verified HeuristicAgent decisions from 16 sourced Goat Control/Chaos Turbo duels. On separate verified trajectories with real choices, exact teacher-action agreement rose from 737/891 for the prior vanilla-trained version-2 checkpoint to 859/891. On held-out paired duels, the new checkpoint split 16–16 against that prior checkpoint and won only 18/32 against RandomAgent. The protocol, hashes, deck splits, and confidence intervals are in [the evaluation log](evaluation.md). This is evidence that the imitation pipeline can learn the teacher on these decks; it is not evidence of improved competitive strength. Authorized expert demonstrations and stronger self-play updates remain necessary for M4.
