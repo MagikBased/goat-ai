@@ -5,14 +5,17 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 KYCOO = 88240808
 SORCERER = 9596126
 GRACEFUL = 79571449
 BOOK = 14087893
+SNATCH = 45986603
 NOBLEMAN = 504700116  # GOAT variant
 LIGHT = 15025844  # Mystical Elf
 DARK = 7359741  # Mechanicalchaser
@@ -30,12 +33,14 @@ def _kycoo_deck(tmp_path):
     return _deck(tmp_path / "kycoo.ydk", (*([KYCOO] * 3), *VANILLA_DECK[3:]))
 
 
-def _chaos_deck(tmp_path, *, book=False):
+def _chaos_deck(tmp_path, *, book=False, snatch=False):
     lights = (LIGHT, OTHER_LIGHT)
     darks = (49881766, DARK)
     filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
     if book:
         filler = [BOOK if code == 69140098 else code for code in filler]
+    if snatch:
+        filler[filler.index(GEMINI_ELF)] = SNATCH
     cards = (GRACEFUL, *([SORCERER] * 3),
              *(code for code in lights for _ in range(3)),
              *(code for code in darks for _ in range(3)), *filler[:24])
@@ -122,6 +127,91 @@ def test_kycoo_blocks_chaos_graveyard_cost_until_book_sets_it(tmp_path):
                     "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("Kycoo's Chaos lock did not release into a completed Sorcerer summon")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_snatch_steal_reverses_kycoo_chaos_lock(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    _require_scripts(root, KYCOO, SORCERER, GRACEFUL, SNATCH)
+    with GoatEnvironment(_chaos_deck(tmp_path, snatch=True), _kycoo_deck(tmp_path),
+                         seed=18, engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        assert {GRACEFUL, SNATCH, SORCERER}.issubset(c.code for c in observation.hand)
+        graceful = discarded = kycoo = locked = snatched = targeted = summoned = checked = False
+        costs = set()
+        agents = (RandomAgent(18), RandomAgent(19))
+        for _ in range(5000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / "kycoo_snatch.json"
+                write_trajectory(path, env.trajectory())
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                    env.trajectory().decisions)
+                return
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 and not graceful:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == GRACEFUL), None)
+                graceful |= action is not None
+            if graceful and not discarded and actions[0].kind == "select_cards":
+                action = next((a for a in actions if {c["code"] for c in a.parameters["cards"]}
+                               == {LIGHT, DARK}), None)
+                assert action is not None
+                discarded = True
+            if observation.turn == 2 and observation.acting_player == 1 and not kycoo:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == KYCOO), None)
+                kycoo |= action is not None
+            if observation.turn == 3 and observation.acting_player == 0 \
+                    and observation.phase == "main1" and not locked:
+                assert discarded and kycoo
+                assert {LIGHT, DARK}.issubset(c.code for c in observation.graveyards[0])
+                assert not any(a.kind == "special_summon"
+                               and a.parameters.get("code") == SORCERER for a in actions)
+                locked = True
+            if locked and not snatched and observation.acting_player == 0:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == SNATCH), action)
+                snatched |= action is not None and action.kind == "activate"
+            if snatched and not targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code") == KYCOO
+                               and a.parameters.get("controller") == 1), action)
+                targeted |= action is not None and action.kind == "select_card"
+            if targeted and not summoned and observation.acting_player == 0:
+                stolen = next((c for c in observation.field if c.code == KYCOO
+                               and c.controller == 0), None)
+                if stolen is not None:
+                    assert any(c.code == SNATCH for c in observation.field)
+                    summon = next((a for a in actions if a.kind == "special_summon"
+                                   and a.parameters.get("code") == SORCERER), None)
+                    if summon is not None:
+                        action = summon
+                        summoned = True
+            if summoned and costs != {LIGHT, DARK} and actions[0].kind == "select_card":
+                choice = next((a for a in actions if a.parameters.get("code")
+                               in {LIGHT, DARK} - costs
+                               and a.parameters.get("location") == 16), None)
+                if choice is not None:
+                    action = choice
+                    costs.add(choice.parameters["code"])
+            if action is None and not summoned:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[observation.acting_player].select_action(
+                    observation, actions)
+            observation = env.step(action)
+            if summoned and costs == {LIGHT, DARK} and not checked and any(
+                    c.code == SORCERER and c.controller == 0 for c in observation.field):
+                assert any(c.code == KYCOO and c.controller == 0
+                           for c in observation.field)
+                assert {LIGHT, DARK}.issubset(c.code for c in observation.banished[0])
+                assert {f"official/c{code}.lua" for code in (KYCOO, SNATCH)} <= (
+                    env.engine.probe.loaded_script_sha256.keys())
+                checked = True
+    pytest.fail("Snatch Steal did not reverse Kycoo's Chaos lock")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
