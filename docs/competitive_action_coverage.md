@@ -89,6 +89,8 @@ regression. Book of Moon responding to another Book also has a native
 same-target chain and visibility regression; that response appeared four times
 in the sample. Trap Dustshoot chained to another Trap Dustshoot appeared three
 times and now has a native two-hand reveal and full-duel replay regression.
+Solemn Judgment responding to Dustshoot appeared twice and now has a paired
+negated-versus-resolved hand-visibility regression.
 These counts are from random-agent choices; they do
 not estimate tournament play rates or policy quality.
 
