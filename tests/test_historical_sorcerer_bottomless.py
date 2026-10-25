@@ -1,4 +1,4 @@
-"""GOAT Ignition priority changes a Sorcerer/Bottomless exchange."""
+"""GOAT Ignition priority changes Chaos boss / Bottomless exchanges."""
 
 import os
 from pathlib import Path
@@ -12,6 +12,7 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 SORCERER = 9596126
+BLS = 504700118
 GRACEFUL = 79571449
 BOTTOMLESS = 504700052
 LIGHT = 15025844
@@ -19,10 +20,14 @@ DARK = 7359741
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("boss,boss_script", [
+    (SORCERER, f"official/c{SORCERER}.lua"),
+    (BLS, f"goat/c{BLS}.lua"),
+])
 @pytest.mark.parametrize("use_priority", [False, True])
-def test_sorcerer_priority_before_bottomless(tmp_path, use_priority):
+def test_chaos_boss_priority_before_bottomless(tmp_path, use_priority, boss, boss_script):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    scripts = (f"official/c{SORCERER}.lua", f"official/c{GRACEFUL}.lua",
+    scripts = (boss_script, f"official/c{GRACEFUL}.lua",
                f"goat/c{BOTTOMLESS}.lua")
     for relative in scripts:
         if not (root / "scripts" / relative).is_file():
@@ -30,10 +35,10 @@ def test_sorcerer_priority_before_bottomless(tmp_path, use_priority):
     lights = (LIGHT, 62651957)
     darks = (49881766, DARK)
     filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
-    chaos_cards = (GRACEFUL, SORCERER,
+    chaos_cards = (GRACEFUL, boss,
                    *(code for code in lights for _ in range(3)),
                    *(code for code in darks for _ in range(3)), *filler[:26])
-    chaos_deck = tmp_path / "sorcerer.ydk"
+    chaos_deck = tmp_path / "chaos_boss.ydk"
     chaos_deck.write_text("#main\n" + "\n".join(map(str, chaos_cards))
                           + "\n#extra\n!side\n")
     trap_deck = tmp_path / "bottomless.ydk"
@@ -43,7 +48,7 @@ def test_sorcerer_priority_before_bottomless(tmp_path, use_priority):
     with GoatEnvironment(str(chaos_deck), str(trap_deck), seed=100,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
-        assert {SORCERER, GRACEFUL, LIGHT, DARK}.issubset(
+        assert {boss, GRACEFUL, LIGHT, DARK}.issubset(
             c.code for c in observation.hand)
         assert BOTTOMLESS in {c.code for c in env.engine.probe.observation(1).hand}
         graceful = discarded = trap_set = defender_summoned = summoned = False
@@ -76,7 +81,7 @@ def test_sorcerer_priority_before_bottomless(tmp_path, use_priority):
                     and defender_summoned:
                 if not summoned:
                     action = next((a for a in actions if a.kind == "special_summon"
-                                   and a.parameters.get("code") == SORCERER), None)
+                                   and a.parameters.get("code") == boss), None)
                     summoned |= action is not None
                 if summoned and len(costs) < 2 and actions[0].kind == "select_card":
                     action = next((a for a in actions if a.parameters.get("code")
@@ -85,7 +90,7 @@ def test_sorcerer_priority_before_bottomless(tmp_path, use_priority):
                         costs.add(action.parameters["code"])
                 if summoned and len(costs) == 2 and not priority_seen:
                     option = next((a for a in actions if a.kind == "chain"
-                                   and a.parameters.get("code") == SORCERER), None)
+                                   and a.parameters.get("code") == boss), None)
                     if option is not None:
                         assert observation.chain == ()
                         assert any(c.controller == 1 and c.zone == "spell_trap"
@@ -116,7 +121,7 @@ def test_sorcerer_priority_before_bottomless(tmp_path, use_priority):
                     c.code for c in observation.graveyards[1]}:
                 assert priority_seen and costs == {LIGHT, DARK}
                 assert observation.chain == ()
-                assert SORCERER in {c.code for c in observation.banished[0]}
+                assert boss in {c.code for c in observation.banished[0]}
                 assert (defender_code in {
                     c.code for c in observation.banished[1]}) == use_priority
                 assert (defender_code in {
@@ -131,7 +136,7 @@ def test_sorcerer_priority_before_bottomless(tmp_path, use_priority):
                     observation = env.step(action)
                     if env.is_terminal():
                         trajectory = env.trajectory()
-                        path = tmp_path / f"sorcerer_bottomless_{use_priority}.json"
+                        path = tmp_path / f"chaos_bottomless_{boss}_{use_priority}.json"
                         write_trajectory(path, trajectory)
                         assert verify_trajectory(read_trajectory(path),
                                                  ExperimentalOcgcoreEngine(root)) == len(
