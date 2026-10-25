@@ -1042,7 +1042,8 @@ are not a quality comparison. The CLI also replay-verified two schema-v21
 competitive-deck duels and trained a width-8 feature-v14 batch-16 checkpoint
 from 522 teacher decisions; its epoch loss was 0.3834609. The checkpoint
 loaded with `batch_size=16` and `feature_version=14` metadata. No held-out
-strength evaluation has been run for the minibatch checkpoint.
+strength evaluation was run for that small smoke checkpoint; the matched
+comparison below uses a larger training set.
 
 The timing measurement loaded the eight ignored JSON files under
 `.cache/goat-ai/v21_chain_target_train_goat_chaos/` and
@@ -1053,3 +1054,53 @@ loading, and checkpoint writing. The CLI smoke used
 `--batch-size 16 --feature-version 14 --epochs 1 --width 8 --seed 16600`
 on `.cache/goat-ai/v21_chain_target_demos/*.json`, with the experimental
 engine and output `.cache/goat-ai/v21_batch16_smoke.pt`.
+
+## Held-out optimizer batch-size comparison
+
+Three feature-v10 behavioral clones used the same eight replay-verified Goat
+Control/Chaos Turbo teacher duels (3,201 decisions), model/shuffle seed 16600,
+width 16, one epoch, and learning rate 0.001. Only optimizer batch size
+changed: 1, 4, or 16. The measured CPU fit time, excluding file loading and
+replay verification, was **16.33 s / 196.0 decisions/s** for size 1,
+**10.84 s / 295.3 decisions/s** for size 4, and **9.90 s / 323.4
+decisions/s** for size 16, with `OMP_NUM_THREADS=1`. Epoch losses were
+0.2497902, 0.2983295, and 0.3543973 respectively. Larger batches made
+fewer optimizer updates on the same records.
+
+On separate sourced Chaos Control/Warrior and Chaos Return/Warrior Main Decks,
+seeds 16610–16613, the both-deck-assignment, seat-swapped direct tests gave
+batch size 4 **16–16** against size 1 (50.0% score; matchup-seed paired 95%
+bootstrap interval 37.5–62.5%). Batch size 16 scored **12–18 with 2 draws**
+against size 1 (40.6%; paired interval 31.3–53.1%). The latter interval still
+contains 50%, so this is not a proven strength difference. An independent
+replay-verified teacher audit on eight unseen-deck duels at seeds 16410–16411
+found exact agreement on **3,135/3,268** decisions for size 1,
+**3,096/3,268** for size 4, and **3,037/3,268** for size 16. Among 1,063
+decisions with multiple legal actions, the counts were **930**, **891**, and
+**832**. All three matched the teacher on the 10 multi-option decisions with
+public chain targets. Staple-specific counts are in the ignored audit JSON.
+The default remains batch size 1; future experiments should compare compute
+budgets, multiple training seeds, and stronger teachers before promoting a
+larger batch.
+
+The batch-1, batch-4, and batch-16 checkpoint SHA-256 hashes are respectively
+`e08f24ed7239070e88ab940643715610f753fbef928a05624325f21053a152d6`,
+`29383276ed9a3314420d8fe14fed7920e6383f714d0a9eb1080d88d947aaea2f`,
+and `572b078576a7894b4f2c8e5d7c73c3267a723a1cf7610327d5e20a8a93c33376`.
+The size-4 and size-16 tournament report hashes are
+`fb8b7806465946c2724e1da63fe4c04612372fd39fd68f972994d5fc67bfe9d7`
+and `e3c17ae927da6ff51c4214626247e0a7dd32cb0e44f947d51df8fe8dfc2f44fc`.
+All artifacts are ignored under `.cache/goat-ai/`.
+
+Reproduce with the same eight input paths in the previous section. Train each
+checkpoint using `scripts/train_behavioral_clone.py` with
+`--engine experimental --feature-version 10 --epochs 1 --width 16
+--seed 16600 --learning-rate 0.001`, changing only `--batch-size` and the
+output path. For each comparison, run `scripts/evaluate_policy.py` with the
+larger-batch checkpoint as the first argument, the batch-1 checkpoint as
+`--opponent-checkpoint`, `--engine experimental`, `--both-deck-assignments`,
+`--require-unseen-main-decks`, the two matchups above,
+`--seed 16610 --seeds 4 --max-decisions 3000 --workers 2`. Run
+`scripts/audit_policy_agreement.py --engine experimental` with the batch-1
+and comparison checkpoints on the eight previously collected Chaos
+Control/Warrior trajectories at seeds 16410–16411.
