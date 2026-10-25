@@ -246,7 +246,7 @@ def test_control_probe_complete_and_seeded():
 
     first = run()
     assert first[0] == 1
-    assert len(first[1]) == 1251
+    assert len(first[1]) == 1116
     assert first == run()
 
 

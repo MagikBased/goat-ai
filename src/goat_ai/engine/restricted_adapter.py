@@ -5,6 +5,7 @@ unsupported request; it does not silently hide legal choices or fake rules.
 General GOAT card/effect support remains M1 work.
 """
 
+import json
 import sqlite3
 from dataclasses import replace
 from pathlib import Path
@@ -148,7 +149,8 @@ class RestrictedOcgcoreEngine:
                 cards = []
                 for code, controller, location, sequence in choice.cards:
                     target = {"controller": controller, "location": location}
-                    if not (location == 0x02 and controller != native.player):
+                    if location not in (0x01, 0x40) and not (
+                            location == 0x02 and controller != native.player):
                         target["sequence"] = sequence
                     visible_code = public_code(code, controller, location, sequence)
                     if visible_code is not None:
@@ -174,14 +176,27 @@ class RestrictedOcgcoreEngine:
                 parameters["code"] = choice.announced_card
             if choice.prompt_id is not None:
                 parameters["prompt_id"] = choice.prompt_id
-            if (choice.sequence is not None
+            if (choice.sequence is not None and choice.location not in (0x01, 0x40)
                     and not (choice.location == 0x02 and choice.controller != native.player)):
                 parameters["sequence"] = choice.sequence
             if choice.controller is not None:
                 parameters["controller"] = choice.controller
+            if kind in ("select_cards", "tribute_cards") and any(
+                    card[2] in (0x01, 0x40) for card in choice.cards):
+                parameters["cards"].sort(key=lambda card: json.dumps(card, sort_keys=True))
             actions.append(Action(str(index), kind, native.player, parameters))
-        self._choices = native.choices
-        self._actions = tuple(actions)
+        paired = list(zip(native.choices, actions, strict=True))
+        if any(choice.kind != "sort_cards" and (
+                choice.location in (0x01, 0x40)
+                or any(card[2] in (0x01, 0x40) for card in choice.cards))
+               for choice in native.choices):
+            # Native Deck/Extra Deck order is private. Publish choices in an
+            # order derived only from visible fields, not native slot order.
+            paired.sort(key=lambda pair: (pair[1].kind,
+                        json.dumps(pair[1].parameters, sort_keys=True)))
+        self._choices = tuple(choice for choice, _ in paired)
+        self._actions = tuple(replace(action, id=str(index))
+                              for index, (_, action) in enumerate(paired))
         self._last_observation = observation
         return Decision(self._last_observation, self._actions)
 
