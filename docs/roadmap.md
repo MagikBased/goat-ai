@@ -322,6 +322,14 @@ opponent's End Phase, confirms its Summon restriction ends with that turn,
 and Tributes a Sheep Token for Metamorphosis on the controller's next turn.
 The full seeded native duel replay-verifies. See [GOAT rules](goat_rules.md).
 
+A 2005 tournament-described Snatch Steal / Tsukuyomi line now has a pinned
+native fixture: Tsukuyomi Sets the stolen monster, Snatch leaves the field,
+the stolen monster can be Flip Summoned after the chain closes, and it remains
+with the Snatch player on the opponent's next turn. The defender's hidden view
+and remembered field identity are checked. The complete duel replay-verifies;
+Vampire Lord's own effect remains outside this general-rule fixture. See
+[GOAT rules](goat_rules.md).
+
 The Chaos boss / Bottomless Trap Hole priority fixture now runs both official
 Chaos Sorcerer and the separate GOAT Black Luster Soldier script. For each,
 activating its banish effect before the Bottomless response removes the target
