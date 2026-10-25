@@ -497,6 +497,23 @@ The earlier archived 60-game report remains a historical measurement. Re-running
 
 The current ordered games and summary matched exactly between one and four native workers. The four-worker tournament took **16.11 seconds** (3.72 duels/s); the one-worker run of the same games took **59.33 seconds** (1.01 duels/s). Runtime measurements were taken in separate runs. New `evaluate_native.py` reports include `source_code_sha256` over project Python source, evaluator, and `pyproject.toml`, plus `card_scripts_sha256` over the pinned Lua script tree. For the four-worker report these were `6ded7a84aa7d43716604cd7f5ac0d8e3ef3c5164a9756de33784a5441640422d` and `f886f54c419d3792fd69888d74190c070992609caad8f5737e3f563bd736b71c`, respectively. Together with the existing native asset and deck hashes, these fields make later implementation drift detectable. The report stays under the ignored `.cache/goat-ai/research/` directory; repeat the `decks` and `args` loop above with `--workers 4` and the same seed options to reproduce it. This remains protocol coverage, not a card-correctness or strength claim.
 
+## Six-tournament-deck pairwise protocol sweep (2026-10-25)
+
+The current [competitive tournament corpus](../src/goat_ai/evaluation/competitive_corpus.py) contains six published tournament Main Decks, including Bazoo Return and excluding the Flip Control guide deck. `evaluate_native.py --tournament-corpus` creates all 15 unordered pairings directly from that list. Seeds 9750–9751 and both seats produced **60/60 terminal native duels** under the 3,000-decision cap. The games used **57,071 decisions** in total, with **1,391** in the longest duel. Agent A's deck assignment recorded 35 wins, 23 losses, and two draws; both agents were random, so these results do not measure playing strength or historical correctness of every card effect.
+
+On the pinned local assets with four native workers and `OMP_NUM_THREADS=1`, the tournament took **17.03 seconds**, or **3.52 duels/s**. The identical schedule with one worker took **61.74 seconds**. All 60 ordered game records, the summary, deck and base asset hashes, Python source hash, and Lua script-tree hash matched exactly across worker counts. The source hash was `58d5344601591d2916fe2071ae7e2cfdd728a7d5852aef2e626f94e4395a40f0`; the script-tree hash was `f886f54c419d3792fd69888d74190c070992609caad8f5737e3f563bd736b71c`. Runtime varies with system load.
+
+Reproduce from the repository root after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=. .venv/bin/python scripts/evaluate_native.py \
+  --engine experimental --tournament-corpus --agent-a random --agent-b random \
+  --seed 9750 --seeds 2 --max-decisions 3000 --workers 4 \
+  --output .cache/goat-ai/research/six_tournament_deck_sweep_9750_9751.json
+```
+
+The one-worker check uses the same command with `--workers 1` and a different output path. Generated reports stay in the ignored `.cache` directory.
+
 ## Balanced six-deck heuristic baseline (2026-10-25)
 
 The generic `HeuristicAgent` and `RandomAgent` were evaluated on all 15 unordered pairings of the same six Main Deck examples, with **both deck assignments**, **both agent seats**, and seeds 9800–9801: 120 games per report. The exact same schedule and pinned asset/deck hashes were used for a RandomAgent-versus-RandomAgent control. All 240 games reached terminal outcomes below the 3,000-decision cap. The control matters because even with both seats swapped, a fixed candidate deck assignment can dominate a short result; the schedule also reverses which deck candidate A receives.

@@ -57,6 +57,8 @@ A previous six-deck pairwise random-agent sweep covered all 15 distinct pairings
 
 An expanded 300-duel, four-worker sweep on seeds 9600–9609 also reached native terminal outcomes in every game. A 60-duel subset reproduced exact ordered outcomes and decision counts in a separate one-worker run. Measured rates, hardware, pins, and reproduction commands are in [the evaluation log](evaluation.md). This broadens M1 protocol evidence while M1 and the M2 card audit remain open.
 
+The current six-tournament-deck corpus, now including Bazoo Return in place of the earlier guide-list slot, has its own complete pairwise protocol sweep: all 15 matchups, both seats, and seeds 9750–9751 reached terminal in **60/60 games** below 3,000 decisions. Ordered results and counts matched between one and four native workers; source-code and Lua-script-tree fingerprints now accompany the report. See [the evaluation log](evaluation.md). This tests the published deck corpus used to prioritize card rulings, not competitive agent strength.
+
 A seeded Thunder Dragon / Morphing Jar fixture now checks the player-visible hand-memory boundary: a revealed search creates known opponent cards, a later hidden Set reduces the guaranteed count conservatively, and Jar's hand replacement clears current knowledge while retaining the historical reveal event. The full duel replay-verifies; see [GOAT rules](goat_rules.md).
 
 ## M2 — Historical correctness gate

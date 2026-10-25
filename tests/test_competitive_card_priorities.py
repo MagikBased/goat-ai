@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
+from scripts.evaluate_native import tournament_matchups
 from scripts.report_competitive_card_priorities import priority_rows
 
 
@@ -18,6 +19,11 @@ def test_tournament_priority_corpus_excludes_guide_and_includes_bazoo():
             by_code[14087893]["main_copies"]) == (6, 14)  # Book of Moon
     assert (by_code[87621407]["main_deck_count"],
             by_code[87621407]["main_copies"]) == (5, 13)  # Dekoichi
+    matchups = tournament_matchups(root)
+    assert len(matchups) == 15
+    assert all("flip_control_goatformat_guide.ydk" not in pair for pair in matchups)
+    assert sum("bazoo_return_weirdchamp_worlds.ydk" in pair[1]
+               for pair in matchups) == 5
 
 
 def test_priority_rows_uses_main_decks_and_exact_card_ids(tmp_path):
