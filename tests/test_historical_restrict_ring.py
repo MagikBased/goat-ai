@@ -17,8 +17,9 @@ SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("ring_hits_restrict", [False, True])
-def test_ring_chained_to_restrict_removes_source_or_equip_target(tmp_path, ring_hits_restrict):
+@pytest.mark.parametrize("ring_case", ["equip_target", "restrict_in_chain",
+                                      "equipped_restrict"])
+def test_ring_chained_to_restrict_removes_source_or_equip_target(tmp_path, ring_case):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                      f"goat/c{RESTRICT}.lua", f"pre-errata/c{RING}.lua"):
@@ -36,9 +37,9 @@ def test_ring_chained_to_restrict_removes_source_or_equip_target(tmp_path, ring_
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
         goat = meta = token = fusion = restrict = target = False
-        summoned = set_ring = chained_ring = ring_target = False
-        target_code = target_attack = None
-        for _ in range(90):
+        summoned = set_ring = chained_ring = ring_target = equipped = False
+        target_code = target_attack = original_attack = None
+        for _ in range(110):
             actions = env.legal_actions()
             action = None
             if observation.turn == 1 and observation.acting_player == 0 and not goat:
@@ -76,23 +77,37 @@ def test_ring_chained_to_restrict_removes_source_or_equip_target(tmp_path, ring_
                                and a.parameters.get("controller") == 1
                                and a.parameters.get("code") == target_code), action)
                 target |= action is not None and action.kind == "select_card"
-            if target and observation.acting_player == 1 and not chained_ring:
+                if target:
+                    original_attack = next(card.attack for card in observation.field
+                                           if card.code == target_code and card.controller == 1)
+            if target and observation.acting_player == 1 and not chained_ring \
+                    and ring_case != "equipped_restrict":
                 action = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == RING), action)
                 if action is not None and action.kind == "chain":
                     assert observation.chain[0].card_code == RESTRICT
                     chained_ring = True
+            if target and ring_case == "equipped_restrict" and not equipped \
+                    and observation.turn == 3 and observation.phase == "main1" \
+                    and not observation.chain:
+                equipped = any(card.code == target_code and card.zone == "spell_trap"
+                               and card.controller == 0 for card in observation.field)
+            if equipped and observation.turn == 4 and observation.acting_player == 1 \
+                    and not chained_ring:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == RING), action)
+                chained_ring |= action is not None and action.kind == "activate"
             if chained_ring and not ring_target:
                 action = next((a for a in actions if a.kind == "select_card"
-                               and a.parameters.get("controller") == (0 if ring_hits_restrict else 1)
+                               and a.parameters.get("controller") == (0 if ring_case != "equip_target" else 1)
                                and a.parameters.get("code") == (
-                                   RESTRICT if ring_hits_restrict else target_code)), action)
+                                   RESTRICT if ring_case != "equip_target" else target_code)), action)
                 ring_target |= action is not None and action.kind == "select_card"
                 if ring_target:
                     target_attack = next(card.attack for card in observation.field
-                                         if card.controller == (0 if ring_hits_restrict else 1)
+                                         if card.controller == (0 if ring_case != "equip_target" else 1)
                                          and card.code == (
-                                             RESTRICT if ring_hits_restrict else target_code))
+                                             RESTRICT if ring_case != "equip_target" else target_code))
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "place", "select_position", "pass", "end_phase")), actions[0])
@@ -108,7 +123,12 @@ def test_ring_chained_to_restrict_removes_source_or_equip_target(tmp_path, ring_
                 assert summoned and set_ring and chained_ring
                 assert observation.chain == ()
                 assert observation.life_points == (8000 - target_attack,) * 2
-                if ring_hits_restrict:
+                if ring_case == "equipped_restrict":
+                    assert equipped and target_attack == original_attack > 0
+                    assert any(card.code == RESTRICT for card in observation.graveyards[0])
+                    assert any(card.code == target_code for card in observation.graveyards[1])
+                    assert not any(card.code == target_code for card in observation.field)
+                elif ring_case == "restrict_in_chain":
                     assert any(card.code == RESTRICT for card in observation.graveyards[0])
                     assert any(card.code == target_code and card.controller == 1
                                and card.zone == "monster" for card in observation.field)
