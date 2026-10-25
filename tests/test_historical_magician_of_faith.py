@@ -16,6 +16,83 @@ GEMINI_ELF = 69140098
 NECROVALLEY = 511002998
 MYSTICAL_SPACE_TYPHOON = 5318639
 SOLEMN_JUDGMENT = 41420027
+COMPULSORY = 94192409
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_magician_of_faith_recovers_pot_after_compulsory_returns_it(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (POT_OF_GREED, MAGICIAN_OF_FAITH, COMPULSORY):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    own = tmp_path / "mof.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        POT_OF_GREED, MAGICIAN_OF_FAITH, *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
+    other = tmp_path / "compulsory.ydk"
+    other.write_text("#main\n" + "\n".join(map(str, (
+        COMPULSORY, COMPULSORY, COMPULSORY, *VANILLA_DECK[3:])))
+                     + "\n#extra\n!side\n")
+    with GoatEnvironment(str(own), str(other), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        pot_used = mof_set = trap_set = flipped = pot_targeted = False
+        chained = compulsory_targeted = False
+        for _ in range(75):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not pot_used:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == POT_OF_GREED), None)
+                    pot_used |= action is not None
+                elif not mof_set:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == MAGICIAN_OF_FAITH), None)
+                    mof_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not trap_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == COMPULSORY), None)
+                trap_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and mof_set and not flipped:
+                action = next((a for a in actions if a.kind == "flip_summon"
+                               and a.parameters.get("code") == MAGICIAN_OF_FAITH), None)
+                flipped |= action is not None
+            if flipped and not pot_targeted and actions[0].kind == "select_card" \
+                    and obs.acting_player == 0:
+                assert obs.chain[0].card_code == MAGICIAN_OF_FAITH
+                action = next((a for a in actions if a.parameters.get("code")
+                               == POT_OF_GREED and a.parameters.get("location") == 16), None)
+                pot_targeted = action is not None
+            if pot_targeted and obs.acting_player == 1 and not chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == COMPULSORY), None)
+                chained = action is not None
+            if chained and not compulsory_targeted and obs.acting_player == 1 \
+                    and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               == MAGICIAN_OF_FAITH and a.parameters.get("controller") == 0), None)
+                compulsory_targeted = action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if compulsory_targeted and not obs.chain and obs.acting_player == 0 \
+                    and POT_OF_GREED in {c.code for c in obs.hand}:
+                assert {POT_OF_GREED, MAGICIAN_OF_FAITH}.issubset(
+                    {c.code for c in obs.hand})
+                assert not any(c.zone == "monster" and c.controller == 0 for c in obs.field)
+                assert {COMPULSORY} <= {c.code for c in obs.graveyards[1]}
+                opponent = env.engine.probe.observation(1)
+                assert opponent.opponent_hand_count == len(obs.hand)
+                assert set(opponent.known_opponent_hand_cards) == {
+                    POT_OF_GREED, MAGICIAN_OF_FAITH}
+                assert not any(c.code in (POT_OF_GREED, MAGICIAN_OF_FAITH)
+                               for c in opponent.hand)
+                assert {f"official/c{code}.lua" for code in (
+                    MAGICIAN_OF_FAITH, COMPULSORY)}.issubset(
+                        env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Compulsory did not return Magician of Faith during its Flip Effect")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
