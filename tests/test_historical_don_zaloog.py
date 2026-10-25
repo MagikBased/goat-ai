@@ -10,6 +10,7 @@ from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 
 DON_ZALOOG = 76922029
+MYSTICAL_ELF = 15025844
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -91,6 +92,76 @@ def test_don_zaloog_battle_damage_choices_keep_hand_hidden(tmp_path, choice):
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail(f"Don Zaloog did not complete {choice} battle-damage line")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_don_triggers_when_weaker_monster_attacks_it(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{DON_ZALOOG}.lua").is_file():
+        pytest.skip("Don Zaloog script not installed")
+    deck = tmp_path / "don.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        *([DON_ZALOOG] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=10,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        don_summoned = elf_summoned = elf_attacked = offered = mode_selected = False
+        before_hand = None
+        for _ in range(65):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 \
+                    and not don_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == DON_ZALOOG), None)
+                don_summoned |= action is not None
+            if observation.turn == 2 and observation.acting_player == 1 \
+                    and observation.phase == "main1" and not elf_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == MYSTICAL_ELF), None)
+                elf_summoned |= action is not None
+            if observation.turn == 2 and observation.acting_player == 1 \
+                    and observation.phase == "main1" and elf_summoned and action is None:
+                action = next((a for a in actions if a.kind == "battle_phase"), None)
+            if observation.turn == 2 and observation.acting_player == 1 \
+                    and observation.phase == "battle_start" and not elf_attacked:
+                before_hand = len(observation.hand)
+                action = next((a for a in actions if a.kind == "attack"
+                               and a.parameters.get("code") == MYSTICAL_ELF), None)
+                elf_attacked |= action is not None
+            if elf_attacked and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.kind == "select_card"
+                               and a.parameters.get("code") == DON_ZALOOG), None)
+            if elf_attacked and not offered and any(a.kind == "yes"
+                                                    and a.parameters.get("code") == DON_ZALOOG
+                                                    for a in actions):
+                assert observation.acting_player == 0
+                assert observation.phase == "damage_step"
+                assert observation.life_points == (8000, 7400)
+                action = next(a for a in actions if a.kind == "yes"
+                              and a.parameters.get("code") == DON_ZALOOG)
+                offered = True
+            if offered and not mode_selected and actions[0].kind == "select_option":
+                assert observation.acting_player == 0
+                assert len(actions) == 2
+                action = actions[0]  # Random opponent-hand discard.
+                mode_selected = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+            if mode_selected and observation.phase == "battle_step" \
+                    and observation.acting_player == 1:
+                assert observation.life_points == (8000, 7400)
+                assert len(observation.hand) == before_hand - 1
+                assert any(c.code == MYSTICAL_ELF for c in observation.graveyards[1])
+                assert len(observation.graveyards[1]) == 2
+                assert any(c.code == DON_ZALOOG for c in observation.field)
+                assert f"official/c{DON_ZALOOG}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Don did not trigger after being attacked by Mystical Elf")
 
 
 def _reach_mode_choice(env):
