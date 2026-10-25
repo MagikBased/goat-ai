@@ -14,6 +14,7 @@ GRACEFUL = 79571449
 RETURN = 27174286
 BOOK_OF_MOON = 14087893
 MYSTICAL_SPACE_TYPHOON = 5318639
+SOLEMN_JUDGMENT = 41420027
 LIGHT = 15025844
 DARK = 49881766
 
@@ -126,11 +127,12 @@ def test_return_revives_chaos_costs_with_book_end_phase_exception(
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_mst_chained_to_return_destroys_trap_but_not_its_revival(tmp_path):
+@pytest.mark.parametrize("negate", [False, True])
+def test_return_chain_distinguishes_mst_destruction_from_solemn_negation(tmp_path, negate):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    response = SOLEMN_JUDGMENT if negate else MYSTICAL_SPACE_TYPHOON
     for relative in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua",
-                     f"official/c{RETURN}.lua",
-                     f"official/c{MYSTICAL_SPACE_TYPHOON}.lua"):
+                     f"official/c{RETURN}.lua", f"official/c{response}.lua"):
         if not (root / "scripts" / relative).is_file():
             pytest.skip(f"script {relative} not installed")
     lights = (LIGHT, 62651957)
@@ -142,17 +144,17 @@ def test_mst_chained_to_return_destroys_trap_but_not_its_revival(tmp_path):
              *(RETURN if code == 23771716 else code for code in filler[:26]))
     deck = tmp_path / "chaos_return.ydk"
     deck.write_text("#main\n" + "\n".join(map(str, cards)) + "\n#extra\n!side\n")
-    opposing = tmp_path / "mst.ydk"
+    opposing = tmp_path / "response.ydk"
     opposing.write_text("#main\n" + "\n".join(map(str, (
-        MYSTICAL_SPACE_TYPHOON, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+        response, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
     with GoatEnvironment(str(deck), str(opposing), seed=100,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
         assert {GRACEFUL, BLS, RETURN, LIGHT, DARK}.issubset(c.code for c in obs.hand)
-        assert MYSTICAL_SPACE_TYPHOON in {
+        assert response in {
             c.code for c in env.engine.probe.observation(1).hand}
-        graceful = discarded = summoned = return_set = mst_set = return_used = False
-        mst_chained = mst_targeted = revived = False
+        graceful = discarded = summoned = return_set = response_set = return_used = False
+        response_chained = response_targeted = resolved = False
         costs = []
         for _ in range(105):
             actions = env.legal_actions()
@@ -179,45 +181,50 @@ def test_mst_chained_to_return_destroys_trap_but_not_its_revival(tmp_path):
                     action = next((a for a in actions if a.kind == "set_spell_trap"
                                    and a.parameters.get("code") == RETURN), None)
                     return_set |= action is not None
-            if obs.turn == 2 and obs.acting_player == 1 and not mst_set:
+            if obs.turn == 2 and obs.acting_player == 1 and not response_set:
                 action = next((a for a in actions if a.kind == "set_spell_trap"
-                               and a.parameters.get("code") == MYSTICAL_SPACE_TYPHOON), None)
-                mst_set |= action is not None
+                               and a.parameters.get("code") == response), None)
+                response_set |= action is not None
             if obs.turn == 3 and obs.acting_player == 0 and not return_used:
                 action = next((a for a in actions if a.kind == "activate"
                                and a.parameters.get("code") == RETURN), action)
                 return_used |= action is not None and action.kind == "activate"
-            if return_used and obs.acting_player == 1 and not mst_chained:
+            if return_used and obs.acting_player == 1 and not response_chained:
                 action = next((a for a in actions if a.kind == "chain"
-                               and a.parameters.get("code") == MYSTICAL_SPACE_TYPHOON), action)
-                mst_chained |= action is not None and action.kind == "chain"
-                if mst_chained:
+                               and a.parameters.get("code") == response), action)
+                response_chained |= action is not None and action.kind == "chain"
+                if response_chained:
                     assert obs.life_points == (4000, 8000)
                     assert {LIGHT, DARK} == {c.code for c in obs.banished[0]}
-            if mst_chained and not mst_targeted and actions[0].kind == "select_card":
+            if not negate and response_chained and not response_targeted \
+                    and actions[0].kind == "select_card":
                 assert obs.acting_player == obs.viewer == 1
                 action = next((a for a in actions if a.parameters.get("code") == RETURN
                                and a.parameters.get("controller") == 0), None)
-                mst_targeted |= action is not None
+                response_targeted |= action is not None
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_cards", "select_card", "place", "select_position",
                     "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if mst_targeted and not revived and RETURN in {c.code for c in obs.graveyards[0]} \
-                    and MYSTICAL_SPACE_TYPHOON in {c.code for c in obs.graveyards[1]} \
+            if response_chained and not resolved \
+                    and RETURN in {c.code for c in obs.graveyards[0]} \
+                    and response in {c.code for c in obs.graveyards[1]} \
                     and not obs.chain:
-                assert obs.life_points == (4000, 8000)
-                assert {LIGHT, DARK} == {c.code for c in obs.field
-                                         if c.controller == 0 and c.zone == "monster"
-                                         and c.code != BLS}
-                assert not obs.banished[0]
-                revived = True
-            if revived and obs.turn >= 4:
+                assert obs.life_points == (4000, 4000 if negate else 8000)
+                revived_codes = {c.code for c in obs.field
+                                 if c.controller == 0 and c.zone == "monster"
+                                 and c.code != BLS}
+                assert revived_codes == (set() if negate else {LIGHT, DARK})
+                assert {c.code for c in obs.banished[0]} == (
+                    {LIGHT, DARK} if negate else set())
+                assert response_targeted == (not negate)
+                resolved = True
+            if resolved and obs.turn >= 4:
                 assert {LIGHT, DARK} == {c.code for c in obs.banished[0]}
                 assert BLS in {c.code for c in obs.field}
                 assert f"official/c{RETURN}.lua" in env.engine.probe.loaded_script_sha256
-                assert f"official/c{MYSTICAL_SPACE_TYPHOON}.lua" in (
+                assert f"official/c{response}.lua" in (
                     env.engine.probe.loaded_script_sha256)
                 return
-    pytest.fail("MST/Return chain did not resolve into revival and End Phase banish")
+    pytest.fail("Return chain did not resolve for the selected response")
