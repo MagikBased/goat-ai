@@ -19,9 +19,8 @@ SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("manual_change_before_book", [False, True])
-def test_book_reset_respects_prior_manual_position_change(tmp_path,
-                                                          manual_change_before_book):
+@pytest.mark.parametrize("prior_action", ["none", "manual_change", "attack"])
+def test_book_reset_respects_prior_actions(tmp_path, prior_action):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = {f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                f"goat/c{RESTRICT}.lua", f"official/c{BOOK}.lua"}
@@ -41,7 +40,8 @@ def test_book_reset_respects_prior_manual_position_change(tmp_path,
         assert {SCAPEGOAT, METAMORPHOSIS, BOOK} <= {card.code for card in obs.hand}
         own_goat = other_goat = meta = own_token = fusion = False
         first_effect = first_target = first_equipped = book = book_target = False
-        manually_changed = locked = flipped = second_effect = second_target = False
+        manually_changed = battle_entered = attack_declared = attack_targeted = False
+        locked = flipped = second_effect = second_target = False
         first_slot = second_slot = None
 
         def finish_and_verify(observation):
@@ -55,7 +55,7 @@ def test_book_reset_respects_prior_manual_position_change(tmp_path,
                 pytest.fail("Restrict / Book continuation exceeded 3000 decisions")
             trajectory = env.trajectory()
             assert trajectory.schema_version == 21
-            path = tmp_path / f"restrict_book_reset_{manual_change_before_book}.json"
+            path = tmp_path / f"restrict_book_reset_{prior_action}.json"
             write_trajectory(path, trajectory)
             assert verify_trajectory(read_trajectory(path),
                                      ExperimentalOcgcoreEngine(root)) == len(
@@ -106,12 +106,33 @@ def test_book_reset_respects_prior_manual_position_change(tmp_path,
                         assert not any(a.kind in ("activate", "chain")
                                        and a.parameters.get("code") == RESTRICT
                                        for a in actions)
-                if first_equipped and manual_change_before_book \
+                if first_equipped and prior_action == "manual_change" \
                         and not manually_changed and action is None:
                     action = next((a for a in actions if a.kind == "change_position"
                                    and a.parameters.get("code") == RESTRICT), None)
                     manually_changed |= action is not None
-                if first_equipped and (not manual_change_before_book or manually_changed) \
+                if first_equipped and prior_action == "attack" and not book \
+                        and action is None:
+                    if obs.phase == "main1" and not battle_entered:
+                        action = next((a for a in actions if a.kind == "battle_phase"), None)
+                        battle_entered |= action is not None
+                    elif obs.phase == "battle_start" and not attack_declared:
+                        action = next((a for a in actions if a.kind == "attack"
+                                       and a.parameters.get("code") == RESTRICT), None)
+                        attack_declared |= action is not None
+                    elif attack_declared and not attack_targeted \
+                            and actions[0].kind == "select_card":
+                        action = next((a for a in actions if a.parameters.get("controller")
+                                       == 1 and a.parameters.get("code") in SHEEP_CODES
+                                       and a.parameters.get("sequence") != first_slot), None)
+                        attack_targeted |= action is not None
+                    elif attack_targeted and obs.phase in ("battle_start", "battle_step"):
+                        action = next((a for a in actions if a.kind == "main2"), None)
+                ready_for_book = (prior_action == "none"
+                                  or prior_action == "manual_change" and manually_changed
+                                  or prior_action == "attack" and attack_targeted
+                                  and obs.phase == "main2")
+                if first_equipped and ready_for_book \
                         and not book and action is None:
                     action = next((a for a in actions if a.kind == "activate"
                                    and a.parameters.get("code") == BOOK), None)
@@ -130,8 +151,10 @@ def test_book_reset_respects_prior_manual_position_change(tmp_path,
                                if c.controller == 1 and c.zone == "monster") == 3
                     flip_option = next((a for a in actions if a.kind == "flip_summon"
                                         and a.parameters.get("code") == RESTRICT), None)
-                    if manual_change_before_book:
-                        assert manually_changed and flip_option is None
+                    if prior_action != "none":
+                        assert (manually_changed if prior_action == "manual_change"
+                                else attack_declared and attack_targeted)
+                        assert flip_option is None
                         locked = True
                     else:
                         action = flip_option
@@ -176,5 +199,6 @@ def test_book_reset_respects_prior_manual_position_change(tmp_path,
                 f"goats={own_goat}/{other_goat} meta={meta}/{own_token}/{fusion} "
                 f"first={first_effect}/{first_target}/{first_equipped} "
                 f"book={book}/{book_target} change={manually_changed} "
+                f"attack={battle_entered}/{attack_declared}/{attack_targeted} "
                 f"lock={locked} flip={flipped} "
                 f"second={second_effect}/{second_target}")
