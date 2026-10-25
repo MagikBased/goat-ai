@@ -172,6 +172,11 @@ def main() -> None:
         "evaluation_seeds": seeds,
         "both_deck_assignments": args.both_deck_assignments,
         "opponent": "checkpoint" if args.opponent_checkpoint else args.opponent,
+        "opponent_agent_version": (None if args.opponent_checkpoint else {
+            "random": 1,
+            "heuristic": HeuristicAgent.teacher_version,
+            "combat_heuristic": CombatHeuristicAgent.teacher_version,
+        }[args.opponent]),
         "opponent_checkpoint_sha256": (sha256(args.opponent_checkpoint)
                                         if args.opponent_checkpoint else None),
         "engine": args.engine,

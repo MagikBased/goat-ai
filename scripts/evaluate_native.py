@@ -119,6 +119,14 @@ def main() -> None:
     }
     result = {
         "agent_a": args.agent_a, "agent_b": args.agent_b,
+        "agent_a_version": (CombatHeuristicAgent.teacher_version
+                            if args.agent_a == "combat_heuristic"
+                            else HeuristicAgent.teacher_version
+                            if args.agent_a in ("heuristic", "flip_heuristic") else 1),
+        "agent_b_version": (CombatHeuristicAgent.teacher_version
+                            if args.agent_b == "combat_heuristic"
+                            else HeuristicAgent.teacher_version
+                            if args.agent_b in ("heuristic", "flip_heuristic") else 1),
         "ruleset_scope": f"{args.engine} GOAT-mode native adapter",
         "core": "edo9300/ygopro-core baa3881d0bae48e9994f915f5c931be53c1ba8ef",
         "platform": platform.platform(), "cpu": platform.processor(),
