@@ -31,7 +31,8 @@ def test_book_chained_to_breaker_summon_keeps_counter_off(tmp_path):
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
         book_set = breaker_summoned = book_chained = book_targeted = False
-        for _ in range(65):
+        book_resolved = breaker_flipped = False
+        for _ in range(90):
             actions = env.legal_actions()
             action = None
             if observation.turn == 2 and observation.acting_player == 1 \
@@ -57,12 +58,17 @@ def test_book_chained_to_breaker_summon_keeps_counter_off(tmp_path):
                 action = next((a for a in actions if a.kind == "select_card"
                                and a.parameters.get("code") == BREAKER), None)
                 book_targeted |= action is not None
+            if book_resolved and observation.turn == 5 \
+                    and observation.acting_player == 0 and not breaker_flipped:
+                action = next((a for a in actions if a.kind == "flip_summon"
+                               and a.parameters.get("code") == BREAKER), None)
+                breaker_flipped |= action is not None
             if action is None:
                 action = next((a for a in actions if a.kind == "pass"), None)
             if action is None:
                 action = next((a for a in actions if a.kind == "end_phase"), actions[0])
             observation = env.step(action)
-            if book_targeted and not observation.chain and any(
+            if not book_resolved and book_targeted and not observation.chain and any(
                     c.controller == 0 and c.zone == "monster" and c.position == "facedown"
                     for c in observation.field):
                 assert observation.acting_player == 0
@@ -71,7 +77,15 @@ def test_book_chained_to_breaker_summon_keeps_counter_off(tmp_path):
                 assert breaker.counters == ()
                 assert not any(a.parameters.get("code") == BREAKER
                                and a.kind in ("activate", "chain") for a in env.legal_actions())
+                book_resolved = True
+            if breaker_flipped and not observation.chain and any(
+                    c.code == BREAKER and c.position != "facedown"
+                    for c in observation.field):
+                breaker = next(c for c in observation.field if c.code == BREAKER)
+                assert (breaker.attack, breaker.counters) == (1600, ())
+                assert not any(a.parameters.get("code") == BREAKER
+                               and a.kind in ("activate", "chain") for a in env.legal_actions())
                 assert f"official/c{BREAKER}.lua" in env.engine.probe.loaded_script_sha256
                 assert f"official/c{BOOK_OF_MOON}.lua" in env.engine.probe.loaded_script_sha256
                 return
-    pytest.fail("Book did not turn Breaker facedown before its counter resolved")
+    pytest.fail("Book / Breaker line did not reach the counter-free Flip Summon")
