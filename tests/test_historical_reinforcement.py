@@ -76,6 +76,7 @@ def test_reinforcement_search_hides_deck_order_and_reveals_chosen_warrior(tmp_pa
         assert reveal.recipient == 1
         assert [(c.code, c.controller, c.location) for c in reveal.cards] == [
             (MYSTIC_SWORDSMAN, 0, 2)]
+        assert opponent.known_opponent_hand_cards == (MYSTIC_SWORDSMAN,)
         assert not observation.private_reveals
         assert f"goat/c{REINFORCEMENT}.lua" in env.engine.probe.loaded_script_sha256
 
@@ -122,6 +123,7 @@ def test_reinforcement_empty_search_shows_only_opponent_the_deck(tmp_path):
                 assert Counter(c.code for c in reveal.cards) == Counter(
                     c.code for c in env.engine.probe._query_location(0, 1))
                 assert all(c.controller == 0 and c.location == 1 for c in reveal.cards)
+                assert opponent.known_opponent_hand_cards == ()
                 assert f"goat/c{REINFORCEMENT}.lua" in (
                     env.engine.probe.loaded_script_sha256)
                 return

@@ -10,6 +10,7 @@ import hashlib
 import random
 import sqlite3
 import struct
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -505,6 +506,18 @@ class OcgcoreProbe:
                     reveal = PrivateRevealView(self._turn, recipient, cards)
                     self._private_reveals.append(reveal)
                     self._decision_private_reveals.append(reveal)
+                    known_hand = getattr(self, "_known_hand", None)
+                    if known_hand is not None:
+                        for controller in (0, 1):
+                            if controller == recipient:
+                                continue
+                            shown = Counter(card.code for card in cards
+                                            if card.controller == controller
+                                            and card.location == LOCATION_HAND)
+                            remembered = Counter(known_hand[controller])
+                            for code, count in shown.items():
+                                known_hand[controller].extend(
+                                    [code] * max(0, count - remembered[code]))
                     for index in range(count):
                         controller = message[10 + index * 10]
                         location = message[11 + index * 10]

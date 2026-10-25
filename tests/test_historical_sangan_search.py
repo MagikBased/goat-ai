@@ -85,6 +85,7 @@ def test_sangan_search_reveals_only_to_opponent(tmp_path, has_target):
                 if has_target:
                     assert selected
                     assert [c.code for c in reveal.cards] == [MYSTICAL_ELF]
+                    assert opponent.known_opponent_hand_cards == (MYSTICAL_ELF,)
                     assert MYSTICAL_ELF in {c.code for c in owner.hand}
                     assert owner.deck_counts[0] == deck_before_attack - 1
                 else:
@@ -92,6 +93,7 @@ def test_sangan_search_reveals_only_to_opponent(tmp_path, has_target):
                     assert Counter(c.code for c in reveal.cards) == Counter(
                         c.code for c in env.engine.probe._query_location(0, 1))
                     assert owner.deck_counts[0] == deck_before_attack == 34
+                    assert opponent.known_opponent_hand_cards == ()
                 assert f"goat/c{SANGAN}.lua" in env.engine.probe.loaded_script_sha256
                 return
     pytest.fail("Sangan search did not reveal the correct information to the opponent")

@@ -79,6 +79,7 @@ def test_confirm_cards_preserves_recipient_and_discards_native_card_order():
     probe._chain = []
     probe._public_history = []
     probe._known_facedown = {}
+    probe._known_hand = {0: [], 1: []}
     probe._private_reveals = []
     probe._decision_private_reveals = []
     message = (bytes((MSG_CONFIRM_CARDS, 0)) + struct.pack("<I", 2)
@@ -90,6 +91,11 @@ def test_confirm_cards_preserves_recipient_and_discards_native_card_order():
     assert reveal.recipient == 0 and reveal.turn == 3
     assert [(card.code, card.controller, card.location) for card in reveal.cards] == [
         (100, 1, 1), (200, 1, 1)]
+    assert probe._known_hand == {0: [], 1: []}
+    in_hand = bytes((MSG_CONFIRM_CARDS, 0)) + struct.pack("<I", 1) \
+        + struct.pack("<IBBI", 200, 1, 2, 0)
+    probe._update_public_clock([in_hand, in_hand])
+    assert probe._known_hand == {0: [], 1: [200]}
     with pytest.raises(ValueError, match="MSG_CONFIRM_CARDS"):
         probe._update_public_clock([message[:-1]])
 
