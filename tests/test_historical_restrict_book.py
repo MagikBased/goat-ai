@@ -1,4 +1,4 @@
-"""Book of Moon chained to Restrict's equip effect preserves its target."""
+"""Book of Moon can set Restrict or its target before equip resolves."""
 
 import os
 from pathlib import Path
@@ -17,8 +17,8 @@ SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("chain_book", [False, True])
-def test_book_chained_to_restrict_prevents_equipping_target(tmp_path, chain_book):
+@pytest.mark.parametrize("book_case", ["no_book", "book_restrict", "book_target"])
+def test_book_chained_to_restrict_equip_effect(tmp_path, book_case):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                      f"goat/c{RESTRICT}.lua", f"official/c{BOOK}.lua"):
@@ -77,7 +77,8 @@ def test_book_chained_to_restrict_prevents_equipping_target(tmp_path, chain_book
                                == target_code and a.parameters.get("controller") == 1),
                               action)
                 target |= action is not None and action.kind == "select_card"
-            if chain_book and target and obs.acting_player == 1 and not chained_book:
+            if book_case != "no_book" and target and obs.acting_player == 1 \
+                    and not chained_book:
                 action = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == BOOK), action)
                 if action is not None and action.kind == "chain":
@@ -85,7 +86,9 @@ def test_book_chained_to_restrict_prevents_equipping_target(tmp_path, chain_book
                     chained_book = True
             if chained_book and not book_target and actions[0].kind == "select_card":
                 action = next((a for a in actions if a.parameters.get("code")
-                               == RESTRICT and a.parameters.get("controller") == 0),
+                               == (RESTRICT if book_case == "book_restrict" else target_code)
+                               and a.parameters.get("controller") == (
+                                   0 if book_case == "book_restrict" else 1)),
                               action)
                 book_target |= action is not None and action.kind == "select_card"
             if action is None:
@@ -100,7 +103,7 @@ def test_book_chained_to_restrict_prevents_equipping_target(tmp_path, chain_book
                 assert sum(c.code in SHEEP_CODES for c in own.field) == 3
                 assert METAMORPHOSIS in {c.code for c in own.graveyards[0]}
                 assert own.extra_deck_counts[0] == 0
-                if chain_book:
+                if book_case == "book_restrict":
                     assert chained_book and book_target
                     assert own_restrict.position == "facedown"
                     assert BOOK in {c.code for c in own.graveyards[1]}
@@ -116,18 +119,31 @@ def test_book_chained_to_restrict_prevents_equipping_target(tmp_path, chain_book
                         (c.controller, c.zone, c.sequence, c.code)
                         for c in other.known_opponent_field_cards}
                 else:
-                    assert not chained_book
+                    assert chained_book == (book_case == "book_target")
                     assert own_restrict.position == "faceup"
                     assert not any(c.code == target_code and c.zone == "monster"
                                    for c in own.field)
-                    assert any(c.code == target_code and c.zone == "spell_trap"
-                               and c.controller == 0 for c in own.field)
-                    assert BOOK in {c.code for c in other.field}
+                    equipped = next(c for c in own.field if c.code == target_code
+                                    and c.zone == "spell_trap" and c.controller == 0)
+                    if book_case == "book_target":
+                        assert book_target
+                        assert BOOK in {c.code for c in own.graveyards[1]}
+                        assert equipped.position == "facedown"
+                        assert own_restrict.attack == own_restrict.defense == 0
+                        hidden = next(c for c in other.field if c.zone == "spell_trap"
+                                      and c.controller == 0
+                                      and c.sequence == equipped.sequence)
+                        assert hidden.code is None and hidden.position == "facedown"
+                        assert (0, "spell_trap", hidden.sequence, target_code) in {
+                            (c.controller, c.zone, c.sequence, c.code)
+                            for c in other.known_opponent_field_cards}
+                    else:
+                        assert BOOK in {c.code for c in other.field}
                 assert own.life_points == (8000, 8000)
                 assert {f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
                         f"goat/c{RESTRICT}.lua"} \
                     <= env.engine.probe.loaded_script_sha256.keys()
-                if chain_book:
+                if book_case != "no_book":
                     assert f"official/c{BOOK}.lua" in \
                         env.engine.probe.loaded_script_sha256
                 return
