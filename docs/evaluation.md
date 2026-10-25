@@ -658,9 +658,14 @@ with multiple legal actions. Card-specific exact matches were:
 | Graceful Charity | 7/8 | 7/7 | 18/20 |
 | Pot of Greed | 6/7 | 5/5 | 7/7 |
 
-The Breaker and BLS disagreements include card and target choices worth
-examining on larger held-out deck families. For example, in one visible state
-the teacher activated Heavy Storm while the clone chose Snatch Steal; in
+The teacher-selected Breaker split is more specific than its 26/36 total:
+Normal Summons matched 7/7 and `chain` actions matched 5/5, while attacks
+matched 7/11, position changes 5/10, and Flip Summons 2/3. This sample points
+to combat and position decisions involving Breaker, not evidence of a defect in
+its Spell Counter effect. BLS `chain` and `activate` actions matched 7/7 and
+6/6; four of its latest-chain-link choices differed, warranting a target-choice
+audit. In one visible state the teacher activated Heavy Storm while the clone
+chose Snatch Steal; in
 another, the teacher targeted a Sheep Token with Ring while the clone targeted
 its own Breaker. A small heuristic sample cannot establish which choice was
 stronger. An attempt to reuse the older seed-8600–8601 trajectories failed

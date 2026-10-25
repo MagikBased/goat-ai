@@ -101,6 +101,8 @@ def main() -> None:
               for path, _ in checkpoints}
     staple_counts = {str(path): defaultdict(empty_staple_counts)
                      for path, _ in checkpoints}
+    staple_selected_kinds = {str(path): defaultdict(lambda: defaultdict(
+        lambda: {"exact": 0, "total": 0})) for path, _ in checkpoints}
     verified = []
     for path in args.trajectories:
         trajectory = read_trajectory(path)
@@ -133,6 +135,11 @@ def main() -> None:
                         card_bucket["multi_option_total"] += len(record.legal_actions) > 1
                         card_bucket["exact"] += chosen == record.selected_action
                         card_bucket["kind"] += chosen.kind == record.selected_action.kind
+                        if context == "teacher_selected":
+                            kind_bucket = staple_selected_kinds[str(checkpoint)][code][
+                                record.selected_action.kind]
+                            kind_bucket["total"] += 1
+                            kind_bucket["exact"] += chosen == record.selected_action
                 scopes = ["all"]
                 if len(record.legal_actions) > 1:
                     scopes.append("multi_option")
@@ -160,7 +167,11 @@ def main() -> None:
         policies.append({"checkpoint": str(path), "sha256": sha256(path),
                          "overall": overall, "by_deck": by_deck,
                          "by_staple": {
-                             str(code): {"name": staple_names[code], **card_counts}
+                             str(code): {
+                                 "name": staple_names[code], **card_counts,
+                                 "teacher_selected_by_kind": dict(
+                                     staple_selected_kinds[str(path)][code]),
+                             }
                              for code, card_counts in sorted(
                                  staple_counts[str(path)].items())}})
     result = {"engine": args.engine, "trajectories": verified, "policies": policies,
