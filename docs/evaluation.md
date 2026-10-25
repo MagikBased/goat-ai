@@ -2220,3 +2220,13 @@ used to train the checkpoint. Agreement cannot establish competitive
 strength, and the denominator varies by deck. The lower Warrior and Chaos
 Return agreement identifies where to inspect decision classes and collect
 stronger, source-backed demonstrations before another model comparison.
+
+For high-play cards, the audit also counts decisions where the basic heuristic
+selected a card-source action. The clone exactly matched Heavy Storm in 19/32
+such decisions, Breaker the Magical Warrior in 89/100, Book of Moon in 85/92,
+Snatch Steal in 30/34, Black Luster Soldier in 23/25, and Nobleman of Crossout
+in 49/50. It matched all 18 Delinquent Duo, 26 Pot of Greed, 21 Graceful
+Charity, and 51 Ring of Destruction selections. Heavy Storm and Breaker have
+the most observed disagreements in this corpus and are the next decision
+classes to inspect. These counts do not distinguish mistakes by the clone
+from mistakes by the heuristic.
