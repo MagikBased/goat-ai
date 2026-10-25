@@ -7,10 +7,12 @@ import pytest
 
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 
 ZABORG = 51945556
 TRIBUTE = 15025844
+SOLEMN = 41420027
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -142,3 +144,65 @@ def test_tribute_set_zaborg_does_not_trigger_or_destroy_a_monster(tmp_path):
                               actions[0])
             obs = env.step(action)
     pytest.fail("Zaborg Tribute Set did not finish")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_solemn_negates_zaborg_tribute_summon_before_its_trigger(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (ZABORG, SOLEMN):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    decks = Path(__file__).resolve().parent.parent / "examples/decks"
+    cards = list(read_ydk(decks / "cannon_probe.ydk").main)
+    cards[:2] = [TRIBUTE, ZABORG]
+    own = tmp_path / "zaborg_summon.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, cards)) + "\n")
+    opponent = tmp_path / "solemn.ydk"
+    opponent.write_text("#main\n" + "\n".join(map(str, (
+        *([SOLEMN] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own), str(opponent), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert ZABORG in {c.code for c in obs.hand}
+        first_summoned = trap_set = zaborg_attempted = tributed = negated = False
+        for _ in range(60):
+            actions = env.legal_actions()
+            action = None
+            if negated and SOLEMN in {c.code for c in obs.graveyards[1]} \
+                    and obs.acting_player == 0 and obs.phase == "main1":
+                assert obs.life_points == (8000, 4000)
+                assert {ZABORG, TRIBUTE}.issubset(c.code for c in obs.graveyards[0])
+                assert SOLEMN in {c.code for c in obs.graveyards[1]}
+                assert not any(c.code == ZABORG for c in obs.field)
+                assert not obs.chain
+                assert not any(a.kind == "select_card" for a in actions)
+                assert not any(a.kind == "normal_summon" for a in actions)
+                assert f"official/c{ZABORG}.lua" in env.engine.probe.loaded_script_sha256
+                return
+            if obs.turn == 1 and obs.acting_player == 0 and not first_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == TRIBUTE), None)
+                first_summoned |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not trap_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SOLEMN), None)
+                trap_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not zaborg_attempted:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == ZABORG), None)
+                zaborg_attempted |= action is not None
+            if zaborg_attempted and not tributed and action is None:
+                action = next((a for a in actions if a.kind == "tribute"
+                               and a.parameters.get("code") == TRIBUTE), None)
+                tributed |= action is not None
+            if tributed and not negated and obs.acting_player == 1:
+                assert not obs.chain
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SOLEMN), None)
+                negated |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in ("end_phase", "pass")),
+                              actions[0])
+            obs = env.step(action)
+    pytest.fail("Solemn did not negate Zaborg before its Tribute Summon trigger")
