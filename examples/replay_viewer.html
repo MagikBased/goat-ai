@@ -104,6 +104,10 @@
           <details><summary>All legal actions</summary><ol id="legal" class="legal-list"></ol></details>
         </div>
         <div class="panel">
+          <h2>Known opponent hand</h2>
+          <div id="known-hand" class="muted"></div>
+        </div>
+        <div class="panel">
           <h2>Public context</h2>
           <div id="restrictions"></div>
           <div id="chain"></div>
@@ -284,6 +288,10 @@
       byId("legal-count").textContent = `${record.legal_actions.length} legal actions at this decision`;
       const legal = byId("legal");
       legal.replaceChildren(...record.legal_actions.map(action => node("li", "", actionLabel(observation, action, known))));
+      const knownHand = observation.known_opponent_hand_cards || [];
+      byId("known-hand").textContent = knownHand.length
+        ? `${knownHand.length} of ${observation.opponent_hand_count} known: ${knownHand.map(nameOf).join(" · ")}`
+        : `No known identities among ${observation.opponent_hand_count} cards`;
       byId("restrictions").textContent = observation.restrictions?.length ? `Restrictions: ${observation.restrictions.join(" · ")}` : "Restrictions: none recorded";
       byId("chain").textContent = observation.chain?.length ? `Chain: ${observation.chain.map(link => `${link.index}. ${nameOf(link.card_code)} (P${link.controller})`).join(" → ")}` : "Chain: empty";
       byId("reveals").textContent = observation.public_reveals?.length
