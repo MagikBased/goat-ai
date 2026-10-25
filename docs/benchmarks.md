@@ -46,3 +46,21 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/benchmark_native.py --engine experime
 ```
 
 The benchmark measures Python decisions, native simulation, setup, and teardown together. Historical card correctness remains governed by the separate source-backed regressions.
+
+## Sourced-deck spawned-worker measurement (2026-10-25)
+
+Commit `8f4701adaf8129889f8c751a695ad3443f79f503` adds `scripts/benchmark_parallel_native.py`. On an Intel Core i7-10700K under Linux 6.8.0-146-generic, it ran eight RandomAgent duels between the sourced Goat Control and Chaos Turbo decks, seeds 9700–9703 with both deck seat orders. All eight reached terminal below the 3,000-decision cap. The one-worker and two-worker runs produced the same winner and decision count for every seed and seat, totaling 8,069 decisions. The report contains deck, core, database, whitelist, and global-script hashes; the generated JSON stays in `.cache`.
+
+| Spawned workers | Wall time including spawn | Duels/s | Decisions/s | Mean native reset | Worker peak RSS |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 7.971 s | 1.004 | 1,012.3 | 0.0640 s/duel | 66,016 KiB |
+| 2 | 4.422 s | 1.809 | 1,824.9 | 0.0700 s/duel | 66,104 and 63,140 KiB |
+
+For the two-worker run, the **sum of worker high-water marks** was 129,244 KiB; the parent process's high-water mark was 26,048 KiB. These high-water marks may have occurred at different times, so their sum is not a measured instantaneous total memory peak. The corresponding one-worker sum was 66,016 KiB, with a 25,940 KiB parent peak. Native reset time totaled 0.512 s for one worker and 0.560 s for two workers. This is one short sample, not a scaling curve or a guarantee for other deck families.
+
+Reproduce after [native setup](native_setup.md):
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/benchmark_parallel_native.py --games 8 --workers 1 --seed 9700 --output .cache/goat-ai/sourced-single-9700-9703.json > .cache/goat-ai/sourced-single-9700-9703.stdout
+PYTHONPATH=. .venv/bin/python scripts/benchmark_parallel_native.py --games 8 --workers 2 --seed 9700 --output .cache/goat-ai/sourced-parallel-9700-9703.json > .cache/goat-ai/sourced-parallel-9700-9703.stdout
+```
