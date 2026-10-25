@@ -8,7 +8,13 @@ import pytest
 from goat_ai.agents import HeuristicAgent, RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
-from goat_ai.evaluation import GameResult, run_tournament, run_tournament_parallel, wilson_interval
+from goat_ai.evaluation import (
+    GameResult,
+    paired_score_difference,
+    run_tournament,
+    run_tournament_parallel,
+    wilson_interval,
+)
 from goat_ai.evaluation.tournament import bootstrap_score_interval
 
 
@@ -30,6 +36,20 @@ def test_paired_bootstrap_scores_complete_wins_and_draws():
     draws = [GameResult("a", "b", seed, seat, None, 10)
              for seed in range(4) for seat in (0, 1)]
     assert bootstrap_score_interval(draws) == (0.5, 0.5)
+
+
+def test_paired_score_difference_preserves_mirrored_deck_and_seat_schedule():
+    candidate = [GameResult(a, b, seed, seat, seat, 10)
+                 for seed in (1, 2) for a, b in (("a", "b"), ("b", "a"))
+                 for seat in (0, 1)]
+    control = [GameResult(g.deck_a, g.deck_b, g.seed, g.a_seat,
+                          1 - g.a_seat, 10) for g in reversed(candidate)]
+    assert paired_score_difference(candidate, control) == (1.0, 1.0, 1.0)
+    assert paired_score_difference(candidate, candidate) == (0.0, 0.0, 0.0)
+    with pytest.raises(ValueError, match="schedules differ"):
+        paired_score_difference(candidate, control[:-1])
+    with pytest.raises(ValueError, match="duplicate tournament game"):
+        paired_score_difference(candidate + candidate[:1], control)
 
 
 def test_parallel_runner_rejects_unpickleable_factories():

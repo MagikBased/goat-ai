@@ -3,10 +3,11 @@
 from .tournament import (
     GameResult,
     TournamentReport,
+    paired_score_difference,
     run_tournament,
     run_tournament_parallel,
     wilson_interval,
 )
 
-__all__ = ["GameResult", "TournamentReport", "run_tournament",
+__all__ = ["GameResult", "TournamentReport", "paired_score_difference", "run_tournament",
            "run_tournament_parallel", "wilson_interval"]

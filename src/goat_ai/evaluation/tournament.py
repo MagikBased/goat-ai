@@ -104,6 +104,50 @@ def bootstrap_score_interval(games: Sequence[GameResult],
             samples[int(0.975 * (resamples - 1))])
 
 
+def paired_score_difference(
+    candidate: Sequence[GameResult], control: Sequence[GameResult],
+    resamples: int = 4096,
+) -> tuple[float, float, float]:
+    """Candidate minus control score with a paired, matchup-seed bootstrap.
+
+    Each unordered deck pair and seed is one unit, keeping both deck
+    assignments and seats together when the schedule includes them.
+    """
+    if not candidate or resamples < 1:
+        raise ValueError("nonempty games and positive resamples required")
+
+    def keyed(games: Sequence[GameResult]) -> dict[tuple[str, str, int, int], float]:
+        result = {}
+        for game in games:
+            key = (game.deck_a, game.deck_b, game.seed, game.a_seat)
+            if key in result:
+                raise ValueError(f"duplicate tournament game: {key}")
+            result[key] = 1.0 if game.a_outcome == "win" else (
+                0.5 if game.a_outcome == "draw" else 0.0)
+        return result
+
+    left, right = keyed(candidate), keyed(control)
+    if left.keys() != right.keys():
+        raise ValueError("candidate and control schedules differ")
+    clusters: dict[tuple[str, str, int], list[float]] = {}
+    for (deck_a, deck_b, seed, _seat), score in left.items():
+        unit = (*sorted((deck_a, deck_b)), seed)
+        clusters.setdefault(unit, []).append(score - right[deck_a, deck_b, seed, _seat])
+    units = tuple(clusters.values())
+    point = sum(sum(unit) for unit in units) / len(candidate)
+    if len(units) == 1:
+        return point, -1.0, 1.0
+    rng = Random(0)
+    samples = []
+    for _ in range(resamples):
+        chosen = [units[rng.randrange(len(units))] for _ in units]
+        samples.append(sum(sum(unit) for unit in chosen) /
+                       sum(len(unit) for unit in chosen))
+    samples.sort()
+    return (point, samples[int(0.025 * (resamples - 1))],
+            samples[int(0.975 * (resamples - 1))])
+
+
 def run_tournament(
     matchups: Sequence[tuple[str, str]], seeds: Sequence[int],
     agent_a: Callable[[int], Agent], agent_b: Callable[[int], Agent],
