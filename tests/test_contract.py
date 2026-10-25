@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 
 from goat_ai.actions import Action
-from goat_ai.agents import HeuristicAgent, HumanAgent, RandomAgent
+from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, HumanAgent, RandomAgent
 from goat_ai.engine import Decision, RulesProfile, SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
 from goat_ai.observations import (
@@ -233,6 +233,39 @@ def test_flip_type_metadata_changes_generic_summon_preference():
     agent = HeuristicAgent(flip_monster_codes={flip_code})
     assert agent.select_action(view(), flip_actions) == flip_actions[1]
     assert agent.select_action(view(), ordinary_actions) == ordinary_actions[0]
+
+
+def test_combat_heuristic_uses_only_visible_battle_stats():
+    weak = Action("0", "attack", 0, {"sequence": 0})
+    strong = Action("1", "attack", 0, {"sequence": 1})
+    main2 = Action("2", "main2", 0)
+    field = (
+        CardView(0, "monster", "faceup", 1, 0, "attack", 1200, 800),
+        CardView(0, "monster", "faceup", 2, 1, "attack", 1900, 1200),
+        CardView(1, "monster", "faceup", 3, 0, "attack", 1700, 1000),
+    )
+    agent = CombatHeuristicAgent()
+    battle = replace(view(), phase="battle_start", field=field)
+    assert agent.select_action(battle, (weak, strong, main2)) == strong
+    target = Action("3", "select_card", 0, {"controller": 1, "location": 4,
+                                             "sequence": 0, "code": 3})
+    bigger = Action("4", "select_card", 0, {"controller": 1, "location": 4,
+                                             "sequence": 2, "code": 4})
+    target_view = replace(battle, phase="battle_step", field=field + (
+        CardView(1, "monster", "faceup", 4, 2, "attack", 2100, 900),))
+    assert agent.select_action(target_view, (bigger, target)) == target
+    hidden_target = Action("5", "select_card", 0, {"controller": 1, "location": 4,
+                                                    "sequence": 3})
+    mixed = replace(battle, phase="battle_step", field=field[:2] + (
+        CardView(1, "monster", "faceup", 3, 0, "attack", 2200, 1000),
+        CardView(1, "monster", "facedown", None, 3, "defense")))
+    assert agent.select_action(mixed, (target, hidden_target)) == hidden_target
+    blocked = replace(battle, field=field[:2] + (
+        CardView(1, "monster", "faceup", 3, 0, "attack", 2200, 1000),))
+    assert agent.select_action(blocked, (weak, strong, main2)) == main2
+    hidden = replace(battle, field=field[:2] + (
+        CardView(1, "monster", "facedown", None, 0, "defense"),))
+    assert agent.select_action(hidden, (weak, strong, main2)) == strong
 
 
 def test_trajectory_round_trip_and_legality(tmp_path):

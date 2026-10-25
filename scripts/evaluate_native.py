@@ -10,10 +10,10 @@ from functools import partial
 from pathlib import Path
 from time import perf_counter
 
-from goat_ai.agents import HeuristicAgent, RandomAgent
+from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
-from goat_ai.evaluation import run_tournament, run_tournament_parallel
+from goat_ai.evaluation import both_deck_assignments, run_tournament, run_tournament_parallel
 
 FLIP_MONSTER_TYPE = 0x200000  # TYPE_FLIP in the pinned scripts/constant.lua
 
@@ -43,6 +43,8 @@ def agent_factory(name: str, native_root: Path):
         return RandomAgent
     if name == "heuristic":
         return make_heuristic
+    if name == "combat_heuristic":
+        return make_combat_heuristic
     if name == "flip_heuristic":
         return partial(make_flip_heuristic,
                        flip_monster_codes=flip_monster_codes(native_root))
@@ -51,6 +53,10 @@ def agent_factory(name: str, native_root: Path):
 
 def make_heuristic(_seed: int) -> HeuristicAgent:
     return HeuristicAgent()
+
+
+def make_combat_heuristic(_seed: int) -> CombatHeuristicAgent:
+    return CombatHeuristicAgent()
 
 
 def make_flip_heuristic(_seed: int, *, flip_monster_codes: frozenset[int]) -> HeuristicAgent:
@@ -63,9 +69,13 @@ def main() -> None:
     parser.add_argument("--engine", choices=("restricted", "experimental"),
                         default="restricted")
     parser.add_argument("--matchup", nargs=2, action="append", metavar=("DECK_A", "DECK_B"))
-    parser.add_argument("--agent-a", choices=("random", "heuristic", "flip_heuristic"),
+    parser.add_argument("--both-deck-assignments", action="store_true",
+                        help="evaluate each deck pair with either agent assigned either deck")
+    parser.add_argument("--agent-a", choices=("random", "heuristic", "combat_heuristic",
+                                              "flip_heuristic"),
                         default="random")
-    parser.add_argument("--agent-b", choices=("random", "heuristic", "flip_heuristic"),
+    parser.add_argument("--agent-b", choices=("random", "heuristic", "combat_heuristic",
+                                              "flip_heuristic"),
                         default="random")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--seeds", type=int, default=2)
@@ -79,6 +89,8 @@ def main() -> None:
     fixtures = Path(__file__).resolve().parent.parent / "examples/decks"
     matchups = args.matchup or [[str(fixtures / "vanilla_probe.ydk"),
                                   str(fixtures / "vanilla_reverse.ydk")]]
+    if args.both_deck_assignments:
+        matchups = both_deck_assignments(matchups)
     seeds = list(range(args.seed, args.seed + args.seeds))
     runner = run_tournament_parallel if args.workers > 1 else run_tournament
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
@@ -114,7 +126,8 @@ def main() -> None:
         "duels_per_second": len(report.games) / wall_seconds,
         "decisions_per_second": sum(game.decisions for game in report.games) / wall_seconds,
         "asset_sha256": assets, "deck_sha256": deck_hashes,
-        "seeds": seeds, "summary": report.summary(),
+        "seeds": seeds, "both_deck_assignments": args.both_deck_assignments,
+        "summary": report.summary(),
         "games": [asdict(game) | {"a_outcome": game.a_outcome} for game in report.games],
     }
     payload = json.dumps(result, indent=2) + "\n"

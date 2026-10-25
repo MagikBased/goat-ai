@@ -1,4 +1,4 @@
-from .baseline import Agent, HeuristicAgent, HumanAgent, RandomAgent
+from .baseline import Agent, CombatHeuristicAgent, HeuristicAgent, HumanAgent, RandomAgent
 
-__all__ = ["Agent", "HeuristicAgent", "HumanAgent", "RandomAgent"]
+__all__ = ["Agent", "CombatHeuristicAgent", "HeuristicAgent", "HumanAgent", "RandomAgent"]
 

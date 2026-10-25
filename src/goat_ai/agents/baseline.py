@@ -5,7 +5,7 @@ from collections.abc import Callable, Collection, Sequence
 from typing import ClassVar, Protocol
 
 from goat_ai.actions import Action
-from goat_ai.observations import Observation
+from goat_ai.observations import CardView, Observation
 
 
 class Agent(Protocol):
@@ -44,6 +44,71 @@ class HeuristicAgent:
         if not legal_actions:
             raise ValueError("no legal actions")
         return max(legal_actions, key=self._score)
+
+
+class CombatHeuristicAgent(HeuristicAgent):
+    """Generic visible-stat combat choices; never consults native private state."""
+
+    def __init__(self, flip_monster_codes: Collection[int] = ()) -> None:
+        super().__init__(flip_monster_codes)
+        self._attacker: tuple[int, int] | None = None
+
+    @staticmethod
+    def _battle_stat(card: CardView) -> int | None:
+        return card.attack if card.orientation == "attack" else card.defense
+
+    def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
+        if not legal_actions:
+            raise ValueError("no legal actions")
+        opponents = [card for card in observation.field
+                     if card.zone == "monster" and card.controller != observation.viewer]
+        own = {(card.controller, card.sequence): card for card in observation.field
+               if card.zone == "monster" and card.controller == observation.viewer}
+        attacks = [action for action in legal_actions if action.kind == "attack"]
+        if attacks:
+            visible = all(card.position == "faceup" and card.attack is not None
+                          and card.defense is not None for card in opponents)
+            def attack_power(action: Action) -> int:
+                card = own.get((action.actor, action.parameters.get("sequence")))
+                return card.attack or 0 if card is not None else 0
+
+            safe = [action for action in attacks if not opponents or not visible
+                    or any(attack_power(action) >= self._battle_stat(card)
+                           for card in opponents)]
+            if safe:
+                chosen = max(safe, key=attack_power)
+                self._attacker = (chosen.actor, chosen.parameters["sequence"])
+                return chosen
+            transition = next((action for action in legal_actions
+                               if action.kind in ("main2", "end_phase")), None)
+            if transition is not None:
+                return transition
+        if (self._attacker in own and observation.phase == "battle_step"
+                and not observation.chain and legal_actions[0].kind == "select_card"):
+            candidates = [action for action in legal_actions
+                          if action.kind == "select_card"
+                          and action.parameters.get("controller") != observation.viewer
+                          and action.parameters.get("location") == 4]
+            by_slot = {(card.controller, card.sequence): card for card in opponents}
+            def target_card(action: Action) -> CardView | None:
+                return by_slot.get((action.parameters["controller"],
+                                    action.parameters.get("sequence")))
+
+            visible_targets = [action for action in candidates
+                               if (card := target_card(action))
+                               is not None and card.position == "faceup"
+                               and card.attack is not None and card.defense is not None]
+            attacker = own[self._attacker]
+            favorable = [action for action in visible_targets
+                         if attacker.attack is not None
+                         and attacker.attack >= self._battle_stat(target_card(action))]
+            if favorable:
+                return min(favorable, key=lambda action: self._battle_stat(
+                    target_card(action)))
+            hidden = [action for action in candidates if action not in visible_targets]
+            if hidden:
+                return hidden[0]
+        return super().select_action(observation, legal_actions)
 
 
 class HumanAgent:

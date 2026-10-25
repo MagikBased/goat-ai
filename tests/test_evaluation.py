@@ -10,6 +10,7 @@ from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import (
     GameResult,
+    both_deck_assignments,
     paired_score_difference,
     run_tournament,
     run_tournament_parallel,
@@ -29,6 +30,12 @@ def test_wilson_interval_handles_edges_and_balanced_results():
         wilson_interval(3, 2)
 
 
+def test_both_deck_assignments_deduplicates_reverse_pairs():
+    assert both_deck_assignments((("goat", "chaos"), ("chaos", "goat"),
+                                  ("warrior", "warrior"))) == (
+        ("goat", "chaos"), ("chaos", "goat"), ("warrior", "warrior"))
+
+
 def test_paired_bootstrap_scores_complete_wins_and_draws():
     wins = [GameResult("a", "b", seed, seat, seat, 10)
             for seed in range(4) for seat in (0, 1)]
@@ -36,6 +43,10 @@ def test_paired_bootstrap_scores_complete_wins_and_draws():
     draws = [GameResult("a", "b", seed, seat, None, 10)
              for seed in range(4) for seat in (0, 1)]
     assert bootstrap_score_interval(draws) == (0.5, 0.5)
+    one_seed = [GameResult(a, b, 1, seat, seat, 10)
+                for a, b in (("goat", "chaos"), ("chaos", "goat"))
+                for seat in (0, 1)]
+    assert bootstrap_score_interval(one_seed) == (0.0, 1.0)
 
 
 def test_paired_score_difference_preserves_mirrored_deck_and_seat_schedule():

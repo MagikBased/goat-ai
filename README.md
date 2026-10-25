@@ -64,6 +64,7 @@ python scripts/benchmark_native.py --games 3 --seed 42
 python scripts/benchmark_native.py --engine experimental --deck-a examples/decks/goat_control_lolmarcus_2020.ydk --deck-b examples/decks/chaos_turbo_riclar_2020.ydk --games 10 --seed 9700 --max-decisions 3000
 python scripts/audit_card_pool.py
 python scripts/evaluate_native.py --agent-a heuristic --agent-b random --seeds 10
+python scripts/evaluate_native.py --engine experimental --agent-a combat_heuristic --agent-b heuristic --both-deck-assignments --matchup examples/decks/goat_control_lolmarcus_2020.ydk examples/decks/chaos_turbo_riclar_2020.ydk --seeds 2
 python scripts/evaluate_native.py --agent-a random --agent-b random --seeds 4 --workers 2
 ```
 

@@ -78,6 +78,20 @@ class TournamentReport:
         }
 
 
+def both_deck_assignments(
+    matchups: Sequence[tuple[str, str]],
+) -> tuple[tuple[str, str], ...]:
+    """Run each unordered deck pair with each agent assigned each deck once."""
+    expanded: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for deck_a, deck_b in matchups:
+        for pair in ((deck_a, deck_b), (deck_b, deck_a)):
+            if pair not in seen:
+                expanded.append(pair)
+                seen.add(pair)
+    return tuple(expanded)
+
+
 def bootstrap_score_interval(games: Sequence[GameResult],
                              resamples: int = 4096) -> tuple[float, float]:
     """Percentile bootstrap, resampling each matchup/seed as one paired unit."""
@@ -87,7 +101,8 @@ def bootstrap_score_interval(games: Sequence[GameResult],
         raise ValueError("resamples must be positive")
     clusters: dict[tuple[str, str, int], list[GameResult]] = {}
     for game in games:
-        clusters.setdefault((game.deck_a, game.deck_b, game.seed), []).append(game)
+        unit = (*sorted((game.deck_a, game.deck_b)), game.seed)
+        clusters.setdefault(unit, []).append(game)
     units = tuple(clusters.values())
     if len(units) == 1:
         return (0.0, 1.0)

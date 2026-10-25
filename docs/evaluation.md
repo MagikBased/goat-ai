@@ -559,3 +559,26 @@ On the local pinned native assets, RandomAgent versus RandomAgent completed all 
 OMP_NUM_THREADS=1 PYTHONPATH=. .venv/bin/python scripts/evaluate_native.py --engine experimental --matchup examples/decks/dimension_fusion_turbo_goatformat_guide.ydk examples/decks/chaos_turbo_riclar_2020.ydk --seed 9900 --seeds 10 --max-decisions 3000 --workers 4 --agent-a random --agent-b random --output artifacts/dft_chaos_random_9900_9909.json
 PYTHONPATH=. GOAT_AI_NATIVE_ROOT=.cache/goat-ai .venv/bin/pytest -q tests/test_dimension_fusion_turbo_duel.py tests/test_historical_dimension_fusion.py
 ```
+
+## Visible-stat combat heuristic and deck-assignment balance (2026-10-25)
+
+`CombatHeuristicAgent` is an experimental, deck-agnostic extension of the original `HeuristicAgent`. It selects a higher-ATK attacker, avoids attacking when every visible opposing monster would beat every available attacker, and prefers a beatable face-up battle target. It uses only `Observation.field` and the current legal actions; it does not query the native duel state or hidden cards. The original heuristic remains available as a fixed control and as the teacher named in earlier demonstration reports. The combat heuristic has no search, matchup model, or card-specific tactics; hidden defenders and response cards can still punish its attacks.
+
+A first **unbalanced** head-to-head assigned each agent a fixed deck within each pair and only swapped seats. On seeds 316–323 the combat heuristic won 45/64 games across four directed matchups; on seeds 324–331 it won only 20/48 across three others. The latter included 2/16 when assigned Chaos Control against Goat Control, whereas in the reverse assignment on seeds 332–339 it won 13/16. These results show a large deck-assignment effect and cannot by themselves establish a general agent improvement.
+
+The runner now accepts `--both-deck-assignments` to schedule both agents with each deck in an unordered pair, while still swapping seats. Its percentile score interval resamples the unordered deck pair and seed as one unit, retaining all mirrored games together. With two pairs on seeds 332–339, the combat heuristic scored **37 wins, 26 losses, 1 draw in 64 games** (58.6%; paired 95% bootstrap score interval **53.1–64.1%** after the corrected clustering). On a separate three-pair schedule on seeds 340–347, it scored **54 wins, 42 losses in 96 games** (56.3%; paired 95% interval **52.1–61.5%**). That later schedule includes the Flip Control guide list, which is not a tournament entry. Both samples favor the combat heuristic on their selected deck pairs and seeds; the matchup splits still vary, and neither sample proves broad competitive strength against human players or other agents. The older evaluation reports were generated before this clustering change, so their saved intervals are historical output and may differ if regenerated with the current code. Game outcomes are unaffected.
+
+Reproduce the later balanced schedule after [native setup](native_setup.md):
+
+```bash
+PYTHONPATH=. GOAT_AI_NATIVE_ROOT=.cache/goat-ai .venv/bin/python scripts/evaluate_native.py \
+  --engine experimental --agent-a combat_heuristic --agent-b heuristic \
+  --both-deck-assignments \
+  --matchup examples/decks/chaos_return_dingosig_worlds_2022.ydk examples/decks/warrior_montague_clash.ydk \
+  --matchup examples/decks/flip_control_goatformat_guide.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk examples/decks/warrior_montague_clash.ydk \
+  --seed 340 --seeds 8 --max-decisions 3000 \
+  --output artifacts/combat_heuristic_balanced_340_347.json
+```
+
+The ignored local report records individual outcomes, seat and deck assignments, asset and deck hashes, wall time, and the measured interval. Follow-up evaluation should include additional independent tournament deck files, more seeds, and direct comparison against RandomAgent before using this baseline as a behavioral-cloning teacher. No generated report or replay is committed.
