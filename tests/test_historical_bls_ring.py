@@ -1,4 +1,4 @@
-"""BLS's activated banish resolves after chained Ring destroys BLS."""
+"""Ring and Book responses to BLS's pending banish effect."""
 
 import os
 from pathlib import Path
@@ -12,61 +12,45 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 BLS = 504700118
-RING = 511000824
 GRACEFUL = 79571449
+RING = 511000824
+BOOK = 14087893
 LIGHT = 15025844
 DARK = 7359741
-BOOK = 14087893
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("book_response", [False, True])
-def test_ring_destroys_bls_but_pending_banish_still_resolves(tmp_path,
-                                                             book_response):
+@pytest.mark.parametrize("response", ["pass", "ring_target", "ring_bls",
+                                         "book_bls"])
+def test_ring_chained_to_bls_banish(tmp_path, response):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    scripts = (f"goat/c{BLS}.lua", f"pre-errata/c{RING}.lua",
-               f"official/c{GRACEFUL}.lua")
-    required = set(scripts) | ({f"official/c{BOOK}.lua"} if book_response else set())
-    for script in required:
-        if not (root / "scripts" / script).is_file():
-            pytest.skip(f"script {script} not installed")
+    scripts = {f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua",
+               f"pre-errata/c{RING}.lua", f"official/c{BOOK}.lua"}
+    if any(not (root / "scripts" / script).is_file() for script in scripts):
+        pytest.skip("required GOAT card scripts not installed")
     lights = (LIGHT, 62651957)
     darks = (49881766, DARK)
-    filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
-    bls_cards = (GRACEFUL, BLS, *(code for code in lights for _ in range(3)),
-                 *(code for code in darks for _ in range(3)), *filler[:26])
-    if book_response:
-        # Preserve the seed's opening card positions while replacing one
-        # three-copy Normal Monster with Book of Moon.
-        bls_cards = tuple(BOOK if code == 23771716 else code for code in bls_cards)
-        assert bls_cards.count(BOOK) == 3
-    bls_deck = tmp_path / "bls.ydk"
-    bls_deck.write_text("#main\n" + "\n".join(map(str, bls_cards))
-                        + "\n#extra\n!side\n")
-    ring_deck = tmp_path / "ring.ydk"
-    ring_deck.write_text("#main\n" + "\n".join(map(str, (
+    filler = [BOOK if code == 23771716 else code for code in VANILLA_DECK
+              if code not in (*lights, *darks)]
+    attacker = tmp_path / "bls.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        GRACEFUL, BLS, *(code for code in lights for _ in range(3)),
+        *(code for code in darks for _ in range(3)), *filler[:26])))
+        + "\n#extra\n!side\n")
+    defender = tmp_path / "ring.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
         RING, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
 
-    with GoatEnvironment(str(bls_deck), str(ring_deck), seed=100,
+    with GoatEnvironment(str(attacker), str(defender), seed=100,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
-        if book_response:
-            assert BOOK in {c.code for c in obs.hand}
-        graceful = discarded = ring_set = defender_summoned = bls_summoned = False
-        bls_used = defender_targeted = ring_chained = bls_targeted = False
-        book_chained = book_targeted = checked = False
+        assert {BLS, GRACEFUL, BOOK, LIGHT, DARK} <= {card.code for card in obs.hand}
+        graceful = discarded = ring_set = defender_summoned = False
+        summoned = priority_seen = banish_targeted = responded = ring_targeted = False
+        book_chained = book_targeted = False
+        defender_code = defender_attack = None
         costs = set()
-        defender_code = None
-        agents = (RandomAgent(100), RandomAgent(101))
-        for _ in range(3000):
-            if env.is_terminal():
-                assert checked
-                path = tmp_path / f"bls_ring_book_{book_response}.json"
-                write_trajectory(path, env.trajectory())
-                assert verify_trajectory(read_trajectory(path),
-                                         ExperimentalOcgcoreEngine(root)) == len(
-                    env.trajectory().decisions)
-                return
+        for _ in range(110):
             actions = env.legal_actions()
             action = None
             if obs.turn == 1 and obs.acting_player == 0:
@@ -89,69 +73,111 @@ def test_ring_destroys_bls_but_pending_banish_still_resolves(tmp_path,
                         defender_code = action.parameters["code"]
                         defender_summoned = True
             if obs.turn == 3 and obs.acting_player == 0 and defender_summoned:
-                if not bls_summoned:
+                if not summoned:
                     action = next((a for a in actions if a.kind == "special_summon"
                                    and a.parameters.get("code") == BLS), None)
-                    bls_summoned |= action is not None
-                if bls_summoned and len(costs) < 2 and actions[0].kind == "select_card":
+                    summoned |= action is not None
+                if summoned and len(costs) < 2 and actions[0].kind == "select_card":
                     action = next((a for a in actions if a.parameters.get("code")
                                    in ({LIGHT, DARK} - costs)), action)
                     if action is not None and action.kind == "select_card":
                         costs.add(action.parameters["code"])
-                if costs == {LIGHT, DARK} and not bls_used:
-                    option = next((a for a in actions if a.kind == "chain"
+                if summoned and len(costs) == 2 and not priority_seen:
+                    action = next((a for a in actions if a.kind == "chain"
                                    and a.parameters.get("code") == BLS), None)
-                    if option is not None:
+                    if action is not None:
                         assert obs.chain == ()
-                        action = option
-                        bls_used = True
-                if bls_used and not defender_targeted and actions[0].kind == "select_card":
-                    action = next((a for a in actions if a.parameters.get("controller") == 1
-                                   and a.parameters.get("code") == defender_code), action)
-                    defender_targeted |= action is not None and action.kind == "select_card"
-            if defender_targeted and obs.acting_player == 1 and not ring_chained:
-                option = next((a for a in actions if a.kind == "chain"
-                               and a.parameters.get("code") == RING), None)
-                if option is not None:
-                    assert obs.chain[0].card_code == BLS
-                    action = option
-                    ring_chained = True
-            if ring_chained and not bls_targeted and actions[0].kind == "select_card":
-                action = next((a for a in actions if a.parameters.get("controller") == 0
-                               and a.parameters.get("code") == BLS), None)
-                bls_targeted |= action is not None
-            if book_response and bls_targeted and not book_chained \
-                    and obs.acting_player == 0:
-                option = next((a for a in actions if a.kind == "chain"
+                        assert any(c.controller == 1 and c.zone == "spell_trap"
+                                   and c.position == "facedown" and c.code is None
+                                   for c in obs.field)
+                        priority_seen = True
+                if priority_seen and not banish_targeted \
+                        and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == defender_code and a.parameters.get("controller") == 1),
+                                  None)
+                    banish_targeted |= action is not None
+                    if banish_targeted:
+                        defender_attack = next(c.attack for c in obs.field
+                                               if c.code == defender_code
+                                               and c.controller == 1)
+            if banish_targeted and obs.acting_player == 1 and not responded:
+                assert obs.chain[0].card_code == BLS
+                ring = next((a for a in actions if a.kind == "chain"
+                             and a.parameters.get("code") == RING), None)
+                assert ring is not None
+                action = ring if response != "pass" else next(
+                    a for a in actions if a.kind == "pass")
+                responded = True
+            if response != "pass" and responded and not ring_targeted \
+                    and actions[0].kind == "select_card":
+                ring_code = defender_code if response == "ring_target" else BLS
+                ring_controller = 1 if response == "ring_target" else 0
+                action = next((a for a in actions if a.parameters.get("code")
+                               == ring_code and a.parameters.get("controller")
+                               == ring_controller), None)
+                ring_targeted |= action is not None
+            if response == "book_bls" and ring_targeted and obs.acting_player == 0 \
+                    and not book_chained:
+                action = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == BOOK), None)
-                if option is not None:
-                    assert [link.card_code for link in obs.chain] == [BLS, RING]
-                    action = option
-                    book_chained = True
+                book_chained |= action is not None
             if book_chained and not book_targeted and actions[0].kind == "select_card":
-                action = next((a for a in actions if a.parameters.get("controller") == 0
-                               and a.parameters.get("code") == BLS), None)
-                book_targeted = action is not None
-            if action is None and not checked:
-                action = next((a for a in actions if a.kind in (
-                    "select_card", "place", "pass", "end_phase")), actions[0])
+                action = next((a for a in actions if a.parameters.get("code") == BLS
+                               and a.parameters.get("controller") == 0), None)
+                book_targeted |= action is not None
             if action is None:
-                action = agents[obs.acting_player].select_action(obs, actions)
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if not checked and bls_targeted and RING in {c.code for c in obs.graveyards[1]}:
-                assert ring_set and defender_summoned and bls_used
-                assert obs.chain == ()
-                assert obs.life_points == ((8000, 8000) if book_response
-                                           else (5000, 5000))
-                assert (BLS in {c.code for c in obs.graveyards[0]}) != book_response
-                assert defender_code in {c.code for c in obs.banished[1]}
-                if book_response:
-                    assert book_chained and book_targeted
-                    assert any(c.code == BLS and c.position == "facedown"
-                               for c in env.engine.probe.observation(0).field)
-                    assert BOOK in {c.code for c in obs.graveyards[0]}
+            if responded and not obs.chain and defender_code in {
+                    c.code for c in (obs.graveyards[1] if response == "ring_target"
+                                     else obs.banished[1])}:
+                assert costs == {LIGHT, DARK} and priority_seen and banish_targeted
+                assert ring_targeted == (response != "pass")
+                assert book_chained == book_targeted == (response == "book_bls")
+                assert (RING in {c.code for c in obs.graveyards[1]}) == (
+                    response != "pass")
+                assert (BOOK in {c.code for c in obs.graveyards[0]}) == (
+                    response == "book_bls")
+                own_bls = next((c for c in obs.field if c.code == BLS), None)
+                assert (BLS in {c.code for c in obs.graveyards[0]}) == (
+                    response == "ring_bls")
+                assert (own_bls is None) == (response == "ring_bls")
+                if response == "book_bls":
+                    assert own_bls.position == "facedown"
+                elif own_bls is not None:
+                    assert own_bls.position == "faceup"
+                assert (defender_code in {c.code for c in obs.banished[1]}) == (
+                    response != "ring_target")
+                assert (defender_code in {c.code for c in obs.graveyards[1]}) == (
+                    response == "ring_target")
+                damage = {"pass": 0, "ring_target": defender_attack,
+                          "ring_bls": 3000, "book_bls": 0}[response]
+                assert obs.life_points == (8000 - damage,) * 2
+                expected_scripts = {f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua"}
+                if response != "pass":
+                    expected_scripts.add(f"pre-errata/c{RING}.lua")
+                if response == "book_bls":
+                    expected_scripts.add(f"official/c{BOOK}.lua")
+                assert expected_scripts <= env.engine.probe.loaded_script_sha256.keys()
+                agents = (RandomAgent(100), RandomAgent(101))
+                for _ in range(5000):
+                    if env.is_terminal():
+                        break
+                    obs = env.step(agents[obs.acting_player].select_action(
+                        obs, env.legal_actions()))
                 else:
-                    assert not any(c.zone == "monster" for c in obs.field)
-                assert required <= env.engine.probe.loaded_script_sha256.keys()
-                checked = True
-    pytest.fail("BLS/Ring duel did not complete")
+                    pytest.fail("BLS / Ring continuation exceeded 5000 decisions")
+                trajectory = env.trajectory()
+                path = tmp_path / f"bls_ring_{response}.json"
+                write_trajectory(path, trajectory)
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                                             trajectory.decisions)
+                return
+    pytest.fail(f"BLS / Ring line stalled: turn={obs.turn} phase={obs.phase} "
+                f"setup={graceful}/{discarded}/{ring_set}/{defender_summoned} "
+                f"summon={summoned}/{costs} priority={priority_seen}/{banish_targeted} "
+                f"response={response}/{responded}/{ring_targeted} "
+                f"book={book_chained}/{book_targeted}")

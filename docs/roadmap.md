@@ -328,6 +328,13 @@ activating its banish effect before the Bottomless response removes the target
 after the boss is banished; passing priority leaves the target in play. All
 four full duels replay-verify against pinned native assets.
 
+A paired BLS / Ring of Destruction fixture now checks the defender's choice to
+destroy their own monster while BLS's banish effect is pending. Ring deals that
+monster's current ATK to both players; BLS's target is gone at resolution, so
+the monster reaches the Graveyard rather than being banished. Passing Ring
+banishes it instead. Both complete duels serialize and replay-verify; see
+[GOAT rules](goat_rules.md).
+
 An independent April 2005 list checks the pinned card IDs and copy limits for the 18 cards appearing in at least four of the five tournament Main Decks; the ten shared by all five are pinned as a corpus regression. A read-only comparison matches all 1,679 names in GoatFormat's published card-pool spreadsheet against the pinned whitelist after ten explicit printed-name equivalences. The whitelist has two additional legal names omitted by that sheet, with separate cutoff evidence. A second source-backed audit checks the April 2005 copy limit of all 1,704 pinned whitelist IDs against GoatFormat's 73 named restrictions and finds no mismatch; see [GOAT rules](goat_rules.md). Card-specific historical rulings and release-date membership beyond the independent sheet remain open.
 
 1. Finish interaction and interruption coverage for cards shared by these lists, especially Black Luster Soldier, Nobleman of Crossout, Book of Moon, Pot of Greed, Graceful Charity, and common removal and traps. Existing single-line fixtures are a starting point, not a complete ruling audit.
