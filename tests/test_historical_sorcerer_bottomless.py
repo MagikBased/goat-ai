@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 SORCERER = 9596126
 GRACEFUL = 79571449
@@ -86,6 +88,10 @@ def test_sorcerer_priority_before_bottomless(tmp_path, use_priority):
                                    and a.parameters.get("code") == SORCERER), None)
                     if option is not None:
                         assert observation.chain == ()
+                        assert any(c.controller == 1 and c.zone == "spell_trap"
+                                   and c.position == "facedown" and c.code is None
+                                   for c in observation.field)
+                        assert not observation.known_opponent_field_cards
                         priority_seen = True
                         action = option if use_priority else next(
                             a for a in actions if a.kind == "pass")
@@ -118,7 +124,20 @@ def test_sorcerer_priority_before_bottomless(tmp_path, use_priority):
                 assert target_selected == use_priority
                 assert observation.life_points == (8000, 8000)
                 assert set(scripts).issubset(env.engine.probe.loaded_script_sha256)
-                return
+                agents = (RandomAgent(100), RandomAgent(101))
+                for _ in range(5000):
+                    action = agents[observation.acting_player].select_action(
+                        observation, env.legal_actions())
+                    observation = env.step(action)
+                    if env.is_terminal():
+                        trajectory = env.trajectory()
+                        path = tmp_path / f"sorcerer_bottomless_{use_priority}.json"
+                        write_trajectory(path, trajectory)
+                        assert verify_trajectory(read_trajectory(path),
+                                                 ExperimentalOcgcoreEngine(root)) == len(
+                                                     trajectory.decisions)
+                        return
+                pytest.fail("Sorcerer/Bottomless duel did not finish in 5000 decisions")
     pytest.fail(f"Sorcerer/Bottomless line stalled: summon={summoned} "
                 f"priority={priority_seen} effect={effect_used}/{target_selected} "
                 f"Bottomless={bottomless_used} turn={observation.turn}")
