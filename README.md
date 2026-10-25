@@ -97,6 +97,24 @@ xdg-open replays/scapegoat_3.html
 
 The generated HTML is self-contained and shows card names when the pinned card database is installed. The duel board keeps both fields and hands on one screen at desktop sizes; playback controls, legal actions, graveyards, and other details scroll in the right sidebar. The viewing player is always at the bottom. Use its slider, arrow keys, or Play button to step through decisions; `#decision=11` opens a particular decision. Staged card choices show the required selection count and already selected cards. The legal-action list shows 100 entries at a time, with a button for more. New schema-v18 recordings also include a final frame with the terminal field and Life Points; older recordings end on the last decision. Public Deck-top reveals, cards shown only to the acting player, known opponent hand identities, active disabled field zones, and the acting player's starting Deck composition appear on new recordings. Known hand cards are listed in the sidebar without assigning them to hidden hand slots. You can also open `examples/replay_viewer.html` directly and choose any saved GOAT AI JSON trajectory, in which case cards appear by ID. The viewer has no card art or animations and does not open EDOPro `.yrp`/`.yrpX` files. Replays and generated HTML live in ignored `replays/`.
 
+To review a decision, expand **All legal actions** in the sidebar and click a
+choice. Enter your name or alias, confirm that you created the labels and
+authorize their use, then download the local JSON label file. It stores
+decision and action indexes tied to the source trajectory's SHA-256; it does
+not upload the replay. The training CLI replay-verifies the exact source file,
+checks player-visible action safety, and rejects stale or illegal labels:
+
+```bash
+OMP_NUM_THREADS=1 python scripts/train_behavioral_clone.py \
+  replays/scapegoat_3.json \
+  --annotation ~/Downloads/goat_ai_labels_seed_3.json \
+  --engine experimental --output checkpoints/reviewed_smoke.pt
+```
+
+This is a pipeline example using retrospective labels. Such labels are not
+live human gameplay recordings or evidence of a stronger policy; see
+[the ML notes](docs/ml.md).
+
 For a replay that shows a two-zone choice and the resulting disabled Monster Zones, run `python examples/record_ground_collapse.py`, then `python scripts/render_replay.py replays/ground_collapse_3.json` and open `replays/ground_collapse_3.html`. This uses the experimental adapter and verifies the full seeded duel before writing the trajectory.
 
 The play example prints the winner and decision count and optionally writes a JSON trajectory. `--human-seat` uses the same action API for a CLI player. The evaluation command swaps candidate seats for each seed and reports matchup and seat results; see [the evaluation log](docs/evaluation.md). Supported decision types remain limited to the tested decks, and unsupported requests fail explicitly. The default environment still fails closed because general GOAT effects and visibility cases are unfinished. The benchmark includes reset and Python action selection; results are specific to this fixture and machine.

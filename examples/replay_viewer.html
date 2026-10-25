@@ -19,11 +19,12 @@
     .toolbar, .summary, .player-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .toolbar { justify-content: flex-end; min-width: 0; }
     #file-name { max-width: 185px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; }
-    button, input[type=file], input[type=number] { font: inherit; }
+    button, input[type=file], input[type=number], input[type=text] { font: inherit; }
     button { padding: 7px 13px; color: #eef5f3; background: #234854; border: 1px solid #4f7980; border-radius: 7px; cursor: pointer; }
     button:hover, button:focus-visible { background: #306575; }
     button:disabled { opacity: .4; cursor: default; }
     input[type=number] { width: 82px; padding: 6px; color: inherit; background: #14242d; border: 1px solid #4f7980; border-radius: 6px; }
+    input[type=text] { width: 100%; padding: 6px; color: inherit; background: #14242d; border: 1px solid #4f7980; border-radius: 6px; }
     input[type=range] { flex: 1; min-width: 170px; accent-color: #7dcab1; }
     input[type=file] { max-width: 225px; font-size: .78rem; }
     label { display: inline-flex; align-items: center; gap: 5px; }
@@ -67,6 +68,10 @@
     .selection-progress { margin-top: 7px; font-size: .86rem; color: #bde0d1; }
     .legal-list { max-height: 210px; overflow: auto; padding-left: 22px; }
     .legal-list li { margin: 3px 0; }
+    .legal-list button { width: 100%; padding: 5px 7px; text-align: left; }
+    .legal-list button.annotated { border-color: #f5d782; background: #645333; }
+    .annotation-actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+    .annotation-actions button { flex: 1; }
     #legal-more { margin-top: 7px; width: 100%; }
     .notice { padding: 10px 12px; border-left: 3px solid #e5cb6d; background: #293734; margin: 12px 0; }
     [hidden] { display: none !important; }
@@ -107,6 +112,19 @@
           <details><summary>All legal actions</summary><ol id="legal" class="legal-list"></ol><button id="legal-more" type="button" hidden>Show more</button></details>
         </div>
         <div class="panel">
+          <h2>Review a decision</h2>
+          <p class="muted">Choose an action from the legal list above to label this frame. Labels are retrospective and stay on this device until downloaded.</p>
+          <p id="annotation-status" class="muted"></p>
+          <div class="annotation-actions">
+            <button id="label-recorded" type="button">Use recorded action</button>
+            <button id="clear-label" type="button">Clear frame label</button>
+          </div>
+          <label for="reviewer">Reviewer name</label>
+          <input id="reviewer" type="text" autocomplete="name" placeholder="Your name or alias">
+          <p><label><input id="annotation-consent" type="checkbox"> I created these labels and authorize their use for GOAT AI research.</label></p>
+          <button id="download-labels" type="button">Download labels</button>
+        </div>
+        <div class="panel">
           <h2>Known opponent hand</h2>
           <div id="known-hand" class="muted"></div>
         </div>
@@ -131,6 +149,7 @@
   </main>
   <script id="embedded-replay" type="application/json">__EMBEDDED_REPLAY__</script>
   <script id="embedded-names" type="application/json">__EMBEDDED_NAMES__</script>
+  <script id="embedded-sha256" type="application/json">"__SOURCE_SHA256__"</script>
   <script>
     "use strict";
     let replay = null;
@@ -139,6 +158,8 @@
     let timer = null;
     let legalFrame = -1;
     let legalShown = 100;
+    let sourceSha256 = "";
+    let annotations = new Map();
     const byId = id => document.getElementById(id);
     const phaseName = phase => String(phase || "unknown").replaceAll("_", " ");
     const locationName = location => ({1: "Deck", 2: "Hand", 4: "Monster", 8: "Spell/Trap", 16: "Graveyard", 32: "Banished", 64: "Extra"})[location] || `zone ${location}`;
@@ -314,10 +335,24 @@
       byId("legal-count").textContent = terminal ? "No legal actions" : `${count} legal actions at this decision`;
       const legal = byId("legal");
       legal.replaceChildren(...(terminal ? [] : record.legal_actions.slice(0, legalShown).map(
-        action => node("li", "", actionLabel(observation, action, known)))));
+        (action, actionIndex) => {
+          const item = node("li");
+          const button = node("button", annotations.get(index) === actionIndex ? "annotated" : "",
+                              actionLabel(observation, action, known));
+          button.type = "button";
+          button.addEventListener("click", () => { annotations.set(index, actionIndex); render(); });
+          item.append(button);
+          return item;
+        })));
       const more = byId("legal-more");
       more.hidden = count <= legalShown;
       if (!more.hidden) more.textContent = `Show next ${Math.min(100, count - legalShown)} (${count - legalShown} remaining)`;
+      const frameLabel = annotations.get(index);
+      byId("annotation-status").textContent = `${annotations.size} labeled frame${annotations.size === 1 ? "" : "s"}`
+        + (terminal ? " · Final state" : frameLabel == null ? " · This frame is unlabeled"
+          : ` · This frame: option ${frameLabel + 1}`);
+      byId("label-recorded").disabled = terminal;
+      byId("clear-label").disabled = terminal || frameLabel == null;
       const knownHand = observation.known_opponent_hand_cards || [];
       byId("known-hand").textContent = knownHand.length
         ? `${knownHand.length} of ${observation.opponent_hand_count} known: ${knownHand.map(nameOf).join(" · ")}`
@@ -348,9 +383,9 @@
       render();
     }
     function stop() { if (timer) clearInterval(timer); timer = null; byId("play").textContent = "Play"; }
-    function setReplay(data, label) {
+    function setReplay(data, label, hash) {
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
-      stop(); replay = data; legalFrame = -1;
+      stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map();
       const requested = Number(location.hash.match(/^#decision=(\d+)$/)?.[1] || 1);
       index = Math.max(0, Math.min(data.decisions.length - 1 + Number(Boolean(data.terminal_observation)), requested - 1));
       byId("file-name").textContent = label; render();
@@ -358,12 +393,43 @@
     byId("file").addEventListener("change", async event => {
       const file = event.target.files[0];
       if (!file) return;
-      try { setReplay(JSON.parse(await file.text()), file.name); }
+      try {
+        const bytes = await file.arrayBuffer();
+        if (!crypto.subtle) throw new Error("This browser cannot hash the replay file.");
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        const hash = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+        setReplay(JSON.parse(new TextDecoder().decode(bytes)), file.name, hash);
+      }
       catch (error) { byId("notice").hidden = false; byId("notice").textContent = `Could not load replay: ${error.message}`; }
     });
     byId("previous").addEventListener("click", () => move(-1));
     byId("next").addEventListener("click", () => move(1));
     byId("legal-more").addEventListener("click", () => { legalShown += 100; render(); });
+    byId("label-recorded").addEventListener("click", () => {
+      if (!replay || index >= replay.decisions.length) return;
+      const record = replay.decisions[index];
+      const selected = record.legal_actions.findIndex(action => action.id === record.selected_action.id);
+      if (selected < 0) return;
+      annotations.set(index, selected);
+      render();
+    });
+    byId("clear-label").addEventListener("click", () => { annotations.delete(index); render(); });
+    byId("download-labels").addEventListener("click", () => {
+      const reviewer = byId("reviewer").value.trim();
+      if (!/^[a-f0-9]{64}$/.test(sourceSha256)) return alert("Load a replay with a source SHA-256 first.");
+      if (!reviewer) return alert("Enter a reviewer name or alias.");
+      if (!byId("annotation-consent").checked) return alert("Confirm that these are your labels and authorize their use.");
+      if (!annotations.size) return alert("Label at least one decision first.");
+      const choices = [...annotations].sort((a, b) => a[0] - b[0]).map(
+        ([decision_index, action_index]) => ({decision_index, action_index}));
+      const data = {schema_version: 1, source_trajectory_sha256: sourceSha256,
+                    authorization: "self_recorded", reviewer, choices};
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2) + "\n"],
+                                            {type: "application/json"}));
+      const link = document.createElement("a");
+      link.href = url; link.download = `goat_ai_labels_seed_${replay.seed}.json`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
     byId("slider").addEventListener("input", event => { index = Number(event.target.value); render(); });
     byId("jump").addEventListener("change", event => { index = Math.max(0, Math.min(replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation)), Number(event.target.value) - 1)); render(); });
     byId("play").addEventListener("click", () => {
@@ -378,7 +444,8 @@
     });
     try {
       names = JSON.parse(byId("embedded-names").textContent);
-      setReplay(JSON.parse(byId("embedded-replay").textContent), "Embedded trajectory");
+      setReplay(JSON.parse(byId("embedded-replay").textContent), "Embedded trajectory",
+                JSON.parse(byId("embedded-sha256").textContent));
     } catch (_) { /* The standalone viewer waits for a chosen JSON file. */ }
   </script>
 </body>

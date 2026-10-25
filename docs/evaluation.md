@@ -2375,3 +2375,29 @@ training-game provenance lists `self_play_rl`; existing RL continuations
 already updated from their in-memory learner-only decision records. This
 corrects a future data-ingestion hazard and does not itself change any
 previous competitive result.
+
+## Local retrospective decision-label pipeline (2026-10-25)
+
+The offline replay viewer now lets a reviewer select one of the displayed
+legal actions and download an authorized label file tied to the source JSON's
+byte SHA-256. The behavioral-cloning CLI accepts one annotation file per
+trajectory, replay-verifies the complete source, audits visible choices, and
+trains only the selected legal labels. It rejects altered source bytes,
+invalid indexes, duplicates, and missing self-recorded authorization.
+Generated standalone HTML embeds the source SHA-256; opening a JSON file in
+the viewer hashes it locally in the browser. No replay or label is uploaded.
+A headless Chromium check clicked a legal action in rendered
+`replays/scapegoat_3.json` and exported a schema-v1 label with the exact
+source hash `5bdcca3951f9b9cf6f80d96344fcf7be9ed2aa747e0dbee12646fa8b109ec2a6`.
+
+A native integration smoke used the existing seed-19700 competitive-deck
+self-play trajectory (1,261 replay-verified decisions). A locally generated
+test label chose an offered Breaker Normal Summon at decision index 2 instead
+of the recorded action. The CLI trained exactly **one** decision, marked its
+source `human_annotation`, and saved the test reviewer, authorization, and
+annotation SHA-256 in the ignored checkpoint. The label file SHA-256 was
+`079a3704ba8e8daa8def43de5005300dcceb38e18e07f50c0d7bee83226ff483`;
+the smoke checkpoint SHA-256 was
+`69def39fa5b705a3f63808d9178bf944018a17d4e2962fbb4b03678817150dd2`.
+This is a pipeline test with a synthetic label, not an authorized expert
+dataset or a measured policy gain.

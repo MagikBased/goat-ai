@@ -11,9 +11,11 @@ import torch
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import (
     demonstrator_records,
     demonstrator_seat,
+    read_decision_annotations,
     read_trajectory,
     verify_trajectory,
 )
@@ -41,6 +43,9 @@ def focus_opportunity(record, codes: set[int]) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("trajectories", nargs="+", type=Path)
+    parser.add_argument("--annotation", type=Path, action="append", default=[],
+                        help="self-recorded labels, one per trajectory in the same order; "
+                             "train only annotated decisions")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--output", type=Path, required=True)
@@ -62,13 +67,15 @@ def main() -> None:
             or any(code <= 0 for code in args.focus_card)
             or args.focus_weight > 1 and not args.focus_card):
         parser.error("training parameters must be positive; focus weight needs focus cards")
+    if args.annotation and len(args.annotation) != len(args.trajectories):
+        parser.error("provide one annotation file for each trajectory")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     records = []
     sources: Counter[str] = Counter()
     trajectory_hashes = {}
     training_games = []
-    for path in args.trajectories:
+    for index, path in enumerate(args.trajectories):
         raw = path.read_bytes()
         trajectory = read_trajectory(path)
         if trajectory.schema_version not in range(3, 23) or not trajectory.deck_sha256 or not (
@@ -79,17 +86,32 @@ def main() -> None:
             raise ValueError(f"{path}: feature version {args.feature_version} requires "
                              "schema v22 attack context")
         count = verify_trajectory(trajectory, engine_type(args.native_root))
-        selected = demonstrator_records(trajectory)
+        annotation = None
+        if args.annotation:
+            audit_trajectory_visibility(trajectory)
+            annotation, selected = read_decision_annotations(
+                args.annotation[index], hashlib.sha256(raw).hexdigest(), trajectory)
+        else:
+            selected = demonstrator_records(trajectory)
         records.extend(selected)
-        sources[trajectory.source] += len(selected)
+        source = "human_annotation" if annotation is not None else trajectory.source
+        sources[source] += len(selected)
         trajectory_hashes[str(path)] = hashlib.sha256(raw).hexdigest()
         training_games.append({"seed": trajectory.seed,
                                "deck_sha256": trajectory.deck_sha256,
                                "main_deck_composition_sha256": tuple(
                                    main_deck_composition_sha256(read_ydk(deck))
                                    for deck in trajectory.decks),
-                               "source": trajectory.source,
-                               "demonstrator_seat": demonstrator_seat(trajectory),
+                               "source": source,
+                               "demonstrator_seat": (None if annotation is not None
+                                                     else demonstrator_seat(trajectory)),
+                               "annotation_sha256": (hashlib.sha256(
+                                   args.annotation[index].read_bytes()).hexdigest()
+                                   if annotation is not None else None),
+                               "authorization": ("self_recorded" if annotation is not None
+                                                 else (trajectory.skill_metadata or {}).get(
+                                                     "authorization")),
+                               "reviewer": annotation.reviewer if annotation is not None else None,
                                "teacher": (trajectory.skill_metadata or {}).get("teacher"),
                                "teacher_version": (trajectory.skill_metadata or {}).get(
                                    "teacher_version"),

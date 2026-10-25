@@ -1,6 +1,7 @@
 """Build an offline, player-visible HTML viewer for a saved JSON trajectory."""
 
 import argparse
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -50,7 +51,8 @@ def _card_names(codes: set[int], native_root: Path) -> dict[int, str]:
 def render_replay(source: Path, output: Path, native_root: Path) -> tuple[int, int]:
     """Validate a trajectory and embed only its recorded views in an offline page."""
     trajectory = read_trajectory(source)
-    raw = json.loads(source.read_text(encoding="utf-8"))
+    source_bytes = source.read_bytes()
+    raw = json.loads(source_bytes)
     if not trajectory.decisions:
         raise ValueError("trajectory contains no decisions to view")
     names = _card_names(_card_codes(raw["decisions"]) |
@@ -59,8 +61,9 @@ def render_replay(source: Path, output: Path, native_root: Path) -> tuple[int, i
     # Escaping '<' prevents replay text from closing an embedded script element.
     replay_json = json.dumps(raw, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")
     names_json = json.dumps(names, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")
-    html = template.replace("__EMBEDDED_REPLAY__", replay_json).replace(
-        "__EMBEDDED_NAMES__", names_json)
+    html = (template.replace("__SOURCE_SHA256__", hashlib.sha256(source_bytes).hexdigest())
+            .replace("__EMBEDDED_NAMES__", names_json)
+            .replace("__EMBEDDED_REPLAY__", replay_json))
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(html, encoding="utf-8")
     return len(trajectory.decisions), len(names)

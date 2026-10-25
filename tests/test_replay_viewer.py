@@ -1,5 +1,6 @@
 """The offline viewer embeds validated visible decisions and escapes replay text."""
 
+import hashlib
 import sqlite3
 from dataclasses import replace
 
@@ -63,6 +64,9 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     assert '"own_main_deck":[10,10,13]' in html
     assert '"opponent_hand_count":5' in html
     assert '"known_opponent_hand_cards":[14]' in html
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    assert f'<script id="embedded-sha256" type="application/json">"{digest}"</script>' in html
+    assert 'id="download-labels"' in html
     assert 'id="known-hand"' in html
     assert '"attack":1900' in html
     assert '"counters":[[1,1]]' in html

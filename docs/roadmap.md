@@ -165,6 +165,14 @@ rates or an agent-strength comparison.
 
 A first sourced-deck baseline now evaluates HeuristicAgent versus RandomAgent on both Goat Control/Chaos Turbo deck assignments with seat swaps. The 32-game seeds-7000–7007 report and its limitations are in [the evaluation log](evaluation.md). This does not satisfy the held-out competitive-policy exit gate.
 
+The offline viewer can now collect local retrospective labels for legal
+decisions in a recorded duel. Annotation files are tied to the trajectory
+byte hash and require explicit self-recorded authorization; cloning verifies
+the full replay and visible action safety before using only labeled choices.
+A one-label Breaker smoke run passed. These are hindsight annotations, not
+reconstructed DuelingBook/EDOPro games or expert demonstrations; see
+[the evaluation log](evaluation.md).
+
 **Work:** Build seeded agent tournaments with deck and matchup splits, seat swaps, confidence intervals, and held-out evaluation opponents. Measure duel throughput, decisions per second, runtime memory, and initialization overhead on named hardware. Validate self-play trajectory round trips. Investigate `.yrp` and `.yrpX` reconstruction; ingest human games only when permission, legal-action recovery, and player-visible knowledge can be established.
 
 **Exit:** A reproducible benchmark report and tournament report exist for the tested core/assets/decks. Replay support is claimed only for formats that have parser and reconstruction tests.

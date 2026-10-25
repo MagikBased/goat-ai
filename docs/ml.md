@@ -37,6 +37,29 @@ is rejected. A `source=self_play` trajectory without a labeled seat still
 represents both players' decisions. The training checkpoint records the
 resolved demonstrator seat for each source game.
 
+## Retrospective decision annotations
+
+The offline replay viewer lets a reviewer label any displayed decision with
+one of that frame's legal actions. The downloaded schema-v1 JSON contains the
+source trajectory SHA-256, reviewer alias, explicit `self_recorded`
+authorization, and pairs of zero-based decision and legal-action indexes.
+No observation or hidden card state is added to the label file. The viewer
+runs locally and does not submit labels to a server. The checkbox is the
+reviewer's self-attestation; the software does not independently verify
+identity or rights to third-party gameplay footage.
+
+Pass one `--annotation` file per positional trajectory to
+`scripts/train_behavioral_clone.py`, in the same order. In annotation mode
+the trainer uses **only** the labeled decisions. It first replay-verifies the
+complete fingerprinted trajectory against pinned native assets and audits
+visible action safety, then checks the exact trajectory byte hash, authorization,
+unique decision indexes, and legal-action indexes. The checkpoint records
+`source=human_annotation`, the reviewer, authorization, annotation hash, and
+selected decision count. These are hindsight choices on recorded states; a
+reviewer can inspect future frames, so they must not be presented as live
+human-gameplay demonstrations or assumed to reflect expert skill. Hold out
+entire games and decklists before claiming any training benefit.
+
 For a controlled baseline, collect heuristic decisions against RandomAgent in both seats and train on only those decisions:
 
 ```bash
