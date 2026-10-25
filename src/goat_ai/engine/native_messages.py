@@ -6,8 +6,8 @@ the observation and action visibility boundary is audited.
 
 import struct
 from dataclasses import dataclass
-from itertools import combinations
-from math import comb
+from itertools import combinations, permutations
+from math import comb, factorial
 
 from goat_ai.engine.ocgcore_probe import MSG_SELECT_CHAIN, MSG_SELECT_IDLECMD
 
@@ -115,6 +115,21 @@ def decode_decision(message: bytes,
         return NativeDecision(player, tuple(
             NativeChoice("announce_card", code, announced_card=code)
             for code in announcement_codes))
+    if kind == 25:  # MSG_SORT_CARD
+        player = reader.integer(1)
+        count = reader.integer(4)
+        if player not in (0, 1) or not 1 <= count <= 6 or factorial(count) > 2048:
+            raise NotImplementedError("card sorting bounds are not supported")
+        cards = tuple((reader.integer(4), reader.integer(1), reader.integer(4),
+                       reader.integer(4)) for _ in range(count))
+        reader.finish()
+        if any(controller not in (0, 1) or location not in (1, 2, 4, 8, 16, 32, 64)
+               for _, controller, location, _ in cards):
+            raise ValueError("invalid card sorting location")
+        return NativeDecision(player, tuple(
+            NativeChoice("sort_cards", bytes(order),
+                         cards=tuple(cards[index] for index in order))
+            for order in permutations(range(count))))
     if kind == 19:  # MSG_SELECT_POSITION
         player = reader.integer(1)
         reader.integer(4)  # card identity is not needed to choose a position

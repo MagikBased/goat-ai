@@ -60,6 +60,16 @@ def test_new_native_choice_formats():
         decode_decision(card_prompt)
     with pytest.raises(NotImplementedError, match="expression"):
         decode_decision(b"\x8e\x00\x01" + struct.pack("<Q", 1), (100,))
+    sort = b"\x19\x01" + struct.pack("<I", 3) + b"".join(
+        struct.pack("<IBII", code, 1, 1, sequence)
+        for code, sequence in ((100, 2), (200, 1), (300, 0)))
+    sorted_cards = decode_decision(sort)
+    assert len(sorted_cards.choices) == 6
+    assert sorted_cards.choices[0].response == b"\x00\x01\x02"
+    assert sorted_cards.choices[-1].response == b"\x02\x01\x00"
+    assert [card[0] for card in sorted_cards.choices[-1].cards] == [300, 200, 100]
+    with pytest.raises(NotImplementedError, match="sorting bounds"):
+        decode_decision(b"\x19\x00" + struct.pack("<I", 7))
     tribute = (b"\x14\x00\x01" + struct.pack("<III", 1, 2, 2)
                + struct.pack("<IBBIB", 111, 0, 4, 0, 1)
                + struct.pack("<IBBIB", 222, 0, 4, 1, 1))

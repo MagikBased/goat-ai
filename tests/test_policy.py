@@ -94,6 +94,27 @@ def test_announced_attribute_and_number_are_distinct_policy_features():
     assert legacy.action_kinds.tolist() == [0, 0, 0, 0, 0]
 
 
+def test_version_seven_distinguishes_card_sort_order():
+    vocabulary = CardVocabulary((10, 20))
+    first = {"code": 10, "controller": 0, "location": 1, "sequence": 32}
+    second = {"code": 20, "controller": 0, "location": 1, "sequence": 33}
+    choices = (Action("a", "sort_cards", 0, {"cards": [first, second]}),
+               Action("b", "sort_cards", 0, {"cards": [second, first]}))
+    features = encode_decision(view(), choices, vocabulary)
+    assert features.action_target_context.shape == (2, 2, 6)
+    assert features.action_target_context[0, 0, -1] == 0
+    assert features.action_target_context[0, 1, -1] == 1
+    assert features.action_kinds[0] == features.action_kinds[1] != 0
+    torch.manual_seed(24)
+    model = LegalActionPolicy(vocabulary.size, width=16)
+    scores = model(features)
+    assert scores.shape == (2,)
+    assert scores[0] != scores[1]
+    previous = encode_decision(view(), choices, vocabulary, feature_version=6)
+    assert previous.action_target_context.shape == (2, 2, 5)
+    assert previous.action_kinds.tolist() == [0, 0]
+
+
 def test_multi_target_features_preserve_visible_slots_without_hidden_codes():
     vocabulary = CardVocabulary((10, 20))
     choices = (

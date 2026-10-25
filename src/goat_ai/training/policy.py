@@ -27,8 +27,9 @@ ACTION_KINDS = (
 )
 ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
+SORT_ACTION_KINDS = ("sort_cards",)
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
-POLICY_FEATURE_VERSION = 6  # distinguish Attribute and number announcements
+POLICY_FEATURE_VERSION = 7  # preserve ordered card choices
 
 
 @dataclass(frozen=True)
@@ -69,7 +70,7 @@ class DecisionFeatures:
     action_kinds: Tensor  # [A]
     action_cards: Tensor  # [A]
     action_targets: Tensor  # [A, T], zero-padded
-    action_target_context: Tensor  # [A, T, 5]: owner, zone, slot, slot sin/cos
+    action_target_context: Tensor  # [A, T, 5] through v6; v7 adds selected order
     action_target_mask: Tensor  # [A, T]: target exists, even when its ID is hidden
     action_numbers: Tensor  # [A, 8] through v5, [A, 11] in v6
     deck_cards: Tensor  # [D]: sorted initial own Main Deck card IDs, or [0] before v5
@@ -86,7 +87,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in (1, 2, 3, 4, 5, 6):
+    if feature_version not in (1, 2, 3, 4, 5, 6, 7):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -144,6 +145,8 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
     kinds = ACTION_KINDS + ZONE_ACTION_KINDS if feature_version >= 4 else ACTION_KINDS
     if feature_version >= 6:
         kinds += ANNOUNCE_ACTION_KINDS
+    if feature_version >= 7:
+        kinds += SORT_ACTION_KINDS
     for action in legal_actions:
         params = action.parameters
         kind_indices.append(kinds.index(action.kind) + 1
@@ -162,7 +165,10 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
              int(card.get("sequence", 0)) / 64,
              sin(int(card.get("sequence", 0))),
              cos(int(card.get("sequence", 0))))
-            for card in selected
+            + (((rank / max(1, len(selected) - 1)
+                 if action.kind == "sort_cards" else 0.0),)
+               if feature_version >= 7 else ())
+            for rank, card in enumerate(selected)
         ])
         prompt_id = int(params.get("prompt_id", 0))
         race = int(params.get("race", 0))
@@ -184,7 +190,8 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         action_numbers.append(numeric)
     width = max(1, *(len(row) for row in targets))
     padded_targets = [row + [0] * (width - len(row)) for row in targets]
-    padded_context = [row + [(0.0, 0.0, 0.0, 0.0, 0.0)] * (width - len(row))
+    empty_context = (0.0,) * (6 if feature_version >= 7 else 5)
+    padded_context = [row + [empty_context] * (width - len(row))
                       for row in target_context]
     target_masks = [[1] * len(row) + [0] * (width - len(row)) for row in targets]
     phase = PHASES.index(observation.phase) + 1 if observation.phase in PHASES else 0
@@ -208,7 +215,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in (1, 2, 3, 4, 5, 6):
+        if feature_version not in (1, 2, 3, 4, 5, 6, 7):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -218,14 +225,16 @@ class LegalActionPolicy(nn.Module):
         self.phase = nn.Embedding(len(PHASES) + 1, width, padding_idx=0)
         kind_count = (len(ACTION_KINDS)
                       + (len(ZONE_ACTION_KINDS) if feature_version >= 4 else 0)
-                      + (len(ANNOUNCE_ACTION_KINDS) if feature_version >= 6 else 0))
+                      + (len(ANNOUNCE_ACTION_KINDS) if feature_version >= 6 else 0)
+                      + (len(SORT_ACTION_KINDS) if feature_version >= 7 else 0))
         self.kind = nn.Embedding(kind_count + 1, width, padding_idx=0)
         self.state_numbers = nn.Sequential(nn.Linear(42 if feature_version >= 4 else 10, width), nn.ReLU(),
                                            nn.Linear(width, width))
         self.action_numbers = nn.Sequential(nn.Linear(11 if feature_version >= 6 else 8, width), nn.ReLU(),
                                             nn.Linear(width, width))
         if feature_version >= 2:
-            self.target_context = nn.Sequential(nn.Linear(5, width), nn.ReLU(),
+            self.target_context = nn.Sequential(nn.Linear(
+                width + 6 if feature_version >= 7 else 5, width), nn.ReLU(),
                                                 nn.Linear(width, width))
         if feature_version >= 5:
             self.deck_projection = nn.Sequential(nn.Linear(width, width), nn.ReLU())
@@ -251,7 +260,10 @@ class LegalActionPolicy(nn.Module):
         target_mean = (self.card(targets) * target_mask).sum(1) / target_mask.sum(1).clamp(
             min=1)
         if self.feature_version >= 2:
-            context = self.target_context(features.action_target_context)
+            context_input = (torch.cat((self.card(targets), features.action_target_context),
+                                       dim=-1) if self.feature_version >= 7
+                             else features.action_target_context)
+            context = self.target_context(context_input)
             target_mean = target_mean + (context * target_mask).sum(1) / target_mask.sum(
                 1).clamp(min=1)
         action = (self.kind(features.action_kinds) + self.card(features.action_cards)
