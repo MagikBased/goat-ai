@@ -2230,3 +2230,20 @@ Charity, and 51 Ring of Destruction selections. Heavy Storm and Breaker have
 the most observed disagreements in this corpus and are the next decision
 classes to inspect. These counts do not distinguish mistakes by the clone
 from mistakes by the heuristic.
+
+A follow-up audit records the clone's alternative action kind and deduplicates
+*exact* visible decisions (observation, legal actions, and heuristic choice).
+It replay-verified the same 30 duels; the detailed report SHA-256 is
+`8d15fc78e96338fbd07ec12c821554cd1a3a075089a39a0193b5fc8bac4e7489`.
+Heavy Storm had 8 mismatches among 21 distinct activation demonstrations:
+the clone chose another activation twice, Normal Summon four times, Flip
+Summon once, and Special Summon once. Its 5 raw Set-action mismatches represent
+3 distinct demonstrations; all clone alternatives were different Set cards.
+For Breaker, 6 of 27 attack demonstrations disagreed: four times the clone
+went to Main Phase 2 and twice it chose a different attacker. Four of 17
+position-change demonstrations also disagreed. All 21 Breaker chain responses
+matched, so that class is a lower priority for policy work in this sample.
+Exact deduplication removes repeated states but does not make the remaining
+decisions statistically independent. Inspect Heavy Storm activation timing and
+Breaker combat choices on held-out decks before changing training weights;
+neither agent's choice is treated as ground truth for strategic quality.

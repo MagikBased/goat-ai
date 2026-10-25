@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 from collections import defaultdict
+from dataclasses import asdict
 from pathlib import Path
 
 import torch
@@ -107,6 +108,15 @@ def decision_deck(trajectory: Trajectory, record: DecisionRecord) -> str:
     return trajectory.decks[record.observation.acting_player]
 
 
+def decision_fingerprint(record: DecisionRecord) -> str:
+    """Identify an exact visible decision, including its legal and chosen actions."""
+    decision = (asdict(record.observation),
+                tuple(asdict(action) for action in record.legal_actions),
+                asdict(record.selected_action))
+    payload = json.dumps(decision, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, action="append", required=True)
@@ -137,7 +147,9 @@ def main() -> None:
     staple_counts = {str(path): defaultdict(empty_staple_counts)
                      for path, _ in checkpoints}
     staple_selected_kinds = {str(path): defaultdict(lambda: defaultdict(
-        lambda: {"exact": 0, "total": 0})) for path, _ in checkpoints}
+        lambda: {"exact": 0, "total": 0, "chosen_kinds": defaultdict(int),
+                 "fingerprints": set(), "mismatch_fingerprints": set()}))
+                             for path, _ in checkpoints}
     verified = []
     for path in args.trajectories:
         trajectory = read_trajectory(path)
@@ -175,6 +187,11 @@ def main() -> None:
                                 record.selected_action.kind]
                             kind_bucket["total"] += 1
                             kind_bucket["exact"] += chosen == record.selected_action
+                            kind_bucket["chosen_kinds"][chosen.kind] += 1
+                            fingerprint = decision_fingerprint(record)
+                            kind_bucket["fingerprints"].add(fingerprint)
+                            if chosen != record.selected_action:
+                                kind_bucket["mismatch_fingerprints"].add(fingerprint)
                 for scope in decision_scopes(record):
                     bucket[scope]["total"] += 1
                     bucket[scope]["exact"] += chosen == record.selected_action
@@ -191,8 +208,16 @@ def main() -> None:
                          "by_staple": {
                              str(code): {
                                  "name": staple_names[code], **card_counts,
-                                 "teacher_selected_by_kind": dict(
-                                     staple_selected_kinds[str(path)][code]),
+                                 "teacher_selected_by_kind": {
+                                     kind: {"exact": bucket["exact"],
+                                            "total": bucket["total"],
+                                            "chosen_kinds": dict(bucket["chosen_kinds"]),
+                                            "unique_demonstrations": len(
+                                                bucket["fingerprints"]),
+                                            "unique_mismatches": len(
+                                                bucket["mismatch_fingerprints"])}
+                                     for kind, bucket in
+                                     staple_selected_kinds[str(path)][code].items()},
                              }
                              for code, card_counts in sorted(
                                  staple_counts[str(path)].items())}})

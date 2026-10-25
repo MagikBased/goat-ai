@@ -40,6 +40,7 @@ from goat_ai.training.self_play import (
 from scripts.audit_policy_agreement import (
     STAPLES,
     decision_deck,
+    decision_fingerprint,
     decision_scopes,
     staple_context,
 )
@@ -91,6 +92,16 @@ def test_policy_audit_attributes_each_decision_to_its_acting_deck():
                             (left, right), 0)
     assert decision_deck(trajectory, left) == "left.ydk"
     assert decision_deck(trajectory, right) == "right.ydk"
+
+
+def test_policy_audit_fingerprint_identifies_visible_decision_and_choice():
+    observation = view()
+    legal = actions()
+    first = DecisionRecord(observation, legal, legal[0])
+    second = DecisionRecord(observation, legal, legal[1])
+    assert decision_fingerprint(first) == decision_fingerprint(
+        DecisionRecord(observation, legal, legal[0]))
+    assert decision_fingerprint(first) != decision_fingerprint(second)
 
 
 def test_focus_opportunity_uses_card_source_or_public_chain():
