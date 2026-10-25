@@ -90,7 +90,7 @@
           <button id="play">Play</button>
           <button id="next" title="Right arrow">Next</button>
           <input id="slider" type="range" min="0" value="0" aria-label="Decision position">
-          <label class="decision-jump">Decision <input id="jump" type="number" min="1" value="1"> <span id="total"></span></label>
+          <label class="decision-jump">Frame <input id="jump" type="number" min="1" value="1"> <span id="total"></span></label>
           <label class="skip-label"><input id="skip" type="checkbox" checked> Skip passes and placement</label>
         </div>
         <div class="panel summary">
@@ -257,37 +257,43 @@
     function render() {
       if (!replay) return;
       const decisions = replay.decisions;
-      const record = decisions[index];
-      const observation = record.observation;
+      const terminal = Boolean(replay.terminal_observation) && index === decisions.length;
+      const record = terminal ? null : decisions[index];
+      const observation = terminal ? replay.terminal_observation : record.observation;
+      const lastIndex = decisions.length - 1 + Number(Boolean(replay.terminal_observation));
       const known = knownMap(observation);
       byId("viewer").hidden = false;
       byId("notice").hidden = true;
-      byId("slider").max = String(decisions.length - 1);
+      byId("slider").max = String(lastIndex);
       byId("slider").value = String(index);
       history.replaceState(null, "", `#decision=${index + 1}`);
-      byId("jump").max = String(decisions.length);
+      byId("jump").max = String(lastIndex + 1);
       byId("jump").value = String(index + 1);
-      byId("total").textContent = `/ ${decisions.length}`;
+      byId("total").textContent = `/ ${lastIndex + 1}`;
       byId("previous").disabled = index === 0;
-      byId("next").disabled = index === decisions.length - 1;
+      byId("next").disabled = index === lastIndex;
       byId("turn").textContent = `Turn ${observation.turn} · ${phaseName(observation.phase)}`;
-      byId("viewpoint").textContent = `Decision ${index + 1} · Player ${observation.acting_player} acts · Player ${observation.viewer}'s visible view`;
-      byId("result").textContent = index === decisions.length - 1
+      byId("viewpoint").textContent = terminal
+        ? `Final state · Player ${observation.viewer}'s visible view`
+        : `Decision ${index + 1} · Player ${observation.acting_player} acts · Player ${observation.viewer}'s visible view`;
+      byId("result").textContent = terminal || index === decisions.length - 1 && !replay.terminal_observation
         ? `Seed ${replay.seed} · ${replay.winner == null ? "Draw" : `Winner: Player ${replay.winner}`}`
         : `Seed ${replay.seed} · Outcome hidden`;
       const board = byId("board");
       board.replaceChildren(playerBoard(observation, 1 - observation.viewer, known),
-                            node("div", "centerline", `TURN ${observation.turn} · ${phaseName(observation.phase).toUpperCase()} · PLAYER ${observation.acting_player} TO ACT`),
+                            node("div", "centerline", terminal
+                              ? `TURN ${observation.turn} · DUEL ENDED`
+                              : `TURN ${observation.turn} · ${phaseName(observation.phase).toUpperCase()} · PLAYER ${observation.acting_player} TO ACT`),
                             playerBoard(observation, observation.viewer, known));
       byId("piles").replaceChildren(node("h2", "", "Graveyards and banished cards"),
         listZone("Opponent Graveyard", observation.graveyards[1 - observation.viewer]),
         listZone("Opponent Banished", observation.banished[1 - observation.viewer]),
         listZone("Your Graveyard", observation.graveyards[observation.viewer]),
         listZone("Your Banished", observation.banished[observation.viewer]));
-      byId("action").textContent = actionLabel(observation, record.selected_action, known);
-      byId("legal-count").textContent = `${record.legal_actions.length} legal actions at this decision`;
+      byId("action").textContent = terminal ? "Duel ended" : actionLabel(observation, record.selected_action, known);
+      byId("legal-count").textContent = terminal ? "No legal actions" : `${record.legal_actions.length} legal actions at this decision`;
       const legal = byId("legal");
-      legal.replaceChildren(...record.legal_actions.map(action => node("li", "", actionLabel(observation, action, known))));
+      legal.replaceChildren(...(terminal ? [] : record.legal_actions.map(action => node("li", "", actionLabel(observation, action, known)))));
       const knownHand = observation.known_opponent_hand_cards || [];
       byId("known-hand").textContent = knownHand.length
         ? `${knownHand.length} of ${observation.opponent_hand_count} known: ${knownHand.map(nameOf).join(" · ")}`
@@ -311,8 +317,9 @@
       if (!replay) return;
       let candidate = index + direction;
       const skip = byId("skip").checked;
+      const lastIndex = replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation));
       while (candidate >= 0 && candidate < replay.decisions.length && skip && ["pass", "place", "shuffle_hand"].includes(replay.decisions[candidate].selected_action.kind)) candidate += direction;
-      if (candidate < 0 || candidate >= replay.decisions.length) { stop(); return; }
+      if (candidate < 0 || candidate > lastIndex) { stop(); return; }
       index = candidate;
       render();
     }
@@ -321,7 +328,7 @@
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
       stop(); replay = data;
       const requested = Number(location.hash.match(/^#decision=(\d+)$/)?.[1] || 1);
-      index = Math.max(0, Math.min(data.decisions.length - 1, requested - 1));
+      index = Math.max(0, Math.min(data.decisions.length - 1 + Number(Boolean(data.terminal_observation)), requested - 1));
       byId("file-name").textContent = label; render();
     }
     byId("file").addEventListener("change", async event => {
@@ -333,7 +340,7 @@
     byId("previous").addEventListener("click", () => move(-1));
     byId("next").addEventListener("click", () => move(1));
     byId("slider").addEventListener("input", event => { index = Number(event.target.value); render(); });
-    byId("jump").addEventListener("change", event => { index = Math.max(0, Math.min(replay.decisions.length - 1, Number(event.target.value) - 1)); render(); });
+    byId("jump").addEventListener("change", event => { index = Math.max(0, Math.min(replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation)), Number(event.target.value) - 1)); render(); });
     byId("play").addEventListener("click", () => {
       if (timer) { stop(); return; }
       byId("play").textContent = "Pause";

@@ -1,6 +1,7 @@
 """The offline viewer embeds validated visible decisions and escapes replay text."""
 
 import sqlite3
+from dataclasses import replace
 
 from goat_ai.actions import Action
 from goat_ai.observations import (
@@ -70,3 +71,33 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     assert "</script><script>window.injected" not in html
     assert "\\u003c/script>" in html
     assert "Card #999" not in html
+
+
+def test_render_replay_includes_terminal_frame_and_its_card_names(tmp_path):
+    database = tmp_path / "native/database"
+    database.mkdir(parents=True)
+    with sqlite3.connect(database / "cards.cdb") as connection:
+        connection.execute("CREATE TABLE texts (id INTEGER PRIMARY KEY, name TEXT)")
+        connection.execute("INSERT INTO texts VALUES (99, 'Final Card')")
+    observation = Observation(
+        viewer=0, acting_player=0, turn=1, phase="main1", life_points=(8000, 8000),
+        hand=(), field=(), graveyards=((), ()), banished=((), ()),
+        opponent_hand_count=5, deck_counts=(35, 35), extra_deck_counts=(0, 0),
+    )
+    final = replace(observation, life_points=(0, 0),
+                    graveyards=((CardView(0, "graveyard", "faceup", 99),), ()))
+    action = Action("0", "pass", 0)
+    trajectory = Trajectory(
+        "goat", ("a.ydk", "b.ydk"), 42,
+        (DecisionRecord(observation, (action,), action),), None,
+        schema_version=18, terminal_observation=final,
+    )
+    source = tmp_path / "terminal.json"
+    output = tmp_path / "terminal.html"
+    write_trajectory(source, trajectory)
+    assert render_replay(source, output, tmp_path / "native") == (1, 1)
+    html = output.read_text()
+    assert '"terminal_observation"' in html
+    assert '"life_points":[0,0]' in html
+    assert '"99":"Final Card"' in html
+    assert 'terminal ? "Duel ended"' in html

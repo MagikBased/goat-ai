@@ -266,6 +266,32 @@ def test_replay_verifier_detects_changed_decision_and_outcome():
                           ContractEngine())
 
 
+def test_schema_eighteen_terminal_observation_round_trip_and_verification(tmp_path):
+    with GoatEnvironment("a", "b", seed=42, engine=ContractEngine()) as env:
+        env.reset()
+        final = env.step(env.legal_actions()[0])
+        assert env.is_terminal()
+        trajectory = env.trajectory()
+    assert trajectory.schema_version == 18
+    assert trajectory.terminal_observation == final
+    path = tmp_path / "terminal.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, ContractEngine()) == 1
+    with pytest.raises(ReplayMismatch, match="requires a terminal observation"):
+        verify_trajectory(replace(loaded, terminal_observation=None), ContractEngine())
+    changed = replace(loaded, terminal_observation=replace(
+        final, life_points=(100, 200)))
+    with pytest.raises(ReplayMismatch, match="terminal observation"):
+        verify_trajectory(changed, ContractEngine())
+    raw = json.loads(path.read_text())
+    raw.pop("terminal_observation")
+    path.write_text(json.dumps(raw))
+    with pytest.raises(ValueError, match="requires a terminal observation"):
+        read_trajectory(path)
+
+
 def test_old_position_action_replays_as_flip_summon():
     class FlipEngine(ContractEngine):
         def reset(self, deck1, deck2, seed):

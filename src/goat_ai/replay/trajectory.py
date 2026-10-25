@@ -43,6 +43,7 @@ class Trajectory:
     rules_profile: dict | None = None
     deck_sha256: tuple[str, str] | None = None
     asset_sha256: dict[str, str] | None = None
+    terminal_observation: Observation | None = None
 
 
 def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
@@ -52,7 +53,7 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     version = raw.get("schema_version")
-    if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17):
+    if version not in range(1, 19):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
@@ -66,9 +67,7 @@ def read_trajectory(path: str | Path) -> Trajectory:
             result.append(CardView(**item))
         return tuple(result)
 
-    records = []
-    for record in raw["decisions"]:
-        view = record["observation"]
+    def observation(view: dict) -> Observation:
         view["hand"] = cards(view["hand"])
         if "own_extra_deck" in view:
             view["own_extra_deck"] = cards(view["own_extra_deck"])
@@ -113,14 +112,20 @@ def read_trajectory(path: str | Path) -> Trajectory:
         for key in ("life_points", "deck_counts", "extra_deck_counts",
                     "public_history", "known_opponent_cards", "restrictions"):
             view[key] = tuple(view[key])
-        records.append(DecisionRecord(Observation(**view),
-                                      tuple(Action(**a) for a in record["legal_actions"]),
-                                      Action(**record["selected_action"])))
+        return Observation(**view)
+
+    records = [DecisionRecord(observation(record["observation"]),
+                              tuple(Action(**a) for a in record["legal_actions"]),
+                              Action(**record["selected_action"]))
+               for record in raw["decisions"]]
+    terminal = raw.get("terminal_observation") if version >= 18 else None
+    if version >= 18 and terminal is None:
+        raise ValueError("schema v18 requires a terminal observation")
     hashes = raw.get("deck_sha256")
     return Trajectory(
         raw["ruleset"], tuple(raw["decks"]), raw["seed"], tuple(records),
         raw["winner"], raw["source"], raw.get("skill_metadata"), version,
         raw.get("rules_profile"), tuple(hashes) if hashes is not None else None,
-        raw.get("asset_sha256"),
+        raw.get("asset_sha256"), observation(terminal) if terminal is not None else None,
     )
 

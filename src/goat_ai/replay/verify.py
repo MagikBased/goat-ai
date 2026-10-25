@@ -21,6 +21,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
     Every observation and complete legal-action list is compared before an
     action is sent, so an unsupported native request cannot pass silently.
     """
+    if trajectory.schema_version >= 18 and trajectory.terminal_observation is None:
+        raise ReplayMismatch("schema v18 requires a terminal observation")
     if trajectory.ruleset != engine.ruleset.name:
         raise ReplayMismatch("ruleset differs from recorded trajectory")
     if trajectory.rules_profile is not None and trajectory.rules_profile != asdict(engine.ruleset):
@@ -92,6 +94,13 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             raise ReplayMismatch("record ended before engine terminal state")
         if env.result() != trajectory.winner:
             raise ReplayMismatch("winner differs from recorded trajectory")
+        if (trajectory.schema_version >= 18
+                and trajectory.terminal_observation is not None
+                and observation != trajectory.terminal_observation):
+            fields = [name for name in vars(observation)
+                      if getattr(observation, name) != getattr(
+                          trajectory.terminal_observation, name)]
+            raise ReplayMismatch(f"terminal observation differs in {fields}")
         if trajectory.asset_sha256 is not None:
             manifest = getattr(engine, "replay_manifest", None)
             if manifest is None or manifest() != trajectory.asset_sha256:

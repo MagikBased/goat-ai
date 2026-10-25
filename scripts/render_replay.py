@@ -53,7 +53,8 @@ def render_replay(source: Path, output: Path, native_root: Path) -> tuple[int, i
     raw = json.loads(source.read_text(encoding="utf-8"))
     if not trajectory.decisions:
         raise ValueError("trajectory contains no decisions to view")
-    names = _card_names(_card_codes(raw["decisions"]), native_root)
+    names = _card_names(_card_codes(raw["decisions"]) |
+                        _card_codes(raw.get("terminal_observation")), native_root)
     template = TEMPLATE.read_text(encoding="utf-8")
     # Escaping '<' prevents replay text from closing an embedded script element.
     replay_json = json.dumps(raw, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")
