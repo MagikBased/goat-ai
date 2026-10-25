@@ -17,6 +17,8 @@ NOBLEMAN = 504700116  # GOAT variant
 LIGHT = 15025844  # Mystical Elf
 DARK = 7359741  # Mechanicalchaser
 OTHER_LIGHT = 62651957  # X-Head Cannon
+GEMINI_ELF = 69140098
+GIANT_SOLDIER = 13039848
 
 
 def _deck(path, cards):
@@ -184,6 +186,90 @@ def test_kycoo_direct_damage_offers_one_or_two_graveyard_monsters_to_banish(tmp_
                     "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("Kycoo did not offer its two-monster battle-damage choice")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_kycoo_cannot_target_monster_destroyed_by_its_battle(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    _require_scripts(root, KYCOO, GRACEFUL)
+    with GoatEnvironment(_kycoo_deck(tmp_path), _chaos_deck(tmp_path), seed=15,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        assert {GRACEFUL, OTHER_LIGHT, GEMINI_ELF, GIANT_SOLDIER}.issubset(
+            c.code for c in env.engine.probe.observation(1).hand)
+        summoned = graceful = discarded = soldier_summoned = False
+        battle = attacked = target_chosen = trigger_accepted = banish_chosen = False
+        for _ in range(70):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 \
+                    and not summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == KYCOO), None)
+                summoned |= action is not None
+            if observation.turn == 2 and observation.acting_player == 1:
+                if not graceful:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL), None)
+                    graceful |= action is not None
+                if graceful and not discarded:
+                    action = next((a for a in actions if a.kind == "select_cards"
+                                   and {c["code"] for c in a.parameters["cards"]}
+                                   == {OTHER_LIGHT, GEMINI_ELF}), action)
+                    discarded |= action is not None and action.kind == "select_cards"
+                if discarded and not soldier_summoned and action is None:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == GIANT_SOLDIER), None)
+                    soldier_summoned |= action is not None
+            if observation.turn == 3 and observation.acting_player == 0:
+                if observation.phase == "main1" and not battle:
+                    assert soldier_summoned
+                    assert {OTHER_LIGHT, GEMINI_ELF}.issubset(
+                        c.code for c in observation.graveyards[1])
+                    action = next((a for a in actions if a.kind == "battle_phase"), None)
+                    battle |= action is not None
+                if observation.phase == "battle_start" and not attacked:
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == KYCOO), None)
+                    attacked |= action is not None
+                if attacked and not target_chosen and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == GIANT_SOLDIER and
+                                   a.parameters.get("controller") == 1), None)
+                    target_chosen |= action is not None
+                if target_chosen and not trigger_accepted and any(
+                        a.kind == "yes" and a.parameters.get("code") == KYCOO
+                        for a in actions):
+                    assert observation.life_points == (8000, 7500)
+                    action = next(a for a in actions if a.kind == "yes"
+                                  and a.parameters.get("code") == KYCOO)
+                    trigger_accepted = True
+                if trigger_accepted and not banish_chosen \
+                        and actions[0].kind in ("select_card", "select_cards"):
+                    assert observation.phase == "damage_step"
+                    assert GIANT_SOLDIER not in {c.code
+                                                 for c in observation.graveyards[1]}
+                    assert {a.parameters["code"] for a in actions
+                            if a.kind == "select_card"} == {OTHER_LIGHT, GEMINI_ELF}
+                    action = next((a for a in actions if a.kind == "select_cards"
+                                   and {c["code"] for c in a.parameters["cards"]}
+                                   == {OTHER_LIGHT, GEMINI_ELF}), None)
+                    banish_chosen |= action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_cards", "select_card", "place", "pass", "end_phase")),
+                    actions[0])
+            observation = env.step(action)
+            if banish_chosen and observation.phase == "battle_step" \
+                    and not observation.chain:
+                assert {c.code for c in observation.banished[1]} == {
+                    OTHER_LIGHT, GEMINI_ELF}
+                assert {c.code for c in observation.graveyards[1]} == {
+                    GRACEFUL, GIANT_SOLDIER}
+                assert observation.life_points == (8000, 7500)
+                assert f"official/c{KYCOO}.lua" in env.engine.probe.loaded_script_sha256
+                return
+    pytest.fail("Kycoo's battle target exclusion did not finish")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
