@@ -42,6 +42,8 @@ def main() -> None:
     parser.add_argument("--max-decisions", type=int, default=5000)
     parser.add_argument("--skip-capped-games", action="store_true",
                         help="record over-cap duels as censored; exclude them from updates and provenance")
+    parser.add_argument("--skip-unsupported-games", action="store_true",
+                        help="record native protocol gaps; exclude those games from updates and provenance")
     parser.add_argument("--record-dir", type=Path,
                         help="optional ignored directory for exact self-play trajectories")
     args = parser.parse_args()
@@ -84,6 +86,7 @@ def main() -> None:
         learner_temperature=args.learner_temperature,
         max_decisions=args.max_decisions, random_seed=args.seed,
         skip_capped_games=args.skip_capped_games,
+        skip_unsupported_games=args.skip_unsupported_games,
         record_episode=record,
     )
     terminal_reports = [report for report in reports if report["status"] == "terminal"]
@@ -108,6 +111,7 @@ def main() -> None:
               "learner_temperature": args.learner_temperature,
               "max_decisions": args.max_decisions, "seed": args.seed,
               "skip_capped_games": args.skip_capped_games}
+    config["skip_unsupported_games"] = args.skip_unsupported_games
     source_decisions = dict(parent.get("source_decisions", {}))
     source_decisions["self_play_rl"] = (source_decisions.get("self_play_rl", 0)
                                         + sum(report["learner_decisions"] for report in reports))
@@ -130,6 +134,10 @@ def main() -> None:
     print(json.dumps({"output": str(args.output), "games": len(terminal_reports),
                       "scheduled_games": len(reports),
                       "censored_games": len(reports) - len(terminal_reports),
+                      "unsupported_games": sum(report["status"] == "simulator_unavailable"
+                                               for report in reports),
+                      "decision_limit_games": sum(report["status"] == "decision_limit"
+                                                  for report in reports),
                       "wins": wins, "losses": losses,
                       "draws": len(terminal_reports) - wins - losses,
                       "learner_decisions": sum(report["learner_decisions"]

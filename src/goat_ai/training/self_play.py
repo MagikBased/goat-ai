@@ -9,6 +9,7 @@ import torch
 
 from goat_ai.agents import Agent, RandomAgent
 from goat_ai.engine import RulesEngine
+from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import DecisionRecord, Trajectory
 from goat_ai.training.policy import CardVocabulary, LegalActionPolicy, encode_decision
@@ -149,6 +150,7 @@ def train_against_snapshot_pool(
     max_decisions: int = 5000, random_seed: int = 0,
     learner_temperature: float = 1.0,
     skip_capped_games: bool = False,
+    skip_unsupported_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
 ) -> tuple[dict, ...]:
     """Train one learner seat per duel against random or frozen past policies.
@@ -189,6 +191,14 @@ def train_against_snapshot_pool(
             reports.append({"seed": seed, "learner_seat": learner_seat,
                             "decks": decks, "opponent": opponent_name,
                             "status": "decision_limit", "decisions": max_decisions,
+                            "learner_decisions": 0, "policy_loss": None})
+            continue
+        except SimulatorUnavailable as exc:
+            if not skip_unsupported_games:
+                raise
+            reports.append({"seed": seed, "learner_seat": learner_seat,
+                            "decks": decks, "opponent": opponent_name,
+                            "status": "simulator_unavailable", "error": str(exc),
                             "learner_decisions": 0, "policy_loss": None})
             continue
         if record_episode is not None:

@@ -12,6 +12,11 @@ from math import comb, factorial
 from goat_ai.engine.ocgcore_probe import MSG_SELECT_CHAIN, MSG_SELECT_IDLECMD
 
 
+# A sourced-deck self-play duel reached a 3,003-way MSG_SELECT_CARD prompt.
+# Keep a resource bound while allowing that observed native request.
+MAX_CARD_SELECTION_COMBINATIONS = 4096
+
+
 @dataclass(frozen=True)
 class NativeChoice:
     kind: str
@@ -246,7 +251,7 @@ def decode_decision(message: bytes,
             reader.integer(4)  # position
             cards.append((code, controller, location, sequence))
         option_count = sum(comb(count, size) for size in range(minimum, maximum + 1))
-        if option_count > 2048:
+        if option_count > MAX_CARD_SELECTION_COMBINATIONS:
             raise NotImplementedError(f"card selection has {option_count} combinations")
         choices = []
         for size in range(minimum, maximum + 1):

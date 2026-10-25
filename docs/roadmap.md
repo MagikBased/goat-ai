@@ -246,6 +246,14 @@ clone matched all 16 held-out teacher attack-target choices, then scored
 open. Next work should improve cross-deck consistency and test a distinct
 self-play update on unseen decks; see [evaluation](evaluation.md).
 
+The v3 clone's 64-game snapshot-pool continuation now replay-verifies all
+44,056 decisions after the adapter accepted a 3,003-way Return from the
+Different Dimension selection. The child scored 64–62–2 against its parent
+in 128 held-out direct games, with a paired interval including 50% and a
+weaker Chaos Control split. This is a completed negative self-play pilot,
+not the M4 strength exit. Larger multi-card selections still require a
+scalable legal-action representation; see [evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

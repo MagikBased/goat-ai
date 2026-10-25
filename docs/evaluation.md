@@ -1748,3 +1748,68 @@ checkpoint, `--opponent-checkpoint` set to the v2 feature-v17 checkpoint,
 `--engine experimental --both-deck-assignments --require-unseen-main-decks`,
 the Chaos Control/Chaos Return matchup, `--seed 18450 --seeds 32 --workers 4`,
 and `--max-decisions 3000`.
+
+## Return selection boundary and v3 self-play continuation (2026-10-25)
+
+A 64-game, four-deck snapshot-pool continuation from the v3 feature-v17
+clone initially stopped at seed 18855. The native `MSG_SELECT_CARD` request
+offered **3,003** combinations, above the adapter's 2,048-choice guard.
+Inspection of the reproduced seed-18855 decision identified Return from the
+Different Dimension (`27174286`) at turn 45: five cards were selected from
+15 eligible cards in the acting player's public banished pile. The public
+action parameters contain banished-card IDs and slots, not private Deck order.
+The decoder now permits up to 4,096 combinations, with a synthetic 3,003-way
+decoder regression and an explicit rejection above the bound. This extends
+coverage for a card defining the sourced Bazoo Return decks; larger
+combinatorial selections still need a factored action representation.
+
+The trainer also has opt-in `--skip-unsupported-games`. It records a native
+protocol failure with seed, decks, opponent, and error while withholding a
+terminal reward, gradient update, trajectory, and training-game provenance.
+The default still raises immediately. This option is for preserving other
+experimental episodes when an unaudited request appears; a skipped game is
+not evidence of a complete duel.
+
+Rerunning seeds 18800–18863 with the raised bound and the explicit skip
+options completed **64/64 terminal duels**, with zero unsupported or capped
+episodes. All **44,056** recorded decisions in the 64 saved schema-v22
+trajectories replay-verified against fresh pinned native instances. The
+learner made 6,666 multi-option decisions and went 37–27 against its training
+pool of frozen snapshots and RandomAgent.
+The first 55 trajectory JSON files were byte-identical to those saved before
+the decoder stopped; the new bound changed the outcome only after that
+previously unsupported prompt.
+The separate read-only visibility audit passed all 44,056 decisions,
+including 1,709 opponent-field choice entries, 338 face-down opponent-field
+entries, and 132 opponent-hand choice entries. This checks recorded action
+redaction invariants, not every possible hidden-state counterfactual.
+
+Training used the four ordered
+Goat Control/Chaos Turbo and Warrior/Bazoo Return pairings, both learner
+seats, temperature 2.0, learning rate 0.0001, historical opponent probability
+0.75, one snapshot every four games, up to eight snapshots, entropy weight
+0.001, and a 3,000-decision cap. The ignored child checkpoint SHA-256 is
+`9e8797d11cdb711c204dcd77e20a1cc146dfc8de989d4f29b66deb1e62143a91`;
+the training report SHA-256 is
+`ef37c7efc91b066d89d3294e0b11efe5ca5b9ebc6802af4a450eecf869d3f24c`.
+
+On held-out seeds 18900–18931 with both assignments and seats for unseen
+Chaos Control/Chaos Return Main Decks, the child scored **64–62–2** directly
+against its parent over **128 terminal games** (50.8% score; matchup-seed
+paired bootstrap 95% interval **50.0–52.3%**). It scored 28–35–1 when
+assigned Chaos Control and 36–27–1 with Chaos Return. The four-worker
+tournament took 76.37 seconds; ignored report SHA-256 is
+`c1576e64b481301dcc481ed203864f5985c1463a48b4eb8f6059283e672fd4e7`.
+The interval includes 50%, and the two deck splits disagree; this does not
+establish a self-play gain or close M4. The earlier aborted run produced no
+child checkpoint and is excluded from these results.
+
+Reproduce with `scripts/train_self_play.py` from the v3 feature-v17 parent,
+`--engine experimental --seed 18800 --games 64 --max-decisions 3000
+--skip-capped-games --skip-unsupported-games --learner-temperature 2.0`, the
+four ordered pairings above, and the other parameters in this section.
+Verify every saved trajectory using `scripts/verify_trajectory.py
+--experimental`. Run `scripts/evaluate_policy.py` against the parent with
+`--engine experimental --both-deck-assignments --require-unseen-main-decks`,
+the Chaos Control/Chaos Return matchup, `--seed 18900 --seeds 32 --workers 4`,
+and `--max-decisions 3000`.

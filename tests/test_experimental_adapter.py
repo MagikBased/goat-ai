@@ -9,7 +9,10 @@ import pytest
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
-from goat_ai.engine.native_messages import decode_decision
+from goat_ai.engine.native_messages import (
+    MAX_CARD_SELECTION_COMBINATIONS,
+    decode_decision,
+)
 from goat_ai.engine.ocgcore_probe import (
     LOCATION_EXTRA,
     LOCATION_HAND,
@@ -22,6 +25,22 @@ from goat_ai.environments.goat import GoatEnvironment
 
 DECK = "examples/decks/control_probe.ydk"
 CHAOS_DECK = "examples/decks/chaos_probe.ydk"
+
+
+def test_card_selection_covers_observed_3003_way_prompt_with_a_resource_bound():
+    def prompt(count: int, selected: int) -> bytes:
+        return (b"\x0f\x00\x00" + struct.pack("<III", selected, selected, count)
+                + b"".join(struct.pack("<IBBII", 100 + index, 0, LOCATION_HAND,
+                                       index, 0) for index in range(count)))
+
+    decision = decode_decision(prompt(15, 5))
+    assert len(decision.choices) == 3003
+    assert decision.choices[0].kind == "select_cards"
+    assert len(decision.choices[0].cards) == 5
+    assert len(decision.choices[-1].cards) == 5
+    assert MAX_CARD_SELECTION_COMBINATIONS >= 3003
+    with pytest.raises(NotImplementedError, match="8008 combinations"):
+        decode_decision(prompt(16, 6))
 
 
 def test_new_native_choice_formats():

@@ -11,6 +11,7 @@ torch = pytest.importorskip("torch")
 
 from goat_ai.actions import Action
 from goat_ai.engine.decks import read_ydk
+from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.observations import (
     CardView,
     ChainLinkView,
@@ -857,6 +858,36 @@ def test_self_play_can_censor_over_cap_game_without_learning_from_it(monkeypatch
         model, vocabulary, (("a", "b"),), (100, 101), lambda: None,
         skip_capped_games=True, **kwargs)
     assert [report["status"] for report in reports] == ["decision_limit", "terminal"]
+    assert reports[0]["learner_decisions"] == 0
+    assert "reward" not in reports[0]
+    assert saved == [(1, 101)]
+
+
+def test_self_play_reports_unsupported_native_prompt_without_learning(monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=16)
+    saved = []
+
+    def run_episode(_model, _vocabulary, _opponent, _decks, seed, *_args):
+        if seed == 100:
+            raise SimulatorUnavailable("card selection has 8008 combinations")
+        return SimpleNamespace(
+            seed=seed, winner=0, reward=1.0, decisions=3,
+            learner_records=(), trajectory=SimpleNamespace(
+                deck_sha256=("a", "b"), asset_sha256={"core": "hash"},
+                rules_profile="goat"))
+
+    monkeypatch.setattr("goat_ai.training.self_play.run_learning_episode", run_episode)
+    kwargs = dict(random_seed=7, record_episode=lambda index, episode: saved.append(
+        (index, episode.seed)))
+    with pytest.raises(SimulatorUnavailable, match="8008 combinations"):
+        train_against_snapshot_pool(model, vocabulary, (("a", "b"),), (100, 101),
+                                    lambda: None, **kwargs)
+    reports = train_against_snapshot_pool(
+        model, vocabulary, (("a", "b"),), (100, 101), lambda: None,
+        skip_unsupported_games=True, **kwargs)
+    assert [report["status"] for report in reports] == ["simulator_unavailable", "terminal"]
+    assert reports[0]["error"] == "card selection has 8008 combinations"
     assert reports[0]["learner_decisions"] == 0
     assert "reward" not in reports[0]
     assert saved == [(1, 101)]
