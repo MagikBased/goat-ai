@@ -33,7 +33,7 @@ def test_enemy_controller_steals_breaker_before_counter_placement(tmp_path):
         assert BREAKER in {c.code for c in obs.hand}
         assert ENEMY_CONTROLLER in {c.code for c in env.engine.probe.observation(1).hand}
         defender_summoned = controller_set = breaker_summoned = chained = False
-        control_mode = tribute_paid = target_chosen = False
+        control_mode = tribute_paid = target_chosen = control_checked = False
         tribute_code = None
         for _ in range(95):
             actions = env.legal_actions()
@@ -79,7 +79,7 @@ def test_enemy_controller_steals_breaker_before_counter_placement(tmp_path):
                 action = next((a for a in actions if a.kind in (
                     "place", "select_card", "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if target_chosen and not obs.chain \
+            if target_chosen and not control_checked and not obs.chain \
                     and ENEMY_CONTROLLER in {c.code for c in obs.graveyards[1]}:
                 assert defender_summoned and controller_set and breaker_summoned
                 assert chained and control_mode and tribute_paid
@@ -94,5 +94,11 @@ def test_enemy_controller_steals_breaker_before_counter_placement(tmp_path):
                 assert {f"official/c{BREAKER}.lua",
                         f"official/c{ENEMY_CONTROLLER}.lua"}.issubset(
                     env.engine.probe.loaded_script_sha256)
+                control_checked = True
+            if control_checked and obs.turn == 4 and obs.phase == "main1":
+                breaker = next(c for c in obs.field if c.code == BREAKER)
+                assert (breaker.controller, breaker.attack, breaker.counters) \
+                    == (0, 1900, ((1, 1),))
+                assert obs.life_points == (8000, 8000)
                 return
-    pytest.fail("Enemy Controller did not take Breaker before counter placement")
+    pytest.fail("Enemy Controller / Breaker line did not reach the next turn")
