@@ -524,3 +524,30 @@ Ring response to Tsukuyomi. A separate paired native fixture now checks that
 response when Ring targets either Tsukuyomi or Tsukuyomi's intended target;
 see [GOAT rules](goat_rules.md). These counts describe this agent and seed
 schedule only.
+
+## Fresh tournament-deck replay sweep (seed 9910)
+
+After the historical Soul Exchange / Metamorphosis correction, a fresh
+random-agent sweep of all 15 pairings of the six sourced tournament Main
+Decks, with both seat assignments, completed **30 terminal duels** in
+**28,894 decisions** (maximum 1,335 in one duel). Every in-memory trajectory
+replayed against a fresh pinned native engine; this run did not test JSON
+serialization. The ignored report
+`.cache/goat-ai/competitive-actions-tournament-9910.json` has SHA-256
+`f547d9fb20f0f6544cbc8ea03163794fa797bd7df2ed0f383504633ccb2251b2`.
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --tournament-corpus --seed 9910 --seeds 1 \
+  --max-decisions 3000 --verify-replays \
+  --output .cache/goat-ai/competitive-actions-tournament-9910.json \
+  > .cache/goat-ai/competitive-actions-tournament-9910.stdout
+```
+
+This seed selected one Mystical Space Typhoon response to Metamorphosis. A
+new paired native fixture checks that destroying the active Spell does not
+undo its spent Sheep Token or prevent Thousand-Eyes Restrict from arriving;
+both branches serialize, replay-verify, and pass the legal-choice visibility
+audit. The sweep detects adapter failures and decision exposure for its deck
+schedule. It does not establish historical correctness, metagame play rates,
+or agent strength.
