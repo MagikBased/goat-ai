@@ -25,6 +25,8 @@ The repository has a Python environment contract, observation and action types, 
 
 A documented [2020 championship Chaos Turbo Main Deck](../examples/decks/chaos_turbo_riclar_2020.ydk) now exercises a real archetype rather than only synthetic probes. With the experimental adapter and random agents, seeds 1–20 all reached terminal against `control_probe.ydk` within 3,000 decisions. Two seat-swapped, full-deck fixtures also serialize and replay-verify complete trajectories. These are protocol-coverage results; the random plays and current scripts do not establish historical correctness or playing strength.
 
+A [2020 championship Goat Control Main Deck](../examples/decks/goat_control_lolmarcus_2020.ydk), paired with three test-copy Thousand-Eyes Restricts, also completed seeds 1–20 against that Chaos Turbo list within 3,000 decisions. Two seat-swapped matchup fixtures serialize and replay-verify full trajectories. The source omits the Extra Deck, so its contents are a disclosed test choice.
+
 **Work**
 
 1. Implement `.ydk` parsing and April 2005 deck/card-pool validation. Begin with two small legal fixture decks and expand coverage.
