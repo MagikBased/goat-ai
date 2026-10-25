@@ -77,6 +77,7 @@ ordered response pairs. The report JSON SHA-256 was
 | Solemn Judgment → Compulsory Evacuation Device | 6 |
 | Solemn Judgment → Nobleman of Crossout | 6 |
 | Solemn Judgment → Ring of Destruction | 5 |
+| Solemn Judgment → Dust Tornado | 5 |
 | Dust Tornado → Book of Moon | 5 |
 
 The sample also observed four Torrential Tribute responses to Breaker the
