@@ -17,6 +17,7 @@ DARK = 49881766
 DD_WARRIOR_LADY = 7572887
 GEMINI_ELF = 69140098
 TORRENTIAL_TRIBUTE = 53582587
+SOLEMN_JUDGMENT = 41420027
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -175,12 +176,13 @@ def test_dimension_fusion_revives_one_banished_monster_for_each_player(tmp_path)
     pytest.fail("Dimension Fusion did not revive both players' banished monsters")
 
 
+@pytest.mark.parametrize("response_code", [TORRENTIAL_TRIBUTE, SOLEMN_JUDGMENT])
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_torrential_responds_after_dimension_fusion_summons(tmp_path):
+def test_trap_responses_to_dimension_fusion(tmp_path, response_code):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL_CHARITY}.lua",
                      f"official/c{DIMENSION_FUSION}.lua",
-                     f"official/c{TORRENTIAL_TRIBUTE}.lua"):
+                     f"official/c{response_code}.lua"):
         if not (root / "scripts" / relative).is_file():
             pytest.skip(f"script {relative} not installed")
     lights = (LIGHT, 62651957)
@@ -194,18 +196,18 @@ def test_torrential_responds_after_dimension_fusion_summons(tmp_path):
     assert len(cards) == 40 and cards.count(DIMENSION_FUSION) == 3
     own = tmp_path / "dimension_fusion.ydk"
     own.write_text("#main\n" + "\n".join(map(str, cards)) + "\n#extra\n!side\n")
-    other = tmp_path / "torrential.ydk"
+    other = tmp_path / "response.ydk"
     other.write_text("#main\n" + "\n".join(map(str, (
-        TORRENTIAL_TRIBUTE, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+        response_code, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
 
     with GoatEnvironment(str(own), str(other), seed=100,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
         assert {GRACEFUL_CHARITY, BLS, DIMENSION_FUSION, LIGHT, DARK} <= {
             c.code for c in obs.hand}
-        assert TORRENTIAL_TRIBUTE in {
+        assert response_code in {
             c.code for c in env.engine.probe.observation(1).hand}
-        graceful = discarded = summoned = trap_set = fusion_used = torrential_used = False
+        graceful = discarded = summoned = trap_set = fusion_used = response_used = False
         summon_costs = []
         for _ in range(120):
             actions = env.legal_actions()
@@ -231,35 +233,48 @@ def test_torrential_responds_after_dimension_fusion_summons(tmp_path):
                         summon_costs.append(action.parameters["code"])
             if obs.turn == 2 and obs.acting_player == 1 and not trap_set:
                 action = next((a for a in actions if a.kind == "set_spell_trap"
-                               and a.parameters.get("code") == TORRENTIAL_TRIBUTE), None)
+                               and a.parameters.get("code") == response_code), None)
                 trap_set = action is not None
             if obs.turn == 3 and obs.acting_player == 0 and not fusion_used:
                 assert trap_set and set(summon_costs) == {LIGHT, DARK}
                 action = next((a for a in actions if a.kind == "activate"
                                and a.parameters.get("code") == DIMENSION_FUSION), None)
                 fusion_used = action is not None
-            if fusion_used and obs.acting_player == 1 and not torrential_used:
+            if fusion_used and obs.acting_player == 1 and not response_used:
                 action = next((a for a in actions if a.kind == "chain"
-                               and a.parameters.get("code") == TORRENTIAL_TRIBUTE), None)
+                               and a.parameters.get("code") == response_code), None)
                 if action is not None:
-                    assert obs.chain == ()
-                    assert DIMENSION_FUSION in {c.code for c in obs.graveyards[0]}
-                    assert {BLS, LIGHT, DARK} <= {c.code for c in obs.field
-                                                   if c.controller == 0
-                                                   and c.zone == "monster"}
                     assert obs.life_points == (6000, 8000)
-                    torrential_used = True
+                    if response_code == SOLEMN_JUDGMENT:
+                        assert [link.card_code for link in obs.chain] == [DIMENSION_FUSION]
+                        assert {LIGHT, DARK} == {c.code for c in obs.banished[0]}
+                        assert {BLS} == {c.code for c in obs.field
+                                         if c.controller == 0 and c.zone == "monster"}
+                    else:
+                        assert obs.chain == ()
+                        assert DIMENSION_FUSION in {c.code for c in obs.graveyards[0]}
+                        assert {BLS, LIGHT, DARK} <= {c.code for c in obs.field
+                                                       if c.controller == 0
+                                                       and c.zone == "monster"}
+                    response_used = True
             if action is None:
                 action = next((a for a in actions if a.kind in (
                     "select_cards", "select_card", "place", "select_position",
                     "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if torrential_used and TORRENTIAL_TRIBUTE in {
+            if response_used and response_code in {
                     c.code for c in obs.graveyards[1]} and obs.chain == ():
-                assert not any(c.zone == "monster" for c in obs.field)
-                assert {BLS, LIGHT, DARK, DIMENSION_FUSION} <= {
-                    c.code for c in obs.graveyards[0]}
-                assert not obs.banished[0]
-                assert obs.life_points == (6000, 8000)
+                if response_code == SOLEMN_JUDGMENT:
+                    assert {BLS} == {c.code for c in obs.field
+                                     if c.controller == 0 and c.zone == "monster"}
+                    assert {LIGHT, DARK} == {c.code for c in obs.banished[0]}
+                    assert obs.life_points == (6000, 4000)
+                else:
+                    assert not any(c.zone == "monster" for c in obs.field)
+                    assert {BLS, LIGHT, DARK, DIMENSION_FUSION} <= {
+                        c.code for c in obs.graveyards[0]}
+                    assert not obs.banished[0]
+                    assert obs.life_points == (6000, 8000)
+                assert DIMENSION_FUSION in {c.code for c in obs.graveyards[0]}
                 return
-    pytest.fail("Torrential was not offered after Dimension Fusion resolved")
+    pytest.fail(f"response {response_code} was not offered against Dimension Fusion")
