@@ -61,6 +61,8 @@ An expanded 300-duel, four-worker sweep on seeds 9600–9609 also reached native
 
 A paired native Ring of Destruction and Book of Moon fixture now checks target validity at resolution, the no-damage outcome when Book sets the target, and the opponent's hidden field view. Its historical interpretation is identified as an inference in [GOAT rules](goat_rules.md).
 
+A paired Creature Swap / Scapegoat fixture now tests a common Goat Control Token exchange: Scapegoat chained to Swap adds four legal Token choices at resolution, while passing leaves only the original monster available. A Ring of Destruction response fixture removes the defender's only monster before Swap resolves and confirms the exchange fails. All three full duels replay-verify; other interruption types remain open. See [GOAT rules](goat_rules.md).
+
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
 
 **Exit:** Every required fixture passes with pinned engine assets, or is marked as a known incompatibility that blocks a GOAT-correct claim. Run differential checks against documented examples or independently observed duels where practical. Expand the legal-card test corpus beyond the initial fixture decks.
