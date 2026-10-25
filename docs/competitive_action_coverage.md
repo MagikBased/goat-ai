@@ -73,6 +73,7 @@ ordered response pairs. The report JSON SHA-256 was
 | --- | ---: |
 | Solemn Judgment → Book of Moon | 9 |
 | Solemn Judgment → Mystical Space Typhoon | 7 |
+| Solemn Judgment → Solemn Judgment | 6 |
 | Solemn Judgment → Compulsory Evacuation Device | 6 |
 | Solemn Judgment → Nobleman of Crossout | 6 |
 | Dust Tornado → Book of Moon | 5 |
