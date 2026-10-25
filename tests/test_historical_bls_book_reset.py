@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 BLS = 504700118
 GRACEFUL = 79571449
@@ -134,6 +136,20 @@ def test_bls_book_flip_summon_allows_second_banish_same_turn(tmp_path):
                 assert any(c.code == BLS and c.position == "faceup" for c in obs.field)
                 assert obs.life_points == (8000, 8000)
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
+                agents = (RandomAgent(182), RandomAgent(183))
+                for _ in range(3000):
+                    if env.is_terminal():
+                        break
+                    obs = env.step(agents[obs.acting_player].select_action(
+                        obs, env.legal_actions()))
+                else:
+                    pytest.fail("BLS / Book continuation exceeded 3000 decisions")
+                trajectory = env.trajectory()
+                path = tmp_path / "bls_book_reset.json"
+                write_trajectory(path, trajectory)
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                                             trajectory.decisions)
                 return
     pytest.fail(f"BLS reset stalled: summon={summoned} set={set_monster}/{set_goat} "
                 f"effect={first_effect}/{first_resolved}/{second_effect}/{second_target} "
