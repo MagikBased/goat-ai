@@ -89,6 +89,21 @@ def test_audit_checks_multi_card_choices_and_decision_viewer():
                                                   known_opponent_field_cards=()), {}))
 
 
+def test_audit_checks_single_and_multi_tribute_choices():
+    observation = _observation()
+    hidden = {"controller": 1, "location": 4, "sequence": 2, "code": 456}
+    for kind, parameters in (("tribute", hidden),
+                             ("tribute_cards", {"cards": [hidden]})):
+        with pytest.raises(VisibilityViolation, match="face-down"):
+            audit_decision_visibility(_record(observation, parameters, kind))
+    legal = _record(observation, {"cards": [
+        {"controller": 0, "location": 4, "sequence": 0, "code": 123},
+        {"controller": 1, "location": 4, "sequence": 2},
+    ]}, "tribute_cards")
+    assert audit_decision_visibility(legal) == {
+        "opponent_field_choices": 1, "hidden_field_choices": 1}
+
+
 def test_legacy_trajectory_cannot_claim_complete_hand_audit():
     observation = _observation()
     record = _record(observation, {"controller": 1, "location": 2, "code": 321})

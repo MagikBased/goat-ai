@@ -14,9 +14,10 @@ def _choice_cards(record: DecisionRecord) -> Iterable[dict]:
     for action in record.legal_actions:
         if action.actor != record.observation.acting_player:
             raise VisibilityViolation("legal action actor differs from acting player")
-        if action.kind == "select_card":
+        if action.kind in ("select_card", "tribute"):
             yield action.parameters
-        if action.kind in ("select_card", "select_cards", "finish_selection"):
+        if action.kind in ("select_card", "select_cards", "finish_selection",
+                           "tribute_cards"):
             for card in action.parameters.get("cards", ()):
                 yield card
 

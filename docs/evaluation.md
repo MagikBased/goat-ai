@@ -1843,3 +1843,34 @@ committed test fixture. The affected native and visibility suites passed
 **37/37** tests, plus **59/59** probe, query, and policy tests.
 The visibility audit now checks selected-card prefixes on staged actions;
 broader counterfactual hidden-state checks remain separate M1 work.
+
+## Tournament replay and visibility recheck (2026-10-25)
+
+The seed-28500 [six-tournament-deck schedule](competitive_action_coverage.md)
+was rerun with trajectory recording and replay verification enabled. All 30
+seat-swapped duels completed, and a fresh pinned engine matched every one of
+their **18,283 decisions** through the terminal result. The 30 schema-v22
+JSON trajectories total 149,437,757 bytes in the ignored native cache; they
+are not committed. The generated report's SHA-256 is
+`c95f495143a2b2e45a6b9e15dc73260302808a6ef9ea104e3c4204db039a2a83`.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --tournament-corpus --seed 28500 --seeds 1 \
+  --agent combat_heuristic --max-decisions 3000 --verify-replays \
+  --record-dir .cache/goat-ai/tournament_card_audit_28500_replays \
+  --output .cache/goat-ai/tournament_card_audit_28500_verified.json \
+  > .cache/goat-ai/tournament_card_audit_28500_verified.stdout
+PYTHONPATH=src:. .venv/bin/python scripts/audit_trajectory_visibility.py \
+  .cache/goat-ai/tournament_card_audit_28500_replays
+```
+
+The read-only visibility audit passed all 18,283 decisions and checked 671
+offered opposing field choices, including 106 face-down slots, plus 22
+opposing hand choices. The auditor now also checks single and grouped Tribute
+choices; a focused regression verifies that a grouped Tribute payload cannot
+name a hidden opposing monster. This sample contained no opposing Tribute
+choice, so the aggregate counts did not change when that check was added.
+Replay equivalence establishes reproducibility for these pinned assets and
+seeds; the action audit enforces its listed selection invariants. Neither
+establishes historical correctness or general hidden-state noninterference.
