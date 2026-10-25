@@ -102,6 +102,8 @@ def test_compulsory_return_destination_and_hidden_hand(tmp_path, fusion):
                 chooser_view = env.engine.probe.observation(0)
                 assert len(owner_view.hand) == hand_before + (0 if fusion else 1)
                 assert chooser_view.opponent_hand_count == len(owner_view.hand)
+                assert chooser_view.known_opponent_hand_cards == (
+                    () if fusion else (target_code,))
                 assert obs.extra_deck_counts[1] == (1 if fusion else 0)
                 assert not any(c.code == (RESTRICT if fusion else target_code)
                                for c in obs.graveyards[1])

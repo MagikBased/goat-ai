@@ -162,7 +162,7 @@ def test_swap_of_set_monster_keeps_former_controller_knowledge(tmp_path, opponen
                     observation = env.step(action)
                     if env.is_terminal():
                         trajectory = env.trajectory()
-                        assert trajectory.schema_version == 16
+                        assert trajectory.schema_version == 17
                         path = tmp_path / f"creature_swap_set_{opponent_set}.json"
                         write_trajectory(path, trajectory)
                         assert verify_trajectory(read_trajectory(path),

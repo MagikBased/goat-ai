@@ -119,6 +119,31 @@ def test_known_facedown_memory_requires_public_flip_and_clears_on_move():
     assert probe._known_facedown == {}
 
 
+def test_known_hand_memory_uses_public_sources_only():
+    probe = object.__new__(OcgcoreProbe)
+    probe._turn = 2
+    probe._phase = "standby"
+    probe._chain = []
+    probe._public_history = []
+    probe._known_facedown = {}
+    probe._known_hand = {0: [], 1: []}
+
+    def move(code, old_location, new_location):
+        return (bytes((MSG_MOVE,)) + struct.pack("<I", code)
+                + struct.pack("<BBII", 1, old_location, 0, 1)
+                + struct.pack("<BBII", 1, new_location, 0, 1)
+                + struct.pack("<I", 0))
+
+    probe._update_public_clock([move(99999999, 1, 2)])
+    assert probe._known_hand == {0: [], 1: []}  # Private draw's raw code is ignored.
+    probe._update_public_clock([move(511000818, 16, 2)])
+    assert probe._known_hand == {0: [], 1: [511000818]}
+    probe._update_public_clock([move(12345678, 2, 4)])
+    assert probe._known_hand == {0: [], 1: []}  # A Set's source can be ambiguous.
+    probe._update_public_clock([move(222, 4, 2)])
+    assert probe._known_hand == {0: [], 1: [222]}  # Face-up field identity is public.
+
+
 def test_known_facedown_memory_follows_control_change_with_legal_identity():
     probe = object.__new__(OcgcoreProbe)
     probe._turn = 3

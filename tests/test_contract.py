@@ -135,6 +135,23 @@ def test_publicly_seen_facedown_card_keeps_its_slot(tmp_path):
     assert restored.decisions[0].observation.known_opponent_field_cards == ()
 
 
+def test_known_opponent_hand_multiset_round_trips_and_older_schema_reads(tmp_path):
+    observation = replace(view(), known_opponent_hand_cards=(123, 456))
+    action = Action("0", "pass", 0)
+    trajectory = Trajectory("goat", ("a", "b"), 7,
+                            (DecisionRecord(observation, (action,), action),), 0)
+    path = tmp_path / "known_hand.json"
+    write_trajectory(path, trajectory)
+    assert read_trajectory(path) == trajectory
+    with pytest.raises(ValueError, match="known opponent hand"):
+        replace(observation, known_opponent_hand_cards=(123, 456, 789, 999, 1000, 1001))
+    raw = json.loads(path.read_text())
+    raw["schema_version"] = 16
+    raw["decisions"][0]["observation"].pop("known_opponent_hand_cards")
+    path.write_text(json.dumps(raw))
+    assert read_trajectory(path).decisions[0].observation.known_opponent_hand_cards == ()
+
+
 def test_public_deck_reveal_round_trip_and_legacy_reader(tmp_path):
     observation = replace(view(), public_reveals=(
         PublicRevealView(3, 0, "deck_top", (123, 456)),

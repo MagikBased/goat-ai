@@ -94,6 +94,7 @@ class Observation:
     disabled_zones: tuple[DisabledZoneView, ...] = ()
     private_reveals: tuple[PrivateRevealView, ...] = ()
     own_main_deck: tuple[int, ...] = ()  # Initial card multiset, never shuffled order.
+    known_opponent_hand_cards: tuple[int, ...] = ()  # Publicly tracked multiset, no hand slots.
 
     def __post_init__(self) -> None:
         if self.viewer not in (0, 1) or self.acting_player not in (0, 1):
@@ -145,4 +146,9 @@ class Observation:
             raise ValueError("own Main Deck must be an unordered card multiset")
         if self.opponent_hand_count < 0 or any(n < 0 for n in self.deck_counts):
             raise ValueError("counts must be nonnegative")
+        if (len(self.known_opponent_hand_cards) > self.opponent_hand_count
+                or tuple(sorted(self.known_opponent_hand_cards))
+                != self.known_opponent_hand_cards
+                or any(code <= 0 for code in self.known_opponent_hand_cards)):
+            raise ValueError("known opponent hand must be a valid unordered subset")
 

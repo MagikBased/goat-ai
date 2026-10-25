@@ -42,6 +42,9 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                 raise ReplayMismatch(f"decision {index}: engine terminated early")
             compared_observation = observation
             recorded_observation = record.observation
+            if trajectory.schema_version < 17:
+                compared_observation = replace(compared_observation,
+                                               known_opponent_hand_cards=())
             if trajectory.schema_version < 12:
                 def old_cards(cards):
                     return tuple(replace(card, attack=None, defense=None, counters=())

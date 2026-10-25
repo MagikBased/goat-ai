@@ -173,6 +173,7 @@ class OcgcoreProbe:
         self._chain: list[ChainLinkView] = []
         self._public_history: list[str] = []
         self._known_facedown: dict[tuple[int, int, int], int] = {}
+        self._known_hand: dict[int, list[int]] = {0: [], 1: []}
         self._restriction_hints: dict[tuple[int, int], int] = {}
         self._public_reveals: list[PublicRevealView] = []
         self._private_reveals: list[PrivateRevealView] = []
@@ -405,6 +406,25 @@ class OcgcoreProbe:
             if message[0] == MSG_MOVE:
                 if len(message) != 29:
                     raise ValueError("invalid MSG_MOVE length")
+                old_controller, old_location = message[5], message[6]
+                new_controller, new_location = message[15], message[16]
+                known_hand = getattr(self, "_known_hand", None)
+                if known_hand is not None:
+                    if old_controller in (0, 1) and old_location == LOCATION_HAND:
+                        # A hand slot leaving can be private (for example a Set).
+                        # Without a public identity, no remaining known-card
+                        # assignment is safe, so forget this hand's multiset.
+                        known_hand[old_controller].clear()
+                    public_source = (old_location == LOCATION_GRAVE or
+                                     (old_location in (LOCATION_MZONE, LOCATION_SZONE)
+                                      and struct.unpack_from("<I", message, 11)[0] & 0x5))
+                    if (new_controller in (0, 1) and new_location == LOCATION_HAND
+                            and public_source):
+                        # Graveyard and face-up field identities are public.
+                        # Never infer this from a private Deck/hand move's
+                        # raw MSG_MOVE card code.
+                        known_hand[new_controller].append(
+                            struct.unpack_from("<I", message, 1)[0])
                 old_key = (message[5], message[6],
                            struct.unpack_from("<I", message, 7)[0])
                 new_key = (message[15], message[16],
@@ -677,6 +697,7 @@ class OcgcoreProbe:
             private_reveals=tuple(reveal for reveal in self._private_reveals
                                   if reveal.recipient == viewer),
             own_main_deck=self._initial_main_decks[viewer],
+            known_opponent_hand_cards=tuple(sorted(self._known_hand[1 - viewer])),
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:

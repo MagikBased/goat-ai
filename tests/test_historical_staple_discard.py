@@ -6,9 +6,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 GRACEFUL_CHARITY = 79571449
 DELINQUENT_DUO = 44763025
@@ -149,10 +151,28 @@ def test_duo_discards_serpent_then_opponent_recovers_it_at_standby(tmp_path):
                 assert len(obs.hand) == defender_hand_before_return + 1
                 attacker_view = env.engine.probe.observation(0)
                 assert attacker_view.opponent_hand_count == len(obs.hand)
+                assert attacker_view.known_opponent_hand_cards == (SINISTER_SERPENT,)
                 assert not attacker_view.private_reveals
                 assert {f"official/c{DELINQUENT_DUO}.lua",
                         f"pre-errata/c{SINISTER_SERPENT}.lua"}.issubset(
                     env.engine.probe.loaded_script_sha256)
+                agents = (RandomAgent(52), RandomAgent(53))
+                for _ in range(5000):
+                    action = agents[obs.acting_player].select_action(
+                        obs, env.legal_actions())
+                    obs = env.step(action)
+                    if env.is_terminal():
+                        trajectory = env.trajectory()
+                        break
+                else:
+                    pytest.fail("Duo/Serpent replay did not reach a terminal state")
+                assert any(SINISTER_SERPENT in record.observation.known_opponent_hand_cards
+                           for record in trajectory.decisions)
+                path = tmp_path / "duo_serpent.json"
+                write_trajectory(path, trajectory)
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
                 return
             if action is None:
                 action = next((a for a in actions if a.kind in (
