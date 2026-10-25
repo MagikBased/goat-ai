@@ -109,12 +109,15 @@ python scripts/probe_control_deck.py --deck examples/decks/control_probe.ydk --o
 python scripts/probe_control_deck.py --deck examples/decks/chaos_turbo_riclar_2020.ydk --opponent-deck examples/decks/control_probe.ydk --seed 1 --seeds 20
 python scripts/probe_control_deck.py --deck examples/decks/goat_control_lolmarcus_2020.ydk --opponent-deck examples/decks/chaos_turbo_riclar_2020.ydk --seed 1 --seeds 20
 python scripts/probe_control_deck.py --deck examples/decks/warrior_montague_clash.ydk --opponent-deck examples/decks/chaos_turbo_riclar_2020.ydk --seed 1 --seeds 10
+python scripts/probe_control_deck.py --deck examples/decks/flip_control_goatformat_guide.ydk --opponent-deck examples/decks/chaos_turbo_riclar_2020.ydk --seed 31 --seeds 10
 python scripts/probe_random_decks.py --seeds 10 --max-decisions 3000
 ```
 
 The Chaos Turbo Main Deck follows the [Riccardo Lari 2020 championship list](https://www.goatformat.com/chaos-turbo.html), using pinned GOAT/pre-errata card IDs. The published list does not specify an Extra Deck, so this fixture leaves it empty. This probe tests native decision coverage with random play; it does not measure competitive strength or prove every card ruling.
 
 The Goat Control Main Deck follows the [Lolmarcus 2020 championship list](https://www.goatformat.com/goat-control.html). Its published list omits the Extra Deck; the fixture adds three Thousand-Eyes Restricts as a documented test choice so Metamorphosis has a legal summon. Seeds 1–20 completed 20/20 random-agent duels against the Chaos Turbo fixture with Goat Control in seat 0. This is protocol coverage under pinned scripts.
+
+The Flip Control Main Deck follows the [GoatFormat guide list](https://www.goatformat.com/flip-control.html). It is a representative guide list, not an attributed tournament submission. The source omits an Extra Deck, so this fixture leaves it empty. Paired random-agent duels against Chaos Turbo and Goat Control are recorded in the [evaluation log](docs/evaluation.md); they test native protocol coverage, not the archetype’s competitive strength.
 
 The random-deck probe deterministically generates whitelist-legal 40-card
 decks and writes its deck files and JSON report under ignored `.cache/goat-ai/random-probe/`.

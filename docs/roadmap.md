@@ -31,6 +31,8 @@ A documented [competitive Warrior Main Deck](../examples/decks/warrior_montague_
 
 A further 60-duel random-agent sweep on seeds 21–30 covered all three pairings among the sourced Goat Control, Chaos Turbo, and Warrior lists in both seats. All reached terminal under a 3,000-decision cap, with 60,374 decisions total. Goat Control versus Warrior additionally has two complete seat-swapped trajectories that replay-verify. The measured two-worker runtime and limits are in [the evaluation log](evaluation.md). This widens M1 protocol coverage; M2 historical card correctness remains open.
 
+A [GoatFormat guide Flip Control Main Deck](../examples/decks/flip_control_goatformat_guide.ydk) adds a fourth archetype centered on Tsukuyomi, Dekoichi, Magician of Faith, Mask of Darkness, and Time Seal. The guide does not name a tournament pilot or list an Extra Deck, so the fixture records neither. Forty random-agent duels against Chaos Turbo and Goat Control, paired across seats on seeds 31–40, all reached terminal under the 3,000-decision cap. Four full-duel fixtures serialize and replay-verify trajectories. This is additional M1 protocol coverage; historical Time Seal and Mask of Darkness rulings still need targeted M2 audits. Measured runtime and exact reproduction are in [the evaluation log](evaluation.md).
+
 **Work**
 
 1. Implement `.ydk` parsing and April 2005 deck/card-pool validation. Begin with two small legal fixture decks and expand coverage.
@@ -83,7 +85,7 @@ Keep training in Python. Define a versioned, game-independent decision boundary:
 
 ## Immediate next work item
 
-Prioritize M1 and M2 card work by competitive relevance. Use the sourced [Goat Control](../examples/decks/goat_control_lolmarcus_2020.ydk), [Chaos Turbo](../examples/decks/chaos_turbo_riclar_2020.ydk), and [Warrior](../examples/decks/warrior_montague_clash.ydk) lists as the first concrete corpus; expand it with other documented tournament lists before treating it as a metagame frequency estimate.
+Prioritize M1 and M2 card work by competitive relevance. Use the sourced [Goat Control](../examples/decks/goat_control_lolmarcus_2020.ydk), [Chaos Turbo](../examples/decks/chaos_turbo_riclar_2020.ydk), and [Warrior](../examples/decks/warrior_montague_clash.ydk), and [Flip Control](../examples/decks/flip_control_goatformat_guide.ydk) lists as the first concrete corpus. The Flip Control list is a guide example; expand the corpus with additional submitted tournament lists before treating it as a metagame frequency estimate.
 
 1. Finish interaction and interruption coverage for cards shared by these lists, especially Black Luster Soldier, Nobleman of Crossout, Book of Moon, Pot of Greed, Graceful Charity, and common removal and traps. Existing single-line fixtures are a starting point, not a complete ruling audit.
 2. Expand deck-defining lines: Scapegoat, Metamorphosis, Thousand-Eyes Restrict, and Tsukuyomi for Goat Control; Chaos Sorcerer, Gravekeeper's Spy, Dekoichi, and LIGHT/DARK Graveyard setup for Chaos Turbo. Include chains, legal choices, and player-visible information at each decision.
