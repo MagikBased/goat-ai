@@ -16,6 +16,58 @@ GRACEFUL_CHARITY = 79571449
 DELINQUENT_DUO = 44763025
 DUSTSHOOT = 64697231
 SINISTER_SERPENT = 511000818
+SANGAN = 504700178
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_graceful_discard_of_sangan_does_not_start_a_search(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"official/c{GRACEFUL_CHARITY}.lua", f"goat/c{SANGAN}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    deck = tmp_path / "graceful_sangan.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        GRACEFUL_CHARITY, SANGAN, *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {GRACEFUL_CHARITY, SANGAN}.issubset({c.code for c in obs.hand})
+        activated = discarded = False
+        for _ in range(25):
+            actions = env.legal_actions()
+            action = None
+            if not activated and obs.acting_player == 0:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == GRACEFUL_CHARITY), None)
+                activated |= action is not None
+            if activated and not discarded and actions[0].kind == "select_cards":
+                assert obs.deck_counts[0] == 31
+                assert len(obs.hand) == 8
+                action = next((a for a in actions if SANGAN in {
+                    card["code"] for card in a.parameters["cards"]}), None)
+                assert action is not None
+                discarded = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "pass", "end_phase", "place")), actions[0])
+            obs = env.step(action)
+            if discarded and SANGAN in {c.code for c in obs.graveyards[0]}:
+                owner = env.engine.probe.observation(0)
+                opponent = env.engine.probe.observation(1)
+                assert owner.phase == "main1"
+                assert owner.deck_counts[0] == 31
+                assert len(owner.hand) == 6
+                assert len(owner.graveyards[0]) == 3
+                assert not owner.chain
+                assert not any(a.kind == "select_card" and a.parameters.get(
+                    "location") == 1 for a in env.legal_actions())
+                assert not opponent.private_reveals
+                assert opponent.known_opponent_hand_cards == ()
+                assert {f"official/c{GRACEFUL_CHARITY}.lua", f"goat/c{SANGAN}.lua"} \
+                    <= env.engine.probe.loaded_script_sha256.keys()
+                return
+    pytest.fail("Graceful Charity did not discard Sangan within 25 decisions")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
