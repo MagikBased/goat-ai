@@ -1,0 +1,146 @@
+"""Chaos Sorcerer summon cost, banish effect, and attack restriction."""
+
+import os
+from pathlib import Path
+
+import pytest
+
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.engine.probe_deck import VANILLA_DECK
+from goat_ai.environments import GoatEnvironment
+
+CHAOS_SORCERER = 9596126
+GRACEFUL_CHARITY = 79571449
+LIGHT = 62651957  # X-Head Cannon
+DARK = 7359741  # Mechanicalchaser
+
+
+def chaos_deck(tmp_path):
+    lights = (15025844, LIGHT)
+    darks = (49881766, DARK)
+    filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
+    cards = (GRACEFUL_CHARITY, *(CHAOS_SORCERER,) * 3,
+             *(code for code in lights for _ in range(3)),
+             *(code for code in darks for _ in range(3)), *filler[:24])
+    assert len(cards) == 40
+    deck = tmp_path / "chaos_sorcerer.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, cards)) + "\n#extra\n!side\n")
+    return deck
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_sorcerer_banishes_light_dark_cost_then_opponent_monster_and_cannot_attack(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (CHAOS_SORCERER, GRACEFUL_CHARITY):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    deck = chaos_deck(tmp_path)
+
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        graceful = discarded = summoned = opponent_summoned = effect_used = False
+        costs = []
+        opponent_code = None
+        for _ in range(65):
+            actions = env.legal_actions()
+            action = None
+            if observation.acting_player == 0 and observation.turn == 1 and not graceful:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == GRACEFUL_CHARITY), None)
+                graceful |= action is not None
+            if graceful and not discarded and actions[0].kind == "select_cards":
+                action = next((a for a in actions if {card["code"]
+                               for card in a.parameters["cards"]} == {LIGHT, DARK}), None)
+                discarded |= action is not None
+            if (discarded and observation.acting_player == 0 and observation.turn == 1
+                    and not summoned):
+                option = next((a for a in actions if a.kind == "special_summon"
+                               and a.parameters.get("code") == CHAOS_SORCERER), None)
+                if option is not None:
+                    assert {card.code for card in observation.graveyards[0]} == {
+                        LIGHT, DARK, GRACEFUL_CHARITY}
+                    action = option
+                    summoned = True
+            if summoned and len(costs) < 2 and actions[0].kind == "select_card":
+                cost = next((a for a in actions if a.parameters.get("code")
+                             in ({LIGHT, DARK} - set(costs))), None)
+                if cost is not None:
+                    assert cost.parameters["location"] == 16
+                    assert cost.parameters["controller"] == 0
+                    costs.append(cost.parameters["code"])
+                    action = cost
+            if observation.acting_player == 1 and observation.turn == 2 and not opponent_summoned:
+                option = next((a for a in actions if a.kind == "normal_summon"), None)
+                if option is not None:
+                    action = option
+                    opponent_summoned = True
+                    opponent_code = option.parameters["code"]
+            if (observation.acting_player == 0 and observation.turn == 3
+                    and opponent_summoned and not effect_used):
+                option = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == CHAOS_SORCERER), None)
+                if option is not None:
+                    assert set(costs) == {LIGHT, DARK}
+                    assert {card.code for card in observation.banished[0]} == {LIGHT, DARK}
+                    action = option
+                    effect_used = True
+            if effect_used and observation.turn == 3 and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("controller") == 1
+                               and a.parameters.get("code") == opponent_code
+                               and a.parameters.get("location") == 4), action)
+            if (effect_used and observation.turn == 3
+                    and any(card.code == opponent_code for card in observation.banished[1])):
+                assert not any(a.kind == "activate"
+                               and a.parameters.get("code") == CHAOS_SORCERER
+                               for a in actions)
+                assert any(card.code == CHAOS_SORCERER and card.attack == 2300
+                           and card.defense == 2000 for card in observation.field)
+                if observation.phase == "battle_start" and observation.acting_player == 0:
+                    assert not any(a.kind == "attack"
+                                   and a.parameters.get("code") == CHAOS_SORCERER
+                                   for a in actions)
+                    assert observation.life_points == (8000, 8000)
+                    return
+                if observation.phase == "main1" and observation.acting_player == 0:
+                    action = next((a for a in actions if a.kind == "battle_phase"), action)
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "select_position", "pass", "end_phase")),
+                    actions[0])
+            observation = env.step(action)
+    pytest.fail("Chaos Sorcerer line did not reach its attack restriction")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_sorcerer_cannot_pay_its_cost_with_light_and_dark_only_on_field(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{CHAOS_SORCERER}.lua").is_file():
+        pytest.skip("Chaos Sorcerer script not installed")
+    with GoatEnvironment(str(chaos_deck(tmp_path)), "examples/decks/vanilla_probe.ydk",
+                         seed=100, engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        summons = []
+        for _ in range(45):
+            actions = env.legal_actions()
+            action = None
+            if (observation.acting_player == 0 and observation.turn in (1, 3)
+                    and len(summons) < (1 if observation.turn == 1 else 2)):
+                wanted = LIGHT if not summons else DARK
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == wanted), None)
+                if action is not None:
+                    summons.append(wanted)
+            if (observation.turn == 3 and observation.phase == "main1"
+                    and observation.acting_player == 0 and len(summons) == 2
+                    and {LIGHT, DARK}.issubset({card.code for card in observation.field})):
+                assert not observation.graveyards[0]
+                assert not any(a.kind == "special_summon"
+                               and a.parameters.get("code") == CHAOS_SORCERER
+                               for a in actions)
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "select_position", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+    pytest.fail("did not reach the LIGHT/DARK field-only control state")
