@@ -51,6 +51,9 @@ def test_staged_thunder_search_matches_flat_native_choice(tmp_path, monkeypatch,
 
             if staged:
                 assert len([a for a in actions if a.kind == "select_card"]) == 2
+                assert {(a.parameters["selection_minimum"],
+                         a.parameters["selection_maximum"],
+                         a.parameters["selected_count"]) for a in actions} == {(0, 2, 0)}
                 for _ in range(copy_count):
                     action = next(a for a in env.legal_actions() if a.kind == "select_card")
                     obs = env.step(action)
@@ -103,6 +106,9 @@ def test_staged_graceful_discard_commits_one_exact_native_response(tmp_path, mon
             if activated and not selected_first and actions[0].kind == "select_card":
                 assert len(obs.hand) == 8
                 assert obs.deck_counts[0] == 31
+                assert (actions[0].parameters["selection_minimum"],
+                        actions[0].parameters["selection_maximum"],
+                        actions[0].parameters["selected_count"]) == (2, 2, 0)
                 before_native_prompt = env.engine.probe._pending_message
                 assert before_native_prompt[0] == 15
                 action = next(a for a in actions if a.parameters.get("code") == SANGAN)
@@ -110,6 +116,7 @@ def test_staged_graceful_discard_commits_one_exact_native_response(tmp_path, mon
             elif selected_first and not selected_second and actions[0].kind == "select_card":
                 assert env.engine.probe._pending_message == before_native_prompt
                 assert all(a.parameters["cards"][0]["code"] == SANGAN for a in actions)
+                assert all(a.parameters["selected_count"] == 1 for a in actions)
                 assert SANGAN not in {card.code for card in obs.graveyards[0]}
                 action = next(a for a in actions if a.parameters.get("code") != SANGAN)
                 selected_second = True

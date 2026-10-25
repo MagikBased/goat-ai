@@ -205,6 +205,10 @@ class RestrictedOcgcoreEngine:
                 parameters["code"] = choice.announced_card
             if choice.prompt_id is not None:
                 parameters["prompt_id"] = choice.prompt_id
+            if native.card_selection is not None:
+                parameters["selection_minimum"] = native.card_selection.minimum
+                parameters["selection_maximum"] = native.card_selection.maximum
+                parameters["selected_count"] = len(self._selection_indices)
             if (choice.sequence is not None and choice.location not in (0x01, 0x40)
                     and not (choice.location == 0x02 and choice.controller != native.player)):
                 parameters["sequence"] = choice.sequence

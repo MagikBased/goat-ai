@@ -19,6 +19,8 @@ As of the six current lists, the highest Main Deck prevalence is:
 
 Use list prevalence first and total copies second when choosing among unaudited common interactions. Prefer a sourced historical ruling with a concrete competitive consequence and a deterministic native fixture. Also cover archetype-defining cards with lower cross-list prevalence; for example, Return and Bazoo each appear in two of these six lists and define the Return decks.
 
+For the current audit, work down the shared-staple group first: Book of Moon, Nobleman of Crossout, Delinquent Duo, Heavy Storm, Breaker, Graceful Charity, Black Luster Soldier, and Ring of Destruction. Then address frequently shared matchup cards such as Dekoichi, Trap Dustshoot, D.D. Warrior Lady, Mirror Force, Torrential Tribute, Snatch Steal, and Chaos Sorcerer. When a common card already has a fixture, add a distinct historically sourced interaction or an interruption/visibility branch instead of counting another setup mention as coverage. Keep unusual cards in scope only when needed to exercise one of these interactions or a deck-defining line. This order is a development priority, not a claim that the six lists measure 2005 play rates.
+
 Reproduce the counts with:
 
 ```bash

@@ -64,8 +64,10 @@
     .detail-box h3 { margin: 0 0 5px; font-size: .9rem; }
     .detail-box ul { margin: 4px 0 0; padding-left: 19px; }
     .action { font-size: 1.05rem; color: #ffe3a5; }
+    .selection-progress { margin-top: 7px; font-size: .86rem; color: #bde0d1; }
     .legal-list { max-height: 210px; overflow: auto; padding-left: 22px; }
     .legal-list li { margin: 3px 0; }
+    #legal-more { margin-top: 7px; width: 100%; }
     .notice { padding: 10px 12px; border-left: 3px solid #e5cb6d; background: #293734; margin: 12px 0; }
     [hidden] { display: none !important; }
     @media (max-width: 900px) { body { height: auto; overflow: auto; } .topbar { height: auto; flex-wrap: wrap; } main { height: auto; overflow: visible; } #viewer { display: block; } .board { height: min(760px, 75dvh); min-height: 550px; margin-bottom: 10px; } .sidebar { overflow: visible; } .controls { position: static; } }
@@ -100,8 +102,9 @@
         <div class="panel">
           <h2>Selected action</h2>
           <div id="action" class="action"></div>
+          <p id="selection-progress" class="selection-progress" hidden></p>
           <p id="legal-count" class="muted"></p>
-          <details><summary>All legal actions</summary><ol id="legal" class="legal-list"></ol></details>
+          <details><summary>All legal actions</summary><ol id="legal" class="legal-list"></ol><button id="legal-more" type="button" hidden>Show more</button></details>
         </div>
         <div class="panel">
           <h2>Known opponent hand</h2>
@@ -134,6 +137,8 @@
     let names = {};
     let index = 0;
     let timer = null;
+    let legalFrame = -1;
+    let legalShown = 100;
     const byId = id => document.getElementById(id);
     const phaseName = phase => String(phase || "unknown").replaceAll("_", " ");
     const locationName = location => ({1: "Deck", 2: "Hand", 4: "Monster", 8: "Spell/Trap", 16: "Graveyard", 32: "Banished", 64: "Extra"})[location] || `zone ${location}`;
@@ -246,7 +251,11 @@
         const zone = parameters.location === 4 ? "Monster" : parameters.location === 8 ? "Spell/Trap" : `Zone ${parameters.location}`;
         parts.push(`P${parameters.controller} ${zone} ${parameters.sequence + 1}`);
       }
-      if (parameters.cards) parts.push(parameters.cards.map(card => cardLabel(observation, card, known)).join(", "));
+      if (parameters.cards) {
+        const cards = parameters.cards.map(card => cardLabel(observation, card, known)).join(", ");
+        parts.push(action.kind === "select_card" && parameters.selection_maximum != null
+          ? `Already selected: ${cards}` : cards);
+      }
       if (parameters.zones) parts.push(parameters.zones.map(zone => `P${zone.controller} ${zone.location === 4 ? "Monster" : "Spell/Trap"} ${zone.sequence + 1}`).join(", "));
       if (parameters.position != null) parts.push(`position ${parameters.position}`);
       if (parameters.race != null) parts.push(`race ${parameters.race}`);
@@ -256,6 +265,7 @@
     }
     function render() {
       if (!replay) return;
+      if (index !== legalFrame) { legalFrame = index; legalShown = 100; }
       const decisions = replay.decisions;
       const terminal = Boolean(replay.terminal_observation) && index === decisions.length;
       const record = terminal ? null : decisions[index];
@@ -291,9 +301,23 @@
         listZone("Your Graveyard", observation.graveyards[observation.viewer]),
         listZone("Your Banished", observation.banished[observation.viewer]));
       byId("action").textContent = terminal ? "Duel ended" : actionLabel(observation, record.selected_action, known);
-      byId("legal-count").textContent = terminal ? "No legal actions" : `${record.legal_actions.length} legal actions at this decision`;
+      const staged = terminal ? null : record.legal_actions.find(action => action.parameters?.selection_maximum != null);
+      const progress = byId("selection-progress");
+      progress.hidden = !staged;
+      if (staged) {
+        const params = staged.parameters;
+        const chosen = (params.cards || []).map(card => cardLabel(observation, card, known));
+        progress.textContent = `${params.selected_count} selected · choose ${params.selection_minimum}–${params.selection_maximum}`
+          + (chosen.length ? ` · Already selected: ${chosen.join(", ")}` : "");
+      }
+      const count = terminal ? 0 : record.legal_actions.length;
+      byId("legal-count").textContent = terminal ? "No legal actions" : `${count} legal actions at this decision`;
       const legal = byId("legal");
-      legal.replaceChildren(...(terminal ? [] : record.legal_actions.map(action => node("li", "", actionLabel(observation, action, known)))));
+      legal.replaceChildren(...(terminal ? [] : record.legal_actions.slice(0, legalShown).map(
+        action => node("li", "", actionLabel(observation, action, known)))));
+      const more = byId("legal-more");
+      more.hidden = count <= legalShown;
+      if (!more.hidden) more.textContent = `Show next ${Math.min(100, count - legalShown)} (${count - legalShown} remaining)`;
       const knownHand = observation.known_opponent_hand_cards || [];
       byId("known-hand").textContent = knownHand.length
         ? `${knownHand.length} of ${observation.opponent_hand_count} known: ${knownHand.map(nameOf).join(" · ")}`
@@ -326,7 +350,7 @@
     function stop() { if (timer) clearInterval(timer); timer = null; byId("play").textContent = "Play"; }
     function setReplay(data, label) {
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
-      stop(); replay = data;
+      stop(); replay = data; legalFrame = -1;
       const requested = Number(location.hash.match(/^#decision=(\d+)$/)?.[1] || 1);
       index = Math.max(0, Math.min(data.decisions.length - 1 + Number(Boolean(data.terminal_observation)), requested - 1));
       byId("file-name").textContent = label; render();
@@ -339,6 +363,7 @@
     });
     byId("previous").addEventListener("click", () => move(-1));
     byId("next").addEventListener("click", () => move(1));
+    byId("legal-more").addEventListener("click", () => { legalShown += 100; render(); });
     byId("slider").addEventListener("input", event => { index = Number(event.target.value); render(); });
     byId("jump").addEventListener("change", event => { index = Math.max(0, Math.min(replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation)), Number(event.target.value) - 1)); render(); });
     byId("play").addEventListener("click", () => {
