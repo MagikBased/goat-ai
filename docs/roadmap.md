@@ -336,6 +336,12 @@ the stolen BLS can be Flip Summoned and banish a second opposing monster that
 same turn. The original owner's hidden field view retains only public memory
 of BLS's identity. The full duel replay-verifies; see [GOAT rules](goat_rules.md).
 
+A guide-described Tsukuyomi / Nobleman line now Sets an opposing GOAT BLS and
+banishes it. The target action names only its field slot, while the acting
+player retains public knowledge that it is BLS. Nobleman performs no Flip
+monster Deck verification, and the complete duel replay-verifies; see
+[GOAT rules](goat_rules.md).
+
 The Chaos boss / Bottomless Trap Hole priority fixture now runs both official
 Chaos Sorcerer and the separate GOAT Black Luster Soldier script. For each,
 activating its banish effect before the Bottomless response removes the target
