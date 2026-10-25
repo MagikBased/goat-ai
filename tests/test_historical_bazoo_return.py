@@ -16,6 +16,7 @@ FIRST = 62651957
 SECOND = 97590747
 THIRD = 51934376
 MECHANICALCHASER = 7359741
+SKILL_DRAIN = 82732705
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -198,3 +199,79 @@ def test_bazoo_three_graveyard_cost_persists_through_opponent_turn(tmp_path):
                 assert {c.code for c in obs.banished[0]} == {FIRST, SECOND, THIRD}
                 boosted = True
     pytest.fail("Bazoo three-card cost and ATK duration did not finish")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_skill_drain_chained_after_bazoo_cost_prevents_attack_boost(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (BAZOO, GRACEFUL, SKILL_DRAIN):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    own = tmp_path / "bazoo.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        GRACEFUL, *([BAZOO] * 3), *([RETURN] * 3), *VANILLA_DECK[7:])))
+                   + "\n#extra\n!side\n")
+    other = tmp_path / "drain.ydk"
+    other.write_text("#main\n" + "\n".join(map(str, (
+        SKILL_DRAIN if code == MECHANICALCHASER else code
+        for code in VANILLA_DECK))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(own), str(other), seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {GRACEFUL, BAZOO, FIRST, SECOND}.issubset(c.code for c in obs.hand)
+        assert SKILL_DRAIN in {c.code for c in env.engine.probe.observation(1).hand}
+        graceful = discarded = trap_set = summoned = bazoo_used = cost_paid = False
+        drain_chained = False
+        for _ in range(70):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not graceful:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL), None)
+                    graceful |= action is not None
+                if graceful and not discarded:
+                    action = next((a for a in actions if a.kind == "select_cards"
+                                   and {c["code"] for c in a.parameters["cards"]}
+                                   == {FIRST, SECOND}), action)
+                    discarded |= action is not None and action.kind == "select_cards"
+            if obs.turn == 2 and obs.acting_player == 1 and not trap_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SKILL_DRAIN), None)
+                trap_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0:
+                if not summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == BAZOO), None)
+                    summoned |= action is not None
+                if summoned and not bazoo_used and action is None:
+                    action = next((a for a in actions if a.kind in ("activate", "chain")
+                                   and a.parameters.get("code") == BAZOO), None)
+                    bazoo_used |= action is not None
+                if bazoo_used and not cost_paid:
+                    action = next((a for a in actions if a.kind == "select_cards"
+                                   and {c["code"] for c in a.parameters["cards"]}
+                                   == {FIRST, SECOND}), action)
+                    cost_paid |= action is not None and action.kind == "select_cards"
+            if cost_paid and obs.acting_player == 1 and not drain_chained:
+                assert {c.code for c in obs.banished[0]} == {FIRST, SECOND}
+                assert any(c.code == BAZOO and c.attack == 1600 for c in obs.field)
+                assert [link.card_code for link in obs.chain] == [BAZOO]
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SKILL_DRAIN), None)
+                drain_chained |= action is not None
+                assert drain_chained
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_cards", "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if drain_chained and not obs.chain and obs.turn == 3 and obs.phase == "main1" \
+                    and obs.acting_player == 0 \
+                    and any(c.code == SKILL_DRAIN for c in obs.field):
+                assert obs.life_points == (8000, 7000)
+                assert {c.code for c in obs.banished[0]} == {FIRST, SECOND}
+                assert any(c.code == BAZOO and c.attack == 1600 for c in obs.field)
+                assert {f"official/c{code}.lua" for code in (BAZOO, SKILL_DRAIN)}.issubset(
+                    env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Skill Drain did not resolve after Bazoo's banish cost")
