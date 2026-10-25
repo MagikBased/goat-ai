@@ -148,3 +148,90 @@ def test_mind_control_stolen_monster_cannot_be_tributed_and_returns(
                     "place", "pass", "main2", "end_phase")), actions[0])
             obs = env.step(action)
     pytest.fail(f"Mind Control return did not occur: {returned}")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_mind_control_targets_set_monster_without_revealing_its_target(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{MIND_CONTROL}.lua").is_file():
+        pytest.skip("Mind Control script not installed")
+    own = tmp_path / "mind_control_set.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        CANNON_SOLDIER, MIND_CONTROL, BOOK_OF_MOON, *VANILLA_DECK[3:])))
+                   + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own), "examples/decks/vanilla_probe.ydk", seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert MIND_CONTROL in {c.code for c in obs.hand}
+        monster_set = mind_used = targeted = stolen = returned = False
+        monster_code = None
+        for _ in range(90):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1 and not monster_set:
+                action = next((a for a in actions if a.kind == "set_monster"), None)
+                if action is not None:
+                    monster_code = action.parameters["code"]
+                    monster_set = True
+            if obs.turn == 3 and obs.acting_player == 0 and not mind_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == MIND_CONTROL), None)
+                mind_used |= action is not None
+            if mind_used and not targeted and actions[0].kind == "select_card":
+                assert obs.acting_player == obs.viewer == 0
+                hidden = next(c for c in obs.field if c.zone == "monster"
+                              and c.controller == 1)
+                assert hidden.code is None and hidden.position == "facedown"
+                assert len(actions) == 1
+                action = actions[0]
+                assert action.parameters.get("controller") == 1
+                assert "code" not in action.parameters
+                targeted = True
+            if targeted and not stolen and obs.turn == 3 and obs.acting_player == 0 \
+                    and not obs.chain:
+                controlled = next((c for c in obs.field if c.zone == "monster"
+                                   and c.controller == 0), None)
+                if controlled is not None:
+                    assert controlled.code == monster_code
+                    assert controlled.position == "facedown"
+                    other_view = env.engine.probe.observation(1)
+                    former_card = next(c for c in other_view.field
+                                       if c.zone == "monster" and c.controller == 0)
+                    assert former_card.code is None
+                    assert former_card.position == "facedown"
+                    stolen = True
+            if stolen and obs.turn == 4 and not returned:
+                own_view = env.engine.probe.observation(0)
+                other_view = env.engine.probe.observation(1)
+                returned_card = next(c for c in other_view.field
+                                     if c.zone == "monster" and c.controller == 1)
+                assert returned_card.code == monster_code
+                assert returned_card.position == "facedown"
+                hidden = next(c for c in own_view.field if c.zone == "monster"
+                              and c.controller == 1)
+                assert hidden.code is None and hidden.position == "facedown"
+                assert (1, "monster", hidden.sequence, monster_code) in {
+                    (c.controller, c.zone, c.sequence, c.code)
+                    for c in own_view.known_opponent_field_cards}
+                assert MIND_CONTROL in {c.code for c in own_view.graveyards[0]}
+                assert f"official/c{MIND_CONTROL}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                returned = True
+                agents = (RandomAgent(100), RandomAgent(101))
+                for _ in range(5000):
+                    obs = env.step(agents[obs.acting_player].select_action(
+                        obs, env.legal_actions()))
+                    if env.is_terminal():
+                        path = tmp_path / "mind_control_set.json"
+                        write_trajectory(path, env.trajectory())
+                        assert verify_trajectory(read_trajectory(path),
+                                                 ExperimentalOcgcoreEngine(root)) == len(
+                                                     env.trajectory().decisions)
+                        return
+                pytest.fail("Mind Control set-target duel did not finish")
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail(f"Mind Control set-target return did not occur: {returned}")
