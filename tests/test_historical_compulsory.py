@@ -5,11 +5,14 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 COMPULSORY = 94192409
+BOOK_OF_MOON = 14087893
 SCAPEGOAT = 504700123
 METAMORPHOSIS = 46411259
 RESTRICT = 504700102
@@ -20,6 +23,96 @@ def _deck(path, cards, extra=()):
     path.write_text("#main\n" + "\n".join(map(str, cards))
                     + "\n#extra\n" + "\n".join(map(str, extra)) + "\n!side\n")
     return str(path)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_booked_public_monster_returned_by_compulsory_stays_known_in_hand(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (BOOK_OF_MOON, COMPULSORY):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    responder = _deck(tmp_path / "book_compulsory.ydk",
+                      (BOOK_OF_MOON, COMPULSORY, *VANILLA_DECK[2:]))
+    with GoatEnvironment(responder, "examples/decks/vanilla_probe.ydk", seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {BOOK_OF_MOON, COMPULSORY}.issubset({c.code for c in obs.hand})
+        set_cards = set()
+        summoned = book_used = book_targeted = compulsory_used = False
+        compulsory_targeted = False
+        summoned_code = None
+        for _ in range(100):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and len(set_cards) < 2:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") in (
+                                   {BOOK_OF_MOON, COMPULSORY} - set_cards)), None)
+                if action is not None:
+                    set_cards.add(action.parameters["code"])
+            if obs.turn == 2 and obs.acting_player == 1 and not summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"), action)
+                if action is not None and action.kind == "normal_summon":
+                    summoned = True
+                    summoned_code = action.parameters["code"]
+            if obs.turn == 3 and obs.acting_player == 0 and not book_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == BOOK_OF_MOON), action)
+                book_used |= action is not None and action.parameters.get("code") == BOOK_OF_MOON
+            if book_used and not book_targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("controller") == 1
+                               and a.parameters.get("code") == summoned_code), None)
+                book_targeted |= action is not None
+            if book_targeted and BOOK_OF_MOON in {c.code for c in obs.graveyards[0]} \
+                    and obs.acting_player == 0 and not compulsory_used:
+                hidden = next(c for c in obs.field if c.controller == 1
+                              and c.zone == "monster")
+                assert hidden.code is None and hidden.position == "facedown"
+                assert (1, "monster", hidden.sequence, summoned_code) in {
+                    (c.controller, c.zone, c.sequence, c.code)
+                    for c in obs.known_opponent_field_cards}
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == COMPULSORY), action)
+                compulsory_used |= action is not None and action.parameters.get(
+                    "code") == COMPULSORY
+            if compulsory_used and not compulsory_targeted \
+                    and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("controller") == 1
+                               and a.parameters.get("location") == 4), None)
+                if action is not None:
+                    assert "code" not in action.parameters
+                    compulsory_targeted = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if compulsory_targeted and COMPULSORY in {
+                    c.code for c in obs.graveyards[0]}:
+                owner = env.engine.probe.observation(1)
+                chooser = env.engine.probe.observation(0)
+                assert summoned_code in {c.code for c in owner.hand}
+                assert not any(c.controller == 1 and c.zone == "monster"
+                               for c in chooser.field)
+                assert chooser.known_opponent_hand_cards == (summoned_code,)
+                assert not chooser.known_opponent_field_cards
+                agents = (RandomAgent(18), RandomAgent(19))
+                for _ in range(3000):
+                    if env.is_terminal():
+                        break
+                    obs = env.step(agents[obs.acting_player].select_action(
+                        obs, env.legal_actions()))
+                else:
+                    pytest.fail("Book/Compulsory duel did not terminate")
+                trajectory = env.trajectory()
+                assert any(record.observation.known_opponent_hand_cards
+                           == (summoned_code,) for record in trajectory.decisions)
+                path = tmp_path / "book_compulsory.json"
+                write_trajectory(path, trajectory)
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) \
+                    == len(trajectory.decisions)
+                return
+    pytest.fail("Book and Compulsory did not return the known monster")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

@@ -412,6 +412,11 @@ class OcgcoreProbe:
                     raise ValueError("invalid MSG_MOVE length")
                 old_controller, old_location = message[5], message[6]
                 new_controller, new_location = message[15], message[16]
+                old_key = (old_controller, old_location,
+                           struct.unpack_from("<I", message, 7)[0])
+                new_key = (new_controller, new_location,
+                           struct.unpack_from("<I", message, 17)[0])
+                known_code = self._known_facedown.get(old_key)
                 known_hand = getattr(self, "_known_hand", None)
                 if known_hand is not None:
                     if old_controller in (0, 1) and old_location == LOCATION_HAND:
@@ -443,17 +448,14 @@ class OcgcoreProbe:
                                      (old_location in (LOCATION_MZONE, LOCATION_SZONE)
                                       and struct.unpack_from("<I", message, 11)[0] & 0x5))
                     if (new_controller in (0, 1) and new_location == LOCATION_HAND
-                            and public_source):
-                        # Graveyard and face-up field identities are public.
-                        # Never infer this from a private Deck/hand move's
-                        # raw MSG_MOVE card code.
+                            and (public_source or known_code is not None)):
+                        # A previously public face-down field card remains
+                        # identifiable when returned to its owner's hand.
+                        # Never infer identity from a private Deck/hand move.
                         known_hand[new_controller].append(
-                            struct.unpack_from("<I", message, 1)[0])
-                old_key = (message[5], message[6],
-                           struct.unpack_from("<I", message, 7)[0])
-                new_key = (message[15], message[16],
-                           struct.unpack_from("<I", message, 17)[0])
-                known_code = self._known_facedown.pop(old_key, None)
+                            struct.unpack_from("<I", message, 1)[0]
+                            if public_source else known_code)
+                self._known_facedown.pop(old_key, None)
                 self._known_facedown.pop(new_key, None)
                 if (new_key[0] in (0, 1)
                         and new_key[1] in (LOCATION_MZONE, LOCATION_SZONE)
