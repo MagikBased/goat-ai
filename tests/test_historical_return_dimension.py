@@ -15,6 +15,7 @@ RETURN = 27174286
 BOOK_OF_MOON = 14087893
 MYSTICAL_SPACE_TYPHOON = 5318639
 SOLEMN_JUDGMENT = 41420027
+ROYAL_DECREE = 51452091
 SCAPEGOAT = 504700123
 BAZOO = 40133511
 CHASER = 7359741
@@ -131,10 +132,13 @@ def test_return_revives_chaos_costs_with_book_end_phase_exception(
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("negate", [False, True])
-def test_return_chain_distinguishes_mst_destruction_from_solemn_negation(tmp_path, negate):
+@pytest.mark.parametrize("response", [MYSTICAL_SPACE_TYPHOON,
+                                      SOLEMN_JUDGMENT, ROYAL_DECREE])
+def test_return_chain_distinguishes_removal_activation_negation_and_decree(
+        tmp_path, response):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    response = SOLEMN_JUDGMENT if negate else MYSTICAL_SPACE_TYPHOON
+    negate = response == SOLEMN_JUDGMENT
+    decree = response == ROYAL_DECREE
     for relative in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua",
                      f"official/c{RETURN}.lua", f"official/c{response}.lua"):
         if not (root / "scripts" / relative).is_file():
@@ -200,7 +204,8 @@ def test_return_chain_distinguishes_mst_destruction_from_solemn_negation(tmp_pat
                 if response_chained:
                     assert obs.life_points == (4000, 8000)
                     assert {LIGHT, DARK} == {c.code for c in obs.banished[0]}
-            if not negate and response_chained and not response_targeted \
+            if response == MYSTICAL_SPACE_TYPHOON and response_chained \
+                    and not response_targeted \
                     and actions[0].kind == "select_card":
                 assert obs.acting_player == obs.viewer == 1
                 action = next((a for a in actions if a.parameters.get("code") == RETURN
@@ -213,16 +218,19 @@ def test_return_chain_distinguishes_mst_destruction_from_solemn_negation(tmp_pat
             obs = env.step(action)
             if response_chained and not resolved \
                     and RETURN in {c.code for c in obs.graveyards[0]} \
-                    and response in {c.code for c in obs.graveyards[1]} \
+                    and (response in {c.code for c in obs.graveyards[1]}
+                         or (decree and any(c.code == ROYAL_DECREE
+                                            and c.position == "faceup"
+                                            for c in obs.field))) \
                     and not obs.chain:
                 assert obs.life_points == (4000, 4000 if negate else 8000)
                 revived_codes = {c.code for c in obs.field
                                  if c.controller == 0 and c.zone == "monster"
                                  and c.code != BLS}
-                assert revived_codes == (set() if negate else {LIGHT, DARK})
+                assert revived_codes == (set() if negate or decree else {LIGHT, DARK})
                 assert {c.code for c in obs.banished[0]} == (
-                    {LIGHT, DARK} if negate else set())
-                assert response_targeted == (not negate)
+                    {LIGHT, DARK} if negate or decree else set())
+                assert response_targeted == (response == MYSTICAL_SPACE_TYPHOON)
                 resolved = True
             if resolved and obs.turn >= 4:
                 assert {LIGHT, DARK} == {c.code for c in obs.banished[0]}
