@@ -223,6 +223,18 @@ def test_agents_use_same_contract():
     assert HumanAgent(input_fn=lambda _: "1", output_fn=lambda _: None).select_action(view(), actions) == actions[1]
 
 
+def test_flip_type_metadata_changes_generic_summon_preference():
+    flip_code, ordinary_code = 87621407, 49881766
+    flip_actions = (Action("0", "normal_summon", 0, {"code": flip_code}),
+                    Action("1", "set_monster", 0, {"code": flip_code}))
+    ordinary_actions = (Action("0", "normal_summon", 0, {"code": ordinary_code}),
+                        Action("1", "set_monster", 0, {"code": ordinary_code}))
+    assert HeuristicAgent().select_action(view(), flip_actions) == flip_actions[0]
+    agent = HeuristicAgent(flip_monster_codes={flip_code})
+    assert agent.select_action(view(), flip_actions) == flip_actions[1]
+    assert agent.select_action(view(), ordinary_actions) == ordinary_actions[0]
+
+
 def test_trajectory_round_trip_and_legality(tmp_path):
     action = Action("1", "attack", 0, {"target": "direct"})
     observation = replace(view(), chain=(ChainLinkView(1, 123, 0, 4, 2),),

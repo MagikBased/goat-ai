@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import platform
+import sqlite3
 from dataclasses import asdict
 from functools import partial
 from pathlib import Path
@@ -14,6 +15,8 @@ from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import run_tournament, run_tournament_parallel
 
+FLIP_MONSTER_TYPE = 0x200000  # TYPE_FLIP in the pinned scripts/constant.lua
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -23,16 +26,35 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def agent_factory(name: str):
+def flip_monster_codes(native_root: Path) -> frozenset[int]:
+    """Read public card type metadata from the pinned databases."""
+    codes = set()
+    for relative in ("database/cards.cdb", "database/goat-entries.cdb",
+                     "database/cards-unofficial.cdb"):
+        path = native_root / relative
+        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as database:
+            codes.update(row[0] for row in database.execute(
+                "SELECT id FROM datas WHERE (type & ?) != 0", (FLIP_MONSTER_TYPE,)))
+    return frozenset(codes)
+
+
+def agent_factory(name: str, native_root: Path):
     if name == "random":
         return RandomAgent
     if name == "heuristic":
         return make_heuristic
+    if name == "flip_heuristic":
+        return partial(make_flip_heuristic,
+                       flip_monster_codes=flip_monster_codes(native_root))
     raise ValueError(f"unknown agent: {name}")
 
 
 def make_heuristic(_seed: int) -> HeuristicAgent:
     return HeuristicAgent()
+
+
+def make_flip_heuristic(_seed: int, *, flip_monster_codes: frozenset[int]) -> HeuristicAgent:
+    return HeuristicAgent(flip_monster_codes)
 
 
 def main() -> None:
@@ -41,8 +63,10 @@ def main() -> None:
     parser.add_argument("--engine", choices=("restricted", "experimental"),
                         default="restricted")
     parser.add_argument("--matchup", nargs=2, action="append", metavar=("DECK_A", "DECK_B"))
-    parser.add_argument("--agent-a", choices=("random", "heuristic"), default="random")
-    parser.add_argument("--agent-b", choices=("random", "heuristic"), default="random")
+    parser.add_argument("--agent-a", choices=("random", "heuristic", "flip_heuristic"),
+                        default="random")
+    parser.add_argument("--agent-b", choices=("random", "heuristic", "flip_heuristic"),
+                        default="random")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--seeds", type=int, default=2)
     parser.add_argument("--max-decisions", type=int, default=5000)
@@ -61,7 +85,8 @@ def main() -> None:
                    else ExperimentalOcgcoreEngine)
     started = perf_counter()
     report = runner(
-        matchups, seeds, agent_factory(args.agent_a), agent_factory(args.agent_b),
+        matchups, seeds, agent_factory(args.agent_a, args.native_root),
+        agent_factory(args.agent_b, args.native_root),
         partial(engine_type, args.native_root), args.max_decisions,
         **({"workers": args.workers} if args.workers > 1 else {}),
     )

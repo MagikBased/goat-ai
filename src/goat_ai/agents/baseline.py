@@ -1,7 +1,7 @@
 """All agents consume the same redacted observation and legal action list."""
 
 import random
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from typing import ClassVar, Protocol
 
 from goat_ai.actions import Action
@@ -23,7 +23,7 @@ class RandomAgent:
 
 
 class HeuristicAgent:
-    """Simple generic action preference; no deck or card ID scripts."""
+    """Simple generic action preference; optional public Flip type metadata."""
 
     _scores: ClassVar[dict[str, int]] = {
         "attack": 5, "activate": 4, "special_summon": 3,
@@ -31,10 +31,19 @@ class HeuristicAgent:
         "change_position": 0, "pass": -1, "phase_transition": -2,
     }
 
+    def __init__(self, flip_monster_codes: Collection[int] = ()) -> None:
+        self.flip_monster_codes = frozenset(flip_monster_codes)
+
+    def _score(self, action: Action) -> int:
+        if (action.kind == "set_monster"
+                and action.parameters.get("code") in self.flip_monster_codes):
+            return 3
+        return self._scores.get(action.kind, 0)
+
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
             raise ValueError("no legal actions")
-        return max(legal_actions, key=lambda a: self._scores.get(a.kind, 0))
+        return max(legal_actions, key=self._score)
 
 
 class HumanAgent:

@@ -524,3 +524,11 @@ assert candidate['deck_sha256'] == control['deck_sha256']
 print(paired_score_difference(candidate_games, control_games))
 PY
 ```
+
+### Flip-aware heuristic ablation
+
+The generic heuristic scores face-up Normal Summons above monster Sets. A seed-9800 Flip Control action trace showed it Normal Summoning Dekoichi, Mask of Darkness, and Magician of Faith while Set was legal. An optional `flip_heuristic` variant reads the public Flip-monster type flag from the pinned card databases and scores Sets of those monsters above Normal Summons. It uses the same redacted observations and legal actions as other agents; the default `heuristic` is unchanged.
+
+On the identical 120-game, six-deck schedule above, `flip_heuristic` scored **75 wins, 44 losses, and 1 draw** against RandomAgent (62.9%; paired score interval 52.9–72.5%). Its score difference from the original heuristic was **−0.4 percentage points**, with a paired 95% bootstrap interval of **−8.3 to +7.9 points**. Flip Control improved from 3/20 to 6/20 wins, and Chaos Turbo from 11/20 to 15/20, while Chaos Control fell from 14/20 to 7/20. The variant therefore has no measured aggregate improvement; more decision-level analysis and independent seeds are needed before making it the default. The four-worker run used 75,132 decisions in 16.98 seconds on the same pinned assets. All 120 games reached terminal states under the cap.
+
+To reproduce, run the schedule-building shell commands above with `--agent-a flip_heuristic` and `--output artifacts/sourced_balanced_flip_heuristic_random_9800_9801.json`. In the Python snippet above, load that report as the candidate and `sourced_balanced_heuristic_random_9800_9801.json` as the control.
