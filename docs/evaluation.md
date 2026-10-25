@@ -1965,3 +1965,28 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
   --both-deck-assignments --require-unseen-main-decks \
   --seed 19050 --seeds 32 --workers 4 --max-decisions 3000
 ```
+
+## Thunder Dragon zero-search policy decision (2026-10-25)
+
+The native GOAT Thunder Dragon prompt offers a legal `cancel` response that
+resolves as a zero-copy search. Policy inference version 2 always overrode
+`cancel`, even when the model ranked it highest. The two held-out Thunder
+Dragon prompts in the replay-verified seed-17200 teacher sample exposed this:
+both saved feature-v17 checkpoints scored `cancel` highest, while the wrapper
+selected a Deck copy. Version 3 permits the first cancellation at a distinct
+player-visible prompt and uses the best non-cancel action if that same prompt
+recurs. The guard ignores history text and transient action IDs but compares
+the visible state and legal choices; it keeps only 64 prompts per turn.
+
+On the same 611 multi-option held-out teacher decisions, the 32-duel parent
+checkpoint now agrees on **595/611** (previously 593/611) and the 64-duel
+clone on **597/611** (previously 595/611). Both recovered decisions are
+Thunder Dragon zero-search choices. A seeded native fixture confirms that
+`cancel` and explicit empty selection both leave the two Deck copies in
+place and reveal nothing. An eight-duel experimental-engine smoke run of the
+parent checkpoint against CombatHeuristicAgent on unseen Chaos Control and
+Chaos Return Main Decks, seeds 19100–19101 with both deck assignments and
+seats, completed all games under 3,000 decisions and scored **3–5–0**. The
+sample is too small to estimate a strength change. The machine-readable
+report is stored locally at
+`.cache/goat-ai/thunder_cancel_inference_v3_eval.json` and is not committed.

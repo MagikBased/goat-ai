@@ -13,7 +13,8 @@ THUNDER_DRAGON = 504700054  # GOAT variant permits searching for zero copies.
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_thunder_dragon_may_choose_zero_with_copies_remaining(tmp_path):
+@pytest.mark.parametrize("zero_action", ["select_cards", "cancel"])
+def test_thunder_dragon_may_choose_zero_with_copies_remaining(tmp_path, zero_action):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     if not (root / f"scripts/goat/c{THUNDER_DRAGON}.lua").is_file():
         pytest.skip("GOAT Thunder Dragon script not installed")
@@ -34,7 +35,7 @@ def test_thunder_dragon_may_choose_zero_with_copies_remaining(tmp_path):
             if activated and any(a.kind == "select_cards" for a in actions):
                 assert any(len(a.parameters.get("cards", ())) == 2
                            for a in actions if a.kind == "select_cards")
-                action = next(a for a in actions if a.kind == "select_cards"
+                action = next(a for a in actions if a.kind == zero_action
                               and not a.parameters.get("cards"))
                 selected_zero = True
             if action is None:

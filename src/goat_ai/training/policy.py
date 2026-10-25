@@ -1,7 +1,7 @@
 """Visible-state, action-conditioned policy for variable legal-action sets."""
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cached_property
 from math import cos, log1p, sin
 from pathlib import Path
@@ -28,7 +28,7 @@ ACTION_KINDS = (
 ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
 SORT_ACTION_KINDS = ("sort_cards",)
-POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
+POLICY_INFERENCE_VERSION = 3  # permit legal cancel once per visible prompt
 POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experiments
 # Version 16 branches from v12 so its combat relation can be tested without
 # the separate v13-v15 equip, chain-target, and occupancy experiments.
@@ -486,6 +486,8 @@ class PolicyAgent:
         self.model = model
         self.vocabulary = vocabulary
         self._last_selection: tuple[int, str, tuple] | None = None
+        self._cancel_turn: int | None = None
+        self._cancelled_prompts: list[tuple[Observation, tuple[tuple, ...]]] = []
 
     @staticmethod
     def _card_reference(action: Action) -> tuple:
@@ -501,10 +503,24 @@ class PolicyAgent:
             scores = self.model(features.to(device))
         chosen = legal_actions[int(scores.argmax().item())]
         if chosen.kind == "cancel":
-            alternatives = [(index, action) for index, action in enumerate(legal_actions)
-                            if action.kind != "cancel"]
-            if alternatives:
-                chosen = max(alternatives, key=lambda item: scores[item[0]].item())[1]
+            if observation.turn != self._cancel_turn:
+                self._cancel_turn = observation.turn
+                self._cancelled_prompts.clear()
+            # A cancellation may return to the same prompt after an activation
+            # retry. Ignore history text and ephemeral action IDs, but compare
+            # all player-visible state and legal choices before overriding it.
+            prompt = (replace(observation, public_history=()),
+                      tuple((action.kind, action.actor, action.parameters)
+                            for action in legal_actions))
+            if prompt in self._cancelled_prompts:
+                alternatives = [(index, action) for index, action in enumerate(legal_actions)
+                                if action.kind != "cancel"]
+                if alternatives:
+                    chosen = max(alternatives, key=lambda item: scores[item[0]].item())[1]
+            else:
+                self._cancelled_prompts.append(prompt)
+                if len(self._cancelled_prompts) > 64:
+                    self._cancelled_prompts.pop(0)
         if chosen.kind == "unselect_card":
             finish = next((action for action in legal_actions
                            if action.kind == "finish_selection"), None)

@@ -266,6 +266,13 @@ split is much worse. This negative pilot argues against simply adding more
 same-deck teacher games; investigate source-aware target choices and broader
 cross-deck evaluation before another promotion. See [evaluation](evaluation.md).
 
+The Thunder Dragon zero-copy search is a legal cancel response in the native
+GOAT script. Policy inference version 3 now permits it once per distinct
+visible prompt while guarding retries. Both saved combat clones recover two
+held-out teacher choices; a small native smoke run completed. Continue with
+other high-play cards and their interaction paths before treating clone
+agreement as competitive strength. See [evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

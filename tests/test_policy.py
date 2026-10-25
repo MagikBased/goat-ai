@@ -941,4 +941,13 @@ def test_policy_agent_progresses_multi_card_selection():
 
     cancel_agent = PolicyAgent(FavorCancel(), CardVocabulary((10, 20)))
     cancel = Action("cancel", "cancel", 0)
-    assert cancel_agent.select_action(view(), (cancel, first)) == first
+    assert cancel_agent.select_action(view(), (cancel, first)) == cancel
+    retry = replace(view(), public_history=("Thunder Dragon effect resolved",))
+    assert cancel_agent.select_action(
+        retry, (Action("new-cancel-id", "cancel", 0),
+                Action("new-select-id", "select_card", 0, first.parameters))
+    ).kind == "select_card"
+    # A changed visible hand is a new decision even on the same turn.
+    changed = replace(view(), hand=(CardView(0, "hand", "hidden", 20, 0),))
+    assert cancel_agent.select_action(changed, (cancel, first)) == cancel
+    assert cancel_agent.select_action(replace(view(), turn=4), (cancel, first)) == cancel
