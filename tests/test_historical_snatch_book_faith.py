@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 SNATCH = 45986603
 BOOK = 14087893
@@ -95,7 +97,21 @@ def test_snatch_book_stolen_faith_recovers_controllers_book(tmp_path):
                 assert any(c.code == FAITH and c.controller == 0
                            and c.position == "faceup" for c in obs.field)
                 assert BOOK not in {c.code for c in obs.graveyards[0]}
-                assert not any(c.code == BOOK for c in env.engine.probe.observation(1).hand)
+                former_owner = env.engine.probe.observation(1)
+                assert not any(c.code == BOOK for c in former_owner.hand)
+                assert BOOK in former_owner.known_opponent_hand_cards
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
-                return
+                agents = (RandomAgent(52), RandomAgent(53))
+                for _ in range(5000):
+                    action = agents[obs.acting_player].select_action(
+                        obs, env.legal_actions())
+                    obs = env.step(action)
+                    if env.is_terminal():
+                        path = tmp_path / "snatch_book_faith.json"
+                        write_trajectory(path, env.trajectory())
+                        assert verify_trajectory(read_trajectory(path),
+                                                 ExperimentalOcgcoreEngine(root)) == len(
+                                                     env.trajectory().decisions)
+                        return
+                pytest.fail("stolen Faith duel did not finish")
     pytest.fail("Snatch / Book / Faith line did not resolve")
