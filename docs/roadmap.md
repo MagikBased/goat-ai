@@ -89,6 +89,8 @@ A third Mind Control fixture targets an already Set monster without leaking its 
 
 A fourth Mind Control fixture confirms the historically barred Metamorphosis Tribute: with a Level 4 Fusion available, Metamorphosis can use the controller's own Cannon Soldier but does not offer the stolen Level 4 monster as a cost. The full duel replay-verifies; see [GOAT rules](goat_rules.md).
 
+Three Kuriboh fixtures now cover its private-hand Damage Step response: accepting versus declining it against a direct attack, and using it to prevent damage without saving a weaker face-up monster from battle destruction. Kuriboh appears in two sourced tournament Side Decks. All three full duels replay-verify; see [GOAT rules](goat_rules.md).
+
 Four Morphing Jar deck-out fixtures now verify the historical five-card draw boundary for either player: with four Deck cards the effect ends the duel, while with five it resolves and the next required draw ends the duel. Two additional native fixtures check equal Deck counts: four each gives a draw, while five each resolves and the next required draw determines the loser. All six terminal trajectories replay-verify. A contemporaneous 2005 TCG source for the simultaneous failed-draw outcome remains to be located, so that historical interpretation is provisional. See [GOAT rules](goat_rules.md).
 
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
