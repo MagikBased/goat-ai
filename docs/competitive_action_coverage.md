@@ -175,3 +175,43 @@ responses to Sakuretsu Armor now have a two-order native chain regression
 with full-duel replay verification. The random-policy action
 counts express decision exposure in this small sample, not actual tournament
 play frequency, historical correctness, or strategic value.
+
+## Same-schedule random and combat-baseline exposure
+
+The probe also accepts `--agent combat_heuristic` (or `heuristic`). This
+changes only the agent selecting from the same player-visible observations
+and legal actions. Use matching seeds and tournament pairings to see how a
+baseline's choices alter card exposure:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --tournament-corpus --agent combat_heuristic \
+  --seed 9840 --seeds 1 --max-decisions 3000 \
+  --output .cache/goat-ai/competitive-actions-combat-9840.json \
+  > .cache/goat-ai/competitive-actions-combat-9840.stdout
+PYTHONPATH=src:. .venv/bin/python scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --tournament-corpus --agent random \
+  --seed 9840 --seeds 1 --max-decisions 3000 \
+  --output .cache/goat-ai/competitive-actions-random-9840.json \
+  > .cache/goat-ai/competitive-actions-random-9840.stdout
+```
+
+Both runs completed 30/30 terminal games, including one draw under the
+combat baseline and three under random selection. The combat run recorded
+15,904 decisions and 56 selected card responses; its report SHA-256 is
+`1617e0f1a212344fa3b4f1627468746aa28e9b71252427d324a0c126185949cb`.
+The random run recorded 28,222 decisions and 79 selected card responses;
+its report SHA-256 is
+`f0bda7b365718155a99c37b95a8c7e5bca23fb0608a1d712853297d4b48e53ad`.
+Repeating the random run produced that same SHA-256.
+The two agents induce different game lengths, so raw action counts are not
+comparable play rates. Book of Moon was the most selected activate/chain
+staple in both samples (58 combat, 117 random). The combat sample also
+selected Torrential Tribute 38 times and chose it in response to Tsukuyomi
+four times, making that pair a candidate for a historical ruling fixture.
+
+The random run first uncovered a valid zero-card `MSG_CONFIRM_DECKTOP` frame
+that the adapter incorrectly rejected. The pinned core permits this frame
+when no cards are available to reveal. The adapter now accepts it without
+adding an empty card-reveal event, and the run completes. This is a protocol
+fix, not a card-specific historical ruling.

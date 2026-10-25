@@ -11,7 +11,7 @@ from collections import Counter
 from itertools import combinations
 from pathlib import Path
 
-from goat_ai.agents import RandomAgent
+from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
@@ -30,6 +30,17 @@ DEFAULT_MATCHUPS = (
 def tournament_matchups(fixtures: Path) -> tuple[tuple[Path, Path], ...]:
     """Pair each of the six sourced tournament Main Decks once."""
     return tuple(combinations((fixtures / name for name in TOURNAMENT_MAIN_DECKS), 2))
+
+
+def make_agent(name: str, seed: int):
+    """Construct a baseline using only the public observation/action interface."""
+    if name == "random":
+        return RandomAgent(seed)
+    if name == "heuristic":
+        return HeuristicAgent()
+    if name == "combat_heuristic":
+        return CombatHeuristicAgent()
+    raise ValueError(f"unknown baseline agent: {name}")
 SOURCE_KINDS = frozenset({
     "activate", "chain", "normal_summon", "flip_summon", "special_summon",
     "set_monster", "set_spell_trap", "attack", "change_position",
@@ -87,7 +98,8 @@ def card_names(native_root: Path, codes: set[int]) -> dict[int, str]:
 
 
 def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
-          first_seed: int, seeds: int, max_decisions: int) -> dict:
+          first_seed: int, seeds: int, max_decisions: int,
+          agent_name: str = "random") -> dict:
     if seeds < 1 or max_decisions < 1 or not matchups:
         raise ValueError("positive seeds/max_decisions and nonempty matchups required")
     offered: Counter[tuple[int, str]] = Counter()
@@ -110,13 +122,21 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
                 with GoatEnvironment(*(str(path) for path in decks), seed=seed,
                                      engine=ExperimentalOcgcoreEngine(native_root)) as env:
                     observation = env.reset()
-                    agents = (RandomAgent(seed * 2), RandomAgent(seed * 2 + 1))
-                    for _ in range(max_decisions):
+                    agents = (make_agent(agent_name, seed * 2),
+                              make_agent(agent_name, seed * 2 + 1))
+                    for decision_index in range(max_decisions):
                         if env.is_terminal():
                             break
                         action = agents[observation.acting_player].select_action(
                             observation, env.legal_actions())
-                        observation = env.step(action)
+                        try:
+                            observation = env.step(action)
+                        except Exception as error:
+                            raise RuntimeError(
+                                f"probe failed: decks={tuple(map(deck_label, decks))}, "
+                                f"seed={seed}, swapped={swapped}, "
+                                f"decision={decision_index}"
+                            ) from error
                     else:
                         if not env.is_terminal():
                             raise RuntimeError(f"duel exceeded {max_decisions} decisions: "
@@ -163,8 +183,9 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
         "global_constants": "scripts/constant.lua",
         "global_utility": "scripts/utility.lua",
     }
-    return {
-        "scope": "seeded random-agent source-action sample; not GOAT correctness or play rate",
+    result = {
+        "scope": f"seeded {agent_name.replace('_', '-')}-agent source-action sample; "
+                 "not GOAT correctness or play rate",
         "seeds": list(range(first_seed, first_seed + seeds)),
         "max_decisions": max_decisions,
         "asset_sha256": {name: sha256_file(native_root / relative)
@@ -184,6 +205,9 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
                 responses.items(), key=lambda item: (-item[1], item[0]))
         ],
     }
+    if agent_name != "random":
+        result["agent"] = agent_name
+    return result
 
 
 def main() -> None:
@@ -195,6 +219,8 @@ def main() -> None:
     schedule.add_argument("--tournament-corpus", action="store_true",
                           help="probe all 15 pairs of six sourced tournament decks")
     parser.add_argument("--seed", type=int, default=9700)
+    parser.add_argument("--agent", choices=("random", "heuristic", "combat_heuristic"),
+                        default="random")
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--max-decisions", type=int, default=3000)
     parser.add_argument("--output", type=Path)
@@ -207,7 +233,7 @@ def main() -> None:
     else:
         matchups = tuple(tuple(pair) for pair in args.matchup)
     report = probe(args.native_root, matchups, args.seed, args.seeds,
-                   args.max_decisions)
+                   args.max_decisions, args.agent)
     payload = json.dumps(report, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

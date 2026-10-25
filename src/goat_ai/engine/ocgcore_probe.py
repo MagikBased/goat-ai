@@ -606,12 +606,14 @@ class OcgcoreProbe:
                 if len(message) < 6 or message[1] not in (0, 1):
                     raise ValueError("invalid MSG_CONFIRM_DECKTOP")
                 count = struct.unpack_from("<I", message, 2)[0]
-                if not count or len(message) != 6 + count * 10:
-                    raise ValueError("invalid MSG_CONFIRM_DECKTOP card count")
-                codes = tuple(struct.unpack_from("<I", message, 6 + index * 10)[0]
-                              for index in range(count))
-                self._public_reveals.append(PublicRevealView(
-                    self._turn, message[1], "deck_top", codes))
+                if len(message) != 6 + count * 10:
+                    raise ValueError("invalid MSG_CONFIRM_DECKTOP card count: "
+                                     f"count={count}, frame_length={len(message)}")
+                if count:
+                    codes = tuple(struct.unpack_from("<I", message, 6 + index * 10)[0]
+                                  for index in range(count))
+                    self._public_reveals.append(PublicRevealView(
+                        self._turn, message[1], "deck_top", codes))
             elif message[0] == MSG_CONFIRM_CARDS:
                 if len(message) < 6 or message[1] not in (0, 1):
                     raise ValueError("invalid MSG_CONFIRM_CARDS")

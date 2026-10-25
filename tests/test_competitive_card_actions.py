@@ -5,9 +5,10 @@ from itertools import combinations
 from types import SimpleNamespace
 
 from goat_ai.actions import Action
+from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
 from scripts.probe_competitive_card_actions import (
-    ROOT, count_chain_response, count_source_actions, deck_label,
+    ROOT, count_chain_response, count_source_actions, deck_label, make_agent,
     tournament_matchups,
 )
 
@@ -42,6 +43,12 @@ def test_tournament_probe_pairs_every_sourced_list_and_no_guide_deck():
     assert tournament_matchups(fixtures) == expected
     assert len(expected) == 15
     assert all("guide" not in str(path) for pair in expected for path in pair)
+
+
+def test_probe_agent_choice_uses_baseline_public_action_interfaces():
+    assert isinstance(make_agent("random", 5), RandomAgent)
+    assert isinstance(make_agent("heuristic", 5), HeuristicAgent)
+    assert isinstance(make_agent("combat_heuristic", 5), CombatHeuristicAgent)
 
 
 def test_chain_response_uses_latest_public_link_and_ignores_nonresponses():

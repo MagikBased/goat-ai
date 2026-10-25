@@ -9,6 +9,7 @@ from goat_ai.engine.ocgcore_probe import (
     GOAT_FLAGS,
     MSG_ATTACK,
     MSG_CONFIRM_CARDS,
+    MSG_CONFIRM_DECKTOP,
     MSG_DAMAGE_STEP_END,
     MSG_DAMAGE_STEP_START,
     MSG_DRAW,
@@ -98,6 +99,22 @@ def test_confirm_cards_preserves_recipient_and_discards_native_card_order():
     assert probe._known_hand == {0: [], 1: [200]}
     with pytest.raises(ValueError, match="MSG_CONFIRM_CARDS"):
         probe._update_public_clock([message[:-1]])
+
+
+def test_zero_count_decktop_confirmation_is_a_valid_empty_reveal():
+    probe = object.__new__(OcgcoreProbe)
+    probe._turn = 4
+    probe._public_reveals = []
+    empty = bytes((MSG_CONFIRM_DECKTOP, 0)) + struct.pack("<I", 0)
+    probe._update_public_clock([empty])
+    assert probe._public_reveals == []
+    one_card = bytes((MSG_CONFIRM_DECKTOP, 1)) + struct.pack("<I", 1) \
+        + struct.pack("<IBBI", 55144522, 1, 1, 0)
+    probe._update_public_clock([one_card])
+    assert [(reveal.player, reveal.codes) for reveal in probe._public_reveals] == [
+        (1, (55144522,))]
+    with pytest.raises(ValueError, match="MSG_CONFIRM_DECKTOP card count"):
+        probe._update_public_clock([empty + b"\x00"])
 
 
 def test_known_facedown_memory_requires_public_flip_and_clears_on_move():
