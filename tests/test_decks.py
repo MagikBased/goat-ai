@@ -51,6 +51,8 @@ SOURCED_TOURNAMENT_MAIN_DECKS = (
     "chaos_return_dingosig_worlds_2022.ydk",
 )
 
+BAZOO_RETURN_WORLD_DECK = Path("examples/decks/bazoo_return_weirdchamp_worlds.ydk")
+
 SHARED_STAPLE_IDS = frozenset({
     71413901, 44763025, 45986603, 55144522, 504700116,
     14087893, 504700118, 19613556, 511000824, 79571449,
@@ -104,6 +106,21 @@ def test_main_deck_fingerprint_ignores_order_comments_and_side(tmp_path):
     assert expected == main_deck_composition_sha256(read_ydk(second))
     second.write_text("#main\n456\n123\n456\n")
     assert expected != main_deck_composition_sha256(read_ydk(second))
+
+
+@pytest.mark.skipif(not Path(".cache/goat-ai/banlist/GOAT.lflist.conf").exists(),
+                    reason="native assets not installed")
+def test_sourced_bazoo_return_deck_matches_published_counts_and_is_legal():
+    root = Path(".cache/goat-ai")
+    deck = read_ydk(BAZOO_RETURN_WORLD_DECK)
+    assert len(deck.main) == 40
+    assert deck.extra == deck.side == ()
+    assert Counter(deck.main)[40133511] == 3  # Bazoo the Soul-Eater
+    assert Counter(deck.main)[27174286] == 3  # Return from the Different Dimension
+    assert Counter(deck.main)[504700054] == 3  # GOAT Thunder Dragon
+    validate_goat_deck(deck, read_goat_whitelist(root / "banlist/GOAT.lflist.conf"),
+                       root / "database/cards.cdb", root / "database/goat-entries.cdb",
+                       root / "database/cards-unofficial.cdb")
 
 
 def test_whitelist_parsing(tmp_path):

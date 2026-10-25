@@ -20,6 +20,7 @@ DEFAULT_DECKS = (
     "warrior_montague_clash.ydk",
     "chaos_control_insids_worlds_2022.ydk",
     "chaos_return_dingosig_worlds_2022.ydk",
+    "bazoo_return_weirdchamp_worlds.ydk",
 )
 
 
@@ -65,7 +66,7 @@ def main() -> None:
     fixtures = tuple(sorted((ROOT / "tests").glob("test_historical_*.py")))
     rows = priority_rows(deck_paths, fixtures, names)
     if args.json:
-        print(json.dumps({"scope": "five sourced tournament Main Decks; numeric fixture "
+        print(json.dumps({"scope": "six sourced tournament Main Decks; numeric fixture "
                                     "references are not historical correctness evidence",
                           "decks": [str(path.relative_to(ROOT)) for path in deck_paths],
                           "cards": rows}, indent=2))
