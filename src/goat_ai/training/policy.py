@@ -27,7 +27,7 @@ ACTION_KINDS = (
 )
 ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 POLICY_INFERENCE_VERSION = 2  # selection-progress and cancel-loop guards
-POLICY_FEATURE_VERSION = 4  # distinguish zone choices and active zone restrictions
+POLICY_FEATURE_VERSION = 5  # encode the player's known initial Main Deck composition
 
 
 @dataclass(frozen=True)
@@ -71,6 +71,7 @@ class DecisionFeatures:
     action_target_context: Tensor  # [A, T, 5]: owner, zone, slot, slot sin/cos
     action_target_mask: Tensor  # [A, T]: target exists, even when its ID is hidden
     action_numbers: Tensor  # [A, 8]
+    deck_cards: Tensor  # [D]: sorted initial own Main Deck card IDs, or [0] before v5
 
     def to(self, device: torch.device | str) -> "DecisionFeatures":
         return DecisionFeatures(*(value.to(device) for value in self.__dict__.values()))
@@ -84,7 +85,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in (1, 2, 3, 4):
+    if feature_version not in (1, 2, 3, 4, 5):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -186,6 +187,9 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         torch.tensor(padded_context, dtype=torch.float32),
         torch.tensor(target_masks, dtype=torch.bool),
         torch.tensor(action_numbers, dtype=torch.float32),
+        torch.tensor([vocabulary.index(code) for code in observation.own_main_deck]
+                     if feature_version >= 5 and observation.own_main_deck else [0],
+                     dtype=torch.long),
     )
 
 
@@ -195,7 +199,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in (1, 2, 3, 4):
+        if feature_version not in (1, 2, 3, 4, 5):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -212,6 +216,8 @@ class LegalActionPolicy(nn.Module):
         if feature_version >= 2:
             self.target_context = nn.Sequential(nn.Linear(5, width), nn.ReLU(),
                                                 nn.Linear(width, width))
+        if feature_version >= 5:
+            self.deck_projection = nn.Sequential(nn.Linear(width, width), nn.ReLU())
         self.score = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
                                    nn.Linear(width, 1))
 
@@ -223,6 +229,11 @@ class LegalActionPolicy(nn.Module):
         pooled = (visible * mask).sum(0) / mask.sum().clamp(min=1)
         state = pooled + self.phase(features.phase) + self.state_numbers(
             features.state_numbers)
+        if self.feature_version >= 5:
+            deck_mask = (features.deck_cards != 0).unsqueeze(1)
+            deck = (self.card(features.deck_cards) * deck_mask).sum(0) / deck_mask.sum().clamp(
+                min=1)
+            state = state + self.deck_projection(deck)
         targets = features.action_targets
         target_mask = ((targets != 0) if self.feature_version == 1
                        else features.action_target_mask).unsqueeze(-1)

@@ -10,9 +10,9 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restric
 | Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
 | Complete headless duel | Restricted native adapter reaches terminal through `GoatEnvironment`; general card support unfinished |
 | Environment contract and illegal-action validation | Implemented |
-| Player-visible observation schema | Own hand and Extra Deck, public zones, battle position, chain links, bounded public events, known opponent field cards, public Deck-top reveals, recipient-scoped card reveals, disabled zones, and the public Scapegoat summon restriction; broader reveal and restriction coverage pending |
+| Player-visible observation schema | Own hand, initial Main Deck composition, and Extra Deck; public zones, battle position, chain links, bounded public events, known opponent field cards, public Deck-top reveals, recipient-scoped card reveals, disabled zones, and the public Scapegoat summon restriction; broader reveal and restriction coverage pending |
 | Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
-| JSON trajectory round trip | Schema v10 records recipient-scoped card reveals alongside active disabled zones and public reveals; earlier schemas remain readable and replay-verifiable |
+| JSON trajectory round trip | Schema v11 records the player's initial Main Deck as a sorted card multiset alongside recipient-scoped and public reveals; earlier schemas remain readable and replay-verifiable |
 | Tournaments | Seeded, seat-swapped sequential and spawned-process runners; paired score intervals and Wilson intervals for supported decks |
 | Native throughput benchmark | Implemented for vanilla fixture only; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
@@ -93,7 +93,7 @@ python scripts/render_replay.py replays/scapegoat_3.json
 xdg-open replays/scapegoat_3.html
 ```
 
-The generated HTML is self-contained and shows card names when the pinned card database is installed. Use its slider, arrow keys, or Play button to step through decisions; `#decision=11` opens a particular decision. Public Deck-top reveals, cards shown only to the acting player, and active disabled field zones appear on new recordings. You can also open `examples/replay_viewer.html` directly and choose any saved GOAT AI JSON trajectory, in which case cards appear by ID. The viewer has no card art or animations and does not open EDOPro `.yrp`/`.yrpX` files. Replays and generated HTML live in ignored `replays/`.
+The generated HTML is self-contained and shows card names when the pinned card database is installed. Use its slider, arrow keys, or Play button to step through decisions; `#decision=11` opens a particular decision. Public Deck-top reveals, cards shown only to the acting player, active disabled field zones, and the acting player's starting Deck composition appear on new recordings. You can also open `examples/replay_viewer.html` directly and choose any saved GOAT AI JSON trajectory, in which case cards appear by ID. The viewer has no card art or animations and does not open EDOPro `.yrp`/`.yrpX` files. Replays and generated HTML live in ignored `replays/`.
 
 For a replay that shows a two-zone choice and the resulting disabled Monster Zones, run `python examples/record_ground_collapse.py`, then `python scripts/render_replay.py replays/ground_collapse_3.json` and open `replays/ground_collapse_3.html`. This uses the experimental adapter and verifies the full seeded duel before writing the trajectory.
 

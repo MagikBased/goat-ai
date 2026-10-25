@@ -153,6 +153,22 @@ def test_feature_version_four_represents_zone_choices_and_disabled_slots():
     assert not torch.equal(features.state_numbers, clear.state_numbers)
 
 
+def test_feature_version_five_sees_own_deck_composition_without_order():
+    vocabulary = CardVocabulary((10, 20))
+    first = replace(view(), own_main_deck=(10, 10, 20))
+    second = replace(view(), own_main_deck=(10, 20, 20))
+    first_features = encode_decision(first, actions(), vocabulary, feature_version=5)
+    second_features = encode_decision(second, actions(), vocabulary, feature_version=5)
+    assert first_features.deck_cards.tolist() == [2, 2, 3]
+    assert second_features.deck_cards.tolist() == [2, 3, 3]
+    assert torch.equal(first_features.state_cards, second_features.state_cards)
+    torch.manual_seed(19)
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=5)
+    assert not torch.allclose(model(first_features), model(second_features))
+    legacy = encode_decision(first, actions(), vocabulary, feature_version=4)
+    assert legacy.deck_cards.tolist() == [0]
+
+
 def test_supervised_update_reduces_loss_for_visible_decision():
     torch.manual_seed(6)
     torch.set_num_threads(1)

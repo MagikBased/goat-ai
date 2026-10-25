@@ -45,7 +45,7 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     trajectory = play()
     assert trajectory == play()
     assert trajectory.winner == 1
-    assert trajectory.schema_version == 10
+    assert trajectory.schema_version == 11
     assert trajectory.rules_profile == vars(RestrictedOcgcoreEngine(root).ruleset)
     assert trajectory.deck_sha256 is not None
     assert trajectory.asset_sha256 is not None
@@ -71,7 +71,7 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     previous = replace(trajectory, schema_version=4,
                        decisions=tuple(_old_position_actions(replace(record, observation=replace(
                            record.observation, known_opponent_cards=(),
-                           known_opponent_field_cards=())))
+                           known_opponent_field_cards=(), own_main_deck=())))
                                        for record in trajectory.decisions))
     assert verify_trajectory(previous, RestrictedOcgcoreEngine(root)) == len(
         previous.decisions)

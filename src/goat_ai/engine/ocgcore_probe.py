@@ -172,6 +172,7 @@ class OcgcoreProbe:
         self._restriction_hints: dict[tuple[int, int], int] = {}
         self._public_reveals: list[PublicRevealView] = []
         self._private_reveals: list[PrivateRevealView] = []
+        self._initial_main_decks: tuple[tuple[int, ...], tuple[int, ...]] = ((), ())
         self._disabled_zones: tuple[DisabledZoneView, ...] = ()
         self._bind()
         major, minor = c.c_int(), c.c_int()
@@ -289,6 +290,9 @@ class OcgcoreProbe:
             raise ValueError("probe deck requires at least six cards")
         if len(deck) < 40 or (opponent_deck is not None and len(opponent_deck) < 40):
             raise ValueError("native duel requires at least 40 main-deck cards per player")
+        self._initial_main_decks = (tuple(sorted(deck)),
+                                    tuple(sorted(opponent_deck if opponent_deck is not None
+                                                 else deck)))
         # Four nonzero 64-bit words; exact split is part of reproducibility.
         words = tuple((seed + i + 1) & ((1 << 64) - 1) for i in range(4))
         opts = DuelOptions(
@@ -581,6 +585,7 @@ class OcgcoreProbe:
             disabled_zones=self._disabled_zones,
             private_reveals=tuple(reveal for reveal in self._private_reveals
                                   if reveal.recipient == viewer),
+            own_main_deck=self._initial_main_decks[viewer],
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:

@@ -90,6 +90,7 @@ class Observation:
     public_reveals: tuple[PublicRevealView, ...] = ()
     disabled_zones: tuple[DisabledZoneView, ...] = ()
     private_reveals: tuple[PrivateRevealView, ...] = ()
+    own_main_deck: tuple[int, ...] = ()  # Initial card multiset, never shuffled order.
 
     def __post_init__(self) -> None:
         if self.viewer not in (0, 1) or self.acting_player not in (0, 1):
@@ -127,6 +128,9 @@ class Observation:
                       or not 0 <= card.location <= 255 for card in reveal.cards)
                for reveal in self.private_reveals):
             raise ValueError("private reveal must belong to the observation viewer")
+        if (self.own_main_deck != tuple(sorted(self.own_main_deck))
+                or any(code <= 0 for code in self.own_main_deck)):
+            raise ValueError("own Main Deck must be an unordered card multiset")
         if self.opponent_hand_count < 0 or any(n < 0 for n in self.deck_counts):
             raise ValueError("counts must be nonnegative")
 

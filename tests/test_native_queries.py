@@ -30,6 +30,9 @@ def test_native_observation_hides_opponent_hand_and_deck_order():
     viewer_b, opponent_b = observe(tuple(reversed(VANILLA_DECK)))
     assert viewer_a == viewer_b
     assert opponent_a.hand != opponent_b.hand
+    assert opponent_a.own_main_deck == opponent_b.own_main_deck
+    assert opponent_a.own_main_deck == tuple(sorted(VANILLA_DECK))
+    assert viewer_a.own_main_deck == tuple(sorted(VANILLA_DECK))
     assert viewer_a.turn == 1 and viewer_a.phase == "draw"
     assert viewer_a.life_points == (8000, 8000)
     assert viewer_a.deck_counts == (34, 35)

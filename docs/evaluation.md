@@ -121,3 +121,42 @@ Feature version 2 keeps a separate target-presence mask and embeds the visible c
 The same eight verified heuristic demonstration duels were retrained for three epochs with width 32 and seed 17. The version-2 checkpoint SHA-256 is `b53fed2c70de0f5c57993388f4964c89b896401bfdc5ec753a82df48e100c4ec`; epoch losses were 0.09548, 0.001964, and 0.000288. Training, including full replay verification, took 29.03 seconds wall time, 28.61 user CPU seconds, and 335,972 KB peak RSS on the same Intel Core i7-10700K and PyTorch 2.5.1+cpu with `OMP_NUM_THREADS=1`.
 
 On held-out vanilla seeds 2000–2007, it won **15/16 versus RandomAgent** and **9/16 versus HeuristicAgent**, exactly matching the version-1 outcome counts. On the experimental control/Chaos schedules at seeds 3000–3003, it won **14/16 versus RandomAgent** (paired score interval 68.75–100%), compared with 12/16 for version 1. A direct, seat-swapped version-2 versus version-1 comparison on a separate experimental seed range 3100–3107 won **17/32** (paired score interval 34.375–71.875%): 13/16 with the control probe and 4/16 with the Chaos probe. The interval includes 50%, and these decks lack a complete historical rules and visibility audit. The new features remove one representational ambiguity; these results do not establish stronger play.
+
+## Own-Deck feature check on two experimental matchups
+
+On 2026-10-24, a version-5 policy was trained for one epoch at width 16 and seed 17 on the 1,126 replay-verified decisions from the schema-v11 Ground Collapse fixture (`examples/record_ground_collapse.py`, training seed 3). Its teacher decisions are mostly random. The version-5 checkpoint SHA-256 is `8934273db109672bf9b77bc369a3de4635e9fe7979061409d9d02110500cdbd2`. A version-4 checkpoint trained from the earlier schema-v9 recording has SHA-256 `9e1a505d320190072ca2aec1fe60a3efecdf90bcebc30b5280b06691b93036fd`. Retraining version 4 from the current schema-v11 recording with the new `--feature-version 4` option produced **identical model tensors and loss** (0.5452325494), although the file hash changed to `3720c90e6f454b70333e19452357caf9083439459ae8a034507d53b22aae42ed` because the recorded trajectory metadata changed. Version 5's one-epoch mean decision loss was 0.5429644987.
+
+The checkpoints were evaluated on held-out seeds 60–63, both seat assignments, with two matchups: Ground Collapse versus the vanilla fixture and control versus Chaos. All games used the experimental adapter and the pinned GOAT-mode core. The measured schedules used the earlier tensor-equivalent version-4 checkpoint.
+
+| Candidate | Opponent | Wins | Losses | Paired score 95% bootstrap | Ground/vanilla | Control/Chaos |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Version 4 | RandomAgent | 14 | 2 | 68.75–100% | 6/8 | 8/8 |
+| Version 5 | RandomAgent | 11 | 5 | 56.25–87.5% | 4/8 | 7/8 |
+| Version 5 | Version 4 | 7 | 9 | 18.75–68.75% | 2/8 | 5/8 |
+
+Version 4 won 6/8 in the first seat and 8/8 in the second against RandomAgent. Version 5 won 4/8 and 7/8 respectively; against version 4 it won 2/8 and 5/8. These four-seed samples are small, the experimental decks are not fully audited for historical rules or visibility, and the direct interval includes 50%. The model architectures and random initialization differ, so the comparison does not isolate a causal Deck-feature effect. The measurements provide **no evidence of a playing-strength gain** from version 5. On the Intel Core i7-10700K, Linux 6.8.0-146-generic x86_64, and `OMP_NUM_THREADS=1`, the three tournament calls took 20.52, 27.60, and 27.94 seconds respectively; those one-run times are not throughput estimates.
+
+Reproduce the training and schedules locally after [native setup](native_setup.md):
+
+```bash
+python examples/record_ground_collapse.py
+OMP_NUM_THREADS=1 python scripts/train_behavioral_clone.py \
+  replays/ground_collapse_3.json --engine experimental --feature-version 4 \
+  --output checkpoints/ground_v4.pt --epochs 1 --width 16 --seed 17
+OMP_NUM_THREADS=1 python scripts/train_behavioral_clone.py \
+  replays/ground_collapse_3.json --engine experimental --feature-version 5 \
+  --output checkpoints/ground_v5.pt --epochs 1 --width 16 --seed 17
+OMP_NUM_THREADS=1 python scripts/evaluate_policy.py checkpoints/ground_v4.pt \
+  --engine experimental --seed 60 --seeds 4 \
+  --matchup examples/decks/ground_collapse_probe.ydk examples/decks/vanilla_probe.ydk \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk
+OMP_NUM_THREADS=1 python scripts/evaluate_policy.py checkpoints/ground_v5.pt \
+  --engine experimental --seed 60 --seeds 4 \
+  --matchup examples/decks/ground_collapse_probe.ydk examples/decks/vanilla_probe.ydk \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk
+OMP_NUM_THREADS=1 python scripts/evaluate_policy.py checkpoints/ground_v5.pt \
+  --opponent-checkpoint checkpoints/ground_v4.pt --engine experimental \
+  --seed 60 --seeds 4 \
+  --matchup examples/decks/ground_collapse_probe.ydk examples/decks/vanilla_probe.ydk \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk
+```

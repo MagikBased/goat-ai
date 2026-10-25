@@ -20,6 +20,9 @@ def _card_codes(value) -> set[int]:
              if key in ("code", "card_code") and isinstance(code, int) and code > 0}
     if "codes" in value and isinstance(value["codes"], list):
         codes.update(code for code in value["codes"] if isinstance(code, int) and code > 0)
+    if "own_main_deck" in value and isinstance(value["own_main_deck"], list):
+        codes.update(code for code in value["own_main_deck"]
+                     if isinstance(code, int) and code > 0)
     for item in value.values():
         if isinstance(item, (dict, list)):
             codes.update(_card_codes(item))

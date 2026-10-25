@@ -100,6 +100,10 @@
           <h2>Cards shown to this player</h2>
           <div id="private-reveals" class="muted"></div>
         </div>
+        <div class="panel">
+          <h2>Own starting Main Deck</h2>
+          <div id="decklist" class="muted"></div>
+        </div>
       </div>
     </section>
   </main>
@@ -247,6 +251,11 @@
       byId("private-reveals").textContent = observation.private_reveals?.length
         ? observation.private_reveals.map(reveal => `Turn ${reveal.turn}: ${reveal.cards.map(card => `${nameOf(card.code)} (P${card.controller} ${locationName(card.location)})`).join(", ")}`).join(" · ")
         : "No recipient-scoped reveals recorded";
+      const composition = new Map();
+      for (const code of observation.own_main_deck || []) composition.set(code, (composition.get(code) || 0) + 1);
+      byId("decklist").textContent = composition.size
+        ? [...composition].map(([code, count]) => `${count}× ${nameOf(code)}`).join(" · ")
+        : "Deck composition not recorded in this trajectory";
     }
     function move(direction) {
       if (!replay) return;

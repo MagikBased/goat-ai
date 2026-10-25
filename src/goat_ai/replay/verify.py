@@ -41,6 +41,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             if env.is_terminal():
                 raise ReplayMismatch(f"decision {index}: engine terminated early")
             compared_observation = observation
+            if trajectory.schema_version < 11:
+                compared_observation = replace(compared_observation, own_main_deck=())
             if trajectory.schema_version < 10:
                 compared_observation = replace(compared_observation, private_reveals=())
             if trajectory.schema_version < 9:

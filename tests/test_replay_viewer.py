@@ -23,6 +23,7 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
         connection.execute("INSERT INTO texts VALUES (10, 'Visible Monster')")
         connection.execute("INSERT INTO texts VALUES (11, 'Revealed Monster')")
         connection.execute("INSERT INTO texts VALUES (12, 'Privately Seen Monster')")
+        connection.execute("INSERT INTO texts VALUES (13, 'Decklist Only Monster')")
     observation = Observation(
         viewer=0, acting_player=0, turn=1, phase="main1", life_points=(8000, 8000),
         hand=(CardView(0, "hand", "hidden", 10, 0),),
@@ -32,6 +33,7 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
         public_reveals=(PublicRevealView(1, 1, "deck_top", (11,)),),
         disabled_zones=(DisabledZoneView(0, "monster", 2),),
         private_reveals=(PrivateRevealView(1, 0, (RevealedCardView(12, 1, 1),)),),
+        own_main_deck=(10, 10, 13),
     )
     action = Action("0", "normal_summon", 0, {"code": 10})
     trajectory = Trajectory(
@@ -42,15 +44,17 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     source = tmp_path / "game.json"
     output = tmp_path / "game.html"
     write_trajectory(source, trajectory)
-    assert render_replay(source, output, tmp_path / "native") == (1, 3)
+    assert render_replay(source, output, tmp_path / "native") == (1, 4)
     html = output.read_text()
     assert '"10":"Visible Monster"' in html
     assert '"11":"Revealed Monster"' in html
     assert '"12":"Privately Seen Monster"' in html
+    assert '"13":"Decklist Only Monster"' in html
     assert '"public_reveals"' in html
     assert '"disabled_zones"' in html
     assert 'slot.disabled' in html
     assert '"private_reveals"' in html
+    assert '"own_main_deck":[10,10,13]' in html
     assert '"opponent_hand_count":5' in html
     assert '"code":null' in html
     assert "window.injected=true" in html

@@ -163,6 +163,22 @@ def test_private_reveal_round_trip_and_cross_player_rejection(tmp_path):
     assert read_trajectory(path).decisions[0].observation.private_reveals == ()
 
 
+def test_own_deck_composition_round_trip_without_deck_order(tmp_path):
+    observation = replace(view(), own_main_deck=(10, 10, 20))
+    with pytest.raises(ValueError, match="unordered card multiset"):
+        replace(view(), own_main_deck=(20, 10, 10))
+    action = Action("0", "pass", 0)
+    path = tmp_path / "own_deck.json"
+    write_trajectory(path, Trajectory("goat", ("a", "b"), 7,
+                                      (DecisionRecord(observation, (action,), action),), 0))
+    assert read_trajectory(path).decisions[0].observation.own_main_deck == (10, 10, 20)
+    raw = json.loads(path.read_text())
+    raw["schema_version"] = 10
+    raw["decisions"][0]["observation"].pop("own_main_deck")
+    path.write_text(json.dumps(raw))
+    assert read_trajectory(path).decisions[0].observation.own_main_deck == ()
+
+
 def test_agents_use_same_contract():
     actions = (Action("0", "pass", 0), Action("1", "attack", 0))
     assert RandomAgent(5).select_action(view(), actions) in actions
