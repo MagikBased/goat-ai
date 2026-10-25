@@ -75,6 +75,29 @@ def test_feature_version_eight_uses_visible_monster_stats_and_counters():
     assert torch.equal(legacy_before.state_card_numbers, legacy_after.state_card_numbers)
 
 
+def test_feature_version_nine_uses_only_publicly_known_opponent_hand_cards():
+    vocabulary = CardVocabulary((10, 20, 30))
+    known = replace(view(), known_opponent_hand_cards=(20,))
+    unknown = replace(view(), known_opponent_hand_cards=())
+    same_multiset = replace(view(), known_opponent_hand_cards=(20, 30))
+    first = encode_decision(known, actions(), vocabulary, feature_version=9)
+    second = encode_decision(unknown, actions(), vocabulary, feature_version=9)
+    assert first.known_hand_cards.tolist() == [vocabulary.index(20)]
+    assert second.known_hand_cards.tolist() == [0]
+    assert encode_decision(same_multiset, actions(), vocabulary,
+                           feature_version=9).known_hand_cards.tolist() == [
+                               vocabulary.index(20), vocabulary.index(30)]
+    assert torch.equal(first.state_cards, second.state_cards)
+    torch.manual_seed(29)
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=9)
+    assert model(first).shape == (3,)
+    assert not torch.allclose(model(first), model(second))
+    legacy_known = encode_decision(known, actions(), vocabulary, feature_version=8)
+    legacy_unknown = encode_decision(unknown, actions(), vocabulary, feature_version=8)
+    assert legacy_known.known_hand_cards.tolist() == [0]
+    assert torch.equal(legacy_known.known_hand_cards, legacy_unknown.known_hand_cards)
+
+
 def test_action_ids_are_not_features_but_public_card_and_controller_are():
     vocabulary = CardVocabulary((10, 20))
     original = encode_decision(view(), actions(), vocabulary)
@@ -304,6 +327,22 @@ def test_version_two_checkpoint_ignores_new_known_card_memory(tmp_path):
     after = encode_decision(without_memory, actions(), vocabulary, feature_version=2)
     assert torch.equal(restored.model(before), restored.model(after))
     assert restored.select_action(observation, actions()) in actions()
+
+
+def test_version_eight_checkpoint_ignores_known_opponent_hand(tmp_path):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=8)
+    checkpoint = tmp_path / "v8.pt"
+    torch.save({"schema_version": 1, "model_state": model.state_dict(),
+                "vocabulary_codes": vocabulary.codes, "width": 16,
+                "feature_version": 8}, checkpoint)
+    restored = load_policy_agent(checkpoint)
+    known = replace(view(), known_opponent_hand_cards=(20,))
+    unknown = replace(view(), known_opponent_hand_cards=())
+    assert restored.model.feature_version == 8
+    assert torch.equal(
+        restored.model(encode_decision(known, actions(), vocabulary, 8)),
+        restored.model(encode_decision(unknown, actions(), vocabulary, 8)))
 
 
 def test_evaluation_rejects_training_seed_overlap():
