@@ -19,6 +19,8 @@ SECOND_DISCARD = 79182538
 MYSTIC_TOMATO = 504700142
 SANGAN = 504700178
 GEMINI_ELF = 69140098
+SCAPEGOAT = 504700123
+SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -86,6 +88,66 @@ def test_torrential_after_summon_destroys_faceup_and_book_facedown_monsters(tmp_
                 assert observation.life_points == (8000, 8000)
                 return
     pytest.fail("Torrential Tribute / Book of Moon chain did not resolve")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_torrential_after_scapegoat_resolution_destroys_all_tokens(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"goat/c{SCAPEGOAT}.lua",
+                     f"official/c{TORRENTIAL_TRIBUTE}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    goat_deck = tmp_path / "scapegoat.ydk"
+    torrential_deck = tmp_path / "torrential.ydk"
+    goat_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([SCAPEGOAT] * 2), *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
+    torrential_deck.write_text("#main\n" + "\n".join(map(str, (
+        TORRENTIAL_TRIBUTE, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(goat_deck), str(torrential_deck), seed=52,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        goat_set = trap_set = goat_used = torrential_used = False
+        for _ in range(85):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not goat_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SCAPEGOAT), None)
+                goat_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not trap_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == TORRENTIAL_TRIBUTE), None)
+                trap_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and trap_set and not goat_used:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == SCAPEGOAT), None)
+                goat_used |= action is not None
+            if goat_used and obs.acting_player == 1 and not torrential_used:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == TORRENTIAL_TRIBUTE), None)
+                if action is not None:
+                    assert obs.chain == ()
+                    assert SCAPEGOAT in {c.code for c in obs.graveyards[0]}
+                    assert {c.code for c in obs.field if c.zone == "monster"
+                            and c.controller == 0} == SHEEP_CODES
+                    torrential_used = True
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_zones", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if torrential_used and TORRENTIAL_TRIBUTE in {
+                    c.code for c in obs.graveyards[1]}:
+                assert obs.chain == ()
+                assert not any(c.zone == "monster" for c in obs.field)
+                assert not any(c.code in SHEEP_CODES for pile in (
+                    *obs.graveyards, *obs.banished) for c in pile)
+                assert obs.life_points == (8000, 8000)
+                assert {f"goat/c{SCAPEGOAT}.lua",
+                        f"official/c{TORRENTIAL_TRIBUTE}.lua"}.issubset(
+                            env.engine.probe.loaded_script_sha256)
+                return
+    pytest.fail("Torrential was not offered after Scapegoat summoned four tokens")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
