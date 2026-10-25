@@ -548,6 +548,10 @@ This seed selected one Mystical Space Typhoon response to Metamorphosis. A
 new paired native fixture checks that destroying the active Spell does not
 undo its spent Sheep Token or prevent Thousand-Eyes Restrict from arriving;
 both branches serialize, replay-verify, and pass the legal-choice visibility
-audit. The sweep detects adapter failures and decision exposure for its deck
-schedule. It does not establish historical correctness, metagame play rates,
-or agent strength.
+audit. It also selected Torrential Tribute after Bazoo the Soul-Eater three
+times. A paired fixture checks the historical Summon-priority choice: Bazoo
+can banish two monsters as its Ignition Effect cost before Torrential destroys
+it, whereas passing leaves those monsters in the Graveyard. Both complete
+duels replay-verify and pass the visibility audit. The sweep detects adapter
+failures and decision exposure for its deck schedule. It does not establish
+historical correctness, metagame play rates, or agent strength.
