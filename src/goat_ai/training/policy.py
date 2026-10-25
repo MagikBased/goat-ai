@@ -78,6 +78,7 @@ class DecisionFeatures:
     known_hand_cards: Tensor  # [H]: publicly known opponent hand IDs, or [0] before v9
     chain_cards: Tensor  # [L, 2]: ordered public chain card and relative controller, or [[0, 0]]
     state_card_sequences: Tensor  # [N]: field sequence, -1 for non-field cards
+    state_equip_slots: Tensor  # [N, 3]: public target controller, zone, sequence
     action_field_slots: Tensor  # [A, 3]: relative controller, zone, sequence
     action_multi_field_slots: Tensor  # [A, T, 3]: field slots in variable target sets
 
@@ -93,7 +94,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 13):
+    if feature_version not in range(1, 14):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -110,6 +111,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
     cards = []
     card_numbers = []
     card_sequences = []
+    equip_slots = []
     for card in (*observation.hand, *observation.field, *observation.graveyards[0],
                  *observation.graveyards[1], *observation.banished[0],
                  *observation.banished[1], *observation.own_extra_deck):
@@ -122,6 +124,10 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                       POSITIONS.index(card.position) + 1))
         card_sequences.append(card.sequence if card.zone in ("monster", "spell_trap")
                               and card.sequence is not None else -1)
+        equip_slots.append((int(card.equipped_to[0] != observation.viewer) + 1,
+                            ZONES.index("monster") + 1, card.equipped_to[1])
+                           if feature_version >= 13 and card.equipped_to is not None
+                           else (0, 0, -1))
         spell_count = sum(count for kind, count in card.counters if kind == 1)
         card_numbers.append((card.attack / 8000 if card.attack is not None else 0.0,
                              card.defense / 8000 if card.defense is not None else 0.0,
@@ -134,10 +140,12 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                       int(link.controller != observation.viewer) + 1, 3))
         card_numbers.append((0.0,) * 5)
         card_sequences.append(-1)
+        equip_slots.append((0, 0, -1))
     if not cards:
         cards.append((0, 0, 0, 0))
         card_numbers.append((0.0,) * 5)
         card_sequences.append(-1)
+        equip_slots.append((0, 0, -1))
 
     own = observation.viewer
     opponent = 1 - own
@@ -257,6 +265,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         torch.tensor(chain_links if feature_version >= 10 and chain_links else [(0, 0)],
                      dtype=torch.long),
         torch.tensor(card_sequences, dtype=torch.long),
+        torch.tensor(equip_slots, dtype=torch.long),
         torch.tensor(action_field_slots, dtype=torch.long),
         torch.tensor(padded_field_slots, dtype=torch.long),
     )
@@ -268,7 +277,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 13):
+        if feature_version not in range(1, 14):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -278,6 +287,9 @@ class LegalActionPolicy(nn.Module):
         if feature_version >= 8:
             self.card_numbers = nn.Sequential(nn.Linear(5, width), nn.ReLU(),
                                               nn.Linear(width, width))
+        if feature_version >= 13:
+            self.equip_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
+                                            nn.Linear(width, width))
         self.phase = nn.Embedding(len(PHASES) + 1, width, padding_idx=0)
         kind_count = (len(ACTION_KINDS)
                       + (len(ZONE_ACTION_KINDS) if feature_version >= 4 else 0)
@@ -307,6 +319,16 @@ class LegalActionPolicy(nn.Module):
                    + self.owner(cards[:, 2]) + self.position(cards[:, 3]))
         if self.feature_version >= 8:
             visible = visible + self.card_numbers(features.state_card_numbers)
+        if self.feature_version >= 13:
+            slots = features.state_equip_slots
+            target_match = ((slots[:, None, 0] == cards[None, :, 2])
+                            & (slots[:, None, 1] == cards[None, :, 1])
+                            & (slots[:, None, 2] ==
+                               features.state_card_sequences[None, :])
+                            & (slots[:, None, 1] != 0))
+            target_visible = target_match.to(visible.dtype) @ visible
+            pair = self.equip_pair(torch.cat((visible, target_visible), dim=1))
+            visible = visible + pair * (slots[:, 1] != 0).unsqueeze(1)
         mask = (cards[:, 1] != 0).unsqueeze(1)
         pooled = (visible * mask).sum(0) / mask.sum().clamp(min=1)
         state = pooled + self.phase(features.phase) + self.state_numbers(

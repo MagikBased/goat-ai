@@ -238,6 +238,35 @@ def test_feature_version_twelve_uses_only_visible_field_cards():
     assert LegalActionPolicy(vocabulary.size, width=16, feature_version=12)(features).shape == (1,)
 
 
+def test_feature_version_thirteen_binds_public_equip_to_monster_slot():
+    vocabulary = CardVocabulary((10, 20, 30, 40))
+    first = replace(view(), field=(
+        CardView(0, "monster", "faceup", 20, 0, "attack", 1600, 1000),
+        CardView(0, "monster", "faceup", 30, 1, "attack", 1900, 1000),
+        CardView(0, "spell_trap", "faceup", 40, 0, equipped_to=(0, 0)),
+    ))
+    moved = replace(first, field=(*first.field[:2],
+                                  replace(first.field[2], equipped_to=(0, 1))))
+    choices = (Action("end", "end_phase", 0),)
+    old_first = encode_decision(first, choices, vocabulary, feature_version=12)
+    old_moved = encode_decision(moved, choices, vocabulary, feature_version=12)
+    assert all(torch.equal(a, b) for a, b in zip(
+        old_first.__dict__.values(), old_moved.__dict__.values(), strict=True))
+    current_first = encode_decision(first, choices, vocabulary, feature_version=13)
+    current_moved = encode_decision(moved, choices, vocabulary, feature_version=13)
+    assert current_first.state_equip_slots.tolist() == [
+        [0, 0, -1], [0, 0, -1], [0, 0, -1], [1, 2, 0]]
+    assert current_moved.state_equip_slots[-1].tolist() == [1, 2, 1]
+    torch.manual_seed(13)
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=13)
+    assert not torch.allclose(model(current_first), model(current_moved))
+    model(current_first).sum().backward()
+    assert any(parameter.grad is not None and parameter.grad.abs().sum() > 0
+               for parameter in model.equip_pair.parameters())
+    old_model = LegalActionPolicy(vocabulary.size, width=16, feature_version=12)
+    assert torch.allclose(old_model(old_first), old_model(old_moved))
+
+
 def test_action_ids_are_not_features_but_public_card_and_controller_are():
     vocabulary = CardVocabulary((10, 20))
     original = encode_decision(view(), actions(), vocabulary)

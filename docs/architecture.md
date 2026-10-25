@@ -27,9 +27,9 @@ set with the recording, applies the selected action, and checks the result.
 The v19 equip relation comes from ocgcore's `QUERY_EQUIP_CARD` field on the
 Spell/Trap Zone. The adapter exposes only the field slot of a face-up Equip
 Spell's current target; it suppresses that query result for face-down cards.
-The current PyTorch feature versions do not encode this new relation, so a
-future policy experiment must add it explicitly before claiming the model
-uses equip attachments.
+The default PyTorch feature version 10 and experimental version 12 omit
+this relation. Opt-in version 13 binds the Equip Spell embedding to its public
+monster target slot; it has no measured playing-strength result yet.
 Schemas v3–v19 verify deck contents and native asset fingerprints as well as the
 recorded path. Callers must retain the original deck files and native assets;
 the recording stores hashes, not copies. Older v1/v2 recordings can still be
