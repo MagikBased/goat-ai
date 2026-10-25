@@ -645,9 +645,9 @@ class OcgcoreProbe:
             raise RuntimeError("native location query returned no data")
         return decode_location(c.string_at(pointer, length.value))
 
-    def observation(self, viewer: int) -> Observation:
+    def observation(self, viewer: int, *, terminal: bool = False) -> Observation:
         """Build a redacted view; only audited fields are requested or returned."""
-        if self._pending_message is None or viewer not in (0, 1):
+        if (self._pending_message is None and not terminal) or viewer not in (0, 1):
             raise RuntimeError("observation requires a pending decision and valid viewer")
         from goat_ai.engine.native_queries import decode_life_points
 
@@ -667,6 +667,10 @@ class OcgcoreProbe:
             tuple(len(locations[p, LOCATION_MZONE]) for p in (0, 1)),
             tuple(len(locations[p, LOCATION_SZONE]) for p in (0, 1)),
         )
+        if terminal:
+            # The native field query stores lethal negative LP as uint32.
+            lp = tuple(max(0, value if value < (1 << 31) else value - (1 << 32))
+                       for value in lp)
 
         def view_card(player: int, location: int, sequence: int, card) -> CardView:
             faceup = bool(card.position & 0x5)
@@ -700,7 +704,8 @@ class OcgcoreProbe:
                                if card is not None)
                          for player in (0, 1))
         return Observation(
-            viewer=viewer, acting_player=self.decode_pending().player,
+            viewer=viewer,
+            acting_player=viewer if terminal else self.decode_pending().player,
             turn=self._turn, phase=self._phase, life_points=lp,
             hand=tuple(CardView(viewer, "hand", "hidden", card.code, sequence)
                        for sequence, card in enumerate(hand) if card is not None),

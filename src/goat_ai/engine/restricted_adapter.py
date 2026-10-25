@@ -213,6 +213,8 @@ class RestrictedOcgcoreEngine:
             if transition.terminal:
                 self._choices = ()
                 self._actions = ()
+                self._last_observation = self.probe.observation(
+                    self._last_observation.viewer, terminal=True)
                 return Decision(self._last_observation, (), terminal=True,
                                 winner=transition.winner)
             return self._decision()
