@@ -87,7 +87,9 @@ Magical Warrior, which already have a [historical fixture](goat_rules.md).
 Solemn Judgment responding to Book of Moon now has a source-backed native
 regression. Book of Moon responding to another Book also has a native
 same-target chain and visibility regression; that response appeared four times
-in the sample. These counts are from random-agent choices; they do
+in the sample. Trap Dustshoot chained to another Trap Dustshoot appeared three
+times and now has a native two-hand reveal and full-duel replay regression.
+These counts are from random-agent choices; they do
 not estimate tournament play rates or policy quality.
 
 Reproduce the expanded sample after [native setup](native_setup.md):
