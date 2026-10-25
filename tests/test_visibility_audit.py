@@ -73,6 +73,16 @@ def test_audit_checks_multi_card_choices_and_decision_viewer():
     ]}, "select_cards")
     with pytest.raises(VisibilityViolation, match="face-down"):
         audit_decision_visibility(multi)
+    staged = _record(observation, {"controller": 0, "location": 32, "code": 123,
+                                   "cards": [{"controller": 1, "location": 4,
+                                              "sequence": 2, "code": 456}]})
+    with pytest.raises(VisibilityViolation, match="face-down"):
+        audit_decision_visibility(staged)
+    finish = _record(observation, {"cards": [
+        {"controller": 1, "location": 2, "code": 654},
+    ]}, "finish_selection")
+    with pytest.raises(VisibilityViolation, match="unknown identity"):
+        audit_decision_visibility(finish)
     with pytest.raises(VisibilityViolation, match="acting player"):
         audit_decision_visibility(_record(replace(observation, viewer=1,
                                                   acting_player=0, hand=(),

@@ -7,6 +7,7 @@ General GOAT card/effect support remains M1 work.
 
 import json
 import sqlite3
+import struct
 from dataclasses import replace
 from pathlib import Path
 
@@ -31,6 +32,7 @@ class RestrictedOcgcoreEngine:
         self._choices: tuple[NativeChoice, ...] = ()
         self._actions: tuple[Action, ...] = ()
         self._last_observation = None
+        self._selection_indices: tuple[int, ...] | None = None
 
     def _load_deck(self, path: str) -> Decklist:
         deck = read_ydk(path)
@@ -89,6 +91,24 @@ class RestrictedOcgcoreEngine:
             native = self.probe.decode_pending()
         except NotImplementedError as exc:
             raise SimulatorUnavailable(f"native request unsupported by restricted adapter: {exc}") from exc
+        if native.card_selection is not None:
+            selection = native.card_selection
+            if self._selection_indices is None:
+                self._selection_indices = ()
+            selected = self._selection_indices
+            selected_cards = tuple(selection.cards[index] for index in selected)
+            choices = ([replace(choice, cards=selected_cards)
+                        for choice in native.choices if choice.response not in selected]
+                       if len(selected) < selection.maximum else [])
+            if len(selected) >= selection.minimum:
+                choices.append(NativeChoice(
+                    "finish_selection", self._card_selection_response(selected),
+                    cards=selected_cards))
+            if selection.cancelable:
+                choices.append(NativeChoice("cancel", -1))
+            native = replace(native, choices=tuple(choices))
+        else:
+            self._selection_indices = None
         observation = self.probe.observation(native.player)
         if pending_attack is not None and native.player == pending_attack.controller \
                 and any(choice.kind == "select_card" and choice.location == 0x04
@@ -209,12 +229,33 @@ class RestrictedOcgcoreEngine:
         self._last_observation = observation
         return Decision(self._last_observation, self._actions)
 
+    @staticmethod
+    def _card_selection_response(indices: tuple[int, ...]) -> bytes:
+        ordered = tuple(sorted(indices))
+        return struct.pack("<II", 0, len(ordered)) + struct.pack(
+            f"<{len(ordered)}I", *ordered)
+
     def step(self, action: Action) -> Decision:
         if self.probe is None or action not in self._actions:
             raise ValueError("illegal action or engine not reset")
         index = self._actions.index(action)
         try:
-            transition = self.probe.respond(self._choices[index].response)
+            choice = self._choices[index]
+            if self._selection_indices is not None and choice.kind == "select_card":
+                if not isinstance(choice.response, int):
+                    raise RuntimeError("staged selection candidate has no native index")
+                selected = (*self._selection_indices, choice.response)
+                selection = self.probe.decode_pending().card_selection
+                if selection is None:
+                    raise RuntimeError("staged selection lost its native prompt")
+                if len(selected) < selection.maximum:
+                    self._selection_indices = selected
+                    return self._decision()
+                response = self._card_selection_response(selected)
+            else:
+                response = choice.response
+            self._selection_indices = None
+            transition = self.probe.respond(response)
             if transition.terminal:
                 self._choices = ()
                 self._actions = ()
@@ -235,6 +276,7 @@ class RestrictedOcgcoreEngine:
             self.probe = None
         self._choices = ()
         self._actions = ()
+        self._selection_indices = None
 
     def replay_manifest(self) -> dict[str, str]:
         """Hash native files and every script loaded during the current duel."""

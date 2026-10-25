@@ -12,8 +12,8 @@ from math import comb, factorial
 from goat_ai.engine.ocgcore_probe import MSG_SELECT_CHAIN, MSG_SELECT_IDLECMD
 
 
-# A sourced-deck self-play duel reached a 3,003-way MSG_SELECT_CARD prompt.
-# Keep a resource bound while allowing that observed native request.
+# Preserve the existing flat action contract through the observed 3,003-way
+# Return prompt. Larger card selections use staged, linear-size choices.
 MAX_CARD_SELECTION_COMBINATIONS = 4096
 
 
@@ -36,9 +36,32 @@ class NativeChoice:
 
 
 @dataclass(frozen=True)
+class NativeCardSelection:
+    cards: tuple[tuple[int, int, int, int], ...]
+    minimum: int
+    maximum: int
+    cancelable: bool
+
+    def accepts(self, response: int | bytes) -> bool:
+        """Validate one complete native choice without enumerating subsets."""
+        if isinstance(response, int):
+            return self.cancelable and response == -1
+        if not isinstance(response, bytes) or len(response) < 8:
+            return False
+        kind, size = struct.unpack_from("<II", response)
+        if kind != 0 or not self.minimum <= size <= self.maximum \
+                or len(response) != 8 + 4 * size:
+            return False
+        indices = struct.unpack_from(f"<{size}I", response, 8)
+        return all(index < len(self.cards) for index in indices) \
+            and tuple(sorted(set(indices))) == indices
+
+
+@dataclass(frozen=True)
 class NativeDecision:
     player: int
     choices: tuple[NativeChoice, ...]
+    card_selection: NativeCardSelection | None = None
 
 
 class _Reader:
@@ -252,7 +275,14 @@ def decode_decision(message: bytes,
             cards.append((code, controller, location, sequence))
         option_count = sum(comb(count, size) for size in range(minimum, maximum + 1))
         if option_count > MAX_CARD_SELECTION_COMBINATIONS:
-            raise NotImplementedError(f"card selection has {option_count} combinations")
+            reader.finish()
+            selection = NativeCardSelection(tuple(cards), minimum, maximum,
+                                            bool(cancelable))
+            choices = tuple(NativeChoice("select_card", index, code, controller,
+                                         location, sequence)
+                            for index, (code, controller, location, sequence)
+                            in enumerate(cards))
+            return NativeDecision(player, choices, selection)
         choices = []
         for size in range(minimum, maximum + 1):
             for indices in combinations(range(count), size):

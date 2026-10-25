@@ -27,7 +27,7 @@ DECK = "examples/decks/control_probe.ydk"
 CHAOS_DECK = "examples/decks/chaos_probe.ydk"
 
 
-def test_card_selection_covers_observed_3003_way_prompt_with_a_resource_bound():
+def test_card_selection_stages_combinations_above_the_flat_action_bound():
     def prompt(count: int, selected: int) -> bytes:
         return (b"\x0f\x00\x00" + struct.pack("<III", selected, selected, count)
                 + b"".join(struct.pack("<IBBII", 100 + index, 0, LOCATION_HAND,
@@ -39,8 +39,17 @@ def test_card_selection_covers_observed_3003_way_prompt_with_a_resource_bound():
     assert len(decision.choices[0].cards) == 5
     assert len(decision.choices[-1].cards) == 5
     assert MAX_CARD_SELECTION_COMBINATIONS >= 3003
-    with pytest.raises(NotImplementedError, match="8008 combinations"):
-        decode_decision(prompt(16, 6))
+    staged = decode_decision(prompt(16, 6))
+    assert len(staged.choices) == 16
+    assert staged.card_selection is not None
+    assert (staged.card_selection.minimum, staged.card_selection.maximum) == (6, 6)
+    assert staged.choices[0].kind == "select_card"
+    selection = staged.card_selection
+    assert selection.accepts(struct.pack("<8I", 0, 6, 0, 1, 2, 3, 4, 5))
+    assert not selection.accepts(struct.pack("<8I", 0, 6, 0, 1, 2, 3, 4, 16))
+    assert not selection.accepts(struct.pack("<8I", 0, 6, 0, 1, 1, 3, 4, 5))
+    assert not selection.accepts(struct.pack("<8I", 0, 6, 1, 0, 2, 3, 4, 5))
+    assert not selection.accepts(-1)
 
 
 def test_new_native_choice_formats():

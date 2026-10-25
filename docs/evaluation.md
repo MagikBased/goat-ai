@@ -1758,10 +1758,10 @@ Inspection of the reproduced seed-18855 decision identified Return from the
 Different Dimension (`27174286`) at turn 45: five cards were selected from
 15 eligible cards in the acting player's public banished pile. The public
 action parameters contain banished-card IDs and slots, not private Deck order.
-The decoder now permits up to 4,096 combinations, with a synthetic 3,003-way
-decoder regression and an explicit rejection above the bound. This extends
+At the time, the decoder permitted up to 4,096 combinations, with a synthetic
+3,003-way decoder regression and an explicit rejection above the bound. This extends
 coverage for a card defining the sourced Bazoo Return decks; larger
-combinatorial selections still need a factored action representation.
+combinatorial selections required further work at the time of this pilot.
 
 The trainer also has opt-in `--skip-unsupported-games`. It records a native
 protocol failure with seed, decks, opponent, and error while withholding a
@@ -1813,3 +1813,33 @@ Verify every saved trajectory using `scripts/verify_trajectory.py
 `--engine experimental --both-deck-assignments --require-unseen-main-decks`,
 the Chaos Control/Chaos Return matchup, `--seed 18900 --seeds 32 --workers 4`,
 and `--max-decisions 3000`.
+
+## Staged native card selection beyond the flat action bound (2026-10-25)
+
+`MSG_SELECT_CARD` requests with more than 4,096 complete combinations now
+expose at most one `select_card` action per remaining card, rather than
+materializing every subset. The selected-card prefix appears only in the
+acting player's legal-action parameters. The adapter offers
+`finish_selection` once the native minimum is met, automatically submits at
+the maximum, and validates the exact canonical response before passing it
+to ocgcore. The core performs the card effect; the Python adapter only
+collects a legal native choice. Other bounded request types, such as tribute
+selection and card sorting, are unchanged.
+
+With the flat threshold forced to one combination, a native Graceful
+Charity fixture selected two hand cards in separate decisions, completed
+a duel, serialized it, and replay-verified the full trajectory. Three
+native GOAT Thunder Dragon branches chose zero, one, or two Deck copies
+through staged actions. Each branch produced the same next observation
+and legal actions as the corresponding flat native selection. A local
+read-only replay of the seed-18855 Return game, with the threshold lowered
+to 2,048, followed 958 unchanged recorded decisions to the 3,003-way
+prompt. Selecting the same five public banished cards in stages produced
+the exact next observation and legal actions from the original complete
+choice. The remaining recorded decisions also matched through the terminal
+result: 1,021 original decisions plus four extra staged decisions, with
+the same winner. The saved Return trajectory is ignored and is not a
+committed test fixture. The affected native and visibility suites passed
+**37/37** tests, plus **59/59** probe, query, and policy tests.
+The visibility audit now checks selected-card prefixes on staged actions;
+broader counterfactual hidden-state checks remain separate M1 work.

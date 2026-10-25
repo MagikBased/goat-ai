@@ -251,8 +251,11 @@ The v3 clone's 64-game snapshot-pool continuation now replay-verifies all
 Different Dimension selection. The child scored 64–62–2 against its parent
 in 128 held-out direct games, with a paired interval including 50% and a
 weaker Chaos Control split. This is a completed negative self-play pilot,
-not the M4 strength exit. Larger multi-card selections still require a
-scalable legal-action representation; see [evaluation](evaluation.md).
+not the M4 strength exit. `MSG_SELECT_CARD` prompts above 4,096 complete
+combinations now use staged linear-size actions; native Graceful Charity and
+Thunder Dragon regressions check that boundary, and a local Return replay
+matched its flat native result. Other request types may still exceed their
+bounds; see [evaluation](evaluation.md).
 
 ## M5 — Search and other formats
 

@@ -891,8 +891,11 @@ class OcgcoreProbe:
         """Send one native response and process until another decision or terminal."""
         if self._pending_message is None:
             raise RuntimeError("no pending native decision")
-        choices = self.decode_pending().choices
-        if response_value not in {choice.response for choice in choices}:
+        decision = self.decode_pending()
+        legal = (decision.card_selection.accepts(response_value)
+                 if decision.card_selection is not None
+                 else response_value in {choice.response for choice in decision.choices})
+        if not legal:
             raise ValueError("illegal native response")
         self._decision_private_reveals.clear()
         if isinstance(response_value, int):
