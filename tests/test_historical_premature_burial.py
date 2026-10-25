@@ -15,6 +15,7 @@ BOOK_OF_MOON = 14087893
 MYSTICAL_SPACE_TYPHOON = 5318639
 MYSTICAL_ELF = 15025844
 SECOND_DISCARD = 79182538
+SOLEMN_JUDGMENT = 41420027
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -171,3 +172,92 @@ def test_mst_chained_to_premature_activation_prevents_revive_but_cost_is_paid(tm
                     "select_card", "place", "pass", "end_phase")), actions[0])
             observation = env.step(action)
     pytest.fail("chained MST did not resolve before Premature Burial")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("negate_activation", [False, True])
+def test_solemn_can_negate_premature_activation_but_not_its_effect_summon(
+    tmp_path, negate_activation,
+):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (GRACEFUL_CHARITY, PREMATURE_BURIAL, SOLEMN_JUDGMENT):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    attacker = tmp_path / "premature.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        GRACEFUL_CHARITY, PREMATURE_BURIAL, MYSTICAL_SPACE_TYPHOON,
+        *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    defender = tmp_path / "solemn.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        *([SOLEMN_JUDGMENT] * 3), *VANILLA_DECK[3:])))
+                        + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(attacker), str(defender), seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {GRACEFUL_CHARITY, PREMATURE_BURIAL}.issubset(c.code for c in obs.hand)
+        assert SOLEMN_JUDGMENT in {
+            c.code for c in env.engine.probe.observation(1).hand}
+        graceful = discarded = solemn_set = premature = targeted = responded = False
+        for _ in range(65):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not graceful:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL_CHARITY), None)
+                    graceful |= action is not None
+                elif not discarded and actions[0].kind == "select_cards":
+                    action = next((a for a in actions if {c["code"] for c in
+                                   a.parameters["cards"]} == {
+                                       MYSTICAL_ELF, SECOND_DISCARD}), None)
+                    discarded |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not solemn_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SOLEMN_JUDGMENT), None)
+                solemn_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and discarded:
+                if not premature:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == PREMATURE_BURIAL), None)
+                    premature |= action is not None
+                elif not targeted and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.parameters.get("code")
+                                   == MYSTICAL_ELF and a.parameters.get("location") == 16),
+                                  None)
+                    targeted |= action is not None
+            if targeted and obs.acting_player == 1 and not responded:
+                solemn = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SOLEMN_JUDGMENT), None)
+                if solemn is not None:
+                    assert obs.life_points == (7200, 8000)
+                    assert MYSTICAL_ELF in {c.code for c in obs.graveyards[0]}
+                    action = solemn if negate_activation else next(
+                        a for a in actions if a.kind == "pass")
+                    responded = True
+            if responded and obs.acting_player == 0 and obs.phase == "main1" \
+                    and any(a.kind == "end_phase" for a in actions):
+                own_monsters = {c.code for c in obs.field
+                                if c.controller == 0 and c.zone == "monster"}
+                if negate_activation:
+                    assert obs.life_points == (7200, 4000)
+                    assert MYSTICAL_ELF in {c.code for c in obs.graveyards[0]}
+                    assert MYSTICAL_ELF not in own_monsters
+                    assert PREMATURE_BURIAL in {c.code for c in obs.graveyards[0]}
+                    assert SOLEMN_JUDGMENT in {c.code for c in obs.graveyards[1]}
+                else:
+                    assert obs.life_points == (7200, 8000)
+                    assert MYSTICAL_ELF in own_monsters
+                    assert PREMATURE_BURIAL in {c.code for c in obs.field}
+                    assert not any(c.code == SOLEMN_JUDGMENT
+                                   for c in obs.graveyards[1])
+                    assert any(c.controller == 1 and c.zone == "spell_trap"
+                               for c in obs.field)
+                assert f"official/c{PREMATURE_BURIAL}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail("Premature Burial and Solemn did not resolve within 65 decisions")
