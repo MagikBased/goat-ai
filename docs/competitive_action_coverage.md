@@ -186,6 +186,12 @@ with full-duel replay verification. The random-policy action
 counts express decision exposure in this small sample, not actual tournament
 play frequency, historical correctness, or strategic value.
 
+A paired native regression now checks Book of Moon chained to Dekoichi's
+already activated Flip Effect. Book sets Dekoichi at Chain Link 2 and the
+draw still occurs at Chain Link 1; the pass control leaves Dekoichi face-up.
+Both complete duels replay-verify. This tests one interaction between a card
+in all six Main Decks and one in five; see [GOAT rules](goat_rules.md).
+
 Heavy Storm appears in all six tournament Main Decks and Trap Dustshoot in
 five. A paired native regression now checks Dustshoot chained to Heavy against
 passing, including the private hand reveal and destruction of another Set
