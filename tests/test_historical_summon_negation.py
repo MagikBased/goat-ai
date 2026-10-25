@@ -7,10 +7,12 @@ import pytest
 
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 
 CANNON_SOLDIER = 11384280
 SOLEMN_JUDGMENT = 41420027
+SANGAN = 504700178
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -70,3 +72,63 @@ def test_solemn_negates_normal_summon_before_ignition_priority(tmp_path):
                               choices[0])
             observation = env.step(action)
         pytest.fail("Solemn summon-negation branch did not resolve within 40 decisions")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_solemn_negated_sangan_summon_does_not_search(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"scripts/goat/c{SANGAN}.lua",
+                     f"scripts/official/c{SOLEMN_JUDGMENT}.lua"):
+        if not (root / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    attacker = tmp_path / "sangan.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        SANGAN, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    defender = tmp_path / "solemn.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        *([SOLEMN_JUDGMENT] * 3), *VANILLA_DECK[3:])))
+                        + "\n#extra\n!side\n")
+    with GoatEnvironment(str(attacker), str(defender), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert SANGAN in {c.code for c in obs.hand}
+        assert SOLEMN_JUDGMENT in {c.code for c in env.engine.probe.observation(1).hand}
+        set_trap = summon_attempted = solemn_chained = False
+        deck_before = hand_before = None
+        for _ in range(45):
+            actions = env.legal_actions()
+            if solemn_chained and obs.acting_player == 0 and obs.phase == "main1" \
+                    and SOLEMN_JUDGMENT in {c.code for c in obs.graveyards[1]}:
+                assert obs.life_points == (8000, 4000)
+                assert SANGAN in {c.code for c in obs.graveyards[0]}
+                assert not any(c.code == SANGAN for c in obs.field)
+                assert obs.deck_counts[0] == deck_before
+                assert len(obs.hand) == hand_before - 1
+                assert not obs.private_reveals
+                assert not env.engine.probe.observation(1).private_reveals
+                assert not any(a.kind == "select_card" and a.parameters.get("location")
+                               == 1 for a in actions)
+                assert not any(link.card_code == SANGAN for link in obs.chain)
+                if any(a.kind == "end_phase" for a in actions):
+                    return
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1 and not set_trap:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == SOLEMN_JUDGMENT), None)
+                set_trap |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not summon_attempted:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == SANGAN), None)
+                if action is not None:
+                    deck_before = obs.deck_counts[0]
+                    hand_before = len(obs.hand)
+                    summon_attempted = True
+            if summon_attempted and obs.acting_player == 1 and not solemn_chained:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == SOLEMN_JUDGMENT), action)
+                solemn_chained |= action is not None and action.kind == "chain"
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+    pytest.fail("Solemn did not negate Sangan's Summon without a search")
