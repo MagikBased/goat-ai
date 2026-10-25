@@ -231,6 +231,13 @@ paired interval crossing 50% and a weaker Chaos Control split. Keep v17
 experimental and continue measuring competitive strength; see
 [evaluation](evaluation.md). This does not close M4.
 
+The combat teacher's attack-target preference now applies to the engine's
+`battle_start` target prompts as well as `battle_step`. This is teacher
+version 3; prior demonstrations remain labeled version 2. The next data
+collection should use version 3 on common GOAT decks, with a fresh held-out
+competitive comparison before replacing any policy checkpoint. See
+[evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

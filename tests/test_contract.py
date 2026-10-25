@@ -16,6 +16,7 @@ from goat_ai.observations import (
     PrivateRevealView,
     PublicRevealView,
     RevealedCardView,
+    TargetSlotView,
 )
 from goat_ai.replay import (
     DecisionRecord,
@@ -254,6 +255,9 @@ def test_combat_heuristic_uses_only_visible_battle_stats():
     target_view = replace(battle, phase="battle_step", field=field + (
         CardView(1, "monster", "faceup", 4, 2, "attack", 2100, 900),))
     assert agent.select_action(target_view, (bigger, target)) == target
+    current_target = replace(target_view, phase="battle_start",
+                             pending_attack=TargetSlotView(0, "monster", 1))
+    assert CombatHeuristicAgent().select_action(current_target, (bigger, target)) == target
     hidden_target = Action("5", "select_card", 0, {"controller": 1, "location": 4,
                                                     "sequence": 3})
     mixed = replace(battle, phase="battle_step", field=field[:2] + (

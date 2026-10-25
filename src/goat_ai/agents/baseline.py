@@ -50,7 +50,7 @@ class HeuristicAgent:
 class CombatHeuristicAgent(HeuristicAgent):
     """Generic visible-stat combat choices; never consults native private state."""
 
-    teacher_version: ClassVar[int] = 2  # consume attack target context only once
+    teacher_version: ClassVar[int] = 3  # use schema-v22 attacker context in both target phases
 
     def __init__(self, flip_monster_codes: Collection[int] = ()) -> None:
         super().__init__(flip_monster_codes)
@@ -63,7 +63,10 @@ class CombatHeuristicAgent(HeuristicAgent):
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
             raise ValueError("no legal actions")
-        pending_attack = self._pending_attack
+        pending_attack = ((observation.turn, observation.pending_attack.controller,
+                           observation.pending_attack.sequence)
+                          if observation.pending_attack is not None
+                          else self._pending_attack)
         self._pending_attack = None
         opponents = [card for card in observation.field
                      if card.zone == "monster" and card.controller != observation.viewer]
@@ -92,7 +95,7 @@ class CombatHeuristicAgent(HeuristicAgent):
         if (pending_attack is not None
                 and pending_attack[:2] == (observation.turn, observation.viewer)
                 and (pending_attack[1], pending_attack[2]) in own
-                and observation.phase == "battle_step"
+                and observation.phase in ("battle_start", "battle_step")
                 and not observation.chain and legal_actions[0].kind == "select_card"):
             candidates = [action for action in legal_actions
                           if action.kind == "select_card"

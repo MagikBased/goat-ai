@@ -1667,3 +1667,30 @@ v17 checkpoint, `--opponent-checkpoint` pointing to the v16 checkpoint,
 the Chaos Control/Chaos Return matchup, `--seed 18400 --seeds 32 --workers 4`,
 and `--max-decisions 3000`. Generated trajectories, checkpoints, and reports
 remain ignored outside Git.
+
+## Combat teacher target-prompt correction (2026-10-25)
+
+An audit of the schema-v22 CombatHeuristicAgent v2 recordings found that the
+agent applied its visible-stat target preference only in `battle_step`.
+Ocgcore requested most attack targets in `battle_start`, so those choices
+fell through to the generic first-legal-action preference. Of 127 training
+attack-target prompts, 113 occurred in `battle_start` and 14 in
+`battle_step`; the held-out split was 14 and 2 of 16. Replaying those exact
+observations through the corrected teacher changes 26/127 training and 8/16
+held-out target choices. These are off-policy differences, not game wins.
+
+CombatHeuristicAgent teacher version 3 uses the schema-v22 acting player's
+own attacker slot in either phase, while retaining the earlier in-memory
+fallback for older observation schemas. The teacher still uses only public
+field stats and treats face-down targets as unknown. Earlier v2 recordings
+and model comparisons retain their v2 provenance; newly collected v3 data
+must be kept separate.
+
+For a direct diagnostic, v3 played the committed v2 implementation on the
+experimental native adapter. The schedule used seeds 701–708, both seats,
+both deck assignments, and two sourced pairings: Chaos Control versus Goat
+Control, and Chaos Return versus Warrior. Across 64 terminal games v3 scored
+**32–30–2** (51.6%; matchup-seed paired bootstrap 95% interval
+**46.9–56.2%**). This small comparison does not establish stronger play.
+The correction is retained because the target rule now executes at the
+documented prompt and the selected action uses only visible information.
