@@ -19,7 +19,8 @@ SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("prior_action", ["none", "manual_change", "attack"])
+@pytest.mark.parametrize("prior_action", ["none", "manual_change", "attack",
+                                         "summoned_this_turn"])
 def test_book_reset_respects_prior_actions(tmp_path, prior_action):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = {f"goat/c{SCAPEGOAT}.lua", f"official/c{METAMORPHOSIS}.lua",
@@ -36,6 +37,7 @@ def test_book_reset_respects_prior_actions(tmp_path, prior_action):
 
     with GoatEnvironment(str(attacker), str(defender), seed=70,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
+        target_turn = 3 if prior_action == "summoned_this_turn" else 5
         obs = env.reset()
         assert {SCAPEGOAT, METAMORPHOSIS, BOOK} <= {card.code for card in obs.hand}
         own_goat = other_goat = meta = own_token = fusion = False
@@ -84,7 +86,7 @@ def test_book_reset_respects_prior_actions(tmp_path, prior_action):
                 action = next((a for a in actions if a.parameters.get("code") == RESTRICT),
                               None)
                 fusion |= action is not None
-            if obs.turn == 5 and obs.acting_player == 0 and fusion:
+            if obs.turn == target_turn and obs.acting_player == 0 and fusion:
                 if not first_effect:
                     action = next((a for a in actions if a.kind in ("activate", "chain")
                                    and a.parameters.get("code") == RESTRICT), None)
@@ -128,7 +130,7 @@ def test_book_reset_respects_prior_actions(tmp_path, prior_action):
                         attack_targeted |= action is not None
                     elif attack_targeted and obs.phase in ("battle_start", "battle_step"):
                         action = next((a for a in actions if a.kind == "main2"), None)
-                ready_for_book = (prior_action == "none"
+                ready_for_book = (prior_action in ("none", "summoned_this_turn")
                                   or prior_action == "manual_change" and manually_changed
                                   or prior_action == "attack" and attack_targeted
                                   and obs.phase == "main2")
@@ -152,8 +154,12 @@ def test_book_reset_respects_prior_actions(tmp_path, prior_action):
                     flip_option = next((a for a in actions if a.kind == "flip_summon"
                                         and a.parameters.get("code") == RESTRICT), None)
                     if prior_action != "none":
-                        assert (manually_changed if prior_action == "manual_change"
-                                else attack_declared and attack_targeted)
+                        if prior_action == "manual_change":
+                            assert manually_changed
+                        elif prior_action == "attack":
+                            assert attack_declared and attack_targeted
+                        else:
+                            assert prior_action == "summoned_this_turn" and meta and fusion
                         assert flip_option is None
                         locked = True
                     else:
@@ -174,7 +180,7 @@ def test_book_reset_respects_prior_actions(tmp_path, prior_action):
                 action = next((a for a in actions if a.kind in (
                     "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
-            if locked and obs.turn == 5 and not obs.chain:
+            if locked and obs.turn == target_turn and not obs.chain:
                 own = env.engine.probe.observation(0)
                 restrict = next(c for c in own.field if c.code == RESTRICT)
                 assert restrict.position == "facedown"
@@ -183,7 +189,7 @@ def test_book_reset_respects_prior_actions(tmp_path, prior_action):
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
                 finish_and_verify(obs)
                 return
-            if second_target and not obs.chain and obs.turn == 5:
+            if second_target and not obs.chain and obs.turn == target_turn:
                 assert first_equipped and book and book_target and flipped
                 assert first_slot != second_slot
                 restrict = next(c for c in obs.field if c.code == RESTRICT)
