@@ -410,3 +410,26 @@ that the adapter incorrectly rejected. The pinned core permits this frame
 when no cards are available to reveal. The adapter now accepts it without
 adding an empty card-reveal event, and the run completes. This is a protocol
 fix, not a card-specific historical ruling.
+
+## Six tournament decks, every pair
+
+An additional local probe used `CombatHeuristicAgent`, seed 28500, all 15
+pairs of the six sourced tournament Main Decks, both seat orders, and a
+3,000-decision cap. All **30 duels completed**, totaling **18,283 decisions**;
+individual duels ranged from 201 to 1,975 decisions. The generated report is
+ignored under `.cache/goat-ai/tournament_card_audit_28500.json` and has SHA-256
+`0fbab5ac5f35f306059db057f289e0af4331827abdaee089a404d85e5462837f`.
+Reproduce it with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --tournament-corpus --seed 28500 --seeds 1 \
+  --agent combat_heuristic --max-decisions 3000 \
+  --output .cache/goat-ai/tournament_card_audit_28500.json \
+  > .cache/goat-ai/tournament_card_audit_28500.stdout
+```
+
+Dust Tornado responded to Nobleman of Crossout twice in this sample. A paired
+native [ruling fixture](goat_rules.md) now checks that response and the pass
+branch. These are baseline-agent action counts, not historical play rates or
+evidence that untested card interactions are correct.
