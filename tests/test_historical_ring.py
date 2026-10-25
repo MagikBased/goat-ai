@@ -10,7 +10,7 @@ from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 
 RING_PRE_ERRATA = 511000824
-GEMINI_ELF = 49881766
+ARCHFIEND_SOLDIER = 49881766
 BREAKER = 71413901
 BOOK_OF_MOON = 14087893
 
@@ -33,7 +33,7 @@ def test_pre_errata_ring_targets_own_monster_and_damages_both_players(tmp_path):
             action = None
             if observation.turn == 1 and observation.acting_player == 0 and not summoned:
                 action = next((a for a in actions if a.kind == "normal_summon"
-                               and a.parameters.get("code") == GEMINI_ELF), None)
+                               and a.parameters.get("code") == ARCHFIEND_SOLDIER), None)
                 summoned |= action is not None
             if (action is None and observation.turn == 1
                     and observation.acting_player == 0 and summoned and not set_ring):
@@ -47,7 +47,7 @@ def test_pre_errata_ring_targets_own_monster_and_damages_both_players(tmp_path):
                 activated |= action is not None and action.kind == "chain"
             if activated and not selected:
                 action = next((a for a in actions if a.kind == "select_card"
-                               and a.parameters.get("code") == GEMINI_ELF
+                               and a.parameters.get("code") == ARCHFIEND_SOLDIER
                                and a.parameters.get("controller") == 0), action)
                 selected |= action is not None and action.kind == "select_card"
             if action is None:
@@ -64,7 +64,7 @@ def test_pre_errata_ring_targets_own_monster_and_damages_both_players(tmp_path):
                                 for card in observation.graveyards[0]):
                 assert summoned and set_ring and activated
                 assert observation.life_points == (6100, 6100)
-                assert any(card.code == GEMINI_ELF for card in observation.graveyards[0])
+                assert any(card.code == ARCHFIEND_SOLDIER for card in observation.graveyards[0])
                 assert not any(card.zone == "monster" for card in observation.field)
                 assert f"pre-errata/c{RING_PRE_ERRATA}.lua" in (
                     env.engine.probe.loaded_script_sha256)

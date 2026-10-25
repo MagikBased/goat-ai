@@ -11,7 +11,7 @@ from goat_ai.environments import GoatEnvironment
 
 RING = 511000824  # pre-errata GOAT variant
 BOOK = 14087893
-GEMINI_ELF = 49881766
+ARCHFIEND_SOLDIER = 49881766
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -24,8 +24,8 @@ def test_book_chained_to_ring_protects_face_up_monster(tmp_path, chain_book):
             pytest.skip(f"script {relative} not installed")
     monster_deck = tmp_path / "monster.ydk"
     monster_deck.write_text("#main\n" + "\n".join(map(str, (
-        GEMINI_ELF, BOOK, BOOK, BOOK,
-        *tuple(code for code in VANILLA_DECK if code != GEMINI_ELF)[:36])))
+        ARCHFIEND_SOLDIER, BOOK, BOOK, BOOK,
+        *tuple(code for code in VANILLA_DECK if code != ARCHFIEND_SOLDIER)[:36])))
         + "\n#extra\n!side\n")
     ring_deck = tmp_path / "ring.ydk"
     ring_deck.write_text("#main\n" + "\n".join(map(str, (
@@ -42,7 +42,7 @@ def test_book_chained_to_ring_protects_face_up_monster(tmp_path, chain_book):
             if obs.turn == 1 and obs.acting_player == 0:
                 if not summoned:
                     action = next((a for a in actions if a.kind == "normal_summon"
-                                   and a.parameters.get("code") == GEMINI_ELF), None)
+                                   and a.parameters.get("code") == ARCHFIEND_SOLDIER), None)
                     summoned |= action is not None
                 if action is None and summoned and not book_set:
                     action = next((a for a in actions if a.kind == "set_spell_trap"
@@ -58,7 +58,7 @@ def test_book_chained_to_ring_protects_face_up_monster(tmp_path, chain_book):
                 ring_used |= action is not None
             if ring_used and not ring_targeted and actions[0].kind == "select_card":
                 action = next((a for a in actions if a.kind == "select_card"
-                               and a.parameters.get("code") == GEMINI_ELF), None)
+                               and a.parameters.get("code") == ARCHFIEND_SOLDIER), None)
                 ring_targeted |= action is not None
             if chain_book and ring_targeted and obs.acting_player == 0 \
                     and not book_chained:
@@ -67,7 +67,7 @@ def test_book_chained_to_ring_protects_face_up_monster(tmp_path, chain_book):
                 book_chained |= action is not None
             if book_chained and not book_targeted and actions[0].kind == "select_card":
                 action = next((a for a in actions if a.kind == "select_card"
-                               and a.parameters.get("code") == GEMINI_ELF), None)
+                               and a.parameters.get("code") == ARCHFIEND_SOLDIER), None)
                 book_targeted |= action is not None
             if action is None:
                 action = next((a for a in actions if a.kind in (
@@ -82,16 +82,16 @@ def test_book_chained_to_ring_protects_face_up_monster(tmp_path, chain_book):
                     assert book_chained and book_targeted
                     assert obs.life_points == (8000, 8000)
                     assert BOOK in {c.code for c in obs.graveyards[0]}
-                    assert any(c.code == GEMINI_ELF and c.position == "facedown"
+                    assert any(c.code == ARCHFIEND_SOLDIER and c.position == "facedown"
                                for c in owner.field)
                     assert any(c.controller == 0 and c.zone == "monster"
                                and c.position == "facedown" and c.code is None
                                for c in opponent.field)
-                    assert not any(c.code == GEMINI_ELF for c in owner.graveyards[0])
+                    assert not any(c.code == ARCHFIEND_SOLDIER for c in owner.graveyards[0])
                 else:
                     assert not book_chained
                     assert obs.life_points == (6100, 6100)
-                    assert GEMINI_ELF in {c.code for c in obs.graveyards[0]}
+                    assert ARCHFIEND_SOLDIER in {c.code for c in obs.graveyards[0]}
                 loaded = env.engine.probe.loaded_script_sha256
                 assert f"pre-errata/c{RING}.lua" in loaded
                 if chain_book:

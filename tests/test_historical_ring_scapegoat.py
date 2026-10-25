@@ -11,7 +11,7 @@ from goat_ai.environments import GoatEnvironment
 
 RING = 511000824
 SCAPEGOAT = 504700123
-GEMINI_ELF = 49881766
+ARCHFIEND_SOLDIER = 49881766
 SHEEP_CODES = {73915052, 73915053, 73915054, 73915055}
 
 
@@ -32,7 +32,7 @@ def test_ring_choices_and_damage_with_scapegoat_tokens(tmp_path, target_token):
     with GoatEnvironment(str(ring_deck), str(goat_deck), seed=52,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
-        assert {RING, GEMINI_ELF}.issubset({c.code for c in obs.hand})
+        assert {RING, ARCHFIEND_SOLDIER}.issubset({c.code for c in obs.hand})
         assert SCAPEGOAT in {c.code for c in env.engine.probe.observation(1).hand}
         elf_summoned = ring_set = goat_used = ring_used = target_chosen = False
         for _ in range(95):
@@ -41,7 +41,7 @@ def test_ring_choices_and_damage_with_scapegoat_tokens(tmp_path, target_token):
             if obs.turn == 1 and obs.acting_player == 0:
                 if not elf_summoned:
                     action = next((a for a in actions if a.kind == "normal_summon"
-                                   and a.parameters.get("code") == GEMINI_ELF), None)
+                                   and a.parameters.get("code") == ARCHFIEND_SOLDIER), None)
                     elf_summoned |= action is not None
                 if elf_summoned and not ring_set and action is None:
                     action = next((a for a in actions if a.kind == "set_spell_trap"
@@ -62,7 +62,7 @@ def test_ring_choices_and_damage_with_scapegoat_tokens(tmp_path, target_token):
                     ring_used |= action is not None and action.kind == "activate"
             if ring_used and not target_chosen and actions[0].kind == "select_card":
                 choices = {a.parameters.get("code") for a in actions}
-                assert choices == SHEEP_CODES | {GEMINI_ELF}
+                assert choices == SHEEP_CODES | {ARCHFIEND_SOLDIER}
                 assert len(actions) == 5
                 assert all(a.parameters.get("location") == 4 for a in actions)
                 action = next((a for a in actions if (a.parameters.get("code")
@@ -80,9 +80,9 @@ def test_ring_choices_and_damage_with_scapegoat_tokens(tmp_path, target_token):
                 assert {c.code for c in remaining_tokens} <= SHEEP_CODES
                 assert not any(c.code in SHEEP_CODES for pile in obs.graveyards
                                for c in pile)
-                assert (GEMINI_ELF in {c.code for c in obs.graveyards[0]}) \
+                assert (ARCHFIEND_SOLDIER in {c.code for c in obs.graveyards[0]}) \
                     != target_token
-                assert (GEMINI_ELF in {c.code for c in obs.field}) == target_token
+                assert (ARCHFIEND_SOLDIER in {c.code for c in obs.field}) == target_token
                 assert {f"pre-errata/c{RING}.lua", f"goat/c{SCAPEGOAT}.lua"} \
                     <= env.engine.probe.loaded_script_sha256.keys()
                 return
