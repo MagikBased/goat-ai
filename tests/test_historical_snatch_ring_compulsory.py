@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 SNATCH_STEAL = 45986603
 RING = 511000824
@@ -124,5 +126,56 @@ def test_compulsory_returns_snatch_stolen_ring_target_to_owner(
                         f"pre-errata/c{RING}.lua",
                         f"official/c{COMPULSORY}.lua"} <= (
                             env.engine.probe.loaded_script_sha256.keys())
-                return
-    pytest.fail("Snatch / Ring / Compulsory chain did not resolve")
+                break
+        else:
+            pytest.fail("Snatch / Ring / Compulsory chain did not resolve")
+        if not chain_compulsory:
+            return
+        for _ in range(40):
+            actions = env.legal_actions()
+            if obs.turn == 4 and obs.acting_player == 1:
+                summon = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == GEMINI_ELF), None)
+                if summon is not None:
+                    assert env.engine.probe.observation(0).known_opponent_hand_cards \
+                        == (GEMINI_ELF,)
+                    obs = env.step(summon)
+                    break
+            action = next((a for a in actions if a.kind in ("pass", "end_phase")),
+                          actions[0])
+            obs = env.step(action)
+        else:
+            pytest.fail("owner did not re-Summon returned Gemini Elf")
+        for _ in range(10):
+            if any(c.code == GEMINI_ELF and c.controller == 1
+                   for c in env.engine.probe.observation(0).field):
+                break
+            actions = env.legal_actions()
+            action = next((a for a in actions if a.kind in (
+                "place", "select_position", "pass")), actions[0])
+            obs = env.step(action)
+        else:
+            pytest.fail("Gemini Elf Summon did not finish")
+        former_controller = env.engine.probe.observation(0)
+        assert former_controller.known_opponent_hand_cards == ()
+        assert any(c.code == GEMINI_ELF and c.controller == 1
+                   for c in former_controller.field)
+        agents = (RandomAgent(52), RandomAgent(53))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            obs = env.step(agents[obs.acting_player].select_action(
+                obs, env.legal_actions()))
+        else:
+            pytest.fail("Snatch / Ring / Compulsory duel exceeded 3000 decisions")
+        trajectory = env.trajectory()
+        assert trajectory.winner in (0, 1, None)
+        assert any(record.observation.viewer == 0
+                   and record.observation.known_opponent_hand_cards == (GEMINI_ELF,)
+                   for record in trajectory.decisions)
+    path = tmp_path / "snatch_ring_compulsory.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, ExperimentalOcgcoreEngine(root)) == len(
+        trajectory.decisions)
