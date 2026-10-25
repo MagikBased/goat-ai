@@ -399,3 +399,5 @@ A fifth branch applies the [historical Book of Moon attack ruling](https://www.g
 
 Unresolved: exact script revisions for 2005 TCG card text, card-specific rulings that differ from current OCG scripts, and differences among community tournament interpretations. These require individual source-backed regression cases before a correctness claim.
 
+
+**Public targets during Book of Moon and Nobleman chains:** [Book of Moon’s text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5432&ope=2&request_locale=en) targets a face-up monster, and [historical Nobleman rulings](https://www.goatformat.com/rulings5.html) describe its face-down monster target. The pinned core emits a public target message after each activation starts a chain link. Seeded fixtures confirm that both players see the target controller and Monster Zone slot at the response window. A Nobleman target remains unidentified to a player who has not seen the face-down card. Two chained Books retain a separate target slot on each active link. This verifies the adapter’s information boundary for these cases; other target message shapes and non-field targets remain unaudited.

@@ -83,7 +83,7 @@ def test_snatch_steal_upkeep_and_heavy_storm_return_control(tmp_path):
                 else:
                     pytest.fail("Snatch / Heavy duel exceeded 3000 decisions")
                 trajectory = env.trajectory()
-                assert trajectory.schema_version == 20
+                assert trajectory.schema_version == 21
                 assert any(card.equipped_to is not None
                            for decision in trajectory.decisions
                            for card in decision.observation.field)
@@ -92,6 +92,13 @@ def test_snatch_steal_upkeep_and_heavy_storm_return_control(tmp_path):
                 loaded = read_trajectory(path)
                 assert loaded == trajectory
                 assert verify_trajectory(loaded, ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
+                previous = json.loads(path.read_text())
+                previous["schema_version"] = 20
+                previous_path = tmp_path / "snatch_heavy_v20.json"
+                previous_path.write_text(json.dumps(previous))
+                assert verify_trajectory(read_trajectory(previous_path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
                     trajectory.decisions)
                 legacy = json.loads(path.read_text())
                 legacy["schema_version"] = 18

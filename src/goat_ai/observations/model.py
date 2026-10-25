@@ -18,12 +18,20 @@ class CardView:
 
 
 @dataclass(frozen=True)
+class TargetSlotView:
+    controller: int
+    zone: str
+    sequence: int
+
+
+@dataclass(frozen=True)
 class ChainLinkView:
     index: int
     card_code: int
     controller: int
     location: int
     sequence: int
+    targets: tuple[TargetSlotView, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -102,6 +110,11 @@ class Observation:
             raise ValueError("viewer and acting player must be 0 or 1")
         if any(card.controller != self.viewer for card in self.hand):
             raise ValueError("observation hand must contain viewer's cards only")
+        if any(target.controller not in (0, 1)
+               or target.zone not in ("monster", "spell_trap")
+               or not 0 <= target.sequence < (7 if target.zone == "monster" else 8)
+               for link in self.chain for target in link.targets):
+            raise ValueError("chain targets must identify public field slots")
         if any(card.controller != self.viewer or card.zone != "extra" or card.code is None
                for card in self.own_extra_deck):
             raise ValueError("own Extra Deck must contain only visible viewer cards")

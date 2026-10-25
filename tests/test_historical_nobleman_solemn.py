@@ -8,6 +8,7 @@ import pytest
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.observations import TargetSlotView
 
 NOBLEMAN = 504700116
 SOLEMN = 41420027
@@ -68,6 +69,14 @@ def test_solemn_response_prevents_nobleman_flip_deck_verification(tmp_path, nega
                                and a.parameters.get("location") == 4
                                and "code" not in a.parameters), None)
                 targeted = action is not None
+            if targeted and obs.acting_player == 1 and obs.chain \
+                    and obs.chain[-1].card_code == NOBLEMAN:
+                attacker_view = env.engine.probe.observation(0)
+                hidden = next(c for c in attacker_view.field if c.controller == 1
+                              and c.zone == "monster" and c.position == "facedown")
+                assert hidden.code is None
+                assert attacker_view.chain[0].targets == obs.chain[0].targets == (TargetSlotView(
+                    1, "monster", hidden.sequence),)
             if negate and targeted and obs.acting_player == 1 \
                     and not solemn_chained:
                 option = next((a for a in actions if a.kind == "chain"

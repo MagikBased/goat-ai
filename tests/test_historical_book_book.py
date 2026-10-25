@@ -8,6 +8,7 @@ import pytest
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.observations import TargetSlotView
 
 BOOK = 14087893
 
@@ -68,6 +69,10 @@ def test_book_chained_to_book_sets_the_common_target_first(tmp_path):
             obs = env.step(action)
             if second_target and len(obs.chain) == 2:
                 assert [link.card_code for link in obs.chain] == [BOOK, BOOK]
+                monster = next(c for c in obs.field if c.controller == 0
+                               and c.zone == "monster")
+                expected = (TargetSlotView(0, "monster", monster.sequence),)
+                assert all(link.targets == expected for link in obs.chain)
                 two_link_seen = True
             if second_target and not obs.chain and BOOK in {
                     c.code for c in obs.graveyards[0]} and BOOK in {

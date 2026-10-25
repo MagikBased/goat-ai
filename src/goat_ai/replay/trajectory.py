@@ -14,6 +14,7 @@ from goat_ai.observations import (
     PrivateRevealView,
     PublicRevealView,
     RevealedCardView,
+    TargetSlotView,
 )
 
 
@@ -53,7 +54,7 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     version = raw.get("schema_version")
-    if version not in range(1, 21):
+    if version not in range(1, 22):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
@@ -110,7 +111,11 @@ def read_trajectory(path: str | Path) -> Trajectory:
         else:
             view.pop("known_opponent_hand_cards", None)
         if version >= 2:
-            view["chain"] = tuple(ChainLinkView(**link) for link in view["chain"])
+            view["chain"] = tuple(ChainLinkView(
+                link["index"], link["card_code"], link["controller"],
+                link["location"], link["sequence"],
+                tuple(TargetSlotView(**target) for target in link.get("targets", ()))
+                if version >= 21 else ()) for link in view["chain"])
         else:
             view["chain"] = tuple(view["chain"])
         for key in ("life_points", "deck_counts", "extra_deck_counts",

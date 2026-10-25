@@ -7,8 +7,9 @@ from .model import (
     PrivateRevealView,
     PublicRevealView,
     RevealedCardView,
+    TargetSlotView,
 )
 
 __all__ = ["CardView", "ChainLinkView", "DisabledZoneView", "KnownCardView", "Observation",
-           "PrivateRevealView", "PublicRevealView", "RevealedCardView"]
+           "PrivateRevealView", "PublicRevealView", "RevealedCardView", "TargetSlotView"]
 

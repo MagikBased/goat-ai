@@ -858,8 +858,8 @@ Schema-v19 Goat Control / Chaos Turbo recordings with CombatHeuristicAgent in
 both seats on seeds 16000–16001 produced four replay-verified duels and 1,955
 teacher decisions. Of these, 239 had a visible Equip Spell target, including 75
 with multiple legal actions. The behavioral-cloning CLI now accepts
-replay-fingerprinted v19 and v20 recordings. These exact v19 file hashes were
-produced at commit `c65fe41`; current collection writes v20 and may yield
+replay-fingerprinted v19 through v21 recordings. These exact v19 file hashes were
+produced at commit `c65fe41`; current collection writes v21 and may yield
 different hashes while preserving the same experiment schedule. With one epoch, width 16, learning rate
 0.001, and model seed 16000, feature version 12 ended at loss 0.2695023 and
 opt-in version 13 at 0.2692132. Common model layers start at exactly the same

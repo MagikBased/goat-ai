@@ -11,7 +11,7 @@ import random
 import sqlite3
 import struct
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from goat_ai.observations import (
@@ -23,6 +23,7 @@ from goat_ai.observations import (
     PrivateRevealView,
     PublicRevealView,
     RevealedCardView,
+    TargetSlotView,
 )
 
 CORE_API_VERSION = (11, 0)
@@ -93,6 +94,7 @@ MSG_CHAINING = 70
 MSG_CHAIN_SOLVING = 72
 MSG_CHAIN_SOLVED = 73
 MSG_CHAIN_END = 74
+MSG_BECOME_TARGET = 83
 MSG_DRAW = 90
 MSG_MOVE = 50
 MSG_POS_CHANGE = 53
@@ -692,6 +694,26 @@ class OcgcoreProbe:
                     sequence=struct.unpack_from("<I", message, 17)[0],
                 ))
                 self._public_history.append(f"chain:{index}:start")
+            elif message[0] == MSG_BECOME_TARGET:
+                if len(message) < 5:
+                    raise ValueError("truncated MSG_BECOME_TARGET")
+                count = struct.unpack_from("<I", message, 1)[0]
+                if len(message) != 5 + count * 10:
+                    raise ValueError("invalid MSG_BECOME_TARGET card count")
+                if self._chain and self._resolving_chain_index is None:
+                    targets = list(self._chain[-1].targets)
+                    for index in range(count):
+                        offset = 5 + index * 10
+                        controller, location = message[offset:offset + 2]
+                        zone = {LOCATION_MZONE: "monster",
+                                LOCATION_SZONE: "spell_trap"}.get(location)
+                        if controller not in (0, 1) or zone is None:
+                            continue  # Do not expose private-zone indices.
+                        sequence = struct.unpack_from("<I", message, offset + 2)[0]
+                        target = TargetSlotView(controller, zone, sequence)
+                        if target not in targets:
+                            targets.append(target)
+                    self._chain[-1] = replace(self._chain[-1], targets=tuple(targets))
             elif message[0] == MSG_CHAIN_SOLVING:
                 if len(message) != 2 or not (1 <= message[1] <= len(self._chain)):
                     raise ValueError("invalid MSG_CHAIN_SOLVING")

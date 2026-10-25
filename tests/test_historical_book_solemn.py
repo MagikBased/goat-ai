@@ -8,6 +8,7 @@ import pytest
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.observations import TargetSlotView
 
 BOOK = 14087893
 SOLEMN = 41420027
@@ -56,6 +57,12 @@ def test_solemn_response_to_book_activation(tmp_path, negate):
                                    == monster_code and a.parameters.get("controller") == 0),
                                   None)
                     targeted = action is not None
+            if targeted and obs.acting_player == 1 and obs.chain \
+                    and obs.chain[-1].card_code == BOOK:
+                monster = next(c for c in obs.field if c.code == monster_code
+                               and c.zone == "monster")
+                assert obs.chain[0].targets == (TargetSlotView(
+                    0, "monster", monster.sequence),)
             if negate and targeted and obs.acting_player == 1 \
                     and not solemn_chained:
                 option = next((a for a in actions if a.kind == "chain"
