@@ -1353,3 +1353,63 @@ then seeds 17120–17135 with the new checkpoint against
 `scripts/audit_policy_agreement.py` on the fresh seed-17200 trajectories with
 both `--checkpoint` flags for the off-policy diagnostic. Generated data and
 checkpoints remain ignored by Git.
+## Public occupancy feature ablation (2026-10-25)
+
+Feature version 15 adds twelve public zone and pile counts to the state
+encoder. The hypothesis was that the previous average-card pooling loses
+board size, which matters for common cards such as Torrential Tribute,
+Mirror Force, and Heavy Storm. The feature is opt-in; the default and
+existing v12 checkpoint format are unchanged. This experiment compares the
+new version against the four-deck feature-v12 clone described above; v15
+also includes the v13 equip and v14 chain-target features, so the result
+cannot isolate the twelve counts alone.
+
+The v15 width-32 clone used the same 32 replay-verified training duels,
+10,449 CombatHeuristicAgent v2 demonstrator decisions, three epochs,
+learning rate 0.001, and seed 17 as the v12 clone. Mean training losses were
+0.12071, 0.05784, and 0.04262. Its ignored checkpoint
+`checkpoints/combat_fourdeck_fv15_17000_17003.pt` has SHA-256
+`c3d71929213b37dd293635a117a8c9cb77894252c7e4fe1aaea2eead5d802035`.
+These are agent-generated demonstrations, not human gameplay.
+
+Four held-out Chaos Control/Chaos Return teacher trajectories, seed 17200,
+replay-verified **4,067 decisions**, including 718 teacher decisions with
+multiple legal actions. V15 matched **681/718** exact choices versus
+**687/718** for v12. The agreement report SHA-256 is
+`347fb25dc7aeb1beb21c3b73ba26aa309c7b5e10e41a01aed6b375540c46a08d`.
+
+On unseen Chaos Control and Chaos Return Main Decks, with both deck
+assignments and both seats over seeds 17300–17307, v15 scored **13–18–1**
+directly against v12: a 42.2% score with a paired 95% bootstrap interval
+of **34.4–50.0%**. Its first-seat score was 12.5% and second-seat score
+71.9%, underscoring how uneven this small evaluation remains. The 32-game
+single-process run took 54.49 seconds on the recorded x86_64 CPU, with
+17,209 decisions. The report SHA-256 is
+`cdc2fdbfa914d919cebe7cda98f32f80875ab298d4a70d279afd8b97f85f6abe`.
+This is a negative pilot for adopting v15; it neither proves the counts
+harm strength in general nor meets the M4 competitive-policy exit.
+
+Reproduce with pinned assets and the existing local trajectories:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  replays/combat_fourdeck_{baz_war,ct_gc,gc_ct,war_baz}_{17000_17001,17002_17003}/*.json \
+  --native-root .cache/goat-ai --engine experimental \
+  --output checkpoints/combat_fourdeck_fv15_17000_17003.pt \
+  --epochs 3 --width 32 --feature-version 15 --learning-rate 0.001 --seed 17
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_agreement.py \
+  --checkpoint checkpoints/combat_fourdeck_fv15_17000_17003.pt \
+  --checkpoint checkpoints/combat_fourdeck_fv12_17000_17003.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --output .cache/goat-ai/combat_fourdeck_fv15_vs_v12_agreement_17200.json \
+  replays/combat_fourdeck_holdout_{cc_cr,cr_cc}_17200/*.json
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+  checkpoints/combat_fourdeck_fv15_17000_17003.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --opponent-checkpoint checkpoints/combat_fourdeck_fv12_17000_17003.pt \
+  --both-deck-assignments --require-unseen-main-decks \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+    examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --seed 17300 --seeds 8 --max-decisions 3000 \
+  --output .cache/goat-ai/combat_fourdeck_fv15_vs_v12_17300_17307.json
+```

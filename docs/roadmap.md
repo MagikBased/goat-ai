@@ -155,6 +155,14 @@ The cloning trainer also supports opt-in extra exposure to decisions involving s
 
 A new feature-v12 clone trained on 10,449 replay-verified CombatHeuristicAgent v2 decisions from four tournament Main Decks was checked against its teacher and an older two-deck clone on unseen Chaos Control and Chaos Return decks. It scored 12–20 against the teacher and 34–30 directly against the older clone on separate balanced schedules; both direct-score intervals include 50%. Held-out multi-option teacher agreement improved by only 5/718. The broader data did not demonstrate a competitive gain or satisfy M4; [the evaluation log](evaluation.md) records checkpoints, hashes, and schedule details. Future policy work should use the six-deck baseline and per-deck splits to judge practical strength, not training loss or teacher agreement alone.
 
+An opt-in feature-v15 encoder now supplies public field and pile counts to
+test whether pooled card embeddings were losing board-size information. On
+the same four-deck demonstrations, it matched 681/718 held-out multi-option
+teacher choices against v12's 687/718, then scored 13–18–1 directly against
+v12 on unseen Chaos Control/Chaos Return Main Decks. This negative pilot is
+documented in [the evaluation log](evaluation.md); keep the default model
+unchanged and do not count it as the M4 strength exit.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

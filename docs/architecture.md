@@ -31,6 +31,11 @@ it exposes that public relation even when the Equip Card is face-down, without r
 The default PyTorch feature version 10 and experimental version 12 omit
 this relation. Opt-in versions 13 and 14 bind the Equip Spell embedding to its public
 monster target slot. Version 14 also binds public chain targets to their links. A first small held-out comparison found no strength gain; see [evaluation](evaluation.md).
+Opt-in version 15 adds twelve public occupancy features: own and opposing
+face-up/face-down monster and Spell/Trap counts, plus each player's Graveyard
+and banished counts. Field counts use only visible zones and positions; they
+do not include hidden card identities. The default remains version 10 so old
+checkpoints keep their exact feature width.
 Schemas v3–v21 verify deck contents and native asset fingerprints as well as the
 recorded path. Callers must retain the original deck files and native assets;
 the recording stores hashes, not copies. Older v1/v2 recordings can still be

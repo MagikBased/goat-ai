@@ -95,7 +95,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 15):
+    if feature_version not in range(1, 16):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -167,6 +167,20 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
             for zone in ("monster", "spell_trap")
             for sequence in range(8)
         )
+    if feature_version >= 15:
+        # The average card embedding does not retain how many cards occupy
+        # each public zone. Counts are available to either player, including
+        # for face-down cards whose identities stay hidden.
+        numbers += tuple(
+            sum(card.controller == player and card.zone == zone
+                and card.position == position for card in observation.field) / 5
+            for player in (own, opponent)
+            for zone in ("monster", "spell_trap")
+            for position in ("faceup", "facedown")
+        )
+        numbers += tuple(len(pile) / 40 for piles in
+                         (observation.graveyards, observation.banished)
+                         for pile in (piles[own], piles[opponent]))
     kind_indices = []
     card_indices = []
     targets = []
@@ -286,7 +300,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 15):
+        if feature_version not in range(1, 16):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -302,7 +316,8 @@ class LegalActionPolicy(nn.Module):
                       + (len(ANNOUNCE_ACTION_KINDS) if feature_version >= 6 else 0)
                       + (len(SORT_ACTION_KINDS) if feature_version >= 7 else 0))
         self.kind = nn.Embedding(kind_count + 1, width, padding_idx=0)
-        self.state_numbers = nn.Sequential(nn.Linear(42 if feature_version >= 4 else 10, width), nn.ReLU(),
+        number_width = 54 if feature_version >= 15 else 42 if feature_version >= 4 else 10
+        self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
         self.action_numbers = nn.Sequential(nn.Linear(11 if feature_version >= 6 else 8, width), nn.ReLU(),
                                             nn.Linear(width, width))

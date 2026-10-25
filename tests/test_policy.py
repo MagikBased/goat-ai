@@ -140,6 +140,28 @@ def test_feature_version_eight_uses_visible_monster_stats_and_counters():
     assert torch.equal(legacy_before.state_card_numbers, legacy_after.state_card_numbers)
 
 
+def test_feature_version_fifteen_counts_public_occupancy_without_card_identity():
+    vocabulary = CardVocabulary((10, 20))
+    original = view()
+    crowded = replace(original, field=(
+        CardView(0, "monster", "faceup", 20, 0, "attack", 1900, 1000),
+        CardView(1, "monster", "facedown", None, 0, "defense"),
+        CardView(1, "spell_trap", "facedown", None, 1),
+    ))
+    first = encode_decision(original, actions(), vocabulary, feature_version=15)
+    second = encode_decision(crowded, actions(), vocabulary, feature_version=15)
+    assert first.state_numbers.shape == (54,)
+    assert second.state_numbers[-12:].tolist() == pytest.approx(
+        [0.2, 0, 0, 0, 0, 0.2, 0, 0.2, 0, 0, 0, 0])
+    assert not torch.equal(first.state_numbers, second.state_numbers)
+    assert torch.equal(encode_decision(original, actions(), vocabulary,
+                                       feature_version=14).state_numbers,
+                       encode_decision(crowded, actions(), vocabulary,
+                                       feature_version=14).state_numbers)
+    assert LegalActionPolicy(vocabulary.size, width=16, feature_version=15)(
+        second).shape == (3,)
+
+
 def test_feature_version_nine_uses_only_publicly_known_opponent_hand_cards():
     vocabulary = CardVocabulary((10, 20, 30))
     known = replace(view(), known_opponent_hand_cards=(20,))
