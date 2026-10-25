@@ -91,6 +91,10 @@ in the sample. Trap Dustshoot chained to another Trap Dustshoot appeared three
 times and now has a native two-hand reveal and full-duel replay regression.
 Solemn Judgment responding to Dustshoot appeared twice and now has a paired
 negated-versus-resolved hand-visibility regression.
+Raigeki Break responding to Book of Moon appeared three times and has a paired
+target-removal fixture. The reverse Book response to Raigeki Break now has a
+paired native fixture showing that changing the targeted monster face-down
+does not prevent Break from destroying it.
 These counts are from random-agent choices; they do
 not estimate tournament play rates or policy quality.
 
