@@ -1,5 +1,20 @@
 # Baseline evaluation log
 
+## Chaos Control versus Chaos Turbo protocol sweep
+
+Dmitry “InsiDS” Summovsky’s [third-place 2022 Worlds Chaos Control list](https://www.formatlibrary.com/decks/6548) was downloaded as a public YDK and converted to the pinned GOAT/pre-errata IDs in [`chaos_control_insids_worlds_2022.ydk`](../examples/decks/chaos_control_insids_worlds_2022.ydk). The source has 40 Main, 15 Extra, and 15 Side cards; all three sections pass the pinned GOAT legality gate. Two seat-swapped full duels against the sourced Chaos Turbo list serialize and replay-verify exact trajectories.
+
+A random-agent schedule on seeds 1–2, with each deck in both seats, completed **4/4 terminal duels** under the 3,000-decision cap. It recorded 4,224 decisions, or 1,056 per duel. Chaos Control’s assigned RandomAgent won 2/4, both in seat 0; this small result measures protocol coverage and does not estimate relative deck strength. On the pinned Linux x86_64 assets with one worker, the tournament took 4.293 seconds, measuring 0.932 duels and 984 decisions per second. Generated results remain outside Git.
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai python scripts/evaluate_native.py \
+  --engine experimental \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+    examples/decks/chaos_turbo_riclar_2020.ydk \
+  --agent-a random --agent-b random --seed 1 --seeds 2 \
+  --max-decisions 3000 --output artifacts/chaos_control_chaos_turbo_random_1_2.json
+```
+
 ## Warrior versus Chaos protocol sweep
 
 Sean Montague's [fourth-place Warrior list](https://www.goatformat.com/warrior.html) was transcribed into [`warrior_montague_clash.ydk`](../examples/decks/warrior_montague_clash.ydk), using GOAT and pre-errata IDs from the pinned whitelist. The source omits an Extra Deck, so this fixture leaves it empty. The 40-card Main Deck passes the pinned legality gate. Two seat-swapped Warrior versus sourced Chaos Turbo duels serialize and replay-verify complete trajectories.
