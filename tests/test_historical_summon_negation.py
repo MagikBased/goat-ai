@@ -17,6 +17,7 @@ BLS = 504700118
 GRACEFUL = 79571449
 LIGHT = 15025844
 DARK = 7359741
+PREMATURE_BURIAL = 70828912
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -143,15 +144,17 @@ def test_solemn_negates_bls_inherent_special_summon_after_cost(tmp_path):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"scripts/goat/c{BLS}.lua",
                      f"scripts/official/c{GRACEFUL}.lua",
-                     f"scripts/official/c{SOLEMN_JUDGMENT}.lua"):
+                     f"scripts/official/c{SOLEMN_JUDGMENT}.lua",
+                     f"scripts/official/c{PREMATURE_BURIAL}.lua"):
         if not (root / relative).is_file():
             pytest.skip(f"script {relative} not installed")
     lights = (LIGHT, 62651957)
     darks = (49881766, DARK)
     filler = [code for code in VANILLA_DECK if code not in (*lights, *darks)]
-    bls_cards = (GRACEFUL, BLS,
+    bls_cards = [GRACEFUL, BLS,
                  *(code for code in lights for _ in range(3)),
-                 *(code for code in darks for _ in range(3)), *filler[:26])
+                 *(code for code in darks for _ in range(3)), *filler[:26]]
+    bls_cards[17] = PREMATURE_BURIAL
     attacker = tmp_path / "bls.ydk"
     attacker.write_text("#main\n" + "\n".join(map(str, bls_cards))
                         + "\n#extra\n!side\n")
@@ -162,7 +165,8 @@ def test_solemn_negates_bls_inherent_special_summon_after_cost(tmp_path):
     with GoatEnvironment(str(attacker), str(defender), seed=100,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
-        assert {BLS, GRACEFUL, LIGHT, DARK}.issubset(c.code for c in obs.hand)
+        assert {BLS, GRACEFUL, LIGHT, DARK, PREMATURE_BURIAL}.issubset(
+            c.code for c in obs.hand)
         assert SOLEMN_JUDGMENT in {
             c.code for c in env.engine.probe.observation(1).hand}
         graceful_used = discarded = solemn_set = summon_attempted = solemn_used = False
@@ -217,6 +221,10 @@ def test_solemn_negates_bls_inherent_special_summon_after_cost(tmp_path):
                 assert obs.life_points == (8000, 4000)
                 assert not any(a.kind == "special_summon" and a.parameters.get("code")
                                == BLS for a in env.legal_actions())
+                assert PREMATURE_BURIAL in {c.code for c in obs.hand}
+                assert {c.code for c in obs.graveyards[0]} == {GRACEFUL, BLS}
+                assert not any(a.kind == "activate" and a.parameters.get("code")
+                               == PREMATURE_BURIAL for a in env.legal_actions())
                 loaded = env.engine.probe.loaded_script_sha256
                 assert {f"goat/c{BLS}.lua",
                         f"official/c{SOLEMN_JUDGMENT}.lua"}.issubset(loaded)
