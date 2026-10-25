@@ -1255,3 +1255,101 @@ ignored `.cache` directory. Later report JSON will include `by_deck_a` and
 therefore have a different whole-file hash from the one above, while the
 ordered game outcomes should remain the same with the pinned assets and agent
 versions.
+
+## Four-tournament-deck combat clone, held-out deck check (2026-10-25)
+
+The balanced six-deck baseline above suggested testing whether broader
+imitation data helps a policy generalize. A fresh feature-v12, width-32
+behavioral clone used **32 full native duels** of CombatHeuristicAgent version
+2 against RandomAgent. The teacher played both seats and both deck orders in
+Goat Control versus Chaos Turbo and Warrior versus Bazoo Return, with seeds
+17000–17003. The teacher won 29/32 collection games. All **20,031 decisions**
+replay-verified before training; the demonstrator-seat filter retained
+**10,449 teacher decisions**. Three CPU epochs at learning rate 0.001 and seed
+17 gave mean cross-entropies 0.12419, 0.05738, and 0.04456. The ignored local
+checkpoint is `checkpoints/combat_fourdeck_fv12_17000_17003.pt`, SHA-256
+`1a1ca996a96b680e45e6141fd1634a9f2517787e7f06faaabecddb6c97b2f4a4`.
+Its metadata records all input trajectory hashes, four training seeds, four
+Main Deck compositions, and the teacher version. These are agent-generated
+demonstrations, not human games.
+
+Chaos Control and Chaos Return Main Decks were **excluded from training**.
+`--require-unseen-main-decks` rejected any overlapping training composition
+before each evaluation. On these two held-out decks, with both deck
+assignments and both seats over seeds 17100–17107, the new clone scored
+**12–20** against CombatHeuristicAgent (37.5% score; paired 95% interval
+21.9–53.1%). The older two-deck clone
+`checkpoints/combat_bc_fv12_15100_15103.pt` scored **11–21** on the identical
+schedule (34.4%; 21.9–46.9%). The matched score difference was +3.1 points,
+with a matchup-seed bootstrap interval from −15.6 to +15.6 points. On fresh
+seeds 17120–17135, the new clone scored **34–30 directly** against that older
+checkpoint (53.1%; paired interval 46.9–59.4%). None of these intervals
+establish a competitive gain. The direct-match deck split was 13–19 with
+Chaos Control and 21–11 with Chaos Return, so even the small aggregate lead
+was not uniform across held-out decks.
+
+A separate off-policy audit used four fresh CombatHeuristicAgent v2 versus
+RandomAgent duels on those same held-out deck files, with seed 17200 in both
+deck orders and teacher seats. All 4,067 recorded decisions replay-verified;
+2,082 were teacher decisions. Among 718 with multiple legal actions, the new
+clone matched 687 exact choices versus 682 for the older clone. Its offered
+staple decisions matched one additional Nobleman of Crossout and one additional
+Ring of Destruction choice; the other eight shared-staple offered counts were
+identical in this small audit. This measures agreement with a heuristic, not
+optimal play. The audit report SHA-256 is
+`f5a9b7b6a43257241984ad9e28235df96633ad00bccf22c680036ff8907346f0`.
+
+The three ignored tournament JSON SHA-256 values, in the order new versus
+teacher, older versus teacher, and new versus older, are
+`caa906dd0579801f7c80662332dc18d1d44fcee04373d0cffb94707ca8905baf`,
+`96c34f2b36c24c0021f62f65689a8afb653dc72355ecb6a4961d3b2650bcadaf`,
+and `3409d8c4012021dbf8db8b21423b754e034db1ad5aecda872be1bf304db84dfc`.
+The experimental GOAT-mode adapter and pinned assets were used throughout.
+The older checkpoint lacks explicit teacher-version metadata and differs in
+training deck diversity and decision count, so the head-to-head comparison
+does not isolate any one cause. This experiment does not meet M4's held-out
+strength gate or establish a self-play gain.
+
+Reproduce the collection from the repository root with pinned native
+assets. The four pair labels fix the input order and saved paths:
+
+```bash
+for entry in \
+  goat_control_lolmarcus_2020:chaos_turbo_riclar_2020:gc_ct \
+  chaos_turbo_riclar_2020:goat_control_lolmarcus_2020:ct_gc \
+  warrior_montague_clash:bazoo_return_weirdchamp_worlds:war_baz \
+  bazoo_return_weirdchamp_worlds:warrior_montague_clash:baz_war; do
+  IFS=: read -r deck_a deck_b label <<< "$entry"
+  for start in 17000 17002; do
+    end=$((start + 1))
+    PYTHONPATH=. OMP_NUM_THREADS=1 .venv/bin/python \
+      scripts/collect_heuristic_demos.py \
+      --native-root .cache/goat-ai --engine experimental \
+      --teacher combat_heuristic --max-decisions 3000 \
+      --deck-a "examples/decks/$deck_a.ydk" \
+      --deck-b "examples/decks/$deck_b.ydk" \
+      --seed "$start" --seeds 2 \
+      --output-dir "replays/combat_fourdeck_${label}_${start}_${end}"
+  done
+done
+```
+
+Train all resulting JSON files with:
+
+```bash
+PYTHONPATH=. OMP_NUM_THREADS=1 .venv/bin/python \
+  scripts/train_behavioral_clone.py \
+  replays/combat_fourdeck_{baz_war,ct_gc,gc_ct,war_baz}_{17000_17001,17002_17003}/*.json \
+  --native-root .cache/goat-ai --engine experimental \
+  --output checkpoints/combat_fourdeck_fv12_17000_17003.pt \
+  --epochs 3 --width 32 --feature-version 12 --learning-rate 0.001 --seed 17
+```
+
+Run `scripts/evaluate_policy.py` with the Chaos Control/Chaos Return matchup,
+`--both-deck-assignments --require-unseen-main-decks --max-decisions 3000`,
+seeds 17100–17107 against `--opponent combat_heuristic` for each checkpoint,
+then seeds 17120–17135 with the new checkpoint against
+`--opponent-checkpoint` pointing to the older one. Run
+`scripts/audit_policy_agreement.py` on the fresh seed-17200 trajectories with
+both `--checkpoint` flags for the off-policy diagnostic. Generated data and
+checkpoints remain ignored by Git.

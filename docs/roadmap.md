@@ -153,6 +153,8 @@ A 64-game self-play continuation from that larger clone produced 64 replay-verif
 
 The cloning trainer also supports opt-in extra exposure to decisions involving selected high-play cards. A matched experiment on ten shared GOAT staples improved held-out multi-option teacher agreement by 12/947 decisions but split a 32-game direct match 16–16 against the unweighted clone. Keep ordinary sampling as the default and use competitive results, rather than teacher agreement alone, to judge this approach; see [the evaluation log](evaluation.md).
 
+A new feature-v12 clone trained on 10,449 replay-verified CombatHeuristicAgent v2 decisions from four tournament Main Decks was checked against its teacher and an older two-deck clone on unseen Chaos Control and Chaos Return decks. It scored 12–20 against the teacher and 34–30 directly against the older clone on separate balanced schedules; both direct-score intervals include 50%. Held-out multi-option teacher agreement improved by only 5/718. The broader data did not demonstrate a competitive gain or satisfy M4; [the evaluation log](evaluation.md) records checkpoints, hashes, and schedule details. Future policy work should use the six-deck baseline and per-deck splits to judge practical strength, not training loss or teacher agreement alone.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
