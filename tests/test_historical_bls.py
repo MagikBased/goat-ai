@@ -18,7 +18,7 @@ BOOK_OF_MOON = 14087893
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("choice", [
-    "double_attack", "banish", "banish_book", "attack_then_main2"])
+    "double_attack", "banish", "banish_book", "attack_then_main2", "attack_book"])
 def test_bls_historical_turn_choices(tmp_path, choice):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for script in (f"goat/c{BLS}.lua", f"official/c{GRACEFUL}.lua"):
@@ -35,7 +35,7 @@ def test_bls_historical_turn_choices(tmp_path, choice):
     deck = tmp_path / "bls.ydk"
     deck.write_text("#main\n" + "\n".join(map(str, cards)) + "\n#extra\n!side\n")
     opponent_deck = "examples/decks/vanilla_probe.ydk"
-    if choice == "banish_book":
+    if choice in ("banish_book", "attack_book"):
         if not (root / f"scripts/official/c{BOOK_OF_MOON}.lua").is_file():
             pytest.skip("Book of Moon script not installed")
         opponent = tmp_path / "book_response.ydk"
@@ -79,15 +79,17 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                 if action is not None:
                     assert action.parameters["location"] == 16
                     costs.append(action.parameters["code"])
-            if observation.turn == 2 and observation.acting_player == 1 \
+            if choice != "attack_book" and observation.turn == 2 \
+                    and observation.acting_player == 1 \
                     and not opponent_summoned:
                 option = next((a for a in actions if a.kind == "normal_summon"), None)
                 if option is not None:
                     action = option
                     opponent_summoned = True
                     opponent_code = option.parameters["code"]
-            if (choice == "banish_book" and observation.turn == 2
-                    and observation.acting_player == 1 and opponent_summoned
+            if (choice in ("banish_book", "attack_book") and observation.turn == 2
+                    and observation.acting_player == 1
+                    and (opponent_summoned or choice == "attack_book")
                     and not book_set and action is None):
                 action = next((a for a in actions if a.kind == "set_spell_trap"
                                and a.parameters.get("code") == BOOK_OF_MOON), None)
@@ -106,14 +108,14 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                                    and a.parameters.get("location") == 4), action)
                     effect_targeted |= action is not None and action.kind == "select_card"
                 if observation.phase == "main1" and (
-                        choice in ("double_attack", "attack_then_main2") or (
+                        choice in ("double_attack", "attack_then_main2", "attack_book") or (
                             effect_used and any(c.code == opponent_code
                                                 for c in observation.banished[1]))):
                     if choice == "attack_then_main2":
                         assert any(a.kind == "activate" and a.parameters.get("code") == BLS
                                    for a in actions)
                     action = next((a for a in actions if a.kind == "battle_phase"), action)
-                if choice in ("double_attack", "attack_then_main2") \
+                if choice in ("double_attack", "attack_then_main2", "attack_book") \
                         and observation.phase == "battle_start" \
                         and not first_attack:
                     assert set(costs) == {LIGHT, DARK}
@@ -121,7 +123,8 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                     action = next((a for a in actions if a.kind == "attack"
                                    and a.parameters.get("code") == BLS), action)
                     first_attack = action is not None and action.kind == "attack"
-                if first_attack and actions[0].kind == "select_card":
+                if choice != "attack_book" and first_attack \
+                        and actions[0].kind == "select_card":
                     action = next((a for a in actions if a.parameters.get("controller") == 1
                                    and a.parameters.get("location") == 4), action)
                 if first_attack and any(a.kind == "yes" and a.parameters.get("code") == BLS
@@ -155,6 +158,34 @@ def test_bls_historical_turn_choices(tmp_path, choice):
                 action = next((a for a in actions if a.parameters.get("controller") == 1
                                and a.parameters.get("code") == opponent_code), action)
                 book_targeted |= action is not None and action.kind == "select_card"
+            if choice == "attack_book" and first_attack \
+                    and observation.acting_player == 1:
+                if not book_chained:
+                    option = next((a for a in actions if a.kind == "chain"
+                                   and a.parameters.get("code") == BOOK_OF_MOON), None)
+                    if option is not None:
+                        action = option
+                        book_chained = True
+                elif not book_targeted and actions[0].kind == "select_card":
+                    action = next((a for a in actions if a.kind == "select_card"
+                                   and a.parameters.get("controller") == 0
+                                   and a.parameters.get("code") == BLS), None)
+                    book_targeted |= action is not None
+            if choice == "attack_book" and book_targeted \
+                    and BOOK_OF_MOON in {c.code for c in observation.graveyards[1]}:
+                assert observation.life_points == (8000, 8000)
+                assert any(c.code == BLS and c.position == "facedown"
+                           for c in env.engine.probe.observation(0).field)
+                if observation.phase == "battle_step" and observation.acting_player == 0:
+                    assert not any(a.kind == "attack" and a.parameters.get("code") == BLS
+                                   for a in actions)
+                    action = next((a for a in actions if a.kind == "main2"), action)
+                if observation.phase == "main2" and observation.acting_player == 0:
+                    assert not any(a.kind in ("flip_summon", "change_position", "activate")
+                                   and a.parameters.get("code") == BLS for a in actions)
+                    assert f"official/c{BOOK_OF_MOON}.lua" in (
+                        env.engine.probe.loaded_script_sha256)
+                    return
             if (choice == "banish_book" and book_chained
                     and BOOK_OF_MOON in {c.code for c in observation.graveyards[1]}):
                 assert book_targeted
