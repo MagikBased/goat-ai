@@ -1,6 +1,7 @@
 """Sangan destroyed mid-chain searches after Pot of Greed finishes drawing."""
 
 import os
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -16,15 +17,24 @@ MYSTICAL_ELF = 15025844
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_ring_destroys_sangan_mid_pot_chain_then_searches(tmp_path):
+@pytest.mark.parametrize("draw_sole_target", [False, True])
+def test_ring_destroys_sangan_mid_pot_chain_then_searches(tmp_path, draw_sole_target):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     for relative in (f"goat/c{SANGAN}.lua", f"pre-errata/c{RING}.lua",
                      f"official/c{POT}.lua"):
         if not (root / "scripts" / relative).is_file():
             pytest.skip(f"script {relative} not installed")
     player_deck = tmp_path / "sangan_pot.ydk"
-    player_deck.write_text("#main\n" + "\n".join(map(str, (
-        SANGAN, POT, *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
+    if draw_sole_target:
+        high_attack = [code for code in VANILLA_DECK
+                       if code not in (MYSTICAL_ELF, 13039848)]
+        cards = [SANGAN, POT, *high_attack, *([14087893] * 3), MYSTICAL_ELF]
+        assert len(cards) == 40
+        cards[10], cards[-1] = cards[-1], cards[10]
+    else:
+        cards = [SANGAN, POT, *VANILLA_DECK[2:]]
+    player_deck.write_text("#main\n" + "\n".join(map(str, cards))
+                           + "\n#extra\n!side\n")
     opponent_deck = tmp_path / "ring.ydk"
     opponent_deck.write_text("#main\n" + "\n".join(map(str, (
         RING, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
@@ -54,6 +64,10 @@ def test_ring_destroys_sangan_mid_pot_chain_then_searches(tmp_path):
                 if action is not None:
                     hand_before = len(obs.hand)
                     deck_before = obs.deck_counts[0]
+                    if draw_sole_target:
+                        assert MYSTICAL_ELF not in {c.code for c in obs.hand}
+                        assert sum(c.code == MYSTICAL_ELF for c in
+                                   env.engine.probe._query_location(0, 1)) == 1
                     pot_used = True
             if pot_used and obs.acting_player == 1 and not ring_chained:
                 action = next((a for a in actions if a.kind == "chain"
@@ -63,7 +77,8 @@ def test_ring_destroys_sangan_mid_pot_chain_then_searches(tmp_path):
                 action = next((a for a in actions if a.kind == "select_card"
                                and a.parameters.get("code") == SANGAN), None)
                 ring_targeted |= action is not None
-            if ring_targeted and not searched and actions[0].kind == "select_card" \
+            if ring_targeted and not draw_sole_target and not searched \
+                    and actions[0].kind == "select_card" \
                     and any(a.parameters.get("location") == 1 for a in actions):
                 assert obs.chain and obs.chain[0].card_code == SANGAN
                 assert obs.deck_counts[0] == deck_before - 2
@@ -81,6 +96,29 @@ def test_ring_destroys_sangan_mid_pot_chain_then_searches(tmp_path):
                 action = next((a for a in actions if a.kind in (
                     "place", "pass", "end_phase")), actions[0])
             obs = env.step(action)
+            if draw_sole_target and ring_targeted:
+                owner = env.engine.probe.observation(0)
+                opponent = env.engine.probe.observation(1)
+                if opponent.private_reveals:
+                    assert obs.chain == ()
+                    assert MYSTICAL_ELF in {c.code for c in owner.hand}
+                    assert not any(c.code == MYSTICAL_ELF for c in
+                                   env.engine.probe._query_location(0, 1))
+                    assert len(owner.hand) == hand_before + 1
+                    assert owner.deck_counts[0] == deck_before - 2 == 31
+                    assert owner.life_points == (7000, 7000)
+                    assert SANGAN in {c.code for c in owner.graveyards[0]}
+                    assert not owner.private_reveals
+                    assert len(opponent.private_reveals) == 1
+                    reveal = opponent.private_reveals[0]
+                    assert reveal.recipient == 1 and len(reveal.cards) == 31
+                    assert Counter(c.code for c in reveal.cards) == Counter(
+                        c.code for c in env.engine.probe._query_location(0, 1))
+                    assert opponent.known_opponent_hand_cards == ()
+                    assert {f"goat/c{SANGAN}.lua", f"pre-errata/c{RING}.lua",
+                            f"official/c{POT}.lua"}.issubset(
+                                env.engine.probe.loaded_script_sha256)
+                    return
             if searched and obs.chain == () and MYSTICAL_ELF in {c.code for c in obs.hand}:
                 assert obs.deck_counts[0] == deck_before - 3
                 assert len(obs.hand) == hand_before + 2
