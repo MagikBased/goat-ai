@@ -25,6 +25,8 @@ class NativeChoice:
     race: int | None = None
     prompt_id: int | None = None
     zones: tuple[tuple[int, int, int], ...] = ()
+    attribute: int | None = None
+    number: int | None = None
 
 
 @dataclass(frozen=True)
@@ -89,6 +91,16 @@ def decode_decision(message: bytes) -> NativeDecision:
                         for index in range(count))
         reader.finish()
         return NativeDecision(player, choices)
+    if kind == 143:  # MSG_ANNOUNCE_NUMBER
+        player = reader.integer(1)
+        count = reader.integer(1)
+        if player not in (0, 1) or not count:
+            raise ValueError("invalid number announcement")
+        choices = tuple(NativeChoice("announce_number", index,
+                                     number=reader.integer(8))
+                        for index in range(count))
+        reader.finish()
+        return NativeDecision(player, choices)
     if kind == 19:  # MSG_SELECT_POSITION
         player = reader.integer(1)
         reader.integer(4)  # card identity is not needed to choose a position
@@ -108,6 +120,21 @@ def decode_decision(message: bytes) -> NativeDecision:
         if player not in (0, 1) or not 1 <= count <= len(bits) or comb(len(bits), count) > 2048:
             raise NotImplementedError("race announcement bounds are not supported")
         choices = tuple(NativeChoice("announce_race", struct.pack("<Q", mask), race=mask)
+                        for group in combinations(bits, count)
+                        for mask in (sum(group),))
+        return NativeDecision(player, choices)
+    if kind == 141:  # MSG_ANNOUNCE_ATTRIB
+        player = reader.integer(1)
+        count = reader.integer(1)
+        available = reader.integer(4)
+        reader.finish()
+        bits = tuple(1 << index for index in range(32) if available & (1 << index))
+        if player not in (0, 1) or not 1 <= count <= len(bits) or available & ~0x7F:
+            raise ValueError("invalid attribute announcement")
+        if comb(len(bits), count) > 2048:
+            raise NotImplementedError("attribute announcement has too many combinations")
+        choices = tuple(NativeChoice("announce_attribute", struct.pack("<I", mask),
+                                     attribute=mask)
                         for group in combinations(bits, count)
                         for mask in (sum(group),))
         return NativeDecision(player, choices)

@@ -142,6 +142,10 @@ class RestrictedOcgcoreEngine:
                 parameters["position"] = choice.position
             if choice.race is not None:
                 parameters["race"] = choice.race
+            if choice.attribute is not None:
+                parameters["attribute"] = choice.attribute
+            if choice.number is not None:
+                parameters["number"] = choice.number
             if choice.prompt_id is not None:
                 parameters["prompt_id"] = choice.prompt_id
             if choice.sequence is not None:

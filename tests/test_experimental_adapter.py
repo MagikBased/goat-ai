@@ -40,11 +40,64 @@ def test_new_native_choice_formats():
     assert [choice.position for choice in positions.choices] == [1, 4]
     races = decode_decision(b"\x8c\x00\x01" + struct.pack("<Q", 0b101))
     assert [choice.race for choice in races.choices] == [1, 4]
+    attributes = decode_decision(b"\x8d\x00\x01" + struct.pack("<I", 0x6f))
+    assert [choice.attribute for choice in attributes.choices] == [1, 2, 4, 8, 32, 64]
+    assert [choice.response for choice in attributes.choices] == [
+        struct.pack("<I", bit) for bit in (1, 2, 4, 8, 32, 64)]
+    numbers = decode_decision(b"\x8f\x00\x02" + struct.pack("<QQ", 1000, 2000))
+    assert [(choice.kind, choice.number, choice.response) for choice in numbers.choices] == [
+        ("announce_number", 1000, 0), ("announce_number", 2000, 1)]
+    with pytest.raises(ValueError, match="truncated"):
+        decode_decision(b"\x8f\x00\x02" + struct.pack("<Q", 1000))
+    with pytest.raises(ValueError, match="invalid attribute"):
+        decode_decision(b"\x8d\x00\x01" + struct.pack("<I", 0x80))
     tribute = (b"\x14\x00\x01" + struct.pack("<III", 1, 2, 2)
                + struct.pack("<IBBIB", 111, 0, 4, 0, 1)
                + struct.pack("<IBBIB", 222, 0, 4, 1, 1))
     assert [choice.kind for choice in decode_decision(tribute).choices] == [
         "tribute", "tribute", "tribute_cards", "cancel"]
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("code,kind,parameter,chosen", [
+    (17078030, "announce_number", "number", 2000),
+    (40410110, "announce_attribute", "attribute", 32),
+])
+def test_native_announcement_resolves_in_real_duel(tmp_path, code, kind, parameter, chosen):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{code}.lua").is_file():
+        pytest.skip("card script not installed")
+    deck_lines = Path("examples/decks/vanilla_probe.ydk").read_text().splitlines()
+    deck_lines[2] = str(code)
+    deck = tmp_path / "announcement.ydk"
+    deck.write_text("\n".join(deck_lines) + "\n")
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        for _ in range(20):
+            actions = env.legal_actions()
+            if actions[0].kind == kind:
+                selected = next(action for action in actions
+                                if action.parameters[parameter] == chosen)
+                observation = env.step(selected)
+                assert observation.life_points == ((6000, 8000) if kind == "announce_number"
+                                                   else (8000, 8000))
+                assert env.legal_actions()
+                return
+            selected = next((action for action in actions
+                             if action.kind in ("activate", "chain")
+                             and action.parameters.get("code") == code), None)
+            if selected is None:
+                selected = next((action for action in actions
+                                 if action.kind in ("set_spell_trap", "normal_summon")
+                                 and action.parameters.get("code") == code), None)
+            if selected is None:
+                selected = next((action for action in actions if action.kind == "place"), None)
+            if selected is None:
+                selected = next((action for action in actions
+                                 if action.kind in ("pass", "end_phase")), actions[0])
+            observation = env.step(selected)
+    pytest.fail(f"{kind} prompt was not reached")
 
 
 def test_native_multi_zone_selection_uses_exact_three_byte_locations():

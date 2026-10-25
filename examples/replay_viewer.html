@@ -119,6 +119,12 @@
     const phaseName = phase => String(phase || "unknown").replaceAll("_", " ");
     const locationName = location => ({1: "Deck", 2: "Hand", 4: "Monster", 8: "Spell/Trap", 16: "Graveyard", 32: "Banished", 64: "Extra"})[location] || `zone ${location}`;
     const nameOf = code => code == null ? "Unknown card" : (names[String(code)] || `Card #${code}`);
+    const attributeName = mask => {
+      const names = [[1, "EARTH"], [2, "WATER"], [4, "FIRE"], [8, "WIND"],
+                     [16, "LIGHT"], [32, "DARK"], [64, "DIVINE"]];
+      const selected = names.filter(([bit]) => mask & bit).map(([, name]) => name);
+      return selected.length && !(mask & ~127) ? selected.join(" + ") : String(mask);
+    };
     const node = (tag, className, content) => {
       const element = document.createElement(tag);
       if (className) element.className = className;
@@ -213,6 +219,8 @@
       if (parameters.zones) parts.push(parameters.zones.map(zone => `P${zone.controller} ${zone.location === 4 ? "Monster" : "Spell/Trap"} ${zone.sequence + 1}`).join(", "));
       if (parameters.position != null) parts.push(`position ${parameters.position}`);
       if (parameters.race != null) parts.push(`race ${parameters.race}`);
+      if (parameters.attribute != null) parts.push(attributeName(parameters.attribute));
+      if (parameters.number != null) parts.push(String(parameters.number));
       return parts.join(" · ");
     }
     function render() {
