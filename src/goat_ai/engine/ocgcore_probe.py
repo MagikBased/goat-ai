@@ -32,6 +32,20 @@ GOAT_DECK_CONFIRM_OLD = b"Duel.ConfirmCards(tp,dg)"
 GOAT_DECK_CONFIRM_HISTORICAL = b"Duel.ConfirmCards(1-tp,dg)"
 UPSTREAM_GOAT_RESTRICT_SHA256 = "579c13c4afff6a581360b221ed79867b7b7d75c57870d9953dc2f21711c0670a"
 GOAT_RESTRICT_EFFECT_MARKER = b"\tc:RegisterEffect(e5)\nend\n"
+GOAT_RESTRICT_EQUIP_MARKER = (
+    b"\tif not c:EquipByEffectAndLimitRegister(e,tp,tc,id) then return end\n"
+)
+GOAT_RESTRICT_HISTORICAL_EQUIP = b"""\t-- Historical Skill Drain ruling: an existing Equip Card stays attached.
+\tif not Duel.Equip(tp,tc,c,false) then return end
+\ttc:RegisterFlagEffect(id,RESET_EVENT+RESETS_STANDARD,0,0)
+\tlocal limit=Effect.CreateEffect(c)
+\tlimit:SetType(EFFECT_TYPE_SINGLE)
+\tlimit:SetProperty(EFFECT_FLAG_CANNOT_DISABLE)
+\tlimit:SetCode(EFFECT_EQUIP_LIMIT)
+\tlimit:SetReset(RESET_EVENT+RESETS_STANDARD)
+\tlimit:SetValue(function(le,ec) return le:GetOwner()==ec end)
+\ttc:RegisterEffect(limit)
+"""
 GOAT_RESTRICT_DAMAGE_EFFECT = b"""\tc:RegisterEffect(e5)
 \t-- Historical PSV-084 ruling: reflect battle damage while equipped.
 \tlocal e6=Effect.CreateEffect(c)
@@ -345,11 +359,14 @@ class OcgcoreProbe:
                                         GOAT_DECK_CONFIRM_HISTORICAL)
         if path.relative_to(self.scripts) == Path("goat/c504700102.lua"):
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RESTRICT_SHA256 \
-                    or contents.count(GOAT_RESTRICT_EFFECT_MARKER) != 1:
-                self.errors.append("pinned GOAT Restrict script changed; battle-damage patch not applied")
+                    or contents.count(GOAT_RESTRICT_EFFECT_MARKER) != 1 \
+                    or contents.count(GOAT_RESTRICT_EQUIP_MARKER) != 1:
+                self.errors.append("pinned GOAT Restrict script changed; historical patches not applied")
                 return 0
             contents = (contents.replace(GOAT_RESTRICT_EFFECT_MARKER,
                                          GOAT_RESTRICT_DAMAGE_EFFECT)
+                        .replace(GOAT_RESTRICT_EQUIP_MARKER,
+                                 GOAT_RESTRICT_HISTORICAL_EQUIP)
                         + GOAT_RESTRICT_DAMAGE_FUNCTIONS)
         self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
             hashlib.sha256(contents).hexdigest()
