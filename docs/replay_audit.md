@@ -50,6 +50,49 @@ games as `self_play_review`, which the trainer tracks separately from human
 gameplay and policy-checkpoint reviews. Do not turn the sampled actions
 themselves into expert demonstrations.
 
+Three SHA-256-bound learner-seat review labels preserve the legal alternatives
+at the Faith, Heavy Storm, and Breaker frames in
+`examples/annotations/selfplay_value_seed3001_faith_set.review.json`,
+`selfplay_value_seed3002_heavy_hold.review.json`, and
+`selfplay_value_seed3003_breaker_enemy.review.json`. A fixed-state scorecard
+replay-verified their three source duels, audited visibility, and confirmed
+that neither exact replay nor seed was in the unchanged feature-19 parent's
+training provenance. That parent ranked the reviewed Faith Set **5th of 6**
+(reviewed minus recorded summon logit **−2.253**), Heavy Storm hold **1st of 2**
+(**+0.583**), and Breaker's enemy target **2nd of 3** (**−0.045**). The
+parent's best Faith action at that frame was to Set a different Spell/Trap,
+so the pairwise summon-versus-Set margin does not prove it would greedily
+Summon Faith in a complete duel. The Heavy Storm error in this sample is
+exploration, whereas the target and Flip preferences expose weaker fixed-state
+ordering. Three states are not a strength estimate.
+
+The ignored scorecard is `artifacts/feature19_selfplay_review_scorecard.json`
+(SHA-256 `28e92ac9c5b602277959bb7a528f6d10dd1cbd76f4c40c9c8fbe999c625ed501`).
+Reproduce it with `scripts/score_reviewed_decisions.py`, the feature-19 parent
+checkpoint, and the three matching replay/annotation pairs above. Regenerate
+the ignored source replays first with the four-game value-baseline smoke command
+in [evaluation](evaluation.md); a fresh run reproduced all four decision
+streams exactly after excluding only the added recording-provenance fields.
+The MST
+frame is intentionally not a one-choice label: two opposing Set Spell/Traps
+are legal and neither hidden identity is available to the acting player.
+Its actionable preference is for an opposing target over the own Dust Tornado,
+without claiming which opposing slot is better. A future review format should
+represent acceptable-action sets or pairwise preferences before using that
+case for training.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/score_reviewed_decisions.py \
+  --checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt \
+  --case replays/selfplay_value_smoke_3000/episode_00001_seed_3001.json \
+         examples/annotations/selfplay_value_seed3001_faith_set.review.json \
+  --case replays/selfplay_value_smoke_3000/episode_00002_seed_3002.json \
+         examples/annotations/selfplay_value_seed3002_heavy_hold.review.json \
+  --case replays/selfplay_value_smoke_3000/episode_00003_seed_3003.json \
+         examples/annotations/selfplay_value_seed3003_breaker_enemy.review.json \
+  --output artifacts/feature19_selfplay_review_scorecard.json
+```
+
 ## Extended visible-state shortlist, feature-19 checkpoint
 
 `scripts/audit_policy_replays.py` now uses pinned printed card metadata to

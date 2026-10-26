@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "source_trajectory_sha256": "b8559c66591afe12c1514c26515ff7b889c00ec0c1f831240d755aa7fd3d5424",
+  "authorization": "self_play_review",
+  "reviewer": "GOAT AI replay audit",
+  "choices": [
+    {
+      "decision_index": 1080,
+      "action_index": 2
+    }
+  ]
+}
