@@ -18,6 +18,7 @@
     #viewer { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 350px); gap: 10px; }
     .toolbar, .summary, .player-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .toolbar { justify-content: flex-end; min-width: 0; }
+    .image-picker { font-size: .78rem; }
     #file-name { max-width: 185px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; }
     button, input[type=file], input[type=number], input[type=text] { font: inherit; }
     button { padding: 7px 13px; color: #eef5f3; background: #234854; border: 1px solid #4f7980; border-radius: 7px; cursor: pointer; }
@@ -43,7 +44,15 @@
     .viewer-side .slot { border-color: #a95a9e; }
     .slot.disabled { border-color: #b86b6b; background: #4d2f35; }
     .slot-label { font-size: .63rem; color: #c5dcc9; margin-bottom: 3px; }
-    .card { min-height: 0; min-width: 0; flex: 1; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; justify-content: space-between; font-size: .8rem; overflow-wrap: anywhere; overflow: hidden; box-shadow: 0 2px 7px #0005; }
+    .card { position: relative; min-height: 0; min-width: 0; flex: 1; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; justify-content: space-between; font-size: .8rem; overflow-wrap: anywhere; overflow: hidden; box-shadow: 0 2px 7px #0005; isolation: isolate; }
+    .card > strong, .card > small { position: relative; z-index: 2; text-shadow: 0 1px 2px #000b; }
+    .card.has-art { color: #fff; background: #16232c; }
+    .card.has-placeholder { color: #fff; background: radial-gradient(circle at 50% 48%, #4b7f86 0 15%, #244754 16% 35%, #132935 36% 100%); }
+    .card.has-placeholder::after { content: ""; position: absolute; inset: 35% 0 0; background: linear-gradient(transparent, #0a1017dc); z-index: 1; }
+    .card-placeholder { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(1.2rem, 3vw, 2.4rem); color: #bde0d1; text-shadow: 0 2px 9px #071015; z-index: 0; }
+    .card.has-art::after { content: ""; position: absolute; inset: 35% 0 0; background: linear-gradient(transparent, #0a1017ed); z-index: 1; }
+    .card-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 26%; z-index: 0; }
+    .card-back { position: absolute; inset: 5px; border: 2px solid #c69454; border-radius: 4px; background: repeating-radial-gradient(ellipse at center, #e1b46e 0 2px, #874a34 3px 6px, #351b37 7px 10px); box-shadow: inset 0 0 0 4px #432840, inset 0 0 0 6px #c69454; opacity: .8; z-index: 0; }
     .monster { background: #b18b50; color: #201709; }
     .spell_trap { background: #457d85; color: #08181b; }
     .facedown { background: repeating-linear-gradient(35deg, #644e87, #644e87 8px, #4e3b70 8px, #4e3b70 16px); color: #fff; }
@@ -53,8 +62,30 @@
     .centerline { flex: 0 0 36px; display: flex; justify-content: center; align-items: center; border-top: 1px solid #678a86; border-bottom: 1px solid #678a86; color: #e8edd4; font-weight: 700; letter-spacing: .03em; }
     .hand { flex: 0 0 55px; min-width: 0; display: flex; gap: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
     .hand .card { flex: 0 0 105px; }
-    .hand-back { flex: 0 0 35px; height: 49px; border: 2px solid #947bb4; border-radius: 5px; background: repeating-linear-gradient(35deg, #55436e, #55436e 7px, #3c3156 7px, #3c3156 14px); }
+    .hand-back { position: relative; flex: 0 0 35px; height: 49px; border: 2px solid #947bb4; border-radius: 5px; background: #3c3156; overflow: hidden; }
+    .hand-back .card-back { inset: 3px; }
     .zone-counts { display: flex; gap: 8px; flex-wrap: wrap; color: #c1d7d3; }
+    .pile-trigger { padding: 2px 5px; font-size: inherit; color: #d9eeda; background: #254b4b; border: 1px solid #638b7f; }
+    .pile-trigger:hover, .pile-trigger:focus-visible { background: #397265; }
+    .deck-slot { cursor: pointer; width: 100%; color: inherit; background: #173039; text-align: left; }
+    .deck-slot strong { align-self: center; font-size: 1.3rem; }
+    .deck-slot .card-back { position: relative; display: block; flex: 1; min-height: 0; margin: 1px 12%; inset: auto; }
+    .pile-dialog { width: min(760px, calc(100vw - 24px)); max-height: min(82dvh, 900px); padding: 0; color: #eef5f3; background: #172731; border: 1px solid #739283; border-radius: 12px; box-shadow: 0 20px 65px #000a; }
+    .pile-dialog::backdrop { background: #02080dba; backdrop-filter: blur(3px); }
+    .pile-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid #456674; }
+    .pile-head h2 { margin: 0; font-size: 1.1rem; }
+    .pile-note { padding: 9px 16px; color: #b8cecb; }
+    .pile-scroll { max-height: calc(min(82dvh, 900px) - 105px); padding: 10px 16px 18px; overflow-y: auto; scrollbar-width: thin; }
+    .pile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); gap: 10px; }
+    .pile-card { min-width: 0; background: #20333c; border: 1px solid #4c6970; border-radius: 7px; overflow: hidden; }
+    .pile-card .card { height: 150px; border-radius: 0; }
+    .pile-card-caption { padding: 6px; min-height: 44px; font-size: .75rem; overflow-wrap: anywhere; }
+    .pile-card-count { color: #ffe3a5; font-weight: 700; }
+    .card-arrive { animation: card-arrive .34s ease-out both; }
+    .card-flip { animation: card-flip .42s ease-out both; }
+    @keyframes card-arrive { from { opacity: .25; transform: translateY(-14px) scale(.92); } to { opacity: 1; transform: none; } }
+    @keyframes card-flip { from { transform: rotateY(85deg); opacity: .5; } to { transform: rotateY(0); opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .card-arrive, .card-flip { animation: none; } }
     .sidebar { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 3px; }
     .controls { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; background: #203744; }
     .controls button { padding: 7px 3px; }
@@ -84,6 +115,8 @@
     <div><h1>GOAT AI Replay Viewer</h1><p class="muted subtitle">Player-visible decision snapshots</p></div>
     <div class="toolbar">
       <label>Open trajectory <input id="file" type="file" accept=".json,application/json"></label>
+      <label class="image-picker" title="Select your local card image folder">Card images <input id="images" type="file" webkitdirectory directory multiple accept="image/jpeg,image/png,image/webp"></label>
+      <span id="image-count" class="muted subtitle"></span>
       <span id="file-name" class="muted">No replay loaded</span>
     </div>
   </header>
@@ -150,6 +183,11 @@
       </aside>
     </section>
   </main>
+  <dialog id="pile-dialog" class="pile-dialog" aria-labelledby="pile-title">
+    <div class="pile-head"><h2 id="pile-title"></h2><button id="pile-close" type="button" aria-label="Close card pile">Close</button></div>
+    <p id="pile-note" class="pile-note"></p>
+    <div id="pile-scroll" class="pile-scroll"></div>
+  </dialog>
   <script id="embedded-replay" type="application/json">__EMBEDDED_REPLAY__</script>
   <script id="embedded-names" type="application/json">__EMBEDDED_NAMES__</script>
   <script id="embedded-options" type="application/json">__EMBEDDED_OPTIONS__</script>
@@ -167,6 +205,12 @@
     let sourceSha256 = "";
     let annotations = new Map();
     let commonFrames = [];
+    let cardFiles = new Map();
+    let cardImages = new Map();
+    let previousFrame = -1;
+    let previousField = new Map();
+    let animateNext = false;
+    let currentObservation = null;
     // Card IDs in >=5 of the six sourced tournament Main Decks; tests pin this list.
     const COMMON_CARD_CODES = new Set([
       14087893, 504700116, 44763025, 19613556, 71413901,
@@ -207,6 +251,69 @@
       if (content != null) element.textContent = String(content);
       return element;
     };
+    const fieldKey = card => `${card.controller}:${card.zone}:${card.sequence}`;
+    const fieldSignature = card => `${card.code ?? "hidden"}:${card.position}:${card.orientation}`;
+    function addCardVisual(element, code, facedown) {
+      const key = String(code);
+      if (!facedown && code != null && cardFiles.has(key) && !cardImages.has(key))
+        cardImages.set(key, URL.createObjectURL(cardFiles.get(key)));
+      if (!facedown && code != null && cardImages.has(key)) {
+        const art = node("img", "card-art");
+        art.src = cardImages.get(key);
+        art.alt = "";
+        element.classList.add("has-art");
+        element.prepend(art);
+      } else if (facedown) {
+        element.prepend(node("span", "card-back"));
+      } else {
+        element.classList.add("has-placeholder");
+        element.prepend(node("span", "card-placeholder", "✦"));
+      }
+    }
+    function pileCard(code, count = 1) {
+      const tile = node("div", "pile-card");
+      const card = node("div", "card monster");
+      addCardVisual(card, code, code == null);
+      card.append(node("strong", "", code == null ? "Concealed" : nameOf(code)));
+      tile.append(card);
+      const caption = node("div", "pile-card-caption");
+      if (count > 1) caption.append(node("span", "pile-card-count", `${count}× `));
+      caption.append(document.createTextNode(code == null ? "Concealed card" : nameOf(code)));
+      tile.append(caption);
+      return tile;
+    }
+    function showPile(player, zone) {
+      if (!currentObservation) return;
+      stop();
+      const observation = currentObservation;
+      const own = player === observation.viewer;
+      const label = `${own ? "Your" : "Opponent"} ${zone === "deck" ? "Deck" : zone === "graveyard" ? "Graveyard" : "Banished cards"}`;
+      byId("pile-title").textContent = label;
+      const scroll = byId("pile-scroll");
+      const grid = node("div", "pile-grid");
+      let note;
+      if (zone === "deck") {
+        const remaining = observation.deck_counts[player];
+        if (own && observation.own_main_deck?.length) {
+          note = `${remaining} cards remain. Starting Main Deck composition is shown below; the identities and order of the remaining cards are unknown.`;
+          const counts = new Map();
+          for (const code of observation.own_main_deck) counts.set(code, (counts.get(code) || 0) + 1);
+          for (const [code, count] of counts) grid.append(pileCard(code, count));
+        } else {
+          note = own ? `${remaining} cards remain. This replay has no recorded starting decklist.`
+            : `${remaining} cards remain. Opponent Deck identities and order are hidden.`;
+        }
+      } else {
+        const cards = zone === "graveyard" ? observation.graveyards[player] : observation.banished[player];
+        note = `${cards.length} ${cards.length === 1 ? "card" : "cards"}. ${zone === "graveyard" ? "Graveyard cards are public." : "Concealed banished cards remain hidden."}`;
+        for (const card of cards) grid.append(pileCard(card.code));
+      }
+      byId("pile-note").textContent = note;
+      if (!grid.childElementCount) scroll.replaceChildren(node("p", "muted", "No cards to display."));
+      else scroll.replaceChildren(grid);
+      scroll.scrollTop = 0;
+      byId("pile-dialog").showModal();
+    }
     const knownMap = observation => {
       const result = new Map();
       for (const card of observation.known_opponent_field_cards || []) {
@@ -243,6 +350,12 @@
     function cardElement(observation, card, known) {
       const code = visibleCode(observation, card, known);
       const element = node("div", `card ${card.zone} ${card.position === "facedown" ? "facedown" : ""} ${card.code == null && code != null ? "known" : ""}`);
+      addCardVisual(element, card.code, card.position === "facedown");
+      if (animateNext && previousFrame >= 0 && index > previousFrame) {
+        const before = previousField.get(fieldKey(card));
+        if (!before) element.classList.add("card-arrive");
+        else if (before !== fieldSignature(card)) element.classList.add("card-flip");
+      }
       element.append(node("strong", "", cardLabel(observation, card, known)));
       const status = card.position === "facedown" ? (code == null ? "Hidden" : "Previously revealed") : "Face-up";
       const stats = card.attack == null ? "" : ` · ${card.attack}/${card.defense}`;
@@ -264,22 +377,30 @@
       }
       return row;
     }
-    function listZone(title, cards) {
+    function listZone(title, cards, player, zone) {
       const box = node("div", "detail-box");
-      box.append(node("h3", "", `${title} (${cards.length})`));
+      const open = node("button", "pile-trigger", `${title} (${cards.length}) · View cards`);
+      open.type = "button";
+      open.addEventListener("click", () => showPile(player, zone));
+      box.append(open);
       if (cards.length) box.append(node("p", "muted", cards.map(card => card.code == null ? "Concealed" : nameOf(card.code)).join(" · ")));
       return box;
     }
     function zoneLine(observation, player, zone, known) {
       const line = node("div", "zone-line");
       line.append(zoneRow(observation, player, zone, known));
-      const auxiliary = node("div", "slot field-zone");
+      const auxiliary = node(zone === "spell_trap" ? "div" : "button", "slot field-zone");
       if (zone === "spell_trap") {
         auxiliary.append(node("span", "slot-label", "Field Spell"));
         const fieldSpell = observation.field.find(card => card.controller === player && card.zone === "spell_trap" && card.sequence === 5);
         if (fieldSpell) auxiliary.append(cardElement(observation, fieldSpell, known));
       } else {
+        auxiliary.type = "button";
+        auxiliary.classList.add("deck-slot");
+        auxiliary.setAttribute("aria-label", `View Player ${player} Deck`);
+        auxiliary.addEventListener("click", () => showPile(player, "deck"));
         auxiliary.append(node("span", "slot-label", "Deck"));
+        auxiliary.append(node("span", "card-back"));
         auxiliary.append(node("strong", "", observation.deck_counts[player]));
       }
       line.append(auxiliary);
@@ -291,14 +412,31 @@
       const playerHeader = node("div", "player-header");
       playerHeader.append(node("strong", "", `Player ${player}${own ? " · your view" : " · opponent"}`));
       const handCount = own ? observation.hand.length : observation.opponent_hand_count;
-      playerHeader.append(node("span", "zone-counts", `Hand ${handCount} · Extra ${observation.extra_deck_counts[player]} · GY ${observation.graveyards[player].length} · Banished ${observation.banished[player].length}`));
+      const counts = node("span", "zone-counts");
+      counts.append(node("span", "", `Hand ${handCount} · Extra ${observation.extra_deck_counts[player]}`));
+      for (const [zone, title, amount] of [["graveyard", "GY", observation.graveyards[player].length], ["banished", "Banished", observation.banished[player].length]]) {
+        const open = node("button", "pile-trigger", `${title} ${amount}`);
+        open.type = "button";
+        open.addEventListener("click", () => showPile(player, zone));
+        counts.append(open);
+      }
+      playerHeader.append(counts);
       playerHeader.append(node("span", "life", `${observation.life_points[player]} LP`));
       section.append(playerHeader);
       const hand = node("div", "hand");
       if (own) {
-        for (const card of observation.hand) hand.append(node("div", "card monster", nameOf(card.code)));
+        for (const card of observation.hand) {
+          const element = node("div", "card monster");
+          addCardVisual(element, card.code, false);
+          element.append(node("strong", "", nameOf(card.code)));
+          hand.append(element);
+        }
       } else {
-        for (let i = 0; i < handCount; i++) hand.append(node("div", "hand-back"));
+        for (let i = 0; i < handCount; i++) {
+          const back = node("div", "hand-back");
+          back.append(node("span", "card-back"));
+          hand.append(back);
+        }
       }
       if (!own) section.append(hand);
       if (own) {
@@ -348,6 +486,7 @@
       const terminal = Boolean(replay.terminal_observation) && index === decisions.length;
       const record = terminal ? null : decisions[index];
       const observation = terminal ? replay.terminal_observation : record.observation;
+      currentObservation = observation;
       const lastIndex = decisions.length - 1 + Number(Boolean(replay.terminal_observation));
       const known = knownMap(observation);
       byId("viewer").hidden = false;
@@ -376,11 +515,14 @@
                               ? `TURN ${observation.turn} · DUEL ENDED`
                               : `TURN ${observation.turn} · ${phaseName(observation.phase).toUpperCase()} · PLAYER ${observation.acting_player} TO ACT`),
                             playerBoard(observation, observation.viewer, known));
+      previousFrame = index;
+      previousField = new Map(observation.field.map(card => [fieldKey(card), fieldSignature(card)]));
+      animateNext = false;
       byId("piles").replaceChildren(node("h2", "", "Graveyards and banished cards"),
-        listZone("Opponent Graveyard", observation.graveyards[1 - observation.viewer]),
-        listZone("Opponent Banished", observation.banished[1 - observation.viewer]),
-        listZone("Your Graveyard", observation.graveyards[observation.viewer]),
-        listZone("Your Banished", observation.banished[observation.viewer]));
+        listZone("Opponent Graveyard", observation.graveyards[1 - observation.viewer], 1 - observation.viewer, "graveyard"),
+        listZone("Opponent Banished", observation.banished[1 - observation.viewer], 1 - observation.viewer, "banished"),
+        listZone("Your Graveyard", observation.graveyards[observation.viewer], observation.viewer, "graveyard"),
+        listZone("Your Banished", observation.banished[observation.viewer], observation.viewer, "banished"));
       byId("action").textContent = terminal ? "Duel ended" : actionLabel(
         observation, record.selected_action, known,
         record.legal_actions.findIndex(action => action.id === record.selected_action.id));
@@ -446,6 +588,7 @@
       while (candidate >= 0 && candidate < replay.decisions.length && skip && ["pass", "place", "shuffle_hand"].includes(replay.decisions[candidate].selected_action.kind)) candidate += direction;
       if (candidate < 0 || candidate > lastIndex) { stop(); return; }
       index = candidate;
+      animateNext = direction > 0;
       render();
     }
     function moveCommon(direction) {
@@ -458,6 +601,7 @@
     function setReplay(data, label, hash) {
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
       stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map();
+      previousFrame = -1; previousField = new Map(); animateNext = false;
       commonFrames = data.decisions.flatMap((record, frame) => commonDecision(record) ? [frame] : []);
       const requested = Number(location.hash.match(/^#decision=(\d+)$/)?.[1] || 1);
       index = Math.max(0, Math.min(data.decisions.length - 1 + Number(Boolean(data.terminal_observation)), requested - 1));
@@ -474,6 +618,22 @@
         setReplay(JSON.parse(new TextDecoder().decode(bytes)), file.name, hash);
       }
       catch (error) { byId("notice").hidden = false; byId("notice").textContent = `Could not load replay: ${error.message}`; }
+    });
+    byId("images").addEventListener("change", event => {
+      for (const url of cardImages.values()) URL.revokeObjectURL(url);
+      cardFiles = new Map();
+      cardImages = new Map();
+      for (const file of event.target.files) {
+        const match = file.name.match(/^(\d+)\.(?:jpe?g|png|webp)$/i);
+        if (match) cardFiles.set(match[1], file);
+      }
+      byId("image-count").textContent = `${cardFiles.size} images loaded`;
+      previousFrame = -1;
+      render();
+    });
+    byId("pile-close").addEventListener("click", () => byId("pile-dialog").close());
+    byId("pile-dialog").addEventListener("click", event => {
+      if (event.target === byId("pile-dialog")) byId("pile-dialog").close();
     });
     byId("previous").addEventListener("click", () => move(-1));
     byId("next").addEventListener("click", () => move(1));
@@ -513,7 +673,7 @@
       timer = setInterval(() => move(1), 650);
     });
     document.addEventListener("keydown", event => {
-      if (!replay || ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+      if (!replay || byId("pile-dialog").open || ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
       if (event.key === "ArrowRight") move(1);
       if (event.key === "ArrowLeft") move(-1);
     });
