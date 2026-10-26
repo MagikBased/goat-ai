@@ -2632,3 +2632,41 @@ report is `artifacts/policy_guard_v2_vs_tactical_v2_top5_2310_2311.json`
 The evaluation rejected training deck file hashes and required unseen Main
 Deck compositions. These results do not support calling the guarded policy
 the strongest local agent yet.
+
+## Schema-v23 / feature-v19 pipeline smoke test
+
+The native adapter now records the public turn player separately from the
+acting player. Two TacticalHeuristicAgent v3 versus RandomAgent duels at seed
+2400 generated 1,695 total schema-v23 decisions, of which 903 belonged to the
+teacher. Both were replay-verified by the behavioral-cloning command before
+training. A one-epoch feature-v19, width-16 clone used exactly those 903
+teacher decisions and reported training loss 0.5401. The loaded checkpoint
+then completed and replay-verified a 1,232-decision native duel against
+RandomAgent at seed 2410, winning from seat 0. This is a pipeline check, not a
+playing-strength estimate or a held-out model comparison.
+The teacher records include Scapegoat Set on its own Main Phase, activated at
+the opponent's Battle Start in one duel, and activated during the opponent's
+End Phase in the other. Each decision records the turn owner separately from
+the responding player.
+
+Reproduce with `scripts/collect_heuristic_demos.py --teacher tactical
+--engine experimental --seed 2400 --seeds 1`, using the Cas Flip Control and
+Daryl Gravekeepers decks, then `scripts/train_behavioral_clone.py` with
+`--feature-version 19 --width 16 --epochs 1 --batch-size 32
+--learning-rate 0.001 --seed 19`. The ignored local checkpoint is
+`checkpoints/schema23_v19_v3_smoke_2400.pt` (SHA-256
+`59562962062d6847f9b484f431d2d26ac6c1a9f1a1faab15940515847e750c2e`).
+The two trajectory SHA-256 values are
+`727ce29d5f07cd17c8af585cbf0672720b6d26387b083347053cca800e7b26bc`
+and `a1d6a7c9e20e736f9352c573a1b14fe3a0ede649b465e67c2659fc87af1278ae`;
+the evaluation replay hash is
+`8f9eaeb58fa4f2880e610265cb6e173063aa95886c618e7ca1495e6cda4ac2f0`.
+
+The turn-aware tactical guard (policy inference v5) scored **27–13** against
+the same feature-v17 checkpoint without a guard over 40 duels on two ordered
+2005 deck pairings, both deck assignments, both seats, and seeds 2410–2414.
+Its paired bootstrap 95% interval was 52.5–82.5%. This small ablation checks
+that the new timing condition did not erase the earlier gain; it does not
+replace the broader 160-game v4 guard evaluation above. The ignored report is
+`artifacts/guard_v5_vs_plain_two_pairs_2410_2414.json` (SHA-256
+`ab5b4f600eb9fbea63daef92b783f85bd60298721e957bb74461f795d26aa173`).

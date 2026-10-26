@@ -49,7 +49,7 @@ def test_ring_double_knockout_returns_current_terminal_observation(
         assert observation.life_points == (0, 0)
         assert env.legal_actions() == ()
         trajectory = env.trajectory()
-        assert trajectory.schema_version == 22
+        assert trajectory.schema_version == 23
         assert trajectory.terminal_observation == observation
         assert len(trajectory.decisions) == decisions
         assert trajectory.decisions[-1].observation.life_points == pre_lp

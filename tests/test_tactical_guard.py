@@ -7,12 +7,13 @@ from goat_ai.agents.tactical_guard import admissible_action_indices
 from goat_ai.observations import CardView, ChainLinkView, Observation
 
 
-def board(*cards, phase="main1", turn=1, viewer=0, chain=()):
+def board(*cards, phase="main1", turn=1, viewer=0, chain=(), turn_player=None):
     return Observation(
         viewer=viewer, acting_player=viewer, turn=turn, phase=phase,
         life_points=(8000, 8000), hand=(), field=tuple(cards),
         graveyards=((), ()), banished=((), ()), opponent_hand_count=5,
         deck_counts=(35, 35), extra_deck_counts=(0, 0), chain=chain,
+        turn_player=turn_player,
     )
 
 
@@ -40,6 +41,13 @@ def test_scapegoat_waits_for_end_or_battle_and_can_answer_removal():
     assert kept(board(phase="main1"), (goat, decline)) == (decline,)
     assert kept(board(phase="end"), (goat, decline)) == (goat, decline)
     assert kept(board(phase="battle_start"), (goat, decline)) == (goat, decline)
+    assert kept(board(phase="end", turn_player=0), (goat, decline)) == (decline,)
+    assert kept(board(phase="end", turn_player=1), (goat, decline)) == (
+        goat, decline)
+    assert kept(board(phase="battle_start", turn_player=0),
+                (goat, decline)) == (decline,)
+    assert kept(board(phase="battle_start", turn_player=1),
+                (goat, decline)) == (goat, decline)
     harmless = (ChainLinkView(1, 72302403, 1, 8, 0),)
     assert kept(board(phase="main1", chain=harmless), (goat, decline)) == (decline,)
     pending = (ChainLinkView(1, 19613556, 1, 8, 0),)

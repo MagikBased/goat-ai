@@ -46,7 +46,7 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     trajectory = play()
     assert trajectory == play()
     assert trajectory.winner == 1
-    assert trajectory.schema_version == 22
+    assert trajectory.schema_version == 23
     assert trajectory.rules_profile == vars(RestrictedOcgcoreEngine(root).ruleset)
     assert trajectory.deck_sha256 is not None
     assert trajectory.asset_sha256 is not None
@@ -88,11 +88,11 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     older_path.write_text(json.dumps(older))
     assert verify_trajectory(read_trajectory(older_path),
                              RestrictedOcgcoreEngine(root)) == len(trajectory.decisions)
-    previous = replace(trajectory, schema_version=4,
+    previous = replace(trajectory, schema_version=4, terminal_observation=None,
                        decisions=tuple(_old_position_actions(replace(record, observation=replace(
                            record.observation, known_opponent_cards=(),
                            known_opponent_field_cards=(), own_main_deck=(),
-                           pending_attack=None)))
+                           pending_attack=None, turn_player=None)))
                                        for record in trajectory.decisions))
     assert verify_trajectory(previous, RestrictedOcgcoreEngine(root)) == len(
         previous.decisions)
@@ -220,15 +220,16 @@ def test_book_of_moon_chains_and_hides_turned_monster(tmp_path):
                 path = tmp_path / "book.json"
                 write_trajectory(path, trajectory)
                 assert read_trajectory(path) == trajectory
-                previous = replace(
-                    trajectory, schema_version=5,
-                    decisions=tuple(_old_position_actions(replace(
-                        record, observation=replace(
-                            record.observation, known_opponent_field_cards=())))
-                        for record in trajectory.decisions),
-                )
-                write_trajectory(path, previous)
-                assert verify_trajectory(read_trajectory(path), RestrictedOcgcoreEngine(root)) == len(
+                old_json = json.loads(path.read_text())
+                old_json["schema_version"] = 5
+                old_json.pop("terminal_observation", None)
+                for record in old_json["decisions"]:
+                    for action in [*record["legal_actions"], record["selected_action"]]:
+                        if action["kind"] == "flip_summon":
+                            action["kind"] = "change_position"
+                path.write_text(json.dumps(old_json))
+                previous = read_trajectory(path)
+                assert verify_trajectory(previous, RestrictedOcgcoreEngine(root)) == len(
                     previous.decisions)
                 return
         pytest.fail("Book of Moon fixture duel exceeded 5000 decisions")

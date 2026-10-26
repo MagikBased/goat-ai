@@ -40,6 +40,7 @@ def test_common_card_navigation_matches_sourced_main_decks():
     assert 'id="next-common"' in template
     assert 'id="agents"' in template
     assert 'meta.demonstrator_seat' in template
+    assert 'observation.turn_player ?? observation.acting_player' in template
 
 
 def test_reviewer_frame_combines_private_views_without_changing_agent_observation():

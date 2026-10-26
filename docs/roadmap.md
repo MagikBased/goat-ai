@@ -251,6 +251,13 @@ paired interval crossing 50% and a weaker Chaos Control split. Keep v17
 experimental and continue measuring competitive strength; see
 [evaluation](evaluation.md). This does not close M4.
 
+Schema v23 adds the public turn owner to observations and trajectories, and
+feature v19 exposes that distinction to a policy without revealing private
+state. A replay-verified smoke run proves collection, training, and inference
+work end to end; it does not meet the M4 competitive gain gate. Next, collect
+authorized and reviewed timing decisions, then compare v19 against a matched
+parent across held-out decks and seeds. See [evaluation](evaluation.md).
+
 The combat teacher's attack-target preference now applies to the engine's
 `battle_start` target prompts as well as `battle_step`. This is teacher
 version 3; prior demonstrations remain labeled version 2. The next data

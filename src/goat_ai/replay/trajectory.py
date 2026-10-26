@@ -49,7 +49,7 @@ class Trajectory:
 
 def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
     version = trajectory.schema_version
-    if version not in range(1, 23):
+    if version not in range(1, 24):
         raise ValueError("unsupported trajectory schema")
     if version >= 18 and trajectory.terminal_observation is None:
         raise ValueError("schema v18 requires a terminal observation")
@@ -84,13 +84,17 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
             raise ValueError("chain target slots require schema v21")
         if version < 22 and view.pending_attack is not None:
             raise ValueError("pending attacker slot requires schema v22")
+        if version < 23 and view.turn_player is not None:
+            raise ValueError("turn player requires schema v23")
+        if version >= 23 and view.turn_player is None:
+            raise ValueError("schema v23 requires the public turn player")
     Path(path).write_text(json.dumps(asdict(trajectory), separators=(",", ":")) + "\n", encoding="utf-8")
 
 
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     version = raw.get("schema_version")
-    if version not in range(1, 23):
+    if version not in range(1, 24):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
@@ -150,6 +154,12 @@ def read_trajectory(path: str | Path) -> Trajectory:
             view["pending_attack"] = TargetSlotView(**view["pending_attack"])
         else:
             view.pop("pending_attack", None)
+        if version >= 23:
+            if (type(view.get("turn_player")) is not int
+                    or view["turn_player"] not in (0, 1)):
+                raise ValueError("schema v23 requires the public turn player")
+        else:
+            view.pop("turn_player", None)
         if version >= 2:
             view["chain"] = tuple(ChainLinkView(
                 link["index"], link["card_code"], link["controller"],

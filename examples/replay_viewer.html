@@ -659,7 +659,11 @@
       const rail = node("div", "centerline");
       const turn = node("span", "phase-turn");
       turn.append(node("span", "", `T${observation.turn}`),
-                  node("span", "", terminal ? "END" : `P${observation.acting_player + 1}`));
+                  node("span", "", terminal ? "END"
+                    : `P${(observation.turn_player ?? observation.acting_player) + 1}`));
+      turn.title = observation.turn_player == null
+        ? "Turn player unavailable in this older replay; showing the acting player"
+        : `Player ${observation.turn_player + 1}'s turn`;
       rail.append(turn);
       const current = observation.phase === "draw" ? "DP"
         : observation.phase === "standby" ? "SP"
@@ -728,7 +732,8 @@
       byId("previous-common").disabled = nearbyCommon(-1) == null;
       byId("next-common").disabled = nearbyCommon(1) == null;
       byId("common-count").textContent = `${commonFrames.length} common-card choices`;
-      byId("turn").textContent = `Turn ${observation.turn} · ${phaseName(observation.phase)}`;
+      byId("turn").textContent = `Turn ${observation.turn}${observation.turn_player == null
+        ? "" : ` · Player ${observation.turn_player + 1}'s turn`} · ${phaseName(observation.phase)}`;
       const agents = replayAgents(replay);
       byId("agents").textContent = agents.some(Boolean)
         ? agents.map((name, seat) => `P${seat}: ${name || "identity unrecorded"}`).join(" · ")

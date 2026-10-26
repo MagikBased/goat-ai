@@ -38,10 +38,9 @@ def admissible_action_indices(observation: Observation,
                               card_races: Mapping[int, int] | None = None) -> tuple[int, ...]:
     """Defer clearly wasteful actions while preserving an engine-legal choice.
 
-    Scapegoat is normally held for an End Phase. Battle Phase or a chain
-    threatening a Set copy can justify using it sooner. The observation does
-    not yet expose the turn player separately from the actor, so this version
-    cannot distinguish the controller's own End Phase from the opponent's.
+    Scapegoat is normally held for the opponent's End Phase. Their Battle
+    Phase or a chain threatening a Set copy can justify using it sooner.
+    Older trajectories without a turn owner retain the broader timing rule.
     """
     own = observation.viewer
     own_backrow = sum(c.zone == "spell_trap" and c.controller == own
@@ -86,6 +85,10 @@ def admissible_action_indices(observation: Observation,
                and (target.controller, target.sequence) in goat_slots
                for target in link.targets)
         for link in observation.chain)
+    goat_timing = (observation.phase in (
+        "battle_start", "battle_step", "battle", "damage_step",
+        "damage_calculation", "end")
+        and (observation.turn_player is None or observation.turn_player != own))
     kept = []
     for index, action in enumerate(legal_actions):
         code = action.parameters.get("code")
@@ -102,8 +105,7 @@ def admissible_action_indices(observation: Observation,
             continue
         if (code == SCAPEGOAT and action.kind in ("activate", "chain")
                 and not goat_in_danger
-                and observation.phase not in ("battle_start", "battle_step", "battle",
-                                               "damage_step", "damage_calculation", "end")):
+                and not goat_timing):
             continue
         if (code == ENEMY_CONTROLLER and action.kind in ("activate", "chain")
                 and can_pass and not observation.chain

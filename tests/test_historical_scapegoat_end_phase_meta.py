@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from goat_ai.agents import RandomAgent
+from goat_ai.agents import RandomAgent, TacticalHeuristicAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
@@ -36,6 +36,7 @@ def test_end_phase_scapegoat_allows_next_turn_metamorphosis(tmp_path):
         assert {SCAPEGOAT, METAMORPHOSIS}.issubset(c.code for c in obs.hand)
         goat_set = opponent_summoned = goat_activated = tokens_seen = False
         next_turn_checked = meta_activated = token_tributed = fusion_chosen = False
+        tactical = TacticalHeuristicAgent()
         for _ in range(110):
             actions = env.legal_actions()
             action = None
@@ -46,8 +47,15 @@ def test_end_phase_scapegoat_allows_next_turn_metamorphosis(tmp_path):
             if obs.turn == 2 and obs.acting_player == 1 and not opponent_summoned:
                 action = next((a for a in actions if a.kind == "normal_summon"), None)
                 opponent_summoned = action is not None
+            if (obs.turn == 1 and obs.phase == "end" and obs.acting_player == 0
+                    and goat_set and any(a.parameters.get("code") == SCAPEGOAT
+                                      and a.kind == "chain" for a in actions)):
+                assert obs.turn_player == 0
+                assert tactical.select_action(obs, actions).parameters.get("code") != SCAPEGOAT
             if (obs.turn == 2 and obs.phase == "end" and obs.acting_player == 0
                     and goat_set and not goat_activated):
+                assert obs.turn_player == 1
+                assert tactical.select_action(obs, actions).parameters.get("code") == SCAPEGOAT
                 action = next((a for a in actions if a.kind == "chain"
                                and a.parameters.get("code") == SCAPEGOAT), None)
                 goat_activated = action is not None
@@ -56,6 +64,7 @@ def test_end_phase_scapegoat_allows_next_turn_metamorphosis(tmp_path):
             if (obs.turn == 3 and obs.phase == "main1" and obs.acting_player == 0
                     and tokens_seen and not next_turn_checked
                     and any(a.kind == "activate" for a in actions)):
+                assert obs.turn_player == 0
                 assert RESTRICTION not in obs.restrictions
                 assert any(a.kind == "normal_summon" for a in actions)
                 assert sum(c.code in SHEEP_CODES for c in obs.field) == 4

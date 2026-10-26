@@ -19,6 +19,7 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
+from goat_ai.training.policy import POLICY_INFERENCE_VERSION
 
 
 def main() -> None:
@@ -68,8 +69,10 @@ def main() -> None:
                     skill_metadata={
                         "demonstrator_seat": args.policy_seat,
                         "policy_checkpoint_sha256": sha256_file(args.checkpoint),
-                        "policy_inference": ("greedy_tactical_guard_v1" if args.tactical_guard
+                        "policy_inference": ("greedy_tactical_guard_v2" if args.tactical_guard
                                              else "greedy"),
+                        "policy_inference_version": POLICY_INFERENCE_VERSION,
+                        "policy_feature_version": policy.model.feature_version,
                         "opponent": type(opponent).__name__,
                         "opponent_version": getattr(opponent, "teacher_version", 1),
                     },

@@ -237,6 +237,7 @@ class OcgcoreProbe:
         self._duel = c.c_void_p()
         self._pending_message: bytes | None = None
         self._turn = 0
+        self._turn_player: int | None = None
         self._phase = "unknown"
         self._chain: list[ChainLinkView] = []
         self._resolving_chain_index: int | None = None
@@ -709,7 +710,10 @@ class OcgcoreProbe:
                         else:
                             self._restriction_hints[key] = count - 1
             if message[0] == 40:
+                if len(message) != 2 or message[1] not in (0, 1):
+                    raise ValueError("invalid MSG_NEW_TURN player")
                 self._turn += 1
+                self._turn_player = message[1]
                 self._public_history.append(f"turn:{self._turn}")
             elif message[0] == 41:
                 if len(message) < 3:
@@ -864,7 +868,8 @@ class OcgcoreProbe:
         return Observation(
             viewer=viewer,
             acting_player=viewer if terminal else self.decode_pending().player,
-            turn=self._turn, phase=self._phase, life_points=lp,
+            turn=self._turn, phase=self._phase, turn_player=self._turn_player,
+            life_points=lp,
             hand=tuple(CardView(viewer, "hand", "hidden", card.code, sequence)
                        for sequence, card in enumerate(hand) if card is not None),
             field=field, graveyards=graveyards, banished=banished,

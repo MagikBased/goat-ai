@@ -29,12 +29,13 @@ ACTION_KINDS = (
 ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
 SORT_ACTION_KINDS = ("sort_cards",)
-POLICY_INFERENCE_VERSION = 4  # optional visible-state tactical guard
+POLICY_INFERENCE_VERSION = 5  # tactical guard distinguishes current turn owner
 POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experiments
 # Version 16 branches from v12 so its combat relation can be tested without
 # the separate v13-v15 equip, chain-target, and occupancy experiments.
 # Version 17 adds attacker-to-target combat stats using schema-v22 context.
 # Version 18 adds an explicit public chain-source/candidate-card relation.
+# Version 19 adds the public turn player, distinct from the actor in response windows.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 
@@ -102,7 +103,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 19):
+    if feature_version not in range(1, 20):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -189,6 +190,9 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         numbers += tuple(len(pile) / 40 for piles in
                          (observation.graveyards, observation.banished)
                          for pile in (piles[own], piles[opponent]))
+    if feature_version >= 19:
+        numbers += (float(observation.turn_player == own),
+                    float(observation.turn_player is not None))
     kind_indices = []
     card_indices = []
     targets = []
@@ -348,7 +352,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 19):
+        if feature_version not in range(1, 20):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -364,7 +368,8 @@ class LegalActionPolicy(nn.Module):
                       + (len(ANNOUNCE_ACTION_KINDS) if feature_version >= 6 else 0)
                       + (len(SORT_ACTION_KINDS) if feature_version >= 7 else 0))
         self.kind = nn.Embedding(kind_count + 1, width, padding_idx=0)
-        number_width = 54 if feature_version == 15 else 42 if feature_version >= 4 else 10
+        number_width = (44 if feature_version >= 19 else 54
+                        if feature_version == 15 else 42 if feature_version >= 4 else 10)
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
         action_number_width = (19 if feature_version >= 17 else 15

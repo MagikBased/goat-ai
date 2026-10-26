@@ -55,11 +55,12 @@ class ContractEngine:
     def reset(self, deck1: str, deck2: str, seed: int) -> Decision:
         self.seed = seed
         self.steps = 0
-        return Decision(view(), (Action("0", "pass", 0), Action("1", "attack", 0)))
+        return Decision(replace(view(), turn_player=0),
+                        (Action("0", "pass", 0), Action("1", "attack", 0)))
 
     def step(self, action: Action) -> Decision:
         self.steps += 1
-        return Decision(view(), (), terminal=True, winner=0)
+        return Decision(replace(view(), turn_player=0), (), terminal=True, winner=0)
 
     def replay_manifest(self) -> dict[str, str]:
         return {"fixture": "sha256-value"}
@@ -91,6 +92,10 @@ def test_visible_schema_excludes_hidden_opponent_cards():
     assert all(card.controller == 0 for card in view().hand)
     with pytest.raises(ValueError, match="viewer"):
         replace(view(), hand=(CardView(1, "hand", "hidden", 999),))
+    with pytest.raises(ValueError, match="turn player"):
+        replace(view(), turn_player=2)
+    with pytest.raises(ValueError, match="turn player"):
+        replace(view(), turn_player=True)
     with pytest.raises(ValueError, match="face-up monster"):
         replace(view(), field=(CardView(1, "monster", "facedown", None, 0,
                                         "defense", 1900, 1000),))
@@ -425,13 +430,13 @@ def test_replay_verifier_detects_changed_decision_and_outcome():
                           ContractEngine())
 
 
-def test_schema_twenty_two_terminal_observation_round_trip_and_verification(tmp_path):
+def test_schema_twenty_three_terminal_observation_round_trip_and_verification(tmp_path):
     with GoatEnvironment("a", "b", seed=42, engine=ContractEngine()) as env:
         env.reset()
         final = env.step(env.legal_actions()[0])
         assert env.is_terminal()
         trajectory = env.trajectory()
-    assert trajectory.schema_version == 22
+    assert trajectory.schema_version == 23
     assert trajectory.terminal_observation == final
     path = tmp_path / "terminal.json"
     write_trajectory(path, trajectory)
@@ -444,6 +449,30 @@ def test_schema_twenty_two_terminal_observation_round_trip_and_verification(tmp_
         final, life_points=(100, 200)))
     with pytest.raises(ReplayMismatch, match="terminal observation"):
         verify_trajectory(changed, ContractEngine())
+
+
+def test_turn_player_requires_schema_twenty_three_and_older_replays_stay_readable(tmp_path):
+    action = Action("0", "pass", 0)
+    current_view = replace(view(), turn_player=1)
+    current = Trajectory("goat", ("a", "b"), 7,
+                         (DecisionRecord(current_view, (action,), action),), 0,
+                         schema_version=23, terminal_observation=current_view)
+    path = tmp_path / "turn_owner.json"
+    write_trajectory(path, current)
+    assert read_trajectory(path) == current
+    with pytest.raises(ValueError, match="schema v23"):
+        write_trajectory(path, replace(current, schema_version=22))
+    raw = json.loads(path.read_text())
+    del raw["decisions"][0]["observation"]["turn_player"]
+    path.write_text(json.dumps(raw))
+    with pytest.raises(ValueError, match="schema v23"):
+        read_trajectory(path)
+    legacy_view = replace(current_view, turn_player=None)
+    legacy = replace(current, schema_version=22,
+                     decisions=(DecisionRecord(legacy_view, (action,), action),),
+                     terminal_observation=legacy_view)
+    write_trajectory(path, legacy)
+    assert read_trajectory(path) == legacy
     raw = json.loads(path.read_text())
     raw.pop("terminal_observation")
     path.write_text(json.dumps(raw))

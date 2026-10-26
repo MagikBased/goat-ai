@@ -26,10 +26,11 @@ legal actions based on public state; it does not change simulator legality or
 checkpoint weights. These filters encode common preferences, not universally
 correct plays. For example, destroying one's own Spell/Trap can sometimes be
 valuable, and Scapegoat can be used earlier to block an attack or answer
-removal. The current observation does not explicitly identify the turn player,
-so the guard allows either player's End Phase; prioritizing the opponent's End
-Phase needs a versioned observation-field change. A stronger policy also needs
-opponent-aware value estimates and training
+removal. Schema v23 now records the turn player separately from the acting
+player; new recordings defer Scapegoat until the opponent's Battle or End Phase
+unless the Set card is threatened. Older trajectories lack that field and use
+the broader timing rule. A stronger policy also needs opponent-aware value
+estimates and training
 examples for these exceptions.
 
 To inspect the guarded seed 2202 duel, open

@@ -82,7 +82,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=1,
                         help="decisions per optimizer update; forward passes remain individual")
     parser.add_argument("--width", type=int, default=64)
-    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 19)),
+    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 20)),
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
@@ -109,13 +109,15 @@ def main() -> None:
     for index, path in enumerate(args.trajectories):
         raw = path.read_bytes()
         trajectory = read_trajectory(path)
-        if trajectory.schema_version not in range(3, 23) or not trajectory.deck_sha256 or not (
+        if trajectory.schema_version not in range(3, 24) or not trajectory.deck_sha256 or not (
             trajectory.asset_sha256
         ):
-            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v22")
+            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v23")
         if args.feature_version >= 17 and trajectory.schema_version < 22:
             raise ValueError(f"{path}: feature version {args.feature_version} requires "
                              "schema v22 attack context")
+        if args.feature_version >= 19 and trajectory.schema_version < 23:
+            raise ValueError(f"{path}: feature version 19 requires schema v23 turn owner")
         count = verify_trajectory(trajectory, engine_type(args.native_root))
         annotation = None
         if args.annotation:

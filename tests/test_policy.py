@@ -283,6 +283,27 @@ def test_feature_version_eighteen_binds_public_chain_source_to_target():
     assert not torch.allclose(model(with_chain), chained_before)
 
 
+def test_feature_version_nineteen_distinguishes_turn_owner_from_actor():
+    vocabulary = CardVocabulary((10, 20))
+    action = (Action("pass", "pass", 0),)
+    base = view()
+    own_turn = encode_decision(replace(base, turn_player=0), action,
+                               vocabulary, feature_version=19)
+    opponent_turn = encode_decision(replace(base, turn_player=1), action,
+                                    vocabulary, feature_version=19)
+    legacy = encode_decision(base, action, vocabulary, feature_version=19)
+    assert own_turn.state_numbers.shape == (44,)
+    assert own_turn.state_numbers[-2:].tolist() == [1.0, 1.0]
+    assert opponent_turn.state_numbers[-2:].tolist() == [0.0, 1.0]
+    assert legacy.state_numbers[-2:].tolist() == [0.0, 0.0]
+    assert torch.equal(encode_decision(replace(base, turn_player=0), action,
+                                       vocabulary, feature_version=18).state_numbers,
+                       encode_decision(replace(base, turn_player=1), action,
+                                       vocabulary, feature_version=18).state_numbers)
+    assert LegalActionPolicy(vocabulary.size, width=16, feature_version=19)(
+        own_turn).shape == (1,)
+
+
 def test_feature_version_nine_uses_only_publicly_known_opponent_hand_cards():
     vocabulary = CardVocabulary((10, 20, 30))
     known = replace(view(), known_opponent_hand_cards=(20,))

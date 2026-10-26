@@ -105,10 +105,14 @@ class Observation:
     own_main_deck: tuple[int, ...] = ()  # Initial card multiset, never shuffled order.
     known_opponent_hand_cards: tuple[int, ...] = ()  # Publicly tracked multiset, no hand slots.
     pending_attack: TargetSlotView | None = None  # Own attacker while choosing its target.
+    turn_player: int | None = None  # Current turn owner; differs from actor during responses.
 
     def __post_init__(self) -> None:
         if self.viewer not in (0, 1) or self.acting_player not in (0, 1):
             raise ValueError("viewer and acting player must be 0 or 1")
+        if self.turn_player is not None and (
+                type(self.turn_player) is not int or self.turn_player not in (0, 1)):
+            raise ValueError("turn player must be 0 or 1 when recorded")
         if any(card.controller != self.viewer for card in self.hand):
             raise ValueError("observation hand must contain viewer's cards only")
         if self.pending_attack is not None and (
