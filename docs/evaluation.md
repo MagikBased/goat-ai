@@ -5176,6 +5176,19 @@ and Lolmarcus/Michael GOAT Control, both assignments and seats, seeds
 Decision quality on this narrow resource class improved, but held-out match
 strength did not; feature v25 remains experimental and M4 stays open.
 
+On a separate matched schedule against unguarded `TacticalHeuristicAgent`,
+seeds 11500–11507 with the same two held-out deck pairs, both assignments,
+and both seats, v25 scored **17–47** and its unchanged v23 parent **16–48**.
+The paired score difference was **+1.6 percentage points**, with a 95%
+matchup-seed bootstrap interval of **−7.8 to +10.9 points**. Both policies
+remain well below this tactical baseline on these deck pairs. The ignored
+reports are `.cache/goat-ai/fv25_trade_vs_tactical_11500_11507.json`
+(SHA-256 `84219b73c300673aa50f652d6c15c847a3a1043c5f89628079f8f387ed28bc24`)
+and `.cache/goat-ai/fv23_parent_vs_tactical_11500_11507.json`
+(SHA-256 `d3b205585a7b5f384062eafabae5c744265b7f58ee41db194d8e811b654a466b`).
+This strengthens the conclusion that the local card-trade correction has
+not established a competitive gain.
+
 For visual review, a new v25-versus-Tactical duel on the *previously reviewed*
 Return/Flip seed 9901 reached terminal in **251 replay-verified decisions**
 with the neural seat winning. Its greedy choices reproduce from the saved
