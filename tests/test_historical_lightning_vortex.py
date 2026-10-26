@@ -119,3 +119,81 @@ def test_vortex_cost_and_book_response_to_faceup_only_removal(tmp_path, chain_bo
                         env.engine.probe.loaded_script_sha256
                 checked = True
     pytest.fail("Lightning Vortex chain did not finish")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_vortex_is_legal_only_after_opponent_flips_monster_faceup(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{VORTEX}.lua").is_file():
+        pytest.skip("Lightning Vortex script not installed")
+    attacker = tmp_path / "vortex.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        VORTEX, SERPENT, *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
+    defender_cards = list(VANILLA_DECK)
+    defender_cards[0], defender_cards[6] = defender_cards[6], defender_cards[0]
+    defender = tmp_path / "set_gemini.ydk"
+    defender.write_text("#main\n" + "\n".join(map(str, defender_cards))
+                        + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(attacker), str(defender), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {VORTEX, SERPENT} <= {c.code for c in obs.hand}
+        set_monster = hidden_gate = flipped = activated = discarded = checked = False
+        agents = (RandomAgent(18), RandomAgent(19))
+        for _ in range(3000):
+            if env.is_terminal():
+                assert checked
+                trajectory = env.trajectory()
+                path = tmp_path / "vortex_activation_gate.json"
+                write_trajectory(path, trajectory)
+                assert verify_trajectory(read_trajectory(path),
+                                         ExperimentalOcgcoreEngine(root)) == len(
+                                             trajectory.decisions)
+                assert audit_trajectory_visibility(trajectory)["decisions"] == len(
+                    trajectory.decisions)
+                return
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1 and not set_monster:
+                action = next((a for a in actions if a.kind == "set_monster"
+                               and a.parameters.get("code") == GEMINI), None)
+                set_monster |= action is not None
+            if obs.turn == 3 and obs.phase == "main1" and obs.acting_player == 0:
+                hidden = next(c for c in obs.field if c.controller == 1
+                              and c.zone == "monster")
+                assert hidden.code is None and hidden.position == "facedown"
+                assert VORTEX in {c.code for c in obs.hand}
+                assert SERPENT in {c.code for c in obs.hand}
+                assert not any(a.kind == "activate" and
+                               a.parameters.get("code") == VORTEX for a in actions)
+                hidden_gate = True
+            if obs.turn == 4 and obs.acting_player == 1 and not flipped:
+                action = next((a for a in actions if a.kind == "flip_summon"
+                               and a.parameters.get("code") == GEMINI), None)
+                flipped |= action is not None
+            if obs.turn == 5 and obs.acting_player == 0 and flipped and not activated:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == VORTEX), None)
+                activated |= action is not None
+            if activated and not discarded and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code") == SERPENT
+                               and a.parameters.get("location") == 2), None)
+                discarded |= action is not None
+            if action is None and not checked:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+            if discarded and not checked and VORTEX in {
+                    c.code for c in obs.graveyards[0]} and not obs.chain:
+                assert set_monster and hidden_gate and flipped and activated
+                assert SERPENT in {c.code for c in obs.graveyards[0]}
+                assert GEMINI in {c.code for c in obs.graveyards[1]}
+                assert not any(c.controller == 1 and c.zone == "monster"
+                               for c in obs.field)
+                assert f"official/c{VORTEX}.lua" in \
+                    env.engine.probe.loaded_script_sha256
+                checked = True
+    pytest.fail("Lightning Vortex activation gate did not finish")
