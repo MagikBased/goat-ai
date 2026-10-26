@@ -6,7 +6,7 @@ import pytest
 
 from goat_ai.actions import Action
 from goat_ai.evaluation.replay_review import review_candidates
-from goat_ai.observations import CardView, Observation
+from goat_ai.observations import CardView, ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory
 
 
@@ -104,3 +104,62 @@ def test_shortlist_rejects_non_policy_source_or_missing_seat():
         review_candidates(replace(saved, skill_metadata={}))
     with pytest.raises(ValueError, match="checkpoint SHA-256"):
         review_candidates(replace(saved, skill_metadata={"demonstrator_seat": 0}))
+
+
+def test_shortlist_flags_weak_flip_summon_only_when_set_was_legal():
+    faith = 31560081
+    summon = Action("summon", "normal_summon", 0, {"code": faith})
+    set_faith = Action("set", "set_monster", 0, {"code": faith})
+    with_set = policy(record(view(), summon, set_faith))
+    without_set = policy(record(view(), summon))
+    printed = {faith: 300}
+    assert review_candidates(with_set) == ()
+    found = review_candidates(with_set, weak_flip_attacks=printed)
+    assert [(c.category, c.evidence) for c in found] == [
+        ("weak_flip_normal_summon_with_set_available",
+         {"card_code": faith, "printed_attack": 300})]
+    assert review_candidates(without_set, weak_flip_attacks=printed) == ()
+
+
+def test_shortlist_flags_tribe_type_that_hits_only_own_visible_monsters():
+    tribe = 33184167
+    own_spellcaster = CardView(0, "monster", "faceup", 101, 0,
+                               "attack", 1200, 1000)
+    enemy_machine = CardView(1, "monster", "faceup", 202, 0,
+                             "attack", 1800, 1000)
+    own_hidden = CardView(0, "monster", "facedown", 303, 1,
+                          "defense")
+    spellcaster, machine = 2, 32
+    obs = replace(view(own_spellcaster, own_hidden, enemy_machine),
+                  chain=(ChainLinkView(1, tribe, 0, 4, 0),))
+    name_spellcaster = Action("spellcaster", "announce_race", 0,
+                              {"race": spellcaster})
+    name_machine = Action("machine", "announce_race", 0, {"race": machine})
+    races = {101: spellcaster, 202: machine, 303: spellcaster}
+    bad = policy(record(obs, name_spellcaster, name_machine))
+    good = policy(record(obs, name_machine, name_spellcaster))
+    assert review_candidates(bad) == ()
+    found = review_candidates(bad, card_races=races)
+    assert [(c.category, c.evidence) for c in found] == [
+        ("tribe_race_hits_only_own_with_enemy_option",
+         {"race": spellcaster, "own_hits": 1,
+          "visible_enemy_hits": 0, "enemy_race_options": 1})]
+    assert review_candidates(good, card_races=races) == ()
+
+
+def test_shortlist_flags_tribe_activation_before_forced_type_choice():
+    tribe = 33184167
+    own_monster = CardView(0, "monster", "faceup", tribe, 0,
+                           "attack", 1600, 1000)
+    enemy_hidden = CardView(1, "monster", "facedown", None, 0, "defense")
+    chain_tribe = Action("tribe", "chain", 0, {"code": tribe})
+    decline = Action("decline", "pass", 0)
+    own_race = Action("own_race", "announce_race", 0, {"race": 64})
+    activation = record(view(own_monster, enemy_hidden), chain_tribe, decline)
+    prompt = record(replace(view(own_monster, enemy_hidden),
+                            chain=(ChainLinkView(1, tribe, 0, 4, 0),)), own_race)
+    found = review_candidates(policy(activation, prompt, activation),
+                              card_races={tribe: 64})
+    assert [(c.viewer_frame, c.category) for c in found] == [
+        (1, "tribe_activation_without_visible_enemy"),
+        (3, "tribe_activation_without_visible_enemy")]

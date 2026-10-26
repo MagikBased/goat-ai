@@ -424,9 +424,13 @@ Decree. A separate `policy_review` annotation source lets reviewers correct
 checkpoint-attributed policy decisions without misclassifying them as human
 demonstrations. Five such choices transferred to fixed Scapegoat states, but
 the child split 31–32–1 against its parent in 64 unseen-Main-Deck games.
-The new verified replay shortlist found only one clear Heavy Storm resource
-error across eight additional games; its Scapegoat prompts need contextual
-review before labeling. Prioritize independent high-quality decision data and
+The verified replay shortlist found one clear Heavy Storm resource error in
+eight additional games. An extended player-visible review now also finds three
+weak Magician of Faith summons with a Set option, two Tribe activations without
+a face-up enemy, and one Tribe Type choice that destroys two own Spies instead
+of four opposing Sheep Tokens. These are review prompts, not training labels;
+see the [replay audit](replay_audit.md). Scapegoat timing prompts still need
+contextual review. Prioritize independent high-quality decision data and
 cross-deck play gains; neither the guard nor review-fit child closes M4.
 
 ## M5 — Search and other formats

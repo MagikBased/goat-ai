@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from goat_ai.agents import load_card_races
+from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import category_counts, review_candidates
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
@@ -24,13 +25,15 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     checkpoint_sha256 = sha256_file(args.checkpoint)
+    card_races = load_card_races(args.native_root)
+    weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
     reports = []
     for path in args.replays:
         trajectory = read_trajectory(path)
         verified = verify_trajectory(
             trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
-        candidates = review_candidates(trajectory)
+        candidates = review_candidates(trajectory, card_races, weak_flip_attacks)
         metadata = trajectory.skill_metadata or {}
         if metadata.get("policy_checkpoint_sha256") != checkpoint_sha256:
             raise ValueError(f"{path}: checkpoint SHA-256 differs from recording")
@@ -42,7 +45,7 @@ def main() -> None:
         guarded = inference == "greedy_tactical_guard_v3"
         policy = load_policy_agent(
             args.checkpoint, tactical_guard=guarded,
-            card_races=load_card_races(args.native_root) if guarded else None)
+            card_races=card_races if guarded else None)
         if metadata.get("policy_feature_version") != policy.model.feature_version:
             raise ValueError(f"{path}: policy feature version differs")
         policy_seat = metadata["demonstrator_seat"]

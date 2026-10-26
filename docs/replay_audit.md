@@ -6,6 +6,40 @@ must never feed a policy or a baseline. Viewer frames below are one-based; JSON
 `decisions` indices are one less. The agent is identified from trajectory
 `skill_metadata`, not inferred from the viewer's opponent/your-view label.
 
+## Extended visible-state shortlist, feature-19 checkpoint
+
+`scripts/audit_policy_replays.py` now uses pinned printed card metadata to
+surface Normal Summons of Flip monsters with at most 500 printed ATK when a Set
+of the same card was legal. It also flags Tribe-Infecting Virus activations
+with no face-up opposing monster and Tribe Type announcements that destroy an
+own face-up monster while an offered Type would hit a visible opposing monster.
+The reviewer sees only the acting player's observation and legal actions.
+These are prompts for review, not automatic labels: a face-up Flip summon or
+deliberate own-monster destruction can be correct in a particular line.
+
+All eight saved feature-19 policy games from seeds 2640–2647 replay-verified
+against today's pinned assets. Their 5,478 decisions include 2,780 choices
+matched exactly to `tactical_v3_fv19_2500_2503.pt`. The extended shortlist
+found **three Magician of Faith face-up summons** with a legal Set alternative
+(viewer frames 536 of `policy_batch_v19_cc_war_2641_p0.json`, and 93 and 906
+of `policy_batch_v19_daryl_cas_2647_p1.json`). The Daryl/Cas policy also
+activated Tribe with no face-up opposing monster at frames **250** and **356**;
+`pass` was legal before it discarded a card. At frame **115** of
+`policy_batch_v19_jesse_daryl_2644_p1.json`, it named Spellcaster, hitting
+two of its own face-up Gravekeeper's Spies, while Beast was a legal Type that
+would hit four opposing Sheep Tokens. That last choice closely matches the
+reported self-destruction mistake and has a player-visible alternative; the
+earlier Tribe activations should be reviewed at the activation decision, not
+at their later forced Type prompts.
+
+The ignored report is
+`artifacts/policy_review_candidates_batch_extended_2640_2647.json` (SHA-256
+`dc8a66535c12833a6fddb85b0e596671362bc6443ab9b3cbf105e6f17f3f1f5e`).
+Regenerate it with `--checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt`
+and the eight `replays/policy_batch_v19_*json` files. It contains 14 review
+prompts in total, including the previously reported Heavy Storm and
+Scapegoat prompts. No new training labels or policy weights were changed.
+
 ## Seed 2202, policy versus CombatHeuristicAgent v3
 
 Replay: `replays/policy_vs_combat_2202.json`. Policy P0 uses

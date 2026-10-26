@@ -5,6 +5,7 @@ These are candidates, not automatic play labels or evidence of a rules error.
 
 import re
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 
 from goat_ai.actions import Action
@@ -16,6 +17,7 @@ TORRENTIAL_TRIBUTE = 53582587
 SCAPEGOAT = 504700123
 ROYAL_DECREE = 51452091
 SAKURETSU_ARMOR = 56120475
+TRIBE_INFECTING_VIRUS = 33184167
 
 
 @dataclass(frozen=True)
@@ -39,7 +41,10 @@ def _is_action(action: Action, kind: str, code: int) -> bool:
     return action.kind == kind and action.parameters.get("code") == code
 
 
-def review_candidates(trajectory: Trajectory) -> tuple[ReviewCandidate, ...]:
+def review_candidates(trajectory: Trajectory,
+                      card_races: Mapping[int, int] | None = None,
+                      weak_flip_attacks: Mapping[int, int] | None = None,
+                      ) -> tuple[ReviewCandidate, ...]:
     """Flag selected actions of the recorded policy seat using only its view.
 
     Repeated priority passes in the same turn and phase are reported once so
@@ -57,6 +62,8 @@ def review_candidates(trajectory: Trajectory) -> tuple[ReviewCandidate, ...]:
             or re.fullmatch(r"[0-9a-f]{64}", checkpoint_sha256) is None):
         raise ValueError("policy replay must identify its checkpoint SHA-256")
     candidates: list[ReviewCandidate] = []
+    card_races = card_races or {}
+    weak_flip_attacks = weak_flip_attacks or {}
     seen: set[tuple[str, int, str]] = set()
     for index, record in enumerate(trajectory.decisions):
         obs = record.observation
@@ -99,6 +106,39 @@ def review_candidates(trajectory: Trajectory) -> tuple[ReviewCandidate, ...]:
             found.append(("ring_without_visible_enemy_target",
                           {"own_monsters": len(own_monsters),
                            "visible_enemy_monsters": 0}))
+        if (selected.kind == "normal_summon"
+                and (code := selected.parameters.get("code")) in weak_flip_attacks
+                and any(a.kind == "set_monster"
+                        and a.parameters.get("code") == code
+                        for a in record.legal_actions)):
+            found.append(("weak_flip_normal_summon_with_set_available",
+                          {"card_code": code,
+                           "printed_attack": weak_flip_attacks[code]}))
+        if (_is_action(selected, "chain", TRIBE_INFECTING_VIRUS)
+                and can_pass and not any(c.zone == "monster"
+                                     and c.position == "faceup"
+                                     for c in opposing)):
+            found.append(("tribe_activation_without_visible_enemy",
+                          {"own_monsters": len(own_monsters),
+                           "visible_enemy_monsters": 0}))
+        if (selected.kind == "announce_race" and card_races and obs.chain
+                and obs.chain[-1].card_code == TRIBE_INFECTING_VIRUS
+                and obs.chain[-1].controller == seat):
+            race = selected.parameters.get("race")
+            own_hits = sum(c.position == "faceup" and c.code is not None
+                           and card_races.get(c.code) == race for c in own_monsters)
+            enemy_hits = sum(c.position == "faceup" and c.code is not None
+                             and card_races.get(c.code) == race for c in enemy_monsters)
+            enemy_races_offered = {card_races[c.code] for c in enemy_monsters
+                                   if c.position == "faceup" and c.code in card_races
+                                   and any(a.kind == "announce_race"
+                                           and a.parameters.get("race") == card_races[c.code]
+                                           for a in record.legal_actions)}
+            if own_hits and not enemy_hits and enemy_races_offered:
+                found.append(("tribe_race_hits_only_own_with_enemy_option",
+                              {"race": race, "own_hits": own_hits,
+                               "visible_enemy_hits": 0,
+                               "enemy_race_options": len(enemy_races_offered)}))
         if (selected.kind == "pass" and goat_offered
                 and obs.turn_player is not None and obs.turn_player != seat):
             if (obs.phase in ("battle_start", "battle_step")
@@ -113,10 +153,12 @@ def review_candidates(trajectory: Trajectory) -> tuple[ReviewCandidate, ...]:
                                "own_life_points": obs.life_points[seat]}))
         for category, evidence in found:
             key = (category, obs.turn, obs.phase)
-            if key not in seen:
+            if category.startswith("scapegoat_pass_"):
+                if key in seen:
+                    continue
                 seen.add(key)
-                candidates.append(ReviewCandidate(
-                    index, category, obs.turn, obs.phase, seat, evidence))
+            candidates.append(ReviewCandidate(
+                index, category, obs.turn, obs.phase, seat, evidence))
     return tuple(candidates)
 
 
