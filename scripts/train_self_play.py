@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import torch
@@ -92,12 +93,23 @@ def main() -> None:
         parser.error("four_roles requires a whole four-role cycle for every matchup")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
+    parent_checkpoint_sha256 = sha256(args.checkpoint)
 
     def record(index, episode):
         if args.record_dir is not None:
             args.record_dir.mkdir(parents=True, exist_ok=True)
+            trajectory = replace(
+                episode.trajectory,
+                skill_metadata={
+                    **(episode.trajectory.skill_metadata or {}),
+                    "parent_checkpoint_sha256": parent_checkpoint_sha256,
+                    "self_play_episode_index": index,
+                    "learner_temperature": args.learner_temperature,
+                    "learner_action_selection": "sampled_softmax",
+                },
+            )
             write_trajectory(args.record_dir / f"episode_{index:05d}_seed_{episode.seed}.json",
-                             episode.trajectory)
+                             trajectory)
 
     reports = train_against_snapshot_pool(
         agent.model, agent.vocabulary, matchups, seeds,
@@ -152,7 +164,7 @@ def main() -> None:
         "vocabulary_codes": agent.vocabulary.codes,
         "width": agent.model.card.embedding_dim,
         "feature_version": agent.model.feature_version,
-        "parent_checkpoint_sha256": sha256(args.checkpoint),
+        "parent_checkpoint_sha256": parent_checkpoint_sha256,
         "training_games": training_games,
         "trajectory_sha256": parent.get("trajectory_sha256", {}),
         "source_decisions": source_decisions,

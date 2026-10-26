@@ -20,6 +20,7 @@ SAKURETSU_ARMOR = 56120475
 TRIBE_INFECTING_VIRUS = 33184167
 BLACK_LUSTER_SOLDIER = 504700118
 MYSTICAL_SPACE_TYPHOON = 5318639
+BREAKER_THE_MAGICAL_WARRIOR = 71413901
 
 
 @dataclass(frozen=True)
@@ -53,16 +54,18 @@ def review_candidates(trajectory: Trajectory,
     a reviewer gets a useful shortlist. Callers must verify the source replay
     against its native assets before treating these as replay-backed findings.
     """
-    if trajectory.source != "policy_evaluation":
-        raise ValueError("review candidates require a policy_evaluation replay")
+    if trajectory.source not in ("policy_evaluation", "self_play_rl"):
+        raise ValueError("review candidates require a policy_evaluation or self_play_rl replay")
     metadata = trajectory.skill_metadata or {}
-    seat = metadata.get("demonstrator_seat")
+    seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
+                        else "demonstrator_seat")
     if type(seat) is not int or seat not in (0, 1):
-        raise ValueError("policy replay must identify its policy seat")
-    checkpoint_sha256 = metadata.get("policy_checkpoint_sha256")
-    if (not isinstance(checkpoint_sha256, str)
-            or re.fullmatch(r"[0-9a-f]{64}", checkpoint_sha256) is None):
-        raise ValueError("policy replay must identify its checkpoint SHA-256")
+        raise ValueError("replay must identify its policy seat or learner seat")
+    if trajectory.source == "policy_evaluation":
+        checkpoint_sha256 = metadata.get("policy_checkpoint_sha256")
+        if (not isinstance(checkpoint_sha256, str)
+                or re.fullmatch(r"[0-9a-f]{64}", checkpoint_sha256) is None):
+            raise ValueError("policy replay must identify its checkpoint SHA-256")
     candidates: list[ReviewCandidate] = []
     card_races = card_races or {}
     weak_flip_attacks = weak_flip_attacks or {}
@@ -156,6 +159,9 @@ def review_candidates(trajectory: Trajectory,
                               {"source_card_code": source}))
             elif source == MYSTICAL_SPACE_TYPHOON:
                 found.append(("mst_targets_own_card_with_enemy_option",
+                              {"source_card_code": source}))
+            elif source == BREAKER_THE_MAGICAL_WARRIOR:
+                found.append(("breaker_targets_own_card_with_enemy_option",
                               {"source_card_code": source}))
         if (selected.kind == "pass" and goat_offered
                 and obs.turn_player is not None and obs.turn_player != seat):

@@ -6,6 +6,47 @@ must never feed a policy or a baseline. Viewer frames below are one-based; JSON
 `decisions` indices are one less. The agent is identified from trajectory
 `skill_metadata`, not inferred from the viewer's opponent/your-view label.
 
+## Recent sampled self-play review
+
+Four recent self-play trajectories were replay-verified against the pinned native
+engine and passed the visibility audit. The learner's actions were **sampled**
+from a positive-temperature policy during training. These examples diagnose
+exploration and training feedback; they do not prove that a saved greedy
+checkpoint would choose the same moves. Existing files identify the learner
+seat but do not contain the exact per-game policy weights or temperature.
+New recordings include the parent checkpoint hash, episode index, sampling
+temperature, and action-selection method for clearer provenance.
+
+| Replay (under `replays/`) | Viewer frame | Player-visible choice and legal alternative |
+| --- | ---: | --- |
+| `selfplay_value_smoke_3000/episode_00001_seed_3001.json` | 54 | Learner P1 Normal Summons 300 ATK Magician of Faith into an empty monster board; Set of the same card is legal. |
+| `selfplay_value_smoke_3000/episode_00002_seed_3002.json` | 336 | Learner P0 activates its Set Heavy Storm with only its own Set Trap Dustshoot as collateral and no opposing Spell/Trap; End Phase is legal. |
+| `selfplay_value_smoke_3000/episode_00003_seed_3003.json` | 1081 | Learner P1's Breaker targets its own Set Trap Dustshoot while an opposing Set Spell/Trap is a legal target. |
+| `selfplay_fourroles_2820_2883/episode_00063_seed_2883.json` | 386 | Learner P1's Mystical Space Typhoon targets its own Set Dust Tornado while two opposing Set Spell/Traps are legal targets. |
+
+The scripted shortlist found ten prompts across these four duels, including
+these four. Other prompts require separate manual review; a flag is not a
+mistake label. The ignored report is
+`artifacts/selfplay_review_candidates_3001_3003_2883.json` (SHA-256
+`7dd2263c48b781909f566e28476047d5209bffec72f72e4455dc6d58d5013c1d`).
+Reproduce it with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_selfplay_replays.py \
+  replays/selfplay_value_smoke_3000/episode_00001_seed_3001.json \
+  replays/selfplay_value_smoke_3000/episode_00002_seed_3002.json \
+  replays/selfplay_value_smoke_3000/episode_00003_seed_3003.json \
+  replays/selfplay_fourroles_2820_2883/episode_00063_seed_2883.json \
+  --output artifacts/selfplay_review_candidates_3001_3003_2883.json
+```
+
+The next correction experiment should score owner, source, and resource loss
+at removal target prompts and at the earlier activation choice; compare it
+with the unchanged policy on held-out decks and seats. Set preference for
+Flip monsters needs the same comparison. Review Scapegoat timing separately
+because an early activation or a pass can both be right in specific board
+states. Do not turn these sampled actions into expert demonstrations.
+
 ## Extended visible-state shortlist, feature-19 checkpoint
 
 `scripts/audit_policy_replays.py` now uses pinned printed card metadata to
