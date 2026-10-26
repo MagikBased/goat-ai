@@ -64,3 +64,42 @@ Reproduce after [native setup](native_setup.md):
 PYTHONPATH=. .venv/bin/python scripts/benchmark_parallel_native.py --games 8 --workers 1 --seed 9700 --output .cache/goat-ai/sourced-single-9700-9703.json > .cache/goat-ai/sourced-single-9700-9703.stdout
 PYTHONPATH=. .venv/bin/python scripts/benchmark_parallel_native.py --games 8 --workers 2 --seed 9700 --output .cache/goat-ai/sourced-parallel-9700-9703.json > .cache/goat-ai/sourced-parallel-9700-9703.stdout
 ```
+
+## Sourced-deck worker scaling pilot (2026-10-26)
+
+At project commit `05260a875a3bf52a92e0dce3a2a541d0032eb014`, the same
+Goat Control/Chaos Turbo pairing ran 16 seeded RandomAgent duels, seeds
+9800–9807 in both deck seat orders, on an Intel Core i7-10700K under Linux
+6.8.0-146-generic. `OMP_NUM_THREADS=1` was set. All four worker counts
+produced the same ordered winners and decision counts: 16 terminal duels and
+16,860 decisions, each under the 3,000-decision limit. Wall time includes
+spawn and teardown. Each row is one run, so the rates are pilot measurements
+rather than a scaling guarantee.
+
+| Workers | Wall time | Duels/s | Decisions/s | Mean reset | Sum of worker peak RSS |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 17.547 s | 0.912 | 960.9 | 0.0722 s | 67,716 KiB |
+| 2 | 9.301 s | 1.720 | 1,812.6 | 0.0767 s | 134,120 KiB |
+| 4 | 5.203 s | 3.075 | 3,240.7 | 0.0814 s | 264,520 KiB |
+| 8 | 3.648 s | 4.386 | 4,621.3 | 0.1079 s | 525,504 KiB |
+
+The 8-worker row used all eight workers. The parent process peak was
+25,940–26,284 KiB across runs. The worker total sums separate `VmHWM` high
+water marks; these peaks need not have occurred at the same time. The runs do
+not measure instantaneous machine-wide memory, neural inference, or longer
+training workloads. Raw ignored report SHA-256 values for 1/2/4/8 workers are
+`8381bce79d6141f331b1dc3396fe95ae2ce5e535704019ec454bc0ee2bba163c`,
+`4efe4b3d5d91cd6c4b9aceaf924ad5f5e70b169c5190181bd3b03c9ff8471108`,
+`05d1b12cb9c64d8a521b086234603fa2b7ff5be5fd9cd55f1a8364aef3400290`,
+and `2e21354ecb7762328bb5177ec1bbada9e1d7d69b40af758809f0cd32132905b4`.
+
+Reproduce with the pinned assets described in [native setup](native_setup.md):
+
+```bash
+for workers in 1 2 4 8; do
+  PYTHONPATH=. OMP_NUM_THREADS=1 .venv/bin/python scripts/benchmark_parallel_native.py \
+    --games 16 --workers "$workers" --seed 9800 \
+    --output ".cache/goat-ai/scaling-${workers}-9800-9807.json" \
+    > ".cache/goat-ai/scaling-${workers}-9800-9807.stdout"
+done
+```

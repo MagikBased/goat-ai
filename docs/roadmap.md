@@ -227,6 +227,12 @@ replay fixture, match its original core/scripts, recover each legal-action
 set and selected response, and pass the existing visibility and exact replay
 gates. See [research](research.md).
 
+A 16-duel, sourced-deck native worker pilot now compares 1, 2, 4, and 8
+spawned processes on identical seeds and both deck seat orders. Ordered
+outcomes and decision counts matched at all four worker counts. The measured
+throughput and per-worker peak memory are in [benchmarks](benchmarks.md);
+large training jobs and instantaneous total memory remain unmeasured.
+
 **Exit:** A reproducible benchmark report and tournament report exist for the tested core/assets/decks. Replay support is claimed only for formats that have parser and reconstruction tests.
 
 The sourced-deck single-process benchmark records reset overhead and peak process RSS alongside throughput on named hardware. A separate spawned-worker benchmark now measures one and two workers on the sourced Goat Control/Chaos Turbo decks, including per-worker high-water RSS and native reset time; the seat-swapped game outcomes reproduce across worker counts. [The benchmark log](benchmarks.md) gives the measurements and their limits. Instantaneous total memory use, broader deck families, and a scaling curve remain unmeasured.
