@@ -515,9 +515,13 @@ Flip Control weakness. This improves action representation and diagnosis,
 but does not close M4's competitive gate. Schema-v24 current-Type observations
 now support opt-in feature version 21, which relates a declared Type to the
 count and ATK of matching face-up monsters on each side. A one-game same-data
-feature-20/21 training smoke test completed; it is not a strength comparison.
-Add diverse Type/target reviews and require held-out cross-deck improvement
-before promotion; see
+feature-20/21 training smoke test completed. A larger same-data clone on
+2,459 teacher decisions ranked the separately reviewed Beast choice first
+with feature 21 versus second with feature 20, but its 64-duel held-out,
+seat-swapped match ended only 33–31 for feature 21 with a paired interval
+crossing 50% and large deck splits. Add diverse Type/target reviews, compare
+fresh seeds and additional training runs, and require consistent cross-deck
+improvement before promotion; see
 [evaluation](evaluation.md).
 
 ## M5 — Search and other formats

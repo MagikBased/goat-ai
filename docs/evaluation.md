@@ -3568,3 +3568,75 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/train_behavioral_clone.py \
   --feature-version 21 --epochs 1 --width 16 --batch-size 16 --seed 21 \
   --output .cache/goat-ai/fv21_smoke_2647.pt
 ```
+
+## Same-data current-Type relation comparison
+
+Eight schema-v23 TacticalHeuristicAgent v3 versus CombatHeuristicAgent v3
+games on Cas Stomphorst Flip Control and Daryl Gessler Gravekeepers were
+independently replay-verified and upgraded to schema v24. Their original
+files were left unchanged. Both models trained on the same **2,459** teacher
+decisions, two epochs, width 32, batch size 16, seed 21, using the pinned
+experimental engine. Feature 20 ended with mean training loss **0.2396365**;
+feature 21 ended at **0.2360020**. These training losses are not a strength
+comparison.
+
+The existing policy-review preference at viewer frame 115 of the separate
+Jesse/Daryl seed-2644 game was transferred to its verified schema-v24 replay.
+The preferred Beast choice and disfavored recorded Spellcaster choice kept
+their legal indices. Neither the exact replay nor its seed was in either
+checkpoint's training provenance. Feature 20 ranked Beast **2nd of 3** and
+chose Spellcaster (preference margin **−1.011**); feature 21 ranked Beast
+**1st of 3** (margin **+0.127**). Both models chose the visibly favorable
+opponent Type in two further seed-2647 fixed-state probes. This is one
+independently reviewed decision, not a playing-strength estimate.
+
+The direct held-out match used seeds **3600–3607**, two published matchup
+pairs (Chaos Control/Warrior and Flip Control/Chaos Return), both deck
+assignments, and both seats. The evaluator rejected any Main Deck composition
+seen in either checkpoint's training games. All **64** duels terminated below
+the 3,000-decision cap. Feature 21 scored **33–31** against feature 20, a
+**51.56%** score rate with a paired 95% bootstrap interval of
+**43.75%–59.38%**. By feature-21 deck, the splits were Chaos Control **5–11**,
+Warrior **11–5**, Flip Control **7–9**, and Chaos Return **10–6**. This does
+not establish a competitive improvement or justify promoting feature 21;
+the deck dependence and limited independent review coverage call for more
+examples and a fresh evaluation schedule.
+
+The ignored checkpoints are
+`.cache/goat-ai/fv20_casdaryl_schema24_control.pt` (SHA-256
+`504ff955c6c5876e2e55863193003697cbcc4b3b81d03a302b0587751c23e1fc`)
+and `.cache/goat-ai/fv21_casdaryl_schema24_experiment.pt` (SHA-256
+`c6cc59780d665edf2c83b143d1b371e9aa05fcfff5ac988edfc48613ccd21011`).
+The ignored tournament report is
+`artifacts/fv21_vs_fv20_type_relation_3600_3607.json` (SHA-256
+`6ea4a5da9be88eb3af9e7fb964f9d0525041d1ccb6664d273cc47d0124cca3b5`).
+Reproduce the competition after upgrading the teacher replays with
+`scripts/upgrade_trajectory_schema.py` and training both feature versions:
+
+```bash
+mkdir -p replays/tactical_v3_cas_daryl_schema24_2500_2503
+for replay_file in replays/tactical_v3_cas_daryl_2500_2503/*.json; do
+  OMP_NUM_THREADS=1 .venv/bin/python scripts/upgrade_trajectory_schema.py \
+    "$replay_file" --engine experimental --native-root .cache/goat-ai \
+    --output "replays/tactical_v3_cas_daryl_schema24_2500_2503/$(basename "$replay_file")"
+done
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_behavioral_clone.py \
+  replays/tactical_v3_cas_daryl_schema24_2500_2503/*.json \
+  --engine experimental --native-root .cache/goat-ai \
+  --feature-version 20 --epochs 2 --width 32 --batch-size 16 --seed 21 \
+  --output .cache/goat-ai/fv20_casdaryl_schema24_control.pt
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_behavioral_clone.py \
+  replays/tactical_v3_cas_daryl_schema24_2500_2503/*.json \
+  --engine experimental --native-root .cache/goat-ai \
+  --feature-version 21 --epochs 2 --width 32 --batch-size 16 --seed 21 \
+  --output .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --opponent-checkpoint .cache/goat-ai/fv20_casdaryl_schema24_control.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk examples/decks/warrior_montague_clash.ydk \
+  --matchup examples/decks/flip_control_goatformat_guide.ydk examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 3600 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output artifacts/fv21_vs_fv20_type_relation_3600_3607.json
+```

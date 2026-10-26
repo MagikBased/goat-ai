@@ -291,6 +291,15 @@ opt-in five-review preference update, Beast ranks first. Those are
 **training-state diagnostics** for the update, not competitive evidence. The
 held-out results and checkpoint hashes are in [evaluation](evaluation.md).
 
+For the current-Type feature experiment, the original verified replay was
+deterministically upgraded to a separate schema-v24 file, and the same
+frame-115 review was rebound to its new SHA-256 in
+`examples/preferences/feature21_tribe_spies_tokens_2644_p1.preference.json`.
+The legal action list and indices are unchanged. This is a transfer of the
+existing judgment, **not a second independent review**. A same-data
+feature-21 clone ranks Beast first at this held-out frame, while a feature-20
+control ranks it second; the 64-duel match did not establish stronger play.
+
 ## Seed 2202, policy versus CombatHeuristicAgent v3
 
 Replay: `replays/policy_vs_combat_2202.json`. Policy P0 uses
