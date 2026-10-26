@@ -78,10 +78,12 @@ counting rules on those exact 50 cross-deck games. Outcomes and decision
 counts reproduced; the run observed 61 Dekoichi Flip Summons and 131 selected
 card responses to public chain links. This gives the next historical-ruling
 audit a measured queue without claiming human play rates.
-The older full-whitelist seeds-0–9 report cited above no longer reproduces its
-12,382-decision count in this worktree: both the pre-change and current probe
-scripts now record 12,006 decisions. The difference remains unexplained and
-the [README](../README.md) records the current report hash.
+The older full-whitelist seeds-0–9 report cited above reproduces with project
+source at `6611e1b` and the same pinned native assets. At the `7d05ea2` to
+`b84e0d8` boundary, the Deck-search privacy fix changed the RandomAgent's
+action order and therefore the paths for seeds 6 and 9. The other eight seeds
+retained their counts. The current source reproduces 12,006 decisions; the
+[README](../README.md) records its report hash and per-seed comparison.
 
 An expanded 300-duel, four-worker sweep on seeds 9600–9609 also reached native terminal outcomes in every game. A 60-duel subset reproduced exact ordered outcomes and decision counts in a separate one-worker run. Measured rates, hardware, pins, and reproduction commands are in [the evaluation log](evaluation.md). This broadens M1 protocol evidence while M1 and the M2 card audit remain open.
 

@@ -179,10 +179,13 @@ It is a native protocol coverage check, not a historical correctness or playing-
 On the currently pinned local assets, seeds 0–9 completed 10/10 duels in
 12,006 decisions; the report SHA-256 is
 `de9e1d0aa4695fe223d6a1b7fa4690958374ba632f58431dde706ec5e6149d01`.
-The previously reported 12,382-decision result was an earlier recorded run;
-the cause of the difference has not been isolated. The unchanged pre-change
-probe script produces the current 12,006-decision result, so the older hash
-is retained only as historical data.
+The earlier 12,382-decision result is reproducible with project source at
+`6611e1b` and the same pinned native assets. Commit `b84e0d8` changed the
+order of Deck-search actions to hide native Deck slots: seeds 6 and 9 changed
+from 1,295 and 1,249 decisions to 1,397 and 771, respectively; the other
+eight seeds retained their counts. `RandomAgent` selects by action index, so
+this privacy fix changed its choices and subsequent duel paths. These counts
+measure protocol coverage, not comparable agent strength.
 For generated decks made entirely from sourced tournament cards, use
 `--card-pool tournament --verify-replays`. Add `--distinct-opponents` to pair
 two independently generated legal decks in each duel; see
