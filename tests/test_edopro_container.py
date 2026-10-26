@@ -82,7 +82,40 @@ def test_yrpx_reads_packet_stream_without_mislabeling_as_decisions():
         (40, b"AB"), (41, b"C")]
     assert replay.summary()["packet_count"] == 2
     assert replay.summary()["response_count"] == 0
+    assert replay.summary()["selection_prompt_packet_count"] == 0
+    assert replay.summary()["embedded_yrp_response_count"] is None
     assert not replay.decks
+
+
+def test_yrpx_exposes_bounded_embedded_yrp1_without_private_summary_values():
+    legacy_payload = (_prefix(YRP1) + struct.pack("<I2II", 2, 10, 20, 0)
+                      + struct.pack("<I1II", 1, 30, 0)
+                      + struct.pack("<I", 0) + b"\x01\x05\x00")
+    legacy = _container(YRP1, legacy_payload)
+    packets = (bytes((11,)) + struct.pack("<I", 1) + b"X"
+               + bytes((231,)) + struct.pack("<I", len(legacy)) + legacy)
+    replay = parse_edopro_container(_container(YRPX, _prefix(YRPX) + packets))
+    embedded = replay.embedded_legacy_replay()
+    assert embedded is not None
+    assert embedded.header.format == "yrp"
+    assert embedded.decks[0].main == (10, 20)
+    assert embedded.responses == (b"\x05",)
+    summary = replay.summary()
+    assert summary["selection_prompt_packet_count"] == 1
+    assert summary["embedded_yrp_response_count"] == 1
+    assert "Private player" not in str(summary)
+    assert "10, 20" not in str(summary)
+
+
+def test_yrpx_rejects_wrong_or_duplicate_embedded_replay():
+    wrong = _container(YRPX, _prefix(YRPX))
+    record = bytes((231,)) + struct.pack("<I", len(wrong)) + wrong
+    replay = parse_edopro_container(_container(YRPX, _prefix(YRPX) + record))
+    with pytest.raises(ReplayContainerError, match="not yrp1"):
+        replay.embedded_legacy_replay()
+    replay = parse_edopro_container(_container(YRPX, _prefix(YRPX) + record * 2))
+    with pytest.raises(ReplayContainerError, match="multiple embedded"):
+        replay.embedded_legacy_replay()
 
 
 def test_yrpx_accepts_bounded_zero_padding_without_lzma_end_marker():

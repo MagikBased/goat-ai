@@ -40,8 +40,23 @@ allocates only the declared output size. Our reader accepts at most eight
 extra zero bytes and still rejects nonzero or excessive output; that eight-byte
 bound is a defensive parser limit, not an EDOPro format guarantee. These are
 modern packet-stream samples, not GOAT duels or demonstrations of recoverable
-player decisions. A real `yrp1` sample and a permitted GOAT replay remain
-unvalidated.
+player decisions. A standalone real `yrp1` file and a permitted GOAT replay
+remain unvalidated.
+
+Packet inspection narrows the reconstruction path. All five sampled
+`.yrpX` streams had **zero** `MSG_SELECT_*`/selection prompt packets, but each
+had one `OLD_REPLAY_MODE` packet (`231`) containing a valid embedded `yrp1`
+replay. The embedded files contain 65, 52, 251, 14, and 31 saved responses,
+respectively, in the sample order above. The record type and upstream
+handling are defined by [EDOPro's `common.h`](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/common.h)
+and [replay parser](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp).
+The intake API can now expose that embedded replay without printing its
+private Deck IDs or responses. These five samples show that the packet
+stream alone does not supply legal options, while the nested old-mode replay
+may permit response reconstruction if the original engine/scripts can be
+matched. A response byte sequence still does not identify the corresponding
+player-visible observation or all legal actions. Do not train on it without
+re-running and validating the duel.
 
 Reproduce the first real-file intake check without committing the replay:
 

@@ -28,6 +28,9 @@ MAX_PAYLOAD_BYTES = 128 * 1024 * 1024
 MAX_LZMA_PADDING_BYTES = 8
 MAX_PLAYERS = 16
 MAX_CARDS_PER_ZONE = 255
+OLD_REPLAY_MODE = 231
+SELECTION_MESSAGES = frozenset((10, 11, 12, 13, 14, 15, 16, 18, 19,
+                                20, 21, 22, 23, 24, 25, 26))
 
 
 class ReplayContainerError(ValueError):
@@ -67,8 +70,24 @@ class EdoReplayContainer:
     responses: tuple[bytes, ...]
     packets: tuple[ReplayPacket, ...]
 
+    def embedded_legacy_replay(self) -> "EdoReplayContainer | None":
+        """Read EDOPro's optional old-mode replay inside a yrpX stream."""
+        if self.header.format != "yrpX":
+            return None
+        records = [packet.payload for packet in self.packets
+                   if packet.message == OLD_REPLAY_MODE]
+        if not records:
+            return None
+        if len(records) != 1:
+            raise ReplayContainerError("multiple embedded legacy replay records")
+        replay = parse_edopro_container(records[0])
+        if replay.header.format != "yrp":
+            raise ReplayContainerError("embedded replay is not yrp1")
+        return replay
+
     def summary(self) -> dict:
         """Return structural facts only; omit names, card IDs and raw choices."""
+        embedded = self.embedded_legacy_replay()
         return {
             "format": self.header.format,
             "sha256": self.sha256,
@@ -82,6 +101,10 @@ class EdoReplayContainer:
             "extra_deck_counts": [len(deck.extra) for deck in self.decks],
             "response_count": len(self.responses),
             "packet_count": len(self.packets),
+            "selection_prompt_packet_count": sum(
+                packet.message in SELECTION_MESSAGES for packet in self.packets),
+            "embedded_yrp_response_count": (
+                len(embedded.responses) if embedded is not None else None),
             "decision_reconstruction": "not_implemented",
         }
 

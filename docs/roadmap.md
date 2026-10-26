@@ -223,7 +223,9 @@ synthetic source-layout fixtures and reject truncation, oversized payloads,
 and another simulator's `yrp2` magic. Five real modern `.yrpX` samples from
 an MIT-licensed replay-tool repository now pass intake inspection, including
 raw LZMA streams without end markers and one extended-header replay. This is
-an intake inspection tool,
+an intake inspection tool. Each real packet stream had no selection prompts
+but did contain one valid embedded `yrp1` Deck/response record; the CLI now
+reports its response count without printing private values. It is still
 not replay decision reconstruction or an authorized human-data pipeline.
 Before using any `.yrp`/`.yrpX` for imitation, obtain a permitted real GOAT
 replay fixture, match its original core/scripts, recover each legal-action
