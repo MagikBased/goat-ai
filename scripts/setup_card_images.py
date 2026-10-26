@@ -1,6 +1,7 @@
 """Cache small card images for one GOAT AI trajectory; files stay outside Git."""
 
 import argparse
+import hashlib
 import json
 import sqlite3
 import time
@@ -12,6 +13,12 @@ from goat_ai.replay import read_trajectory
 from scripts.render_replay import _card_codes
 
 IMAGE_BASE = "https://images.ygoprodeck.com/images/cards_small"
+COVER_COMMIT = "54a6e2395c532648ff762540e9615319fac4f51b"
+COVER_BASE = f"https://raw.githubusercontent.com/ProjectIgnis/Distribution/{COVER_COMMIT}/textures"
+COVER_FILES = {
+    "cover.png": "67479d49ab1abe3b9e0669634db4493aaeaf5e3b22b4ceba5725ec3c9469ca3e",
+    "cover2.png": "4aeab387b87507eb79e98d2a6a78b6d37dbfe79804405dbe8b30dfc666ad31f3",
+}
 
 
 def _image_aliases(codes: list[int], native_root: Path) -> dict[int, int]:
@@ -73,16 +80,45 @@ def setup_card_images(trajectory: Path | list[Path], output_dir: Path, native_ro
     return downloaded, cached, unavailable
 
 
+def setup_card_backs(output_dir: Path) -> tuple[int, int]:
+    """Cache the two pinned EDOPro cover textures outside the repository."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    downloaded = cached = 0
+    for filename, digest in COVER_FILES.items():
+        target = output_dir / filename
+        if target.is_file():
+            cached += 1
+            continue
+        request = Request(f"{COVER_BASE}/{filename}",
+                          headers={"User-Agent": "goat-ai-local-replay-viewer/0.1"})
+        with urlopen(request, timeout=15) as response:
+            data = response.read(2_000_001)
+        if not data.startswith(b"\x89PNG\r\n\x1a\n") or hashlib.sha256(data).hexdigest() != digest:
+            raise ValueError(f"unexpected EDOPro cover data for {filename}")
+        temporary = target.with_suffix(".png.tmp")
+        temporary.write_bytes(data)
+        temporary.replace(target)
+        downloaded += 1
+    return downloaded, cached
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("trajectory", type=Path, nargs="+")
+    parser.add_argument("trajectory", type=Path, nargs="*")
     parser.add_argument("--output-dir", type=Path, default=Path("replays/card_images"))
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
+    parser.add_argument("--card-back-only", action="store_true")
     args = parser.parse_args()
-    downloaded, cached, unavailable = setup_card_images(
-        args.trajectory, args.output_dir, args.native_root)
-    print(f"card images: {downloaded} downloaded, {cached} cached, "
-          f"{unavailable} unavailable; run render_replay.py --catalog-viewer next")
+    if not args.trajectory and not args.card_back_only:
+        parser.error("provide one or more trajectories, or use --card-back-only")
+    if args.trajectory and not args.card_back_only:
+        downloaded, cached, unavailable = setup_card_images(
+            args.trajectory, args.output_dir, args.native_root)
+        print(f"card faces: {downloaded} downloaded, {cached} cached, "
+              f"{unavailable} unavailable")
+    downloaded, cached = setup_card_backs(args.output_dir)
+    print(f"card backs: {downloaded} downloaded, {cached} cached; "
+          "run render_replay.py --catalog-viewer next")
 
 
 if __name__ == "__main__":

@@ -295,7 +295,19 @@
         cardImages.set(key, URL.createObjectURL(cardFiles.get(key)));
       return cardImages.get(key) || localImages[key] || null;
     }
-    function addCardVisual(element, code, facedown) {
+    function cardBack(opponent = false) {
+      const back = node("span", "card-back");
+      back.setAttribute("aria-hidden", "true");
+      const source = imageSource(opponent ? "backOpponent" : "back") || imageSource("back");
+      if (source) {
+        back.style.background = `url("${source}") center / contain no-repeat`;
+        back.style.border = "0";
+        back.style.boxShadow = "none";
+        back.style.opacity = "1";
+      }
+      return back;
+    }
+    function addCardVisual(element, code, facedown, opponent = false) {
       const source = facedown ? null : imageSource(code);
       if (source) {
         const art = node("img", "card-art");
@@ -304,16 +316,16 @@
         element.classList.add("has-art");
         element.prepend(art);
       } else if (facedown) {
-        element.prepend(node("span", "card-back"));
+        element.prepend(cardBack(opponent));
       } else {
         element.classList.add("has-placeholder");
         element.prepend(node("span", "card-placeholder", "✦"));
       }
     }
-    function pileCard(code, count = 1) {
+    function pileCard(code, count = 1, opponent = false) {
       const tile = node("div", "pile-card");
       const card = node("div", "card monster");
-      addCardVisual(card, code, code == null);
+      addCardVisual(card, code, code == null, opponent);
       card.append(node("strong", "", code == null ? "Concealed" : nameOf(code)));
       tile.append(card);
       const caption = node("div", "pile-card-caption");
@@ -355,7 +367,7 @@
       } else {
         const cards = zone === "graveyard" ? observation.graveyards[player] : observation.banished[player];
         note = `${cards.length} ${cards.length === 1 ? "card" : "cards"}. ${zone === "graveyard" ? "Graveyard cards are public." : "Concealed banished cards remain hidden."}`;
-        for (const card of cards) grid.append(pileCard(card.code));
+        for (const card of cards) grid.append(pileCard(card.code, 1, !own));
       }
       byId("pile-note").textContent = note;
       if (!grid.childElementCount) scroll.replaceChildren(node("p", "muted", "No cards to display."));
@@ -401,7 +413,8 @@
       const element = node("div", `card ${card.zone} ${card.position === "facedown" ? "facedown" : ""} ${card.code == null && code != null ? "known" : ""}`);
       element.title = cardLabel(observation, card, known);
       element.dataset.fieldKey = fieldKey(card);
-      addCardVisual(element, card.code, card.position === "facedown");
+      addCardVisual(element, card.code, card.position === "facedown",
+                    card.controller !== observation.viewer);
       if (animateNext && previousFrame >= 0 && index > previousFrame) {
         const before = previousField.get(fieldKey(card));
         if (!before) element.classList.add("card-arrive");
@@ -449,7 +462,7 @@
         if (pile.length) {
           const top = node("div", "card monster");
           const last = pile[pile.length - 1];
-          addCardVisual(top, last.code, last.code == null);
+          addCardVisual(top, last.code, last.code == null, player !== observation.viewer);
           pileButton.append(top);
         }
         pileButton.append(node("strong", "", pile.length));
@@ -470,7 +483,7 @@
         auxiliary.setAttribute("aria-label", `View Player ${player + 1} Deck`);
         auxiliary.title = "Deck";
         auxiliary.addEventListener("click", () => showPile(player, "deck"));
-        auxiliary.append(node("span", "card-back"));
+        auxiliary.append(cardBack(player !== observation.viewer));
         auxiliary.append(node("strong", "", observation.deck_counts[player]));
       }
       line.append(auxiliary);
@@ -510,7 +523,7 @@
       extraButton.setAttribute("aria-label", `View Player ${player + 1} Extra Deck`);
       extraButton.title = "Extra Deck";
       extraButton.addEventListener("click", () => showPile(player, "extra"));
-      extraButton.append(node("span", "card-back"),
+      extraButton.append(cardBack(player !== observation.viewer),
                          node("strong", "", observation.extra_deck_counts[player]));
       row.append(extraButton);
       return row;
@@ -551,7 +564,7 @@
           back.addEventListener("mouseleave", () => { byId("hand-preview").hidden = true; });
           back.addEventListener("focus", () => showHandPreview(back, false));
           back.addEventListener("blur", () => { byId("hand-preview").hidden = true; });
-          back.append(node("span", "card-back"));
+          back.append(cardBack(true));
           hand.append(back);
         }
       }
@@ -771,6 +784,8 @@
       for (const file of event.target.files) {
         const match = file.name.match(/^(\d+)\.(?:jpe?g|png|webp)$/i);
         if (match) cardFiles.set(match[1], file);
+        if (file.name === "cover.png") cardFiles.set("back", file);
+        if (file.name === "cover2.png") cardFiles.set("backOpponent", file);
       }
       byId("image-count").textContent = `${cardFiles.size} images loaded`;
       previousFrame = -1;

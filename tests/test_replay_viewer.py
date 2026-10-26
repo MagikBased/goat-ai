@@ -22,7 +22,7 @@ from goat_ai.observations import (
 )
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
 from scripts.render_replay import render_catalog_viewer, render_replay
-from scripts.setup_card_images import setup_card_images
+from scripts.setup_card_images import setup_card_backs, setup_card_images
 
 
 def test_common_card_navigation_matches_sourced_main_decks():
@@ -75,6 +75,7 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     image_folder.mkdir()
     (image_folder / "10.jpg").write_bytes(b"local thumbnail")
     (image_folder / "999.jpg").write_bytes(b"unrelated thumbnail")
+    (image_folder / "cover.png").write_bytes(b"local card back")
     write_trajectory(source, trajectory)
     assert render_replay(source, output, tmp_path / "native") == (1, 5)
     html = output.read_text()
@@ -83,7 +84,8 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     assert '"12":"Privately Seen Monster"' in html
     assert '"13":"Decklist Only Monster"' in html
     assert '"14":"Known Hand Monster"' in html
-    assert '<script id="embedded-images" type="application/json">{"10":"card_images/10.jpg"}</script>' in html
+    assert ('<script id="embedded-images" type="application/json">'
+            '{"10":"card_images/10.jpg","back":"card_images/cover.png"}</script>') in html
     assert 'card_images/999.jpg' not in html
     assert '"public_reveals"' in html
     assert '"disabled_zones"' in html
@@ -238,3 +240,33 @@ def test_image_setup_uses_base_art_for_goat_variant_and_caches_it(tmp_path, monk
     assert (output / f"{variant}.jpg").read_bytes() == b"\xff\xd8\xfftest image"
     assert setup_card_images(source, output, tmp_path / "native", delay=0) == (0, 1, 0)
     assert len(requested) == 1
+
+
+def test_card_back_setup_checks_pinned_image_and_reuses_cache(tmp_path, monkeypatch):
+    data = b"\x89PNG\r\n\x1a\ncard back"
+    monkeypatch.setattr("scripts.setup_card_images.COVER_FILES", {
+        "cover.png": hashlib.sha256(data).hexdigest(),
+        "cover2.png": hashlib.sha256(data).hexdigest(),
+    })
+    requested = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self, limit):
+            return data
+
+    def fake_urlopen(request, timeout):
+        requested.append(request.full_url)
+        return Response()
+
+    monkeypatch.setattr("scripts.setup_card_images.urlopen", fake_urlopen)
+    assert setup_card_backs(tmp_path / "images") == (2, 0)
+    assert all("/54a6e2395c532648ff762540e9615319fac4f51b/" in url
+               for url in requested)
+    assert setup_card_backs(tmp_path / "images") == (0, 2)
+    assert len(requested) == 2

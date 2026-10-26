@@ -90,7 +90,7 @@ def _catalog_codes(native_root: Path) -> set[int]:
     return codes
 
 
-def _local_card_images(output: Path, codes: set[int]) -> dict[int, str]:
+def _local_card_images(output: Path, codes: set[int]) -> dict[int | str, str]:
     """Reference only locally cached art beside the generated HTML."""
     folder = output.parent / "card_images"
     images = {}
@@ -99,11 +99,14 @@ def _local_card_images(output: Path, codes: set[int]) -> dict[int, str]:
             if (folder / f"{code}.{suffix}").is_file():
                 images[code] = f"card_images/{code}.{suffix}"
                 break
+    for key, filename in (("back", "cover.png"), ("backOpponent", "cover2.png")):
+        if (folder / filename).is_file():
+            images[key] = f"card_images/{filename}"
     return images
 
 
 def _embed_viewer(raw: dict | None, source_sha256: str, names: dict[int, str],
-                  options: dict[int, str], images: dict[int, str]) -> str:
+                  options: dict[int, str], images: dict[int | str, str]) -> str:
     template = TEMPLATE.read_text(encoding="utf-8")
     # Escaping '<' prevents replay or database text from closing a script element.
     replay_json = json.dumps(raw, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")
