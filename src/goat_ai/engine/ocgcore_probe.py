@@ -59,6 +59,15 @@ METAMORPHOSIS_COST_FILTER_GOAT = (
     b"\tlocal lv=c:GetLevel()"
 )
 UPSTREAM_BOOK_SHA256 = "25848f596f425817a250bef9038343fbbcd482b40a0312d84c143e927b12083d"
+UPSTREAM_FIREBIRD_SHA256 = "76c351a0006682d2a31449084cb821d43e6fc5f9f0b98931cae1859d632c2600"
+FIREBIRD_BATTLE_CONDITION_OLD = b"""function s.atkcon2(e,tp,eg,ep,ev,re,r,rp)
+\treturn s.cfilter2(Duel.GetAttacker()) or s.cfilter2(Duel.GetAttackTarget())
+end"""
+FIREBIRD_BATTLE_CONDITION_FIXED = b"""function s.atkcon2(e,tp,eg,ep,ev,re,r,rp)
+\t-- Some EVENT_BATTLED callbacks omit tp; the effect handler owns this check.
+\tlocal controller=e:GetHandlerPlayer()
+\treturn s.cfilter2(Duel.GetAttacker(),controller) or s.cfilter2(Duel.GetAttackTarget(),controller)
+end"""
 BOOK_TARGET_OLD = b"""function s.target(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
 \tif chkc then return chkc:IsLocation(LOCATION_MZONE) and chkc:IsCanTurnSet() end
 \tif chk==0 then return Duel.IsExistingTarget(Card.IsCanTurnSet,tp,LOCATION_MZONE,LOCATION_MZONE,1,nil) end
@@ -500,6 +509,13 @@ class OcgcoreProbe:
                 self.errors.append("pinned Book script changed; historical Desert target patch not applied")
                 return 0
             contents = contents.replace(BOOK_TARGET_OLD, BOOK_TARGET_HISTORICAL)
+        if path.relative_to(self.scripts) == Path("goat/c504700151.lua"):
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_FIREBIRD_SHA256 \
+                    or contents.count(FIREBIRD_BATTLE_CONDITION_OLD) != 1:
+                self.errors.append("pinned Firebird script changed; battle callback patch not applied")
+                return 0
+            contents = contents.replace(FIREBIRD_BATTLE_CONDITION_OLD,
+                                        FIREBIRD_BATTLE_CONDITION_FIXED)
         self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
             hashlib.sha256(contents).hexdigest()
         )

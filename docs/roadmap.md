@@ -108,6 +108,14 @@ decoding and a redacted blind choice resolved those cases. On the same
 all **25,833** decisions replay-verified. The ignored report is
 `.cache/goat-ai/random-probe-distinct-10000-fixed/report.json` (SHA-256
 `86576a1cf12a0836956348ee6a48735d1698e96295de1cc1f049654a038fd378`).
+
+The next 100 independent whitelist-deck pairs on seeds 10024–10123 yielded
+93 terminal, replay-verified duels. A pinned Firebird battle callback crashed
+three games; a SHA-guarded in-memory correction allowed all three original
+seeds to complete and replay-verify. Four cases remain open: two native
+`MSG_SELECT_SUM` prompts and two opposing-hand choices without a
+recipient-scoped reveal. Resolve those exact seeds before claiming broader
+M1 protocol coverage; see [evaluation](evaluation.md).
 This is a protocol and reproducibility result, not a historical correctness
 certificate for arbitrary decks. Focused native fixtures verify the
 declaration catalogs against two hidden opponent Decks and the Spy reveal
@@ -841,3 +849,11 @@ baselines correct these fixed decisions. Their separate 32-duel direct
 comparisons against the prior version both split 16–16, so neither closes
 M4's competitive gate. The reviewed choices are bound to source replay
 hashes as baseline preferences; see [replay audit](replay_audit.md).
+
+The v12-versus-v12 seed-6803 replay exposed six additional reviewed resource
+and BLS/Thunder Dragon choices. Tactical v13 changes those exact visible-state
+decisions and a fresh self-play replay passes full verification. Its first
+64-duel direct comparison against v12 scored 34–30, with an uneven assigned-deck
+split and a paired interval touching 50%. Keep M4 open: this heuristic change
+does not establish cross-deck strength or a learned self-play gain. See
+[replay audit](replay_audit.md) and [evaluation](evaluation.md).

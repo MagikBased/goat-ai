@@ -490,6 +490,73 @@ def test_v12_raigeki_target_prefers_other_enemy_card_to_sheep_token():
     assert TacticalHeuristicAgent().select_action(view, (token,)) == token
 
 
+def test_v13_holds_mst_against_resolving_normal_spell():
+    pot = CardView(0, "spell_trap", "faceup", 55144522, 0)
+    mystic = Action("mst", "chain", 0, {"code": 5318639, "location": 2})
+    decline = Action("decline", "pass", 0)
+    chain = (ChainLinkView(1, 55144522, 0, 8, 0),)
+    view = board(pot, chain=chain, turn_player=0)
+    assert TacticalHeuristicAgent().select_action(view, (mystic, decline)) == decline
+    assert TacticalHeuristicAgent(v13_guards=False).select_action(
+        view, (mystic, decline)) == mystic
+
+
+def test_v13_holds_redundant_book_and_book_after_torrential():
+    own_chaos = CardView(0, "monster", "faceup", 9596126, 0,
+                         "attack", 2300, 2000)
+    enemy_set = CardView(1, "monster", "facedown", None, 0, "defense")
+    book = Action("book", "chain", 0, {"code": 14087893, "location": 2})
+    decline = Action("decline", "pass", 0)
+    first_book = board(own_chaos, enemy_set,
+                       chain=(ChainLinkView(1, 14087893, 1, 8, 0),), turn_player=0)
+    assert TacticalHeuristicAgent().select_action(first_book, (book, decline)) == decline
+    assert TacticalHeuristicAgent(v13_guards=False).select_action(
+        first_book, (book, decline)) == book
+    enemy = replace(enemy_set, position="faceup", code=87621407,
+                    orientation="attack", attack=1400, defense=1000)
+    torrential = board(own_chaos, enemy,
+                       chain=(ChainLinkView(1, 53582587, 0, 8, 0),), turn_player=1)
+    assert TacticalHeuristicAgent().select_action(torrential, (book, decline)) == decline
+
+
+def test_v13_holds_raigeki_break_against_low_value_monster():
+    mimic = CardView(1, "monster", "faceup", 504700129, 0,
+                     "attack", 100, 1000)
+    sheep = CardView(1, "monster", "faceup", 73915052, 1,
+                     "defense", 0, 0)
+    break_card = Action("break", "chain", 0, {"code": 4178474, "location": 8})
+    decline = Action("decline", "pass", 0)
+    view = board(mimic, sheep,
+                 chain=(ChainLinkView(1, 504700129, 1, 4, 0),), turn_player=1)
+    assert TacticalHeuristicAgent().select_action(view, (break_card, decline)) == decline
+    assert TacticalHeuristicAgent(v13_guards=False).select_action(
+        view, (break_card, decline)) == break_card
+
+
+def test_v13_preserves_bls_against_sheep_and_weak_tribute():
+    bls = CardView(0, "monster", "faceup", 504700118, 0,
+                   "attack", 3000, 2500)
+    sheep = CardView(1, "monster", "faceup", 73915052, 0,
+                     "defense", 0, 0)
+    banish = Action("banish", "chain", 0, {"code": 504700118, "location": 4})
+    decline = Action("decline", "pass", 0)
+    view = board(bls, sheep, turn_player=0)
+    assert TacticalHeuristicAgent().select_action(view, (banish, decline)) == decline
+    assert TacticalHeuristicAgent(v13_guards=False).select_action(
+        view, (banish, decline)) == banish
+    thunder = Action("thunder", "normal_summon", 0,
+                     {"code": 504700054, "location": 2})
+    battle = Action("battle", "battle_phase", 0)
+    other = CardView(0, "monster", "faceup", 504700044, 1,
+                     "attack", 1200, 1500)
+    position = Action("position", "change_position", 0,
+                      {"code": 504700044, "location": 4, "sequence": 1})
+    assert TacticalHeuristicAgent().select_action(
+        board(bls, other, turn_player=0), (thunder, position, battle)) == battle
+    assert TacticalHeuristicAgent(v13_guards=False).select_action(
+        board(bls, other, turn_player=0), (thunder, position, battle)) == thunder
+
+
 def test_v9_creature_swap_prefers_token_and_tsukuyomi_resets_equipped_restrict():
     jinzo = CardView(0, "monster", "faceup", 77585513, 0,
                      "attack", 2400, 1500)

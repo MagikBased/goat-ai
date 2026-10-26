@@ -151,7 +151,7 @@ class CombatFlipHeuristicAgent(CombatHeuristicAgent):
 class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
     """Flip-aware baseline with conservative, visible-board Trap decisions."""
 
-    teacher_version: ClassVar[int] = 12  # reactive Book/Raigeki use
+    teacher_version: ClassVar[int] = 13  # reviewed chain and tribute value
     RING: ClassVar[int] = 511000824
     TORRENTIAL: ClassVar[int] = 53582587
     SINISTER: ClassVar[int] = 511000818
@@ -163,7 +163,8 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                  v8_guards: bool = True, v9_guards: bool | None = None,
                  v10_guards: bool | None = None,
                  v11_guards: bool | None = None,
-                 v12_guards: bool | None = None) -> None:
+                 v12_guards: bool | None = None,
+                 v13_guards: bool | None = None) -> None:
         super().__init__(flip_monster_codes)
         self.card_races = dict(card_races or {})
         self.card_facts = dict(card_facts or {})
@@ -172,6 +173,7 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
         self.v10_guards = self.v9_guards if v10_guards is None else v10_guards
         self.v11_guards = self.v10_guards if v11_guards is None else v11_guards
         self.v12_guards = self.v11_guards if v12_guards is None else v12_guards
+        self.v13_guards = self.v12_guards if v13_guards is None else v13_guards
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
@@ -260,7 +262,8 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
             tactical_v9_guards=self.v9_guards,
             tactical_v10_guards=self.v10_guards,
             tactical_v11_guards=self.v11_guards,
-            tactical_v12_guards=self.v12_guards, card_facts=self.card_facts)
+            tactical_v12_guards=self.v12_guards,
+            tactical_v13_guards=self.v13_guards, card_facts=self.card_facts)
         targets = safe_target_indices(
             observation, legal_actions, admissible,
             protect_removal_targets=self.v9_guards,
@@ -282,6 +285,15 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                                 for action in legal_actions)
             if enemy and tsukuyomi and bls_activate is not None and bls_can_reset:
                 return bls_activate
+        if self.v13_guards and observation.phase == "main1" and not opposing:
+            bls_ready = any(card.zone == "monster" and card.controller == observation.viewer
+                            and card.code == BLACK_LUSTER_SOLDIER
+                            and card.position == "faceup" and card.orientation == "attack"
+                            for card in observation.field)
+            battle = next((action for action in filtered
+                           if action.kind == "battle_phase"), None)
+            if bls_ready and battle is not None:
+                return battle
         return super().select_action(observation, filtered)
 
 

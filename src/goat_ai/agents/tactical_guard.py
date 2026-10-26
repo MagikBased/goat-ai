@@ -10,6 +10,7 @@ from goat_ai.actions import Action
 from goat_ai.observations import CardView, Observation
 
 HEAVY_STORM = 19613556
+POT_OF_GREED = 55144522
 SCAPEGOAT = 504700123
 TORRENTIAL_TRIBUTE = 53582587
 RING_OF_DESTRUCTION = 511000824
@@ -248,6 +249,7 @@ def admissible_action_indices(observation: Observation,
                               tactical_v10_guards: bool = False,
                               tactical_v11_guards: bool = False,
                               tactical_v12_guards: bool = False,
+                              tactical_v13_guards: bool = False,
                               card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                               ) -> tuple[int, ...]:
     """Defer clearly wasteful actions while preserving an engine-legal choice.
@@ -274,6 +276,19 @@ def admissible_action_indices(observation: Observation,
     own_monster_threatened = any(
         target.zone == "monster" and target.controller == own
         for link in observation.chain for target in link.targets)
+    opponent_non_token = [c for c in opponent_monsters
+                          if c.code not in SHEEP_TOKENS]
+    only_weak_opponent_monsters = bool(opponent_monsters) and all(
+        c.position == "faceup" and c.attack is not None and c.attack < 1000
+        for c in opponent_non_token)
+    latest_chain_type = ((card_facts or {}).get(observation.chain[-1].card_code,
+                         (None, 0, 0))[0] if observation.chain else None)
+    other_opponent_backrow = any(
+        c.zone == "spell_trap" and c.controller != own
+        and not (observation.chain and c.controller == observation.chain[-1].controller
+                 and observation.chain[-1].location == 8
+                 and c.sequence == observation.chain[-1].sequence)
+        for c in observation.field)
     known_thunder_left = (known_thunder_copies_in_deck(observation)
                           if tactical_v9_guards else None)
     card_races = card_races or {}
@@ -351,6 +366,24 @@ def admissible_action_indices(observation: Observation,
                 and observation.turn_player != own and not enemy_book_target
                 and not own_monster_threatened):
             continue
+        if (tactical_v13_guards and code == MYSTICAL_SPACE_TYPHOON
+                and action.kind == "chain" and can_pass and observation.chain
+                and (latest_chain_type in (2, 4)
+                     or observation.chain[-1].card_code == POT_OF_GREED)
+                and not other_opponent_backrow):
+            continue
+        if (tactical_v13_guards and code == BOOK_OF_MOON
+                and action.kind == "chain" and can_pass and observation.chain
+                and (any(link.card_code == TORRENTIAL_TRIBUTE
+                         for link in observation.chain)
+                     or (observation.chain[-1].card_code == BOOK_OF_MOON
+                         and not enemy_book_target))):
+            continue
+        if (tactical_v13_guards and code == RAIGEKI_BREAK
+                and action.kind == "chain" and can_pass and not opponent_backrow
+                and only_weak_opponent_monsters and not own_monster_threatened
+                and observation.pending_attack is None):
+            continue
         if (tactical_v12_guards and code == RAIGEKI_BREAK
                 and action.kind == "chain" and can_pass and observation.chain
                 and observation.chain[-1].controller == own
@@ -386,6 +419,21 @@ def admissible_action_indices(observation: Observation,
                             and c.sequence == action.parameters.get("sequence")
                             and c.owner is not None and c.owner != own
                             for c in own_monsters)):
+            continue
+        if (tactical_v13_guards and code == BLACK_LUSTER_SOLDIER
+                and action.kind in ("activate", "chain")
+                and observation.turn_player == own
+                and observation.phase == "main1" and not opponent_backrow
+                and opponent_monsters
+                and all(c.code in SHEEP_TOKENS for c in opponent_monsters)
+                and any(c.code == BLACK_LUSTER_SOLDIER and c.position == "faceup"
+                        and c.orientation == "attack" and c.controller == own
+                        for c in own_monsters)):
+            continue
+        if (tactical_v13_guards and code == THUNDER_DRAGON
+                and action.kind == "normal_summon"
+                and any(c.code == BLACK_LUSTER_SOLDIER and c.controller == own
+                        for c in own_monsters)):
             continue
         if (tactical_v9_guards and code == RAIGEKI_BREAK
                 and action.kind in ("activate", "chain")

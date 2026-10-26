@@ -4743,3 +4743,30 @@ replay-verified. The ignored corrected report is
 `86576a1cf12a0836956348ee6a48735d1698e96295de1cc1f049654a038fd378`).
 This exercises native protocol breadth; randomly assembled decks and random
 agents do not establish 2005 ruling correctness or competitive strength.
+
+### Tactical v13 and expanded protocol triage
+
+Six user-reviewed v12 seed-6803 choices are stored as SHA-bound
+`baseline_review` preferences and reproduced on the original player-visible
+states. Tactical v13 changes those choices. A direct 64-duel v13-versus-v12
+evaluation used Matt/Chaos Turbo and Cas/Daryl, both deck assignments and
+seats, seeds 8800–8807. V13 scored **34–30**, with a paired bootstrap score
+interval of **50.0%–57.8%**. Its assigned-deck split was 6–10 on Chaos Turbo,
+7–9 on Cas, 10–6 on Matt, and 11–5 on Daryl. The ignored report is
+`.cache/goat-ai/tactical_v13_vs_v12_8800_8807.json` (SHA-256
+`57f757e522da00080f80ef3466dd75c480fa368d988a8f8f59d9ef561cc74c44`). This does not establish
+a cross-deck strength gain or M4 promotion.
+
+The distinct, full-whitelist random-deck sweep on seeds 10024–10123 reached
+terminal in **93/100** duels before further adapter fixes, with every
+terminal trajectory replay-verified. Three failures were a pinned GOAT
+Firebird Lua callback passing `nil` as the controller during battle. A
+SHA-guarded in-memory patch uses the effect handler's player; all three
+original seeds (10030, 10062, 10122) now reach terminal and replay-verify
+individually. Two more games stopped at undecoded native `MSG_SELECT_SUM`
+prompts (10097, 10102), and two at opponent-hand choices lacking an addressed
+reveal (10093, 10107). Those four cases remain open; this is not a 100/100
+completion claim. Reports are under
+`.cache/goat-ai/random-probe-distinct-10024-10123/` (report SHA-256
+`08933bbbd10661ba48b632750ddc1078f1f4362dd017c14c5ae2955fcf0f350c`) and
+`.cache/goat-ai/firebird-fixed-{10030,10062,10122}/`.

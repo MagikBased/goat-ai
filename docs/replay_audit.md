@@ -1047,3 +1047,32 @@ opposing non-Token monster while Sheep Tokens are available. Both complete
 v12-versus-v12 trajectories replay-verified, passed visibility checks,
 and reproduced their versioned teacher choices. The changed branch and
 one-duel outcome are not a strength result.
+
+### Tactical v13 review of seed 6803
+
+In the v12-versus-v12 replay, the user identified six resource and combat
+mistakes. The source trajectory is
+`replays/tactical_v12_self_6803/seed_6803_seat_0.json` (SHA-256
+`85eb87112fd42033ffb386bed29195d8dde639807b0d36c993afaaa07503155b`).
+Its player-1 decision 5 chained Mystical Space Typhoon to that player's own
+Pot of Greed. Player 2 chained a second Book of Moon to the first Book at
+decision 53, used Raigeki Break on a 100-ATK Dark Mimic LV1 at 90, chained
+Book after Torrential Tribute at 163, banished a Sheep Token with BLS at
+419 despite no opposing backrow, and offered BLS as Tribute for Thunder Dragon
+at 627. The user-reviewed alternatives are bound to this replay in
+`examples/preferences/tactical_v12_seed6803_player{1,2}_resource.preference.json`.
+Both source seats, all six action alternatives, the full native replay, and
+the player-visible trajectory passed validation.
+
+Tactical v13 passes on the four reviewed chains, saves BLS's attack against
+the Sheep Tokens when there is no opposing backrow, and enters Battle Phase
+instead of Summoning Thunder Dragon over its BLS on the fixed v12 states.
+[BLS's official text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5835&ope=2&request_locale=en)
+allows a second consecutive attack after destroying an opposing monster by
+battle, while activating its banish effect prevents it from attacking that
+turn. The guard is a tactical preference, not a change to legal actions.
+The new `replays/tactical_v13_self_seed6803.html` shows both players using
+v13. Its two underlying complete duels, 530 and 953 decisions, replay-verified,
+passed visibility checks, and reproduced teacher choices. Neither replay
+reached one of the six exact bad-play patterns, but the different game paths
+do not prove that every Book, Raigeki, or tribute decision is sound.

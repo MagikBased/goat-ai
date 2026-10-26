@@ -86,21 +86,22 @@ def agent_factory(name: str, native_root: Path):
     if name == "combat_flip":
         return partial(make_combat_flip,
                        flip_monster_codes=flip_monster_codes(native_root))
-    if name in ("tactical", "tactical_v11", "tactical_v10", "tactical_v9",
+    if name in ("tactical", "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9",
                 "tactical_v8", "tactical_v7"):
         return partial(make_tactical,
                        flip_monster_codes=flip_monster_codes(native_root),
                        card_races=load_card_races(native_root),
                        card_facts=(load_card_facts(native_root)
-                                   if name in ("tactical", "tactical_v11", "tactical_v10",
+                                   if name in ("tactical", "tactical_v12", "tactical_v11", "tactical_v10",
                                                "tactical_v9")
                                    else {}),
                        v8_guards=name != "tactical_v7",
-                       v9_guards=name in ("tactical", "tactical_v11", "tactical_v10",
+                       v9_guards=name in ("tactical", "tactical_v12", "tactical_v11", "tactical_v10",
                                           "tactical_v9"),
-                       v10_guards=name in ("tactical", "tactical_v11", "tactical_v10"),
-                       v11_guards=name in ("tactical", "tactical_v11"),
-                       v12_guards=name == "tactical")
+                       v10_guards=name in ("tactical", "tactical_v12", "tactical_v11", "tactical_v10"),
+                       v11_guards=name in ("tactical", "tactical_v12", "tactical_v11"),
+                       v12_guards=name in ("tactical", "tactical_v12"),
+                       v13_guards=name == "tactical")
     if name == "flip_heuristic":
         return partial(make_flip_heuristic,
                        flip_monster_codes=flip_monster_codes(native_root))
@@ -129,12 +130,12 @@ def make_tactical(_seed: int, *, flip_monster_codes: frozenset[int],
                   v8_guards: bool = True, v9_guards: bool = True,
                   v10_guards: bool = True,
                   v11_guards: bool = True,
-                  v12_guards: bool = True) -> TacticalHeuristicAgent:
+                  v12_guards: bool = True, v13_guards: bool = True) -> TacticalHeuristicAgent:
     return TacticalHeuristicAgent(flip_monster_codes, card_races,
                                   card_facts=card_facts,
                                   v8_guards=v8_guards, v9_guards=v9_guards,
                                   v10_guards=v10_guards, v11_guards=v11_guards,
-                                  v12_guards=v12_guards)
+                                  v12_guards=v12_guards, v13_guards=v13_guards)
 
 
 def main() -> None:
@@ -153,12 +154,12 @@ def main() -> None:
                         help="evaluate each deck pair with either agent assigned either deck")
     parser.add_argument("--agent-a", choices=("random", "heuristic", "combat_heuristic",
                                               "combat_flip", "flip_heuristic", "tactical",
-                                              "tactical_v11", "tactical_v10", "tactical_v9",
+                                              "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9",
                                               "tactical_v8", "tactical_v7"),
                         default="random")
     parser.add_argument("--agent-b", choices=("random", "heuristic", "combat_heuristic",
                                               "combat_flip", "flip_heuristic", "tactical",
-                                              "tactical_v11", "tactical_v10", "tactical_v9",
+                                              "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9",
                                               "tactical_v8", "tactical_v7"),
                         default="random")
     parser.add_argument("--seed", type=int, default=42)
@@ -207,6 +208,7 @@ def main() -> None:
         "agent_a": args.agent_a, "agent_b": args.agent_b,
         "agent_a_version": (TacticalHeuristicAgent.teacher_version
                             if args.agent_a == "tactical"
+                            else 12 if args.agent_a == "tactical_v12"
                             else 11 if args.agent_a == "tactical_v11"
                             else 10 if args.agent_a == "tactical_v10"
                             else 9 if args.agent_a == "tactical_v9"
@@ -220,6 +222,7 @@ def main() -> None:
                             if args.agent_a in ("heuristic", "flip_heuristic") else 1),
         "agent_b_version": (TacticalHeuristicAgent.teacher_version
                             if args.agent_b == "tactical"
+                            else 12 if args.agent_b == "tactical_v12"
                             else 11 if args.agent_b == "tactical_v11"
                             else 10 if args.agent_b == "tactical_v10"
                             else 9 if args.agent_b == "tactical_v9"
