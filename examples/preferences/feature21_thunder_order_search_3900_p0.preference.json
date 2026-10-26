@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "source_trajectory_sha256": "3b4f4846638163cc91f3f0525458f4efed65dc89b0650a07278ee15299bb3b35",
+  "authorization": "policy_review",
+  "reviewer": "GOAT AI replay review from player notes",
+  "preferences": [
+    {
+      "decision_index": 2,
+      "preferred_action_indices": [8],
+      "disfavored_action_indices": [7]
+    },
+    {
+      "decision_index": 11,
+      "preferred_action_indices": [3],
+      "disfavored_action_indices": [4]
+    }
+  ]
+}

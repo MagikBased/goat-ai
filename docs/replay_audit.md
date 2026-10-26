@@ -699,3 +699,69 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/audit_policy_replays.py \
   --native-root .cache/goat-ai \
   --output artifacts/selfplay_episode62_review_audit.json
 ```
+
+### Player review of Thunder Dragon and opponent responses
+
+The complete feature-21 seed-3900 replay (SHA-256
+`3b4f4846638163cc91f3f0525458f4efed65dc89b0650a07278ee15299bb3b35`)
+contains two additional reviewed **policy-seat** choices. At viewer frame
+**3**, Player 1 activated Pot of Greed while activating its hand Thunder
+Dragon was also legal. Searching first would avoid the chance of drawing
+another copy before removing copies from Deck. The Main Deck actually has
+**three** Thunder Dragons, not one. At frame **12**, after Thunder Dragon
+resolved, **two** remaining copies were selectable, but the policy chose the
+empty `select_cards` option, adding none. These legal alternatives are bound
+to the replay in
+`examples/preferences/feature21_thunder_order_search_3900_p0.preference.json`.
+This is a decision problem, not evidence that the deck contains only one copy
+or that the engine failed to offer the search.
+
+At frame **15**, the policy Normal Summoned Magician of Faith; setting it or
+Normal Summoning Sinister Serpent were legal. At frame **23**, it selected
+Faith as Metamorphosis material with no opposing monsters. Serpent was still
+in hand at that target prompt, so it was not a legal alternative there; the
+earlier summon decision created that constraint. The automated shortlist now
+flags the Pot/Thunder order, empty search, weak Flip summon, and this
+Metamorphosis material choice for review. It does not turn them into blanket
+rules: Metamorphosis into Thousand-Eyes Restrict can have other defensive or
+tempo value.
+
+The same replay's Player 2 was **TacticalHeuristicAgent v4**, not the learned
+policy. It used Solemn Judgment on Player 1's Sinister Serpent Normal Summon
+at frame **99**, paying from 7000 to 3500 LP, then on Scapegoat at frame
+**128**, paying from 3500 to 1750 LP; Pass was legal at both prompts. The
+Scapegoat response is now an automated opponent-seat review candidate. The
+summon-negation observation currently lacks an explicit pending summoned-card
+identity, so the shortlist does not infer that Solemn's target was Serpent
+from the field alone.
+
+In the feature-21 seed-3901 replay, Player 2 Tactical v4 selected its own
+Black Luster Soldier as its banish target at frame **158** while five opposing
+monsters were legal targets. The opponent-seat audit flags it. Tactical v5
+now uses the visible target guard and chose an opposing monster at the same
+decision state. It leaves a self-target available when a visible own Snatch
+Steal is equipped to that BLS; a temporary Brain Control change cannot yet
+be identified reliably from the observation's current-controller field.
+Re-recording seed 3901 against Tactical v5 produced a **649-decision** native
+replay, verified to terminal, where frame 158 targeted the opposing monster:
+`replays/fv21_vs_tactical_v5_3901_p0.json` (SHA-256
+`780f12517a3cf80f23a59a384593c5025ff17616b82d2c2ec613681599d53041`).
+Tactical v5 also passed on the recorded Scapegoat/Solemn state when replayed
+through its agent API. These are baseline behavior fixes, not a demonstrated
+competitive gain for the learned policy.
+
+The ignored two-seat audit report is
+`artifacts/fv21_user_notes_both_seats_audit.json` (SHA-256
+`106ba4ee4c5be3f9f65bd9b8656bca396a3a610385fe106ed4c46aa0c42c0f05`).
+It verifies the policy's greedy choices; opponent choices are labeled
+`native_replay_only_not_agent_reproduced`, preserving their separate
+provenance.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/audit_policy_replays.py \
+  replays/fv21_review_scan_3900_3903/seed_3900_seat_0.json \
+  replays/fv21_review_scan_3900_3903/seed_3901_seat_0.json \
+  --checkpoint .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --native-root .cache/goat-ai --include-opponent \
+  --output artifacts/fv21_user_notes_both_seats_audit.json
+```

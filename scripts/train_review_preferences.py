@@ -118,6 +118,7 @@ def main() -> None:
     child = {
         "schema_version": 1, "model_state": model.state_dict(),
         "vocabulary_codes": agent.vocabulary.codes,
+        "vocabulary_card_properties": agent.vocabulary.card_properties,
         "width": model.card.embedding_dim, "feature_version": model.feature_version,
         "parent_checkpoint_sha256": sha256_file(args.checkpoint),
         "training_games": [*metadata["training_games"], *training_games],

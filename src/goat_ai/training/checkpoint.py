@@ -16,7 +16,11 @@ def load_policy_agent(path: str | Path, *, device: str = "cpu",
     checkpoint = torch.load(path, map_location=device, weights_only=True)
     if not isinstance(checkpoint, dict) or checkpoint.get("schema_version") != 1:
         raise ValueError("unsupported policy checkpoint schema")
-    vocabulary = CardVocabulary(tuple(checkpoint["vocabulary_codes"]))
+    vocabulary = CardVocabulary(tuple(checkpoint["vocabulary_codes"]),
+                                tuple(tuple(item) for item in
+                                      checkpoint.get("vocabulary_card_properties", ())))
+    if checkpoint.get("feature_version", 1) >= 22 and not vocabulary.card_properties:
+        raise ValueError("feature version 22 checkpoint lacks printed card properties")
     model = LegalActionPolicy(vocabulary.size, width=int(checkpoint["width"]),
                               feature_version=int(checkpoint.get("feature_version", 1)))
     model.load_state_dict(checkpoint["model_state"])

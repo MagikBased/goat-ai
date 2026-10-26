@@ -322,6 +322,36 @@ def test_tactical_agent_does_not_name_own_race_for_tribe():
                                (activate, decline)) == decline
 
 
+def test_tactical_bls_target_prefers_enemy_unless_snatch_equip_is_visible():
+    bls = 504700118
+    own_bls = CardView(0, "monster", "faceup", bls, 0, "attack", 3000, 2500)
+    opponent = CardView(1, "monster", "faceup", 31560081, 1,
+                        "attack", 300, 400)
+    snapshot = replace(view(), field=(own_bls, opponent),
+                       chain=(ChainLinkView(1, bls, 0, 4, 0),))
+    self_target = Action("self", "select_card", 0,
+                         {"code": bls, "controller": 0, "location": 4, "sequence": 0})
+    enemy_target = Action("enemy", "select_card", 0,
+                          {"code": 31560081, "controller": 1,
+                           "location": 4, "sequence": 1})
+    agent = TacticalHeuristicAgent()
+    assert agent.select_action(snapshot, (self_target, enemy_target)) == enemy_target
+    equipped = replace(snapshot, field=snapshot.field + (
+        CardView(0, "spell_trap", "faceup", 45986603, 2,
+                 equipped_to=(0, 0)),))
+    assert agent.select_action(equipped, (self_target, enemy_target)) == self_target
+
+
+def test_tactical_agent_preserves_solemn_against_opponent_scapegoat():
+    solemn = Action("solemn", "chain", 1, {"code": 41420027})
+    decline = Action("pass", "pass", 1)
+    snapshot = replace(view(), viewer=1, acting_player=1,
+                       hand=(), field=(), turn_player=0,
+                       life_points=(8000, 3500),
+                       chain=(ChainLinkView(1, 504700123, 0, 8, 3),))
+    assert TacticalHeuristicAgent().select_action(snapshot, (solemn, decline)) == decline
+
+
 def test_combat_heuristic_uses_only_visible_battle_stats():
     weak = Action("0", "attack", 0, {"sequence": 0})
     strong = Action("1", "attack", 0, {"sequence": 1})

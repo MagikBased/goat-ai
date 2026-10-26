@@ -550,6 +550,20 @@ Flip-effect readiness and Spell-in-Graveyard context to action scoring before
 another update. Keep the parent as reference and use a new held-out schedule
 for any feature experiment; see [evaluation](evaluation.md).
 
+Feature version 22 now encodes pinned printed Flip/ATK properties and public
+resource counts. A same-data clone moved preferred Faith/Ring actions higher
+at four reviewed frames, but its two 64-duel unseen-composition comparisons
+with feature 21 scored 36–27–1 and 28–34–2, with severe role dependence.
+Do not promote it from these results. Player review of seed 3900 added two
+Thunder Dragon preference labels: the policy used Pot before an available
+Thunder search and then voluntarily selected zero of two available copies.
+The replay audit can now inspect the opponent seat separately; this revealed
+that TacticalHeuristicAgent v4, not the learned policy, self-targeted Black
+Luster Soldier and negated Scapegoat with Solemn Judgment. Tactical v5
+addresses those visible cases, but its broader strength is unmeasured.
+Next, train on more independent reviewed decisions and add public context for
+control-change and summon-response value before any promotion claim.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

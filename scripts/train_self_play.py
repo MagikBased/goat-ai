@@ -162,6 +162,7 @@ def main() -> None:
     checkpoint = {
         "schema_version": 1, "model_state": agent.model.state_dict(),
         "vocabulary_codes": agent.vocabulary.codes,
+        "vocabulary_card_properties": agent.vocabulary.card_properties,
         "width": agent.model.card.embedding_dim,
         "feature_version": agent.model.feature_version,
         "parent_checkpoint_sha256": parent_checkpoint_sha256,

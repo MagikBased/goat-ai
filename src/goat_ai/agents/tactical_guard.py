@@ -20,6 +20,8 @@ ROYAL_DECREE = 51452091
 SAKURETSU_ARMOR = 56120475
 BLACK_LUSTER_SOLDIER = 504700118
 MYSTICAL_SPACE_TYPHOON = 5318639
+SNATCH_STEAL = 45986603
+SOLEMN_JUDGMENT = 41420027
 
 
 def safe_target_indices(observation: Observation,
@@ -37,6 +39,14 @@ def safe_target_indices(observation: Observation,
     if source.card_code not in (BLACK_LUSTER_SOLDIER, MYSTICAL_SPACE_TYPHOON):
         return indices
     own = observation.viewer
+    if source.card_code == BLACK_LUSTER_SOLDIER and any(
+        card.controller == own and card.zone == "spell_trap"
+        and card.position == "faceup" and card.code == SNATCH_STEAL
+        and card.equipped_to == (own, source.sequence)
+        for card in observation.field
+    ):
+        # A controlled opponent BLS may return when the equip leaves.
+        return indices
     has_enemy_target = any(legal_actions[i].kind == "select_card"
                            and legal_actions[i].parameters.get("controller") != own
                            for i in indices)
@@ -174,6 +184,11 @@ def admissible_action_indices(observation: Observation,
         if (code == ENEMY_CONTROLLER and action.kind in ("activate", "chain")
                 and can_pass and not observation.chain
                 and observation.phase in ("draw", "standby")):
+            continue
+        if (code == SOLEMN_JUDGMENT and action.kind == "chain" and can_pass
+                and observation.chain and observation.chain[-1].card_code == SCAPEGOAT
+                and observation.chain[-1].controller != own
+                and observation.turn_player != own):
             continue
         if (code == TORRENTIAL_TRIBUTE and action.kind == "chain" and can_pass
                 and len(opponent_monsters) <= len(own_monsters)):

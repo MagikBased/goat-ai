@@ -484,6 +484,71 @@ def test_feature_version_twenty_one_relates_choice_to_current_public_type():
         current).shape == (2,)
 
 
+def test_feature_version_twenty_two_uses_printed_flip_and_public_resources():
+    faith, storm, pot, vanilla = 31560081, 19613556, 55144522, 10
+    vocabulary = CardVocabulary(
+        tuple(sorted((faith, storm, pot, vanilla))),
+        tuple(sorted(((faith, 0x200021, 300), (storm, 2, 0),
+                      (pot, 2, 0), (vanilla, 0x21, 1400)))),
+    )
+    choices = (Action("summon", "normal_summon", 0, {"code": faith}),
+               Action("set", "set_monster", 0, {"code": faith}),
+               Action("storm", "activate", 0, {"code": storm}),
+               Action("end", "end_phase", 0))
+    own_set = CardView(0, "spell_trap", "facedown", storm, 0)
+    opponent_set = CardView(1, "spell_trap", "facedown", None, 1)
+    with_spell = replace(view(), hand=(CardView(0, "hand", "hidden", faith, 0),),
+                         field=(own_set, opponent_set),
+                         graveyards=((CardView(0, "graveyard", "faceup", pot, 0),), ()))
+    without_spell = replace(with_spell, graveyards=(
+        (CardView(0, "graveyard", "faceup", vanilla, 0),), ()))
+    old = encode_decision(with_spell, choices, vocabulary, feature_version=21)
+    old_other = encode_decision(without_spell, choices, vocabulary, feature_version=21)
+    new = encode_decision(with_spell, choices, vocabulary, feature_version=22)
+    new_other = encode_decision(without_spell, choices, vocabulary, feature_version=22)
+    assert torch.equal(old.action_numbers, old_other.action_numbers)
+    assert new.action_numbers.shape == (4, 93)
+    assert torch.allclose(new.action_numbers[0, -8:], torch.tensor([
+        1.0, 300 / 8000, 0.2, 0.2, 0.2, 0.0, 0.0, 0.0]))
+    assert torch.equal(new.action_numbers[0, -8:], new.action_numbers[1, -8:])
+    assert new_other.action_numbers[0, -6] == 0
+    assert LegalActionPolicy(vocabulary.size, width=16, feature_version=22)(
+        new).shape == (4,)
+    with pytest.raises(ValueError, match="printed card properties"):
+        encode_decision(with_spell, choices, CardVocabulary(vocabulary.codes),
+                        feature_version=22)
+
+
+def test_feature_version_twenty_two_checkpoint_requires_printed_metadata(tmp_path):
+    vocabulary = CardVocabulary((10,), ((10, 0x200021, 300),))
+    model = LegalActionPolicy(vocabulary.size, width=16, feature_version=22)
+    path = tmp_path / "policy.pt"
+    checkpoint = {"schema_version": 1, "model_state": model.state_dict(),
+                  "vocabulary_codes": vocabulary.codes,
+                  "vocabulary_card_properties": vocabulary.card_properties,
+                  "width": 16, "feature_version": 22}
+    torch.save(checkpoint, path)
+    assert load_policy_agent(path).vocabulary.properties(10) == (0x200021, 300)
+    torch.save({key: value for key, value in checkpoint.items()
+                if key != "vocabulary_card_properties"}, path)
+    with pytest.raises(ValueError, match="lacks printed card properties"):
+        load_policy_agent(path)
+
+
+def test_feature_version_twenty_two_cannot_see_hidden_target_properties():
+    choices = (Action("target", "select_card", 0,
+                      {"controller": 1, "location": 4, "sequence": 0}),
+               Action("pass", "pass", 0))
+    first = CardVocabulary((10, 20), ((10, 2, 0), (20, 0x200021, 300)))
+    changed = CardVocabulary((10, 20), ((10, 2, 0), (20, 2, 0)))
+    hidden = view()  # Opponent's face-down monster has no visible identity.
+    encoded = encode_decision(hidden, choices, first, feature_version=22)
+    other = encode_decision(hidden, choices, changed, feature_version=22)
+    assert torch.equal(encoded.action_cards, other.action_cards)
+    assert torch.equal(encoded.action_numbers, other.action_numbers)
+    assert torch.equal(encoded.state_cards, other.state_cards)
+
+
 def test_feature_version_nine_uses_only_publicly_known_opponent_hand_cards():
     vocabulary = CardVocabulary((10, 20, 30))
     known = replace(view(), known_opponent_hand_cards=(20,))

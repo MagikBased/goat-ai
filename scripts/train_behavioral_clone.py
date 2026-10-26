@@ -108,7 +108,9 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
         raise ValueError("unsupported parent policy checkpoint schema")
     if (parent.get("width") != model.card.embedding_dim
             or parent.get("feature_version", 1) != model.feature_version
-            or tuple(parent.get("vocabulary_codes", ())) != vocabulary.codes):
+            or tuple(parent.get("vocabulary_codes", ())) != vocabulary.codes
+            or tuple(tuple(item) for item in parent.get(
+                "vocabulary_card_properties", ())) != vocabulary.card_properties):
         raise ValueError("parent policy architecture or vocabulary does not match")
     games = parent.get("training_games")
     if not isinstance(games, list) or not games or any(
@@ -147,7 +149,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=1,
                         help="decisions per optimizer update; forward passes remain individual")
     parser.add_argument("--width", type=int, default=64)
-    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 22)),
+    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 23)),
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
@@ -266,7 +268,8 @@ def main() -> None:
                                "verified_decisions": count,
                                "selected_decisions": len(selected)})
     vocabulary = CardVocabulary.from_goat_whitelist(
-        args.native_root / "banlist/GOAT.lflist.conf")
+        args.native_root / "banlist/GOAT.lflist.conf",
+        native_root=args.native_root if args.feature_version >= 22 else None)
     torch.manual_seed(args.seed)
     model = LegalActionPolicy(vocabulary.size, width=args.width,
                               feature_version=args.feature_version)
@@ -347,7 +350,9 @@ def main() -> None:
     inherited_sources = Counter(parent.get("source_decisions", {})) if parent else Counter()
     checkpoint = {
         "schema_version": 1, "model_state": model.state_dict(),
-        "vocabulary_codes": vocabulary.codes, "width": args.width,
+        "vocabulary_codes": vocabulary.codes,
+        "vocabulary_card_properties": vocabulary.card_properties,
+        "width": args.width,
         "feature_version": model.feature_version,
         "trajectory_sha256": inherited_hashes | trajectory_hashes,
         "source_decisions": dict(inherited_sources + sources),

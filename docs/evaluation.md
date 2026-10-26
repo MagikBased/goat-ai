@@ -3771,3 +3771,76 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
   --seed 4000 --seeds 8 --max-decisions 3000 --workers 2 \
   --output artifacts/fv21_four_review_child_vs_parent_4000_4007.json
 ```
+
+## Printed Flip and public resource relation experiment
+
+Opt-in feature version **22** adds eight action inputs from the acting
+player's observation: printed Flip Type, printed ATK, own Graveyard Spell
+count, each side's visible backrow and monster counts, and a selected
+face-up target's current ATK. Printed properties for the **1,685** allowed
+card IDs come from the pinned CDBs and are saved in the checkpoint so
+inference does not depend on querying a live simulator database. Unknown
+opponent cards have no identity-derived feature. Older checkpoints and the
+default feature version retain their previous encodings.
+
+Training used the same eight schema-v24 Tactical v3 demonstrations and
+configuration as the feature-21 reference: **2,459** teacher decisions,
+two epochs, width 32, batch size 16, seed 21. The two epoch losses were
+**0.3108** and **0.2355**. These training losses do not compare playing
+strength. The ignored checkpoint is
+`.cache/goat-ai/fv22_casdaryl_schema24_experiment.pt` (SHA-256
+`4d86762f705913beb4438c3356a9be6bf4ac877a7f8ccb6244ccd63985496d6f`).
+The reviewed replay decisions were absent from its training data. On four
+earlier Faith/Ring decisions, the feature-22 clone ranked the preferred
+alternatives **2nd, 1st,
+2nd, and 4th**, compared with **4th, 2nd, 2nd, and 5th** for the feature-21
+reference. It chose a preferred action at only **one** of the four. The
+ignored scorecard is `artifacts/fv22_four_review_scorecard.json` (SHA-256
+`327e7c39dd0aaf4141be81896317f7e8b981e5f9067213380b9779f8bf85905b`).
+On two newly reviewed Thunder decisions, feature 22 ranked Thunder-before-
+Pot **4th** and taking both search copies **2nd**; feature 21 ranked them
+**3rd** and **2nd**. The additional representation did not fix these choices.
+
+Against the frozen feature-21 reference, feature 22 scored **36–27–1**
+on 64 complete unseen-composition duels at seeds **4100–4107**, both seats
+and deck assignments. Its point score was **57.03%**, paired 95% bootstrap
+interval **47.66%–65.63%**. A second, different unseen-composition schedule
+at seeds **4200–4207** scored **28–34–2** over 64 complete duels, point score
+**45.31%**, interval **33.59%–57.03%**. Across the two schedules the raw
+count was **64–61–3**; no pooled confidence interval was computed. Flip
+Control went **3–13** on the first schedule; Chaos Control and Chaos Turbo
+each went **5–11** on the second. These intervals and deck splits do not
+establish a general improvement, so feature 22 remains experimental and
+feature 21 remains the reference. The ignored reports are
+`artifacts/fv22_vs_fv21_4100_4107.json` (SHA-256
+`1859517839722c28637f867effa46817b97b60ab42a23e1795cdb134dda28c57`)
+and `artifacts/fv22_vs_fv21_4200_4207.json` (SHA-256
+`9a0d36214303aac18fb522e25e2033eb324c59d8173efd4b521655aa658d69c8`).
+The tournament wall times were **65.58** and **95.14** seconds on two
+workers; these are measured run times, not a general throughput claim.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_behavioral_clone.py \
+  replays/tactical_v3_cas_daryl_schema24_2500_2503/*.json \
+  --engine experimental --native-root .cache/goat-ai \
+  --feature-version 22 --epochs 2 --width 32 --batch-size 16 --seed 21 \
+  --output .cache/goat-ai/fv22_casdaryl_schema24_experiment.pt
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv22_casdaryl_schema24_experiment.pt \
+  --opponent-checkpoint .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/flip_control_goatformat_guide.ydk examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 4100 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output artifacts/fv22_vs_fv21_4100_4107.json
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv22_casdaryl_schema24_experiment.pt \
+  --opponent-checkpoint .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk examples/decks/warrior_montague_clash.ydk \
+  --matchup examples/decks/chaos_turbo_riclar_2020.ydk examples/decks/goat_control_lolmarcus_2020.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 4200 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output artifacts/fv22_vs_fv21_4200_4207.json
+```

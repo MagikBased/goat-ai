@@ -149,6 +149,61 @@ def test_shortlist_flags_weak_flip_summon_only_when_set_was_legal():
     assert review_candidates(without_set, weak_flip_attacks=printed) == ()
 
 
+def test_shortlist_flags_thunder_order_empty_search_and_flip_metamorphosis():
+    thunder, pot, faith, metamorphosis = 504700054, 55144522, 31560081, 46411259
+    pot_action = Action("pot", "activate", 0, {"code": pot})
+    thunder_action = Action("thunder", "activate", 0, {"code": thunder})
+    empty = Action("empty", "select_cards", 0)
+    take_two = Action("two", "select_cards", 0,
+                      {"cards": [{"code": thunder}, {"code": thunder}]})
+    search = replace(view(), chain=(ChainLinkView(1, thunder, 0, 2, 0),))
+    tribute = Action("tribute", "select_card", 0, {"code": faith,
+                                                     "controller": 0, "location": 4,
+                                                     "sequence": 0})
+    metamorphosis_view = replace(
+        view(CardView(0, "monster", "faceup", faith, 0,
+                      "attack", 300, 400)),
+        chain=(ChainLinkView(1, metamorphosis, 0, 8, 0),))
+    found = review_candidates(policy(
+        record(view(), pot_action, thunder_action),
+        record(search, empty, take_two),
+        record(metamorphosis_view, tribute)),
+        weak_flip_attacks={faith: 300})
+    assert [(item.viewer_frame, item.category) for item in found] == [
+        (1, "pot_before_available_thunder_dragon"),
+        (2, "thunder_empty_search_with_copies_available"),
+        (3, "metamorphosis_spends_weak_flip_on_empty_enemy_field")]
+    assert found[1].evidence == {"maximum_selectable_copies": 2}
+
+
+def test_opponent_review_keeps_bls_and_solemn_findings_separate():
+    bls, goat, solemn = 504700118, 504700123, 41420027
+    self_target = Action("self", "select_card", 1,
+                         {"code": bls, "controller": 1, "location": 4, "sequence": 0})
+    enemy_target = Action("enemy", "select_card", 1,
+                          {"code": 31560081, "controller": 0,
+                           "location": 4, "sequence": 1})
+    opponent_view = replace(
+        view(CardView(1, "monster", "faceup", bls, 0,
+                      "attack", 3000, 2500),
+             CardView(0, "monster", "faceup", 31560081, 1,
+                      "attack", 300, 400), player=1),
+        chain=(ChainLinkView(1, bls, 1, 4, 0),))
+    goat_view = replace(opponent_view,
+                        chain=(ChainLinkView(1, goat, 0, 8, 0),))
+    solemn_action = Action("solemn", "chain", 1, {"code": solemn})
+    decline = Action("pass", "pass", 1)
+    saved = policy(record(opponent_view, self_target, enemy_target),
+                   record(goat_view, solemn_action, decline))
+    assert review_candidates(saved) == ()
+    findings = review_candidates(saved, review_seat=1)
+    assert [(item.viewer_frame, item.category) for item in findings] == [
+        (1, "bls_targets_itself_with_enemy_option"),
+        (2, "solemn_on_opponent_scapegoat")]
+    with pytest.raises(ValueError, match="review seat"):
+        review_candidates(saved, review_seat=True)
+
+
 def test_shortlist_flags_tribe_type_that_hits_only_own_visible_monsters():
     tribe = 33184167
     own_spellcaster = CardView(0, "monster", "faceup", 101, 0,

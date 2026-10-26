@@ -23,6 +23,10 @@ TRIBE_INFECTING_VIRUS = 33184167
 BLACK_LUSTER_SOLDIER = 504700118
 MYSTICAL_SPACE_TYPHOON = 5318639
 BREAKER_THE_MAGICAL_WARRIOR = 71413901
+POT_OF_GREED = 55144522
+THUNDER_DRAGON = 504700054
+METAMORPHOSIS = 46411259
+SOLEMN_JUDGMENT = 41420027
 
 
 @dataclass(frozen=True)
@@ -49,12 +53,15 @@ def _is_action(action: Action, kind: str, code: int) -> bool:
 def review_candidates(trajectory: Trajectory,
                       card_races: Mapping[int, int] | None = None,
                       weak_flip_attacks: Mapping[int, int] | None = None,
+                      review_seat: int | None = None,
                       ) -> tuple[ReviewCandidate, ...]:
-    """Flag selected actions of the recorded policy seat using only its view.
+    """Flag selected actions of one seat using only that seat's visible view.
 
     Repeated priority passes in the same turn and phase are reported once so
     a reviewer gets a useful shortlist. Callers must verify the source replay
     against its native assets before treating these as replay-backed findings.
+    The default seat is the recorded policy or learner; an explicit other
+    seat supports separate review of the evaluation opponent.
     """
     if trajectory.source not in ("policy_evaluation", "self_play_rl"):
         raise ValueError("review candidates require a policy_evaluation or self_play_rl replay")
@@ -63,6 +70,10 @@ def review_candidates(trajectory: Trajectory,
                         else "demonstrator_seat")
     if type(seat) is not int or seat not in (0, 1):
         raise ValueError("replay must identify its policy seat or learner seat")
+    if review_seat is not None:
+        if type(review_seat) is not int or review_seat not in (0, 1):
+            raise ValueError("review seat must be player 0 or 1")
+        seat = review_seat
     if trajectory.source == "policy_evaluation":
         checkpoint_sha256 = metadata.get("policy_checkpoint_sha256")
         if (not isinstance(checkpoint_sha256, str)
@@ -87,6 +98,27 @@ def review_candidates(trajectory: Trajectory,
                            for a in record.legal_actions)
         selected = record.selected_action
         found: list[tuple[str, dict[str, int]]] = []
+        if (_is_action(selected, "activate", POT_OF_GREED)
+                and any(_is_action(a, "activate", THUNDER_DRAGON)
+                        for a in record.legal_actions)):
+            found.append(("pot_before_available_thunder_dragon", {"thunder_offered": 1}))
+        if (selected.kind == "select_cards" and not selected.parameters.get("cards")
+                and obs.chain and obs.chain[-1].card_code == THUNDER_DRAGON
+                and obs.chain[-1].controller == seat):
+            available = max((sum(card.get("code") == THUNDER_DRAGON
+                                 for card in action.parameters.get("cards", ()))
+                             for action in record.legal_actions
+                             if action.kind == "select_cards"), default=0)
+            if available:
+                found.append(("thunder_empty_search_with_copies_available",
+                              {"maximum_selectable_copies": available}))
+        if (selected.kind == "select_card" and obs.chain
+                and obs.chain[-1].card_code == METAMORPHOSIS
+                and obs.chain[-1].controller == seat
+                and selected.parameters.get("code") in weak_flip_attacks
+                and not enemy_monsters):
+            found.append(("metamorphosis_spends_weak_flip_on_empty_enemy_field",
+                          {"card_code": selected.parameters["code"]}))
         own_other_backrow = own_backrow
         if (_is_action(selected, "activate", HEAVY_STORM)
                 and selected.parameters.get("location") == 8
@@ -113,6 +145,11 @@ def review_candidates(trajectory: Trajectory,
             found.append(("ring_without_visible_enemy_target",
                           {"own_monsters": len(own_monsters),
                            "visible_enemy_monsters": 0}))
+        if (_is_action(selected, "chain", SOLEMN_JUDGMENT) and can_pass
+                and obs.chain and obs.chain[-1].card_code == SCAPEGOAT
+                and obs.chain[-1].controller != seat):
+            found.append(("solemn_on_opponent_scapegoat",
+                          {"own_life_points": obs.life_points[seat]}))
         if (selected.kind == "normal_summon"
                 and (code := selected.parameters.get("code")) in weak_flip_attacks
                 and any(a.kind == "set_monster"

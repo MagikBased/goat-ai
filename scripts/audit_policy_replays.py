@@ -23,6 +23,9 @@ def main() -> None:
     parser.add_argument("--checkpoint", type=Path,
                         help="required for greedy policy replays; optionally checks a sampled replay's parent hash")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
+    parser.add_argument("--include-opponent", action="store_true",
+                        help="also shortlist the evaluation opponent's visible decisions; "
+                             "native replay verified, but agent choices are not reproduced")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     checkpoint_sha256 = sha256_file(args.checkpoint) if args.checkpoint else None
@@ -77,6 +80,21 @@ def main() -> None:
         else:
             raise ValueError(f"{path}: unsupported trajectory source {trajectory.source!r}")
         candidates = review_candidates(trajectory, card_races, weak_flip_attacks)
+        opponent_review = None
+        if args.include_opponent:
+            if trajectory.source != "policy_evaluation":
+                raise ValueError("--include-opponent requires policy_evaluation replays")
+            other_seat = 1 - provenance["policy_seat"]
+            other_candidates = review_candidates(
+                trajectory, card_races, weak_flip_attacks, review_seat=other_seat)
+            opponent_review = {
+                "seat": other_seat,
+                "agent": metadata.get("opponent"),
+                "agent_version": metadata.get("opponent_version"),
+                "choice_verification": "native_replay_only_not_agent_reproduced",
+                "category_counts": category_counts(other_candidates),
+                "candidates": [candidate.to_dict() for candidate in other_candidates],
+            }
         reports.append({
             "trajectory": str(path),
             "trajectory_sha256": sha256_file(path),
@@ -87,6 +105,7 @@ def main() -> None:
             "verified_decisions": verified,
             "category_counts": category_counts(candidates),
             "candidates": [candidate.to_dict() for candidate in candidates],
+            "opponent_review": opponent_review,
         })
     result = {"schema_version": 1, "replays": reports}
     payload = json.dumps(result, indent=2, sort_keys=True) + "\n"

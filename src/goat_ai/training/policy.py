@@ -10,6 +10,7 @@ import torch
 from torch import Tensor, nn
 
 from goat_ai.actions import Action
+from goat_ai.agents.card_metadata import FLIP_MONSTER_TYPE, load_card_properties
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
     safe_target_indices,
@@ -43,8 +44,11 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # Version 20 represents announced monster Types as exact mask bits. Dividing
 # small Type masks by 2**32 made common choices indistinguishable to float32.
 # Version 21 relates an announced Type to current public face-up monster Types.
+# Version 22 adds printed Flip/ATK metadata and public board-resource context
+# for the reviewed Faith, Heavy Storm, and Ring choices. It is opt-in.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
+SPELL_TYPE = 0x2  # TYPE_SPELL in pinned ocgcore constant.lua
 
 
 @dataclass(frozen=True)
@@ -52,15 +56,29 @@ class CardVocabulary:
     """Index 0 is hidden/absent; index 1 is an unknown visible card."""
 
     codes: tuple[int, ...]
+    card_properties: tuple[tuple[int, int, int], ...] = ()  # code, printed Type, ATK
 
     def __post_init__(self) -> None:
         if self.codes != tuple(sorted(set(self.codes))) or any(code <= 0 for code in self.codes):
             raise ValueError("card vocabulary must contain sorted unique positive codes")
+        if (tuple(code for code, _, _ in self.card_properties)
+                != tuple(sorted(set(code for code, _, _ in self.card_properties)))
+                or any(code not in self.codes or card_type < 0
+                       for code, card_type, _ in self.card_properties)):
+            raise ValueError("card properties must be sorted unique vocabulary members")
 
     @classmethod
-    def from_goat_whitelist(cls, path: str | Path) -> "CardVocabulary":
-        return cls(tuple(sorted(code for code, limit in read_goat_whitelist(path).items()
-                                if limit > 0)))
+    def from_goat_whitelist(cls, path: str | Path, *,
+                            native_root: str | Path | None = None) -> "CardVocabulary":
+        codes = tuple(sorted(code for code, limit in read_goat_whitelist(path).items()
+                             if limit > 0))
+        if native_root is None:
+            return cls(codes)
+        properties = load_card_properties(native_root, set(codes))
+        missing = set(codes) - properties.keys()
+        if missing:
+            raise ValueError(f"allowed cards missing pinned printed metadata: {sorted(missing)}")
+        return cls(codes, tuple((code, *properties[code]) for code in codes))
 
     def index(self, code: int | None) -> int:
         if code is None:
@@ -75,6 +93,14 @@ class CardVocabulary:
     @property
     def size(self) -> int:
         return len(self.codes) + 2
+
+    @cached_property
+    def _properties(self) -> dict[int, tuple[int, int]]:
+        return {code: (card_type, attack)
+                for code, card_type, attack in self.card_properties}
+
+    def properties(self, code: int | None) -> tuple[int, int]:
+        return self._properties.get(code, (0, 0))
 
 
 @dataclass(frozen=True)
@@ -110,8 +136,10 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 22):
+    if feature_version not in range(1, 23):
         raise ValueError("unsupported policy feature version")
+    if feature_version >= 22 and not vocabulary.card_properties:
+        raise ValueError("feature version 22 requires pinned printed card properties")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
     known_codes = ({(card.controller, zone_locations[card.zone], card.sequence): card.code
@@ -212,6 +240,15 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                           if card.zone == "monster" and card.controller == own}
     opponent_monsters = tuple(card for card in observation.field
                               if card.zone == "monster" and card.controller == opponent)
+    if feature_version >= 22:
+        own_gy_spells = sum(bool(vocabulary.properties(card.code)[0] & SPELL_TYPE)
+                            for card in observation.graveyards[own])
+        own_backrow = sum(card.zone == "spell_trap" and card.controller == own
+                          for card in observation.field)
+        enemy_backrow = sum(card.zone == "spell_trap" and card.controller == opponent
+                            for card in observation.field)
+        own_monster_count = len(own_field_monsters)
+        enemy_monster_count = len(opponent_monsters)
     kinds = ACTION_KINDS + ZONE_ACTION_KINDS if feature_version >= 4 else ACTION_KINDS
     if feature_version >= 6:
         kinds += ANNOUNCE_ACTION_KINDS
@@ -313,6 +350,23 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
             numeric += (len(enemy_hits) / 5, len(own_hits) / 5,
                         sum(card.attack or 0 for card in enemy_hits) / 8000,
                         sum(card.attack or 0 for card in own_hits) / 8000)
+        if feature_version >= 22:
+            card_type, printed_attack = vocabulary.properties(visible_code(
+                params.get("code"), params.get("controller"),
+                params.get("location"), params.get("sequence")))
+            selected_monster = next((card for card in observation.field
+                                     if action.kind == "select_card"
+                                     and params.get("location") == 0x04
+                                     and card.zone == "monster"
+                                     and card.controller == params.get("controller")
+                                     and card.sequence == params.get("sequence")
+                                     and card.position == "faceup"), None)
+            numeric += (float(bool(card_type & FLIP_MONSTER_TYPE)),
+                        max(0, printed_attack) / 8000,
+                        own_gy_spells / 5, own_backrow / 5, enemy_backrow / 5,
+                        own_monster_count / 5, enemy_monster_count / 5,
+                        (selected_monster.attack or 0) / 8000
+                        if selected_monster is not None else 0.0)
         action_numbers.append(numeric)
     width = max(1, *(len(row) for row in targets))
     padded_targets = [row + [0] * (width - len(row)) for row in targets]
@@ -370,7 +424,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 22):
+        if feature_version not in range(1, 23):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -390,7 +444,8 @@ class LegalActionPolicy(nn.Module):
                         if feature_version == 15 else 42 if feature_version >= 4 else 10)
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
-        action_number_width = (85 if feature_version >= 21 else 81
+        action_number_width = (93 if feature_version >= 22 else 85
+                               if feature_version >= 21 else 81
                                if feature_version >= 20 else 19
                                if feature_version >= 17 else 15
                                if feature_version == 16 else 11

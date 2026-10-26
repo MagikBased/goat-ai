@@ -7,7 +7,8 @@ from typing import ClassVar, Protocol
 from goat_ai.actions import Action
 from goat_ai.observations import CardView, Observation
 
-from .tactical_guard import admissible_action_indices, tribe_race_value
+from .tactical_guard import (admissible_action_indices, safe_target_indices,
+                             tribe_race_value)
 
 
 class Agent(Protocol):
@@ -142,7 +143,7 @@ class CombatFlipHeuristicAgent(CombatHeuristicAgent):
 class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
     """Flip-aware baseline with conservative, visible-board Trap decisions."""
 
-    teacher_version: ClassVar[int] = 4  # public current Type refines Tribe choices
+    teacher_version: ClassVar[int] = 5  # avoid self-targeted BLS/MST when enemy targets exist
     RING: ClassVar[int] = 511000824
     TORRENTIAL: ClassVar[int] = 53582587
     SINISTER: ClassVar[int] = 511000818
@@ -184,8 +185,9 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                 return max(safe, key=lambda action: by_slot[
                     (action.parameters["controller"], action.parameters["sequence"])].attack)
 
-        filtered = [legal_actions[i] for i in admissible_action_indices(
-            observation, legal_actions, self.card_races)]
+        admissible = admissible_action_indices(observation, legal_actions, self.card_races)
+        filtered = [legal_actions[i] for i in safe_target_indices(
+            observation, legal_actions, admissible)]
         return super().select_action(observation, filtered)
 
 
