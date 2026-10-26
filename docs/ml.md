@@ -57,7 +57,9 @@ resolved demonstrator seat for each source game.
 The offline replay viewer lets a reviewer label a displayed decision with
 one of that frame's legal actions. For a checkpoint-attributed policy replay,
 it offers only the policy seat's decisions and exports `policy_review` labels;
-other supported replays export `self_recorded` labels. The downloaded
+sampled `self_play_rl` replays offer only learner-seat decisions and export
+`self_play_review` labels. Other supported replays export `self_recorded`
+labels. The downloaded
 schema-v1 JSON contains the source trajectory SHA-256, reviewer alias,
 authorization, and pairs of zero-based decision and legal-action indexes.
 No observation or hidden card state is added to the label file. The viewer
@@ -98,6 +100,16 @@ uses `source=policy_review_annotation`, separate from human and scripted
 labels. The reviewer is evaluating the saved player-visible state, so these
 are hypotheses about better play, not demonstrated expert decisions. The
 complete source duel is replay-verified before the corrected choices are used.
+
+Sampled self-play corrections use `authorization=self_play_review`, only on
+the recorded learner seat. The trainer records them as
+`source=self_play_review_annotation`, separate from live human play,
+checkpoint policy reviews, and the sampled self-play action itself. The
+source trajectory must be `self_play_rl` with valid matching learner-seat
+metadata; a `self_recorded` annotation for that source is rejected. A
+reviewer's choice remains a retrospective hypothesis until independently
+evaluated. The viewer does not export labels while reviewer-only hidden-card
+reveals are loaded.
 
 For rehearsal, pass `--annotation-for TRAJECTORY=LABELS` for the scripted
 replay and leave ordinary teacher trajectories unannotated. A scripted

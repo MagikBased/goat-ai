@@ -45,7 +45,10 @@ at removal target prompts and at the earlier activation choice; compare it
 with the unchanged policy on held-out decks and seats. Set preference for
 Flip monsters needs the same comparison. Review Scapegoat timing separately
 because an early activation or a pass can both be right in specific board
-states. Do not turn these sampled actions into expert demonstrations.
+states. The offline viewer now exports learner-seat corrections to these
+games as `self_play_review`, which the trainer tracks separately from human
+gameplay and policy-checkpoint reviews. Do not turn the sampled actions
+themselves into expert demonstrations.
 
 ## Extended visible-state shortlist, feature-19 checkpoint
 

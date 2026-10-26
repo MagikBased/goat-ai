@@ -96,6 +96,8 @@ def test_policy_review_can_correct_only_checkpoint_policy_seat(tmp_path):
     assert labels.authorization == "policy_review"
     assert records[0].selected_action == base.decisions[0].legal_actions[1]
     assert records[0].selected_action != base.decisions[0].selected_action
+    with pytest.raises(ValueError, match="review authorization"):
+        read_decision_annotations(annotation_file(tmp_path), "a" * 64, policy)
 
     with pytest.raises(ValueError, match="policy seat"):
         read_decision_annotations(annotation_file(
@@ -110,3 +112,32 @@ def test_policy_review_can_correct_only_checkpoint_policy_seat(tmp_path):
         with pytest.raises(ValueError, match="checkpoint-attributed"):
             read_decision_annotations(annotation_file(
                 tmp_path, authorization="policy_review"), "a" * 64, invalid)
+
+
+def test_self_play_review_cannot_be_misclassified_as_human_or_label_opponent(tmp_path):
+    base = trajectory()
+    opponent_view = replace(base.decisions[0].observation, viewer=1, acting_player=1)
+    opponent_action = Action("opp-pass", "pass", 1)
+    sampled = replace(base, source="self_play_rl",
+                      skill_metadata={"learner_seat": 0, "demonstrator_seat": 0},
+                      decisions=(*base.decisions,
+                                 DecisionRecord(opponent_view, (opponent_action,),
+                                                opponent_action)))
+    labels, records = read_decision_annotations(annotation_file(
+        tmp_path, authorization="self_play_review"), "a" * 64, sampled)
+    assert labels.authorization == "self_play_review"
+    assert records[0].selected_action == base.decisions[0].legal_actions[1]
+    with pytest.raises(ValueError, match="learner seat"):
+        read_decision_annotations(annotation_file(
+            tmp_path, authorization="self_play_review",
+            choices=[{"decision_index": 1, "action_index": 0}]),
+            "a" * 64, sampled)
+    with pytest.raises(ValueError, match="review authorization"):
+        read_decision_annotations(annotation_file(tmp_path), "a" * 64, sampled)
+    for invalid in (base, replace(sampled, skill_metadata={}),
+                    replace(sampled, skill_metadata={"learner_seat": True}),
+                    replace(sampled, skill_metadata={"learner_seat": 0,
+                                                     "demonstrator_seat": 1})):
+        with pytest.raises(ValueError, match="learner-seat self-play"):
+            read_decision_annotations(annotation_file(
+                tmp_path, authorization="self_play_review"), "a" * 64, invalid)

@@ -247,6 +247,13 @@
     let annotations = new Map();
     function annotationAuthorization() {
       if (!replay) return null;
+      if (replay.source === "self_play_rl") {
+        const learner = replay.skill_metadata?.learner_seat;
+        const demonstrator = replay.skill_metadata?.demonstrator_seat;
+        return ((learner === 0 || learner === 1) &&
+                (demonstrator == null || demonstrator === learner))
+          ? "self_play_review" : null;
+      }
       if (replay.source !== "policy_evaluation") return "self_recorded";
       const seat = replay.skill_metadata?.demonstrator_seat;
       const checkpoint = replay.skill_metadata?.policy_checkpoint_sha256;
@@ -257,8 +264,11 @@
     function canAnnotateFrame(observation) {
       const authorization = annotationAuthorization();
       return !reviewerData && authorization && observation &&
-        (authorization !== "policy_review" ||
-         observation.acting_player === replay.skill_metadata.demonstrator_seat);
+        (authorization === "policy_review"
+          ? observation.acting_player === replay.skill_metadata.demonstrator_seat
+          : authorization === "self_play_review"
+            ? observation.acting_player === replay.skill_metadata.learner_seat
+            : true);
     }
     let commonFrames = [];
     let cardFiles = new Map();
@@ -437,11 +447,13 @@
     const replayAgents = data => {
       const meta = data?.skill_metadata || {};
       if (Array.isArray(meta.agents) && meta.agents.length === 2) return meta.agents;
-      const seat = meta.demonstrator_seat;
+      const seat = data.source === "self_play_rl"
+        ? meta.learner_seat : meta.demonstrator_seat;
       if (seat === 0 || seat === 1) {
         const labels = [null, null];
         labels[seat] = data.source === "policy_evaluation"
           ? `Policy${meta.policy_inference?.includes("tactical_guard") ? " + guard" : ""}`
+          : data.source === "self_play_rl" ? "Learner (sampled)"
           : (meta.teacher || "Demonstrator");
         labels[1 - seat] = meta.opponent || "Opponent";
         return labels;

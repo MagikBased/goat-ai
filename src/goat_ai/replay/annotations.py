@@ -29,7 +29,7 @@ def read_decision_annotations(path: str | Path, trajectory_sha256: str,
         raise ValueError("unsupported decision-annotation schema")
     authorization = raw.get("authorization")
     if authorization not in ("self_recorded", "scripted_scenario",
-                             "policy_review"):
+                             "policy_review", "self_play_review"):
         raise ValueError("decision annotations require a supported authorization")
     if (authorization == "scripted_scenario"
             and not trajectory.source.startswith("scripted_")):
@@ -43,6 +43,17 @@ def read_decision_annotations(path: str | Path, trajectory_sha256: str,
                  or not isinstance(checkpoint_sha256, str)
                  or re.fullmatch(r"[0-9a-f]{64}", checkpoint_sha256) is None)):
         raise ValueError("policy_review requires a checkpoint-attributed policy replay")
+    learner_seat = metadata.get("learner_seat")
+    if (authorization == "self_play_review"
+            and (trajectory.source != "self_play_rl"
+                 or type(learner_seat) is not int or learner_seat not in (0, 1)
+                 or (policy_seat is not None
+                     and (type(policy_seat) is not int
+                          or policy_seat != learner_seat)))):
+        raise ValueError("self_play_review requires a learner-seat self-play replay")
+    if authorization == "self_recorded" and trajectory.source in (
+            "self_play_rl", "policy_evaluation"):
+        raise ValueError("agent replay labels require their review authorization")
     if raw.get("source_trajectory_sha256") != trajectory_sha256:
         raise ValueError("annotation source trajectory SHA-256 mismatch")
     reviewer = raw.get("reviewer")
@@ -69,6 +80,9 @@ def read_decision_annotations(path: str | Path, trajectory_sha256: str,
         if (authorization == "policy_review"
                 and record.observation.acting_player != policy_seat):
             raise ValueError("policy_review may label only the policy seat")
+        if (authorization == "self_play_review"
+                and record.observation.acting_player != learner_seat):
+            raise ValueError("self_play_review may label only the learner seat")
         if not 0 <= action_index < len(record.legal_actions):
             raise ValueError("annotation action index is not legal")
         if (authorization == "scripted_scenario"
