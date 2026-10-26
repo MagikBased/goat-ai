@@ -814,6 +814,28 @@ monsters. It records the visible ATK and DEF and leaves switches against any
 opposing monster for human review. This mirrors the narrow position guard v2;
 it is a review candidate rather than proof that every such switch loses value.
 
+On the current pinned native assets, a fresh seed-3901 duel with the same
+feature-v21 checkpoint and Tactical v7 opponent produced 658 verified
+decisions without the guard and 683 with it. The audit reproduced all 339
+unguarded and 345 guarded policy choices. It flagged ten defending Sheep
+Token switches and one empty-field attack-to-weaker-defense switch in the
+unguarded duel, versus zero of either in the guarded duel. Both were won by
+seat 1. The ignored replay SHA-256 values are
+`95b10f034cee7e88a34c4f2b201ba4357379e41ea30f9cc6722c36938cbe09f0`
+and `47f01fe6d19c806839d1860f01bbc34697c65613b977aceba2268fa1e51e5503`,
+respectively; they are local recordings under `.cache/goat-ai/`. This is a
+single-seed behavior check, not a strength estimate. Earlier tracked replays
+use older native asset hashes and remain tied to those assets.
+
+Reproduce either recording with `scripts/record_policy_match.py` using
+`.cache/goat-ai/fv21_casdaryl_schema24_experiment.pt`, `--seed 3901`,
+`--policy-seat 0`, `--opponent tactical`, and the Main Decks
+`examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk` and
+`examples/decks/chaos_turbo_riclar_2020.ydk` as `--deck1` and `--deck2`.
+Add `--position-guard` for the guarded branch. Run
+`scripts/audit_policy_replays.py` on each output with `--checkpoint` set to
+that same checkpoint.
+
 ### Retrospective Sheep Token preference labels
 
 The seed-3901 feature-v21 replay contains 12 policy-seat decisions that move

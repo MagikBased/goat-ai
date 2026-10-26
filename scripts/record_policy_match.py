@@ -42,7 +42,8 @@ def main() -> None:
     parser.add_argument("--self-target-guard", action="store_true",
                         help="avoid observed BLS and MST self-target losses; requires tactical guard")
     parser.add_argument("--position-guard", action="store_true",
-                        help="keep defending Sheep Tokens from switching to 0-ATK attack")
+                        help="filter defending Sheep Token switches and empty-field "
+                             "attack-to-weaker-defense switches")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.max_decisions < 1:
