@@ -4,6 +4,7 @@ These are candidates, not automatic play labels or evidence of a rules error.
 """
 
 import re
+from math import isfinite
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
@@ -209,3 +210,33 @@ def review_candidates(trajectory: Trajectory,
 
 def category_counts(candidates: tuple[ReviewCandidate, ...]) -> dict[str, int]:
     return dict(sorted(Counter(c.category for c in candidates).items()))
+
+
+def sampled_self_play_provenance(trajectory: Trajectory,
+                                 checkpoint_sha256: str | None = None) -> dict:
+    """Validate exploratory learner provenance without claiming choice reproduction.
+
+    A sampled action need not equal its parent's greedy choice. The full duel
+    and visible observations must still be verified by the caller.
+    """
+    if trajectory.source != "self_play_rl":
+        raise ValueError("sampled provenance requires a self_play_rl trajectory")
+    metadata = trajectory.skill_metadata or {}
+    seat = metadata.get("learner_seat")
+    parent = metadata.get("parent_checkpoint_sha256")
+    temperature = metadata.get("learner_temperature")
+    if type(seat) is not int or seat not in (0, 1):
+        raise ValueError("self-play replay must identify learner seat")
+    if not isinstance(parent, str) or re.fullmatch(r"[0-9a-f]{64}", parent) is None:
+        raise ValueError("self-play replay must identify parent checkpoint SHA-256")
+    if checkpoint_sha256 is not None and parent != checkpoint_sha256:
+        raise ValueError("parent checkpoint SHA-256 differs from recording")
+    if metadata.get("learner_action_selection") != "sampled_softmax":
+        raise ValueError("unsupported self-play action selection")
+    if (type(temperature) not in (int, float) or not isfinite(temperature)
+            or temperature <= 0):
+        raise ValueError("self-play replay must record a positive finite temperature")
+    return {"policy_seat": seat, "checkpoint_sha256": parent,
+            "selection_mode": "sampled_softmax", "selection_temperature": temperature,
+            "choice_verification": "not_reproduced_exploratory_sampling",
+            "verified_policy_choices": None}

@@ -679,5 +679,23 @@ The reviewer also replay-verified
 viewer frame 12 / index 11 contains a similar own-only Heavy Storm activation,
 but that learner action was sampled with temperature **2.0**. It must not be
 counted as a greedy feature-21 policy choice. The current
-`scripts/audit_policy_replays.py` accepts `policy_evaluation` trajectories;
-sampled `self_play_rl` review needs a separate provenance-aware audit path.
+`scripts/audit_policy_replays.py` also accepts sampled `self_play_rl`
+trajectories. It verifies the native replay and visibility boundary and
+requires the learner seat, parent checkpoint hash, `sampled_softmax` mode,
+and positive finite temperature. Its output marks sampled choices as
+`not_reproduced_exploratory_sampling`, with `verified_policy_choices: null`.
+Passing `--checkpoint` additionally checks that the named parent weights
+match the recorded hash. Greedy `policy_evaluation` audit still requires
+`--checkpoint` and reproduces every recorded policy choice.
+
+The seed-2882 sampled replay audit verified **986** decisions and flagged
+**one** Heavy Storm candidate. Its ignored report is
+`artifacts/selfplay_episode62_review_audit.json` (SHA-256
+`221bad1a9e1be1e84a3c13cb8c25b9ec67ec0113795f864a7bd469974d3b8a42`).
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/audit_policy_replays.py \
+  replays/selfplay_fourroles_2820_2883/episode_00062_seed_2882.json \
+  --native-root .cache/goat-ai \
+  --output artifacts/selfplay_episode62_review_audit.json
+```

@@ -5,7 +5,8 @@ from dataclasses import replace
 import pytest
 
 from goat_ai.actions import Action
-from goat_ai.evaluation.replay_review import review_candidates
+from goat_ai.evaluation.replay_review import (review_candidates,
+                                              sampled_self_play_provenance)
 from goat_ai.observations import CardView, ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory
 
@@ -31,6 +32,33 @@ def policy(*decisions):
         skill_metadata={"demonstrator_seat": 0,
                         "policy_checkpoint_sha256": "a" * 64},
     )
+
+
+def test_sampled_self_play_provenance_cannot_be_mistaken_for_greedy_choices():
+    sampled = replace(
+        policy(record(view(), Action("pass", "pass", 0))),
+        source="self_play_rl",
+        skill_metadata={"learner_seat": 0,
+                        "parent_checkpoint_sha256": "a" * 64,
+                        "learner_action_selection": "sampled_softmax",
+                        "learner_temperature": 2.0},
+    )
+    provenance = sampled_self_play_provenance(sampled, "a" * 64)
+    assert provenance["selection_mode"] == "sampled_softmax"
+    assert provenance["selection_temperature"] == 2.0
+    assert provenance["choice_verification"] == "not_reproduced_exploratory_sampling"
+    assert provenance["verified_policy_choices"] is None
+    with pytest.raises(ValueError, match="parent checkpoint"):
+        sampled_self_play_provenance(sampled, "b" * 64)
+    for key, bad_value in (("learner_seat", True),
+                           ("parent_checkpoint_sha256", "unknown"),
+                           ("learner_action_selection", "greedy"),
+                           ("learner_temperature", 0),
+                           ("learner_temperature", float("nan"))):
+        corrupted = replace(sampled, skill_metadata={**sampled.skill_metadata,
+                                                     key: bad_value})
+        with pytest.raises(ValueError):
+            sampled_self_play_provenance(corrupted)
 
 
 def test_shortlist_flags_public_waste_and_deduplicates_priority_passes():
