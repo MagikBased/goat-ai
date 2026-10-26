@@ -656,3 +656,28 @@ unchanged parent ranked all four preferred actions below its recorded move.
 A parent-KL child ranked all four first at their training frames, but its
 separate 64-duel held-out comparison scored **31–32–1** versus the frozen
 parent. See [evaluation](evaluation.md); the child is not promoted.
+
+### Independent replay-agent audit of feature-21 policy
+
+An independent read-only audit replay-verified the complete seed-3900,
+seed-3901, and seed-3903 policy games against the pinned native engine. The
+recorded feature-21 policy used greedy action selection; its checkpoint SHA-256
+was `c6cc59780d665edf2c83b143d1b371e9aa05fcfff5ac988edfc48613ccd21011`.
+The reviewer used only the acting player's observation and legal actions.
+
+| Replay | Viewer frame / JSON index | Recorded choice and visible alternative | Improvement hypothesis |
+| --- | ---: | --- | --- |
+| Seed 3900 | 15 / 14 | Normal Summon Magician of Faith at 300 ATK into an empty field; Set the same card was legal. | Score Flip-effect readiness and low-ATK exposure. |
+| Seed 3901 | 663 / 662 and 668 / 667 | Pass on opponent Turn 18 End Phase with Set Scapegoat and no own monsters, then activate that Scapegoat on own Turn 19 Main Phase; opponent had three face-up monsters and activation was legal at the earlier prompt. | Account for turn owner and next-turn summon restriction when valuing Scapegoat timing. |
+| Seed 3903 | 465–466 / 464–465 | Chain Ring of Destruction on opponent Draw Phase and target own 300-ATK Faith while opposing 2300-ATK Chaos Sorcerer was a legal visible target. | Score whether activation is timely and compare target owner, threat, and life-point effects. |
+| Seed 3903 | 925 / 924 | Activate Heavy Storm with only own Set Trap Dustshoot in backrow and no opposing Spell/Trap; Set Storm and End Phase were legal. | Compare own and opposing resources before global removal. |
+
+These are review hypotheses, not universal card rules. For example, sending
+one's own LIGHT monster to the Graveyard can sometimes have follow-up value.
+The reviewer also replay-verified
+`replays/selfplay_fourroles_2820_2883/episode_00062_seed_2882.json`:
+viewer frame 12 / index 11 contains a similar own-only Heavy Storm activation,
+but that learner action was sampled with temperature **2.0**. It must not be
+counted as a greedy feature-21 policy choice. The current
+`scripts/audit_policy_replays.py` accepts `policy_evaluation` trajectories;
+sampled `self_play_rl` review needs a separate provenance-aware audit path.
