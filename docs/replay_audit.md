@@ -861,3 +861,39 @@ TacticalHeuristicAgent v4, and the pinned native assets. The regenerated
 **945-decision** trajectory SHA-256 matched the annotation's source hash.
 Reproducing the annotation requires this historical project revision:
 current TacticalHeuristicAgent v6 deliberately makes different choices.
+
+## Matt versus Chaos, seed 6803: Tactical v7 review
+
+`replays/tactical_v7_matt_vs_chaos_seed6803.json` is a complete, native
+replay-verified duel. Its metadata identifies **Player 2 as Tactical v7** and
+**Player 1 as Combat Heuristic v3**. The viewer's perspective labels are not
+agent identities. The retrospective audit reproduced the v7 teacher choices
+from the recorded player-visible states. Decision indices below are zero-based;
+add one for the viewer frame.
+
+| Decision | Agent | Observed problem | Correction status |
+| ---: | --- | --- | --- |
+| 6 | Tactical v7, P2 | Discarded Snatch Steal to opposing Delinquent Duo with Sinister Serpent also in hand. | v8 chooses the recoverable Serpent. |
+| 42 | Combat v3, P1 | Canceled Thunder Dragon's search when two copies were offered. | v8 selects the maximum offered copies; this does not change Combat v3. |
+| 118 | Combat v3, P1 | Activated BLS's banish effect with no opposing monster, then had only its own BLS as a legal target. | Existing Tactical guard defers the activation; the target prompt alone is too late. |
+| 140 | Tactical v7, P2 | Normal Summoned Sinister Serpent while other Normal Summons, including D.D. Assailant, were legal. | v8 defers Serpent's Normal Summon when another monster can be Normal Summoned. |
+| 167–169 | Combat v3, P1 | Activated Raigeki Break, discarded Heavy Storm, and chose its own set card while an opposing monster was a legal target. | Still needs a general removal and discard value model. |
+| 310 | Tactical v7, P2 | Chained Dust Tornado to Book of Moon. The offered Pass preserved Dust Tornado without stopping Book's one-shot effect. | v8 passes in this specific chain pattern. |
+| 324 | Tactical v7, P2 | Activated Nobleman of Crossout with no opposing face-down monster; the later target prompt offered only its own monster. | v8 defers activation until an opposing face-down monster is visible. |
+
+The reviewed replay also shows Combat v3 Normal Summoning weak Flip monsters,
+using Book of Moon early, and discarding with Raigeki Break. Those are
+remaining baseline errors, not evidence that Tactical v7 made those choices.
+Setting every Spell/Trap is a broader commitment decision: a rule that always
+holds backrow could miss necessary defenses. It needs a measured policy or
+value model with Heavy Storm exposure, immediate threats, and hand size as
+inputs. These fixes encode local, visible card-value checks; they do not yet
+teach general card advantage.
+
+The same-seed v8-versus-v8 trajectory is
+`replays/tactical_v8_matt_vs_chaos_6803/seed_6803_seat_1.json`; its offline
+viewer is `replays/tactical_v8_matt_vs_chaos_seed6803.html` beside the local
+card-image cache. Both seats use Tactical v8, so this is
+the cleaner replay for future human review. `scripts/collect_heuristic_demos.py`
+now accepts `--opponent tactical` to regenerate this pairing. The teacher
+version is recorded so a v7 replay remains reproducible after these changes.

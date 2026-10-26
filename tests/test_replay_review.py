@@ -5,8 +5,7 @@ from dataclasses import replace
 import pytest
 
 from goat_ai.actions import Action
-from goat_ai.evaluation.replay_review import (review_candidates,
-                                              sampled_self_play_provenance)
+from goat_ai.evaluation.replay_review import review_candidates, sampled_self_play_provenance
 from goat_ai.observations import CardView, ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory
 
@@ -132,6 +131,21 @@ def test_shortlist_rejects_non_policy_source_or_missing_seat():
         review_candidates(replace(saved, skill_metadata={}))
     with pytest.raises(ValueError, match="checkpoint SHA-256"):
         review_candidates(replace(saved, skill_metadata={"demonstrator_seat": 0}))
+
+
+def test_shortlist_accepts_versioned_tactical_teacher_source():
+    storm = Action("storm", "activate", 0,
+                   {"code": 19613556, "controller": 0, "location": 8,
+                    "sequence": 1})
+    own_set = CardView(0, "spell_trap", "facedown", 53582587, 0)
+    own_storm = CardView(0, "spell_trap", "facedown", 19613556, 1)
+    tactical = replace(
+        policy(record(view(own_set, own_storm), storm)), source="tactical",
+        skill_metadata={"demonstrator_seat": 0, "teacher": "TacticalHeuristicAgent",
+                        "teacher_version": 7})
+    assert review_candidates(tactical)[0].category == "heavy_storm_only_own_backrow"
+    with pytest.raises(ValueError, match="teacher version"):
+        review_candidates(replace(tactical, skill_metadata={"demonstrator_seat": 0}))
 
 
 def test_shortlist_flags_weak_flip_summon_only_when_set_was_legal():

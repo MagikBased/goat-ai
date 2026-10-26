@@ -22,6 +22,10 @@ BLACK_LUSTER_SOLDIER = 504700118
 MYSTICAL_SPACE_TYPHOON = 5318639
 SNATCH_STEAL = 45986603
 SOLEMN_JUDGMENT = 41420027
+NOBLEMAN_OF_CROSSOUT = 504700116
+DUST_TORNADO = 60082869
+BOOK_OF_MOON = 14087893
+SINISTER_SERPENT = 511000818
 SHEEP_TOKENS = frozenset((73915052, 73915053, 73915054, 73915055))
 
 
@@ -56,12 +60,10 @@ def safe_position_indices(observation: Observation,
         if slot in own_defenders:
             return False
         card = own_monsters.get(slot)
-        if (empty_field_attack_guard and not opponent_monsters and card is not None
-                and card.position == "faceup" and card.orientation == "attack"
-                and card.attack is not None and card.defense is not None
-                and card.attack >= card.defense):
-            return False
-        return True
+        return not (empty_field_attack_guard and not opponent_monsters
+                    and card is not None and card.position == "faceup"
+                    and card.orientation == "attack" and card.attack is not None
+                    and card.defense is not None and card.attack >= card.defense)
 
     kept = tuple(index for index in indices if useful(index))
     return kept or indices
@@ -157,6 +159,7 @@ def weak_flip_set_substitute(observation: Observation,
 def admissible_action_indices(observation: Observation,
                               legal_actions: Sequence[Action],
                               card_races: Mapping[int, int] | None = None,
+                              *, tactical_v8_guards: bool = False,
                               ) -> tuple[int, ...]:
     """Defer clearly wasteful actions while preserving an engine-legal choice.
 
@@ -186,6 +189,11 @@ def admissible_action_indices(observation: Observation,
                            for a in race_actions) if tribe_prompt and race_actions else None)
     tribe_has_target = any(visible_monster_race(c, card_races) is not None
                            for c in opponent_monsters)
+    tribe_has_positive_type = any(
+        tribe_race_value(observation, race, card_races) > 0
+        for race in {visible_monster_race(c, card_races)
+                     for c in opponent_monsters}
+        if race is not None)
     ring_target_prompt = (observation.chain
                           and observation.chain[-1].card_code == RING_OF_DESTRUCTION
                           and observation.chain[-1].controller == own
@@ -222,7 +230,23 @@ def admissible_action_indices(observation: Observation,
             continue
         if (code == TRIBE_INFECTING_VIRUS
                 and action.kind in ("activate", "chain")
-                and have_race_data and not tribe_has_target):
+                and have_race_data and (not tribe_has_target
+                                        or tactical_v8_guards
+                                        and not tribe_has_positive_type)):
+            continue
+        if (tactical_v8_guards and code == NOBLEMAN_OF_CROSSOUT
+                and action.kind in ("activate", "chain")
+                and not any(c.position == "facedown" for c in opponent_monsters)):
+            continue
+        if (tactical_v8_guards and code == DUST_TORNADO
+                and action.kind == "chain" and can_pass and observation.chain
+                and observation.chain[-1].card_code == BOOK_OF_MOON):
+            continue
+        if (tactical_v8_guards and code == SINISTER_SERPENT
+                and action.kind == "normal_summon"
+                and any(other.kind == "normal_summon"
+                        and other.parameters.get("code") != SINISTER_SERPENT
+                        for other in legal_actions)):
             continue
         if (best_race_value is not None and action.kind == "announce_race"
                 and tribe_race_value(observation, action.parameters["race"], card_races)

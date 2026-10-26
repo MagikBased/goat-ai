@@ -4,10 +4,10 @@ These are candidates, not automatic play labels or evidence of a rules error.
 """
 
 import re
-from math import isfinite
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
+from math import isfinite
 
 from goat_ai.actions import Action
 from goat_ai.agents.tactical_guard import visible_monster_race
@@ -63,8 +63,8 @@ def review_candidates(trajectory: Trajectory,
     The default seat is the recorded policy or learner; an explicit other
     seat supports separate review of the evaluation opponent.
     """
-    if trajectory.source not in ("policy_evaluation", "self_play_rl"):
-        raise ValueError("review candidates require a policy_evaluation or self_play_rl replay")
+    if trajectory.source not in ("policy_evaluation", "self_play_rl", "tactical"):
+        raise ValueError("review candidates require a policy_evaluation, self_play_rl, or tactical replay")
     metadata = trajectory.skill_metadata or {}
     seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
                         else "demonstrator_seat")
@@ -79,6 +79,11 @@ def review_candidates(trajectory: Trajectory,
         if (not isinstance(checkpoint_sha256, str)
                 or re.fullmatch(r"[0-9a-f]{64}", checkpoint_sha256) is None):
             raise ValueError("policy replay must identify its checkpoint SHA-256")
+    if trajectory.source == "tactical" and (
+            metadata.get("teacher") != "TacticalHeuristicAgent"
+            or type(metadata.get("teacher_version")) is not int
+            or metadata["teacher_version"] < 1):
+        raise ValueError("tactical replay must identify its teacher version")
     candidates: list[ReviewCandidate] = []
     card_races = card_races or {}
     weak_flip_attacks = weak_flip_attacks or {}

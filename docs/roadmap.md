@@ -779,3 +779,14 @@ the mean and sum children split 32–32; the mean child scored 33–30–1 again
 its parent, with a severe assigned-deck split. No self-play gain is established.
 Keep the legacy reduction as default while testing stronger credit assignment
 and larger independent training sets; see [evaluation](evaluation.md).
+
+The seed-6803 Matt/Chaos replay audit identified concrete card-value mistakes
+and clarified that only Player 2 used Tactical v7; Player 1 used Combat
+Heuristic v3. Tactical v8 now corrects several local choices and can be
+recorded against itself with `--opponent tactical`. Direct v8-versus-v7
+results were 38–25–1 on Matt/Chaos and 40–24 on four different pairings.
+The next milestone is a general, visible-state card-advantage model covering
+discard costs, removal targets, and backrow commitment. Compare each change
+against unchanged v8 across unseen deck compositions and audit fresh replays
+for new waste patterns before promoting it to training data. See
+[replay audit](replay_audit.md) and [evaluation](evaluation.md).

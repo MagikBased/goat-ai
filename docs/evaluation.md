@@ -4570,3 +4570,36 @@ against the other and against the unchanged parent using
 `scripts/evaluate_policy.py --engine experimental --both-deck-assignments
 --require-unseen-main-decks --workers 4 --max-decisions 5000` and the stated
 held-out matchups and seeds.
+
+## Tactical heuristic v8 against v7
+
+After the seed-6803 replay audit, Tactical v8 added player-visible guards for
+the Delinquent Duo discard, Thunder Dragon search, Sinister Serpent Normal
+Summon, Nobleman activation, Dust Tornado response to Book of Moon, and
+Tribe-Infecting Virus activation when every visible Type trade loses value.
+These are baseline heuristics, not a trained neural checkpoint.
+
+A direct experimental-adapter tournament on Matt Peddle Goat Control versus
+Riclar Chaos Turbo, seeds 7700–7715, both seats and both deck assignments,
+gave v8 **38 wins, 25 losses, and 1 draw** against v7 in 64 duels. The recorded
+paired-bootstrap score-rate interval was **52.3%–68.8%**. A separate 64-duel
+four-matchup schedule using seeds 7700–7703 gave v8 **40–24**; the matchups
+were Cas/Daryl, Matt/Chaos Turbo, Jesse/Michael, and Chaos Control/Warrior.
+The same four-matchup schedule previously yielded **32–32** for v7 versus v7,
+and an earlier v8 version containing only the Tribe guard also scored **32–32**
+versus v7. Thus the new bundle changed outcomes, but these samples do not
+identify which change helps most or establish broad competitive strength.
+Both tournaments used four native worker processes and the pinned local
+assets. The reports are under `.cache/goat-ai/tactical_v8_vs_v7_*` and are
+ignored by Git.
+
+The Matt/Chaos tournament can be reproduced with:
+
+```bash
+.venv/bin/python scripts/evaluate_native.py --engine experimental \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+            examples/decks/chaos_turbo_riclar_2020.ydk \
+  --both-deck-assignments --agent-a tactical --agent-b tactical_v7 \
+  --seed 7700 --seeds 16 --workers 4 \
+  --output .cache/goat-ai/tactical_v8_vs_v7_matt_chaos_7700_7715.json
+```

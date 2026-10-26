@@ -7,9 +7,12 @@ from typing import ClassVar, Protocol
 from goat_ai.actions import Action
 from goat_ai.observations import CardView, Observation
 
-from .tactical_guard import (admissible_action_indices, safe_position_indices,
-                             safe_target_indices,
-                             tribe_race_value)
+from .tactical_guard import (
+    admissible_action_indices,
+    safe_position_indices,
+    safe_target_indices,
+    tribe_race_value,
+)
 
 
 class Agent(Protocol):
@@ -144,16 +147,18 @@ class CombatFlipHeuristicAgent(CombatHeuristicAgent):
 class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
     """Flip-aware baseline with conservative, visible-board Trap decisions."""
 
-    teacher_version: ClassVar[int] = 7  # avoid empty-field attack/defense oscillation
+    teacher_version: ClassVar[int] = 8  # conservative visible card-advantage choices
     RING: ClassVar[int] = 511000824
     TORRENTIAL: ClassVar[int] = 53582587
     SINISTER: ClassVar[int] = 511000818
     TRIBE: ClassVar[int] = 33184167
 
     def __init__(self, flip_monster_codes: Collection[int] = (),
-                 card_races: Mapping[int, int] | None = None) -> None:
+                 card_races: Mapping[int, int] | None = None,
+                 *, v8_guards: bool = True) -> None:
         super().__init__(flip_monster_codes)
         self.card_races = dict(card_races or {})
+        self.v8_guards = v8_guards
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
@@ -162,6 +167,33 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                     and action.parameters.get("code") == self.SINISTER), None)
         if yes is not None:
             return yes
+
+        if self.v8_guards and observation.chain:
+            source = observation.chain[-1]
+            if (source.card_code == 44763025 and source.controller != observation.viewer
+                    and legal_actions[0].kind == "select_card"):
+                serpent = next((action for action in legal_actions
+                                if action.parameters.get("code") == self.SINISTER
+                                and action.parameters.get("controller") == observation.viewer
+                                and action.parameters.get("location") == 2), None)
+                if serpent is not None:
+                    return serpent
+            if (source.card_code == 504700054
+                    and source.controller == observation.viewer):
+                searches = [action for action in legal_actions
+                            if action.kind == "select_cards"]
+                if searches:
+                    return max(searches, key=lambda action: sum(
+                        card.get("code") == 504700054
+                        for card in action.parameters.get("cards", ())))
+            if (source.card_code == 504700116
+                    and source.controller == observation.viewer
+                    and legal_actions[0].kind == "select_card"):
+                enemy = next((action for action in legal_actions
+                              if action.parameters.get("controller") != observation.viewer
+                              and action.parameters.get("location") == 4), None)
+                if enemy is not None:
+                    return enemy
 
         monsters = [card for card in observation.field if card.zone == "monster"]
         opposing = [card for card in monsters if card.controller != observation.viewer]
@@ -186,7 +218,9 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                 return max(safe, key=lambda action: by_slot[
                     (action.parameters["controller"], action.parameters["sequence"])].attack)
 
-        admissible = admissible_action_indices(observation, legal_actions, self.card_races)
+        admissible = admissible_action_indices(
+            observation, legal_actions, self.card_races,
+            tactical_v8_guards=self.v8_guards)
         targets = safe_target_indices(observation, legal_actions, admissible)
         filtered = [legal_actions[i] for i in safe_position_indices(
             observation, legal_actions, targets)]

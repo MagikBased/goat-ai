@@ -85,10 +85,11 @@ def agent_factory(name: str, native_root: Path):
     if name == "combat_flip":
         return partial(make_combat_flip,
                        flip_monster_codes=flip_monster_codes(native_root))
-    if name == "tactical":
+    if name in ("tactical", "tactical_v7"):
         return partial(make_tactical,
                        flip_monster_codes=flip_monster_codes(native_root),
-                       card_races=load_card_races(native_root))
+                       card_races=load_card_races(native_root),
+                       v8_guards=name != "tactical_v7")
     if name == "flip_heuristic":
         return partial(make_flip_heuristic,
                        flip_monster_codes=flip_monster_codes(native_root))
@@ -112,8 +113,10 @@ def make_flip_heuristic(_seed: int, *, flip_monster_codes: frozenset[int]) -> He
 
 
 def make_tactical(_seed: int, *, flip_monster_codes: frozenset[int],
-                  card_races: dict[int, int]) -> TacticalHeuristicAgent:
-    return TacticalHeuristicAgent(flip_monster_codes, card_races)
+                  card_races: dict[int, int],
+                  v8_guards: bool = True) -> TacticalHeuristicAgent:
+    return TacticalHeuristicAgent(flip_monster_codes, card_races,
+                                  v8_guards=v8_guards)
 
 
 def main() -> None:
@@ -131,10 +134,12 @@ def main() -> None:
     parser.add_argument("--both-deck-assignments", action="store_true",
                         help="evaluate each deck pair with either agent assigned either deck")
     parser.add_argument("--agent-a", choices=("random", "heuristic", "combat_heuristic",
-                                              "combat_flip", "flip_heuristic", "tactical"),
+                                              "combat_flip", "flip_heuristic", "tactical",
+                                              "tactical_v7"),
                         default="random")
     parser.add_argument("--agent-b", choices=("random", "heuristic", "combat_heuristic",
-                                              "combat_flip", "flip_heuristic", "tactical"),
+                                              "combat_flip", "flip_heuristic", "tactical",
+                                              "tactical_v7"),
                         default="random")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--seeds", type=int, default=2)
@@ -182,6 +187,7 @@ def main() -> None:
         "agent_a": args.agent_a, "agent_b": args.agent_b,
         "agent_a_version": (TacticalHeuristicAgent.teacher_version
                             if args.agent_a == "tactical"
+                            else 7 if args.agent_a == "tactical_v7"
                             else CombatHeuristicAgent.teacher_version
                             if args.agent_a == "combat_heuristic"
                             else CombatFlipHeuristicAgent.teacher_version
@@ -190,6 +196,7 @@ def main() -> None:
                             if args.agent_a in ("heuristic", "flip_heuristic") else 1),
         "agent_b_version": (TacticalHeuristicAgent.teacher_version
                             if args.agent_b == "tactical"
+                            else 7 if args.agent_b == "tactical_v7"
                             else CombatHeuristicAgent.teacher_version
                             if args.agent_b == "combat_heuristic"
                             else CombatFlipHeuristicAgent.teacher_version

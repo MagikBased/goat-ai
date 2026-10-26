@@ -6,8 +6,8 @@ from goat_ai.actions import Action
 from goat_ai.agents import TacticalHeuristicAgent
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
-    safe_target_indices,
     safe_position_indices,
+    safe_target_indices,
     weak_flip_set_substitute,
 )
 from goat_ai.observations import CardView, ChainLinkView, Observation
@@ -155,6 +155,92 @@ def test_tribe_requires_visible_enemy_and_names_the_best_race():
     observed = board(own, own, weak_enemy, strong_enemy, chain=chain)
     assert tuple(options[i] for i in admissible_action_indices(
         observed, options, races)) == (options[2],)
+
+
+def test_v8_tribe_defers_discard_when_all_visible_type_trades_lose():
+    tribe = 33184167
+    enemy = CardView(1, "monster", "faceup", 25262697, 0,
+                     "attack", 2000, 2000, race=2)
+    own_a = CardView(0, "monster", "faceup", 504700102, 0,
+                     "attack", 0, 0, race=2)
+    own_b = CardView(0, "monster", "faceup", 504700044, 1,
+                     "attack", 1700, 2500, race=2)
+    own_tribe = CardView(0, "monster", "faceup", tribe, 2,
+                         "attack", 1600, 1000, race=64)
+    activate = Action("tribe", "activate", 0, {"code": tribe})
+    end = Action("end", "end_phase", 0)
+    actions = (activate, end)
+    snapshot = board(enemy, own_a, own_b, own_tribe)
+    assert admissible_action_indices(snapshot, actions) == (0, 1)
+    assert admissible_action_indices(snapshot, actions,
+                                     tactical_v8_guards=True) == (1,)
+    assert TacticalHeuristicAgent().select_action(snapshot, actions) == end
+    assert TacticalHeuristicAgent(v8_guards=False).select_action(
+        snapshot, actions) == activate
+    profitable = board(enemy, replace(enemy, sequence=1), own_a, own_tribe)
+    assert admissible_action_indices(profitable, actions,
+                                     tactical_v8_guards=True) == (0, 1)
+
+
+def test_v8_prefers_recoverable_serpent_for_duo_discard():
+    chain = (ChainLinkView(1, 44763025, 1, 8, 0),)
+    snatch = Action("snatch", "select_card", 0,
+                    {"code": 45986603, "controller": 0, "location": 2})
+    serpent = Action("serpent", "select_card", 0,
+                      {"code": 511000818, "controller": 0, "location": 2})
+    snapshot = board(chain=chain)
+    assert TacticalHeuristicAgent().select_action(snapshot, (snatch, serpent)) == serpent
+    assert TacticalHeuristicAgent(v8_guards=False).select_action(
+        snapshot, (snatch, serpent)) == snatch
+
+
+def test_v8_thunder_search_takes_available_copies():
+    chain = (ChainLinkView(1, 504700054, 0, 2, 0),)
+    cancel = Action("cancel", "cancel", 0)
+    empty = Action("empty", "select_cards", 0)
+    two = Action("two", "select_cards", 0,
+                 {"cards": [{"code": 504700054}, {"code": 504700054}]})
+    snapshot = board(chain=chain)
+    assert TacticalHeuristicAgent().select_action(snapshot, (cancel, empty, two)) == two
+    assert TacticalHeuristicAgent(v8_guards=False).select_action(
+        snapshot, (cancel, empty, two)) == cancel
+
+
+def test_v8_nobleman_defers_own_only_target_and_prefers_enemy_slot():
+    nobleman = 504700116
+    own_set = CardView(0, "monster", "facedown", 511000818, 0, "defense")
+    enemy_set = CardView(1, "monster", "facedown", None, 1, "defense")
+    activate = Action("nobleman", "activate", 0, {"code": nobleman})
+    end = Action("end", "end_phase", 0)
+    assert TacticalHeuristicAgent().select_action(
+        board(own_set), (activate, end)) == end
+    assert TacticalHeuristicAgent(v8_guards=False).select_action(
+        board(own_set), (activate, end)) == activate
+    own = Action("own", "select_card", 0,
+                 {"controller": 0, "location": 4, "sequence": 0})
+    enemy = Action("enemy", "select_card", 0,
+                   {"controller": 1, "location": 4, "sequence": 1})
+    snapshot = board(own_set, enemy_set,
+                     chain=(ChainLinkView(1, nobleman, 0, 8, 0),))
+    assert TacticalHeuristicAgent().select_action(snapshot, (own, enemy)) == enemy
+
+
+def test_v8_defers_dust_tornado_chain_to_book_of_moon():
+    dust = Action("dust", "chain", 0, {"code": 60082869})
+    decline = Action("decline", "pass", 0)
+    snapshot = board(chain=(ChainLinkView(1, 14087893, 1, 8, 0),))
+    assert TacticalHeuristicAgent().select_action(snapshot, (dust, decline)) == decline
+    assert TacticalHeuristicAgent(v8_guards=False).select_action(
+        snapshot, (dust, decline)) == dust
+
+
+def test_v8_saves_serpent_normal_summon_when_another_monster_is_available():
+    serpent = Action("serpent", "normal_summon", 0, {"code": 511000818})
+    assailant = Action("assailant", "normal_summon", 0, {"code": 70074904})
+    actions = (serpent, assailant)
+    assert TacticalHeuristicAgent().select_action(board(), actions) == assailant
+    assert TacticalHeuristicAgent(v8_guards=False).select_action(
+        board(), actions) == serpent
 
 
 def test_tribe_uses_current_public_type_after_a_field_type_change():

@@ -4,11 +4,14 @@ import argparse
 import json
 from pathlib import Path
 
-from goat_ai.agents import load_card_races
+from goat_ai.agents import TacticalHeuristicAgent, load_card_races, load_flip_monster_codes
 from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
-from goat_ai.evaluation.replay_review import (category_counts, review_candidates,
-                                              sampled_self_play_provenance)
+from goat_ai.evaluation.replay_review import (
+    category_counts,
+    review_candidates,
+    sampled_self_play_provenance,
+)
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
@@ -19,7 +22,7 @@ from goat_ai.training.policy import POLICY_INFERENCE_VERSION
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("replays", nargs="+", type=Path,
-                        help="complete policy_evaluation or sampled self_play_rl trajectories")
+                        help="complete policy_evaluation, sampled self_play_rl, or tactical trajectories")
     parser.add_argument("--checkpoint", type=Path,
                         help="required for greedy policy replays; optionally checks a sampled replay's parent hash")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
@@ -81,6 +84,32 @@ def main() -> None:
                           "selection_temperature": None,
                           "choice_verification": "reproduced_greedy",
                           "verified_policy_choices": policy_choices}
+        elif trajectory.source == "tactical":
+            metadata = trajectory.skill_metadata or {}
+            version = metadata.get("teacher_version")
+            if (metadata.get("teacher") != "TacticalHeuristicAgent"
+                    or type(version) is not int or version not in (7, 8)):
+                raise ValueError(f"{path}: unsupported tactical teacher version")
+            teacher_seat = metadata.get("demonstrator_seat")
+            if type(teacher_seat) is not int or teacher_seat not in (0, 1):
+                raise ValueError(f"{path}: tactical replay lacks a valid teacher seat")
+            teacher = TacticalHeuristicAgent(load_flip_monster_codes(args.native_root),
+                                             card_races,
+                                             v8_guards=version >= 8)
+            teacher_choices = 0
+            for index, decision in enumerate(trajectory.decisions):
+                if decision.observation.acting_player != teacher_seat:
+                    continue
+                chosen = teacher.select_action(decision.observation,
+                                               decision.legal_actions)
+                if chosen != decision.selected_action:
+                    raise ValueError(f"{path}: tactical choice differs at decision {index}")
+                teacher_choices += 1
+            provenance = {"teacher_seat": teacher_seat,
+                          "teacher": metadata["teacher"],
+                          "teacher_version": metadata["teacher_version"],
+                          "choice_verification": "reproduced_tactical_teacher",
+                          "verified_teacher_choices": teacher_choices}
         else:
             raise ValueError(f"{path}: unsupported trajectory source {trajectory.source!r}")
         candidates = review_candidates(trajectory, card_races, weak_flip_attacks)

@@ -28,7 +28,7 @@ def main() -> None:
                                               "combat_flip", "tactical"),
                         default="heuristic")
     parser.add_argument("--opponent", choices=("random", "heuristic",
-                                               "combat_heuristic"), default="random")
+                                               "combat_heuristic", "tactical"), default="random")
     parser.add_argument("--deck-a", type=Path)
     parser.add_argument("--deck-b", type=Path)
     parser.add_argument("--seed", type=int, default=1000)
@@ -48,8 +48,10 @@ def main() -> None:
                     "combat_flip": CombatFlipHeuristicAgent,
                     "tactical": TacticalHeuristicAgent}[args.teacher]
     flip_codes = (load_flip_monster_codes(args.native_root)
-                  if args.teacher in ("combat_flip", "tactical") else frozenset())
-    card_races = load_card_races(args.native_root) if args.teacher == "tactical" else {}
+                  if args.teacher in ("combat_flip", "tactical")
+                  or args.opponent == "tactical" else frozenset())
+    card_races = (load_card_races(args.native_root)
+                  if args.teacher == "tactical" or args.opponent == "tactical" else {})
     args.output_dir.mkdir(parents=True, exist_ok=True)
     games = []
     for seed in range(args.seed, args.seed + args.seeds):
@@ -60,10 +62,12 @@ def main() -> None:
                 observation = env.reset()
                 teacher = (TacticalHeuristicAgent(flip_codes, card_races)
                            if args.teacher == "tactical" else teacher_type(flip_codes))
-                opponent = (RandomAgent(seed) if args.opponent == "random" else {
-                    "heuristic": HeuristicAgent,
-                    "combat_heuristic": CombatHeuristicAgent,
-                }[args.opponent]())
+                opponent = (RandomAgent(seed) if args.opponent == "random" else
+                            TacticalHeuristicAgent(flip_codes, card_races)
+                            if args.opponent == "tactical" else {
+                                "heuristic": HeuristicAgent,
+                                "combat_heuristic": CombatHeuristicAgent,
+                            }[args.opponent]())
                 agents = (teacher if teacher_seat == 0 else opponent,
                           teacher if teacher_seat == 1 else opponent)
                 for _ in range(args.max_decisions):
