@@ -3917,3 +3917,111 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
   --seed 4400 --seeds 8 --max-decisions 3000 --workers 2 \
   --output artifacts/fv23_vs_fv21_4400_4407.json
 ```
+
+## Sheep Token replay-preference pilot
+
+A 12-decision retrospective annotation of the feature-21 seed-3901 replay
+compares legal alternatives that preserve defending 0-ATK Sheep Tokens with
+all legal changes of those tokens into attack. It is bound to the exact
+replay hash and is an action preference, not a human gameplay recording.
+`scripts/train_review_preferences.py` independently replay-verified and
+visibility-audited the full source duel, then fit a width-32 feature-21 child
+of the frozen reference with 150 pairwise parent-KL steps, 64 sampled
+preservation states from four parent demonstration games, seed 23, learning
+rate 0.0001, and KL weight 1.0. Preference loss moved from **1.23937** to
+**0.08782**; the final sampled preservation KL was **0.04563**. On the 12
+*training* decision states, the unchanged parent chose a disfavored token
+switch at 12/12, while the child chose one at 0/12. This is evidence of fit
+on the annotated replay, not generalization or stronger play. The ignored
+checkpoint is `.cache/goat-ai/fv21_sheep_preference_3901_child.pt`; the
+annotation is tracked under `examples/preferences/`.
+
+The first planned tournament was correctly rejected by
+`--require-unseen-main-decks` because its Matt Peddle Goat Control and Chaos
+Turbo decks also appear in the preference replay. The held-out evaluation
+uses Flip Control, Chaos Return, Chaos Control, and Warrior Main Decks instead.
+
+The preference child scored **41–23** against its frozen parent on seeds
+4500–4507 and **35–25–4** on fresh seeds 4600–4607, each a 64-duel,
+seat-swapped, both-deck-assignment schedule on the four unseen Main Decks.
+The paired-bootstrap 95% score intervals were **53.13%–75.00%** and
+**46.09%–68.75%**, respectively. Pooling all 128 games gives **76–48–4**
+(60.94% score; paired-bootstrap interval **52.73%–68.75%**), but these are
+two schedules of the same deck families, not independent archetype coverage.
+The pooled splits are **25–6–1 Chaos Return**, **25–7 Warrior**,
+**14–17–1 Chaos Control**, and **12–18–2 Flip Control**. The favorable
+aggregate is not a uniform cross-deck gain. Both tournaments terminated
+within the decision cap (maximum 1,611 and 1,674 decisions); their two-worker
+wall times were **78.98 s** and **71.91 s**. Ignored reports are
+`artifacts/fv21_sheep_pref_vs_parent_4500_4507.json` and
+`artifacts/fv21_sheep_pref_vs_parent_4600_4607.json`.
+
+A read-only audit of three other old feature-21 replay state sequences found
+**28 changed choices** across **319** multi-option policy decisions. Some
+changes were into Battle Phase, and some chose `cancel` at card-selection
+prompts. Three evaluation Main Decks contain no Scapegoat (Flip Control, Chaos
+Return, and Warrior); Chaos Control has two copies, so the match result
+cannot be attributed specifically to better Sheep Token defense. Parent-KL
+regularization limited but did not localize the update. A matched comparison
+against TacticalHeuristicAgent is needed before considering any checkpoint
+promotion.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_review_preferences.py \
+  .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --case replays/fv21_review_scan_3900_3903/seed_3901_seat_0.json examples/preferences/feature21_sheep_token_defense_3901_p0.preference.json \
+  --preserve-trajectory replays/tactical_v3_cas_daryl_schema24_2500_2503/seed_2500_seat_0.json \
+  --preserve-trajectory replays/tactical_v3_cas_daryl_schema24_2500_2503/seed_2500_seat_1.json \
+  --preserve-trajectory replays/tactical_v3_cas_daryl_schema24_2500_2503/seed_2501_seat_0.json \
+  --preserve-trajectory replays/tactical_v3_cas_daryl_schema24_2500_2503/seed_2501_seat_1.json \
+  --steps 150 --preserve-per-trajectory 16 --preserve-batch 16 \
+  --parent-kl-weight 1.0 --learning-rate 0.0001 --seed 23 \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/fv21_sheep_preference_3901_child.pt
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv21_sheep_preference_3901_child.pt \
+  --opponent-checkpoint .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/flip_control_goatformat_guide.ydk examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk examples/decks/warrior_montague_clash.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 4500 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output artifacts/fv21_sheep_pref_vs_parent_4500_4507.json
+# Repeat with --seed 4600 and the matching output path.
+```
+
+On a third held-out schedule, seeds 4700–4707 and the same four deck
+compositions, the preference child scored **18–46** against
+TacticalHeuristicAgent v6. The unchanged parent scored **15–47–2** against
+that same opponent and game schedule. Their matched score difference was
+**+3.13 percentage points**, with a paired-bootstrap 95% interval of
+**−9.38 to +13.28 points**. The child's absolute score was **28.13%**
+(paired interval **18.75%–35.94%**); it went **0–16** with Chaos Control.
+All 128 baseline games terminated below 3,000 decisions. The two local
+wall times were **36.92 s** and **35.64 s** on two workers. The ignored
+reports are `artifacts/fv21_sheep_pref_vs_tactical_4700_4707.json` and
+`artifacts/fv21_parent_vs_tactical_4700_4707.json`. Despite the favorable
+child-versus-parent aggregate, this does not meet M4's absolute baseline
+strength or cross-deck gate. Keep the child experimental.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv21_sheep_preference_3901_child.pt \
+  --opponent tactical --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/flip_control_goatformat_guide.ydk examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk examples/decks/warrior_montague_clash.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 4700 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output artifacts/fv21_sheep_pref_vs_tactical_4700_4707.json
+# Repeat with the parent checkpoint and matching parent report path.
+```
+
+For artifact identity, the child checkpoint SHA-256 is
+`3c3040d0fd353f0289f68c54188a3f514d718d7d0424b388119879e764369a2c`.
+The four report hashes in order (seeds 4500, 4600, child versus Tactical,
+parent versus Tactical) are
+`4e060a586d4c41305a56e7883ce998028615e0619e509f672040511042d14cbe`,
+`1c91f924b4b60b8c757e68f7103cccaec4c49dfc19555001c8158e898e5f546f`,
+`28ba40c736321ce59bbd363ae74ed94a163f382814ae0fe0853316aca255f10c`,
+and
+`fc1f4ec8521d0f3d37be494bdbca1664bc3dc162762cbb8b444565621dea7516`.

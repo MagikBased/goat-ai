@@ -656,3 +656,12 @@ The first action-conditioned position representation (feature v23) reduced
 splits. Do not promote it on this evidence. Collect independent position
 labels across several decks and compare both decision quality and match
 results before changing the default checkpoint.
+
+A 12-choice Sheep Token preference child fit the reviewed replay and beat its
+unchanged policy parent 76–48–4 across two held-out 64-duel schedules, but
+its gains were concentrated in Chaos Return and Warrior. Against Tactical
+v6 it scored 18–46, only +3.13 percentage points over its parent on a
+matched schedule, with an interval crossing zero. It remains experimental;
+M4 still needs a policy with measured strength across audited deck families
+and a demonstrated self-play gain. The next training-data priority is
+independent, high-quality tactical decisions beyond a single replay and card.
