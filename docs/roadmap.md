@@ -149,6 +149,13 @@ A paired Creature Swap / Scapegoat fixture now tests a common Goat Control Token
 
 A pre-errata Sinister Serpent fixture now checks two returns within one Standby Phase, separated by Raigeki Break discarding Serpent as its cost. The hidden Trap target and opponent's known-hand update are checked in a full replay-verified duel. See [GOAT rules](goat_rules.md).
 
+A paired Metamorphosis fixture now confirms that Raigeki Break can discard a
+card and destroy the activated Normal Spell without stopping its Fusion
+Summon, matching the previously tested Mystical Space Typhoon response. Both
+response and pass branches finish, replay-verify, and pass visibility checks;
+see [GOAT rules](goat_rules.md). This supports the user's resource-preservation
+review without making the heuristic a rules engine.
+
 A Morphing Jar / pre-errata Night Assailant fixture now checks two discard triggers after both players draw their replacement hands, including the opponent-only reveals of the two recovered cards. Its complete duel replay-verifies; see [GOAT rules](goat_rules.md).
 
 Paired Morphing Jar / Solemn Judgment fixtures verify that Solemn can negate Jar's Flip Summon before either hand is reset, while passing allows Jar's discard and five-card draws. Both full duels replay-verify; see [GOAT rules](goat_rules.md).
