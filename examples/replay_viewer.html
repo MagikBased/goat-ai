@@ -31,38 +31,49 @@
     label { display: inline-flex; align-items: center; gap: 5px; }
     .panel { background: #172731; border: 1px solid #36535e; border-radius: 10px; padding: 12px; margin: 0 0 10px; }
     .summary { justify-content: space-between; }
-    .board { margin: 0; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 10px; background: radial-gradient(circle at 50% 50%, #153d42 0%, #102b35 45%, #101b2a 100%); border-color: #537884; }
+    .board { margin: 0; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 10px; background: radial-gradient(circle at 50% 50%, #17424eaa 0%, transparent 55%), repeating-linear-gradient(24deg, transparent 0 54px, #3477773a 55px 57px, transparent 58px 108px), repeating-linear-gradient(-24deg, transparent 0 66px, #33767629 67px 68px, transparent 69px 132px), #071520; border-color: #537884; }
     .duel-side { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
-    .player-header { flex: 0 0 auto; justify-content: space-between; padding: 2px 5px; }
+    .player-header { flex: 0 0 auto; justify-content: space-between; padding: 2px 5px; background: #071924b8; border-radius: 8px; }
     .player-header strong { font-size: 1rem; }
     .player-header .zone-counts { font-size: .78rem; }
-    .life { font-size: 1.1rem; font-weight: 700; color: #fff0b1; }
-    .zone-line { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 10%); gap: 6px; }
+    .life { min-width: 92px; padding: 3px 9px; border: 2px solid #e4ca70; border-radius: 20px; background: linear-gradient(90deg, #b43843, #d6a233); text-align: center; font-size: 1.1rem; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000; }
+    .opponent .life { background: linear-gradient(90deg, #006c65, #3179d9); }
+    .zone-line { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(60px, 10%) minmax(0, 1fr) minmax(60px, 10%); gap: 6px; }
     .zones { min-height: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-    .slot { min-height: 0; min-width: 0; border: 2px solid #627e6d; border-radius: 7px; padding: 4px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
-    .opponent .slot { border-color: #749555; }
-    .viewer-side .slot { border-color: #a95a9e; }
+    .slot { min-height: 0; min-width: 0; border: 2px solid #638677; border-radius: 6px; padding: 3px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; background: #081b2459; box-shadow: inset 0 0 12px #091f2299, 0 0 7px #2b9d8a33; }
+    .opponent .slot { border-color: #6ebf23; box-shadow: inset 0 0 12px #10330066, 0 0 6px #6ebf235e; }
+    .viewer-side .slot { border-color: #e3248e; box-shadow: inset 0 0 12px #33001b66, 0 0 6px #e3248e5e; }
+    .opponent .zones .slot:nth-child(4), .opponent .zones .slot:nth-child(5) { border-color: #d69b18; }
+    .viewer-side .zones .slot:nth-child(4), .viewer-side .zones .slot:nth-child(5) { border-color: #7b3ee7; }
     .slot.disabled { border-color: #b86b6b; background: #4d2f35; }
     .slot-label { font-size: .63rem; color: #c5dcc9; margin-bottom: 3px; }
     .card { position: relative; min-height: 0; min-width: 0; flex: 1; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; justify-content: space-between; font-size: .8rem; overflow-wrap: anywhere; overflow: hidden; box-shadow: 0 2px 7px #0005; isolation: isolate; }
     .card > strong, .card > small { position: relative; z-index: 2; text-shadow: 0 1px 2px #000b; }
-    .card.has-art { color: #fff; background: #16232c; }
+    .card.has-art { color: #fff; background: transparent; padding: 0; }
+    .card.has-art > strong, .card.has-art > small { display: none; }
+    .card.has-art:hover > strong, .card.has-art:focus-within > strong { display: block; align-self: stretch; margin-top: auto; padding: 3px; background: #081119e6; font-size: .68rem; }
     .card.has-placeholder { color: #fff; background: radial-gradient(circle at 50% 48%, #4b7f86 0 15%, #244754 16% 35%, #132935 36% 100%); }
     .card.has-placeholder::after { content: ""; position: absolute; inset: 35% 0 0; background: linear-gradient(transparent, #0a1017dc); z-index: 1; }
     .card-placeholder { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(1.2rem, 3vw, 2.4rem); color: #bde0d1; text-shadow: 0 2px 9px #071015; z-index: 0; }
-    .card.has-art::after { content: ""; position: absolute; inset: 35% 0 0; background: linear-gradient(transparent, #0a1017ed); z-index: 1; }
-    .card-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 26%; z-index: 0; }
+    .card.has-art::after { content: none; }
+    .card-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 0; }
     .card-back { position: absolute; inset: 5px; border: 2px solid #c69454; border-radius: 4px; background: repeating-radial-gradient(ellipse at center, #e1b46e 0 2px, #874a34 3px 6px, #351b37 7px 10px); box-shadow: inset 0 0 0 4px #432840, inset 0 0 0 6px #c69454; opacity: .8; z-index: 0; }
     .monster { background: #b18b50; color: #201709; }
     .spell_trap { background: #457d85; color: #08181b; }
     .facedown { background: repeating-linear-gradient(35deg, #644e87, #644e87 8px, #4e3b70 8px, #4e3b70 16px); color: #fff; }
+    .card.facedown { background: transparent; box-shadow: none; }
+    .card.facedown > strong, .card.facedown > small { display: none; }
+    .card.facedown .card-back { inset: 0 auto 0 50%; width: min(80%, 82px); transform: translateX(-50%); }
     .known { outline: 2px solid #e5cb6d; }
     .card small { opacity: .8; }
     .field-zone { border-color: #ce9c52 !important; }
-    .centerline { flex: 0 0 36px; display: flex; justify-content: center; align-items: center; border-top: 1px solid #678a86; border-bottom: 1px solid #678a86; color: #e8edd4; font-weight: 700; letter-spacing: .03em; }
-    .hand { flex: 0 0 55px; min-width: 0; display: flex; gap: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
-    .hand .card { flex: 0 0 105px; }
-    .hand-back { position: relative; flex: 0 0 35px; height: 49px; border: 2px solid #947bb4; border-radius: 5px; background: #3c3156; overflow: hidden; }
+    .centerline { flex: 0 0 48px; display: flex; justify-content: center; align-items: center; gap: 7px; border-top: 1px solid #678a86; border-bottom: 1px solid #678a86; color: #e8edd4; font-weight: 700; letter-spacing: .03em; background: #071923ba; }
+    .phase-chip { flex: 0 0 37px; width: 37px; height: 37px; display: grid; place-items: center; border: 3px solid #718d94; border-radius: 50%; background: radial-gradient(circle, #133853, #061123); color: #8fb0d4; font-size: .7rem; box-shadow: 0 2px 7px #0008; }
+    .phase-chip.active { border-color: #faf4b1; background: radial-gradient(circle, #d80d58, #830526); color: #fff; box-shadow: 0 0 15px #fb2c77; animation: phase-glow 1.6s ease-in-out infinite alternate; }
+    .phase-turn { padding: 3px 8px; border-radius: 6px; background: #133342; font-size: .72rem; white-space: nowrap; }
+    .hand { flex: 0 0 75px; min-width: 0; display: flex; gap: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+    .hand .card { flex: 0 0 56px; }
+    .hand-back { position: relative; flex: 0 0 48px; height: 70px; border: 2px solid #947bb4; border-radius: 5px; background: #3c3156; overflow: hidden; }
     .hand-back .card-back { inset: 3px; }
     .zone-counts { display: flex; gap: 8px; flex-wrap: wrap; color: #c1d7d3; }
     .pile-trigger { padding: 2px 5px; font-size: inherit; color: #d9eeda; background: #254b4b; border: 1px solid #638b7f; }
@@ -70,6 +81,9 @@
     .deck-slot { cursor: pointer; width: 100%; color: inherit; background: #173039; text-align: left; }
     .deck-slot strong { align-self: center; font-size: 1.3rem; }
     .deck-slot .card-back { position: relative; display: block; flex: 1; min-height: 0; margin: 1px 12%; inset: auto; }
+    .pile-slot { cursor: pointer; width: 100%; color: inherit; text-align: left; }
+    .pile-slot .card { flex: 1; width: 100%; }
+    .pile-slot strong { position: absolute; right: 5px; bottom: 4px; z-index: 3; padding: 1px 6px; border-radius: 9px; background: #06131be6; color: #fff; }
     .pile-dialog { width: min(760px, calc(100vw - 24px)); max-height: min(82dvh, 900px); padding: 0; color: #eef5f3; background: #172731; border: 1px solid #739283; border-radius: 12px; box-shadow: 0 20px 65px #000a; }
     .pile-dialog::backdrop { background: #02080dba; backdrop-filter: blur(3px); }
     .pile-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid #456674; }
@@ -83,9 +97,14 @@
     .pile-card-count { color: #ffe3a5; font-weight: 700; }
     .card-arrive { animation: card-arrive .34s ease-out both; }
     .card-flip { animation: card-flip .42s ease-out both; }
+    .card-draw { animation: card-draw .42s cubic-bezier(.18,.81,.32,1.3) both; }
+    .card-attack { animation: card-attack .7s ease-in-out 2; }
     @keyframes card-arrive { from { opacity: .25; transform: translateY(-14px) scale(.92); } to { opacity: 1; transform: none; } }
     @keyframes card-flip { from { transform: rotateY(85deg); opacity: .5; } to { transform: rotateY(0); opacity: 1; } }
-    @media (prefers-reduced-motion: reduce) { .card-arrive, .card-flip { animation: none; } }
+    @keyframes card-draw { from { opacity: .4; transform: translateX(45px) rotate(12deg) scale(.75); } to { opacity: 1; transform: none; } }
+    @keyframes card-attack { 50% { transform: translateY(-8px) scale(1.07); filter: drop-shadow(0 0 13px #ffca54); } }
+    @keyframes phase-glow { to { box-shadow: 0 0 6px #fb2c77; } }
+    @media (prefers-reduced-motion: reduce) { .card-arrive, .card-flip, .card-draw, .card-attack, .phase-chip.active { animation: none; } }
     .sidebar { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 3px; }
     .controls { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; background: #203744; }
     .controls button { padding: 7px 3px; }
@@ -191,12 +210,14 @@
   <script id="embedded-replay" type="application/json">__EMBEDDED_REPLAY__</script>
   <script id="embedded-names" type="application/json">__EMBEDDED_NAMES__</script>
   <script id="embedded-options" type="application/json">__EMBEDDED_OPTIONS__</script>
+  <script id="embedded-images" type="application/json">__EMBEDDED_IMAGES__</script>
   <script id="embedded-sha256" type="application/json">"__SOURCE_SHA256__"</script>
   <script>
     "use strict";
     let replay = null;
     let names = {};
     let optionTexts = {};
+    let localImages = {};
     let missingNames = new Set();
     let index = 0;
     let timer = null;
@@ -209,6 +230,7 @@
     let cardImages = new Map();
     let previousFrame = -1;
     let previousField = new Map();
+    let previousHand = null;
     let animateNext = false;
     let currentObservation = null;
     // Card IDs in >=5 of the six sourced tournament Main Decks; tests pin this list.
@@ -257,9 +279,10 @@
       const key = String(code);
       if (!facedown && code != null && cardFiles.has(key) && !cardImages.has(key))
         cardImages.set(key, URL.createObjectURL(cardFiles.get(key)));
-      if (!facedown && code != null && cardImages.has(key)) {
+      const source = cardImages.get(key) || localImages[key];
+      if (!facedown && code != null && source) {
         const art = node("img", "card-art");
-        art.src = cardImages.get(key);
+        art.src = source;
         art.alt = "";
         element.classList.add("has-art");
         element.prepend(art);
@@ -350,6 +373,8 @@
     function cardElement(observation, card, known) {
       const code = visibleCode(observation, card, known);
       const element = node("div", `card ${card.zone} ${card.position === "facedown" ? "facedown" : ""} ${card.code == null && code != null ? "known" : ""}`);
+      element.title = cardLabel(observation, card, known);
+      element.dataset.fieldKey = fieldKey(card);
       addCardVisual(element, card.code, card.position === "facedown");
       if (animateNext && previousFrame >= 0 && index > previousFrame) {
         const before = previousField.get(fieldKey(card));
@@ -388,6 +413,21 @@
     }
     function zoneLine(observation, player, zone, known) {
       const line = node("div", "zone-line");
+      const pileZone = zone === "monster" ? "graveyard" : "banished";
+      const pile = pileZone === "graveyard" ? observation.graveyards[player] : observation.banished[player];
+      const pileButton = node("button", "slot pile-slot");
+      pileButton.type = "button";
+      pileButton.setAttribute("aria-label", `View Player ${player} ${pileZone}`);
+      pileButton.addEventListener("click", () => showPile(player, pileZone));
+      pileButton.append(node("span", "slot-label", pileZone === "graveyard" ? "Graveyard" : "Banished"));
+      if (pile.length) {
+        const top = node("div", "card monster");
+        const last = pile[pile.length - 1];
+        addCardVisual(top, last.code, last.code == null);
+        pileButton.append(top);
+      }
+      pileButton.append(node("strong", "", pile.length));
+      line.append(pileButton);
       line.append(zoneRow(observation, player, zone, known));
       const auxiliary = node(zone === "spell_trap" ? "div" : "button", "slot field-zone");
       if (zone === "spell_trap") {
@@ -425,9 +465,12 @@
       section.append(playerHeader);
       const hand = node("div", "hand");
       if (own) {
-        for (const card of observation.hand) {
+        for (const [cardIndex, card] of observation.hand.entries()) {
           const element = node("div", "card monster");
           addCardVisual(element, card.code, false);
+          if (animateNext && previousHand?.viewer === player &&
+              cardIndex >= previousHand.count) element.classList.add("card-draw");
+          element.title = nameOf(card.code);
           element.append(node("strong", "", nameOf(card.code)));
           hand.append(element);
         }
@@ -448,6 +491,24 @@
       }
       if (own) section.append(hand);
       return section;
+    }
+    function phaseRail(observation, terminal) {
+      const rail = node("div", "centerline");
+      rail.append(node("span", "phase-turn", terminal ? `TURN ${observation.turn} · END`
+        : `TURN ${observation.turn} · P${observation.acting_player}`));
+      const current = observation.phase === "draw" ? "DP"
+        : observation.phase === "standby" ? "SP"
+          : observation.phase === "main1" ? "M1"
+            : observation.phase === "main2" ? "M2"
+              : observation.phase === "end" ? "EP" : "BP";
+      for (const [short, label] of [["DP", "Draw"], ["SP", "Standby"], ["M1", "Main 1"],
+                                    ["BP", "Battle"], ["M2", "Main 2"], ["EP", "End"]]) {
+        const chip = node("span", `phase-chip ${!terminal && current === short ? "active" : ""}`, short);
+        chip.title = label;
+        if (!terminal && current === short) chip.setAttribute("aria-current", "step");
+        rail.append(chip);
+      }
+      return rail;
     }
     function actionLabel(observation, action, known, choiceIndex = -1) {
       const parameters = action.parameters || {};
@@ -511,12 +572,18 @@
         : `Seed ${replay.seed} · Outcome hidden`;
       const board = byId("board");
       board.replaceChildren(playerBoard(observation, 1 - observation.viewer, known),
-                            node("div", "centerline", terminal
-                              ? `TURN ${observation.turn} · DUEL ENDED`
-                              : `TURN ${observation.turn} · ${phaseName(observation.phase).toUpperCase()} · PLAYER ${observation.acting_player} TO ACT`),
+                            phaseRail(observation, terminal),
                             playerBoard(observation, observation.viewer, known));
+      const selected = record?.selected_action;
+      if (selected?.kind === "attack") {
+        const targetKey = `${selected.actor}:monster:${selected.parameters?.sequence}`;
+        const attacker = [...board.querySelectorAll("[data-field-key]")].find(
+          element => element.dataset.fieldKey === targetKey);
+        attacker?.classList.add("card-attack");
+      }
       previousFrame = index;
       previousField = new Map(observation.field.map(card => [fieldKey(card), fieldSignature(card)]));
+      previousHand = {viewer: observation.viewer, count: observation.hand.length};
       animateNext = false;
       byId("piles").replaceChildren(node("h2", "", "Graveyards and banished cards"),
         listZone("Opponent Graveyard", observation.graveyards[1 - observation.viewer], 1 - observation.viewer, "graveyard"),
@@ -601,7 +668,7 @@
     function setReplay(data, label, hash) {
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
       stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map();
-      previousFrame = -1; previousField = new Map(); animateNext = false;
+      previousFrame = -1; previousField = new Map(); previousHand = null; animateNext = false;
       commonFrames = data.decisions.flatMap((record, frame) => commonDecision(record) ? [frame] : []);
       const requested = Number(location.hash.match(/^#decision=(\d+)$/)?.[1] || 1);
       index = Math.max(0, Math.min(data.decisions.length - 1 + Number(Boolean(data.terminal_observation)), requested - 1));
@@ -680,6 +747,7 @@
     try {
       names = JSON.parse(byId("embedded-names").textContent);
       optionTexts = JSON.parse(byId("embedded-options").textContent);
+      localImages = JSON.parse(byId("embedded-images").textContent);
       setReplay(JSON.parse(byId("embedded-replay").textContent), "Embedded trajectory",
                 JSON.parse(byId("embedded-sha256").textContent));
     } catch (_) { /* The standalone viewer waits for a chosen JSON file. */ }

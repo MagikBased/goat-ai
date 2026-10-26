@@ -22,6 +22,7 @@ from goat_ai.observations import (
 )
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
 from scripts.render_replay import render_catalog_viewer, render_replay
+from scripts.setup_card_images import setup_card_images
 
 
 def test_common_card_navigation_matches_sourced_main_decks():
@@ -70,6 +71,10 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     )
     source = tmp_path / "game.json"
     output = tmp_path / "game.html"
+    image_folder = tmp_path / "card_images"
+    image_folder.mkdir()
+    (image_folder / "10.jpg").write_bytes(b"local thumbnail")
+    (image_folder / "999.jpg").write_bytes(b"unrelated thumbnail")
     write_trajectory(source, trajectory)
     assert render_replay(source, output, tmp_path / "native") == (1, 5)
     html = output.read_text()
@@ -78,6 +83,8 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     assert '"12":"Privately Seen Monster"' in html
     assert '"13":"Decklist Only Monster"' in html
     assert '"14":"Known Hand Monster"' in html
+    assert '<script id="embedded-images" type="application/json">{"10":"card_images/10.jpg"}</script>' in html
+    assert 'card_images/999.jpg' not in html
     assert '"public_reveals"' in html
     assert '"disabled_zones"' in html
     assert 'slot.disabled' in html
@@ -187,3 +194,47 @@ def test_catalog_viewer_names_all_allowed_cards_without_a_replay(tmp_path):
     (database / "goat-entries.cdb").unlink()
     with pytest.raises(ValueError, match="lack 1 GOAT/Token names"):
         render_catalog_viewer(output, native)
+
+
+def test_image_setup_uses_base_art_for_goat_variant_and_caches_it(tmp_path, monkeypatch):
+    variant, base = 504700116, 71044499
+    database = tmp_path / "native/database"
+    database.mkdir(parents=True)
+    with sqlite3.connect(database / "goat-entries.cdb") as connection:
+        connection.execute("CREATE TABLE datas (id INTEGER PRIMARY KEY, alias INTEGER)")
+        connection.execute("INSERT INTO datas VALUES (?, ?)", (variant, base))
+    observation = Observation(
+        viewer=0, acting_player=0, turn=1, phase="main1", life_points=(8000, 8000),
+        hand=(CardView(0, "hand", "hidden", variant, 0),), field=(),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=5,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0),
+    )
+    action = Action("0", "pass", 0)
+    source = tmp_path / "game.json"
+    write_trajectory(source, Trajectory(
+        "goat", ("a.ydk", "b.ydk"), 42,
+        (DecisionRecord(observation, (action,), action),), 0,
+    ))
+    requested = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self, limit):
+            return b"\xff\xd8\xfftest image"
+
+    def fake_urlopen(request, timeout):
+        requested.append(request.full_url)
+        return Response()
+
+    monkeypatch.setattr("scripts.setup_card_images.urlopen", fake_urlopen)
+    output = tmp_path / "card_images"
+    assert setup_card_images(source, output, tmp_path / "native", delay=0) == (1, 0, 0)
+    assert requested == [f"https://images.ygoprodeck.com/images/cards_small/{base}.jpg"]
+    assert (output / f"{variant}.jpg").read_bytes() == b"\xff\xd8\xfftest image"
+    assert setup_card_images(source, output, tmp_path / "native", delay=0) == (0, 1, 0)
+    assert len(requested) == 1

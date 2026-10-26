@@ -90,17 +90,31 @@ def _catalog_codes(native_root: Path) -> set[int]:
     return codes
 
 
+def _local_card_images(output: Path, codes: set[int]) -> dict[int, str]:
+    """Reference only locally cached art beside the generated HTML."""
+    folder = output.parent / "card_images"
+    images = {}
+    for code in codes:
+        for suffix in ("jpg", "jpeg", "png", "webp"):
+            if (folder / f"{code}.{suffix}").is_file():
+                images[code] = f"card_images/{code}.{suffix}"
+                break
+    return images
+
+
 def _embed_viewer(raw: dict | None, source_sha256: str, names: dict[int, str],
-                  options: dict[int, str]) -> str:
+                  options: dict[int, str], images: dict[int, str]) -> str:
     template = TEMPLATE.read_text(encoding="utf-8")
     # Escaping '<' prevents replay or database text from closing a script element.
     replay_json = json.dumps(raw, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")
     names_json = json.dumps(names, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")
     options_json = json.dumps(options, separators=(",", ":"), ensure_ascii=True).replace(
         "<", "\\u003c")
+    images_json = json.dumps(images, separators=(",", ":"), ensure_ascii=True)
     return (template.replace("__SOURCE_SHA256__", source_sha256)
             .replace("__EMBEDDED_NAMES__", names_json)
             .replace("__EMBEDDED_OPTIONS__", options_json)
+            .replace("__EMBEDDED_IMAGES__", images_json)
             .replace("__EMBEDDED_REPLAY__", replay_json))
 
 
@@ -116,7 +130,8 @@ def render_replay(source: Path, output: Path, native_root: Path) -> tuple[int, i
     codes |= _catalog_codes(native_root)
     names = _card_names(codes, native_root)
     options = _option_texts(codes, native_root)
-    html = _embed_viewer(raw, hashlib.sha256(source_bytes).hexdigest(), names, options)
+    html = _embed_viewer(raw, hashlib.sha256(source_bytes).hexdigest(), names, options,
+                         _local_card_images(output, codes))
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(html, encoding="utf-8")
     return len(trajectory.decisions), len(names)
@@ -134,7 +149,8 @@ def render_catalog_viewer(output: Path, native_root: Path) -> int:
                          "run scripts/setup_native.py first")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(_embed_viewer(None, "", names,
-                                    _option_texts(codes, native_root)), encoding="utf-8")
+                                    _option_texts(codes, native_root),
+                                    _local_card_images(output, codes)), encoding="utf-8")
     return len(names)
 
 
