@@ -11,7 +11,6 @@ from math import comb, factorial
 
 from goat_ai.engine.ocgcore_probe import MSG_SELECT_CHAIN, MSG_SELECT_IDLECMD
 
-
 # Preserve the existing flat action contract through the observed 3,003-way
 # Return prompt. Larger card selections use staged, linear-size choices.
 MAX_CARD_SELECTION_COMBINATIONS = 4096
@@ -136,10 +135,20 @@ def decode_decision(message: bytes,
         count = reader.integer(1)
         options = tuple(reader.integer(8) for _ in range(count))
         reader.finish()
-        supported = ((1, 0x4000010200000000),
-                     (0x4802040, 0x4000010200000000, 0x4000000700000000))
+        is_type = 0x4000010200000000
+        and_op = 0x4000000400000000
+        not_op = 0x4000000700000000
+        extra = 0x4802040
+        supported = (
+            (1, is_type),  # Question: monster names.
+            (extra, is_type, not_op),  # D.D. Designator: non-Extra names.
+            (7, is_type),  # Prohibition: monster, Spell, or Trap names.
+            (extra, is_type, 1, is_type, and_op, not_op),  # Mind Crush.
+            (1, is_type, extra, is_type, not_op, and_op),  # Dark Designator.
+        )
         if player not in (0, 1) or options not in supported:
-            raise NotImplementedError("card announcement expression is not supported")
+            raise NotImplementedError(
+                f"card announcement expression is not supported: {options!r}")
         if not announcement_codes:
             raise NotImplementedError("historical card announcement catalog is unavailable")
         return NativeDecision(player, tuple(

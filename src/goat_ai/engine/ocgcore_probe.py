@@ -282,6 +282,8 @@ class OcgcoreProbe:
         self._initial_main_decks: tuple[tuple[int, ...], tuple[int, ...]] = ((), ())
         self._announcement_codes: tuple[int, ...] | None = None
         self._announcement_non_extra_codes: tuple[int, ...] | None = None
+        self._announcement_all_codes: tuple[int, ...] | None = None
+        self._announcement_monster_non_extra_codes: tuple[int, ...] | None = None
         self._disabled_zones: tuple[DisabledZoneView, ...] = ()
         self._bind()
         major, minor = c.c_int(), c.c_int()
@@ -379,19 +381,32 @@ class OcgcoreProbe:
                             and row[0] == 0 and not row[1] & 0x4000)
             self._announcement_codes = tuple(code for code, card_type in entries
                                              if card_type & 1)
+            self._announcement_all_codes = tuple(code for code, _ in entries)
             # TYPE_EXTRA in the pinned core excludes Fusion, Synchro, Xyz,
             # and Link cards. D.D. Designator's native expression applies
             # NOT ISTYPE(TYPE_EXTRA), so Spells/Traps remain legal names.
             self._announcement_non_extra_codes = tuple(
                 code for code, card_type in entries if not card_type & 0x4802040)
+            self._announcement_monster_non_extra_codes = tuple(
+                code for code, card_type in entries
+                if card_type & 1 and not card_type & 0x4802040)
         prompt = self._pending_message
         if len(prompt) < 3 or len(prompt) != 3 + 8 * prompt[2]:
             return decode_decision(prompt)
         expression = struct.unpack_from(f"<{prompt[2]}Q", prompt, 3)
-        codes = (self._announcement_non_extra_codes
-                 if expression == (0x4802040, 0x4000010200000000,
-                                   0x4000000700000000)
-                 else self._announcement_codes)
+        is_type = 0x4000010200000000
+        and_op = 0x4000000400000000
+        not_op = 0x4000000700000000
+        extra = 0x4802040
+        if expression in ((extra, is_type, not_op),
+                          (extra, is_type, 1, is_type, and_op, not_op)):
+            codes = self._announcement_non_extra_codes
+        elif expression == (7, is_type):
+            codes = self._announcement_all_codes
+        elif expression == (1, is_type, extra, is_type, not_op, and_op):
+            codes = self._announcement_monster_non_extra_codes
+        else:
+            codes = self._announcement_codes
         return decode_decision(prompt, codes)
 
     def _read_script(self, _payload: int, duel: int, name: bytes) -> int:

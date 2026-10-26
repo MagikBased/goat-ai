@@ -99,6 +99,20 @@ The current six-tournament-deck corpus, now including Bazoo Return in place of t
 
 A seeded Thunder Dragon / Morphing Jar fixture now checks the player-visible hand-memory boundary: a revealed search creates known opponent cards, a later hidden Set reduces the guaranteed count conservatively, and Jar's hand replacement clears current knowledge while retaining the historical reveal event. The full duel replay-verifies; see [GOAT rules](goat_rules.md).
 
+A new **24-duel** whitelist-random, distinct-opponent probe on seeds
+10000–10023 found five native protocol failures: four unsupported card-name
+expression prompts (Prohibition, Mind Crush, Dark Designator) and one blind
+opponent-hand choice (The Inexperienced Spy). Exact-expression catalog
+decoding and a redacted blind choice resolved those cases. On the same
+24-seed schedule, **24/24** duels reached terminal below 3,000 decisions;
+all **25,833** decisions replay-verified. The ignored report is
+`.cache/goat-ai/random-probe-distinct-10000-fixed/report.json` (SHA-256
+`86576a1cf12a0836956348ee6a48735d1698e96295de1cc1f049654a038fd378`).
+This is a protocol and reproducibility result, not a historical correctness
+certificate for arbitrary decks. Focused native fixtures verify the
+declaration catalogs against two hidden opponent Decks and the Spy reveal
+boundary; see [GOAT rules](goat_rules.md).
+
 ## M2 — Historical correctness gate
 
 Prioritize rulings by observed GOAT tournament play. The reproducible
@@ -818,3 +832,12 @@ Thunder Dragon rule. It scored 34–29–1 against v8 on a 64-duel, four-matchup
 schedule. M4 still needs trained policy gains on independent decks and seeds;
 this heuristic revision does not close that gate. See [replay audit](replay_audit.md)
 and [evaluation](evaluation.md).
+
+Subsequent user review found that v10 missed a legal BLS banish of an
+opposing Set monster before a Tsukuyomi reset, and that v11 still spent
+Book of Moon on its own Chaos Sorcerer in an idle Draw Phase before
+discarding to Raigeki Break a Sheep Token. The versioned v11 and v12
+baselines correct these fixed decisions. Their separate 32-duel direct
+comparisons against the prior version both split 16–16, so neither closes
+M4's competitive gate. The reviewed choices are bound to source replay
+hashes as baseline preferences; see [replay audit](replay_audit.md).

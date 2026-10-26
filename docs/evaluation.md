@@ -4702,3 +4702,44 @@ it scored **15–17** and **16–15–1** against the unchanged parent, or
 The ignored child and reports are
 `.cache/goat-ai/fv23_seed6803_combined_review21_child.pt` and
 `.cache/goat-ai/fv23_seed6803_combined_review21_vs_parent_heldout_{0,1}.json`.
+
+### Tactical v11 and v12 replay corrections
+
+The v10 turn-13 replay review exposed a BLS guard that incorrectly required
+an opposing face-up monster, and a missed opportunity to banish a Set
+monster before resetting BLS with Tsukuyomi. Tactical v11 separates BLS
+from Chaos Sorcerer's face-up-target restriction and prefers the legal BLS
+activation before Tsukuyomi when BLS can still change position that turn.
+The seeded v11 game follows that line. On a 32-duel direct v11-versus-v10
+comparison across Matt/Chaos Turbo and Cas/Daryl, seeds 8600–8603 with both
+seats and deck assignments, v11 scored **16–16**. Its report is
+`.cache/goat-ai/tactical_v11_vs_v10_8600_8603.json`.
+
+The next replay review found v11 spending Book of Moon on its own Chaos
+Sorcerer in the opponent's Draw Phase, then chaining Raigeki Break to its
+own Book and discarding a card to destroy a Sheep Token. Tactical v12
+defers those early idle activations and prioritizes an opposing non-Token
+card if the removal Trap is already committed. On a separate 32-duel direct
+v12-versus-v11 comparison with the same two deck pairings, seeds 8700–8703,
+both seats and assignments, v12 also scored **16–16**. Its report is
+`.cache/goat-ai/tactical_v12_vs_v11_8700_8703.json`. Both versions fix
+reviewed decisions, but these small direct comparisons show no competitive
+gain. Neither is evidence for M4's trained-policy or self-play gate.
+
+### Distinct whitelist-deck protocol probe
+
+`scripts/probe_random_decks.py --seed 10000 --seeds 24 --max-decisions 3000
+--distinct-opponents --verify-replays` generated 48 different whitelist-legal
+40-card decks and played 24 seeded random-agent duels. Before the adapter
+corrections, **19/24** reached terminal: four stopped at card-name expression
+prompts and one at an unrevealed opposing-hand choice. The original ignored
+report is `.cache/goat-ai/random-probe-distinct-10000/report.json`.
+
+After adding exact expression catalogs and a blind single-hand-card choice,
+the same 24 seeds reached **24/24** terminal outcomes with **25,833** total
+decisions and a maximum of 1,525 decisions in any game. Every full trajectory
+replay-verified. The ignored corrected report is
+`.cache/goat-ai/random-probe-distinct-10000-fixed/report.json` (SHA-256
+`86576a1cf12a0836956348ee6a48735d1698e96295de1cc1f049654a038fd378`).
+This exercises native protocol breadth; randomly assembled decks and random
+agents do not establish 2005 ruling correctness or competitive strength.

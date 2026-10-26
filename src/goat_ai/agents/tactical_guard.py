@@ -28,6 +28,7 @@ BOOK_OF_MOON = 14087893
 SINISTER_SERPENT = 511000818
 THUNDER_DRAGON = 504700054
 CHAOS_SORCERER = 9596126
+TSUKUYOMI = 34853266
 RAIGEKI_BREAK = 4178474
 METAMORPHOSIS = 46411259
 THOUSAND_EYES_RESTRICT = 504700102
@@ -95,7 +96,8 @@ def safe_position_indices(observation: Observation,
 def safe_target_indices(observation: Observation,
                         legal_actions: Sequence[Action],
                         admissible: Sequence[int], *,
-                        protect_removal_targets: bool = False) -> tuple[int, ...]:
+                        protect_removal_targets: bool = False,
+                        prioritize_non_token_removal: bool = False) -> tuple[int, ...]:
     """Avoid observed own-target losses when an enemy target is offered.
 
     This opt-in preference applies only at the target prompt. It does not
@@ -137,6 +139,15 @@ def safe_target_indices(observation: Observation,
     kept = tuple(i for i in indices if not (
         legal_actions[i].kind == "select_card"
         and legal_actions[i].parameters.get("controller") == own))
+    if prioritize_non_token_removal and source.card_code == RAIGEKI_BREAK:
+        sheep_slots = {(card.controller, 4, card.sequence) for card in observation.field
+                       if card.zone == "monster" and card.code in SHEEP_TOKENS
+                       and card.controller != own}
+        valuable = tuple(i for i in kept if (
+            legal_actions[i].parameters.get("controller"),
+            legal_actions[i].parameters.get("location"),
+            legal_actions[i].parameters.get("sequence")) not in sheep_slots)
+        kept = valuable or kept
     return kept or indices
 
 
@@ -235,6 +246,8 @@ def admissible_action_indices(observation: Observation,
                               *, tactical_v8_guards: bool = False,
                               tactical_v9_guards: bool = False,
                               tactical_v10_guards: bool = False,
+                              tactical_v11_guards: bool = False,
+                              tactical_v12_guards: bool = False,
                               card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                               ) -> tuple[int, ...]:
     """Defer clearly wasteful actions while preserving an engine-legal choice.
@@ -256,6 +269,11 @@ def admissible_action_indices(observation: Observation,
                          if c.zone == "monster" and c.controller != own]
     can_pass = any(a.kind == "pass" for a in legal_actions)
     enemy_faceup_monster = any(c.position == "faceup" for c in opponent_monsters)
+    enemy_book_target = any(c.position == "faceup" and c.code not in SHEEP_TOKENS
+                            for c in opponent_monsters)
+    own_monster_threatened = any(
+        target.zone == "monster" and target.controller == own
+        for link in observation.chain for target in link.targets)
     known_thunder_left = (known_thunder_copies_in_deck(observation)
                           if tactical_v9_guards else None)
     card_races = card_races or {}
@@ -324,6 +342,20 @@ def admissible_action_indices(observation: Observation,
                 and observation.turn_player == own and not observation.chain
                 and observation.phase in ("draw", "standby")):
             continue
+        if (tactical_v12_guards and code in (BOOK_OF_MOON, RAIGEKI_BREAK)
+                and action.kind == "chain" and can_pass
+                and not observation.chain and observation.phase in ("draw", "standby")):
+            continue
+        if (tactical_v12_guards and code == BOOK_OF_MOON
+                and action.kind == "chain" and can_pass
+                and observation.turn_player != own and not enemy_book_target
+                and not own_monster_threatened):
+            continue
+        if (tactical_v12_guards and code == RAIGEKI_BREAK
+                and action.kind == "chain" and can_pass and observation.chain
+                and observation.chain[-1].controller == own
+                and observation.chain[-1].card_code == BOOK_OF_MOON):
+            continue
         if (tactical_v10_guards and code == BOOK_OF_MOON
                 and action.kind in ("activate", "chain")
                 and observation.turn_player == own and not observation.chain
@@ -348,7 +380,8 @@ def admissible_action_indices(observation: Observation,
         if (tactical_v9_guards and code in (BLACK_LUSTER_SOLDIER, CHAOS_SORCERER)
                 and action.kind in ("activate", "chain")
                 and (can_pass or tactical_v10_guards)
-                and not enemy_faceup_monster
+                and not (enemy_faceup_monster or (tactical_v11_guards
+                         and code == BLACK_LUSTER_SOLDIER and bool(opponent_monsters)))
                 and not any(c.zone == "monster" and c.controller == own
                             and c.sequence == action.parameters.get("sequence")
                             and c.owner is not None and c.owner != own

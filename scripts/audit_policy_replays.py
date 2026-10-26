@@ -93,7 +93,7 @@ def main() -> None:
             metadata = trajectory.skill_metadata or {}
             version = metadata.get("teacher_version")
             if (metadata.get("teacher") != "TacticalHeuristicAgent"
-                    or type(version) is not int or version not in (7, 8, 9, 10)):
+                    or type(version) is not int or version not in (7, 8, 9, 10, 11, 12)):
                 raise ValueError(f"{path}: unsupported tactical teacher version")
             teacher_seat = metadata.get("demonstrator_seat")
             if type(teacher_seat) is not int or teacher_seat not in (0, 1):
@@ -104,7 +104,9 @@ def main() -> None:
                                                          if version >= 9 else None),
                                              v8_guards=version >= 8,
                                              v9_guards=version >= 9,
-                                             v10_guards=version >= 10)
+                                             v10_guards=version >= 10,
+                                             v11_guards=version >= 11,
+                                             v12_guards=version >= 12)
             teacher_choices = 0
             for index, decision in enumerate(trajectory.decisions):
                 if decision.observation.acting_player != teacher_seat:

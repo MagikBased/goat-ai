@@ -8,8 +8,10 @@ from goat_ai.actions import Action
 from goat_ai.observations import CardView, Observation
 
 from .tactical_guard import (
+    BLACK_LUSTER_SOLDIER,
     SHEEP_TOKENS,
     THOUSAND_EYES_RESTRICT,
+    TSUKUYOMI,
     admissible_action_indices,
     safe_position_indices,
     safe_target_indices,
@@ -149,7 +151,7 @@ class CombatFlipHeuristicAgent(CombatHeuristicAgent):
 class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
     """Flip-aware baseline with conservative, visible-board Trap decisions."""
 
-    teacher_version: ClassVar[int] = 10  # open Main Phase and position guards
+    teacher_version: ClassVar[int] = 12  # reactive Book/Raigeki use
     RING: ClassVar[int] = 511000824
     TORRENTIAL: ClassVar[int] = 53582587
     SINISTER: ClassVar[int] = 511000818
@@ -159,13 +161,17 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                  card_races: Mapping[int, int] | None = None,
                  *, card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                  v8_guards: bool = True, v9_guards: bool | None = None,
-                 v10_guards: bool | None = None) -> None:
+                 v10_guards: bool | None = None,
+                 v11_guards: bool | None = None,
+                 v12_guards: bool | None = None) -> None:
         super().__init__(flip_monster_codes)
         self.card_races = dict(card_races or {})
         self.card_facts = dict(card_facts or {})
         self.v8_guards = v8_guards
         self.v9_guards = v8_guards if v9_guards is None else v9_guards
         self.v10_guards = self.v9_guards if v10_guards is None else v10_guards
+        self.v11_guards = self.v10_guards if v11_guards is None else v11_guards
+        self.v12_guards = self.v11_guards if v12_guards is None else v12_guards
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
@@ -252,13 +258,30 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
             observation, legal_actions, self.card_races,
             tactical_v8_guards=self.v8_guards,
             tactical_v9_guards=self.v9_guards,
-            tactical_v10_guards=self.v10_guards, card_facts=self.card_facts)
+            tactical_v10_guards=self.v10_guards,
+            tactical_v11_guards=self.v11_guards,
+            tactical_v12_guards=self.v12_guards, card_facts=self.card_facts)
         targets = safe_target_indices(
             observation, legal_actions, admissible,
-            protect_removal_targets=self.v9_guards)
+            protect_removal_targets=self.v9_guards,
+            prioritize_non_token_removal=self.v12_guards)
         filtered = [legal_actions[i] for i in safe_position_indices(
             observation, legal_actions, targets,
             v10_guard=self.v10_guards)]
+        if self.v11_guards and observation.phase == "main1":
+            enemy = any(card.zone == "monster" and card.controller != observation.viewer
+                        for card in observation.field)
+            tsukuyomi = any(action.kind == "normal_summon"
+                            and action.parameters.get("code") == TSUKUYOMI
+                            for action in filtered)
+            bls_activate = next((action for action in filtered
+                                 if action.kind == "activate"
+                                 and action.parameters.get("code") == BLACK_LUSTER_SOLDIER), None)
+            bls_can_reset = any(action.kind == "change_position"
+                                and action.parameters.get("code") == BLACK_LUSTER_SOLDIER
+                                for action in legal_actions)
+            if enemy and tsukuyomi and bls_activate is not None and bls_can_reset:
+                return bls_activate
         return super().select_action(observation, filtered)
 
 

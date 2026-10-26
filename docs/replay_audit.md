@@ -1001,3 +1001,49 @@ Both v10 seats and the older v9 seat-0 replay replay-verified, passed the
 visibility audit, and reproduced their versioned teacher choices. The v10
 seat-0 game has no selected position changes; this describes one duel, not
 a general performance claim.
+
+### Tactical v11–v12 follow-up: BLS sequencing and reactive removal
+
+In the v10 seat-0 replay at decision 439 (turn 13), P1 had a face-up BLS,
+Tsukuyomi in hand, and an opposing Set monster. The legal actions included
+both BLS's banish effect and a position change for BLS, showing it was
+eligible for a same-turn Tsukuyomi reset and Flip Summon. Tactical v10
+incorrectly required an opposing **face-up** monster for both BLS and Chaos
+Sorcerer. BLS can target the Set monster; only Chaos Sorcerer requires a
+face-up target. Tactical v11 activates BLS first on this recorded visible
+state, and its full seed-6803 replay then Summons Tsukuyomi, sets BLS,
+Flip Summons it, and attacks. Historical BLS rulings permit another use of
+its effect after a face-down/face-up reset; see [GOAT rules](goat_rules.md).
+The user's turn-13 comparison is stored as a one-decision `baseline_review`
+preference in
+`examples/preferences/tactical_v10_seed6803_player1_bls.preference.json`,
+bound to the v10 replay SHA-256. The v11 offline viewer is
+`replays/tactical_v11_matt_vs_chaos_seed6803.html` (474 decisions).
+
+That v11 replay still spent two cards without visible payoff at decisions
+78 and 81 on turn 3. P2 activated its Set Book of Moon during P1's Draw
+Phase with no incoming chain, targeting its own Chaos Sorcerer. P2 then
+chained Raigeki Break to that Book, discarded a card, and targeted one of
+P1's four 0-ATK Sheep Tokens despite an opposing Set Spell/Trap also being
+offered. Tactical v12 defers an idle Book or Raigeki Break in either player's
+Draw/Standby Phase and defers Raigeki Break chained to its own Book. If
+Raigeki Break is already committed, its target guard prefers an opposing
+non-Token card over a Sheep Token when one is offered. On the **same v11
+observations**, v12 passes at 78 and 81 and selects the opposing Set card
+instead of a Token at the later target prompt. The two user-reviewed
+resource choices are bound to the v11 replay in
+`examples/preferences/tactical_v11_seed6803_player2_resource.preference.json`.
+
+The first v12 replay exposed a further Book of Moon use on its own Chaos
+Sorcerer during P1's Main Phase, while the opposing monsters were all Sheep
+Tokens and no chain link targeted a friendly monster. The v12 guard now
+passes in that situation; it still allows Book against a face-up non-Token
+opponent or when a chain targets a friendly monster. The full v12-versus-v12
+seed-6803 seat-0 replay is
+`replays/tactical_v12_self_6803/seed_6803_seat_0.json` (648 decisions),
+with offline viewer `replays/tactical_v12_self_seed6803.html`. Its Book
+activations target opposing monsters, and its Raigeki Break selects an
+opposing non-Token monster while Sheep Tokens are available. Both complete
+v12-versus-v12 trajectories replay-verified, passed visibility checks,
+and reproduced their versioned teacher choices. The changed branch and
+one-duel outcome are not a strength result.

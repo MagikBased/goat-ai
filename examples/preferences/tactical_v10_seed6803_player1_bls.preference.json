@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "source_trajectory_sha256": "10c291e854c15043e10576c8ffcdfa3896e7b85a24995084a6dba8b1b5bac3d1",
+  "authorization": "baseline_review",
+  "reviewed_seat": 0,
+  "reviewer": "GOAT AI user replay note, Tactical v10 Matt versus Chaos seed 6803",
+  "preferences": [
+    {
+      "decision_index": 439,
+      "preferred_action_indices": [6],
+      "disfavored_action_indices": [0]
+    }
+  ]
+}

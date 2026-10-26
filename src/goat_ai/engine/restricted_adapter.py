@@ -128,11 +128,22 @@ class RestrictedOcgcoreEngine:
         visible_cards = (*observation.field, *observation.graveyards[0],
                          *observation.graveyards[1], *observation.banished[0],
                          *observation.banished[1])
+        blind_spy_choice = (observation.chain
+                            and observation.chain[-1].card_code == 81820689
+                            and observation.chain[-1].controller == native.player
+                            and all(choice.kind == "select_card"
+                                    and choice.location == 0x02
+                                    and choice.controller == 1 - native.player
+                                    for choice in native.choices))
         def public_code(code: int, controller: int, location: int,
                         sequence: int) -> int | None:
             if controller == native.player:
                 return code
             if location == 0x02:
+                if blind_spy_choice:
+                    # The Inexperienced Spy chooses an opponent hand position
+                    # before showing that one card to its controller.
+                    return None
                 # A hand choice is legal to expose only after a reveal
                 # addressed to the acting player in this native transition.
                 # Exchange has a second choice after that transition; retain

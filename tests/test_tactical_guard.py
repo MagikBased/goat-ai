@@ -412,6 +412,84 @@ def test_v10_position_changes_need_visible_combat_value():
         board(defender, weaker_enemy), (switch, end)) == switch
 
 
+def test_v11_bls_banishes_set_enemy_before_tsukuyomi_reset():
+    bls = 504700118
+    own_bls = CardView(0, "monster", "faceup", bls, 0,
+                       "attack", 3000, 2500)
+    hidden_enemy = CardView(1, "monster", "facedown", None, 0, "defense")
+    view = board(own_bls, hidden_enemy, turn_player=0)
+    tsukuyomi = Action("tsuk", "normal_summon", 0, {"code": 34853266})
+    activate = Action("bls", "activate", 0,
+                      {"code": bls, "controller": 0, "sequence": 0})
+    change = Action("position", "change_position", 0,
+                    {"code": bls, "controller": 0, "sequence": 0})
+    end = Action("end", "end_phase", 0)
+    actions = (tsukuyomi, change, activate, end)
+    assert TacticalHeuristicAgent().select_action(view, actions) == activate
+    assert TacticalHeuristicAgent(v11_guards=False).select_action(
+        view, actions) == tsukuyomi
+    # Without a legal position change, a same-turn Flip Summon is uncertain.
+    assert TacticalHeuristicAgent().select_action(
+        view, (tsukuyomi, activate, end)) == activate
+    chaos = replace(own_bls, code=9596126, attack=2300, defense=2000)
+    chaos_activation = replace(activate, parameters={"code": 9596126,
+                                                       "controller": 0, "sequence": 0})
+    assert TacticalHeuristicAgent().select_action(
+        board(chaos, hidden_enemy, turn_player=0),
+        (chaos_activation, end)) == end
+
+
+def test_v12_holds_idle_book_and_raigeki_on_opponents_draw():
+    chaos = CardView(0, "monster", "faceup", 9596126, 0,
+                     "attack", 2300, 2000)
+    sheep = CardView(1, "monster", "faceup", 73915052, 0,
+                     "defense", 0, 0)
+    book = Action("book", "chain", 0, {"code": 14087893, "location": 8})
+    break_card = Action("break", "chain", 0, {"code": 4178474, "location": 8})
+    decline = Action("decline", "pass", 0)
+    view = board(chaos, sheep, phase="draw", turn_player=1)
+    assert TacticalHeuristicAgent().select_action(view, (book, decline)) == decline
+    assert TacticalHeuristicAgent().select_action(view, (break_card, decline)) == decline
+    assert TacticalHeuristicAgent(v12_guards=False).select_action(
+        view, (book, decline)) == book
+    own_book_chain = replace(view, chain=(ChainLinkView(1, 14087893, 0, 8, 0),))
+    assert TacticalHeuristicAgent().select_action(
+        own_book_chain, (break_card, decline)) == decline
+    assert TacticalHeuristicAgent(v12_guards=False).select_action(
+        own_book_chain, (break_card, decline)) == break_card
+
+
+def test_v12_holds_book_when_opponent_only_has_sheep_tokens():
+    chaos = CardView(0, "monster", "faceup", 9596126, 0,
+                     "attack", 2300, 2000)
+    sheep = CardView(1, "monster", "faceup", 73915052, 0,
+                     "defense", 0, 0)
+    book = Action("book", "chain", 0, {"code": 14087893, "location": 8})
+    decline = Action("decline", "pass", 0)
+    view = board(chaos, sheep, phase="main1", turn_player=1,
+                 chain=(ChainLinkView(1, 46411259, 1, 8, 0),))
+    assert TacticalHeuristicAgent().select_action(view, (book, decline)) == decline
+    assert TacticalHeuristicAgent(v12_guards=False).select_action(
+        view, (book, decline)) == book
+
+
+def test_v12_raigeki_target_prefers_other_enemy_card_to_sheep_token():
+    sheep = CardView(1, "monster", "faceup", 73915052, 0,
+                     "defense", 0, 0)
+    backrow = CardView(1, "spell_trap", "facedown", None, 0)
+    chain = (ChainLinkView(1, 4178474, 0, 8, 0),)
+    token = Action("sheep", "select_card", 0,
+                   {"controller": 1, "location": 4, "sequence": 0,
+                    "code": 73915052})
+    set_card = Action("set", "select_card", 0,
+                      {"controller": 1, "location": 8, "sequence": 0})
+    view = board(sheep, backrow, chain=chain)
+    assert TacticalHeuristicAgent().select_action(view, (token, set_card)) == set_card
+    assert TacticalHeuristicAgent(v12_guards=False).select_action(
+        view, (token, set_card)) == token
+    assert TacticalHeuristicAgent().select_action(view, (token,)) == token
+
+
 def test_v9_creature_swap_prefers_token_and_tsukuyomi_resets_equipped_restrict():
     jinzo = CardView(0, "monster", "faceup", 77585513, 0,
                      "attack", 2400, 1500)
