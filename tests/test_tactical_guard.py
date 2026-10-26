@@ -11,6 +11,7 @@ from goat_ai.agents.tactical_guard import (
     weak_flip_set_substitute,
 )
 from goat_ai.observations import CardView, ChainLinkView, Observation, TargetSlotView
+from scripts.evaluate_native import agent_factory
 
 
 def board(*cards, phase="main1", turn=1, viewer=0, chain=(), turn_player=None):
@@ -38,6 +39,37 @@ def test_heavy_storm_avoids_solely_damaging_own_backrow():
     # The rule cannot examine the unknown identity of the opponent's Set card.
     assert kept(board(own_set, opponent_set), (storm, wait)) == kept(
         board(own_set, replace(opponent_set, sequence=0)), (storm, wait))
+
+
+def test_opt_in_spirit_reaper_set_prefers_defense_without_a_profitable_attack():
+    reaper = 504700038
+    summon = Action("summon", "normal_summon", 0, {"code": reaper})
+    set_card = Action("set", "set_monster", 0, {"code": reaper})
+    battle = Action("battle", "battle_phase", 0)
+    sangan = CardView(1, "monster", "faceup", 504700178, 0,
+                      "attack", 1000, 600)
+    choices = (summon, set_card, battle)
+    assert TacticalHeuristicAgent().select_action(board(sangan), choices) == summon
+    candidate = TacticalHeuristicAgent(reaper_set_guard=True)
+    assert candidate.select_action(board(sangan), choices) == set_card
+    assert candidate.select_action(board(), choices) == summon
+    sheep = CardView(1, "monster", "faceup", 73915052, 0,
+                     "defense", 0, 0)
+    assert candidate.select_action(board(sheep), choices) == summon
+    assert candidate.select_action(board(), choices[:2]) == set_card
+
+
+def test_reaper_candidate_inherits_every_v14_guard(monkeypatch, tmp_path):
+    monkeypatch.setattr("scripts.evaluate_native.flip_monster_codes", lambda _: frozenset())
+    monkeypatch.setattr("scripts.evaluate_native.load_card_races", lambda _: {})
+    monkeypatch.setattr("scripts.evaluate_native.load_card_facts", lambda _: {})
+    baseline = agent_factory("tactical", tmp_path)(0)
+    candidate = agent_factory("tactical_reaper_set", tmp_path)(0)
+    for name in ("v8_guards", "v9_guards", "v10_guards", "v11_guards",
+                 "v12_guards", "v13_guards", "v14_guards"):
+        assert getattr(candidate, name) is getattr(baseline, name) is True
+    assert baseline.reaper_set_guard is False
+    assert candidate.reaper_set_guard is True
 
 
 def test_scapegoat_waits_for_end_or_battle_and_can_answer_removal():

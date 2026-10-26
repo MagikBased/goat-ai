@@ -158,6 +158,7 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
     TORRENTIAL: ClassVar[int] = 53582587
     SINISTER: ClassVar[int] = 511000818
     TRIBE: ClassVar[int] = 33184167
+    SPIRIT_REAPER: ClassVar[int] = 504700038  # GOAT variant
 
     def __init__(self, flip_monster_codes: Collection[int] = (),
                  card_races: Mapping[int, int] | None = None,
@@ -167,7 +168,8 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                  v11_guards: bool | None = None,
                  v12_guards: bool | None = None,
                  v13_guards: bool | None = None,
-                 v14_guards: bool | None = None) -> None:
+                 v14_guards: bool | None = None,
+                 reaper_set_guard: bool = False) -> None:
         super().__init__(flip_monster_codes)
         self.card_races = dict(card_races or {})
         self.card_facts = dict(card_facts or {})
@@ -178,6 +180,7 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
         self.v12_guards = self.v11_guards if v12_guards is None else v12_guards
         self.v13_guards = self.v12_guards if v13_guards is None else v13_guards
         self.v14_guards = self.v13_guards if v14_guards is None else v14_guards
+        self.reaper_set_guard = reaper_set_guard
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
@@ -306,6 +309,25 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
         filtered = [legal_actions[i] for i in safe_position_indices(
             observation, legal_actions, targets,
             v10_guard=self.v10_guards)]
+        if self.reaper_set_guard:
+            reaper_set = any(action.kind == "set_monster"
+                             and action.parameters.get("code") == self.SPIRIT_REAPER
+                             for action in filtered)
+            opponents = [card for card in observation.field
+                         if card.zone == "monster"
+                         and card.controller != observation.viewer]
+            can_attack_directly = (not opponents and any(
+                action.kind == "battle_phase" for action in filtered))
+            can_beat_monster = any(
+                card.position == "faceup"
+                and (card.attack if card.orientation == "attack" else card.defense)
+                is not None
+                and (card.attack if card.orientation == "attack" else card.defense) < 300
+                for card in opponents)
+            if reaper_set and not can_attack_directly and not can_beat_monster:
+                filtered = [action for action in filtered
+                            if not (action.kind == "normal_summon"
+                                    and action.parameters.get("code") == self.SPIRIT_REAPER)]
         if self.v11_guards and observation.phase == "main1":
             enemy = any(card.zone == "monster" and card.controller != observation.viewer
                         for card in observation.field)

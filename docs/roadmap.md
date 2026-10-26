@@ -907,3 +907,12 @@ including 69 disagreements with the policy's executed actions. The child
 scored 28–35–1 against its unchanged parent on 64 held-out duels, so it is
 not promoted. M4 still needs more capable generalization and a separately
 verified self-play gain; see [the experiment](evaluation.md).
+
+A user-reviewed Spirit Reaper position mistake now has an opt-in tactical
+Set preference. Its exact replay decision changes as intended, but a 96-duel
+comparison scored 52–44 against v14 with an interval touching 50%, so the
+default teacher stays v14. That comparison also uncovered a historical
+Dark Balter/Sinister Serpent native loop. A source-backed, SHA-guarded
+pre-errata script correction removes the invalid Standby response; the
+formerly capped sourced-deck duel now terminates and replay-verifies. See
+[the ruling](goat_rules.md) and [the evaluation](evaluation.md).

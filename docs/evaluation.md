@@ -5044,3 +5044,35 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_behavioral_clone.py \
   --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
   --output .cache/goat-ai/fv23_on_policy_teacher_9900_9901.pt
 ```
+
+### Spirit Reaper Set preference and Balter/Serpent correction
+
+An opt-in Tactical-v14 variant prefers Setting GOAT Spirit Reaper if it has
+no available direct attack or visible monster it can beat, while retaining
+the baseline's other tactical guards. It changes the exact seed-6803 turn-19
+reviewed decision from Attack Position Normal Summon to Set. It is a
+strategic preference, not a change to the engine's legal actions.
+
+An initial tournament result of 30–65–1 is invalid as a Reaper ablation:
+the first candidate factory accidentally disabled older v9–v13 guards. A
+configuration regression test now compares every guard flag with v14. The
+corrected factory's first attempt hit the 5,000-decision cap in seed 10302.
+Reproduction traced that cap to an independent native issue: Dark Balter
+battle-destroyed Sinister Serpent, whose negated return was repeatedly
+offered in one Standby Phase. The pinned Serpent script now receives a
+SHA-guarded in-memory historical correction. The exact duel terminates and
+replay-verifies; see [GOAT rules](goat_rules.md).
+
+After both corrections, a fresh complete run of the original predeclared
+schedule compared the Reaper variant with unchanged Tactical v14 on Matt
+Peddle/Michael Fukuyama/Chaos Control pairings, both deck assignments and
+seats, seeds 10300–10307. The variant scored **52–44** over **96/96 terminal
+duels**; the paired-bootstrap 95% score interval was **50.0%–59.4%**.
+Assigned-deck results were Matt 22–10, Michael 15–17, and Chaos Control
+15–17. The four-worker tournament took **26.99 seconds** and averaged
+**787.06 decisions** per duel. The ignored report is
+`.cache/goat-ai/reaper_set_vs_v14_10300_10307_balter_fixed.json` (SHA-256
+`4d40d441b6e6184cc72cd37aa636e32b2174010ae5b6f0f58c4c4c543ae1e210`).
+The interval touches 50% and deck splits vary, so the new preference stays
+opt-in pending a separate deck-family comparison. This result says nothing
+about neural-policy strength.

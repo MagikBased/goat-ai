@@ -889,6 +889,9 @@
       const file = event.target.files[0];
       if (!file) return;
       try {
+        if (!file.name.toLowerCase().endsWith(".json")) {
+          throw new Error("Open trajectory needs a replay .json file. Open a generated .html viewer directly in the browser.");
+        }
         const bytes = await file.arrayBuffer();
         if (!crypto.subtle) throw new Error("This browser cannot hash the replay file.");
         const digest = await crypto.subtle.digest("SHA-256", bytes);

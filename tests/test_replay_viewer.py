@@ -44,6 +44,7 @@ def test_common_card_navigation_matches_sourced_main_decks():
     assert 'replay.source === "self_play_rl"' in template
     assert '"self_play_review"' in template
     assert 'observation.acting_player === replay.skill_metadata.learner_seat' in template
+    assert 'Open trajectory needs a replay .json file.' in template
 
 
 def test_reviewer_frame_combines_private_views_without_changing_agent_observation():

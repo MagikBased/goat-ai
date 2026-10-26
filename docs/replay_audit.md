@@ -1101,3 +1101,19 @@ and can be opened at `replays/tactical_v14_self_seed6803.html`. Seat 1 has
 replay-verified, passed visibility checks, and reproduced their versioned
 teacher actions. See [evaluation](evaluation.md) for the paired tournament;
 these exact-state corrections do not establish overall playing strength.
+
+### Spirit Reaper position review
+
+In the repository's Tactical-v14 seed-6803 seat-0 replay, decision 520
+(viewer frame 521, turn 19) Normal Summons GOAT Spirit Reaper in Attack Position
+while the opponent controls a face-up 1000 ATK Sangan. Setting that same
+Reaper is legal. Reaper cannot attack directly or defeat Sangan in battle.
+The user reviewed this as a general preference to Set Reaper when it has no
+profitable attack, while allowing rare tactical exceptions. An opt-in
+`reaper_set_guard` now filters that Attack Position Summon if a Set is legal,
+no direct attack is available, and no visible opponent monster has a battle
+stat below 300. It changes the recorded decision to Set and still permits an
+Attack Position Summon against a visible 0 DEF Sheep Token or an open direct
+attack. This is a visible-state strategic preference, not a legality rule.
+The controlled tournament is in [evaluation](evaluation.md); the guard is
+not part of default Tactical v14 or the neural policy.

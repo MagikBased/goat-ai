@@ -60,6 +60,13 @@ METAMORPHOSIS_COST_FILTER_GOAT = (
 )
 UPSTREAM_BOOK_SHA256 = "25848f596f425817a250bef9038343fbbcd482b40a0312d84c143e927b12083d"
 UPSTREAM_FIREBIRD_SHA256 = "76c351a0006682d2a31449084cb821d43e6fc5f9f0b98931cae1859d632c2600"
+UPSTREAM_SINISTER_SHA256 = "92886fb585816f0e4466b682a0858dd3e514b2965b556e8d72c661b1f1337ed1"
+SINISTER_STANDBY_CONDITION_OLD = b"return Duel.GetTurnPlayer()==tp and Duel.IsExistingMatchingCard"
+SINISTER_STANDBY_CONDITION_HISTORICAL = (
+    b"return not e:GetHandler():IsDisabled() "
+    b"and not e:GetHandler():IsHasEffect(EFFECT_DISABLE) "
+    b"and Duel.GetTurnPlayer()==tp and Duel.IsExistingMatchingCard"
+)
 FIREBIRD_BATTLE_CONDITION_OLD = b"""function s.atkcon2(e,tp,eg,ep,ev,re,r,rp)
 \treturn s.cfilter2(Duel.GetAttacker()) or s.cfilter2(Duel.GetAttackTarget())
 end"""
@@ -516,6 +523,16 @@ class OcgcoreProbe:
                 return 0
             contents = contents.replace(FIREBIRD_BATTLE_CONDITION_OLD,
                                         FIREBIRD_BATTLE_CONDITION_FIXED)
+        if path.relative_to(self.scripts) == Path("pre-errata/c511000818.lua"):
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_SINISTER_SHA256 \
+                    or contents.count(SINISTER_STANDBY_CONDITION_OLD) != 1:
+                self.errors.append("pinned pre-errata Serpent script changed; battle-negation patch not applied")
+                return 0
+            # Dark Balter and Dark Ruler Ha Des negate a battle-destroyed
+            # Serpent even in the Graveyard. The upstream script otherwise
+            # offers a futile optional return repeatedly in one Standby Phase.
+            contents = contents.replace(SINISTER_STANDBY_CONDITION_OLD,
+                                        SINISTER_STANDBY_CONDITION_HISTORICAL)
         self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
             hashlib.sha256(contents).hexdigest()
         )
