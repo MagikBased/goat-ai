@@ -4169,3 +4169,63 @@ agreement, weighted versus unweighted), are
 `e1180b280845881ea5b491e15afd46a2ef28adaa9826f684f04ff434c2aa94c2`,
 `1f927478b735f9fa9130ce4cc73b054e88392bfce1249db5fbef9dc4694f8d9b`,
 and `70c4d807a226e94b0331586ac5ba6d49b67155ec9b6f1680dbcd692bee4bc1f7`.
+
+## Position guard v2: same-checkpoint ablation
+
+The optional inference guard now preserves defending 0-ATK Sheep Tokens and
+rejects attack-to-defense moves when the opponent has no monsters and the
+moving monster's visible ATK is at least its DEF. This experiment compares
+the **same feature-v21 checkpoint** (`c6cc59780d665edf2c83b143d1b371e9aa05fcfff5ac988edfc48613ccd21011`)
+with and without that guard. Training used seeds 2500–2503 on Cas Stomphorst
+and Daryl Gessler Main Decks. Evaluation required distinct Main Deck
+compositions and used Chaos Control, Warrior, Chaos Return, and the Flip
+Control guide list in two pairings, both deck assignments, and both agent
+seats. The pinned native experimental adapter and four workers completed all
+games below the 5,000-decision cap.
+
+| Held-out seeds | Guard wins–losses–draws | Score | 95% paired-bootstrap score interval |
+| --- | ---: | ---: | ---: |
+| 4000–4007 | 35–26–3 | 57.0% | 52.3%–62.5% |
+| 4100–4107 | 34–29–1 | 53.9% | 47.7%–61.7% |
+| Combined | 69–55–4 | 55.5% | 51.2%–60.2% |
+
+The combined first-seat score was 32–32; the second-seat score was 37–23
+with four draws. By assigned deck, the guard scored 10–21–1 Chaos Control,
+25–5–2 Chaos Return, 10–22 Flip Control, and 24–7–1 Warrior. The aggregate
+advantage therefore depends strongly on deck and seat. A separate 64-duel
+schedule against TacticalHeuristicAgent v7 on fresh seeds 4200–4207 scored
+**14–49–1** (22.7% score; paired-bootstrap 95% interval 14.8%–30.5%).
+This does not establish a competitive policy or close M4. Keep the guard
+opt-in and collect stronger policy training evidence across deck families.
+
+The ignored detailed reports are
+`.cache/goat-ai/position_guard_v2_vs_unguarded_4000_4007.json`,
+`.cache/goat-ai/position_guard_v2_vs_unguarded_4100_4107.json`, and
+`.cache/goat-ai/position_guard_v2_vs_tactical_v7_4200_4207.json`, with
+SHA-256 values `e4569381cb5604396178db877a458f47457b125e9471250e1a7fa9445630da71`,
+`add644bf7a800b4df60d65ed79a0716779535ca8cb5f0cb14be7f3459d9541a1`,
+and `57ce0be692cae38644f16e422d2e47f6e79c236818855f12a1b7d4ce1fb74113`.
+The first eight games reproduced exactly, including winner and decision count,
+between one and four workers (6,676 total decisions). The 64-game wall times
+were 41.01 s, 39.98 s, and 19.13 s respectively on Linux
+6.8.0-146-generic; these are measurements for those runs, not a general
+throughput claim.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --opponent-checkpoint .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --position-guard \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk examples/decks/warrior_montague_clash.ydk \
+  --matchup examples/decks/chaos_return_dingosig_worlds_2022.ydk examples/decks/flip_control_goatformat_guide.ydk \
+  --both-deck-assignments --reject-training-deck-hashes \
+  --require-unseen-main-decks --seed 4000 --seeds 8 --workers 4 \
+  --output .cache/goat-ai/position_guard_v2_vs_unguarded_4000_4007.json
+```
+
+Repeat with `--seed 4100` and the matching output name for the second
+direct schedule. For the tactical comparison, replace
+`--opponent-checkpoint ...` with `--opponent tactical`, use `--seed 4200`,
+and write to the matching tactical report path. The `--opponent-position-guard`
+option allows a same-checkpoint reverse-role ablation.

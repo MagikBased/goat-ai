@@ -704,3 +704,12 @@ visual replay is `replays/fv21_position_guard_v2_3901_p0.json`; both its
 683 decisions and the older 721-decision replay passed native replay and
 policy-choice verification. Next, run a held-out, seat-swapped tournament
 before making the guard a default policy inference mode.
+
+A subsequent same-checkpoint, held-out 128-duel comparison measured a
+69–55–4 score for the optional position guard over unguarded inference, but
+the candidate split 32–32 in the first seat and its assigned-deck results
+varied widely. Against TacticalHeuristicAgent v7 it scored 14–49–1 over
+64 further held-out duels. This supports retaining the narrow guard as an
+optional behavior correction; it does not meet M4's cross-deck strength or
+self-play improvement gates. See [evaluation](evaluation.md) for confidence
+intervals, hashes, and reproduction commands.

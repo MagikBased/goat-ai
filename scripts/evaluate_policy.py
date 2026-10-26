@@ -121,9 +121,11 @@ def main() -> None:
     parser.add_argument("--self-target-guard", action="store_true",
                         help="avoid observed BLS and MST self-target losses; requires tactical guard")
     parser.add_argument("--position-guard", action="store_true",
-                        help="standalone defending Sheep Token position filter")
+                        help="standalone Sheep Token and empty-field position filter")
     parser.add_argument("--opponent-tactical-guard", action="store_true",
                         help="guard the opponent checkpoint for a direct ablation")
+    parser.add_argument("--opponent-position-guard", action="store_true",
+                        help="apply the position guard to the opponent checkpoint")
     opponents = parser.add_mutually_exclusive_group()
     opponents.add_argument("--opponent", choices=("random", "heuristic",
                                                   "combat_heuristic", "tactical"),
@@ -152,6 +154,10 @@ def main() -> None:
         parser.error("position guard is a standalone ablation")
     if args.opponent_tactical_guard and not args.opponent_checkpoint:
         parser.error("--opponent-tactical-guard requires --opponent-checkpoint")
+    if args.opponent_position_guard and not args.opponent_checkpoint:
+        parser.error("--opponent-position-guard requires --opponent-checkpoint")
+    if args.opponent_position_guard and args.opponent_tactical_guard:
+        parser.error("opponent position guard is a standalone ablation")
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     if not isinstance(checkpoint, dict) or checkpoint.get("schema_version") != 1:
         parser.error("unsupported policy checkpoint schema")
@@ -185,6 +191,7 @@ def main() -> None:
         card_races=load_card_races(args.native_root)) if args.opponent == "tactical" else None
     opponent = (partial(make_policy_agent, checkpoint=str(args.opponent_checkpoint),
                         tactical_guard=args.opponent_tactical_guard,
+                        position_guard=args.opponent_position_guard,
                         card_races=(load_card_races(args.native_root)
                                     if args.opponent_tactical_guard else None))
                 if args.opponent_checkpoint else {
@@ -225,10 +232,13 @@ def main() -> None:
         "policy_inference_version": POLICY_INFERENCE_VERSION,
         "tactical_guard": args.tactical_guard,
         "position_guard": args.position_guard,
+        "position_guard_version": 2 if args.position_guard else None,
         "tactical_guard_version": (5 if args.self_target_guard else
                                    4 if args.weak_flip_guard else 3
                                    if args.tactical_guard else None),
         "opponent_tactical_guard": args.opponent_tactical_guard,
+        "opponent_position_guard": args.opponent_position_guard,
+        "opponent_position_guard_version": 2 if args.opponent_position_guard else None,
         "policy_feature_version": checkpoint.get("feature_version", 1),
         "core_commit": "baa3881d0bae48e9994f915f5c931be53c1ba8ef",
         "asset_sha256": assets,
