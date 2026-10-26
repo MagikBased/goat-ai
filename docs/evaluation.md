@@ -2566,3 +2566,20 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
   --reject-training-deck-hashes --require-unseen-main-decks \
   --output artifacts/fv17_warm_vs_parent_matt_daryl_2150_2157.json
 ```
+
+## Five 2005 Main Deck holdout, seeds 2200–2201
+
+The feature-17 v3 behavioral-cloning checkpoint scored **37 wins, 42 losses,
+1 draw** against CombatHeuristicAgent v3 over 80 games on all ordered pairs
+of five sourced 2005 tournament Main Decks, both seats, and seeds 2200–2201.
+Its score rate was 46.875% (paired bootstrap 95% interval 40.0–53.75%).
+It scored 15–25 from the first seat and 22–17–1 from the second. The evaluator
+rejected training deck file hashes and required unseen Main Deck compositions.
+This result does not establish an advantage over the heuristic.
+
+The four-worker experimental native run took 37.63 tournament seconds for
+63,268 decisions: **2.13 duels/s** and **1,681 decisions/s** on the recorded
+Linux x86-64 machine. The ignored report is
+`artifacts/fv17_v3_2005_top5_2200_2201.json` (SHA-256
+`91bcd000e261b247de145441f09904e76cfd27e700bff19e13fdee1d712dd8aa`).
+The checkpoint and native assets are fingerprinted inside the report.
