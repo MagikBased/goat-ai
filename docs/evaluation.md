@@ -3117,3 +3117,58 @@ options above, replacing `--weak-flip-guard` with `--self-target-guard`.
 Record and audit the complete duel with `scripts/record_policy_match.py
 --tactical-guard --self-target-guard` and then
 `scripts/audit_policy_replays.py` on the resulting trajectory.
+
+## Eight-label replay-review parent-KL probe
+
+The unchanged feature-19 checkpoint scored all eight SHA-256-bound
+`policy_review` choices below its recorded action in the [replay scorecard](replay_audit.md).
+To test whether these corrections transfer, one experimental child initialized
+from `tactical_v3_fv19_2500_2503.pt` (SHA-256
+`fe197724523b33a8d555e90ab9f7b669dab2081b000346b9b31d1788d7e07fc2`)
+and used the five seed-2612 labels plus the three BLS/MST target labels.
+All four full trajectories replay-verified and passed the visibility audit.
+The trainer recorded them as **eight `policy_review_annotation` decisions**, not
+human demonstrations. It preserved 64 multi-option parent-training states,
+sampled 16 each from four pinned tactical-v3 games at seed 2500, while fitting
+for 200 parent-KL steps at learning rate 0.0001, KL weight 1.0, and seed 2700.
+The final labeled loss was **0.67434** and preservation KL **0.01582**.
+
+The ignored child `checkpoints/tactical_v3_fv19_review8_parent_kl_2700.pt`
+has SHA-256 `5d77876dada4966ca39f5c0198d048fc8ed361875518d78b77849642a24720a7`.
+On its **training** annotations, it ranks six of eight reviewed alternatives
+first; frame 181 selects a different action and frame 209 still prefers the
+recorded pass. Its scorecard correctly marks all four source trajectories and
+seeds as training overlap. The ignored scorecard is
+`artifacts/feature19_review8_child_scorecard.json` (SHA-256
+`fad63d6f32b96fcde0dd8fe2d3d3edfc6abdcea97a224c4ce05403db755f7939`).
+This label fit is not held-out evidence.
+
+For direct competitive evaluation, the child played its unchanged parent on
+Chaos Return, Bazoo Return, Goat Control, and Chaos Turbo Main Decks. The
+evaluator rejected Main Deck compositions present in either checkpoint's
+training games. All six pairings, both deck assignments, both policy seats,
+and seeds 2720–2727 produced **192 terminal duels** and **106,268 decisions**.
+The child scored **99 wins, 91 losses, and two draws**: **52.08%** of points,
+paired-bootstrap 95% interval **45.57–58.59%**. Assigned-deck scores were
+Bazoo Return **36–11–1**, Chaos Return **24–23–1**, Chaos Turbo **17–31**, and
+Goat Control **22–26**. The four-worker tournament took **82.79 seconds** on
+the recorded x86_64 machine. Its ignored report is
+`artifacts/feature19_review8_child_vs_parent_2720_2727.json` (SHA-256
+`9b22bafe8a18cb3d2ec2d21b9a7955f59305221b37ce2ec8fbb0f8a11e0ae474`).
+The overall interval includes 50% and deck results are uneven. This child is
+not a promoted strength improvement. More independent target and timing
+examples, including negative cases where an own target is useful, are needed
+before another training attempt can support a general policy claim.
+
+The fit is reproducible with `scripts/train_behavioral_clone.py` using
+`--engine experimental --width 16 --feature-version 19 --seed 2700
+--parent-kl-steps 200 --preserve-per-trajectory 16 --preserve-batch 16
+--parent-kl-weight 1.0 --learning-rate 0.0001`, the parent checkpoint above,
+the four reviewer-labeled trajectories named in the [replay audit](replay_audit.md),
+and the four seed-2500 preservation files in
+`replays/tactical_v3_cas_daryl_2500_2503/` and
+`replays/tactical_v3_matt_jesse_2500_2503/`. The tournament used
+`scripts/evaluate_policy.py --engine experimental --opponent-checkpoint` set
+to the parent, six `--matchup` pairs from the four decks above,
+`--both-deck-assignments --seed 2720 --seeds 8 --max-decisions 3000
+--require-unseen-main-decks --workers 4`.

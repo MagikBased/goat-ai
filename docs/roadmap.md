@@ -457,6 +457,12 @@ An eight-label, four-replay scorecard now verifies reviewed alternatives and
 reports their raw checkpoint ranks and margins. All eight alternatives rank
 below the unchanged feature-19 policy's recorded choice; this gives future
 updates a fixed-state diagnostic, not a substitute for held-out duels.
+An eight-label parent-KL child fit six of those eight decisions but scored
+99–91–2 against its parent over 192 direct games on four unseen Main Deck
+compositions. Its paired interval includes 50%, and the Bazoo Return and
+Chaos Turbo splits diverged. Keep the child experimental and prioritize
+independent, diverse target/timing demonstrations before more fine-tuning;
+see [evaluation](evaluation.md).
 
 ## M5 — Search and other formats
 
