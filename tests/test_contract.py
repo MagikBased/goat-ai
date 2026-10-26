@@ -481,7 +481,7 @@ def test_replay_verifier_detects_changed_decision_and_outcome():
     with pytest.raises(ReplayMismatch, match="rules profile"):
         verify_trajectory(replace(trajectory, rules_profile={"side_deck_policy": "community"}),
                           ContractEngine())
-    with pytest.raises(ReplayMismatch, match="native assets"):
+    with pytest.raises(ReplayMismatch, match="native assets.*fixture"):
         verify_trajectory(replace(trajectory, asset_sha256={"fixture": "wrong"}),
                           ContractEngine())
 

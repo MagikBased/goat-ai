@@ -175,6 +175,13 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             raise ReplayMismatch(f"terminal observation differs in {fields}")
         if trajectory.asset_sha256 is not None:
             manifest = getattr(engine, "replay_manifest", None)
-            if manifest is None or manifest() != trajectory.asset_sha256:
-                raise ReplayMismatch("native assets differ from recorded trajectory")
+            current = manifest() if manifest is not None else None
+            if current != trajectory.asset_sha256:
+                changed = sorted(set(current or ()) | set(trajectory.asset_sha256))
+                changed = [name for name in changed if (current or {}).get(name)
+                           != trajectory.asset_sha256.get(name)]
+                detail = f": {', '.join(changed[:8])}" if changed else ""
+                if len(changed) > 8:
+                    detail += f" (+{len(changed) - 8} more)"
+                raise ReplayMismatch("native assets differ from recorded trajectory" + detail)
     return len(trajectory.decisions)

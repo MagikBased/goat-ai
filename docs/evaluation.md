@@ -4374,3 +4374,66 @@ Reproduce by invoking `scripts/evaluate_policy.py` with the checkpoint above,
 `--matchup` pairs listed above. Add `--tactical-guard --weak-flip-guard` for
 the second mode. The next training step needs independent, reviewed examples
 across decks and a held-out result against opponents not used as teachers.
+
+## Current-asset Magician of Faith preference probe (2026-10-26)
+
+The previous feature-v23 checkpoint's 16 demonstration replays no longer
+replay-verify under the current native adapter. Their observations and legal
+choices still reproduce, but the loaded Book of Moon script hash differs
+because the adapter now applies the historical target patch. The verifier
+correctly rejects this asset drift. It now names differing asset paths in the
+error to make such failures diagnosable. No old replay was relabeled or
+silently accepted for training.
+
+Fresh TacticalHeuristicAgent v6 demonstrations on the current assets used
+Matt Peddle versus Chaos Turbo (seeds 4800–4803) and Cas Stomphorst versus
+Daryl Gessler (seeds 4810–4813), both teacher seats. All 16 full duels were
+replay-verified and visibility-audited while training a width-32,
+feature-v23 clone for two epochs (seed 27, batch size 16, learning rate
+0.001). Its 4,958 teacher decisions produced checkpoint SHA-256
+`93ca70795e2c5316ab349a4e5c61ebd553915e49abdbe469d0976d3bebe3d9b2`.
+This is a refreshed experimental parent, not the earlier 5,445-decision
+checkpoint and not a strength improvement claim.
+
+Against TacticalHeuristicAgent v7 on Jesse Twohig versus Warrior, seed 6600,
+the refreshed clone Normal Summoned 300-ATK Magician of Faith into a visible
+1800-ATK opposing monster on turn 5, viewer frame 168. Setting the same Faith
+was legal. The complete 401-decision duel replay-verified and the preference
+file at `examples/preferences/fv23_jesse_warrior_6600_faith_set.preference.json`
+binds **Set Faith over Normal Summon Faith** to its SHA-256. This is a
+retrospective project review derived from the player's general Faith guidance,
+not a claim that the player reviewed this exact frame or that Set wins the
+game. The opponent's hidden cards are absent from the policy observation.
+
+A 150-step pairwise update with parent KL weight 1.0 and 64 preservation
+states from four current-asset parent demonstrations moved the labeled
+Set-minus-Summon score margin from **−0.623** to **+1.567**. The child now
+ranks Set first on that *training* state; final sampled preservation KL was
+0.00242. Its checkpoint SHA-256 is
+`2d627cca1733a758cc570ce6b33f488ab15f9b60cc70178c6257da2570bfbfbf`.
+
+On fresh seeds 6700–6707, Michael Fukuyama versus Chaos Return, both deck
+assignments and both seats, the child scored **13–17–2** (43.75%) against its
+frozen parent. Both Main Deck compositions were excluded from all parent and
+preference training; every duel terminated below the 5,000-decision cap.
+The paired-bootstrap 95% score interval was **34.38%–50.00%**. The four-worker
+tournament ran 16,634 decisions in 18.02 s (1.78 duels/s on the recorded
+machine). A single corrected training choice therefore did **not** establish
+better competitive play; the child stays experimental. The ignored report
+SHA-256 is
+`03fcdabe1d3e6b778350a1d41983bdbc6eb844834f2d9b04c31db17f5ee7766b`.
+
+Reproduce with the pinned native setup, `OMP_NUM_THREADS=1`, and these scripts
+in order: `collect_heuristic_demos.py` twice with `--engine experimental
+--teacher tactical --opponent combat_heuristic`, the deck pairs and seeds
+above, `--seeds 4`; `train_behavioral_clone.py` on all 16 resulting JSON
+files with the hyperparameters above; `record_policy_match.py` on Jesse versus
+Warrior, seed 6600, policy seat 0, opponent tactical; then
+`score_reviewed_preferences.py` and `train_review_preferences.py` with the
+tracked preference file and four preservation trajectories (both seats for
+seed 4800 and seed 4810), `--steps 150 --preserve-per-trajectory 16
+--preserve-batch 16 --parent-kl-weight 1 --learning-rate 0.0001 --seed 28`.
+Use `evaluate_policy.py` with `--opponent-checkpoint` set to the refreshed
+parent, `--require-unseen-main-decks --both-deck-assignments --seed 6700
+--seeds 8 --workers 4` and the Michael/Chaos Return matchup. Generated
+replays, checkpoints, and reports remain outside Git.
