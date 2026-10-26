@@ -16,6 +16,7 @@ from goat_ai.agents import (
     HeuristicAgent,
     RandomAgent,
     TacticalHeuristicAgent,
+    load_card_facts,
     load_card_races,
     load_flip_monster_codes,
 )
@@ -49,8 +50,9 @@ def make_combat_heuristic_agent(_seed: int):
 
 
 def make_tactical_agent(_seed: int, flip_codes: frozenset[int],
-                        card_races: dict[int, int]):
-    return TacticalHeuristicAgent(flip_codes, card_races)
+                        card_races: dict[int, int],
+                        card_facts: dict[int, tuple[int, int, int]]):
+    return TacticalHeuristicAgent(flip_codes, card_races, card_facts=card_facts)
 
 
 def validate_heldout_seeds(checkpoint: dict, seeds: list[int]) -> None:
@@ -188,7 +190,8 @@ def main() -> None:
     runner = run_tournament_parallel if args.workers > 1 else run_tournament
     tactical_opponent = partial(
         make_tactical_agent, flip_codes=load_flip_monster_codes(args.native_root),
-        card_races=load_card_races(args.native_root)) if args.opponent == "tactical" else None
+        card_races=load_card_races(args.native_root),
+        card_facts=load_card_facts(args.native_root)) if args.opponent == "tactical" else None
     opponent = (partial(make_policy_agent, checkpoint=str(args.opponent_checkpoint),
                         tactical_guard=args.opponent_tactical_guard,
                         position_guard=args.opponent_position_guard,

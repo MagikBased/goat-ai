@@ -394,6 +394,17 @@ both motivating Thousand-Eyes Restrict choices. Its 34–29–1 direct score on
 Future policy work should inspect source/target labels and broader deck
 coverage before adding more relation layers. See [evaluation](evaluation.md).
 
+The later seed-6803 v9 replay exposed ineffective open Main Phase guards:
+Chaos Sorcerer could still banish itself and Breaker could spend its counter
+on its controller's Trap. Tactical v10 closes those cases, holds the reviewed
+premature Book of Moon, and limits unhelpful battle-position changes. The
+same-seed v10 replay passes native verification and visibility checks. In a
+small direct 32-duel comparison it scored 18–14 against v9, with a paired
+interval including 50%; broader validation remains necessary. A separate
+21-preference training pilot improved reviewed choices but scored 31–32–1
+against its parent on two held-out matchups, so it was not promoted. See
+[replay audit](replay_audit.md) and [evaluation](evaluation.md).
+
 A matched 32-game snapshot-pool self-play pilot compared learning rates
 0.001 and 0.0001 on the same four high-play-deck pairings and seeds. All 64
 training trajectories replay-verified and passed the visibility audit. Both
@@ -798,3 +809,12 @@ A small parent-KL child changed three greedy fixed-state choices but split
 feedback plumbing, not the M4 strength gate. Collect more independently
 reviewed decisions, including target and resource-cost comparisons, before
 another promotion attempt; keep evaluation decks and seeds separate.
+
+The later seed-6803 seat-0 replay review found that both players used Tactical
+v8 and exposed repeated own-monster removal, early Thunder Dragon discards,
+weak Metamorphosis, and poor Swap and Tsukuyomi targets. Tactical v9 adds
+visible-state baseline checks without changing the historical GOAT zero-copy
+Thunder Dragon rule. It scored 34–29–1 against v8 on a 64-duel, four-matchup
+schedule. M4 still needs trained policy gains on independent decks and seeds;
+this heuristic revision does not close that gate. See [replay audit](replay_audit.md)
+and [evaluation](evaluation.md).

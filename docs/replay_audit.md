@@ -875,7 +875,7 @@ add one for the viewer frame.
 | ---: | --- | --- | --- |
 | 6 | Tactical v7, P2 | Discarded Snatch Steal to opposing Delinquent Duo with Sinister Serpent also in hand. | v8 chooses the recoverable Serpent. |
 | 42 | Combat v3, P1 | Canceled Thunder Dragon's search when two copies were offered. | v8 selects the maximum offered copies; this does not change Combat v3. |
-| 118 | Combat v3, P1 | Activated BLS's banish effect with no opposing monster, then had only its own BLS as a legal target. | Existing Tactical guard defers the activation; the target prompt alone is too late. |
+| 118 | Combat v3, P1 | Activated BLS's banish effect with no opposing monster, then had only its own BLS as a legal target. | Tactical v9 defers that activation; the earlier target-only guard did not prevent an own-only choice. |
 | 140 | Tactical v7, P2 | Normal Summoned Sinister Serpent while other Normal Summons, including D.D. Assailant, were legal. | v8 defers Serpent's Normal Summon when another monster can be Normal Summoned. |
 | 167–169 | Combat v3, P1 | Activated Raigeki Break, discarded Heavy Storm, and chose its own set card while an opposing monster was a legal target. | Still needs a general removal and discard value model. |
 | 310 | Tactical v7, P2 | Chained Dust Tornado to Book of Moon. The offered Pass preserved Dust Tornado without stopping Book's one-shot effect. | v8 passes in this specific chain pattern. |
@@ -922,3 +922,82 @@ players' information boundaries. These reviews are **not human gameplay
 demonstrations** and do not turn a baseline's other decisions into expert
 labels. Both the score report and a small opt-in parent-KL experiment are
 recorded in [evaluation](evaluation.md).
+
+## Matt versus Chaos, seed 6803: both players Tactical v8
+
+The user's later notes refer to
+`replays/tactical_v8_matt_vs_chaos_6803/seed_6803_seat_0.json` (SHA-256
+`a5612f3babbae005cb2506c767d38289df8dbbbee99f7aebf48a7570ac04ad5b`),
+an **879-decision, 37-turn** game. Both seats used Tactical v8. This is a
+different duel from the shorter seed-6803 seat-1 replay linked earlier.
+Both trajectories replay-verify. Indices below are zero-based; viewer frames
+are one greater. At effect-target prompts, the mistake may be the earlier
+activation rather than the later forced choice.
+
+| Decision | Reviewed v8 choice | v9 response on the identical visible state |
+| ---: | --- | --- |
+| 10 | Metamorphosis Tributes Newdoria for a Level 4 vanilla Fusion with only a 300-ATK gain. | Defer activation; the printed Fusion Type, Level and ATK show no useful upgrade. A Level 1 Sheep Token with Thousand-Eyes Restrict in the Extra Deck remains eligible. |
+| 34, 37 | P2 discards both searched Thunder Dragons after all three original copies are in hand/Graveyard. | Pass on both activations when the player's own initial list and known zones account for all copies. The engine still permits zero searches under the historical TCG Netrep ruling. |
+| 57, 671, 724, 780 | Chaos Sorcerer selects its controller's monsters despite opposing face-up monsters being offered. | Prefer an opposing target, including Darkfire Dragon, Magician of Faith, or Thousand-Eyes Restrict. |
+| 100, 102 | P1 Sets Heavy Storm, then spends Breaker's counter to destroy it. | Hold the Storm when there is no opposing backrow; decline Breaker's effect if only own backrow exists. Decision 103 is forced once the counter was spent. |
+| 132 | P2 uses Book of Moon on Breaker during P2's Draw Phase. | Pass in the own Draw/Standby Phase without a pending chain. This narrow timing guard does not judge later tactical Book uses. |
+| 384 | P1 gives Jinzo to Creature Swap with three Sheep Tokens also offered. | Offer a Sheep Token. |
+| 477 | P1 targets Tsukuyomi itself with its flip-down effect. | Target its equipped Thousand-Eyes Restrict to free its Equip Card and reset its effect. |
+| 831, 833 | P2 activates Raigeki Break in its own Draw Phase, discards Trap Dustshoot, then targets its own Set Chaos Sorcerer. | Defer that early activation; if a removal effect is already committed and an opposing target is offered, prefer the opposing target. |
+
+The full same-seed v9-versus-v9 game is
+`replays/tactical_v9_matt_vs_chaos_6803/seed_6803_seat_0.json` (445 decisions,
+SHA-256 `52120c51f5fc96b2beb90aa87f4d3b5daf7b3f6c2c7b11014e06bcce3d9ee1d1`).
+Open `replays/tactical_v9_matt_vs_chaos_seed6803.html` for its card-image
+viewer. It replay-verified, passed the decision visibility audit, and
+reproduced the v9 teacher's recorded choices. Historical v8 choices also
+reproduced with v9 behavior disabled. The new duel has a different branch
+and ends on turn 11, so old frame numbers do not map into it. These are
+visible-state heuristics for baseline data quality; a neural policy still
+needs broader training and held-out validation.
+
+The same review also produced 14 `baseline_review` preferences, split by
+acting seat in `examples/preferences/tactical_v8_seed6803_player1_baseline.preference.json`
+and `tactical_v8_seed6803_player2_baseline.preference.json`. Both files bind
+to the v8 replay SHA-256 above and contain only comparisons supported by the
+user's notes, such as holding Thunder Dragon or offering one of three Sheep
+Tokens instead of Jinzo. At target prompts with several plausible opposing
+monsters, unranked alternatives remain unranked. The preference reader,
+replay verifier, and visibility audit accepted all 14 before scoring. The
+earlier feature-v23 Tactical-v6 clone, trained on different seeds, greedily
+chose a preferred action in 6 of 14 states; eight pairwise margins were
+negative. This is fixed-state evidence of learnable gaps, not match strength.
+
+### Tactical v10 follow-up: turn 2 and turn 6
+
+In the v9 seed-6803 seat-0 replay, P2 activated Book of Moon from hand during
+its own Main Phase at decision 35 while controlling no monsters and with no
+chain pending. At decision 51 it activated Chaos Sorcerer's banish effect
+while the opponent had no face-up monster, making the self-target at decision
+52 unavoidable. At decision 217 it spent Breaker's counter with no opposing
+Spell/Trap, making its own Set Ring of Destruction the only target. The v9
+activation checks incorrectly required a `pass` action, which is absent from
+open Main Phase prompts. Tactical v10 handles these prompts and defers Book
+from hand on its own Main Phase without an active chain, except to unlock
+attacks through an opposing face-up Thousand-Eyes Restrict. It also declines
+to chain Book to its own Chaos Sorcerer, BLS, or Breaker effect. Applying v10 to the
+same recorded observations yields pass at 35, Set Magician of Faith at 51,
+and Battle Phase at 217; the resulting duel branches differently.
+
+P2's Breaker could not attack P1's face-up Thousand-Eyes Restrict on turn 6:
+the engine offered Battle Phase but no attack action. This matches Restrict's
+historical lock on attacks by all other monsters, already covered by the
+[paired native regression](goat_rules.md). v10 therefore changes the bad
+Breaker activation. It also removes attack-to-defense switches when ATK is
+at least DEF, and defers a defense-to-attack switch against fully visible
+enemy monsters unless it can win a visible battle. The policy retains legal
+position actions when their value is uncertain; it is still a heuristic.
+
+The complete same-seed v10 replay is
+`replays/tactical_v10_matt_vs_chaos_6803/seed_6803_seat_0.json` (487
+decisions, 13 turns). Open
+`replays/tactical_v10_matt_vs_chaos_seed6803.html` for its offline viewer.
+Both v10 seats and the older v9 seat-0 replay replay-verified, passed the
+visibility audit, and reproduced their versioned teacher choices. The v10
+seat-0 game has no selected position changes; this describes one duel, not
+a general performance claim.

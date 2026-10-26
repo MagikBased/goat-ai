@@ -26,13 +26,21 @@ NOBLEMAN_OF_CROSSOUT = 504700116
 DUST_TORNADO = 60082869
 BOOK_OF_MOON = 14087893
 SINISTER_SERPENT = 511000818
+THUNDER_DRAGON = 504700054
+CHAOS_SORCERER = 9596126
+RAIGEKI_BREAK = 4178474
+METAMORPHOSIS = 46411259
+THOUSAND_EYES_RESTRICT = 504700102
+FUSION_TYPE = 0x40
+EFFECT_TYPE = 0x20
 SHEEP_TOKENS = frozenset((73915052, 73915053, 73915054, 73915055))
 
 
 def safe_position_indices(observation: Observation,
                           legal_actions: Sequence[Action],
                           admissible: Sequence[int], *,
-                          empty_field_attack_guard: bool = True) -> tuple[int, ...]:
+                          empty_field_attack_guard: bool = True,
+                          v10_guard: bool = False) -> tuple[int, ...]:
     """Remove position switches with no visible combat upside.
 
     A defending Sheep Token has no attack power. On an empty opposing field,
@@ -60,6 +68,21 @@ def safe_position_indices(observation: Observation,
         if slot in own_defenders:
             return False
         card = own_monsters.get(slot)
+        if (v10_guard and card is not None and card.position == "faceup"
+                and card.attack is not None and card.defense is not None):
+            if card.orientation == "attack" and card.attack >= card.defense:
+                return False
+            if card.orientation == "defense" and opponent_monsters:
+                # Keep the safer stance unless a visible battle can justify
+                # exposing this monster. Unknown Set monsters remain uncertain.
+                enemies = [enemy for enemy in observation.field
+                           if enemy.zone == "monster" and enemy.controller != observation.viewer]
+                if (all(enemy.position == "faceup" and enemy.attack is not None
+                        for enemy in enemies)
+                        and not any(card.attack > (
+                            enemy.attack if enemy.orientation == "attack"
+                            else (enemy.defense or 0)) for enemy in enemies)):
+                    return False
         return not (empty_field_attack_guard and not opponent_monsters
                     and card is not None and card.position == "faceup"
                     and card.orientation == "attack" and card.attack is not None
@@ -71,7 +94,8 @@ def safe_position_indices(observation: Observation,
 
 def safe_target_indices(observation: Observation,
                         legal_actions: Sequence[Action],
-                        admissible: Sequence[int]) -> tuple[int, ...]:
+                        admissible: Sequence[int], *,
+                        protect_removal_targets: bool = False) -> tuple[int, ...]:
     """Avoid observed own-target losses when an enemy target is offered.
 
     This opt-in preference applies only at the target prompt. It does not
@@ -81,7 +105,12 @@ def safe_target_indices(observation: Observation,
     if not observation.chain or observation.chain[-1].controller != observation.viewer:
         return indices
     source = observation.chain[-1]
-    if source.card_code not in (BLACK_LUSTER_SOLDIER, MYSTICAL_SPACE_TYPHOON):
+    sources = {BLACK_LUSTER_SOLDIER, MYSTICAL_SPACE_TYPHOON}
+    if protect_removal_targets:
+        sources.update((CHAOS_SORCERER, RAIGEKI_BREAK,
+                        BREAKER_THE_MAGICAL_WARRIOR, DUST_TORNADO,
+                        NOBLEMAN_OF_CROSSOUT))
+    if source.card_code not in sources:
         return indices
     own = observation.viewer
     if source.card_code == BLACK_LUSTER_SOLDIER and any(
@@ -156,10 +185,57 @@ def weak_flip_set_substitute(observation: Observation,
                  and a.parameters.get("code") == code), None)
 
 
+def known_thunder_copies_in_deck(observation: Observation) -> int | None:
+    """Upper bound from the player's own original list and current known zones.
+
+    A transferred card in an opponent's hidden zone is not counted. When the
+    initial Main Deck is absent (legacy observations), no inference is made.
+    """
+    initial = observation.own_main_deck.count(THUNDER_DRAGON)
+    if not initial:
+        return None
+    own = observation.viewer
+    outside = sum(card.code == THUNDER_DRAGON for card in (
+        *observation.hand, *observation.graveyards[own],
+        *observation.banished[own]))
+    return max(0, initial - outside)
+
+
+def useful_metamorphosis_option(observation: Observation,
+                                card_facts: Mapping[int, tuple[int, int, int]]) -> bool:
+    """Keep Metamorphosis when a visible tribute can make a useful Fusion.
+
+    Unknown printed metadata leaves the option available. This is a
+    conservative value filter, never a replacement for the engine's legality.
+    """
+    if not card_facts or not observation.own_extra_deck:
+        return True
+    fusions = [card_facts.get(card.code) for card in observation.own_extra_deck]
+    own_monsters = [card for card in observation.field
+                    if card.zone == "monster" and card.controller == observation.viewer]
+    if not own_monsters or any(card.code not in card_facts for card in own_monsters):
+        return True
+    for monster in own_monsters:
+        _, level, printed_attack = card_facts[monster.code]
+        attack = monster.attack if monster.attack is not None else printed_attack
+        for fusion in fusions:
+            if fusion is None:
+                return True
+            card_type, fusion_level, fusion_attack = fusion
+            if not (card_type & FUSION_TYPE) or fusion_level != level:
+                continue
+            if (card_type & EFFECT_TYPE or fusion_attack > max(0, attack) + 500):
+                return True
+    return False
+
+
 def admissible_action_indices(observation: Observation,
                               legal_actions: Sequence[Action],
                               card_races: Mapping[int, int] | None = None,
                               *, tactical_v8_guards: bool = False,
+                              tactical_v9_guards: bool = False,
+                              tactical_v10_guards: bool = False,
+                              card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                               ) -> tuple[int, ...]:
     """Defer clearly wasteful actions while preserving an engine-legal choice.
 
@@ -179,6 +255,9 @@ def admissible_action_indices(observation: Observation,
     opponent_monsters = [c for c in observation.field
                          if c.zone == "monster" and c.controller != own]
     can_pass = any(a.kind == "pass" for a in legal_actions)
+    enemy_faceup_monster = any(c.position == "faceup" for c in opponent_monsters)
+    known_thunder_left = (known_thunder_copies_in_deck(observation)
+                          if tactical_v9_guards else None)
     card_races = card_races or {}
     have_race_data = bool(card_races) or any(c.race is not None for c in opponent_monsters)
     tribe_prompt = (have_race_data and observation.chain
@@ -227,6 +306,58 @@ def admissible_action_indices(observation: Observation,
         code = action.parameters.get("code")
         if (code == HEAVY_STORM and action.kind == "activate"
                 and own_backrow and not opponent_backrow):
+            continue
+        if (tactical_v9_guards and code == HEAVY_STORM
+                and action.kind == "set_spell_trap" and len(observation.hand) < 6
+                and not opponent_backrow):
+            continue
+        if (tactical_v9_guards and code == THUNDER_DRAGON
+                and action.kind in ("activate", "chain")
+                and known_thunder_left == 0):
+            continue
+        if (tactical_v9_guards and code == METAMORPHOSIS
+                and action.kind in ("activate", "chain")
+                and not useful_metamorphosis_option(observation, card_facts or {})):
+            continue
+        if (tactical_v9_guards and code in (BOOK_OF_MOON, RAIGEKI_BREAK)
+                and action.kind == "chain" and can_pass
+                and observation.turn_player == own and not observation.chain
+                and observation.phase in ("draw", "standby")):
+            continue
+        if (tactical_v10_guards and code == BOOK_OF_MOON
+                and action.kind in ("activate", "chain")
+                and observation.turn_player == own and not observation.chain
+                and observation.phase in ("main1", "main2")
+                and action.parameters.get("location") == 2
+                and not any(c.position == "faceup"
+                            and c.code == THOUSAND_EYES_RESTRICT
+                            for c in opponent_monsters)):
+            continue
+        if (tactical_v10_guards and code == BOOK_OF_MOON
+                and action.kind == "chain" and can_pass and observation.chain
+                and observation.chain[-1].controller == own
+                and observation.chain[-1].card_code in (
+                    CHAOS_SORCERER, BLACK_LUSTER_SOLDIER,
+                    BREAKER_THE_MAGICAL_WARRIOR)):
+            continue
+        if (tactical_v9_guards and code == BREAKER_THE_MAGICAL_WARRIOR
+                and action.kind in ("activate", "chain")
+                and (can_pass or tactical_v10_guards)
+                and not opponent_backrow):
+            continue
+        if (tactical_v9_guards and code in (BLACK_LUSTER_SOLDIER, CHAOS_SORCERER)
+                and action.kind in ("activate", "chain")
+                and (can_pass or tactical_v10_guards)
+                and not enemy_faceup_monster
+                and not any(c.zone == "monster" and c.controller == own
+                            and c.sequence == action.parameters.get("sequence")
+                            and c.owner is not None and c.owner != own
+                            for c in own_monsters)):
+            continue
+        if (tactical_v9_guards and code == RAIGEKI_BREAK
+                and action.kind in ("activate", "chain")
+                and (can_pass or tactical_v10_guards)
+                and not any(c.controller != own for c in observation.field)):
             continue
         if (code == TRIBE_INFECTING_VIRUS
                 and action.kind in ("activate", "chain")

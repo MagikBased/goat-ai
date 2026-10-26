@@ -18,6 +18,7 @@ from goat_ai.agents import (
     HeuristicAgent,
     RandomAgent,
     TacticalHeuristicAgent,
+    load_card_facts,
     load_card_races,
     load_flip_monster_codes,
 )
@@ -52,7 +53,8 @@ def flip_monster_codes(native_root: Path) -> frozenset[int]:
 
 
 def make_agent(name: str, seed: int, flip_codes: frozenset[int] = frozenset(),
-               card_races: dict[int, int] | None = None):
+               card_races: dict[int, int] | None = None,
+               card_facts: dict[int, tuple[int, int, int]] | None = None):
     """Construct a baseline using only the public observation/action interface."""
     if name == "random":
         return RandomAgent(seed)
@@ -63,7 +65,7 @@ def make_agent(name: str, seed: int, flip_codes: frozenset[int] = frozenset(),
     if name == "combat_flip":
         return CombatFlipHeuristicAgent(flip_codes)
     if name == "tactical":
-        return TacticalHeuristicAgent(flip_codes, card_races)
+        return TacticalHeuristicAgent(flip_codes, card_races, card_facts=card_facts)
     raise ValueError(f"unknown baseline agent: {name}")
 def deck_label(path: Path) -> str:
     """Use checkout-independent paths for the repository's example decks."""
@@ -112,6 +114,7 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
     flip_codes = (flip_monster_codes(native_root)
                   if agent_name in ("combat_flip", "tactical") else frozenset())
     races = load_card_races(native_root) if agent_name == "tactical" else {}
+    facts = load_card_facts(native_root) if agent_name == "tactical" else {}
     verified_decisions = 0
     if record_dir is not None:
         record_dir.mkdir(parents=True, exist_ok=True)
@@ -124,8 +127,8 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
                 with GoatEnvironment(*(str(path) for path in decks), seed=seed,
                                      engine=ExperimentalOcgcoreEngine(native_root)) as env:
                     observation = env.reset()
-                    agents = (make_agent(agent_name, seed * 2, flip_codes, races),
-                              make_agent(agent_name, seed * 2 + 1, flip_codes, races))
+                    agents = (make_agent(agent_name, seed * 2, flip_codes, races, facts),
+                              make_agent(agent_name, seed * 2 + 1, flip_codes, races, facts))
                     for decision_index in range(max_decisions):
                         if env.is_terminal():
                             break

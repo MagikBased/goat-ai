@@ -11,6 +11,7 @@ from goat_ai.agents import (
     HeuristicAgent,
     RandomAgent,
     TacticalHeuristicAgent,
+    load_card_facts,
     load_card_races,
     load_flip_monster_codes,
 )
@@ -25,10 +26,11 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--teacher", choices=("heuristic", "combat_heuristic",
-                                              "combat_flip", "tactical"),
+                                              "combat_flip", "tactical", "tactical_v9", "tactical_v8"),
                         default="heuristic")
     parser.add_argument("--opponent", choices=("random", "heuristic",
-                                               "combat_heuristic", "tactical"), default="random")
+                                               "combat_heuristic", "tactical",
+                                               "tactical_v9", "tactical_v8"), default="random")
     parser.add_argument("--deck-a", type=Path)
     parser.add_argument("--deck-b", type=Path)
     parser.add_argument("--seed", type=int, default=1000)
@@ -46,12 +48,19 @@ def main() -> None:
     teacher_type = {"heuristic": HeuristicAgent,
                     "combat_heuristic": CombatHeuristicAgent,
                     "combat_flip": CombatFlipHeuristicAgent,
-                    "tactical": TacticalHeuristicAgent}[args.teacher]
+                    "tactical": TacticalHeuristicAgent,
+                    "tactical_v9": TacticalHeuristicAgent,
+                    "tactical_v8": TacticalHeuristicAgent}[args.teacher]
+    tactical_teacher = args.teacher in ("tactical", "tactical_v9", "tactical_v8")
+    tactical_opponent = args.opponent in ("tactical", "tactical_v9", "tactical_v8")
     flip_codes = (load_flip_monster_codes(args.native_root)
-                  if args.teacher in ("combat_flip", "tactical")
-                  or args.opponent == "tactical" else frozenset())
+                  if args.teacher == "combat_flip" or tactical_teacher
+                  or tactical_opponent else frozenset())
     card_races = (load_card_races(args.native_root)
-                  if args.teacher == "tactical" or args.opponent == "tactical" else {})
+                  if tactical_teacher or tactical_opponent else {})
+    card_facts = (load_card_facts(args.native_root)
+                  if args.teacher in ("tactical", "tactical_v9")
+                  or args.opponent in ("tactical", "tactical_v9") else {})
     args.output_dir.mkdir(parents=True, exist_ok=True)
     games = []
     for seed in range(args.seed, args.seed + args.seeds):
@@ -60,11 +69,17 @@ def main() -> None:
             with GoatEnvironment(*(str(deck) for deck in decks), seed=seed,
                                  engine=engine_type(args.native_root)) as env:
                 observation = env.reset()
-                teacher = (TacticalHeuristicAgent(flip_codes, card_races)
-                           if args.teacher == "tactical" else teacher_type(flip_codes))
+                teacher = (TacticalHeuristicAgent(flip_codes, card_races,
+                                                  card_facts=card_facts,
+                                                  v9_guards=args.teacher in ("tactical", "tactical_v9"),
+                                                  v10_guards=args.teacher == "tactical")
+                           if tactical_teacher else teacher_type(flip_codes))
                 opponent = (RandomAgent(seed) if args.opponent == "random" else
-                            TacticalHeuristicAgent(flip_codes, card_races)
-                            if args.opponent == "tactical" else {
+                            TacticalHeuristicAgent(flip_codes, card_races,
+                                                   card_facts=card_facts,
+                                                   v9_guards=args.opponent in ("tactical", "tactical_v9"),
+                                                   v10_guards=args.opponent == "tactical")
+                            if tactical_opponent else {
                                 "heuristic": HeuristicAgent,
                                 "combat_heuristic": CombatHeuristicAgent,
                             }[args.opponent]())
@@ -76,13 +91,18 @@ def main() -> None:
                     observation = env.step(action)
                     if env.is_terminal():
                         trajectory = replace(
-                            env.trajectory(), source=args.teacher,
+                            env.trajectory(), source=("tactical" if tactical_teacher
+                                                      else args.teacher),
                             skill_metadata={"demonstrator_seat": teacher_seat,
                                             "teacher": teacher_type.__name__,
-                                            "teacher_version": teacher_type.teacher_version,
+                                            "teacher_version": (8 if args.teacher == "tactical_v8"
+                                                                else 9 if args.teacher == "tactical_v9"
+                                                                else teacher_type.teacher_version),
                                             "opponent": type(opponent).__name__,
-                                            "opponent_version": getattr(
-                                                opponent, "teacher_version", 1)},
+                                            "opponent_version": (8 if args.opponent == "tactical_v8"
+                                                                 else 9 if args.opponent == "tactical_v9"
+                                                                 else getattr(
+                                                                     opponent, "teacher_version", 1))},
                         )
                         path = args.output_dir / f"seed_{seed}_seat_{teacher_seat}.json"
                         write_trajectory(path, trajectory)

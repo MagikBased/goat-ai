@@ -4645,3 +4645,60 @@ settings above. Direct evaluation used `scripts/evaluate_policy.py
 --engine experimental --both-deck-assignments --opponent-checkpoint
 .cache/goat-ai/fv23_tactical_v6_current_assets.pt --require-unseen-main-decks
 --seed 8200 --seeds 8 --workers 4` for each held-out pair.
+
+### Tactical v9 review of both-seat seed 6803
+
+The separate seed-6803 seat-0 replay has both players running Tactical v8.
+The player's review identified repeated self-targeted removal, premature
+Metamorphosis and Book of Moon, poor Creature Swap and Tsukuyomi targets, and
+two Thunder Dragon discards after its remaining copies were already known
+outside the Deck. Tactical v9 adds conservative visible-state resource and
+target checks. The 879-decision v8 game and a new 445-decision v9-versus-v9
+game both replay-verified and reproduced their versioned teacher choices;
+see [replay audit](replay_audit.md) for exact decision indices. The historical
+GOAT Netrep zero-search option remains legal in the simulator.
+
+In a 64-duel direct v9-versus-v8 tournament with four native workers, seeds
+8200–8203, both seats and deck assignments, v9 scored **34 wins, 29 losses,
+one draw**. By matchup, Cas/Daryl was 7–9, Matt/Chaos Turbo 10–6,
+Jesse/Michael 9–7, and Chaos Control/Warrior 8–7–1. These small samples do
+not establish a general strength gain, and all four matchups use the same
+experimental GOAT-mode adapter rather than an independently certified full
+2005 rules implementation. The ignored, fingerprinted reports are
+`.cache/goat-ai/tactical_v9_vs_v8_fourpair_0_8200_8203.json` through
+`..._3_8200_8203.json`. Reproduce each pair with
+`scripts/evaluate_native.py --engine experimental --both-deck-assignments
+--agent-a tactical_v9 --agent-b tactical_v8 --seed 8200 --seeds 4 --workers 4`
+and the corresponding two Main Deck paths above.
+
+### Tactical v10 correction and review-data experiment
+
+The v9 seed-6803 replay exposed open Main Phase checks that required a
+`pass` action even though the engine offered only phase transitions. This
+allowed Chaos Sorcerer to banish itself and Breaker to destroy its own Set
+Trap. Tactical v10 makes those checks work without a `pass`, holds an
+unmotivated own-turn Book of Moon during its Main Phase or when chaining to
+its own Chaos Sorcerer effect, and
+reduces position switches with no visible battle gain. Its same-seed Matt
+versus Chaos Turbo replay is linked in [replay audit](replay_audit.md).
+
+In a **32-duel** direct v10-versus-v9 tournament on Matt/Chaos Turbo and
+Cas/Daryl, seeds 8500–8503, both seats and deck assignments, v10 scored
+**18–14**. The paired bootstrap score interval was **0.438–0.719**, so this
+small result does not establish a strength improvement. The fingerprinted
+report is `.cache/goat-ai/tactical_v10_vs_v9_8500_8503.json`. Reproduce with
+`scripts/evaluate_native.py --engine experimental --agent-a tactical
+--agent-b tactical_v9 --both-deck-assignments --seed 8500 --seeds 4
+--workers 4` and the two deck pairs above. Here `tactical_v9` preserves
+the reviewed v9 decisions.
+
+The 14 new seat-specific preferences from the v8 seed-6803 review were
+combined with the earlier seven v7 preferences for a **21-comparison**
+parent-KL training pilot. The child greedily chose a preferred action at
+**16 of 21** reviewed source states. On held-out Jesse/Michael and Chaos
+Control/Warrior matchups, seeds 8300–8307, both seats and deck assignments,
+it scored **15–17** and **16–15–1** against the unchanged parent, or
+**31–32–1** combined. That does not meet the competitive promotion gate.
+The ignored child and reports are
+`.cache/goat-ai/fv23_seed6803_combined_review21_child.pt` and
+`.cache/goat-ai/fv23_seed6803_combined_review21_vs_parent_heldout_{0,1}.json`.

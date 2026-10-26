@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "source_trajectory_sha256": "a5612f3babbae005cb2506c767d38289df8dbbbee99f7aebf48a7570ac04ad5b",
+  "authorization": "baseline_review",
+  "reviewed_seat": 1,
+  "reviewer": "GOAT AI user replay notes, Tactical v8 Matt versus Chaos seed 6803",
+  "preferences": [
+    {
+      "decision_index": 34,
+      "preferred_action_indices": [2],
+      "disfavored_action_indices": [0, 1]
+    },
+    {
+      "decision_index": 37,
+      "preferred_action_indices": [1],
+      "disfavored_action_indices": [0]
+    },
+    {
+      "decision_index": 57,
+      "preferred_action_indices": [1],
+      "disfavored_action_indices": [0]
+    },
+    {
+      "decision_index": 132,
+      "preferred_action_indices": [1],
+      "disfavored_action_indices": [0]
+    },
+    {
+      "decision_index": 671,
+      "preferred_action_indices": [5, 6],
+      "disfavored_action_indices": [0]
+    },
+    {
+      "decision_index": 724,
+      "preferred_action_indices": [4],
+      "disfavored_action_indices": [0]
+    },
+    {
+      "decision_index": 780,
+      "preferred_action_indices": [3],
+      "disfavored_action_indices": [0]
+    },
+    {
+      "decision_index": 831,
+      "preferred_action_indices": [1],
+      "disfavored_action_indices": [0]
+    },
+    {
+      "decision_index": 833,
+      "preferred_action_indices": [3],
+      "disfavored_action_indices": [0]
+    }
+  ]
+}

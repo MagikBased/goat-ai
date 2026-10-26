@@ -243,6 +243,205 @@ def test_v8_saves_serpent_normal_summon_when_another_monster_is_available():
         board(), actions) == serpent
 
 
+def test_v9_holds_thunder_when_all_initial_copies_are_known_outside_deck():
+    thunder = 504700054
+    activate = Action("thunder", "chain", 0, {"code": thunder})
+    decline = Action("decline", "pass", 0)
+    view = replace(board(), own_main_deck=(thunder,) * 3,
+                   hand=(CardView(0, "hand", "hidden", thunder),),
+                   graveyards=((CardView(0, "graveyard", "faceup", thunder),
+                                CardView(0, "graveyard", "faceup", thunder)), ()))
+    assert TacticalHeuristicAgent().select_action(view, (activate, decline)) == decline
+    assert TacticalHeuristicAgent(v9_guards=False).select_action(
+        view, (activate, decline)) == activate
+    one_left = replace(view, graveyards=((view.graveyards[0][0],), ()))
+    assert TacticalHeuristicAgent().select_action(
+        one_left, (activate, decline)) == activate
+
+
+def test_v9_defers_weak_vanilla_metamorphosis_but_keeps_effect_fusion():
+    newdoria = CardView(0, "monster", "faceup", 4335645, 0,
+                        "attack", 1200, 800)
+    darkfire = CardView(0, "extra", "facedown", 17881964)
+    restrict = CardView(0, "extra", "facedown", 504700102)
+    metamorphosis = Action("meta", "activate", 0, {"code": 46411259})
+    end = Action("end", "end_phase", 0)
+    facts = {4335645: (33, 4, 1200), 17881964: (65, 4, 1500),
+             73915052: (16401, 1, 0), 504700102: (97, 1, 0)}
+    weak = replace(board(newdoria), own_extra_deck=(darkfire, restrict))
+    assert TacticalHeuristicAgent(card_facts=facts).select_action(
+        weak, (metamorphosis, end)) == end
+    assert TacticalHeuristicAgent(card_facts=facts, v9_guards=False).select_action(
+        weak, (metamorphosis, end)) == metamorphosis
+    sheep = CardView(0, "monster", "faceup", 73915052, 1,
+                     "defense", 0, 0)
+    assert TacticalHeuristicAgent(card_facts=facts).select_action(
+        replace(weak, field=(newdoria, sheep)), (metamorphosis, end)) == metamorphosis
+
+
+def test_v9_preserves_breaker_counter_and_removal_when_only_own_cards_are_targets():
+    breaker = Action("breaker", "chain", 0, {"code": 71413901})
+    decline = Action("decline", "pass", 0)
+    own_backrow = CardView(0, "spell_trap", "facedown", 19613556, 0)
+    assert TacticalHeuristicAgent().select_action(
+        board(own_backrow), (breaker, decline)) == decline
+    enemy_backrow = CardView(1, "spell_trap", "facedown", None, 0)
+    assert TacticalHeuristicAgent().select_action(
+        board(own_backrow, enemy_backrow), (breaker, decline)) == breaker
+    own = Action("own", "select_card", 0,
+                 {"controller": 0, "location": 8, "sequence": 0})
+    enemy = Action("enemy", "select_card", 0,
+                   {"controller": 1, "location": 8, "sequence": 0})
+    target_view = board(own_backrow, enemy_backrow,
+                        chain=(ChainLinkView(1, 71413901, 0, 4, 0),))
+    assert safe_target_indices(target_view, (own, enemy), range(2),
+                               protect_removal_targets=True) == (1,)
+
+
+def test_v9_saves_book_and_raigeki_break_during_own_draw_phase():
+    breaker = CardView(1, "monster", "faceup", 71413901, 0,
+                       "attack", 1900, 1000)
+    book = Action("book", "chain", 0, {"code": 14087893})
+    break_card = Action("break", "chain", 0, {"code": 4178474})
+    decline = Action("decline", "pass", 0)
+    view = board(breaker, phase="draw", turn_player=0)
+    for action in (book, break_card):
+        assert TacticalHeuristicAgent().select_action(view, (action, decline)) == decline
+        assert TacticalHeuristicAgent(v9_guards=False).select_action(
+            view, (action, decline)) == action
+
+
+def test_v9_prefers_opponent_for_chaos_and_raigeki_removal_targets():
+    own = Action("own", "select_card", 0,
+                 {"controller": 0, "location": 4, "sequence": 0})
+    enemy = Action("enemy", "select_card", 0,
+                   {"controller": 1, "location": 4, "sequence": 0})
+    for source in (9596126, 4178474):
+        snapshot = board(chain=(ChainLinkView(1, source, 0, 4, 0),))
+        assert safe_target_indices(snapshot, (own, enemy), range(2),
+                                   protect_removal_targets=True) == (1,)
+        assert TacticalHeuristicAgent().select_action(snapshot, (own, enemy)) == enemy
+    assert safe_target_indices(snapshot, (own,), range(1),
+                               protect_removal_targets=True) == (0,)
+
+
+def test_v9_defers_own_only_chaos_and_bls_banish_activation():
+    own = CardView(0, "monster", "faceup", 9596126, 0,
+                   "attack", 2300, 2000)
+    enemy = CardView(1, "monster", "faceup", 17881964, 0,
+                     "attack", 1500, 1250)
+    decline = Action("decline", "pass", 0)
+    for code in (9596126, 504700118):
+        activate = Action("banish", "chain", 0,
+                          {"code": code, "controller": 0, "sequence": 0})
+        assert TacticalHeuristicAgent().select_action(
+            board(replace(own, code=code)), (activate, decline)) == decline
+        assert TacticalHeuristicAgent().select_action(
+            board(replace(own, code=code), enemy), (activate, decline)) == activate
+
+
+def test_v10_main_phase_open_actions_do_not_require_a_pass_option():
+    own_chaos = CardView(0, "monster", "faceup", 9596126, 0,
+                         "attack", 2300, 2000)
+    own_trap = CardView(0, "spell_trap", "facedown", 511000824, 0)
+    own_breaker = CardView(0, "monster", "faceup", 71413901, 1,
+                           "attack", 1900, 1000)
+    end = Action("end", "end_phase", 0)
+    for code, cards in ((9596126, (own_chaos,)),
+                        (71413901, (own_breaker, own_trap))):
+        activate = Action("activate", "activate", 0,
+                          {"code": code, "controller": 0, "sequence": 0})
+        actions = (activate, end)
+        view = board(*cards, turn_player=0)
+        assert TacticalHeuristicAgent().select_action(view, actions) == end
+        assert TacticalHeuristicAgent(v10_guards=False).select_action(
+            view, actions) == activate
+
+
+def test_v10_book_waits_when_own_main_phase_has_no_monster():
+    enemy = CardView(1, "monster", "faceup", 4335645, 0,
+                     "attack", 1200, 800)
+    book = Action("book", "chain", 0,
+                  {"code": 14087893, "location": 2, "controller": 0})
+    decline = Action("decline", "pass", 0)
+    view = board(enemy, turn_player=0)
+    assert TacticalHeuristicAgent().select_action(view, (book, decline)) == decline
+    assert TacticalHeuristicAgent(v10_guards=False).select_action(
+        view, (book, decline)) == book
+    assert TacticalHeuristicAgent().select_action(
+        board(enemy, turn_player=1), (book, decline)) == book
+    open_book = Action("open-book", "activate", 0,
+                       {"code": 14087893, "location": 2, "controller": 0})
+    end = Action("end", "end_phase", 0)
+    assert TacticalHeuristicAgent().select_action(
+        view, (open_book, end)) == end
+    assert TacticalHeuristicAgent(v10_guards=False).select_action(
+        view, (open_book, end)) == open_book
+    own_chaos = CardView(0, "monster", "faceup", 9596126, 0,
+                         "attack", 2300, 2000)
+    assert TacticalHeuristicAgent().select_action(
+        board(own_chaos, enemy, turn_player=0), (book, decline)) == decline
+    restrict = replace(enemy, code=504700102, attack=0, defense=0)
+    assert TacticalHeuristicAgent().select_action(
+        board(own_chaos, restrict, turn_player=0), (book, decline)) == book
+    own_effect = board(own_chaos, enemy, turn_player=0,
+                       chain=(ChainLinkView(1, 9596126, 0, 4, 0),))
+    assert TacticalHeuristicAgent().select_action(
+        own_effect, (book, decline)) == decline
+    assert TacticalHeuristicAgent(v10_guards=False).select_action(
+        own_effect, (book, decline)) == book
+
+
+def test_v10_position_changes_need_visible_combat_value():
+    attacker = CardView(0, "monster", "faceup", 71413901, 0,
+                        "attack", 1900, 1000)
+    enemy = CardView(1, "monster", "faceup", 25262697, 0,
+                     "attack", 2000, 2000)
+    switch = Action("switch", "change_position", 0,
+                    {"controller": 0, "sequence": 0, "code": 71413901})
+    end = Action("end", "end_phase", 0)
+    assert TacticalHeuristicAgent().select_action(
+        board(attacker, enemy), (switch, end)) == end
+    assert TacticalHeuristicAgent(v10_guards=False).select_action(
+        board(attacker, enemy), (switch, end)) == switch
+    defender = replace(attacker, orientation="defense")
+    assert TacticalHeuristicAgent().select_action(
+        board(defender, enemy), (switch, end)) == end
+    weaker_enemy = replace(enemy, attack=1200)
+    assert TacticalHeuristicAgent().select_action(
+        board(defender, weaker_enemy), (switch, end)) == switch
+
+
+def test_v9_creature_swap_prefers_token_and_tsukuyomi_resets_equipped_restrict():
+    jinzo = CardView(0, "monster", "faceup", 77585513, 0,
+                     "attack", 2400, 1500)
+    sheep = CardView(0, "monster", "faceup", 73915052, 1,
+                     "defense", 0, 0)
+    own_jinzo = Action("jinzo", "select_card", 0,
+                       {"code": 77585513, "controller": 0,
+                        "location": 4, "sequence": 0})
+    own_sheep = Action("sheep", "select_card", 0,
+                       {"code": 73915052, "controller": 0,
+                        "location": 4, "sequence": 1})
+    swap = board(jinzo, sheep, chain=(ChainLinkView(1, 31036355, 0, 8, 0),))
+    assert TacticalHeuristicAgent().select_action(swap,
+                                                  (own_jinzo, own_sheep)) == own_sheep
+    restrict = CardView(0, "monster", "faceup", 504700102, 1,
+                        "attack", 0, 0)
+    tsukuyomi = CardView(0, "monster", "faceup", 34853266, 0,
+                         "attack", 1100, 1400)
+    equipped = CardView(0, "spell_trap", "facedown", 16226796, 0,
+                        equipped_to=(0, 1))
+    self_target = Action("self", "select_card", 0,
+                         {"controller": 0, "location": 4, "sequence": 0})
+    restrict_target = Action("restrict", "select_card", 0,
+                             {"controller": 0, "location": 4, "sequence": 1})
+    view = board(tsukuyomi, restrict, equipped,
+                 chain=(ChainLinkView(1, 34853266, 0, 4, 0),))
+    assert TacticalHeuristicAgent().select_action(
+        view, (self_target, restrict_target)) == restrict_target
+
+
 def test_tribe_uses_current_public_type_after_a_field_type_change():
     tribe_code = 33184167
     own = CardView(0, "monster", "faceup", 504700044, 0, "attack",

@@ -11,6 +11,7 @@ from goat_ai.agents import (
     HeuristicAgent,
     RandomAgent,
     TacticalHeuristicAgent,
+    load_card_facts,
     load_card_races,
     load_flip_monster_codes,
 )
@@ -69,7 +70,8 @@ def main() -> None:
         "combat_heuristic": lambda: CombatHeuristicAgent(),
         "combat_flip": lambda: CombatFlipHeuristicAgent(flip_codes),
         "tactical": lambda: TacticalHeuristicAgent(
-            flip_codes, load_card_races(args.native_root)),
+            flip_codes, load_card_races(args.native_root),
+            card_facts=load_card_facts(args.native_root)),
         "heuristic": lambda: HeuristicAgent(),
         "random": lambda: RandomAgent(args.seed),
     }[args.opponent]()

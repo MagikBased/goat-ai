@@ -69,3 +69,18 @@ def load_card_races(native_root: str | Path) -> dict[int, int]:
             races.update((code, race) for code, race in database.execute(
                 "SELECT id, race FROM datas WHERE race > 0"))
     return races
+
+
+def load_card_facts(native_root: str | Path) -> dict[int, tuple[int, int, int]]:
+    """Read printed Type, Level, and ATK without consulting a duel's state."""
+    root = Path(native_root)
+    facts: dict[int, tuple[int, int, int]] = {}
+    for name in CARD_DATABASES:
+        path = root / "database" / name
+        if not path.is_file():
+            raise FileNotFoundError(f"card database missing: {path}")
+        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as database:
+            facts.update((code, (card_type, level & 0xff, attack))
+                         for code, card_type, level, attack in database.execute(
+                             "SELECT id, type, level, atk FROM datas"))
+    return facts
