@@ -2930,3 +2930,33 @@ and `artifacts/timing_curriculum_chain10_vs_parent_2620_2627.json` (SHA-256
 `7643e5c087fcfbdb68a5236262651a46e468eef8f13dc1351204fc3c7dace95d`).
 The choice transfer is real in these scripted replays; competitive strength
 has not improved in the measured sample, and M4 remains open.
+
+### Replay-audit Royal Decree guard check
+
+The [seed-2612 replay audit](replay_audit.md) found the feature-19 policy
+activating Sakuretsu Armor under its own face-up Royal Decree. The opt-in
+visible-state tactical guard now defers that Sakuretsu activation when `pass`
+is legal. On the saved player-visible observation at viewer frame 181, the
+selected Sakuretsu action is removed; the Book of Moon and missed Scapegoat
+choices elsewhere in that duel remain. The complete recorded duel separately
+replay-verified for **534 decisions**. This is an action-level correction,
+not a re-run of the same duel after changing its earlier choices.
+
+For a small competitive check, the unchanged feature-19 parent checkpoint
+`tactical_v3_fv19_2500_2503.pt` (SHA-256
+`fe197724523b33a8d555e90ab9f7b669dab2081b000346b9b31d1788d7e07fc2`)
+played TacticalHeuristicAgent v3 on Chaos Return/Warrior and Chaos
+Control/Warrior, both deck assignments and both seats, seeds 2620–2623.
+The evaluator required Main Deck compositions unseen in the checkpoint's
+training games. Without the optional guard it scored **13–19**; with the
+*full* guard it scored **15–17**. Two of 32 matched schedule slots changed
+from loss to win, none changed the other way. The guarded score was 46.88%,
+with its evaluator's paired-bootstrap 95% interval 31.25–62.50%.
+The guard contains earlier filters as well as the new Decree rule, so this
+comparison cannot attribute the two wins to the Decree change. The small
+sample does not establish a strength gain or close M4.
+
+Ignored local reports: `artifacts/decree_guard_parent_unguarded_2620.json`
+(SHA-256 `6c3d836cc7b0b9f646fe86f056d7ee65cc9d05f3ba0c76669a5ca86c9cd9b8b5`)
+and `artifacts/decree_guard_parent_guarded_2620.json` (SHA-256
+`2fcd0beea46f3c66bb4524607e2bd7084f9d49c2c61c3a0df950165a2b03eb6b`).

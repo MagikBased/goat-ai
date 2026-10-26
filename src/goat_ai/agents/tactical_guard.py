@@ -16,6 +16,8 @@ RING_OF_DESTRUCTION = 511000824
 TRIBE_INFECTING_VIRUS = 33184167
 BREAKER_THE_MAGICAL_WARRIOR = 71413901
 ENEMY_CONTROLLER = 98045062
+ROYAL_DECREE = 51452091
+SAKURETSU_ARMOR = 56120475
 
 
 def tribe_race_value(observation: Observation, race: int,
@@ -47,6 +49,8 @@ def admissible_action_indices(observation: Observation,
                       for c in observation.field)
     opponent_backrow = sum(c.zone == "spell_trap" and c.controller != own
                            for c in observation.field)
+    faceup_decree = any(c.zone == "spell_trap" and c.position == "faceup"
+                        and c.code == ROYAL_DECREE for c in observation.field)
     own_monsters = [c for c in observation.field
                     if c.zone == "monster" and c.controller == own]
     opponent_monsters = [c for c in observation.field
@@ -118,6 +122,9 @@ def admissible_action_indices(observation: Observation,
                 and not any(c.attack is not None and c.position == "faceup"
                             and 1400 <= c.attack < observation.life_points[own]
                             for c in opponent_monsters)):
+            continue
+        if (code == SAKURETSU_ARMOR and action.kind == "chain" and can_pass
+                and faceup_decree):
             continue
         if (ring_target_prompt and safe_opponent_ring_targets
                 and action.kind == "select_card"

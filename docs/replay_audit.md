@@ -62,11 +62,13 @@ regenerate it with the command below.
 | 209, 288–339, 469–470 (208, 287–338, 468–469) | P0 repeatedly passes with Set Scapegoat legally chainable. Frame 209 is the opponent's End Phase with no own monster and three opponent monsters. On turn 8 it passes at Battle Start and several Battle Step prompts with **zero own monsters**, four opposing monsters, and 6500 LP; by the End Phase it has 2600 LP and still passes. At the opponent's later End Phase it has 500 LP and still passes. | Activating at the opponent's End Phase or in response to an attack would create blockers without the same-turn summon restriction carrying into P0's next turn. The timing guard only removes premature uses; it does not force useful activation. Add labeled defensive and End Phase examples, then test both missed defenses and false-positive activations on held-out games. |
 
 On these saved decisions, the optional tactical guard changes frame 11 away
-from Heavy Storm. It does **not** change the Book of Moon, Sakuretsu Armor, or
+from Heavy Storm and now removes frame 181's Sakuretsu Armor while a face-up
+Royal Decree would negate it. It does **not** change the Book of Moon or
 Scapegoat choices. This is an off-policy diagnostic on fixed observations;
 once a different action is taken, the rest of the duel changes, so it is not
-a measured match-strength gain. No reviewer reveal was used to identify an
-opponent Set card.
+a measured match-strength gain. A small paired held-out check is recorded in
+[evaluation](evaluation.md); it does not establish a gain either. No reviewer
+reveal was used to identify an opponent Set card.
 
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/record_policy_match.py \

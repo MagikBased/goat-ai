@@ -97,3 +97,19 @@ def test_breaker_targets_opponent_backrow_and_controller_waits_until_needed():
     assert kept(board(phase="draw"), (controller, decline)) == (decline,)
     assert kept(board(phase="battle_start"), (controller, decline)) == (
         controller, decline)
+
+
+def test_sakuretsu_waits_while_royal_decree_is_face_up():
+    sakuretsu = Action("sakuretsu", "chain", 0, {"code": 56120475})
+    goat = Action("goat", "chain", 0, {"code": 504700123})
+    decline = Action("pass", "pass", 0)
+    own_decree = CardView(0, "spell_trap", "faceup", 51452091, 0)
+    opponent_decree = replace(own_decree, controller=1)
+    set_decree = replace(own_decree, position="facedown")
+    actions = (sakuretsu, goat, decline)
+
+    for decree in (own_decree, opponent_decree):
+        assert kept(board(decree, phase="battle_step", turn_player=1), actions) == (
+            goat, decline)
+    assert kept(board(set_decree, phase="battle_step", turn_player=1), actions) == actions
+    assert kept(board(phase="battle_step", turn_player=1), actions) == actions
