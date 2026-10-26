@@ -10,6 +10,9 @@ must never feed a policy or a baseline. Viewer frames below are one-based; JSON
 
 Replay: `replays/policy_vs_combat_2202.json`. Policy P0 uses
 `combat_fourdeck_fv17_v3_17000_17003.pt`; P1 is CombatHeuristicAgent v3.
+This is a saved feature-17 checkpoint experiment, not the later tactical-v3
+feature-18/19 checkpoints discussed below. Do not transfer its individual
+mistakes or match result to those later weights without testing them.
 
 | Viewer frame | Actor | Visible mistake | Response |
 | --- | --- | --- | --- |
@@ -110,6 +113,33 @@ End Phase, which may be reasonable. On a separate teacher holdout, it still
 activated Scapegoat four times during an opponent Main Phase when the
 teacher passed. The [evaluation log](evaluation.md) records the exact
 agreement and tournament limits; this is not a promoted policy.
+
+## Older CombatHeuristicAgent v2 versus RandomAgent, seed 17200
+
+Replay: `replays/combat_fourdeck_holdout_cc_cr_17200/seed_17200_seat_1.json`.
+Its metadata records CombatHeuristicAgent **v2 on P1** and RandomAgent on P0.
+These are failures of an earlier baseline and its possible demonstration
+labels, not observations of the current learned policy. The relevant decisions
+use P1's player-visible observation; no reviewer-only card identity is needed.
+The listed actions and alternatives were checked against the saved JSON. A
+fresh native replay check of this older file currently stops at its recorded
+asset-hash check (`ReplayMismatch: native assets differ from recorded
+trajectory`), so this section does not claim verification against today's
+native assets.
+
+| Viewer frame (JSON index) | Visible state and chosen action | Better legal choice and follow-up |
+| --- | --- | --- |
+| 61–62 (60–61) | On turn 3 Draw Phase, P1 has only its own face-up 1400 ATK Dekoichi on the Monster Zone. It chains Set Ring of Destruction with no pending chain and must target that Dekoichi. Life Points are P1 8000, P0 5600; resolution brings them to 6600 and 4200. | `pass` was legal at frame 61. Preserve the monster and Ring for an opposing target, unless self-destruction enables a verified advantage. Teach the agent to check for a safe, valuable opposing target **before** activating a targeted removal card. |
+| 72 (71) | With no monsters on either side, P1 Normal Summons Magician of Faith in 300 ATK. The legal list also offers `set_monster` for the same card. | Set the Flip monster to retain its Flip effect and avoid presenting a weak attacker. This is a preference, not a simulator rule: a face-up summon could be right in a specific lethal or combo line. Use printed Flip metadata and visible combat context. |
+| 76 (75) | Immediately after that summon, P1 chains its own Set Torrential Tribute while its face-up Magician of Faith is the only monster on the field. `pass` is legal. | Pass; using the Trap here destroys only P1's monster and consumes the Trap. The tactical baseline now filters this pattern, but promotion still requires held-out duel evaluation. |
+| 147 (146) | P1 activates Scapegoat from hand in its own Draw Phase with no pending chain. `pass` is legal. | Defer to a useful defensive timing or the opponent's End Phase; Set it first when possible. The current observation schema records turn owner so the new timing guard can distinguish the two players' End Phases. |
+
+The Ring example is especially useful for labeling activation *and* target
+selection: at frame 62 the own monster is the only legal target, so choosing a
+different target at that prompt was impossible. The actionable earlier
+decision is frame 61. Likewise, the Magician of Faith and Torrential sequence
+should be assessed as two decisions with separate legal alternatives, rather
+than a single unexplained loss.
 
 ## Repeatable review process
 
