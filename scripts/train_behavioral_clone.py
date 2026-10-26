@@ -214,7 +214,9 @@ def main() -> None:
                         help="zero-extend v23 action numbers and initialize a zero trade head")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=1,
-                        help="decisions per optimizer update; forward passes remain individual")
+                        help="decisions per optimizer update; combine forward passes with --batched-forward")
+    parser.add_argument("--batched-forward", action="store_true",
+                        help="opt-in padded variable-action policy forward for supported v10+ models")
     parser.add_argument("--verification-workers", type=int, default=1,
                         help="native replay verification processes (default: serial)")
     parser.add_argument("--width", type=int, default=64)
@@ -284,6 +286,8 @@ def main() -> None:
         parser.error("--preserve-trajectories requires --parent-kl-steps")
     if args.parent_kl_steps and (source_weights or args.focus_weight > 1):
         parser.error("parent KL uses labeled decisions directly; omit sampling weights")
+    if args.batched_forward and args.parent_kl_steps:
+        parser.error("batched forward is currently supported only for behavioral cloning")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     teacher = (TacticalHeuristicAgent(
@@ -470,6 +474,7 @@ def main() -> None:
         losses = fit_behavioral_clone(model, vocabulary, records, epochs=args.epochs,
                                       learning_rate=args.learning_rate, seed=args.seed,
                                       batch_size=args.batch_size,
+                                      batched_forward=args.batched_forward,
                                       sampling_weights=sampling_weights)
     fitting_seconds = perf_counter() - fitting_started
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -494,6 +499,7 @@ def main() -> None:
                                    else None),
         "seed": args.seed, "torch_version": str(torch.__version__),
         "batch_size": args.batch_size,
+        "batched_forward": args.batched_forward,
         "focus_cards": tuple(sorted(focus_codes)),
         "focus_weight": args.focus_weight,
         "on_policy_activation_focus_only": args.on_policy_teacher_activation_focus_only,
@@ -521,6 +527,7 @@ def main() -> None:
     summary["verification_seconds"] = verification_seconds
     summary["fitting_seconds"] = fitting_seconds
     summary["verification_workers"] = args.verification_workers
+    summary["batched_forward"] = args.batched_forward
     print(json.dumps(summary, indent=2))
 
 

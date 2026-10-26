@@ -51,7 +51,7 @@ replay review found a Tribe-Infecting Virus Type choice whose old policy
 scored all three actions almost equally; the [replay audit](replay_audit.md)
 and [evaluation](evaluation.md) track the measured follow-up.
 
-This is a first representation, not a validated strong architecture. It does not yet model public event history, recipient-scoped reveals, other restrictions, changes to the Deck since duel start, or individual Damage Step substeps. Unknown card IDs share one embedding. Target context is pooled and may still lose relationships among cards. The model does not infer hidden hands or deck order. It currently scores one decision at a time; opt-in behavioral-clone minibatches accumulate gradients before an optimizer update, but batched inference, recurrent memory, and action-set attention remain open experiments. A held-out three-batch comparison found higher training throughput but no demonstrated strength gain; the original batch size 1 remains the default. See [the measured training comparison](evaluation.md).
+This is a first representation, not a validated strong architecture. It does not yet model public event history, recipient-scoped reveals, other restrictions, changes to the Deck since duel start, or individual Damage Step substeps. Unknown card IDs share one embedding. Target context is pooled and may still lose relationships among cards. The model does not infer hidden hands or deck order. Ordinary inference scores one decision at a time; behavioral cloning can optionally pad variable-length decisions and score a minibatch together with `--batched-forward`. Batched inference across live duels, recurrent memory, and action-set attention remain open experiments. The original batch size 1 remains the default because faster training has not demonstrated stronger play. See [the measured training comparison](evaluation.md) and [throughput benchmark](benchmarks.md).
 
 For local replay review, `scripts/score_reviewed_decisions.py` verifies the
 native trajectory and its visibility, checks SHA-256-bound annotation indices,
@@ -227,11 +227,15 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clo
 The `--batch-size` option belongs to ordinary behavioral cloning; parent-KL
 uses all labeled decisions and `--preserve-batch` reference states at each
 step. Behavioral cloning now collects each minibatch's losses and makes one
-backward call per optimizer update; model forward passes are still per
-decision because legal-action and visible-state lengths vary. Replay
+backward call per optimizer update. `--batched-forward` pads visible states
+and legal-action sets, batches the chain encoder, and masks padded actions
+from the loss. It supports feature versions 10–13 and 16–25; versions
+14–15 retain the individual path because their chain-target encoder needs
+field-dependent inputs. It is opt-in and can produce slightly different
+floating-point updates from the individual path. Replay
 verification, model fitting, and total wall time are reported separately.
 The [measured optimization run](benchmarks.md) shows where time went on one
-32-trajectory workload. This experiment preserved overall win rate against its parent in one
+32-trajectory workload. The earlier minibatch experiment preserved overall win rate against its parent in one
 held-out schedule but did not improve it, and Scapegoat agreement worsened
 where the teacher passed. See [evaluation](evaluation.md).
 

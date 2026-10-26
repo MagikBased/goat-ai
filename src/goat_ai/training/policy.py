@@ -8,6 +8,8 @@ from pathlib import Path
 
 import torch
 from torch import Tensor, nn
+from torch.nn import functional as F
+from torch.nn.utils.rnn import pack_padded_sequence
 
 from goat_ai.actions import Action
 from goat_ai.agents.card_metadata import FLIP_MONSTER_TYPE, load_card_properties
@@ -532,6 +534,11 @@ class LegalActionPolicy(nn.Module):
             nn.init.zeros_(self.trade_head.weight)
 
     def forward(self, features: DecisionFeatures) -> Tensor:
+        return self._forward(features)
+
+    def _forward(self, features: DecisionFeatures,
+                 chain_hidden: Tensor | None = None,
+                 chain_source: Tensor | None = None) -> Tensor:
         cards = features.state_cards
         visible = (self.card(cards[:, 0]) + self.zone(cards[:, 1])
                    + self.owner(cards[:, 2]) + self.position(cards[:, 3]))
@@ -562,26 +569,28 @@ class LegalActionPolicy(nn.Module):
                 known_mask.sum().clamp(min=1))
             state = state + self.known_hand_projection(known_hand)
         if self.feature_version >= 10:
-            chain = features.chain_cards
-            chain_input = self.card(chain[:, 0]) + self.owner(chain[:, 1])
-            if self.feature_version in CHAIN_TARGET_FEATURE_VERSIONS:
-                slots = features.chain_target_slots
-                slot_mask = slots[:, :, 0] != 0
-                field_match = ((slots[:, :, None, 0] == cards[None, None, :, 2])
-                               & (slots[:, :, None, 1] == cards[None, None, :, 1])
-                               & (slots[:, :, None, 2] ==
-                                  features.state_card_sequences[None, None, :])
-                               & slot_mask[:, :, None])
-                occupant = field_match.to(visible.dtype) @ visible
-                target = (self.owner(slots[:, :, 0]) + self.zone(slots[:, :, 1])
-                          + self.chain_target_sequence(slots[:, :, 2].clamp(min=0))
-                          + occupant)
-                target_mean = (target * slot_mask.unsqueeze(-1)).sum(1) / (
-                    slot_mask.sum(1, keepdim=True).clamp(min=1))
-                chain_input = chain_input + self.chain_target_pair(torch.cat(
-                    (chain_input, target_mean), dim=1)) * slot_mask.any(1).unsqueeze(1)
-            _, hidden = self.chain_encoder(chain_input.unsqueeze(0))
-            state = state + hidden[-1, 0] * (chain[:, 0] != 0).any()
+            if chain_hidden is None:
+                chain = features.chain_cards
+                chain_input = self.card(chain[:, 0]) + self.owner(chain[:, 1])
+                if self.feature_version in CHAIN_TARGET_FEATURE_VERSIONS:
+                    slots = features.chain_target_slots
+                    slot_mask = slots[:, :, 0] != 0
+                    field_match = ((slots[:, :, None, 0] == cards[None, None, :, 2])
+                                   & (slots[:, :, None, 1] == cards[None, None, :, 1])
+                                   & (slots[:, :, None, 2] ==
+                                      features.state_card_sequences[None, None, :])
+                                   & slot_mask[:, :, None])
+                    occupant = field_match.to(visible.dtype) @ visible
+                    target = (self.owner(slots[:, :, 0]) + self.zone(slots[:, :, 1])
+                              + self.chain_target_sequence(slots[:, :, 2].clamp(min=0))
+                              + occupant)
+                    target_mean = (target * slot_mask.unsqueeze(-1)).sum(1) / (
+                        slot_mask.sum(1, keepdim=True).clamp(min=1))
+                    chain_input = chain_input + self.chain_target_pair(torch.cat(
+                        (chain_input, target_mean), dim=1)) * slot_mask.any(1).unsqueeze(1)
+                _, hidden = self.chain_encoder(chain_input.unsqueeze(0))
+                chain_hidden = hidden[-1, 0] * (chain[:, 0] != 0).any()
+            state = state + chain_hidden
         targets = features.action_targets
         target_mask = ((targets != 0) if self.feature_version == 1
                        else features.action_target_mask).unsqueeze(-1)
@@ -597,7 +606,8 @@ class LegalActionPolicy(nn.Module):
         action = (self.kind(features.action_kinds) + self.card(features.action_cards)
                   + target_mean + self.action_numbers(features.action_numbers))
         if self.feature_version >= 18:
-            source = features.chain_cards[-1, 0]
+            source = (features.chain_cards[-1, 0] if chain_source is None
+                      else chain_source)
             source_embedding = self.card(source).expand(len(action), -1)
             target_embedding = self.card(features.action_cards)
             action = action + self.source_target_pair(torch.cat(
@@ -627,6 +637,48 @@ class LegalActionPolicy(nn.Module):
             present = features.action_numbers[:, -1]
             logits = logits + self.trade_head(torch.stack((trade, present), dim=1)).squeeze(1)
         return logits
+
+    def forward_batch(self, decisions: Sequence[DecisionFeatures]) -> tuple[Tensor, Tensor]:
+        """Score padded variable-length decisions together, returning a legal mask.
+
+        The chain-target variants need their field-dependent GRU inputs and
+        remain on the ordinary per-decision path. Other v10+ versions batch
+        the chain GRU before vectorizing the remaining state/action encoder.
+        """
+        if not decisions or self.feature_version < 10 or (
+                self.feature_version in CHAIN_TARGET_FEATURE_VERSIONS):
+            raise ValueError("batched forward requires decisions and a supported v10+ model")
+        action_lengths = [len(item.action_kinds) for item in decisions]
+        if any(length < 1 for length in action_lengths):
+            raise ValueError("each batched decision needs a legal action")
+        names = tuple(decisions[0].__dict__)
+        stacked = []
+        for name in names:
+            values = [getattr(item, name) for item in decisions]
+            shape = tuple(max(value.shape[axis] for value in values)
+                          for axis in range(values[0].ndim))
+            stacked.append(torch.stack([
+                F.pad(value, tuple(component for axis in reversed(range(value.ndim))
+                                   for component in (0, shape[axis] - value.shape[axis])))
+                for value in values]))
+        padded = DecisionFeatures(*stacked)
+        chain_lengths = [len(item.chain_cards) for item in decisions]
+        chain = padded.chain_cards
+        chain_input = self.card(chain[:, :, 0]) + self.owner(chain[:, :, 1])
+        packed = pack_padded_sequence(chain_input, chain_lengths,
+                                      batch_first=True, enforce_sorted=False)
+        _, hidden = self.chain_encoder(packed)
+        chain_hidden = hidden[-1] * (chain[:, 0, 0] != 0).unsqueeze(1)
+        chain_sources = torch.stack([item.chain_cards[-1, 0] for item in decisions])
+
+        def score(*values: Tensor) -> Tensor:
+            features = DecisionFeatures(*values[:-2])
+            return self._forward(features, values[-2], values[-1])
+
+        logits = torch.vmap(score)(*stacked, chain_hidden, chain_sources)
+        mask = (torch.arange(logits.shape[1], device=logits.device)[None, :]
+                < torch.tensor(action_lengths, device=logits.device)[:, None])
+        return logits.masked_fill(~mask, -1e9), mask
 
 
 class PolicyAgent:

@@ -15,6 +15,7 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
                          records: Sequence[DecisionRecord], *, epochs: int = 1,
                          learning_rate: float = 1e-3, seed: int = 0,
                          batch_size: int = 1,
+                         batched_forward: bool = False,
                          sampling_weights: Sequence[float] | None = None) -> tuple[float, ...]:
     """Return mean per-decision cross-entropy for each epoch.
 
@@ -28,6 +29,9 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
                                          or any(not isfinite(weight) or weight <= 0
                                                 for weight in sampling_weights)):
         raise ValueError("sampling weights must be finite, positive, and match records")
+    if batched_forward and (model.feature_version < 10
+                            or model.feature_version in (14, 15)):
+        raise ValueError("batched forward requires a supported v10+ feature version")
     device = next(model.parameters()).device
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     losses = []
@@ -49,15 +53,25 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
         for start in range(0, len(order), batch_size):
             batch = order[start:start + batch_size]
             optimizer.zero_grad()
-            batch_losses = []
-            for index in batch:
-                features, target = examples[index]
-                logits = model(features.to(device)).unsqueeze(0)
-                loss = nn.functional.cross_entropy(
-                    logits, torch.tensor([target], dtype=torch.long, device=device))
-                batch_losses.append(loss)
-                total += float(loss.detach())
-            torch.stack(batch_losses).mean().backward()
+            if batched_forward:
+                logits, _ = model.forward_batch([examples[index][0].to(device)
+                                                 for index in batch])
+                targets = torch.tensor([examples[index][1] for index in batch],
+                                       dtype=torch.long, device=device)
+                batch_losses = nn.functional.cross_entropy(
+                    logits, targets, reduction="none")
+                total += float(batch_losses.detach().sum())
+                batch_losses.mean().backward()
+            else:
+                batch_losses = []
+                for index in batch:
+                    features, target = examples[index]
+                    logits = model(features.to(device)).unsqueeze(0)
+                    loss = nn.functional.cross_entropy(
+                        logits, torch.tensor([target], dtype=torch.long, device=device))
+                    batch_losses.append(loss)
+                    total += float(loss.detach())
+                torch.stack(batch_losses).mean().backward()
             optimizer.step()
         losses.append(total / len(examples))
     return tuple(losses)

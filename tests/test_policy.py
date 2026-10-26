@@ -1139,6 +1139,56 @@ def test_behavioral_clone_minibatch_matches_mean_gradient():
         fit_behavioral_clone(actual, vocabulary, records, batch_size=0)
 
 
+@pytest.mark.parametrize("version", (10, 13, 23, 25))
+def test_padded_forward_matches_variable_length_single_decisions(version):
+    vocabulary = CardVocabulary((10, 20), ((10, 0x21, 300), (20, 0x21, 1000)))
+    first = encode_decision(view(), actions(), vocabulary, version)
+    second_view = replace(
+        view(), hand=(CardView(0, "hand", "hidden", 10, 0),
+                      CardView(0, "hand", "hidden", 20, 1)),
+        chain=(ChainLinkView(1, 20, 1, 8, 0),
+               ChainLinkView(2, 10, 0, 8, 0)))
+    second_actions = actions()[:2]
+    second = encode_decision(second_view, second_actions, vocabulary, version)
+    torch.manual_seed(79)
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=version)
+    batched, mask = model.forward_batch((first, second))
+    assert mask.tolist() == [[True, True, True], [True, True, False]]
+    assert torch.allclose(batched[0, :3], model(first), atol=1e-6, rtol=1e-6)
+    assert torch.allclose(batched[1, :2], model(second), atol=1e-6, rtol=1e-6)
+    assert batched[1, 2] < -1e8
+
+
+def test_batched_forward_clone_matches_single_forward_update():
+    vocabulary = CardVocabulary((10, 20), ((10, 0x21, 300), (20, 0x21, 1000)))
+    records = (
+        DecisionRecord(view(), actions(), actions()[0]),
+        DecisionRecord(replace(view(), chain=(ChainLinkView(1, 20, 1, 8, 0),)),
+                       actions()[:2], actions()[1]),
+    )
+    torch.manual_seed(91)
+    baseline = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    torch.manual_seed(91)
+    batched = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    features = [encode_decision(record.observation, record.legal_actions,
+                                vocabulary, 23) for record in records]
+    single_losses = [torch.nn.functional.cross_entropy(
+        baseline(feature).unsqueeze(0), torch.tensor([target]))
+        for feature, target in zip(features, (0, 1), strict=True)]
+    torch.stack(single_losses).mean().backward()
+    batch_logits, _ = batched.forward_batch(features)
+    torch.nn.functional.cross_entropy(batch_logits, torch.tensor([0, 1])).backward()
+    assert all(torch.allclose(left.grad, right.grad, atol=1e-6, rtol=1e-5)
+               for left, right in zip(baseline.parameters(), batched.parameters(),
+                                      strict=True))
+    original_loss = fit_behavioral_clone(baseline, vocabulary, records,
+                                         batch_size=2, learning_rate=0.01, seed=91)
+    batched_loss = fit_behavioral_clone(batched, vocabulary, records,
+                                        batch_size=2, batched_forward=True,
+                                        learning_rate=0.01, seed=91)
+    assert batched_loss == pytest.approx(original_loss, abs=1e-6)
+
+
 def test_behavioral_clone_weighted_sampling_keeps_update_count_and_is_reproducible():
     vocabulary = CardVocabulary((10, 20))
     records = (DecisionRecord(view(), actions(), actions()[0]),

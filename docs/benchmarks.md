@@ -109,21 +109,26 @@ done
 On 26 October 2026, one epoch over 32 replay-verified policy recordings
 (seeds 10400–10407; 2,474 multi-option policy decisions) used PyTorch feature
 version 23, width 32, minibatch size 16, one CPU thread, and the same pinned
-native assets. The trainer made one backward call per minibatch in both runs.
-The only changed option was `--verification-workers`:
+native assets. The trainer made one backward call per minibatch in all runs.
+The third run also enabled padded `--batched-forward`:
 
-| Verification workers | Native verification wall time | Model fitting | Total wall time |
-| ---: | ---: | ---: | ---: |
-| 1 | 22.73 s | 9.41 s | 37.68 s |
-| 4 | 9.73 s | 9.72 s | 25.57 s |
+| Verification workers | Batched forward | Native verification | Model fitting | Total wall |
+| ---: | :---: | ---: | ---: | ---: |
+| 1 | No | 22.73 s | 9.41 s | 37.68 s |
+| 4 | No | 9.73 s | 9.72 s | 25.57 s |
+| 4 | Yes | 9.02 s | 3.33 s | 18.34 s |
 
-This measured a **1.47× end-to-end speedup** for this workload. The saved
+Four verification workers alone measured a **1.47× end-to-end speedup**;
+adding batched forward measured **2.05×** versus the serial unbatched run.
+Fitting itself was **2.92×** faster than four-worker unbatched fitting. The saved
 serial and parallel checkpoints had identical metadata and bit-identical
 model tensors. A two-replay smoke run was slower with two workers (5.90 s
 versus 4.81 s total), so extra workers are useful only when enough replays
 amortize process startup. These runs do not measure peak memory or GPU
-training. The model still performs separate forward passes per decision;
-genuine padded action-set batching remains an open optimization.
+training. Batched forward uses a different floating-point operation order;
+its one-epoch checkpoint had the same greedy choice as the unbatched
+checkpoint on **1,292** multi-option player-visible holdout decisions
+(seeds 11100–11103), but no duel-strength equivalence is claimed.
 
 Reproduce after [native setup](native_setup.md), using the ignored recordings
 from the on-policy teacher experiment described in [evaluation](evaluation.md):
@@ -141,3 +146,8 @@ for workers in 1 4; do
     --output ".cache/goat-ai/profile_on_policy_workers_${workers}.pt"
 done
 ```
+
+For the batched row, repeat the four-worker command with `--batched-forward`
+and a distinct output path. The held-out decision comparison used the ignored
+`resource_holdout_11100_11103` trajectories; it compared raw model argmax
+scores on their recorded visible states, without replaying alternative duels.
