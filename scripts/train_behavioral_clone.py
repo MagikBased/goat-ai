@@ -8,6 +8,7 @@ import random
 from collections import Counter
 from math import isfinite
 from pathlib import Path
+from time import perf_counter
 
 import torch
 
@@ -144,6 +145,7 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
 
 
 def main() -> None:
+    started = perf_counter()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("trajectories", nargs="+", type=Path)
     parser.add_argument("--annotation", type=Path, action="append", default=[],
@@ -398,6 +400,7 @@ def main() -> None:
                         "preservation_states": len(preservation)})
     else:
         summary["epoch_loss"] = losses
+    summary["run_wall_seconds"] = perf_counter() - started
     print(json.dumps(summary, indent=2))
 
 

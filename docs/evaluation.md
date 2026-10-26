@@ -4385,7 +4385,7 @@ correctly rejects this asset drift. It now names differing asset paths in the
 error to make such failures diagnosable. No old replay was relabeled or
 silently accepted for training.
 
-Fresh TacticalHeuristicAgent v6 demonstrations on the current assets used
+Fresh TacticalHeuristicAgent v7 demonstrations on the current assets used
 Matt Peddle versus Chaos Turbo (seeds 4800–4803) and Cas Stomphorst versus
 Daryl Gessler (seeds 4810–4813), both teacher seats. All 16 full duels were
 replay-verified and visibility-audited while training a width-32,
@@ -4437,3 +4437,69 @@ Use `evaluate_policy.py` with `--opponent-checkpoint` set to the refreshed
 parent, `--require-unseen-main-decks --both-deck-assignments --seed 6700
 --seeds 8 --workers 4` and the Michael/Chaos Return matchup. Generated
 replays, checkpoints, and reports remain outside Git.
+
+## Larger current-asset Tactical-v7 clone (2026-10-26)
+
+To test whether the preceding 16-duel parent was limited by imitation data,
+the same width-32 feature-v23 architecture, seed 27, two epochs, batch size
+16, and learning rate 0.001 were trained from scratch on **64** newly recorded
+TacticalHeuristicAgent v7 duels. The four training Main Decks were Matt Peddle
+Goat Control, Chaos Turbo, Cas Stomphorst Flip Control, and Daryl Gessler
+Gravekeepers. Each of the two matchups used 16 seeds and both teacher seats,
+against CombatHeuristicAgent v3. All 64 complete trajectories replay-verified
+and passed the visibility audit in the cloning command. They yielded **21,394**
+teacher decisions; the two epoch losses were 0.17811 and 0.08716. The ignored
+checkpoint SHA-256 is
+`9806d1a9b7830d527c81de959236c5143fd5d0d4afc0c06d13159cb6991b6ceb`.
+The comparison checkpoint is the 4,958-decision current-asset Tactical-v7
+clone above. Its local filename contains `v6` from the older experiment, but
+its replay metadata identifies teacher version **7**.
+
+Two independent held-out schedules used Main Deck compositions absent from
+both checkpoints, swapped deck assignments and agent seats, and terminated
+every duel below 5,000 decisions. On seeds 7000–7003, Jesse Twohig versus
+Michael Fukuyama, Jesse versus Warrior, and Michael versus Chaos Return, the
+large clone scored **32–16** against the small clone (66.7%; paired-bootstrap
+95% interval 56.3%–77.1%). Its assigned-deck scores were 13–3 Jesse, 10–6
+Michael, 5–3 Chaos Return, and 4–4 Warrior. On fresh seeds 7200–7203,
+Chaos Control versus Bazoo Return, Goat Control versus Flip Control guide,
+and Warrior versus Chaos Control, it scored **27–21** (56.3%; interval
+43.8%–70.8%). Its assigned-deck scores were 7–9 Chaos Control, 5–3 Bazoo
+Return, 1–7 Flip Control, 8–0 Goat Control, and 6–2 Warrior. Pooling the
+96 games gives **59–37** (61.5%; paired-bootstrap interval 53.1%–69.8%),
+but the uneven deck splits prevent a uniform cross-archetype claim.
+
+On the first 48-game schedule against TacticalHeuristicAgent v7, the large
+clone scored **17–31** (35.4%; paired-bootstrap interval 25.0%–45.8%) and
+the small clone scored **9–39** (18.8%; interval 10.4%–27.1%). Their matched
+score difference was +16.7 percentage points, with a paired-bootstrap
+interval of **0.0 to +31.3** points. The larger data set improved this
+learned policy relative to the smaller clone, yet the policy still loses
+decisively to its tactical teacher; M4's baseline-strength gate remains open.
+The four-worker wall times for large-versus-small schedules were 32.30 s and
+26.44 s, with 34,830 and 29,070 decisions respectively. The corresponding
+large- and small-versus-teacher runs took 21.72 s and 19.50 s. Training wall
+time was not recorded, so no training-throughput claim is made. The cloning
+command now prints `run_wall_seconds` for future runs, including replay
+verification and checkpoint writing; a one-replay timer smoke run completed
+99 teacher decisions and reported 1.715 s on this host. That smoke timing is
+not the 64-duel training time.
+
+The four ignored report SHA-256 values (first large-versus-small, large-
+versus-teacher, small-versus-teacher, second large-versus-small) are
+`c5ad10cdfc78a0b9ae2b1a0f060f84c045e7a92d073d5ed523686d7399a460e3`,
+`43a72502a8ec655722cb33e09d1981bb437512206d95509ca829ca55e42e251a`,
+`77c7191f16bafd15c306c9e5c94fff99537e627a4130d7696626354385ac5431`,
+and `7531c5976bc939e421c95968920395aab297853f146a77df3bd979b85af406d8`.
+
+Reproduce with `OMP_NUM_THREADS=1` and the pinned native setup. Run
+`scripts/collect_heuristic_demos.py --engine experimental --teacher tactical
+--opponent combat_heuristic --seeds 16` twice: Matt/Chaos Turbo at seed 6800
+and Cas/Daryl at seed 6830, each with its own output directory. Train all
+64 JSON files with `scripts/train_behavioral_clone.py --engine experimental
+--feature-version 23 --width 32 --epochs 2 --batch-size 16
+--learning-rate 0.001 --seed 27`. Evaluate with `scripts/evaluate_policy.py
+--engine experimental --both-deck-assignments --require-unseen-main-decks
+--max-decisions 5000 --workers 4`, using the matchups, seeds, and opponent
+checkpoint or `--opponent tactical` specified above. Generated data remain
+ignored by Git.

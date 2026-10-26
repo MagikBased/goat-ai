@@ -758,6 +758,13 @@ optional behavior correction; it does not meet M4's cross-deck strength or
 self-play improvement gates. See [evaluation](evaluation.md) for confidence
 intervals, hashes, and reproduction commands.
 
+A fresh 64-duel Tactical-v7 imitation set on the current native assets gave a
+feature-v23 clone 21,394 verified teacher decisions. It beat the 16-duel
+current-asset clone 59–37 across two 48-game unseen-composition schedules,
+but scored only 17–31 against Tactical-v7 on one matched schedule. The gain
+is uneven across assigned decks. M4 still needs a policy that beats baselines
+with robust cross-deck evidence, plus a separate self-play improvement.
+
 An opt-in per-decision mean policy-gradient reduction was compared with the
 legacy summed update in matched eight-duel native self-play runs. All 16
 trajectories replay-verified and passed visibility checks. On held-out decks,
