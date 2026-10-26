@@ -11,7 +11,14 @@ from time import perf_counter
 
 import torch
 
-from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
+from goat_ai.agents import (
+    CombatHeuristicAgent,
+    HeuristicAgent,
+    RandomAgent,
+    TacticalHeuristicAgent,
+    load_card_races,
+    load_flip_monster_codes,
+)
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
@@ -20,8 +27,10 @@ from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION
 
 
-def make_policy_agent(_seed: int, checkpoint: str):
-    return load_policy_agent(checkpoint)
+def make_policy_agent(_seed: int, checkpoint: str, tactical_guard: bool = False,
+                      card_races: dict[int, int] | None = None):
+    return load_policy_agent(checkpoint, tactical_guard=tactical_guard,
+                             card_races=card_races)
 
 
 def make_heuristic_agent(_seed: int):
@@ -30,6 +39,11 @@ def make_heuristic_agent(_seed: int):
 
 def make_combat_heuristic_agent(_seed: int):
     return CombatHeuristicAgent()
+
+
+def make_tactical_agent(_seed: int, flip_codes: frozenset[int],
+                        card_races: dict[int, int]):
+    return TacticalHeuristicAgent(flip_codes, card_races)
 
 
 def validate_heldout_seeds(checkpoint: dict, seeds: list[int]) -> None:
@@ -93,9 +107,12 @@ def main() -> None:
     parser.add_argument("--matchup", nargs=2, action="append", metavar=("DECK_A", "DECK_B"))
     parser.add_argument("--both-deck-assignments", action="store_true",
                         help="evaluate either policy with each deck in every pair")
+    parser.add_argument("--tactical-guard", action="store_true",
+                        help="apply experimental visible-state action filter to candidate")
     opponents = parser.add_mutually_exclusive_group()
     opponents.add_argument("--opponent", choices=("random", "heuristic",
-                                                  "combat_heuristic"), default="random")
+                                                  "combat_heuristic", "tactical"),
+                           default="random")
     opponents.add_argument("--opponent-checkpoint", type=Path,
                            help="evaluate directly against another saved policy")
     parser.add_argument("--seed", type=int, default=43)
@@ -138,15 +155,22 @@ def main() -> None:
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     runner = run_tournament_parallel if args.workers > 1 else run_tournament
+    tactical_opponent = partial(
+        make_tactical_agent, flip_codes=load_flip_monster_codes(args.native_root),
+        card_races=load_card_races(args.native_root)) if args.opponent == "tactical" else None
     opponent = (partial(make_policy_agent, checkpoint=str(args.opponent_checkpoint))
                 if args.opponent_checkpoint else {
                     "random": RandomAgent,
                     "heuristic": make_heuristic_agent,
                     "combat_heuristic": make_combat_heuristic_agent,
+                    "tactical": tactical_opponent,
                 }[args.opponent])
     started = perf_counter()
+    card_races = load_card_races(args.native_root) if args.tactical_guard else None
     report = runner(
-        matchups, seeds, partial(make_policy_agent, checkpoint=str(args.checkpoint)),
+        matchups, seeds, partial(make_policy_agent, checkpoint=str(args.checkpoint),
+                                 tactical_guard=args.tactical_guard,
+                                 card_races=card_races),
         opponent, partial(engine_type, args.native_root), args.max_decisions,
         **({"workers": args.workers} if args.workers > 1 else {}),
     )
@@ -165,6 +189,7 @@ def main() -> None:
     result = {
         "checkpoint_sha256": sha256(args.checkpoint),
         "policy_inference_version": POLICY_INFERENCE_VERSION,
+        "tactical_guard": args.tactical_guard,
         "policy_feature_version": checkpoint.get("feature_version", 1),
         "core_commit": "baa3881d0bae48e9994f915f5c931be53c1ba8ef",
         "asset_sha256": assets,
@@ -176,6 +201,7 @@ def main() -> None:
             "random": 1,
             "heuristic": HeuristicAgent.teacher_version,
             "combat_heuristic": CombatHeuristicAgent.teacher_version,
+            "tactical": TacticalHeuristicAgent.teacher_version,
         }[args.opponent]),
         "opponent_checkpoint_sha256": (sha256(args.opponent_checkpoint)
                                         if args.opponent_checkpoint else None),

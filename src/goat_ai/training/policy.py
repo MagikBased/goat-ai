@@ -1,6 +1,6 @@
 """Visible-state, action-conditioned policy for variable legal-action sets."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import cached_property
 from math import cos, log1p, sin
@@ -10,6 +10,7 @@ import torch
 from torch import Tensor, nn
 
 from goat_ai.actions import Action
+from goat_ai.agents.tactical_guard import admissible_action_indices
 from goat_ai.engine.decks import read_goat_whitelist
 from goat_ai.observations import Observation
 
@@ -28,7 +29,7 @@ ACTION_KINDS = (
 ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
 SORT_ACTION_KINDS = ("sort_cards",)
-POLICY_INFERENCE_VERSION = 3  # permit legal cancel once per visible prompt
+POLICY_INFERENCE_VERSION = 4  # optional visible-state tactical guard
 POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experiments
 # Version 16 branches from v12 so its combat relation can be tested without
 # the separate v13-v15 equip, chain-target, and occupancy experiments.
@@ -494,9 +495,13 @@ class LegalActionPolicy(nn.Module):
 class PolicyAgent:
     """Greedy inference through the same Agent interface as the baselines."""
 
-    def __init__(self, model: LegalActionPolicy, vocabulary: CardVocabulary) -> None:
+    def __init__(self, model: LegalActionPolicy, vocabulary: CardVocabulary,
+                 *, tactical_guard: bool = False,
+                 card_races: Mapping[int, int] | None = None) -> None:
         self.model = model
         self.vocabulary = vocabulary
+        self.tactical_guard = tactical_guard
+        self.card_races = dict(card_races or {})
         self._last_selection: tuple[int, str, tuple] | None = None
         self._cancel_turn: int | None = None
         self._cancelled_prompts: list[tuple[Observation, tuple[tuple, ...]]] = []
@@ -513,7 +518,10 @@ class PolicyAgent:
         self.model.eval()
         with torch.no_grad():
             scores = self.model(features.to(device))
-        chosen = legal_actions[int(scores.argmax().item())]
+        admissible = (admissible_action_indices(observation, legal_actions,
+                                                self.card_races)
+                      if self.tactical_guard else range(len(legal_actions)))
+        chosen = legal_actions[max(admissible, key=lambda i: scores[i].item())]
         if chosen.kind == "cancel":
             if observation.turn != self._cancel_turn:
                 self._cancel_turn = observation.turn

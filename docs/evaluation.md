@@ -2583,3 +2583,52 @@ Linux x86-64 machine. The ignored report is
 `artifacts/fv17_v3_2005_top5_2200_2201.json` (SHA-256
 `91bcd000e261b247de145441f09904e76cfd27e700bff19e13fdee1d712dd8aa`).
 The checkpoint and native assets are fingerprinted inside the report.
+
+## Visible-state tactical guard ablation, seeds 2210–2213
+
+The unchanged feature-17 v3 checkpoint with the opt-in tactical guard played
+the same checkpoint without the guard across all ordered pairs of five sourced
+2005 Main Decks, both player seats, and four evaluation seeds. The 160 games
+were split into two independently recorded 80-game runs:
+
+| Seeds | Guard wins | Guard losses | Draws | Score rate | Paired bootstrap 95% interval |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2210–2211 | 52 | 28 | 0 | 65.0% | 58.75–72.5% |
+| 2212–2213 | 47 | 32 | 1 | 59.375% | 50.625–67.5% |
+
+Combined score: **99 wins, 60 losses, 1 draw, 62.19% of available points**.
+The two recorded tournament wall times were 42.76 and 46.66 seconds on four
+workers. The ignored reports are
+`artifacts/guard_v2_vs_plain_top5_2210_2211.json` (SHA-256
+`35e29c652dbad7c06de72567ee8dfe38ad1225890f3be7f24b78eb8e44078626`)
+and `artifacts/guard_v2_vs_plain_top5_2212_2213.json` (SHA-256
+`3d4db745aec4e20f136ecf46acebfa0df56c46ddf97f75427fd0813c7d5860d5`).
+Both reject training deck hashes and require unseen Main Deck compositions.
+
+This is evidence that the guard helps against the same checkpoint on this deck
+set. It is not a claim of superiority to strong humans or to another baseline.
+The guard remains opt-in pending broader matchups and training changes. See
+[replay audit](replay_audit.md) for the particular
+decisions that motivated it.
+
+## TacticalHeuristicAgent v2 versus CombatHeuristicAgent v3
+
+The experimental tactical baseline scored **74 wins, 46 losses** over 120
+paired duels on all ordered pairs of the six sourced tournament Main Decks,
+both seats, and seeds 2300–2301. Its 61.67% score rate had a paired bootstrap
+95% interval of 55.0–68.33%. The four-worker tournament took 15.26 seconds.
+The ignored report is `artifacts/tactical_v2_vs_combat_v3_2300_2301.json`
+(SHA-256 `22a2f75ad5e0c5458b912ca382210833db8cc7b06d1a457ad5e852398e9be4f6`).
+The comparator is a weak hand-built baseline; this result does not establish
+competitive strength.
+
+The guarded feature-17 v3 policy then scored **36 wins, 44 losses** against
+TacticalHeuristicAgent v2 across all ordered pairs of the five sourced 2005
+Main Decks, both seats, and seeds 2310–2311. Its 45.0% score rate had a paired
+bootstrap 95% interval of 36.25–53.75%; it scored 16–24 in the first seat and
+20–20 in the second. The four-worker tournament took 43.57 seconds. The ignored
+report is `artifacts/policy_guard_v2_vs_tactical_v2_top5_2310_2311.json`
+(SHA-256 `39516838fbc8dfeaa675db57e91a22608be83f146d4366472ae433bc79086125`).
+The evaluation rejected training deck file hashes and required unseen Main
+Deck compositions. These results do not support calling the guarded policy
+the strongest local agent yet.

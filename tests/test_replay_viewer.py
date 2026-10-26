@@ -38,6 +38,8 @@ def test_common_card_navigation_matches_sourced_main_decks():
     assert viewer_codes == {code for code, count in deck_counts.items() if count >= 5}
     assert 'id="previous-common"' in template
     assert 'id="next-common"' in template
+    assert 'id="agents"' in template
+    assert 'meta.demonstrator_seat' in template
 
 
 def test_reviewer_frame_combines_private_views_without_changing_agent_observation():

@@ -8,6 +8,7 @@ import argparse
 import json
 import sqlite3
 from collections import Counter
+from dataclasses import replace
 from itertools import combinations
 from pathlib import Path
 
@@ -16,6 +17,9 @@ from goat_ai.agents import (
     CombatHeuristicAgent,
     HeuristicAgent,
     RandomAgent,
+    TacticalHeuristicAgent,
+    load_card_races,
+    load_flip_monster_codes,
 )
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
@@ -36,7 +40,6 @@ DEFAULT_MATCHUPS = (
     ("chaos_return_dingosig_worlds_2022.ydk",
      "flip_control_goatformat_guide.ydk"),
 )
-FLIP_MONSTER_TYPE = 0x200000
 
 
 def tournament_matchups(fixtures: Path) -> tuple[tuple[Path, Path], ...]:
@@ -45,18 +48,11 @@ def tournament_matchups(fixtures: Path) -> tuple[tuple[Path, Path], ...]:
 
 
 def flip_monster_codes(native_root: Path) -> frozenset[int]:
-    """Read public Flip type metadata from the pinned card databases."""
-    codes = set()
-    for relative in ("database/cards.cdb", "database/goat-entries.cdb",
-                     "database/cards-unofficial.cdb"):
-        path = native_root / relative
-        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as database:
-            codes.update(row[0] for row in database.execute(
-                "SELECT id FROM datas WHERE (type & ?) != 0", (FLIP_MONSTER_TYPE,)))
-    return frozenset(codes)
+    return load_flip_monster_codes(native_root)
 
 
-def make_agent(name: str, seed: int, flip_codes: frozenset[int] = frozenset()):
+def make_agent(name: str, seed: int, flip_codes: frozenset[int] = frozenset(),
+               card_races: dict[int, int] | None = None):
     """Construct a baseline using only the public observation/action interface."""
     if name == "random":
         return RandomAgent(seed)
@@ -66,6 +62,8 @@ def make_agent(name: str, seed: int, flip_codes: frozenset[int] = frozenset()):
         return CombatHeuristicAgent()
     if name == "combat_flip":
         return CombatFlipHeuristicAgent(flip_codes)
+    if name == "tactical":
+        return TacticalHeuristicAgent(flip_codes, card_races)
     raise ValueError(f"unknown baseline agent: {name}")
 def deck_label(path: Path) -> str:
     """Use checkout-independent paths for the repository's example decks."""
@@ -111,7 +109,9 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
         prevalence.update(main.keys())
         copies.update(main)
     games = []
-    flip_codes = flip_monster_codes(native_root) if agent_name == "combat_flip" else frozenset()
+    flip_codes = (flip_monster_codes(native_root)
+                  if agent_name in ("combat_flip", "tactical") else frozenset())
+    races = load_card_races(native_root) if agent_name == "tactical" else {}
     verified_decisions = 0
     if record_dir is not None:
         record_dir.mkdir(parents=True, exist_ok=True)
@@ -124,8 +124,8 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
                 with GoatEnvironment(*(str(path) for path in decks), seed=seed,
                                      engine=ExperimentalOcgcoreEngine(native_root)) as env:
                     observation = env.reset()
-                    agents = (make_agent(agent_name, seed * 2, flip_codes),
-                              make_agent(agent_name, seed * 2 + 1, flip_codes))
+                    agents = (make_agent(agent_name, seed * 2, flip_codes, races),
+                              make_agent(agent_name, seed * 2 + 1, flip_codes, races))
                     for decision_index in range(max_decisions):
                         if env.is_terminal():
                             break
@@ -143,7 +143,11 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
                         if not env.is_terminal():
                             raise RuntimeError(f"duel exceeded {max_decisions} decisions: "
                                                f"{decks}, seed={seed}")
-                    trajectory = env.trajectory()
+                    trajectory = replace(
+                        env.trajectory(), source=f"{agent_name}_probe",
+                        skill_metadata={"agents": [type(agent).__name__ for agent in agents],
+                                        "purpose": "native_action_coverage"},
+                    )
                     game = {"decks": [deck_label(path) for path in decks],
                             "seed": seed, "decisions": len(trajectory.decisions),
                             "winner": env.result()}
@@ -249,7 +253,7 @@ def main() -> None:
                           help="probe all 15 pairs of six sourced tournament decks")
     parser.add_argument("--seed", type=int, default=9700)
     parser.add_argument("--agent", choices=("random", "heuristic", "combat_heuristic",
-                                            "combat_flip"),
+                                            "combat_flip", "tactical"),
                         default="random")
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--max-decisions", type=int, default=3000)

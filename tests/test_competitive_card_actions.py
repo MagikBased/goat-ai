@@ -11,9 +11,15 @@ import pytest
 from goat_ai.actions import Action
 from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
+from goat_ai.replay import read_trajectory
 from scripts.probe_competitive_card_actions import (
-    ROOT, count_chain_response, count_source_actions, deck_label, make_agent,
-    probe, tournament_matchups,
+    ROOT,
+    count_chain_response,
+    count_source_actions,
+    deck_label,
+    make_agent,
+    probe,
+    tournament_matchups,
 )
 
 
@@ -88,3 +94,10 @@ def test_sourced_deck_probe_records_and_replay_verifies_full_duels(tmp_path):
                and (tmp_path / "replays" / game["trajectory_file"]).is_file()
                and len(game["trajectory_sha256"]) == 64
                for game in report["games"])
+    assert all(
+        (trajectory := read_trajectory(tmp_path / "replays" / game["trajectory_file"]))
+        .source == "combat_heuristic_probe"
+        and trajectory.skill_metadata == {
+            "agents": ["CombatHeuristicAgent", "CombatHeuristicAgent"],
+            "purpose": "native_action_coverage"}
+        for game in report["games"])

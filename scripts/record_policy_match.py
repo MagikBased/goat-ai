@@ -1,0 +1,92 @@
+"""Record a greedy checkpoint against a named baseline in a native GOAT duel."""
+
+import argparse
+import json
+from dataclasses import replace
+from pathlib import Path
+
+from goat_ai.agents import (
+    CombatFlipHeuristicAgent,
+    CombatHeuristicAgent,
+    HeuristicAgent,
+    RandomAgent,
+    TacticalHeuristicAgent,
+    load_card_races,
+    load_flip_monster_codes,
+)
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
+from goat_ai.replay.fingerprint import sha256_file
+from goat_ai.training import load_policy_agent
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("checkpoint", type=Path)
+    parser.add_argument("--deck1", type=Path, required=True)
+    parser.add_argument("--deck2", type=Path, required=True)
+    parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
+    parser.add_argument("--seed", type=int, default=2202)
+    parser.add_argument("--policy-seat", type=int, choices=(0, 1), default=0)
+    parser.add_argument("--opponent", choices=("combat_heuristic", "combat_flip", "tactical",
+                                               "heuristic", "random"),
+                        default="combat_heuristic")
+    parser.add_argument("--max-decisions", type=int, default=3000)
+    parser.add_argument("--tactical-guard", action="store_true",
+                        help="apply experimental visible-state action filter to policy")
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    if args.max_decisions < 1:
+        parser.error("--max-decisions must be positive")
+    policy = load_policy_agent(
+        args.checkpoint, tactical_guard=args.tactical_guard,
+        card_races=load_card_races(args.native_root) if args.tactical_guard else None)
+    flip_codes = (load_flip_monster_codes(args.native_root)
+                  if args.opponent in ("combat_flip", "tactical") else frozenset())
+    opponent = {
+        "combat_heuristic": lambda: CombatHeuristicAgent(),
+        "combat_flip": lambda: CombatFlipHeuristicAgent(flip_codes),
+        "tactical": lambda: TacticalHeuristicAgent(
+            flip_codes, load_card_races(args.native_root)),
+        "heuristic": lambda: HeuristicAgent(),
+        "random": lambda: RandomAgent(args.seed),
+    }[args.opponent]()
+    agents = [None, None]
+    agents[args.policy_seat] = policy
+    agents[1 - args.policy_seat] = opponent
+    with GoatEnvironment(str(args.deck1), str(args.deck2), args.seed,
+                         ExperimentalOcgcoreEngine(args.native_root)) as env:
+        observation = env.reset()
+        for _ in range(args.max_decisions):
+            action = agents[observation.acting_player].select_action(
+                observation, env.legal_actions())
+            observation = env.step(action)
+            if env.is_terminal():
+                trajectory = replace(
+                    env.trajectory(), source="policy_evaluation",
+                    skill_metadata={
+                        "demonstrator_seat": args.policy_seat,
+                        "policy_checkpoint_sha256": sha256_file(args.checkpoint),
+                        "policy_inference": ("greedy_tactical_guard_v1" if args.tactical_guard
+                                             else "greedy"),
+                        "opponent": type(opponent).__name__,
+                        "opponent_version": getattr(opponent, "teacher_version", 1),
+                    },
+                )
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                write_trajectory(args.output, trajectory)
+                verified = verify_trajectory(
+                    read_trajectory(args.output), ExperimentalOcgcoreEngine(args.native_root))
+                print(json.dumps({"trajectory": str(args.output),
+                                  "source": trajectory.source,
+                                  "policy_seat": args.policy_seat,
+                                  "opponent": type(opponent).__name__,
+                                  "winner": env.result(), "verified_decisions": verified},
+                                 indent=2))
+                return
+    raise RuntimeError(f"duel exceeded {args.max_decisions} decisions")
+
+
+if __name__ == "__main__":
+    main()

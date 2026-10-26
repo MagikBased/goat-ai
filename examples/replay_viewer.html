@@ -174,6 +174,7 @@
         </div>
         <div class="panel summary">
           <div><strong id="turn"></strong><p id="viewpoint" class="muted"></p></div>
+          <div id="agents" class="muted"></div>
           <div id="result" class="muted"></div>
         </div>
         <div class="panel">
@@ -417,6 +418,20 @@
         return COMMON_CARD_CODES.has(params.code) || (params.cards || []).some(
           card => COMMON_CARD_CODES.has(card.code));
       });
+    };
+    const replayAgents = data => {
+      const meta = data?.skill_metadata || {};
+      if (Array.isArray(meta.agents) && meta.agents.length === 2) return meta.agents;
+      const seat = meta.demonstrator_seat;
+      if (seat === 0 || seat === 1) {
+        const labels = [null, null];
+        labels[seat] = data.source === "policy_evaluation"
+          ? `Policy${meta.policy_inference?.includes("tactical_guard") ? " + guard" : ""}`
+          : (meta.teacher || "Demonstrator");
+        labels[1 - seat] = meta.opponent || "Opponent";
+        return labels;
+      }
+      return [null, null];
     };
     const nearbyCommon = direction => {
       if (direction > 0) return commonFrames.find(frame => frame > index);
@@ -714,9 +729,13 @@
       byId("next-common").disabled = nearbyCommon(1) == null;
       byId("common-count").textContent = `${commonFrames.length} common-card choices`;
       byId("turn").textContent = `Turn ${observation.turn} · ${phaseName(observation.phase)}`;
+      const agents = replayAgents(replay);
+      byId("agents").textContent = agents.some(Boolean)
+        ? agents.map((name, seat) => `P${seat}: ${name || "identity unrecorded"}`).join(" · ")
+        : `Agent identities unrecorded · source: ${replay.source || "unknown"}`;
       byId("viewpoint").textContent = terminal
         ? `Final state · ${reviewerData ? "reviewer view" : `Player ${observation.viewer}'s visible view`}`
-        : `Decision ${index + 1} · Player ${observation.acting_player} acts · ${reviewerData ? "reviewer view" : `Player ${observation.viewer}'s visible view`}`;
+        : `Decision ${index + 1} · Player ${observation.acting_player}${agents[observation.acting_player] ? ` (${agents[observation.acting_player]})` : ""} acts · ${reviewerData ? "reviewer view" : `Player ${observation.viewer}'s visible view`}`;
       byId("result").textContent = terminal || index === decisions.length - 1 && !replay.terminal_observation
         ? `Seed ${replay.seed} · ${replay.winner == null ? "Draw" : `Winner: Player ${replay.winner}`}`
         : `Seed ${replay.seed} · Outcome hidden`;

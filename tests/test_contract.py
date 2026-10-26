@@ -10,6 +10,7 @@ from goat_ai.agents import (
     HeuristicAgent,
     HumanAgent,
     RandomAgent,
+    TacticalHeuristicAgent,
 )
 from goat_ai.engine import Decision, RulesProfile, SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
@@ -254,6 +255,66 @@ def test_combat_flip_candidate_prioritizes_public_flip_type():
     set_flip = Action("3", "set_monster", 0, {"code": 87621407})
     assert CombatFlipHeuristicAgent({87621407}).select_action(
         observation, (normal, set_flip)) == set_flip
+
+
+def test_tactical_agent_sets_faith_and_does_not_torrential_its_own_summon():
+    faith = 31560081
+    agent = TacticalHeuristicAgent({faith})
+    normal = Action("normal", "normal_summon", 0, {"code": faith})
+    set_card = Action("set", "set_monster", 0, {"code": faith})
+    assert agent.select_action(view(), (normal, set_card)) == set_card
+
+    board = replace(view(), field=(
+        CardView(0, "monster", "faceup", faith, 0, "attack", 300, 400),
+        CardView(0, "spell_trap", "facedown", 53582587, 1),
+    ))
+    torrential = Action("trap", "chain", 0, {"code": 53582587})
+    decline = Action("pass", "pass", 0)
+    assert agent.select_action(board, (torrential, decline)) == decline
+    enemy = replace(board, field=board.field + (
+        CardView(1, "monster", "faceup", 49881766, 0, "attack", 1900, 1500),
+        CardView(1, "monster", "faceup", 62651957, 1, "attack", 1700, 1400),
+    ))
+    assert agent.select_action(enemy, (torrential, decline)) == torrential
+
+
+def test_tactical_agent_preserves_ring_until_opponent_has_a_safe_target():
+    agent = TacticalHeuristicAgent()
+    own = CardView(0, "monster", "faceup", 49881766, 0, "attack", 1900, 1500)
+    ring = Action("ring", "chain", 0, {"code": 511000824})
+    decline = Action("pass", "pass", 0)
+    board = replace(view(), field=(own,))
+    assert agent.select_action(board, (ring, decline)) == decline
+    enemy = CardView(1, "monster", "faceup", 62651957, 1, "attack", 1700, 1400)
+    board = replace(board, field=(own, enemy))
+    assert agent.select_action(board, (ring, decline)) == ring
+    choosing = replace(board, chain=(ChainLinkView(1, 511000824, 0, 8, 0),))
+    own_target = Action("own", "select_card", 0,
+                        {"controller": 0, "location": 4, "sequence": 0, "code": 49881766})
+    enemy_target = Action("enemy", "select_card", 0,
+                          {"controller": 1, "location": 4, "sequence": 1,
+                           "code": 62651957})
+    assert agent.select_action(choosing, (own_target, enemy_target)) == enemy_target
+
+
+def test_tactical_agent_does_not_name_own_race_for_tribe():
+    tribe = 33184167
+    own_spy = CardView(0, "monster", "faceup", 504700044, 0, "attack", 1200, 2000)
+    opposing_monster = CardView(1, "monster", "faceup", 17881964, 0,
+                                "attack", 1500, 1300)
+    races = {504700044: 2, 17881964: 8192, tribe: 64}
+    agent = TacticalHeuristicAgent(card_races=races)
+    activate = Action("tribe", "chain", 0, {"code": tribe})
+    decline = Action("decline", "pass", 0)
+    board = replace(view(), field=(own_spy, own_spy, opposing_monster))
+    assert agent.select_action(board, (activate, decline)) == activate
+    announce = replace(board, chain=(ChainLinkView(1, tribe, 0, 4, 3),))
+    spellcaster = Action("spellcaster", "announce_race", 0, {"race": 2})
+    other = Action("other", "announce_race", 0, {"race": 64})
+    enemy = Action("enemy", "announce_race", 0, {"race": 8192})
+    assert agent.select_action(announce, (spellcaster, other, enemy)) == enemy
+    assert agent.select_action(replace(board, field=(own_spy,)),
+                               (activate, decline)) == decline
 
 
 def test_combat_heuristic_uses_only_visible_battle_stats():

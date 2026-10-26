@@ -1,11 +1,13 @@
 """All agents consume the same redacted observation and legal action list."""
 
 import random
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import ClassVar, Protocol
 
 from goat_ai.actions import Action
 from goat_ai.observations import CardView, Observation
+
+from .tactical_guard import admissible_action_indices, tribe_race_value
 
 
 class Agent(Protocol):
@@ -135,6 +137,56 @@ class CombatFlipHeuristicAgent(CombatHeuristicAgent):
         if flip is not None:
             return flip
         return super().select_action(observation, legal_actions)
+
+
+class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
+    """Flip-aware baseline with conservative, visible-board Trap decisions."""
+
+    teacher_version: ClassVar[int] = 2
+    RING: ClassVar[int] = 511000824
+    TORRENTIAL: ClassVar[int] = 53582587
+    SINISTER: ClassVar[int] = 511000818
+    TRIBE: ClassVar[int] = 33184167
+
+    def __init__(self, flip_monster_codes: Collection[int] = (),
+                 card_races: Mapping[int, int] | None = None) -> None:
+        super().__init__(flip_monster_codes)
+        self.card_races = dict(card_races or {})
+
+    def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
+        if not legal_actions:
+            raise ValueError("no legal actions")
+        yes = next((action for action in legal_actions if action.kind == "yes"
+                    and action.parameters.get("code") == self.SINISTER), None)
+        if yes is not None:
+            return yes
+
+        monsters = [card for card in observation.field if card.zone == "monster"]
+        opposing = [card for card in monsters if card.controller != observation.viewer]
+        if (observation.chain and observation.chain[-1].card_code == self.TRIBE
+                and observation.chain[-1].controller == observation.viewer):
+            races = [action for action in legal_actions if action.kind == "announce_race"]
+            if races:
+                return max(races, key=lambda action: tribe_race_value(
+                    observation, action.parameters["race"], self.card_races))
+        if (observation.chain and observation.chain[-1].card_code == self.RING
+                and observation.chain[-1].controller == observation.viewer
+                and legal_actions[0].kind == "select_card"):
+            targets = [action for action in legal_actions if action.kind == "select_card"
+                       and action.parameters.get("controller") != observation.viewer]
+            by_slot = {(card.controller, card.sequence): card for card in opposing
+                       if card.position == "faceup" and card.attack is not None}
+            safe = [action for action in targets
+                    if (card := by_slot.get((action.parameters.get("controller"),
+                                             action.parameters.get("sequence")))) is not None
+                    and card.attack < observation.life_points[observation.viewer]]
+            if safe:
+                return max(safe, key=lambda action: by_slot[
+                    (action.parameters["controller"], action.parameters["sequence"])].attack)
+
+        filtered = [legal_actions[i] for i in admissible_action_indices(
+            observation, legal_actions, self.card_races)]
+        return super().select_action(observation, filtered)
 
 
 class HumanAgent:

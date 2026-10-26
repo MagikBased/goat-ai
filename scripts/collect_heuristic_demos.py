@@ -5,7 +5,15 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
+from goat_ai.agents import (
+    CombatFlipHeuristicAgent,
+    CombatHeuristicAgent,
+    HeuristicAgent,
+    RandomAgent,
+    TacticalHeuristicAgent,
+    load_card_races,
+    load_flip_monster_codes,
+)
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
@@ -16,7 +24,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
-    parser.add_argument("--teacher", choices=("heuristic", "combat_heuristic"),
+    parser.add_argument("--teacher", choices=("heuristic", "combat_heuristic",
+                                              "combat_flip", "tactical"),
                         default="heuristic")
     parser.add_argument("--deck-a", type=Path)
     parser.add_argument("--deck-b", type=Path)
@@ -32,8 +41,13 @@ def main() -> None:
     deck_b = args.deck_b or fixtures / "vanilla_reverse.ydk"
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
-    teacher_type = (HeuristicAgent if args.teacher == "heuristic"
-                    else CombatHeuristicAgent)
+    teacher_type = {"heuristic": HeuristicAgent,
+                    "combat_heuristic": CombatHeuristicAgent,
+                    "combat_flip": CombatFlipHeuristicAgent,
+                    "tactical": TacticalHeuristicAgent}[args.teacher]
+    flip_codes = (load_flip_monster_codes(args.native_root)
+                  if args.teacher in ("combat_flip", "tactical") else frozenset())
+    card_races = load_card_races(args.native_root) if args.teacher == "tactical" else {}
     args.output_dir.mkdir(parents=True, exist_ok=True)
     games = []
     for seed in range(args.seed, args.seed + args.seeds):
@@ -42,8 +56,10 @@ def main() -> None:
             with GoatEnvironment(*(str(deck) for deck in decks), seed=seed,
                                  engine=engine_type(args.native_root)) as env:
                 observation = env.reset()
-                agents = (teacher_type() if teacher_seat == 0 else RandomAgent(seed),
-                          teacher_type() if teacher_seat == 1 else RandomAgent(seed))
+                teacher = (TacticalHeuristicAgent(flip_codes, card_races)
+                           if args.teacher == "tactical" else teacher_type(flip_codes))
+                agents = (teacher if teacher_seat == 0 else RandomAgent(seed),
+                          teacher if teacher_seat == 1 else RandomAgent(seed))
                 for _ in range(args.max_decisions):
                     action = agents[observation.acting_player].select_action(
                         observation, env.legal_actions())

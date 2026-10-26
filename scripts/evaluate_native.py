@@ -4,7 +4,6 @@ import argparse
 import hashlib
 import json
 import platform
-import sqlite3
 from dataclasses import asdict
 from functools import partial
 from itertools import combinations
@@ -16,13 +15,14 @@ from goat_ai.agents import (
     CombatHeuristicAgent,
     HeuristicAgent,
     RandomAgent,
+    TacticalHeuristicAgent,
+    load_card_races,
+    load_flip_monster_codes,
 )
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import both_deck_assignments, run_tournament, run_tournament_parallel
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
-
-FLIP_MONSTER_TYPE = 0x200000  # TYPE_FLIP in the pinned scripts/constant.lua
 
 
 def sha256(path: Path) -> str:
@@ -66,15 +66,7 @@ def tournament_matchups(fixtures: Path) -> tuple[tuple[str, str], ...]:
 
 
 def flip_monster_codes(native_root: Path) -> frozenset[int]:
-    """Read public card type metadata from the pinned databases."""
-    codes = set()
-    for relative in ("database/cards.cdb", "database/goat-entries.cdb",
-                     "database/cards-unofficial.cdb"):
-        path = native_root / relative
-        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as database:
-            codes.update(row[0] for row in database.execute(
-                "SELECT id FROM datas WHERE (type & ?) != 0", (FLIP_MONSTER_TYPE,)))
-    return frozenset(codes)
+    return load_flip_monster_codes(native_root)
 
 
 def agent_factory(name: str, native_root: Path):
@@ -87,6 +79,10 @@ def agent_factory(name: str, native_root: Path):
     if name == "combat_flip":
         return partial(make_combat_flip,
                        flip_monster_codes=flip_monster_codes(native_root))
+    if name == "tactical":
+        return partial(make_tactical,
+                       flip_monster_codes=flip_monster_codes(native_root),
+                       card_races=load_card_races(native_root))
     if name == "flip_heuristic":
         return partial(make_flip_heuristic,
                        flip_monster_codes=flip_monster_codes(native_root))
@@ -109,6 +105,11 @@ def make_flip_heuristic(_seed: int, *, flip_monster_codes: frozenset[int]) -> He
     return HeuristicAgent(flip_monster_codes)
 
 
+def make_tactical(_seed: int, *, flip_monster_codes: frozenset[int],
+                  card_races: dict[int, int]) -> TacticalHeuristicAgent:
+    return TacticalHeuristicAgent(flip_monster_codes, card_races)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
@@ -122,10 +123,10 @@ def main() -> None:
     parser.add_argument("--both-deck-assignments", action="store_true",
                         help="evaluate each deck pair with either agent assigned either deck")
     parser.add_argument("--agent-a", choices=("random", "heuristic", "combat_heuristic",
-                                              "combat_flip", "flip_heuristic"),
+                                              "combat_flip", "flip_heuristic", "tactical"),
                         default="random")
     parser.add_argument("--agent-b", choices=("random", "heuristic", "combat_heuristic",
-                                              "combat_flip", "flip_heuristic"),
+                                              "combat_flip", "flip_heuristic", "tactical"),
                         default="random")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--seeds", type=int, default=2)
@@ -170,13 +171,17 @@ def main() -> None:
     }
     result = {
         "agent_a": args.agent_a, "agent_b": args.agent_b,
-        "agent_a_version": (CombatHeuristicAgent.teacher_version
+        "agent_a_version": (TacticalHeuristicAgent.teacher_version
+                            if args.agent_a == "tactical"
+                            else CombatHeuristicAgent.teacher_version
                             if args.agent_a == "combat_heuristic"
                             else CombatFlipHeuristicAgent.teacher_version
                             if args.agent_a == "combat_flip"
                             else HeuristicAgent.teacher_version
                             if args.agent_a in ("heuristic", "flip_heuristic") else 1),
-        "agent_b_version": (CombatHeuristicAgent.teacher_version
+        "agent_b_version": (TacticalHeuristicAgent.teacher_version
+                            if args.agent_b == "tactical"
+                            else CombatHeuristicAgent.teacher_version
                             if args.agent_b == "combat_heuristic"
                             else CombatFlipHeuristicAgent.teacher_version
                             if args.agent_b == "combat_flip"

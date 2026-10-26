@@ -10,6 +10,7 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from goat_ai.actions import Action
+from goat_ai.agents.tactical_guard import HEAVY_STORM, SCAPEGOAT
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.observations import (
@@ -984,8 +985,8 @@ def test_self_play_can_censor_over_cap_game_without_learning_from_it(monkeypatch
                 rules_profile="goat"))
 
     monkeypatch.setattr("goat_ai.training.self_play.run_learning_episode", run_episode)
-    kwargs = dict(max_decisions=5, random_seed=7,
-                  record_episode=lambda index, episode: saved.append((index, episode.seed)))
+    kwargs = {"max_decisions": 5, "random_seed": 7,
+              "record_episode": lambda index, episode: saved.append((index, episode.seed))}
     with pytest.raises(EpisodeDecisionLimit, match="seed=100"):
         train_against_snapshot_pool(model, vocabulary, (("a", "b"),), (100, 101),
                                     lambda: None, **kwargs)
@@ -1013,8 +1014,8 @@ def test_self_play_reports_unsupported_native_prompt_without_learning(monkeypatc
                 rules_profile="goat"))
 
     monkeypatch.setattr("goat_ai.training.self_play.run_learning_episode", run_episode)
-    kwargs = dict(random_seed=7, record_episode=lambda index, episode: saved.append(
-        (index, episode.seed)))
+    kwargs = {"random_seed": 7, "record_episode": lambda index, episode: saved.append(
+        (index, episode.seed))}
     with pytest.raises(SimulatorUnavailable, match="8008 combinations"):
         train_against_snapshot_pool(model, vocabulary, (("a", "b"),), (100, 101),
                                     lambda: None, **kwargs)
@@ -1102,3 +1103,31 @@ def test_policy_agent_progresses_multi_card_selection():
     changed = replace(view(), hand=(CardView(0, "hand", "hidden", 20, 0),))
     assert cancel_agent.select_action(changed, (cancel, first)) == cancel
     assert cancel_agent.select_action(replace(view(), turn=4), (cancel, first)) == cancel
+
+
+def test_policy_tactical_guard_is_opt_in_and_uses_visible_state():
+    class FavorCard(torch.nn.Module):
+        def __init__(self, code_index):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+            self.code_index = code_index
+
+        def forward(self, features):
+            return (features.action_cards == self.code_index).float() * 10 + self.dummy
+
+    vocabulary = CardVocabulary(tuple(sorted((HEAVY_STORM, SCAPEGOAT))))
+    own_set = CardView(0, "spell_trap", "facedown", 45986603, 0)
+    snapshot = replace(view(), field=(own_set,))
+    storm = Action("storm", "activate", 0, {"code": HEAVY_STORM})
+    wait = Action("wait", "end_phase", 0)
+    model = FavorCard(vocabulary.index(HEAVY_STORM))
+    assert PolicyAgent(model, vocabulary).select_action(snapshot, (storm, wait)) == storm
+    assert PolicyAgent(model, vocabulary, tactical_guard=True).select_action(
+        snapshot, (storm, wait)) == wait
+
+    goat = Action("goat", "chain", 0, {"code": SCAPEGOAT})
+    decline = Action("decline", "pass", 0)
+    model = FavorCard(vocabulary.index(SCAPEGOAT))
+    guarded = PolicyAgent(model, vocabulary, tactical_guard=True)
+    assert guarded.select_action(replace(view(), phase="draw"), (goat, decline)) == decline
+    assert guarded.select_action(replace(view(), phase="end"), (goat, decline)) == goat
