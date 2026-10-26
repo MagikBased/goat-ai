@@ -41,6 +41,42 @@ To inspect the guarded seed 2202 duel, open
 replayed through the native engine before the recorder accepts it. Because the
 guard changes early actions, later frame numbers differ from the original.
 
+## Feature-19 learned policy versus TacticalHeuristicAgent v3, seed 2612
+
+Replay: `replays/policy_audit_v19_jesse_daryl_seed2612.json`. This is an
+on-policy, complete 534-decision duel with the feature-19 checkpoint
+`tactical_v3_fv19_2500_2503.pt` (SHA-256
+`fe197724523b33a8d555e90ab9f7b669dab2081b000346b9b31d1788d7e07fc2`).
+Trajectory metadata identifies the **greedy policy on P0**, TacticalHeuristicAgent
+v3 on P1, seed 2612, Jesse Goat Control versus Daryl Gravekeepers, and
+inference version 5. Native replay verification succeeded; P1 won. Later
+experimental timing warm-start checkpoints exist, so this is evidence about
+the named feature-19 checkpoint only. The replay is an ignored local artifact;
+regenerate it with the command below.
+
+| Viewer frame (JSON index) | P0's visible state and chosen action | Legal alternative and improvement |
+| --- | --- | --- |
+| 11 (10) | On turn 1, P0 activates Heavy Storm with its own Set Torrential Tribute and Metamorphosis as the **only** Spell/Traps. After resolution the field has no Spell/Traps. | `end_phase` or other legal actions preserve both cards. The optional tactical guard rejects this activation on the saved observation; train the policy to value resource balance directly, including exceptions where clearing one's own backrow helps. |
+| 142–143 (141–142) | P0 has declared an attack with its 1700 ATK D.D. Assailant against an unknown Set monster. With no pending chain or newly revealed threat, it chains its own Book of Moon and targets the attacker. The attacker is Set and its attack ends. | `pass` was legal at frame 142. Score response cards against the effect of *continuing the already chosen attack*; a card use that cancels that attack needs a concrete reason. |
+| 163 and 181 (162 and 180) | P0 chains Royal Decree to the opponent's Gravekeeper's Spy monster effect while its own Sakuretsu Armor is Set. Decree cannot negate that monster effect. Later P0 activates Sakuretsu Armor against an attack despite its own Royal Decree still face-up; the attacker remains after resolution and Sakuretsu is spent. | `pass` was legal at both decisions; Scapegoat was also legal. Add visible continuous-effect context to Trap action valuation, and penalize activating a Trap while one's own Royal Decree negates it. The earlier Decree activation also merits a separate check because it disables the policy's own defense. |
+| 209, 288–339, 469–470 (208, 287–338, 468–469) | P0 repeatedly passes with Set Scapegoat legally chainable. Frame 209 is the opponent's End Phase with no own monster and three opponent monsters. On turn 8 it passes at Battle Start and several Battle Step prompts with **zero own monsters**, four opposing monsters, and 6500 LP; by the End Phase it has 2600 LP and still passes. At the opponent's later End Phase it has 500 LP and still passes. | Activating at the opponent's End Phase or in response to an attack would create blockers without the same-turn summon restriction carrying into P0's next turn. The timing guard only removes premature uses; it does not force useful activation. Add labeled defensive and End Phase examples, then test both missed defenses and false-positive activations on held-out games. |
+
+On these saved decisions, the optional tactical guard changes frame 11 away
+from Heavy Storm. It does **not** change the Book of Moon, Sakuretsu Armor, or
+Scapegoat choices. This is an off-policy diagnostic on fixed observations;
+once a different action is taken, the rest of the duel changes, so it is not
+a measured match-strength gain. No reviewer reveal was used to identify an
+opponent Set card.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/record_policy_match.py \
+  checkpoints/tactical_v3_fv19_2500_2503.pt \
+  --deck1 examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+  --deck2 examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --seed 2612 --policy-seat 0 --opponent tactical \
+  --output replays/policy_audit_v19_jesse_daryl_seed2612.json
+```
+
 ## Scapegoat turn-owner timing probe, seed 52
 
 `scripts/generate_scapegoat_timing_probe.py` creates a complete, native,
