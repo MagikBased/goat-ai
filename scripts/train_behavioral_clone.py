@@ -32,7 +32,10 @@ from goat_ai.training import (
     fit_with_parent_kl,
 )
 from goat_ai.training.policy import POLICY_FEATURE_VERSION
-from goat_ai.training.on_policy_teacher import label_policy_trajectory
+from goat_ai.training.on_policy_teacher import (
+    filter_activation_opportunities,
+    label_policy_trajectory,
+)
 
 SOURCE_KINDS = frozenset((
     "activate", "attack", "chain", "change_position", "flip_summon",
@@ -119,13 +122,20 @@ def restrict_trainable_modules(model: LegalActionPolicy, modules: list[str]) -> 
 
 
 def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
-                           vocabulary: CardVocabulary) -> dict:
+                           vocabulary: CardVocabulary, *,
+                           allow_v23_to_v24: bool = False,
+                           allow_v23_to_v25: bool = False) -> dict:
     """Continue a clone only when weights and held-out provenance are compatible."""
     parent = torch.load(path, map_location="cpu", weights_only=True)
     if not isinstance(parent, dict) or parent.get("schema_version") != 1:
         raise ValueError("unsupported parent policy checkpoint schema")
+    if (allow_v23_to_v24 or allow_v23_to_v25) and parent.get("feature_version") != 23:
+        raise ValueError("feature upgrade requires a feature-v23 parent")
+    upgrade = (parent.get("feature_version") == 23
+               and ((allow_v23_to_v24 and model.feature_version == 24)
+                    or (allow_v23_to_v25 and model.feature_version == 25)))
     if (parent.get("width") != model.card.embedding_dim
-            or parent.get("feature_version", 1) != model.feature_version
+            or (parent.get("feature_version", 1) != model.feature_version and not upgrade)
             or tuple(parent.get("vocabulary_codes", ())) != vocabulary.codes
             or tuple(tuple(item) for item in parent.get(
                 "vocabulary_card_properties", ())) != vocabulary.card_properties):
@@ -143,7 +153,20 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
     hashes = parent.get("trajectory_sha256")
     if not isinstance(hashes, dict):
         raise TypeError("parent checkpoint lacks trajectory hashes")
-    model.load_state_dict(parent["model_state"], strict=True)
+    state = parent["model_state"]
+    if upgrade:
+        state = dict(state)
+        key = "action_numbers.0.weight"
+        original = state[key]
+        expanded = torch.zeros_like(model.state_dict()[key])
+        if (original.shape != (model.card.embedding_dim, 101)
+                or expanded.shape != (model.card.embedding_dim, 104)):
+            raise ValueError("feature upgrade needs v23 action width 101 and resource width 104")
+        expanded[:, :101] = original
+        state[key] = expanded
+        if model.feature_version == 25:
+            state["trade_head.weight"] = model.state_dict()["trade_head.weight"].clone()
+    model.load_state_dict(state, strict=True)
     return parent
 
 
@@ -159,19 +182,25 @@ def main() -> None:
                         metavar="TRAJECTORY=LABELS",
                         help="label selected trajectories; unlisted demonstrations use their "
                              "recorded demonstrator seat")
-    parser.add_argument("--on-policy-teacher", choices=("tactical_v14",),
+    parser.add_argument("--on-policy-teacher", choices=("tactical_v14", "tactical_card_advantage"),
                         help="label replay-verified policy-visited states with the "
                              "named synthetic teacher; requires --init-checkpoint")
+    parser.add_argument("--on-policy-teacher-activation-focus-only", action="store_true",
+                        help="train only decisions offering activation of a --focus-card")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--init-checkpoint", type=Path,
                         help="continue compatible weights and preserve parent training provenance")
+    parser.add_argument("--upgrade-feature-23-to-24", action="store_true",
+                        help="zero-extend only the v23 action-number input when loading its parent")
+    parser.add_argument("--upgrade-feature-23-to-25", action="store_true",
+                        help="zero-extend v23 action numbers and initialize a zero trade head")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=1,
                         help="decisions per optimizer update; forward passes remain individual")
     parser.add_argument("--width", type=int, default=64)
-    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 24)),
+    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 26)),
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
@@ -214,9 +243,18 @@ def main() -> None:
         parser.error(str(exc))
     if args.init_checkpoint and args.init_checkpoint.resolve() == args.output.resolve():
         parser.error("--output must differ from --init-checkpoint")
+    if args.upgrade_feature_23_to_24 and (not args.init_checkpoint
+                                         or args.feature_version != 24):
+        parser.error("--upgrade-feature-23-to-24 requires a parent and feature v24")
+    if args.upgrade_feature_23_to_25 and (not args.init_checkpoint
+                                         or args.feature_version != 25):
+        parser.error("--upgrade-feature-23-to-25 requires a parent and feature v25")
     if args.on_policy_teacher and (not args.init_checkpoint or args.annotation
                                    or args.annotation_for):
         parser.error("--on-policy-teacher requires --init-checkpoint and no annotations")
+    if args.on_policy_teacher_activation_focus_only and (
+            not args.on_policy_teacher or not args.focus_card):
+        parser.error("activation focus requires --on-policy-teacher and --focus-card")
     if (args.parent_kl_steps < 0 or args.preserve_per_trajectory < 1
             or args.preserve_batch < 1 or not isfinite(args.parent_kl_weight)
             or args.parent_kl_weight <= 0):
@@ -232,8 +270,9 @@ def main() -> None:
     teacher = (TacticalHeuristicAgent(
         load_flip_monster_codes(args.native_root),
         load_card_races(args.native_root),
-        card_facts=load_card_facts(args.native_root))
-        if args.on_policy_teacher == "tactical_v14" else None)
+        card_facts=load_card_facts(args.native_root),
+        card_advantage_guard=args.on_policy_teacher == "tactical_card_advantage")
+        if args.on_policy_teacher else None)
     teacher_parent_hash = (hashlib.sha256(args.init_checkpoint.read_bytes()).hexdigest()
                            if teacher is not None else None)
     records = []
@@ -265,6 +304,9 @@ def main() -> None:
         if teacher is not None:
             selected, disagreements = label_policy_trajectory(
                 trajectory, teacher, teacher_parent_hash)
+            if args.on_policy_teacher_activation_focus_only:
+                selected, disagreements = filter_activation_opportunities(
+                    trajectory, selected, args.focus_card)
         elif label_path is not None:
             annotation, selected = read_decision_annotations(
                 label_path, hashlib.sha256(raw).hexdigest(), trajectory)
@@ -273,7 +315,7 @@ def main() -> None:
                 raise ValueError(f"{path}: scripted replay requires explicit annotations")
             selected = demonstrator_records(trajectory)
         if teacher is not None:
-            source = "automated_teacher_tactical_v14"
+            source = f"automated_teacher_{args.on_policy_teacher}"
         elif annotation is not None:
             source = {"self_recorded": "human_annotation",
                       "scripted_scenario": "synthetic_annotation",
@@ -316,7 +358,10 @@ def main() -> None:
     torch.manual_seed(args.seed)
     model = LegalActionPolicy(vocabulary.size, width=args.width,
                               feature_version=args.feature_version)
-    parent = (load_parent_checkpoint(args.init_checkpoint, model, vocabulary)
+    parent = (load_parent_checkpoint(
+        args.init_checkpoint, model, vocabulary,
+        allow_v23_to_v24=args.upgrade_feature_23_to_24,
+        allow_v23_to_v25=args.upgrade_feature_23_to_25)
               if args.init_checkpoint else None)
     try:
         restrict_trainable_modules(model, args.trainable_module)
@@ -404,10 +449,14 @@ def main() -> None:
         "parent_checkpoint_sha256": (hashlib.sha256(
             args.init_checkpoint.read_bytes()).hexdigest()
             if args.init_checkpoint else None),
+        "parent_feature_upgrade": ("v23_to_v25" if args.upgrade_feature_23_to_25
+                                   else "v23_to_v24" if args.upgrade_feature_23_to_24
+                                   else None),
         "seed": args.seed, "torch_version": str(torch.__version__),
         "batch_size": args.batch_size,
         "focus_cards": tuple(sorted(focus_codes)),
         "focus_weight": args.focus_weight,
+        "on_policy_activation_focus_only": args.on_policy_teacher_activation_focus_only,
         "source_weights": source_weights,
         "label_kind_weights": label_kind_weights,
         "trainable_modules": tuple(args.trainable_module) or ("all",),

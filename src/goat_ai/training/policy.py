@@ -49,9 +49,15 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # for the reviewed Faith, Heavy Storm, and Ring choices. It is opt-in.
 # Version 23 binds a position-change action to that monster's visible battle
 # stats and orientation, with only publicly visible opposing battle stats.
+# Version 24 adds a visible, before-chain card-trade estimate for Heavy Storm
+# and Nobleman of Crossout activations. It cannot predict chain responses.
+# Version 25 adds an opt-in, zero-initialized learned correction for that
+# estimate. With only this head trainable, all other action logits stay frozen.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 SPELL_TYPE = 0x2  # TYPE_SPELL in pinned ocgcore constant.lua
+HEAVY_STORM = 19613556
+NOBLEMAN_OF_CROSSOUT = 504700116
 
 
 @dataclass(frozen=True)
@@ -139,7 +145,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 24):
+    if feature_version not in range(1, 26):
         raise ValueError("unsupported policy feature version")
     if feature_version >= 22 and not vocabulary.card_properties:
         raise ValueError("feature version 22 requires pinned printed card properties")
@@ -390,6 +396,24 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                         min(visible_enemy_stats, default=0) / 8000,
                         float(bool(opponent_monsters) and
                               len(visible_enemy_stats) == len(opponent_monsters)))
+        if feature_version >= 24:
+            trade = 0
+            own_collateral = 0
+            estimated = action.kind == "activate" and params.get("code") in (
+                HEAVY_STORM, NOBLEMAN_OF_CROSSOUT)
+            if estimated and params["code"] == HEAVY_STORM:
+                source_is_set = params.get("location") == 8 and any(
+                    card.controller == own and card.zone == "spell_trap"
+                    and card.sequence == params.get("sequence")
+                    and card.code == HEAVY_STORM for card in observation.field)
+                own_collateral = own_backrow - int(source_is_set)
+                trade = enemy_backrow - own_collateral - 1
+            elif estimated:
+                enemy_set = any(card.position == "facedown" for card in opponent_monsters)
+                own_collateral = int(not enemy_set and any(
+                    card.position == "facedown" for card in own_field_monsters.values()))
+                trade = int(enemy_set) - own_collateral - 1
+            numeric += (trade / 5, own_collateral / 5, float(estimated))
         action_numbers.append(numeric)
     width = max(1, *(len(row) for row in targets))
     padded_targets = [row + [0] * (width - len(row)) for row in targets]
@@ -447,7 +471,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 24):
+        if feature_version not in range(1, 26):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -467,7 +491,8 @@ class LegalActionPolicy(nn.Module):
                         if feature_version == 15 else 42 if feature_version >= 4 else 10)
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
-        action_number_width = (101 if feature_version >= 23 else 93
+        action_number_width = (104 if feature_version >= 24 else 101
+                               if feature_version >= 23 else 93
                                if feature_version >= 22 else 85
                                if feature_version >= 21 else 81
                                if feature_version >= 20 else 19
@@ -502,6 +527,9 @@ class LegalActionPolicy(nn.Module):
             # of requiring the pooled state scorer to discover that relation.
             self.source_target_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
                                                     nn.Linear(width, width))
+        if feature_version >= 25:
+            self.trade_head = nn.Linear(2, 1, bias=False)
+            nn.init.zeros_(self.trade_head.weight)
 
     def forward(self, features: DecisionFeatures) -> Tensor:
         cards = features.state_cards
@@ -593,7 +621,12 @@ class LegalActionPolicy(nn.Module):
             matched = (multi_match.to(visible.dtype) @ visible)
             multi_mask = (multi_slots[:, :, 1] != 0).unsqueeze(-1)
             action = action + (matched * multi_mask).sum(1) / multi_mask.sum(1).clamp(min=1)
-        return self.score(torch.cat((state.expand(len(action), -1), action), dim=1)).squeeze(1)
+        logits = self.score(torch.cat((state.expand(len(action), -1), action), dim=1)).squeeze(1)
+        if self.feature_version >= 25:
+            trade = features.action_numbers[:, -3] * 5
+            present = features.action_numbers[:, -1]
+            logits = logits + self.trade_head(torch.stack((trade, present), dim=1)).squeeze(1)
+        return logits
 
 
 class PolicyAgent:

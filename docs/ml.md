@@ -14,6 +14,14 @@ in per-game provenance. This is synthetic on-policy distillation, not human
 demonstration or a claim that the teacher's choice is always best. The first
 held-out experiment [did not improve playing strength](evaluation.md).
 
+The additional opt-in `tactical_card_advantage` teacher changes only the
+visible Heavy Storm trade preference; it remains a synthetic heuristic.
+`--on-policy-teacher-activation-focus-only` limits labels to decisions where
+one of the specified `--focus-card` IDs has a legal activation. This retains
+both good and bad activation opportunities and records their count and
+teacher disagreements in checkpoint provenance. The 32-game resource
+experiment and its held-out limits are in [evaluation](evaluation.md).
+
 `LegalActionPolicy` scores the legal options supplied by `GoatEnvironment`. It uses only the `Observation` and `Action` values that baseline agents receive. A sorted vocabulary comes from the pinned GOAT whitelist; hidden or absent card identities map to token 0 and visible cards missing from that vocabulary map to an unknown token. The model embeds visible cards, their zones, owners, and positions; pools them into a state vector; then scores each action using its kind, referenced card, selected-card identities, and numeric parameters. It returns one logit per legal action, with no fixed option count or model access to native core state. Feature version 2 also encodes each selected target's visible controller, zone, and slot, including when its card identity is hidden. Target presence has its own mask so hidden IDs are not mistaken for padding. Feature version 3 resolves a face-down opponent card's ID from `known_opponent_field_cards` only when its controller, field zone, and slot match a public memory entry; it applies this to state and action card features. Feature version 4 adds a public disabled-zone bitmask to the state and represents each selected field zone as a structured target, with new action kinds for multi-zone prompts. Feature version 5 separately pools card embeddings from the player's sorted initial Main Deck composition. Feature version 6 distinguishes Attribute, number, and card-name announcement actions with separate kinds; Attribute and number choices also have numeric features. Feature version 7 pairs each selected card embedding with its original slot and chosen rank, allowing distinct ordered Deck-top choices to receive different logits. Feature version 8 projects current ATK, DEF, total counters, and Spell Counter counts for face-up monsters; hidden and face-down card stats remain absent. Feature version 9 separately pools an unordered multiset of publicly known opponent hand cards from schema-v17 observations. Private draws remain unknown and no native hand slot is encoded. Feature version 10 adds an ordered recurrent encoding of the public chain card identities and controllers, so reversing two chain links changes the state representation; it does not use private native state. Feature version 11 is an equal-capacity unordered-chain ablation. Feature version 12 matches each direct or multi-card field selection to its corresponding card in the visible field, adding that card's embedding and visible current stats to the action score. This resolves an ambiguity when identical cards in different slots have different current ATK, DEF, or counters. It adds no model parameters. Opt-in feature version 13 binds each visible face-up Equip Spell to the visible card in its target monster slot and projects the paired embeddings before pooling; a representation test distinguishes two possible equip targets. Opt-in feature version 14 encodes schema-v21 public chain target slots with each link in the ordered chain, binding targets to visible field cards when present. Its target-slot embeddings reveal no hidden card IDs. A matched v13/v14 experiment found no target-specific or held-out strength gain; see [evaluation](evaluation.md). Version 10 remains the default. A first matched v12/v13 experiment found no equip-specific decision change or held-out strength gain; see [evaluation](evaluation.md). Older checkpoints retain their versioned encoder and weights. Version 9 has a representation test and a controlled sourced-deck comparison: it won 18/32 against a version-8 model trained on the same schema-v17 demonstrations, with a paired 95% interval of 40.625–71.875%; see [the evaluation log](evaluation.md). This does not establish a strength gain. Existing checkpoints without a feature version load with the original version-1 encoder. The encoder does not yet use historical public Deck reveals or all restrictions. Opt-in feature version 17 adds four action-specific numbers at an attack-target choice: the public attacker ATK, the target’s visible battle stat, their margin, and a visibility flag. It uses the acting player’s own attacker slot from schema-v22 observations and leaves face-down target stats unknown. A first matched held-out tournament did not establish a playing-strength gain; see [evaluation](evaluation.md). `PolicyAgent` uses scores through the common agent API. Inference version 2 also applies a generic liveness guard at multi-step selections: it avoids a legal `cancel` when another choice is available, finishes a selection instead of unselecting when possible, and avoids immediately unselecting the card it just selected if another card can be selected. These choices can change strategy; reports identify the inference and feature versions.
 
 Opt-in feature version 19 adds two public state numbers for the turn owner:
@@ -61,7 +69,7 @@ python scripts/train_behavioral_clone.py replays/vanilla_42.json \
   --output checkpoints/vanilla_bc.pt --epochs 1 --seed 42
 ```
 
-The training command first replays every input trajectory against the selected pinned native engine, checking each visible observation, legal-action list, chosen action, result, deck hash, and loaded asset hashes. It accepts fingerprinted schema-v3 through v24 recordings; feature versions 17–18 require schema v22, versions 19–20 require schema v23, and version 21 requires schema v24. Use `--engine experimental` for an experimental-adapter trajectory. It then fits cross-entropy to selected actions and saves a versioned checkpoint containing model weights, card vocabulary, seed, PyTorch version, source counts, trajectory hashes, and epoch losses. Generated replays and checkpoints live in ignored directories. Only ingest demonstrations whose use is authorized.
+The training command first replays every input trajectory against the selected pinned native engine, checking each visible observation, legal-action list, chosen action, result, deck hash, and loaded asset hashes. It accepts fingerprinted schema-v3 through v25 recordings; feature versions 17–18 require schema v22, versions 19–20 require schema v23, and version 21 or later requires schema v24. Use `--engine experimental` for an experimental-adapter trajectory. It then fits cross-entropy to selected actions and saves a versioned checkpoint containing model weights, card vocabulary, seed, PyTorch version, source counts, trajectory hashes, and epoch losses. Generated replays and checkpoints live in ignored directories. Only ingest demonstrations whose use is authorized.
 
 To enrich a verified schema-v23 recording with current public Type without
 changing its original bytes or SHA-bound review labels, run
@@ -320,6 +328,28 @@ test verifies that changing only the selected monster's current ATK changes
 v23 action features while leaving v22 action features unchanged. Existing
 checkpoints retain their feature versions. This is an experiment, not a
 promotion of a stronger policy.
+
+### Experimental feature versions 24 and 25: visible card trades
+
+Version 24 adds three action values for a Heavy Storm or Nobleman of Crossout
+activation: a before-chain visible card-trade estimate, friendly collateral,
+and an estimate-present flag. For Heavy Storm, the estimate is opposing back
+row minus friendly back row destroyed minus the Storm itself. The Set Storm
+source is excluded from collateral. For Nobleman, it records whether an
+opposing Set monster exists or the only available Set monster is friendly.
+It uses field counts and positions in the acting player's observation; Set
+opponent identities, chain responses, and future effects are unknown. The
+estimate is a learning input, not a hard legality filter or a full card-value
+model.
+
+Version 25 keeps those features and adds a two-weight learned trade scorer to
+the action logits. The explicit `--upgrade-feature-23-to-25` warm start copies
+the v23 checkpoint, zero-extends its action input, and initializes this scorer
+to zero, preserving the parent's initial logits. Training only
+`--trainable-module trade_head` leaves every other policy weight frozen.
+Tests verify initial logit equality and that only a visible trade changes
+the new score. The default feature version remains 10; v24 and v25 are
+experimental until held-out match strength supports promotion.
 
 ### Action-kind sampling in behavioral cloning
 

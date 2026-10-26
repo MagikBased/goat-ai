@@ -916,3 +916,16 @@ Dark Balter/Sinister Serpent native loop. A source-backed, SHA-guarded
 pre-errata script correction removes the invalid Standby response; the
 formerly capped sourced-deck duel now terminates and replay-verifies. See
 [the ruling](goat_rules.md) and [the evaluation](evaluation.md).
+
+The player-reviewed neural-v14 replay also exposed a self-target Nobleman
+and a Heavy Storm that destroyed only friendly back row. The replay audit
+now flags those choices and visible negative Heavy Storm trades. An opt-in
+Tactical card-count variant corrects 27 of 56 such synthetic-teacher choices
+but split 47–49 against unchanged v14 over 96 duels. A feature-v25 neural
+trade head trained on 149 balanced activation opportunities corrected both
+reviewed frames and improved resource-choice counts on 16 separate recorded
+duels, while scoring only 31–33 against its frozen neural parent over 64
+fresh held-out duels. Keep both experimental. The next M4 step is a broader
+card-value and timing signal that improves independent match outcomes while
+preserving profitable resource use, followed by a separately demonstrated
+self-play gain; see [the evaluation](evaluation.md).

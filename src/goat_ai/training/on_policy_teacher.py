@@ -1,5 +1,6 @@
 """Label policy-visited, player-visible states with a versioned baseline."""
 
+from collections.abc import Collection, Sequence
 from dataclasses import replace
 
 from goat_ai.agents import Agent
@@ -33,3 +34,28 @@ def label_policy_trajectory(
     if not selected:
         raise ValueError("policy replay has no multi-option policy decisions")
     return tuple(selected), disagreements
+
+
+def filter_activation_opportunities(
+    trajectory: Trajectory, labeled: Sequence[DecisionRecord], codes: Collection[int],
+) -> tuple[tuple[DecisionRecord, ...], int]:
+    """Keep teacher labels where a named card could be activated from a visible option."""
+    selected_codes = set(codes)
+    seat = (trajectory.skill_metadata or {}).get("demonstrator_seat")
+    originals = [record for record in trajectory.decisions
+                 if record.observation.acting_player == seat
+                 and len(record.legal_actions) > 1]
+    if not selected_codes or len(originals) != len(labeled):
+        raise ValueError("activation focus needs card IDs and aligned teacher labels")
+    kept = []
+    disagreements = 0
+    for original, teacher in zip(originals, labeled, strict=True):
+        if (original.observation != teacher.observation
+                or original.legal_actions != teacher.legal_actions):
+            raise ValueError("teacher labels do not match recorded visible decisions")
+        if any(action.kind == "activate"
+               and action.parameters.get("code") in selected_codes
+               for action in original.legal_actions):
+            kept.append(teacher)
+            disagreements += original.selected_action != teacher.selected_action
+    return tuple(kept), disagreements

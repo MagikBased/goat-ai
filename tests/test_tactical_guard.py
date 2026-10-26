@@ -41,6 +41,40 @@ def test_heavy_storm_avoids_solely_damaging_own_backrow():
         board(own_set, replace(opponent_set, sequence=0)), (storm, wait))
 
 
+def test_opt_in_heavy_storm_uses_visible_card_advantage():
+    storm = Action("storm", "activate", 0, {"code": 19613556})
+    wait = Action("wait", "end_phase", 0)
+    own = [CardView(0, "spell_trap", "facedown", 45986603, slot)
+           for slot in range(3)]
+    enemy = [CardView(1, "spell_trap", "facedown", None, slot)
+             for slot in range(3)]
+
+    def options(*cards):
+        return tuple((storm, wait)[index] for index in admissible_action_indices(
+            board(*cards), (storm, wait), card_advantage_guard=True))
+
+    assert options() == (wait,)
+    assert options(*own) == (wait,)
+    assert options(own[0], enemy[0]) == (wait,)
+    assert options(*own[:2], enemy[0]) == (wait,)
+    assert options(own[0], *enemy[:2]) == (storm, wait)
+    assert options(*enemy) == (storm, wait)
+    set_storm = Action("storm-set", "activate", 0,
+                       {"code": 19613556, "location": 8, "sequence": 0})
+    source = CardView(0, "spell_trap", "facedown", 19613556, 0)
+    assert admissible_action_indices(
+        board(source, enemy[0]), (set_storm, wait),
+        card_advantage_guard=True) == (0, 1)
+    assert admissible_action_indices(
+        board(source, own[1], enemy[0]), (set_storm, wait),
+        card_advantage_guard=True) == (1,)
+    assert admissible_action_indices(
+        board(source, own[1], *enemy[:2]), (set_storm, wait),
+        card_advantage_guard=True) == (0, 1)
+    # A forced choice remains legal; this preference cannot change engine rules.
+    assert admissible_action_indices(board(), (storm,), card_advantage_guard=True) == (0,)
+
+
 def test_opt_in_spirit_reaper_set_prefers_defense_without_a_profitable_attack():
     reaper = 504700038
     summon = Action("summon", "normal_summon", 0, {"code": reaper})
@@ -70,6 +104,19 @@ def test_reaper_candidate_inherits_every_v14_guard(monkeypatch, tmp_path):
         assert getattr(candidate, name) is getattr(baseline, name) is True
     assert baseline.reaper_set_guard is False
     assert candidate.reaper_set_guard is True
+
+
+def test_card_advantage_candidate_inherits_every_v14_guard(monkeypatch, tmp_path):
+    monkeypatch.setattr("scripts.evaluate_native.flip_monster_codes", lambda _: frozenset())
+    monkeypatch.setattr("scripts.evaluate_native.load_card_races", lambda _: {})
+    monkeypatch.setattr("scripts.evaluate_native.load_card_facts", lambda _: {})
+    baseline = agent_factory("tactical", tmp_path)(0)
+    candidate = agent_factory("tactical_card_advantage", tmp_path)(0)
+    for name in ("v8_guards", "v9_guards", "v10_guards", "v11_guards",
+                 "v12_guards", "v13_guards", "v14_guards"):
+        assert getattr(candidate, name) is getattr(baseline, name) is True
+    assert baseline.card_advantage_guard is False
+    assert candidate.card_advantage_guard is True
 
 
 def test_scapegoat_waits_for_end_or_battle_and_can_answer_removal():

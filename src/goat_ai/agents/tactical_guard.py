@@ -264,6 +264,7 @@ def admissible_action_indices(observation: Observation,
                               tactical_v12_guards: bool = False,
                               tactical_v13_guards: bool = False,
                               tactical_v14_guards: bool = False,
+                              card_advantage_guard: bool = False,
                               card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                               ) -> tuple[int, ...]:
     """Defer clearly wasteful actions while preserving an engine-legal choice.
@@ -354,9 +355,16 @@ def admissible_action_indices(observation: Observation,
     kept = []
     for index, action in enumerate(legal_actions):
         code = action.parameters.get("code")
-        if (code == HEAVY_STORM and action.kind == "activate"
-                and own_backrow and not opponent_backrow):
-            continue
+        if code == HEAVY_STORM and action.kind == "activate":
+            # A Set Storm is the Spell spent, not collateral destroyed by it.
+            source_is_set = action.parameters.get("location") == 8 and any(
+                card.controller == own and card.zone == "spell_trap"
+                and card.sequence == action.parameters.get("sequence")
+                and card.code == HEAVY_STORM for card in observation.field)
+            collateral = own_backrow - int(source_is_set)
+            if (opponent_backrow <= collateral if card_advantage_guard
+                    else own_backrow and not opponent_backrow):
+                continue
         if (tactical_v9_guards and code == HEAVY_STORM
                 and action.kind == "set_spell_trap" and len(observation.hand) < 6
                 and not opponent_backrow):

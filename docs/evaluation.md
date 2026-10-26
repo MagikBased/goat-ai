@@ -5076,3 +5076,137 @@ Assigned-deck results were Matt 22–10, Michael 15–17, and Chaos Control
 The interval touches 50% and deck splits vary, so the new preference stays
 opt-in pending a separate deck-family comparison. This result says nothing
 about neural-policy strength.
+
+### Reviewed Nobleman and Heavy Storm card trades
+
+The policy-versus-Tactical Return/Flip seed-9901 replay has two reviewed
+resource losses: viewer frame 11 activates Nobleman when the only Set monster
+is its own Gravekeeper's Spy, and frame 26 activates Set Heavy Storm into two
+other friendly back-row cards and no opposing back row. The replay SHA-256 is
+`a8158006692a3f7e68aaff18a5c910cc1bb1344ebebf6aec50f90f398f4df3a6`.
+The replay audit reproduces the greedy checkpoint's choices and flags both
+frames. A retrospective preference file binds the user's rejection of those
+actions to that exact replay (SHA-256
+`06bba1e47188ac61ab4141b1b8d6cc1babaa3c363e1211882973d653b5a673a7`).
+Its choice of an alternative Set or End Phase is an engineering inference
+from the user's feedback, not an additional human demonstration.
+
+The unchanged Tactical-v14 synthetic teacher chose Heavy Storm in **27/56**
+policy-visited states where the visible opponent back row could not repay the
+Storm plus friendly collateral. An opt-in teacher variant excludes the Storm
+itself from collateral when Set, then defers activations with a negative
+before-chain card count. It chose **0/56** in those exact states. On a separate
+96-duel, three-pairing schedule with both deck assignments and seats, seeds
+10700–10707, it scored **47–49** versus Tactical v14 (paired-bootstrap 95%
+score interval **44.8%–52.1%**, 22.84-second four-worker run). The ignored
+report is `.cache/goat-ai/card_advantage_vs_v14_10700_10707_sourcefixed.json`
+(SHA-256 `9143ee22fb7e7b60b7f893555dfd7c0e035aaf671a72455a6d136676e7a51b3d`).
+This heuristic corrects the reviewed visible trade without showing a broad
+match advantage; it remains opt-in. An earlier report without Set-Storm
+source subtraction is invalid for this comparison.
+
+Thirty-two greedy parent-policy versus Tactical-v14 duels on Jesse/Warrior
+and Return/Flip, seeds 10400–10407 and both policy seats, yielded **13,995**
+replay-verified decisions. Full-policy Tactical-v14 relabeling supplied
+**2,474** multi-option labels, including **726** disagreements. Its feature-v23
+child scored **27–37** against the unchanged parent on unseen Main Decks,
+seeds 10600–10607, and still chose both reviewed losses. The report is
+`.cache/goat-ai/fv23_on_policy_teacher_10400_10407_vs_parent_10600_10607.json`
+(SHA-256 `35f17c08626846111615d87711341fa0aafdfd56ea45dea7191488602ceefd84`).
+The child checkpoint SHA-256 is
+`aa617d3129f417d07fead788147449c6d567388123b1688cd818074e21caf166`.
+The weak original teacher and large number of routine labels limit this
+result.
+
+Feature v24 adds a before-chain visible card-trade estimate to Heavy Storm
+and Nobleman action features, with an explicit zero-extended warm start from
+feature v23. A corrected-teacher continuation on all 2,474 labels, with the
+two cards weighted tenfold at their opportunities, still chose both bad
+actions in the reviewed replay. It scored **32–32** against the original
+parent on 64 unseen-deck games, seeds 10800–10807 (paired interval
+**39.1%–62.5%**; report SHA-256
+`a41d1a2c9f710dfb2b49974e79350228a425f02cdf09b70af1b31c3975900523`.
+A two-preference parent-KL update did fix both marked
+frames, but generalized by largely suppressing useful activations: on a
+separate 16-replay decision set it chose Nobleman for an opposing Set monster
+in only **5/19** opportunities and Heavy Storm for an even-or-better visible
+trade in only **1/53**. It scored **31–33** versus its unchanged v24 parent on
+64 fresh games, seeds 10900–10907 (paired interval **35.9%–60.9%**). These
+children are not promoted; the latter report SHA-256 is
+`cab17456a260200946d5bb7c247934eeb14add1d06056b0c57c1325be2c4f7f1`.
+
+The next controlled training run kept only **149** activation opportunities
+from the same 32 verified source duels, including **100** disagreements with
+the corrected teacher. A feature-v24 full-network fit still chose Heavy
+Storm in **9/16** negative trades on the separate decision set after a
+30-epoch stronger fit. Feature v25 instead adds a zero-initialized two-weight
+trade scorer and trains only that head from the same original v23 parent.
+Its learned weights were **2.057** on visible net card margin and **2.486**
+on the resource-activation flag; all other parent weights stayed frozen.
+Training took **35.08 seconds**. This checkpoint changes both seed-9901
+reviewed choices: it Sets Solemn Judgment rather than using Nobleman on Spy,
+then ends the turn instead of using Heavy Storm into its own back row. The
+ignored checkpoint is `.cache/goat-ai/fv25_resource_trade_head_10400_10407.pt`
+(SHA-256 `15c8e3ab5d72eea35d57bcfa4df1a5153079d84f3c382bd2b806c88e4fbfe992`).
+
+Sixteen independent parent-policy recordings, seeds 11100–11103, yielded
+**7,792** replay-verified decisions. On their player-visible states, the
+v25 head versus the unchanged v23 parent chose Nobleman on its own only Set
+monster **0/3 versus 2/3**, Nobleman with an opposing Set monster **15/19
+versus 9/19**, Heavy Storm in negative visible trades **2/16 versus 3/16**,
+and Heavy Storm in even-or-better visible trades **37/53 versus 1/53**.
+These are counterfactual action choices on recorded states, not duel wins;
+chain responses and the value of specific cards can change the actual trade.
+On a separately held-out 64-duel tournament using Chaos Control/Bazoo Return
+and Lolmarcus/Michael GOAT Control, both assignments and seats, seeds
+11300–11307, v25 scored **31–33** directly against its unchanged parent
+(paired interval **35.9%–59.4%**). The ignored report is
+`.cache/goat-ai/fv25_resource_trade_head_vs_parent_11300_11307.json`
+(SHA-256 `351f26830ddb83e20b99368d4abd71c47dda0d4572a721ded044db06807aabe6`).
+Decision quality on this narrow resource class improved, but held-out match
+strength did not; feature v25 remains experimental and M4 stays open.
+
+For visual review, a new v25-versus-Tactical duel on the *previously reviewed*
+Return/Flip seed 9901 reached terminal in **251 replay-verified decisions**
+with the neural seat winning. Its greedy choices reproduce from the saved
+checkpoint, and the resource-review shortlister found no candidate in that
+new trajectory. The ignored viewer is
+`replays/neural_v25_trade_head_vs_tactical_return_flip_seed9901.html`.
+This reused seed is an explanatory replay, not held-out strength evidence;
+the policy still Sets multiple Spells/Traps early and may overcommit back row.
+
+The post-Balter script fingerprint prevents the current verifier from using
+some older pre-correction demonstration replays as KL-preservation inputs.
+The two-preference experiment therefore preserved four newer, current-asset
+policy trajectories from seeds 10400 instead. Old checkpoints retain their
+original trajectory hashes and can be reproduced from the corresponding
+earlier code and pinned native assets. Generated data and checkpoints remain
+ignored by Git.
+
+With the 32 source trajectories recorded by `record_policy_match.py` in
+`.cache/goat-ai/on_policy_teacher_10400_10407/`, reproduce the v25 head and
+held-out tournament after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/on_policy_teacher_10400_10407/*.json \
+  --engine experimental --on-policy-teacher tactical_card_advantage \
+  --on-policy-teacher-activation-focus-only \
+  --focus-card 504700116 --focus-card 19613556 \
+  --feature-version 25 --width 32 --epochs 30 --batch-size 16 \
+  --learning-rate 0.01 --seed 47 --trainable-module trade_head \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --upgrade-feature-23-to-25 \
+  --output .cache/goat-ai/fv25_resource_trade_head_10400_10407.pt
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv25_resource_trade_head_10400_10407.pt \
+  --engine experimental \
+  --opponent-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+            examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 11300 --seeds 8 --workers 4 \
+  --output .cache/goat-ai/fv25_resource_trade_head_vs_parent_11300_11307.json
+```

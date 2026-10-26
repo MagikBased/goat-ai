@@ -14,6 +14,7 @@ from goat_ai.agents.tactical_guard import visible_monster_race
 from goat_ai.replay import Trajectory
 
 HEAVY_STORM = 19613556
+NOBLEMAN_OF_CROSSOUT = 504700116
 RING_OF_DESTRUCTION = 511000824
 TORRENTIAL_TRIBUTE = 53582587
 SCAPEGOAT = 504700123
@@ -152,6 +153,20 @@ def review_candidates(trajectory: Trajectory,
             found.append(("heavy_storm_only_own_backrow",
                           {"own_other_backrow": own_other_backrow,
                            "enemy_backrow": 0}))
+        elif (_is_action(selected, "activate", HEAVY_STORM)
+              and enemy_backrow <= own_other_backrow):
+            found.append(("heavy_storm_negative_visible_trade",
+                          {"own_other_backrow": own_other_backrow,
+                           "enemy_backrow": enemy_backrow}))
+        if (_is_action(selected, "activate", NOBLEMAN_OF_CROSSOUT)
+                and any(c.zone == "monster" and c.position == "facedown"
+                        for c in own_monsters)
+                and not any(c.zone == "monster" and c.position == "facedown"
+                            for c in enemy_monsters)):
+            found.append(("nobleman_only_own_set_monster",
+                          {"own_set_monsters": sum(c.position == "facedown"
+                                                   for c in own_monsters),
+                           "enemy_set_monsters": 0}))
         if (_is_action(selected, "chain", SAKURETSU_ARMOR) and can_pass
                 and any(c.zone == "spell_trap" and c.position == "faceup"
                         and c.code == ROYAL_DECREE for c in obs.field)):

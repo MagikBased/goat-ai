@@ -169,7 +169,8 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                  v12_guards: bool | None = None,
                  v13_guards: bool | None = None,
                  v14_guards: bool | None = None,
-                 reaper_set_guard: bool = False) -> None:
+                 reaper_set_guard: bool = False,
+                 card_advantage_guard: bool = False) -> None:
         super().__init__(flip_monster_codes)
         self.card_races = dict(card_races or {})
         self.card_facts = dict(card_facts or {})
@@ -181,6 +182,7 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
         self.v13_guards = self.v12_guards if v13_guards is None else v13_guards
         self.v14_guards = self.v13_guards if v14_guards is None else v14_guards
         self.reaper_set_guard = reaper_set_guard
+        self.card_advantage_guard = card_advantage_guard
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
@@ -299,7 +301,9 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
             tactical_v11_guards=self.v11_guards,
             tactical_v12_guards=self.v12_guards,
             tactical_v13_guards=self.v13_guards,
-            tactical_v14_guards=self.v14_guards, card_facts=self.card_facts)
+            tactical_v14_guards=self.v14_guards,
+            card_advantage_guard=self.card_advantage_guard,
+            card_facts=self.card_facts)
         targets = safe_target_indices(
             observation, legal_actions, admissible,
             protect_removal_targets=self.v9_guards,

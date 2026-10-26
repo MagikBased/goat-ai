@@ -90,12 +90,13 @@ def test_shortlist_flags_public_waste_and_deduplicates_priority_passes():
     candidates = review_candidates(saved)
     assert [(c.viewer_frame, c.category) for c in candidates] == [
         (1, "heavy_storm_only_own_backrow"),
+        (2, "heavy_storm_negative_visible_trade"),
         (3, "sakuretsu_under_decree"),
         (4, "scapegoat_pass_during_open_attack"),
         (6, "scapegoat_pass_opponent_end"),
     ]
     assert candidates[0].evidence == {"own_other_backrow": 1, "enemy_backrow": 0}
-    assert candidates[2].evidence["own_life_points"] == 8000
+    assert candidates[3].evidence["own_life_points"] == 8000
 
 
 def test_shortlist_flags_own_monster_removal_as_review_candidates():
@@ -116,11 +117,29 @@ def test_heavy_storm_does_not_count_its_own_set_card_as_collateral():
                     "controller": 0})
     own_storm = CardView(0, "spell_trap", "facedown", 19613556, 0)
     own_field_spell = CardView(0, "spell_trap", "faceup", 511002998, 5)
-    assert not review_candidates(policy(record(view(own_storm), storm)))
+    assert review_candidates(policy(record(view(own_storm), storm)))[0].category == (
+        "heavy_storm_negative_visible_trade")
     candidates = review_candidates(policy(record(view(own_storm, own_field_spell),
                                                  storm)))
     assert candidates[0].evidence == {"own_other_backrow": 1,
                                       "enemy_backrow": 0}
+
+
+def test_shortlist_flags_negative_heavy_trade_and_self_nobleman():
+    own_set = CardView(0, "spell_trap", "facedown", 53582587, 0)
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 0)
+    spy = CardView(0, "monster", "facedown", 504700044, 0)
+    storm = Action("storm", "activate", 0, {"code": 19613556})
+    nobleman = Action("nobleman", "activate", 0, {"code": 504700116})
+    cases = policy(record(view(own_set, enemy_set), storm),
+                   record(view(spy), nobleman))
+    found = review_candidates(cases)
+    assert [(item.viewer_frame, item.category) for item in found] == [
+        (1, "heavy_storm_negative_visible_trade"),
+        (2, "nobleman_only_own_set_monster"),
+    ]
+    assert found[0].evidence == {"own_other_backrow": 1, "enemy_backrow": 1}
+    assert found[1].evidence == {"own_set_monsters": 1, "enemy_set_monsters": 0}
 
 
 def test_shortlist_rejects_non_policy_source_or_missing_seat():

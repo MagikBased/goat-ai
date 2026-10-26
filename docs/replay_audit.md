@@ -1117,3 +1117,26 @@ Attack Position Summon against a visible 0 DEF Sheep Token or an open direct
 attack. This is a visible-state strategic preference, not a legality rule.
 The controlled tournament is in [evaluation](evaluation.md); the guard is
 not part of default Tactical v14 or the neural policy.
+
+### Nobleman and Heavy Storm resource review
+
+The player-reviewed neural-v14 versus Tactical-v14 Return/Flip seed-9901
+trajectory (SHA-256 `a8158006692a3f7e68aaff18a5c910cc1bb1344ebebf6aec50f90f398f4df3a6`)
+has two clear resource losses by the neural seat. At decision 10 (viewer frame
+11), it activates Nobleman of Crossout while its own Set Gravekeeper's Spy is
+the only face-down monster; selection of that Spy is then forced. At decision
+25 (viewer frame 26), it activates a Set Heavy Storm against two *other* own
+Set Spell/Traps and no opposing back row. Both complete choices replay-verify.
+Tactical v14 declines these exact activations, but an audit of 32 other
+policy-visited duels found that teacher still chose a negative visible Heavy
+Storm trade in 27 of 56 opportunities. Do not treat it as an expert label for
+this decision class.
+
+The replay reviewer now shortlists Nobleman activation with only an own Set
+monster, Heavy Storm with no targets, and Heavy Storm where the visible
+opposing back-row count cannot pay for the Spell plus the controller's other
+back-row cards. A Set Heavy Storm is counted as the Spell being spent, not as
+an additional card destroyed by its effect. These are player-visible review
+prompts, not claims about hidden opponent cards or about optimal play after
+possible chain responses. The opt-in Tactical resource guard and neural
+feature experiments are measured in [evaluation](evaluation.md).

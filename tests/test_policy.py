@@ -41,7 +41,10 @@ from goat_ai.training import (
     load_policy_agent,
 )
 from goat_ai.training.policy import ACTION_KINDS
-from goat_ai.training.on_policy_teacher import label_policy_trajectory
+from goat_ai.training.on_policy_teacher import (
+    filter_activation_opportunities,
+    label_policy_trajectory,
+)
 from goat_ai.training.self_play import (
     EpisodeDecisionLimit,
     VisibleStateValue,
@@ -151,6 +154,35 @@ def test_on_policy_teacher_rejects_illegal_label():
         label_policy_trajectory(trajectory, BadTeacher(), "a" * 64)
 
 
+def test_activation_focus_keeps_both_good_and_bad_trade_opportunities():
+    storm = Action("storm", "activate", 0, {"code": HEAVY_STORM})
+    end = Action("end", "end_phase", 0)
+    summon, set_monster = actions()[:2]
+    records = (DecisionRecord(view(), (storm, end), storm),
+               DecisionRecord(view(), (summon, set_monster), summon),
+               DecisionRecord(view(), (storm, end), end))
+    trajectory = Trajectory("goat", ("a", "b"), 7, records, 0,
+                            source="policy_evaluation",
+                            skill_metadata={"demonstrator_seat": 0,
+                                            "policy_checkpoint_sha256": "a" * 64})
+
+    class Teacher:
+        def select_action(self, observation, legal_actions):
+            return legal_actions[-1]
+
+    labeled, disagreements = label_policy_trajectory(trajectory, Teacher(), "a" * 64)
+    assert disagreements == 2
+    focused, focused_disagreements = filter_activation_opportunities(
+        trajectory, labeled, {HEAVY_STORM})
+    assert len(focused) == 2
+    assert focused_disagreements == 1
+    assert focused[0].selected_action == focused[1].selected_action == end
+    with pytest.raises(ValueError, match="aligned"):
+        filter_activation_opportunities(trajectory, labeled[:1], {HEAVY_STORM})
+    with pytest.raises(ValueError, match="card IDs"):
+        filter_activation_opportunities(trajectory, labeled, set())
+
+
 def test_position_action_features_bind_visible_stats_without_hidden_enemy_stats():
     vocabulary = CardVocabulary((10, 20, 30), ((10, 0, 0), (20, 0, 1900),
                                                (30, 0, 1800)))
@@ -188,6 +220,40 @@ def test_position_action_features_bind_visible_stats_without_hidden_enemy_stats(
                         feature_version=23).action_numbers[0])
     assert torch.isfinite(LegalActionPolicy(vocabulary.size, width=8,
                                              feature_version=23)(features)).all()
+
+
+def test_resource_trade_features_count_only_visible_collateral():
+    codes = tuple(sorted((10, 20, 19613556, 504700116, 504700044)))
+    vocabulary = CardVocabulary(codes, tuple((code, 0, 0) for code in codes))
+    source = CardView(0, "spell_trap", "facedown", 19613556, 0)
+    collateral = CardView(0, "spell_trap", "facedown", 20, 1)
+    enemy = CardView(1, "spell_trap", "facedown", None, 0)
+    own_spy = CardView(0, "monster", "facedown", 504700044, 0)
+    storm = Action("storm", "activate", 0,
+                   {"code": 19613556, "location": 8, "sequence": 0})
+    nobleman = Action("nobleman", "activate", 0,
+                      {"code": 504700116, "location": 2})
+    end = Action("end", "end_phase", 0)
+    observation = replace(view(), field=(source, collateral, enemy, own_spy))
+    features = encode_decision(observation, (storm, nobleman, end),
+                               vocabulary, feature_version=24)
+    assert features.action_numbers.shape == (3, 104)
+    assert features.action_numbers[0, -3:].tolist() == pytest.approx((-0.2, 0.2, 1))
+    assert features.action_numbers[1, -3:].tolist() == pytest.approx((-0.4, 0.2, 1))
+    assert features.action_numbers[2, -3:].tolist() == [0, 0, 0]
+    # Moving an unknown opposing Set card does not change the trade count.
+    changed = replace(observation, field=(source, collateral,
+                                          replace(enemy, sequence=3), own_spy))
+    assert torch.equal(features.action_numbers,
+                       encode_decision(changed, (storm, nobleman, end),
+                                       vocabulary, feature_version=24).action_numbers)
+    with_target = replace(observation, field=(*observation.field,
+                          CardView(1, "monster", "facedown", None, 1)))
+    with_target_features = encode_decision(with_target, (storm, nobleman, end),
+                                           vocabulary, feature_version=24)
+    assert with_target_features.action_numbers[1, -3:].tolist() == [0, 0, 1]
+    assert torch.isfinite(LegalActionPolicy(vocabulary.size, width=8,
+                                            feature_version=24)(features)).all()
 
 
 def test_staple_audit_distinguishes_played_cards_from_target_codes():
@@ -1133,6 +1199,83 @@ def test_warm_start_restores_weights_and_requires_heldout_provenance(tmp_path):
     torch.save(checkpoint, path)
     with pytest.raises(TypeError, match="trajectory hashes"):
         load_parent_checkpoint(path, child, vocabulary)
+
+
+def test_v23_to_v24_upgrade_zero_extends_only_trade_feature_weights(tmp_path):
+    vocabulary = CardVocabulary((10,), ((10, 0, 0),))
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    checkpoint = {
+        "schema_version": 1, "model_state": parent.state_dict(),
+        "vocabulary_codes": vocabulary.codes,
+        "vocabulary_card_properties": vocabulary.card_properties,
+        "width": 8, "feature_version": 23,
+        "trajectory_sha256": {"training.json": "a" * 64},
+        "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                            "main_deck_composition_sha256": ("c", "d")}],
+    }
+    path = tmp_path / "parent.pt"
+    torch.save(checkpoint, path)
+    child = LegalActionPolicy(vocabulary.size, width=8, feature_version=24)
+    with pytest.raises(ValueError, match="architecture or vocabulary"):
+        load_parent_checkpoint(path, child, vocabulary)
+    load_parent_checkpoint(path, child, vocabulary, allow_v23_to_v24=True)
+    assert torch.equal(child.action_numbers[0].weight[:, :101],
+                       parent.action_numbers[0].weight)
+    assert torch.count_nonzero(child.action_numbers[0].weight[:, 101:]) == 0
+    for key, tensor in parent.state_dict().items():
+        if key != "action_numbers.0.weight":
+            assert torch.equal(child.state_dict()[key], tensor)
+    with torch.no_grad():
+        old_logits = parent(encode_decision(view(), actions(), vocabulary,
+                                            feature_version=23))
+        upgraded_logits = child(encode_decision(view(), actions(), vocabulary,
+                                                feature_version=24))
+    assert torch.allclose(old_logits, upgraded_logits, atol=1e-6)
+
+
+def test_v25_trade_head_starts_at_parent_logits_and_can_price_visible_trade(tmp_path):
+    codes = tuple(sorted((10, HEAVY_STORM)))
+    vocabulary = CardVocabulary(codes, tuple((code, 0, 0) for code in codes))
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    checkpoint = {
+        "schema_version": 1, "model_state": parent.state_dict(),
+        "vocabulary_codes": vocabulary.codes,
+        "vocabulary_card_properties": vocabulary.card_properties,
+        "width": 8, "feature_version": 23,
+        "trajectory_sha256": {"training.json": "a" * 64},
+        "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                            "main_deck_composition_sha256": ("c", "d")}],
+    }
+    path = tmp_path / "parent.pt"
+    torch.save(checkpoint, path)
+    child = LegalActionPolicy(vocabulary.size, width=8, feature_version=25)
+    with pytest.raises(ValueError, match="architecture or vocabulary"):
+        load_parent_checkpoint(path, child, vocabulary)
+    load_parent_checkpoint(path, child, vocabulary, allow_v23_to_v25=True)
+    assert torch.count_nonzero(child.trade_head.weight) == 0
+    storm = Action("storm", "activate", 0, {"code": HEAVY_STORM})
+    end = Action("end", "end_phase", 0)
+    enemy = CardView(1, "spell_trap", "facedown", None, 0)
+    own = CardView(0, "spell_trap", "facedown", 10, 0)
+    good = replace(view(), field=(enemy, replace(enemy, sequence=1)))
+    bad = replace(view(), field=(own,))
+    for observation, margin in ((good, 1), (bad, -2)):
+        old = encode_decision(observation, (storm, end), vocabulary, 23)
+        new = encode_decision(observation, (storm, end), vocabulary, 25)
+        with torch.no_grad():
+            baseline = child(new)
+            assert torch.allclose(parent(old), baseline, atol=1e-6)
+            child.trade_head.weight[0, 0] = 1
+            adjusted = child(new)
+            child.trade_head.weight.zero_()
+        assert (adjusted - baseline).tolist() == pytest.approx((margin, 0))
+    checkpoint["feature_version"] = 25
+    checkpoint["model_state"] = child.state_dict()
+    torch.save(checkpoint, path)
+    with pytest.raises(ValueError, match="feature-v23 parent"):
+        load_parent_checkpoint(path, LegalActionPolicy(vocabulary.size, width=8,
+                                                      feature_version=25), vocabulary,
+                               allow_v23_to_v25=True)
 
 
 def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):
