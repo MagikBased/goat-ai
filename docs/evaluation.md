@@ -2401,3 +2401,18 @@ the smoke checkpoint SHA-256 was
 `69def39fa5b705a3f63808d9178bf944018a17d4e2962fbb4b03678817150dd2`.
 This is a pipeline test with a synthetic label, not an authorized expert
 dataset or a measured policy gain.
+
+## Contemporary 2005 deck protocol check
+
+The [Matt Peddle SJC Indianapolis 2005 deck](../examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk) transcribes the published 40-card Main Deck and 16-card Fusion Deck with pinned GOAT/pre-errata variant IDs; the published Side Deck is omitted. The [source transcription and event link](card_priorities.md) remain separate from the six later-GOAT tournament decks. A source-name and whitelist test covers the full playable fixture. One seed-2070 random-agent duel against the 2020 Goat Control example reaches terminal, serializes, replay-verifies, and passes the trajectory visibility audit.
+
+The experimental adapter also ran the two deck assignments, seeds 20050–20051, and both seats: **8/8 terminal duels**, 9,368 decisions, maximum 1,355 decisions in a duel. Sequential wall time was **10.90 seconds** on Linux x86_64 (**0.73 duels/s**, **859 decisions/s**). Both agents were RandomAgent; the 4–4 agent-A split measures neither deck strength nor historical correctness of every effect. The ignored report `artifacts/indianapolis_2005_vs_2020_random_20050_20051.json` contains individual results and asset/deck hashes. Reproduce it with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python -m scripts.evaluate_native \
+  --engine experimental \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+            examples/decks/goat_control_lolmarcus_2020.ydk \
+  --both-deck-assignments --seed 20050 --seeds 2 --max-decisions 3000 \
+  --output artifacts/indianapolis_2005_vs_2020_random_20050_20051.json
+```
