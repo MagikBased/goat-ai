@@ -191,10 +191,26 @@ def test_public_scapegoat_restriction_replays_in_new_and_old_schemas(
     write_trajectory(path, trajectory)
     assert verify_trajectory(read_trajectory(path), ExperimentalOcgcoreEngine(root)) == len(
         trajectory.decisions)
-    previous = replace(trajectory, schema_version=6,
+    def legacy_six_view(view):
+        def old_cards(cards):
+            return tuple(replace(card, attack=None, defense=None, counters=(),
+                                 equipped_to=None) for card in cards)
+
+        return replace(
+            view, restrictions=(), public_reveals=(), disabled_zones=(),
+            private_reveals=(), own_main_deck=(), known_opponent_hand_cards=(),
+            pending_attack=None,
+            chain=tuple(replace(link, targets=()) for link in view.chain),
+            hand=old_cards(view.hand), field=old_cards(view.field),
+            own_extra_deck=old_cards(view.own_extra_deck),
+            graveyards=tuple(old_cards(zone) for zone in view.graveyards),
+            banished=tuple(old_cards(zone) for zone in view.banished),
+        )
+
+    previous = replace(trajectory, schema_version=6, terminal_observation=None,
                        decisions=tuple(replace(
                            record,
-                           observation=replace(record.observation, restrictions=()),
+                           observation=legacy_six_view(record.observation),
                            legal_actions=tuple(replace(action, kind="change_position")
                                                if action.kind == "flip_summon" else action
                                                for action in record.legal_actions),
