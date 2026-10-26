@@ -163,6 +163,27 @@ labels. The reviewer is evaluating the saved player-visible state, so these
 are hypotheses about better play, not demonstrated expert decisions. The
 complete source duel is replay-verified before the corrected choices are used.
 
+To record many policy-visited states reproducibly, use the batch recorder:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/collect_policy_matches.py checkpoints/policy.pt \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --matchup examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+            examples/decks/flip_control_goatformat_guide.ydk \
+  --seed 12000 --seeds 8 --workers 4 --opponent tactical \
+  --output-dir .cache/goat-ai/policy_collection_12000
+```
+
+It records both policy seats for every matchup and seed, replay-verifies
+each complete native duel, audits player-visible information, and writes a
+manifest with the checkpoint, deck, and trajectory hashes. The output
+directory must be empty, so existing recordings cannot be overwritten.
+Use `matchup_*.json` when passing the trajectories to the trainer; the
+directory also contains `manifest.json`. These are synthetic opponent games,
+not authorized human demonstrations.
+
 Sampled self-play corrections use `authorization=self_play_review`, only on
 the recorded learner seat. The trainer records them as
 `source=self_play_review_annotation`, separate from live human play,

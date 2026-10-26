@@ -5256,6 +5256,22 @@ the tournament report is
 Neither child is promoted. The next policy experiment needs evidence that
 its choices improve complete duels, not only teacher agreement.
 
+### Batch policy replay collection
+
+`scripts/collect_policy_matches.py` now records a deterministic schedule of
+both policy seats per matchup and seed through the existing single-duel
+recorder. Every saved trajectory is replay-verified and visibility-audited;
+the manifest binds the checkpoint, deck files, and trajectories by SHA-256.
+With the pinned v23 parent, Jesse Goat Control versus Warrior and seed
+12050, one-worker and two-worker runs each completed two games and 703
+verified decisions. Corresponding trajectory bytes were identical across
+worker counts. A fresh two-worker run on seed 12051 completed both games
+with 663 verified and visibility-audited decisions. Its ignored manifest
+is `.cache/goat-ai/policy_batch_smoke_12051_audit/manifest.json`
+(SHA-256 `40a38d074dd715eaa38ee6cd5c20bd3c56da66cf4b62a6530c29e1148c018578`).
+This validates the collector on a small native schedule; it does not
+measure scaling for large collection jobs or policy strength.
+
 For visual review, a new v25-versus-Tactical duel on the *previously reviewed*
 Return/Flip seed 9901 reached terminal in **251 replay-verified decisions**
 with the neural seat winning. Its greedy choices reproduce from the saved

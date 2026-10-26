@@ -286,6 +286,13 @@ large training jobs and instantaneous total memory remain unmeasured.
 
 **Exit:** A reproducible benchmark report and tournament report exist for the tested core/assets/decks. Replay support is claimed only for formats that have parser and reconstruction tests.
 
+A local batch collector now records both policy seats across named matchups
+and seeds using independent native workers. It replay-verifies and audits
+each player-visible trajectory and writes a SHA-bound manifest. A two-game
+serial/parallel smoke schedule produced identical trajectory bytes; see
+[evaluation](evaluation.md). This supplies reproducible policy-visited data
+for on-policy imitation without treating it as human gameplay.
+
 The sourced-deck single-process benchmark records reset overhead and peak process RSS alongside throughput on named hardware. A separate spawned-worker benchmark now measures one and two workers on the sourced Goat Control/Chaos Turbo decks, including per-worker high-water RSS and native reset time; the seat-swapped game outcomes reproduce across worker counts. [The benchmark log](benchmarks.md) gives the measurements and their limits. Instantaneous total memory use, broader deck families, and a scaling curve remain unmeasured.
 
 A balanced six-deck evaluation now tests both deck assignments and both seats for HeuristicAgent versus RandomAgent and an identical random-versus-random control. The paired score-difference helper reports a measured heuristic advantage with a confidence interval on this small schedule; [the evaluation log](evaluation.md) gives the deck splits and limits. This supplies a stronger baseline for M4 comparisons without satisfying M4's held-out competitive-policy gate.
