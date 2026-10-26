@@ -171,6 +171,15 @@ both the resolved and negated branches. Each full duel replay-verifies and
 passes the player-visible legal-choice audit. This closes one frequent
 competitive-probe response pair, not general chain correctness.
 
+A historical Tribe-Infecting Virus / DNA Surgery pair now checks that a
+Reptile declaration destroys Gagagigo if the opponent passes, while chaining
+DNA Surgery to make all face-up monsters Aqua causes Tribe to destroy none.
+Both complete native duels serialize and replay-verify. Schema v24 adds each
+face-up monster's **current** public Type to the player observation; facedown
+Type remains hidden. Older v23 policy and self-play recordings still verify.
+The tactical Tribe evaluator now uses current Type when present rather than
+printed card metadata. See [GOAT rules](goat_rules.md).
+
 ## M3 — Evaluation and data
 
 An eight-duel two-worker native pilot now reports per-process Linux peak RSS,
@@ -503,8 +512,10 @@ feature-20 clone scored 42–53–1 against feature 19 on 96 held-out duels. A
 five-review parent-KL child corrected the Tribe training state but split
 49–47 against its feature-20 parent on another 96 held-out duels, with severe
 Flip Control weakness. This improves action representation and diagnosis,
-but does not close M4's competitive gate. Add diverse Type/target reviews
-and measured cross-deck improvement before promotion; see
+but does not close M4's competitive gate. Schema-v24 current-Type observations
+now make a player-visible action-to-field Type relation possible. Test that
+representation against a same-data control, add diverse Type/target reviews,
+and require measured cross-deck improvement before promotion; see
 [evaluation](evaluation.md).
 
 ## M5 — Search and other formats

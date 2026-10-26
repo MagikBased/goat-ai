@@ -135,6 +135,21 @@ def test_tribe_requires_visible_enemy_and_names_the_best_race():
         observed, options, races)) == (options[2],)
 
 
+def test_tribe_uses_current_public_type_after_a_field_type_change():
+    tribe_code = 33184167
+    own = CardView(0, "monster", "faceup", 504700044, 0, "attack",
+                   1200, 2000, race=64)
+    enemy = CardView(1, "monster", "faceup", 17881964, 0, "attack",
+                     1500, 1300, race=2)
+    printed = {504700044: 2, 17881964: 8192}
+    chain = (ChainLinkView(1, tribe_code, 0, 4, 1),)
+    options = tuple(Action(str(race), "announce_race", 0, {"race": race})
+                    for race in (64, 8192, 2))
+    observed = board(own, enemy, chain=chain)
+    assert tuple(options[i] for i in admissible_action_indices(
+        observed, options, printed)) == (options[2],)
+
+
 def test_breaker_targets_opponent_backrow_and_controller_waits_until_needed():
     breaker = (ChainLinkView(1, 71413901, 0, 4, 0),)
     own = Action("own", "select_card", 0, {"location": 8, "controller": 0,

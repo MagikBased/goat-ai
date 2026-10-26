@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 
 from goat_ai.actions import Action
+from goat_ai.agents.tactical_guard import visible_monster_race
 from goat_ai.replay import Trajectory
 
 HEAVY_STORM = 19613556
@@ -126,18 +127,20 @@ def review_candidates(trajectory: Trajectory,
             found.append(("tribe_activation_without_visible_enemy",
                           {"own_monsters": len(own_monsters),
                            "visible_enemy_monsters": 0}))
-        if (selected.kind == "announce_race" and card_races and obs.chain
+        if (selected.kind == "announce_race" and obs.chain
                 and obs.chain[-1].card_code == TRIBE_INFECTING_VIRUS
                 and obs.chain[-1].controller == seat):
             race = selected.parameters.get("race")
-            own_hits = sum(c.position == "faceup" and c.code is not None
-                           and card_races.get(c.code) == race for c in own_monsters)
-            enemy_hits = sum(c.position == "faceup" and c.code is not None
-                             and card_races.get(c.code) == race for c in enemy_monsters)
-            enemy_races_offered = {card_races[c.code] for c in enemy_monsters
-                                   if c.position == "faceup" and c.code in card_races
+            own_hits = sum(visible_monster_race(c, card_races) == race
+                           for c in own_monsters)
+            enemy_hits = sum(visible_monster_race(c, card_races) == race
+                             for c in enemy_monsters)
+            enemy_races_offered = {visible_monster_race(c, card_races)
+                                   for c in enemy_monsters
+                                   if visible_monster_race(c, card_races) is not None
                                    and any(a.kind == "announce_race"
-                                           and a.parameters.get("race") == card_races[c.code]
+                                           and a.parameters.get("race") ==
+                                           visible_monster_race(c, card_races)
                                            for a in record.legal_actions)}
             if own_hits and not enemy_hits and enemy_races_offered:
                 found.append(("tribe_race_hits_only_own_with_enemy_option",

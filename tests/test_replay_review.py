@@ -147,6 +147,21 @@ def test_shortlist_flags_tribe_type_that_hits_only_own_visible_monsters():
     assert review_candidates(good, card_races=races) == ()
 
 
+def test_tribe_review_uses_current_type_over_printed_metadata():
+    tribe = 33184167
+    own = CardView(0, "monster", "faceup", 101, 0, "attack",
+                   1200, 1000, race=2)
+    enemy = CardView(1, "monster", "faceup", 202, 0, "attack",
+                     1800, 1000, race=64)
+    obs = replace(view(own, enemy), chain=(ChainLinkView(1, tribe, 0, 4, 1),))
+    own_type = Action("own", "announce_race", 0, {"race": 2})
+    enemy_type = Action("enemy", "announce_race", 0, {"race": 64})
+    found = review_candidates(policy(record(obs, own_type, enemy_type)),
+                              card_races={101: 64, 202: 2})
+    assert [c.category for c in found] == [
+        "tribe_race_hits_only_own_with_enemy_option"]
+
+
 def test_shortlist_flags_tribe_activation_before_forced_type_choice():
     tribe = 33184167
     own_monster = CardView(0, "monster", "faceup", tribe, 0,

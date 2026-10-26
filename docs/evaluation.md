@@ -3479,3 +3479,46 @@ per duel. The ignored report is
 The tiny review set corrected a concrete state, but neither held-out
 comparison supports promoting a new checkpoint. Broader player-visible
 Type/context examples and independently reviewed decisions are needed.
+
+## Current public Type and Tribe / DNA Surgery compatibility
+
+Schema v24 now carries ocgcore's current Type mask for each face-up field
+monster, including changes made by DNA Surgery. Both player-scoped views
+agree on that public field value; face-down field cards have no Type value.
+The native query decoder checks the full unsigned 64-bit mask. Older replay
+schemas omit the new field when replay-verified, so saved schema-v23 policy
+and self-play games remain usable. As a compatibility check after the change,
+`policy_batch_v19_jesse_daryl_2644_p1.json` replay-verified **801** decisions
+and `selfplay_value_smoke_3000/episode_00001_seed_3001.json` verified **629**.
+The older Tribe preference scorecard reproduced its original byte hash
+`2fbd3e4c5de5c61a009c5f3399ef81bb581bdd56fb16f01da36edacafe5a74cb`
+after the schema change.
+
+The sourced [historical Tribe ruling](https://beta.goatformat.com/cards/tribe-infecting-virus)
+and [DNA Surgery card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4951&ope=2&request_locale=en)
+motivate a paired seed-18 native fixture. Tribe discards Sinister Serpent and
+declares Reptile against face-up Gagagigo. Passing DNA Surgery destroys
+Gagagigo; chaining DNA and declaring Aqua changes both face-up monsters to
+Aqua before Tribe resolves, so Gagagigo survives. Both branches ran to
+terminal, serialized, and replay-verified. `tests/test_historical_tribe_dna_surgery.py`
+passed **2/2** with the pinned native assets. This checks a documented
+interaction and the observation boundary; it is not a duel-throughput
+benchmark or evidence of policy strength. TacticalHeuristicAgent is now
+version 4 because its Tribe choices use current public Type when available;
+older schema-v23 demonstrations retain their recorded version-3 provenance.
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai OMP_NUM_THREADS=1 \
+  .venv/bin/python -m pytest -q tests/test_historical_tribe_dna_surgery.py
+```
+
+A new feature-20 checkpoint versus TacticalHeuristicAgent v4 smoke duel on
+Chaos Control/Warrior, seed 3500, completed in **287 decisions**. All 287
+schema-v24 decisions replay-verified, including face-up current-Type values;
+the policy replay auditor reproduced **143/143** recorded policy choices and
+passed its visibility audit. The policy lost this single duel, which is a
+pipeline check rather than a strength estimate. The ignored recording is
+`replays/schema24_fv20_smoke_3500.json` (SHA-256
+`3550b241f12dbcf282023693647f40c8292f3f005f4208ca3c15e177bdae0635`);
+its ignored audit report is `artifacts/schema24_fv20_smoke_audit_3500.json`
+(SHA-256 `5b398fe6b2a96678fa851edf3dd331e08f3684c08c9304a1581c986e7630e1e7`).

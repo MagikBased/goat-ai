@@ -56,12 +56,24 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             return replace(view, chain=tuple(replace(link, targets=())
                                              for link in view.chain))
 
+        def without_races(view):
+            def cards(items):
+                return tuple(replace(card, race=None) for card in items)
+
+            return replace(view, hand=cards(view.hand), field=cards(view.field),
+                           graveyards=tuple(cards(zone) for zone in view.graveyards),
+                           banished=tuple(cards(zone) for zone in view.banished),
+                           own_extra_deck=cards(view.own_extra_deck))
+
         observation = env.reset()
         for index, record in enumerate(trajectory.decisions):
             if env.is_terminal():
                 raise ReplayMismatch(f"decision {index}: engine terminated early")
             compared_observation = observation
             recorded_observation = record.observation
+            if trajectory.schema_version < 24:
+                compared_observation = without_races(compared_observation)
+                recorded_observation = without_races(recorded_observation)
             if trajectory.schema_version < 19:
                 compared_observation = without_equips(compared_observation)
             elif trajectory.schema_version == 19:
@@ -126,18 +138,23 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                                 if trajectory.schema_version < 19 else
                                 without_facedown_equips(observation)
                                 if trajectory.schema_version == 19 else observation)
+        if trajectory.schema_version < 24:
+            terminal_observation = without_races(terminal_observation)
         if trajectory.schema_version < 21:
             terminal_observation = without_chain_targets(terminal_observation)
         if trajectory.schema_version < 22:
             terminal_observation = replace(terminal_observation, pending_attack=None)
         if trajectory.schema_version < 23:
             terminal_observation = replace(terminal_observation, turn_player=None)
+        recorded_terminal = trajectory.terminal_observation
+        if trajectory.schema_version < 24 and recorded_terminal is not None:
+            recorded_terminal = without_races(recorded_terminal)
         if (trajectory.schema_version >= 18
-                and trajectory.terminal_observation is not None
-                and terminal_observation != trajectory.terminal_observation):
+                and recorded_terminal is not None
+                and terminal_observation != recorded_terminal):
             fields = [name for name in vars(terminal_observation)
                       if getattr(terminal_observation, name) != getattr(
-                          trajectory.terminal_observation, name)]
+                          recorded_terminal, name)]
             raise ReplayMismatch(f"terminal observation differs in {fields}")
         if trajectory.asset_sha256 is not None:
             manifest = getattr(engine, "replay_manifest", None)

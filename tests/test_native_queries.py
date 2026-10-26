@@ -5,8 +5,14 @@ from pathlib import Path
 import pytest
 
 from goat_ai.engine.native_messages import decode_decision
-from goat_ai.engine.native_queries import (QUERY_CODE, QUERY_END, QUERY_EQUIP_CARD,
-                                           QUERY_POSITION, decode_location)
+from goat_ai.engine.native_queries import (
+    QUERY_CODE,
+    QUERY_END,
+    QUERY_EQUIP_CARD,
+    QUERY_POSITION,
+    QUERY_RACE,
+    decode_location,
+)
 from goat_ai.engine.ocgcore_probe import OcgcoreProbe
 from goat_ai.engine.probe_deck import VANILLA_DECK
 
@@ -38,6 +44,23 @@ def test_query_location_decodes_public_equip_target():
            + record(QUERY_EQUIP_CARD, bytes(9)) + record(QUERY_END))
     with pytest.raises(ValueError, match="equip target"):
         decode_location(struct.pack("<I", len(bad)) + bad)
+
+
+def test_query_location_decodes_current_monster_type_as_uint64():
+    def record(flag, payload=b""):
+        return struct.pack("<HI", 4 + len(payload), flag) + payload
+
+    race = 1 << 40
+    card = (record(QUERY_CODE, struct.pack("<I", 49003308))
+            + record(QUERY_POSITION, struct.pack("<I", 1))
+            + record(QUERY_RACE, struct.pack("<Q", race))
+            + record(QUERY_END))
+    assert decode_location(struct.pack("<I", len(card)) + card)[0].race == race
+    malformed = (record(QUERY_CODE, struct.pack("<I", 49003308))
+                 + record(QUERY_POSITION, struct.pack("<I", 1))
+                 + record(QUERY_RACE, bytes(4)) + record(QUERY_END))
+    with pytest.raises(ValueError, match="race query"):
+        decode_location(struct.pack("<I", len(malformed)) + malformed)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -84,3 +107,4 @@ def test_native_observation_redacts_opponent_facedown_monster():
         assert opponent.field[0].attack is None
         assert opponent.field[0].defense is None
         assert opponent.field[0].counters == ()
+        assert opponent.field[0].race is None

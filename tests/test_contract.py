@@ -430,13 +430,13 @@ def test_replay_verifier_detects_changed_decision_and_outcome():
                           ContractEngine())
 
 
-def test_schema_twenty_three_terminal_observation_round_trip_and_verification(tmp_path):
+def test_schema_twenty_four_terminal_observation_round_trip_and_verification(tmp_path):
     with GoatEnvironment("a", "b", seed=42, engine=ContractEngine()) as env:
         env.reset()
         final = env.step(env.legal_actions()[0])
         assert env.is_terminal()
         trajectory = env.trajectory()
-    assert trajectory.schema_version == 23
+    assert trajectory.schema_version == 24
     assert trajectory.terminal_observation == final
     path = tmp_path / "terminal.json"
     write_trajectory(path, trajectory)
@@ -478,6 +478,28 @@ def test_turn_player_requires_schema_twenty_three_and_older_replays_stay_readabl
     path.write_text(json.dumps(raw))
     with pytest.raises(ValueError, match="requires a terminal observation"):
         read_trajectory(path)
+
+
+def test_current_monster_type_requires_schema_twenty_four_and_stays_public(tmp_path):
+    action = Action("0", "pass", 0)
+    visible = CardView(1, "monster", "faceup", 49003308, 0, "attack",
+                       1850, 1000, race=524288)
+    current_view = replace(view(), turn_player=0, field=(visible,))
+    current = Trajectory("goat", ("a", "b"), 7,
+                         (DecisionRecord(current_view, (action,), action),), 0,
+                         schema_version=24, terminal_observation=current_view)
+    path = tmp_path / "current_type.json"
+    write_trajectory(path, current)
+    assert read_trajectory(path) == current
+    with pytest.raises(ValueError, match="schema v24"):
+        write_trajectory(path, replace(current, schema_version=23))
+    raw = json.loads(path.read_text())
+    raw["decisions"][0]["observation"]["field"][0].pop("race")
+    path.write_text(json.dumps(raw))
+    with pytest.raises(ValueError, match="schema v24"):
+        read_trajectory(path)
+    with pytest.raises(ValueError, match="face-up monster"):
+        replace(view(), field=(replace(visible, position="facedown", code=None),))
 
 
 def test_old_position_action_replays_as_flip_summon():

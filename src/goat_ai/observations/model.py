@@ -15,6 +15,7 @@ class CardView:
     defense: int | None = None  # Current visible DEF.
     counters: tuple[tuple[int, int], ...] = ()  # (counter type, count) on face-up monsters.
     equipped_to: tuple[int, int] | None = None  # Public target monster slot; card ID may be hidden.
+    race: int | None = None  # Current Type mask of a face-up monster, including field effects.
 
 
 @dataclass(frozen=True)
@@ -138,9 +139,12 @@ class Observation:
         for card in (*self.hand, *self.field, *self.graveyards[0], *self.graveyards[1],
                      *self.banished[0], *self.banished[1], *self.own_extra_deck):
             if (card.zone != "monster" or card.position != "faceup") and (
-                    card.attack is not None or card.defense is not None or card.counters):
-                raise ValueError("dynamic stats and counters require a face-up monster")
+                    card.attack is not None or card.defense is not None
+                    or card.counters or card.race is not None):
+                raise ValueError("dynamic monster data require a face-up monster")
             if ((card.attack is None) != (card.defense is None)
+                    or (card.race is not None and (type(card.race) is not int
+                                                   or not 0 < card.race < 1 << 64))
                     or any(kind <= 0 or count <= 0 for kind, count in card.counters)
                     or tuple(sorted(card.counters)) != card.counters):
                 raise ValueError("invalid visible monster stats or counters")

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 QUERY_CODE = 0x1
 QUERY_POSITION = 0x2
+QUERY_RACE = 0x80
 QUERY_ATTACK = 0x100
 QUERY_DEFENSE = 0x200
 QUERY_EQUIP_CARD = 0x4000
@@ -22,6 +23,7 @@ class QueriedCard:
     defense: int | None = None
     counters: tuple[tuple[int, int], ...] = ()
     equip_target: tuple[int, int, int] | None = None  # controller, location, sequence
+    race: int | None = None  # Current Type mask; public only for face-up monsters.
 
 
 def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
@@ -65,6 +67,10 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
                     raise ValueError("invalid query uint32")
                 values[flag] = struct.unpack("<i" if flag in (QUERY_ATTACK, QUERY_DEFENSE)
                                              else "<I", payload)[0]
+            elif flag == QUERY_RACE:
+                if len(payload) != 8:
+                    raise ValueError("invalid race query uint64")
+                values[flag] = struct.unpack("<Q", payload)[0]
             elif flag == QUERY_COUNTERS:
                 if len(payload) < 4:
                     raise ValueError("invalid counter query")
@@ -93,7 +99,7 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
         cards.append(QueriedCard(values[QUERY_CODE], values[QUERY_POSITION],
                                  bool(values.get(QUERY_IS_PUBLIC, 0)),
                                  values.get(QUERY_ATTACK), values.get(QUERY_DEFENSE),
-                                 counters, equip_target))
+                                 counters, equip_target, values.get(QUERY_RACE)))
     return tuple(cards)
 
 

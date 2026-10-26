@@ -122,7 +122,7 @@ def test_restrict_targets_set_dekoichi_without_revealing_it(tmp_path):
                 else:
                     pytest.fail("Restrict / Dekoichi duel exceeded 3000 decisions")
                 trajectory = env.trajectory()
-                assert trajectory.schema_version == 23
+                assert trajectory.schema_version == 24
                 path = tmp_path / "restrict_set_equip_v21.json"
                 write_trajectory(path, trajectory)
                 assert verify_trajectory(read_trajectory(path),

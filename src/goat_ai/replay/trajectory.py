@@ -49,7 +49,7 @@ class Trajectory:
 
 def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
     version = trajectory.schema_version
-    if version not in range(1, 24):
+    if version not in range(1, 25):
         raise ValueError("unsupported trajectory schema")
     if version >= 18 and trajectory.terminal_observation is None:
         raise ValueError("schema v18 requires a terminal observation")
@@ -88,13 +88,18 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
             raise ValueError("turn player requires schema v23")
         if version >= 23 and view.turn_player is None:
             raise ValueError("schema v23 requires the public turn player")
+        if version < 24 and any(card.race is not None for card in cards):
+            raise ValueError("current monster Type requires schema v24")
+        if version >= 24 and any(card.zone == "monster" and card.position == "faceup"
+                                 and card.race is None for card in view.field):
+            raise ValueError("schema v24 requires current Type for face-up monsters")
     Path(path).write_text(json.dumps(asdict(trajectory), separators=(",", ":")) + "\n", encoding="utf-8")
 
 
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     version = raw.get("schema_version")
-    if version not in range(1, 24):
+    if version not in range(1, 25):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
@@ -109,6 +114,8 @@ def read_trajectory(path: str | Path) -> Trajectory:
                 item["equipped_to"] = tuple(item["equipped_to"])
             else:
                 item.pop("equipped_to", None)
+            if version < 24:
+                item.pop("race", None)
             result.append(CardView(**item))
         return tuple(result)
 
@@ -117,6 +124,9 @@ def read_trajectory(path: str | Path) -> Trajectory:
         if "own_extra_deck" in view:
             view["own_extra_deck"] = cards(view["own_extra_deck"])
         view["field"] = cards(view["field"])
+        if version >= 24 and any(card.zone == "monster" and card.position == "faceup"
+                                 and card.race is None for card in view["field"]):
+            raise ValueError("schema v24 requires current Type for face-up monsters")
         view["graveyards"] = tuple(cards(zone) for zone in view["graveyards"])
         view["banished"] = tuple(cards(zone) for zone in view["banished"])
         if version >= 6:

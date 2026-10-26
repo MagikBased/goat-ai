@@ -194,7 +194,7 @@ def test_public_scapegoat_restriction_replays_in_new_and_old_schemas(
     def legacy_six_view(view):
         def old_cards(cards):
             return tuple(replace(card, attack=None, defense=None, counters=(),
-                                 equipped_to=None) for card in cards)
+                                 equipped_to=None, race=None) for card in cards)
 
         return replace(
             view, restrictions=(), public_reveals=(), disabled_zones=(),

@@ -7,7 +7,7 @@ The engine remains responsible for determining what is legal.
 from collections.abc import Mapping, Sequence
 
 from goat_ai.actions import Action
-from goat_ai.observations import Observation
+from goat_ai.observations import CardView, Observation
 
 HEAVY_STORM = 19613556
 SCAPEGOAT = 504700123
@@ -48,17 +48,22 @@ def safe_target_indices(observation: Observation,
     return kept or indices
 
 
+def visible_monster_race(card: CardView, printed_races: Mapping[int, int]) -> int | None:
+    """Prefer the current public Type; older replays have only printed metadata."""
+    if card.zone != "monster" or card.position != "faceup":
+        return None
+    return card.race if card.race is not None else printed_races.get(card.code)
+
+
 def tribe_race_value(observation: Observation, race: int,
                      card_races: Mapping[int, int]) -> int:
     """Estimate visible monsters removed by a declared race, with ATK as tiebreak."""
     enemy = [c for c in observation.field
              if c.zone == "monster" and c.controller != observation.viewer
-             and c.position == "faceup" and c.code is not None
-             and card_races.get(c.code) == race]
+             and visible_monster_race(c, card_races) == race]
     own = [c for c in observation.field
            if c.zone == "monster" and c.controller == observation.viewer
-           and c.position == "faceup" and c.code is not None
-           and card_races.get(c.code) == race]
+           and visible_monster_race(c, card_races) == race]
     return (10000 * len(enemy) - 15000 * len(own)
             + sum(c.attack or 0 for c in enemy) - sum(c.attack or 0 for c in own))
 
@@ -111,13 +116,14 @@ def admissible_action_indices(observation: Observation,
                          if c.zone == "monster" and c.controller != own]
     can_pass = any(a.kind == "pass" for a in legal_actions)
     card_races = card_races or {}
-    tribe_prompt = (card_races and observation.chain
+    have_race_data = bool(card_races) or any(c.race is not None for c in opponent_monsters)
+    tribe_prompt = (have_race_data and observation.chain
                     and observation.chain[-1].card_code == TRIBE_INFECTING_VIRUS
                     and observation.chain[-1].controller == own)
     race_actions = [a for a in legal_actions if a.kind == "announce_race"]
     best_race_value = (max(tribe_race_value(observation, a.parameters["race"], card_races)
                            for a in race_actions) if tribe_prompt and race_actions else None)
-    tribe_has_target = any(c.position == "faceup" and c.code in card_races
+    tribe_has_target = any(visible_monster_race(c, card_races) is not None
                            for c in opponent_monsters)
     ring_target_prompt = (observation.chain
                           and observation.chain[-1].card_code == RING_OF_DESTRUCTION
@@ -155,7 +161,7 @@ def admissible_action_indices(observation: Observation,
             continue
         if (code == TRIBE_INFECTING_VIRUS
                 and action.kind in ("activate", "chain")
-                and card_races and not tribe_has_target):
+                and have_race_data and not tribe_has_target):
             continue
         if (best_race_value is not None and action.kind == "announce_race"
                 and tribe_race_value(observation, action.parameters["race"], card_races)

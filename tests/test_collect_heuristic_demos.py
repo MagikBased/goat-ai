@@ -33,11 +33,11 @@ def test_tactical_teacher_against_combat_baseline_records_verified_seats(
     assert len(report["games"]) == 2
     for seat, game in enumerate(report["games"]):
         replay = read_trajectory(game["path"])
-        assert replay.schema_version == 23
+        assert replay.schema_version == 24
         assert replay.source == "tactical"
         assert replay.skill_metadata == {
             "demonstrator_seat": seat,
-            "teacher": "TacticalHeuristicAgent", "teacher_version": 3,
+            "teacher": "TacticalHeuristicAgent", "teacher_version": 4,
             "opponent": "CombatHeuristicAgent", "opponent_version": 3,
         }
         assert game["teacher_decisions"] == sum(

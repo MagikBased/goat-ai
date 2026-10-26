@@ -142,7 +142,7 @@ class CombatFlipHeuristicAgent(CombatHeuristicAgent):
 class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
     """Flip-aware baseline with conservative, visible-board Trap decisions."""
 
-    teacher_version: ClassVar[int] = 3  # public turn owner refines Scapegoat timing
+    teacher_version: ClassVar[int] = 4  # public current Type refines Tribe choices
     RING: ClassVar[int] = 511000824
     TORRENTIAL: ClassVar[int] = 53582587
     SINISTER: ClassVar[int] = 511000818

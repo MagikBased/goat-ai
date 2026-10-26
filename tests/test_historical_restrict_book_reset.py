@@ -56,7 +56,7 @@ def test_book_reset_respects_prior_actions(tmp_path, prior_action):
             else:
                 pytest.fail("Restrict / Book continuation exceeded 3000 decisions")
             trajectory = env.trajectory()
-            assert trajectory.schema_version == 23
+            assert trajectory.schema_version == 24
             path = tmp_path / f"restrict_book_reset_{prior_action}.json"
             write_trajectory(path, trajectory)
             assert verify_trajectory(read_trajectory(path),
