@@ -73,13 +73,12 @@ checkpoint, and the three matching replay/annotation pairs above. Regenerate
 the ignored source replays first with the four-game value-baseline smoke command
 in [evaluation](evaluation.md); a fresh run reproduced all four decision
 streams exactly after excluding only the added recording-provenance fields.
-The MST
-frame is intentionally not a one-choice label: two opposing Set Spell/Traps
+The MST frame is intentionally not a one-choice label: two opposing Set Spell/Traps
 are legal and neither hidden identity is available to the acting player.
 Its actionable preference is for an opposing target over the own Dust Tornado,
-without claiming which opposing slot is better. A future review format should
-represent acceptable-action sets or pairwise preferences before using that
-case for training.
+without claiming which opposing slot is better. The separate preference
+format below represents both acceptable opponent slots while preserving the
+recorded own-card target as the disfavored action.
 
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/score_reviewed_decisions.py \
@@ -91,6 +90,44 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/score_reviewed_decis
   --case replays/selfplay_value_smoke_3000/episode_00003_seed_3003.json \
          examples/annotations/selfplay_value_seed3003_breaker_enemy.review.json \
   --output artifacts/feature19_selfplay_review_scorecard.json
+```
+
+The new `examples/preferences/` files express all four audited corrections
+as preferred-versus-disfavored **sets** of legal action indices. The MST case
+prefers both opposing hidden backrow slots over the recorded own Dust
+Tornado, without picking an arbitrary winner between those two unknown
+cards. Breaker's case prefers its unique opposing target over either own Set
+Trap Dustshoot. The learner seat, replay SHA-256, and legal indices are
+validated after native replay verification and a visibility audit. The
+unchanged feature-19 parent scored preferred-minus-disfavored log-mean-exp
+margins of **−2.253** for Faith, **+0.583** for Heavy Storm, **+0.019** for
+Breaker, and **−0.515** for MST. Positive margins mean the preferred set's
+mean exponential score was higher; a positive set margin does not guarantee
+the greedy choice belongs to that set. The parent greedily chose a preferred
+action in only the Heavy Storm state. No source seed or exact replay was in
+that parent's training provenance.
+
+The ignored report is `artifacts/feature19_selfplay_preference_scorecard.json`
+(SHA-256 `bc54a64bdf6ae1093cf5d816299c8d2c5ab451ddf1cbf641ed2fb86cb01a3bec`).
+The scalar seed-2883 replay was regenerated with current recording metadata;
+its full trajectory matched the earlier saved version after removing only
+those added metadata fields. The original scalar checkpoint byte hash was
+preserved as recorded in [evaluation](evaluation.md). These preferences are
+diagnostics, not training labels consumed by the current trainer, and four
+fixed states cannot establish a strength gain.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/score_reviewed_preferences.py \
+  --checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt \
+  --case replays/selfplay_value_smoke_3000/episode_00001_seed_3001.json \
+         examples/preferences/selfplay_value_seed3001_faith.preference.json \
+  --case replays/selfplay_value_smoke_3000/episode_00002_seed_3002.json \
+         examples/preferences/selfplay_value_seed3002_heavy.preference.json \
+  --case replays/selfplay_value_smoke_3000/episode_00003_seed_3003.json \
+         examples/preferences/selfplay_value_seed3003_breaker.preference.json \
+  --case replays/selfplay_fourroles_2820_2883/episode_00063_seed_2883.json \
+         examples/preferences/selfplay_scalar_seed2883_mst.preference.json \
+  --output artifacts/feature19_selfplay_preference_scorecard.json
 ```
 
 ## Extended visible-state shortlist, feature-19 checkpoint

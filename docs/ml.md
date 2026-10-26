@@ -111,6 +111,19 @@ reviewer's choice remains a retrospective hypothesis until independently
 evaluated. The viewer does not export labels while reviewer-only hidden-card
 reveals are loaded.
 
+For reviews where several legal choices are acceptable, the separate
+`examples/preferences/` schema names nonempty preferred and disfavored
+action-index sets at one replay decision. The disfavored set must include
+the recorded action. `scripts/score_reviewed_preferences.py` verifies the
+complete native replay and its visibility, checks the source hash, agent
+seat, and legal indices, then scores the two sets without assigning an
+arbitrary winner among equally plausible options. It subtracts the log of
+each set's size from its log-sum-exp score so a set is not rewarded merely
+for containing more actions. These preferences are fixed-state diagnostics;
+the current trainer does not consume them, and no playing-strength gain is
+claimed from their margins. A preference-training objective needs a
+separate controlled experiment and held-out evaluation.
+
 For rehearsal, pass `--annotation-for TRAJECTORY=LABELS` for the scripted
 replay and leave ordinary teacher trajectories unannotated. A scripted
 trajectory without labels is rejected, so its random filler decisions cannot
