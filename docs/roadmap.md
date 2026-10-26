@@ -899,3 +899,11 @@ with a paired-bootstrap interval of 43.8%–59.4%. This does not satisfy M4's
 self-play strength gate. Keep the imitation checkpoint as the neural reference;
 investigate a stronger learning signal and evaluate any change against the
 same frozen parent on independent deck families.
+
+An opt-in policy-visited Tactical-v14 label path now checks the source
+checkpoint hash and player-visible replay before fitting synthetic teacher
+choices. Eight policy-versus-teacher duels supplied 626 multi-option labels,
+including 69 disagreements with the policy's executed actions. The child
+scored 28–35–1 against its unchanged parent on 64 held-out duels, so it is
+not promoted. M4 still needs more capable generalization and a separately
+verified self-play gain; see [the experiment](evaluation.md).

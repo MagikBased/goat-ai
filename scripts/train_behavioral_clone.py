@@ -12,6 +12,8 @@ from time import perf_counter
 
 import torch
 
+from goat_ai.agents import (TacticalHeuristicAgent, load_card_facts,
+                            load_card_races, load_flip_monster_codes)
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
@@ -30,6 +32,7 @@ from goat_ai.training import (
     fit_with_parent_kl,
 )
 from goat_ai.training.policy import POLICY_FEATURE_VERSION
+from goat_ai.training.on_policy_teacher import label_policy_trajectory
 
 SOURCE_KINDS = frozenset((
     "activate", "attack", "chain", "change_position", "flip_summon",
@@ -156,6 +159,9 @@ def main() -> None:
                         metavar="TRAJECTORY=LABELS",
                         help="label selected trajectories; unlisted demonstrations use their "
                              "recorded demonstrator seat")
+    parser.add_argument("--on-policy-teacher", choices=("tactical_v14",),
+                        help="label replay-verified policy-visited states with the "
+                             "named synthetic teacher; requires --init-checkpoint")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--output", type=Path, required=True)
@@ -208,6 +214,9 @@ def main() -> None:
         parser.error(str(exc))
     if args.init_checkpoint and args.init_checkpoint.resolve() == args.output.resolve():
         parser.error("--output must differ from --init-checkpoint")
+    if args.on_policy_teacher and (not args.init_checkpoint or args.annotation
+                                   or args.annotation_for):
+        parser.error("--on-policy-teacher requires --init-checkpoint and no annotations")
     if (args.parent_kl_steps < 0 or args.preserve_per_trajectory < 1
             or args.preserve_batch < 1 or not isfinite(args.parent_kl_weight)
             or args.parent_kl_weight <= 0):
@@ -220,6 +229,13 @@ def main() -> None:
         parser.error("parent KL uses labeled decisions directly; omit sampling weights")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
+    teacher = (TacticalHeuristicAgent(
+        load_flip_monster_codes(args.native_root),
+        load_card_races(args.native_root),
+        card_facts=load_card_facts(args.native_root))
+        if args.on_policy_teacher == "tactical_v14" else None)
+    teacher_parent_hash = (hashlib.sha256(args.init_checkpoint.read_bytes()).hexdigest()
+                           if teacher is not None else None)
     records = []
     record_sources = []
     sources: Counter[str] = Counter()
@@ -245,18 +261,26 @@ def main() -> None:
         audit_trajectory_visibility(trajectory)
         annotation = None
         label_path = labels_by_path.get(path.resolve())
-        if label_path is not None:
+        disagreements = None
+        if teacher is not None:
+            selected, disagreements = label_policy_trajectory(
+                trajectory, teacher, teacher_parent_hash)
+        elif label_path is not None:
             annotation, selected = read_decision_annotations(
                 label_path, hashlib.sha256(raw).hexdigest(), trajectory)
         else:
             if trajectory.source.startswith("scripted_"):
                 raise ValueError(f"{path}: scripted replay requires explicit annotations")
             selected = demonstrator_records(trajectory)
-        source = ({"self_recorded": "human_annotation",
-                   "scripted_scenario": "synthetic_annotation",
-                   "policy_review": "policy_review_annotation",
-                   "self_play_review": "self_play_review_annotation"}[annotation.authorization]
-                  if annotation is not None else trajectory.source)
+        if teacher is not None:
+            source = "automated_teacher_tactical_v14"
+        elif annotation is not None:
+            source = {"self_recorded": "human_annotation",
+                      "scripted_scenario": "synthetic_annotation",
+                      "policy_review": "policy_review_annotation",
+                      "self_play_review": "self_play_review_annotation"}[annotation.authorization]
+        else:
+            source = trajectory.source
         records.extend(selected)
         record_sources.extend([source] * len(selected))
         sources[source] += len(selected)
@@ -277,8 +301,12 @@ def main() -> None:
                                                      "authorization")),
                                "reviewer": annotation.reviewer if annotation is not None else None,
                                "teacher": (trajectory.skill_metadata or {}).get("teacher"),
-                               "teacher_version": (trajectory.skill_metadata or {}).get(
-                                   "teacher_version"),
+                               "teacher_version": (TacticalHeuristicAgent.teacher_version
+                                                   if teacher is not None else
+                                                   (trajectory.skill_metadata or {}).get(
+                                                       "teacher_version")),
+                               "automated_teacher": args.on_policy_teacher,
+                               "automated_teacher_disagreements": disagreements,
                                "opponent": (trajectory.skill_metadata or {}).get("opponent"),
                                "verified_decisions": count,
                                "selected_decisions": len(selected)})

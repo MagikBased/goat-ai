@@ -4998,3 +4998,49 @@ and `.cache/goat-ai/fv23_tactical_v14_selfplay_vs_parent_9800_9807.json`
 The tournaments took 49.97 and 34.54 seconds with four workers. No
 cross-deck self-play strength gain is established; keep the RL child
 experimental and the imitation parent as the current neural reference.
+
+### Policy-visited synthetic teacher labels
+
+The opt-in cloning path now labels decisions from checkpoint-attributed
+`policy_evaluation` trajectories with Tactical-v14, after exact native replay
+verification and the player-visible audit. It uses only the recorded policy
+seat's multi-option decisions and rejects a source checkpoint hash mismatch.
+These are synthetic labels on policy-visited states, not executed teacher
+actions or human demonstrations. Eight native duels of the feature-v23
+imitation parent against Tactical-v14 used Jesse/Warrior and Return/Flip,
+seeds 9900–9901, with the policy in both seats. They all reached terminal
+and yielded **626** policy decisions with multiple choices. The teacher
+disagreed with the executed choice on **69**. A two-epoch continuation
+(width 32, batch 16, learning rate 0.0001, seed 37) reduced training loss
+from 0.317407 to 0.289099 in 12.31 seconds. Its ignored checkpoint is
+`.cache/goat-ai/fv23_on_policy_teacher_9900_9901.pt` (SHA-256
+`cefc79d3e8944dd4d0285ef6a659d0105565b88a526dda97bc82bfc70f164d8a`).
+
+On unseen Main Deck compositions, both deck assignments and seats, seeds
+10100–10107, the child scored **28–35–1** directly against the unchanged
+parent over 64 duels. The paired-bootstrap 95% score interval was
+**35.2%–53.1%**; the child scored 6–10 when assigned Michael GOAT Control.
+The ignored report is
+`.cache/goat-ai/fv23_on_policy_teacher_vs_parent_10100_10107.json`
+(SHA-256 `71b5975e6d8cc7bea59c860037eb45c4fb6a908fdf0830c4d50cdf6dca9e877e`).
+The four-worker tournament took 49.41 seconds. Keep this child experimental;
+the policy-visited labeling path is valid, but this small teacher correction
+set did not establish a playing-strength gain.
+
+Reproduce a source duel, then label saved duels with the matching parent:
+
+```bash
+PYTHONPATH=src:. python scripts/record_policy_match.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --deck1 examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --deck2 examples/decks/flip_control_goatformat_guide.ydk \
+  --seed 9901 --policy-seat 0 --opponent tactical --max-decisions 5000 \
+  --output .cache/goat-ai/on_policy_teacher_9900_9901/return_flip_9901_seat0.json
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/on_policy_teacher_9900_9901/*.json \
+  --engine experimental --on-policy-teacher tactical_v14 \
+  --feature-version 23 --width 32 --epochs 2 --batch-size 16 \
+  --learning-rate 0.0001 --seed 37 \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/fv23_on_policy_teacher_9900_9901.pt
+```

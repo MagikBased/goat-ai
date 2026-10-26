@@ -41,6 +41,7 @@ from goat_ai.training import (
     load_policy_agent,
 )
 from goat_ai.training.policy import ACTION_KINDS
+from goat_ai.training.on_policy_teacher import label_policy_trajectory
 from goat_ai.training.self_play import (
     EpisodeDecisionLimit,
     VisibleStateValue,
@@ -104,6 +105,50 @@ def actions() -> tuple[Action, ...]:
     return (Action("native-0", "normal_summon", 0, {"code": 10, "location": 2}),
             Action("native-1", "set_monster", 0, {"code": 10, "location": 2}),
             Action("native-2", "end_phase", 0))
+
+
+def test_on_policy_teacher_labels_only_checkpoint_policy_seat():
+    own = DecisionRecord(view(), actions(), actions()[0])
+    opponent_view = replace(view(), viewer=1, acting_player=1,
+                            hand=(CardView(1, "hand", "hidden", 20, 0),))
+    opponent_action = Action("opponent", "pass", 1)
+    other = DecisionRecord(opponent_view, (opponent_action,), opponent_action)
+    parent_hash = "a" * 64
+    trajectory = Trajectory("goat", ("a", "b"), 7, (own, other), 0,
+                            source="policy_evaluation",
+                            skill_metadata={"demonstrator_seat": 0,
+                                            "policy_checkpoint_sha256": parent_hash})
+
+    class Teacher:
+        def select_action(self, observation, legal_actions):
+            assert observation.acting_player == 0
+            return legal_actions[1]
+
+    labeled, disagreements = label_policy_trajectory(trajectory, Teacher(), parent_hash)
+    assert len(labeled) == 1
+    assert labeled[0].selected_action == actions()[1]
+    assert disagreements == 1
+    assert trajectory.decisions[0].selected_action == actions()[0]
+    with pytest.raises(ValueError, match="matching checkpoint"):
+        label_policy_trajectory(trajectory, Teacher(), "b" * 64)
+    with pytest.raises(ValueError, match="matching checkpoint"):
+        label_policy_trajectory(replace(trajectory, source="self_play_rl"),
+                                Teacher(), parent_hash)
+
+
+def test_on_policy_teacher_rejects_illegal_label():
+    record = DecisionRecord(view(), actions(), actions()[0])
+    trajectory = Trajectory("goat", ("a", "b"), 7, (record,), 0,
+                            source="policy_evaluation",
+                            skill_metadata={"demonstrator_seat": 0,
+                                            "policy_checkpoint_sha256": "a" * 64})
+
+    class BadTeacher:
+        def select_action(self, observation, legal_actions):
+            return Action("illegal", "pass", 0)
+
+    with pytest.raises(ValueError, match="illegal action"):
+        label_policy_trajectory(trajectory, BadTeacher(), "a" * 64)
 
 
 def test_position_action_features_bind_visible_stats_without_hidden_enemy_stats():
