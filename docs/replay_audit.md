@@ -49,6 +49,49 @@ experiment, not a promoted stronger agent. Use `--tactical-guard
 it as `greedy_tactical_guard_v4` so the replay auditor can reproduce its
 decisions without confusing it with v3.
 
+## Independent policy-seat review, seeds 2641, 2644, and 2647
+
+The four trajectories below identify the **greedy feature-19 policy** by
+checkpoint SHA-256 `fe197724523b33a8d555e90ab9f7b669dab2081b000346b9b31d1788d7e07fc2`
+and `demonstrator_seat` in their metadata. Its opponent is
+TacticalHeuristicAgent v3. All four complete duels replay-verified against
+the pinned native assets (712, 649, 801, and 1,212 decisions respectively). These
+are additional review findings beyond the automatic shortlist above. Viewer
+frames are one-based; each parenthesized number is the JSON index.
+
+| Replay and policy seat | Frame | Player-visible decision and legal alternative | Improvement candidate |
+| --- | --- | --- | --- |
+| `policy_batch_v19_cc_war_2641_p0.json`, P0 | 219–220 (218–219) | P0 voluntarily activates its face-up Black Luster Soldier's banish effect, then selects **that same 3000 ATK Soldier**. An opposing Set monster is the other legal target. The Soldier is banished by frame 223. Opponent LP is 700. The Set monster's identity is unknown to P0. | Do not select the source Soldier when a legal opposing target exists unless a concrete payoff for self-banish is present. Separately compare effect use with keeping a ready attacker. A legal-target mask alone does not value that activation. |
+| `policy_batch_v19_daryl_cas_2647_p1.json`, P1 | 740–741 (739–740) | P1 again activates its own Black Luster Soldier and selects itself for banishment. The opponent's face-up Sinister Serpent is a legal alternative; two own Sheep Tokens are also offered. The Soldier is banished by frame 744. | Add a visible target/source relation and explicit value of preserving a 3000 ATK body. Check the activation decision as well as the target prompt. |
+| `policy_batch_v19_cc_war_2641_p1.json`, P1 | 154–158 (153–157) | P1 chains Mystical Space Typhoon from hand in its own Draw Phase with no pending chain; `pass` is legal. It targets its own Set Solemn Judgment at frame 156, although an opposing Set Spell/Trap is also a legal target. At frame 158 P1 passes instead of chaining Solemn, and Solemn leaves the field. The opposing Set card's identity is unknown to P1. | Prefer preserving one's own live response card. For a targeted removal effect, score the public owner and zone of every legal target; also penalize unsolicited activation when there is no visible threat. |
+| `policy_batch_v19_jesse_daryl_2644_p1.json`, P1 | 39 (38) | P1 Normal Summons Gravekeeper's Spy in 1200 ATK while the opponent controls a Set monster, face-up Swords of Revealing Light, and four Set Spell/Traps. Setting that same 2000 DEF Flip monster is legal. | Value the printed Flip effect and defensive position before committing a normal summon; score the immediate attack opportunity from visible restrictions. |
+| `policy_batch_v19_daryl_cas_2647_p1.json`, P1 | 410 (409) | On P1's own Main Phase, P1 activates Scapegoat **from hand** while another Scapegoat is already Set and the opponent has only a face-up 300 ATK Sinister Serpent. Setting the hand copy, proceeding to Battle, or ending the turn is legal. There is no pending chain or attack. | Consider Set from hand and hold the existing copy for the opponent's turn. The guard must distinguish hand and field copies and the current turn owner. |
+
+All five target, timing, and summon findings were checked directly against the
+saved legal lists and next states. They are action-level evidence, not proof that
+changing the move would reverse a game's result. The separate guard-v4 duel
+`replays/policy_v4_guard_daryl_cas_2647_p1.json` also replay-verified for
+399 decisions; this small review found no equally clear example in it. That
+does not establish the guarded policy's overall strength.
+
+Reproduce the Mystical Space Typhoon line (change `--policy-seat` to `0` and
+the output name to reproduce the first Black Luster Soldier line):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/record_policy_match.py \
+  checkpoints/tactical_v3_fv19_2500_2503.pt \
+  --deck1 examples/decks/chaos_control_insids_worlds_2022.ydk \
+  --deck2 examples/decks/warrior_montague_clash.ydk \
+  --seed 2641 --policy-seat 1 --opponent tactical \
+  --output replays/policy_batch_v19_cc_war_2641_p1.json
+```
+
+Reproduce the Daryl/Cas lines with the same recorder and checkpoint using
+`--deck1 examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk`,
+`--deck2 examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk`,
+`--seed 2647 --policy-seat 1 --opponent tactical`, and output
+`replays/policy_batch_v19_daryl_cas_2647_p1.json`.
+
 ## Seed 2202, policy versus CombatHeuristicAgent v3
 
 Replay: `replays/policy_vs_combat_2202.json`. Policy P0 uses
