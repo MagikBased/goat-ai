@@ -337,6 +337,16 @@ candidate stays experimental and the default teacher remains version 3.
 See [evaluation](evaluation.md) for the schedule, hashes, and reproduction
 commands.
 
+The feature-v17 v3 checkpoint was also tested on four exact published 2005
+Main Decks absent from its training provenance. It scored 14–18 against
+CombatHeuristicAgent v3 and 17–15 against HeuristicAgent on separate balanced
+32-game schedules; both paired intervals include 50%. Cas Flip Control had a
+weak split even when the same heuristic played both sides against Jesse Goat
+Control, so the small Cas-specific policy split does not isolate a model
+defect. Four replay-verified Cas-versus-Jesse teacher duels provide a held-out
+card-choice audit, but synthetic teacher agreement remains only a diagnostic.
+See [evaluation](evaluation.md). M4 remains open.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

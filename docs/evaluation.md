@@ -2476,3 +2476,52 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/python scripts/eva
   --agent-a random --agent-b random --seed 2110 --seeds 3 \
   --max-decisions 3000 --output artifacts/cas_2005_protocol_3seeds.json
 ```
+
+## Held-out policy check on contemporary 2005 decks
+
+The feature-v17 CombatHeuristicAgent v3 clone `checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt` (SHA-256 `63f300c568a2270510210cf7bd919b94c4519480270caadd7d6890316b807023`) was evaluated on the published Jesse–Cas and Matt–Daryl 2005 pairings, both deck assignments, both seats, and seeds 2120–2123. The evaluator rejected overlaps with its training seeds, exact YDK bytes, and Main Deck compositions. On the pinned experimental GOAT native adapter, the policy scored **14–18** against CombatHeuristicAgent v3 (43.75%, paired 95% bootstrap interval **31.25–56.25%**) over 32 games and 24,695 decisions in 52.17 seconds. Its assigned-deck splits were Cas 2–6, Jesse 5–3, Matt 4–4, and Daryl 3–5. The ignored report is `artifacts/fv17_v3_vs_combat_2005_2120_2123.json`.
+
+On the same deck/seed schedule, the ordinary HeuristicAgent scored **15–17** against CombatHeuristicAgent v3 (46.88%, paired interval **37.5–56.25%**). A direct feature-v17-versus-HeuristicAgent match scored **17–15** (53.13%, paired interval **37.5–68.75%**) over 32 games and 22,570 decisions in 55.30 seconds. The policy's direct assigned-deck splits were Cas 1–7, Jesse 7–1, Matt 4–4, and Daryl 5–3. All three intervals include 50%, and the small deck-specific samples cannot establish a competitive gain or satisfy M4. Identical agents playing Cas against Jesse on seeds 2120–2123 scored **1–7** for Cas, so the policy's Cas split alone is weak evidence of a policy-specific defect.
+
+Four fresh Cas-versus-Jesse CombatHeuristicAgent v3 demonstration duels on held-out seeds 2130–2131 recorded 5,316 decisions, of which 2,808 belonged to the teacher. All four trajectories replay-verified before the policy-agreement audit. The policy matched **843/916** teacher decisions with more than one legal option. On source-card decisions selected by the teacher it matched Wave-Motion Cannon **15/18**, Magician of Faith **26/27**, Tsukuyomi **39/39**, Metamorphosis **11/11**, Scapegoat **5/5**, and Book of Moon **8/8**. This is synthetic teacher agreement, not expert imitation or a causal account of match outcomes. The ignored trajectories and report are under `artifacts/cas_jesse_teacher_2130_2131/` and `artifacts/cas_jesse_fv17_v3_agreement_2130_2131.json`.
+
+Reproduce the two direct policy schedules after [native setup](native_setup.md):
+
+```bash
+for opponent in combat_heuristic heuristic; do
+  GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/python \
+    scripts/evaluate_policy.py checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt \
+    --engine experimental \
+    --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+              examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk \
+    --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+              examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+    --both-deck-assignments --opponent "$opponent" --seed 2120 --seeds 4 \
+    --max-decisions 3000 --reject-training-deck-hashes --require-unseen-main-decks \
+    --output "artifacts/fv17_v3_vs_${opponent}_2005_2120_2123.json"
+done
+```
+
+Reproduce the ordinary-heuristic baseline and the Cas-versus-Jesse mirror:
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/python \
+  scripts/evaluate_native.py --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+            examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --both-deck-assignments --agent-a heuristic --agent-b combat_heuristic \
+  --seed 2120 --seeds 4 --max-decisions 3000 \
+  --output artifacts/heuristic_vs_combat_2005_2120_2123.json
+
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/python \
+  scripts/evaluate_native.py --engine experimental \
+  --matchup examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk \
+            examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+  --agent-a heuristic --agent-b heuristic --seed 2120 --seeds 4 \
+  --max-decisions 3000 \
+  --output artifacts/cas_jesse_heuristic_mirror_2120_2123.json
+```
+
+The saved checkpoint is ignored by Git; its recorded hash identifies the exact local model used here. The CLI validates training provenance and seed separation for new evaluations.
