@@ -163,3 +163,39 @@ def test_shortlist_flags_tribe_activation_before_forced_type_choice():
     assert [(c.viewer_frame, c.category) for c in found] == [
         (1, "tribe_activation_without_visible_enemy"),
         (3, "tribe_activation_without_visible_enemy")]
+
+
+def test_shortlist_flags_bls_self_target_and_mst_own_target():
+    bls = 504700118
+    mst = 5318639
+    own_bls = CardView(0, "monster", "faceup", bls, 0,
+                       "attack", 3000, 2500)
+    opposing_set = CardView(1, "monster", "facedown", None, 0, "defense")
+    own_set = CardView(0, "spell_trap", "facedown", 41420027, 2)
+    opposing_backrow = CardView(1, "spell_trap", "facedown", None, 1)
+    bls_view = replace(
+        view(own_bls, opposing_set),
+        chain=(ChainLinkView(1, bls, 0, 4, 0),))
+    mst_view = replace(
+        view(own_set, opposing_backrow),
+        chain=(ChainLinkView(1, mst, 0, 8, 0),))
+    self_banish = Action("self", "select_card", 0,
+                         {"code": bls, "controller": 0,
+                          "location": 4, "sequence": 0})
+    enemy_monster = Action("enemy", "select_card", 0,
+                           {"controller": 1, "location": 4, "sequence": 0})
+    own_spell = Action("own", "select_card", 0,
+                       {"code": 41420027, "controller": 0,
+                        "location": 8, "sequence": 2})
+    enemy_spell = Action("opponent", "select_card", 0,
+                         {"controller": 1, "location": 8, "sequence": 1})
+    candidates = review_candidates(policy(
+        record(bls_view, self_banish, enemy_monster),
+        record(mst_view, own_spell, enemy_spell),
+        record(bls_view, enemy_monster, self_banish),
+        record(mst_view, enemy_spell, own_spell),
+    ))
+    assert [(c.viewer_frame, c.category) for c in candidates] == [
+        (1, "bls_targets_itself_with_enemy_option"),
+        (2, "mst_targets_own_card_with_enemy_option"),
+    ]

@@ -55,8 +55,9 @@ The four trajectories below identify the **greedy feature-19 policy** by
 checkpoint SHA-256 `fe197724523b33a8d555e90ab9f7b669dab2081b000346b9b31d1788d7e07fc2`
 and `demonstrator_seat` in their metadata. Its opponent is
 TacticalHeuristicAgent v3. All four complete duels replay-verified against
-the pinned native assets (712, 649, 801, and 1,212 decisions respectively). These
-are additional review findings beyond the automatic shortlist above. Viewer
+the pinned native assets (712, 649, 801, and 1,212 decisions respectively).
+The shortlist now flags the two Soldier self-targets and Typhoon's own-card
+target; the other two findings came from independent frame review. Viewer
 frames are one-based; each parenthesized number is the JSON index.
 
 | Replay and policy seat | Frame | Player-visible decision and legal alternative | Improvement candidate |
@@ -73,6 +74,21 @@ changing the move would reverse a game's result. The separate guard-v4 duel
 `replays/policy_v4_guard_daryl_cas_2647_p1.json` also replay-verified for
 399 decisions; this small review found no equally clear example in it. That
 does not establish the guarded policy's overall strength.
+
+The updated local shortlist independently replay-verified and checkpoint-matched
+the three trajectories containing self-targets (712, 649, and 1,212 decisions;
+368, 320, and 632 policy choices). It found the Soldier choices at frames 220
+and 741 and Typhoon at frame 156. Its ignored JSON report is
+`artifacts/policy_review_candidates_self_target_2641_2647.json`. The command is:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_replays.py \
+  --checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt \
+  replays/policy_batch_v19_cc_war_2641_p0.json \
+  replays/policy_batch_v19_cc_war_2641_p1.json \
+  replays/policy_batch_v19_daryl_cas_2647_p1.json \
+  --output artifacts/policy_review_candidates_self_target_2641_2647.json
+```
 
 Reproduce the Mystical Space Typhoon line (change `--policy-seat` to `0` and
 the output name to reproduce the first Black Luster Soldier line):
@@ -183,6 +199,8 @@ an opponent Battle or End Phase with an open monster field. Repeated priority
 passes in the same turn and phase are collapsed. The script never produces
 training labels or claims that each candidate is a mistake; the reviewer must
 check card context, alternatives, and later outcomes.
+It also flags a Black Luster Soldier choosing itself as a target and a
+Mystical Space Typhoon choosing an own card when an opposing target was offered.
 The recorder now tags the updated opt-in guard as
 `greedy_tactical_guard_v3`; the audit rejects older guard versions rather
 than silently rescoring them with changed filters. A guarded seed-2648

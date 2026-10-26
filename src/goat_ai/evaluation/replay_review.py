@@ -18,6 +18,8 @@ SCAPEGOAT = 504700123
 ROYAL_DECREE = 51452091
 SAKURETSU_ARMOR = 56120475
 TRIBE_INFECTING_VIRUS = 33184167
+BLACK_LUSTER_SOLDIER = 504700118
+MYSTICAL_SPACE_TYPHOON = 5318639
 
 
 @dataclass(frozen=True)
@@ -139,6 +141,22 @@ def review_candidates(trajectory: Trajectory,
                               {"race": race, "own_hits": own_hits,
                                "visible_enemy_hits": 0,
                                "enemy_race_options": len(enemy_races_offered)}))
+        if (selected.kind == "select_card" and obs.chain
+                and obs.chain[-1].controller == seat
+                and selected.parameters.get("controller") == seat
+                and any(a.kind == "select_card"
+                        and a.parameters.get("controller") != seat
+                        for a in record.legal_actions)):
+            source = obs.chain[-1].card_code
+            if (source == BLACK_LUSTER_SOLDIER
+                    and selected.parameters.get("code") == source
+                    and selected.parameters.get("location") == obs.chain[-1].location
+                    and selected.parameters.get("sequence") == obs.chain[-1].sequence):
+                found.append(("bls_targets_itself_with_enemy_option",
+                              {"source_card_code": source}))
+            elif source == MYSTICAL_SPACE_TYPHOON:
+                found.append(("mst_targets_own_card_with_enemy_option",
+                              {"source_card_code": source}))
         if (selected.kind == "pass" and goat_offered
                 and obs.turn_player is not None and obs.turn_player != seat):
             if (obs.phase in ("battle_start", "battle_step")
