@@ -143,12 +143,21 @@ def test_catalog_viewer_names_all_allowed_cards_without_a_replay(tmp_path):
         with sqlite3.connect(database / filename) as connection:
             connection.execute("CREATE TABLE texts (id INTEGER PRIMARY KEY, name TEXT)")
             connection.execute("INSERT INTO texts VALUES (?, ?)", (code, name))
+    with sqlite3.connect(database / "cards.cdb") as connection:
+        connection.execute("ALTER TABLE texts ADD COLUMN str1 TEXT")
+        connection.execute("ALTER TABLE texts ADD COLUMN str2 TEXT")
+        connection.execute("UPDATE texts SET str1='Choose effect', "
+                           "str2='Change position' WHERE id=10")
     output = tmp_path / "viewer.html"
     assert render_catalog_viewer(output, native) == 2
     html = output.read_text()
     assert '<script id="embedded-replay" type="application/json">null</script>' in html
     assert '"10":"Visible Monster"' in html
     assert '"99":"GOAT Variant"' in html
+    assert f'"{(10 << 20) | 1}":"Change position"' in html
+    assert 'optionTexts[String(parameters.prompt_id)]' in html
+    assert 'positionName(parameters.position)' in html
+    assert 'raceName(parameters.race)' in html
     assert '"88":' not in html
     assert '"code":99' not in html
     assert 'missingNames.size' in html
@@ -171,7 +180,7 @@ def test_catalog_viewer_names_all_allowed_cards_without_a_replay(tmp_path):
     with sqlite3.connect(database / "cards.cdb") as connection:
         connection.execute("CREATE TABLE datas (id INTEGER PRIMARY KEY, type INTEGER)")
         connection.execute("INSERT INTO datas VALUES (77, 16384)")
-        connection.execute("INSERT INTO texts VALUES (77, 'Generated Token')")
+        connection.execute("INSERT INTO texts (id, name) VALUES (77, 'Generated Token')")
     assert render_catalog_viewer(output, native) == 3
     assert '"77":"Generated Token"' in output.read_text()
 

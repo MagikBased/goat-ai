@@ -49,6 +49,28 @@ def _card_names(codes: set[int], native_root: Path) -> dict[int, str]:
     return names
 
 
+def _option_texts(codes: set[int], native_root: Path) -> dict[int, str]:
+    """Resolve ocgcore Stringid(card_id, index) from the local CDB str columns."""
+    texts = {}
+    for filename in ("cards.cdb", "goat-entries.cdb", "cards-unofficial.cdb"):
+        path = native_root / "database" / filename
+        if not path.is_file():
+            continue
+        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as database:
+            columns = {row[1] for row in database.execute("PRAGMA table_info(texts)")}
+            slots = [index for index in range(1, 17) if f"str{index}" in columns]
+            if not slots:
+                continue
+            selected = ", ".join(f"str{index}" for index in slots)
+            for code in codes:
+                row = database.execute(
+                    f"SELECT {selected} FROM texts WHERE id=?", (code,)).fetchone()
+                if row:
+                    texts.update({(code << 20) | (slot - 1): value
+                                  for slot, value in zip(slots, row) if value})
+    return texts
+
+
 def _catalog_codes(native_root: Path) -> set[int]:
     """Include legal cards and generated Tokens, without game-specific hidden cards."""
     whitelist = native_root / "banlist/GOAT.lflist.conf"
@@ -68,13 +90,17 @@ def _catalog_codes(native_root: Path) -> set[int]:
     return codes
 
 
-def _embed_viewer(raw: dict | None, source_sha256: str, names: dict[int, str]) -> str:
+def _embed_viewer(raw: dict | None, source_sha256: str, names: dict[int, str],
+                  options: dict[int, str]) -> str:
     template = TEMPLATE.read_text(encoding="utf-8")
     # Escaping '<' prevents replay or database text from closing a script element.
     replay_json = json.dumps(raw, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")
     names_json = json.dumps(names, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")
+    options_json = json.dumps(options, separators=(",", ":"), ensure_ascii=True).replace(
+        "<", "\\u003c")
     return (template.replace("__SOURCE_SHA256__", source_sha256)
             .replace("__EMBEDDED_NAMES__", names_json)
+            .replace("__EMBEDDED_OPTIONS__", options_json)
             .replace("__EMBEDDED_REPLAY__", replay_json))
 
 
@@ -87,8 +113,10 @@ def render_replay(source: Path, output: Path, native_root: Path) -> tuple[int, i
         raise ValueError("trajectory contains no decisions to view")
     codes = (_card_codes(raw["decisions"]) |
              _card_codes(raw.get("terminal_observation")))
-    names = _card_names(codes | _catalog_codes(native_root), native_root)
-    html = _embed_viewer(raw, hashlib.sha256(source_bytes).hexdigest(), names)
+    codes |= _catalog_codes(native_root)
+    names = _card_names(codes, native_root)
+    options = _option_texts(codes, native_root)
+    html = _embed_viewer(raw, hashlib.sha256(source_bytes).hexdigest(), names, options)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(html, encoding="utf-8")
     return len(trajectory.decisions), len(names)
@@ -105,7 +133,8 @@ def render_catalog_viewer(output: Path, native_root: Path) -> int:
         raise ValueError(f"card databases lack {len(missing)} GOAT/Token names; "
                          "run scripts/setup_native.py first")
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(_embed_viewer(None, "", names), encoding="utf-8")
+    output.write_text(_embed_viewer(None, "", names,
+                                    _option_texts(codes, native_root)), encoding="utf-8")
     return len(names)
 
 

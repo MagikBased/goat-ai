@@ -152,11 +152,13 @@
   </main>
   <script id="embedded-replay" type="application/json">__EMBEDDED_REPLAY__</script>
   <script id="embedded-names" type="application/json">__EMBEDDED_NAMES__</script>
+  <script id="embedded-options" type="application/json">__EMBEDDED_OPTIONS__</script>
   <script id="embedded-sha256" type="application/json">"__SOURCE_SHA256__"</script>
   <script>
     "use strict";
     let replay = null;
     let names = {};
+    let optionTexts = {};
     let missingNames = new Set();
     let index = 0;
     let timer = null;
@@ -187,6 +189,18 @@
       const selected = names.filter(([bit]) => mask & bit).map(([, name]) => name);
       return selected.length && !(mask & ~127) ? selected.join(" + ") : String(mask);
     };
+    const raceName = mask => {
+      const races = [[1, "Warrior"], [2, "Spellcaster"], [4, "Fairy"], [8, "Fiend"],
+                     [16, "Zombie"], [32, "Machine"], [64, "Aqua"], [128, "Pyro"],
+                     [256, "Rock"], [512, "Winged Beast"], [1024, "Plant"],
+                     [2048, "Insect"], [4096, "Thunder"], [8192, "Dragon"],
+                     [16384, "Beast"], [32768, "Beast-Warrior"], [65536, "Dinosaur"],
+                     [131072, "Fish"], [262144, "Sea Serpent"], [524288, "Reptile"]];
+      return races.find(([bit]) => bit === mask)?.[1] || `Type ${mask}`;
+    };
+    const positionName = position => ({1: "Face-up Attack", 2: "Face-down Attack",
+                                       4: "Face-up Defense", 8: "Face-down Defense"})[position]
+                                     || `Position ${position}`;
     const node = (tag, className, content) => {
       const element = document.createElement(tag);
       if (className) element.className = className;
@@ -232,7 +246,8 @@
       element.append(node("strong", "", cardLabel(observation, card, known)));
       const status = card.position === "facedown" ? (code == null ? "Hidden" : "Previously revealed") : "Face-up";
       const stats = card.attack == null ? "" : ` · ${card.attack}/${card.defense}`;
-      const counters = (card.counters || []).map(([type, count]) => `${count}× counter ${type}`).join(", ");
+      const counters = (card.counters || []).map(([type, count]) =>
+        `${count}× ${type === 1 ? "Spell Counter" : `counter ${type}`}`).join(", ");
       element.append(node("small", "", `${status}${card.orientation ? ` · ${card.orientation.toUpperCase()}` : ""}${stats}${counters ? ` · ${counters}` : ""}`));
       return element;
     }
@@ -296,23 +311,31 @@
       if (own) section.append(hand);
       return section;
     }
-    function actionLabel(observation, action, known) {
+    function actionLabel(observation, action, known, choiceIndex = -1) {
       const parameters = action.parameters || {};
       const parts = [action.kind.replaceAll("_", " ")];
+      const optionText = parameters.prompt_id == null ? null
+        : optionTexts[String(parameters.prompt_id)];
+      if (optionText) parts.push(optionText);
+      else if (action.kind === "select_option" && choiceIndex >= 0)
+        parts.push(`Choice ${choiceIndex + 1}`);
       const code = visibleCode(observation, parameters, known);
       if (code != null) parts.push(nameOf(code));
       if (parameters.controller != null && parameters.sequence != null) {
-        const zone = parameters.location === 4 ? "Monster" : parameters.location === 8 ? "Spell/Trap" : `Zone ${parameters.location}`;
-        parts.push(`P${parameters.controller} ${zone} ${parameters.sequence + 1}`);
+        const owner = parameters.controller === observation.viewer ? "Your" : "Opponent's";
+        const place = locationName(parameters.location);
+        const slot = [4, 8].includes(parameters.location) ? ` ${parameters.sequence + 1}` : "";
+        parts.push(`${owner} ${place}${slot}`);
       }
       if (parameters.cards) {
         const cards = parameters.cards.map(card => cardLabel(observation, card, known)).join(", ");
         parts.push(action.kind === "select_card" && parameters.selection_maximum != null
           ? `Already selected: ${cards}` : cards);
       }
-      if (parameters.zones) parts.push(parameters.zones.map(zone => `P${zone.controller} ${zone.location === 4 ? "Monster" : "Spell/Trap"} ${zone.sequence + 1}`).join(", "));
-      if (parameters.position != null) parts.push(`position ${parameters.position}`);
-      if (parameters.race != null) parts.push(`race ${parameters.race}`);
+      if (parameters.zones) parts.push(parameters.zones.map(zone =>
+        `${zone.controller === observation.viewer ? "Your" : "Opponent's"} ${locationName(zone.location)} ${zone.sequence + 1}`).join(", "));
+      if (parameters.position != null) parts.push(positionName(parameters.position));
+      if (parameters.race != null) parts.push(raceName(parameters.race));
       if (parameters.attribute != null) parts.push(attributeName(parameters.attribute));
       if (parameters.number != null) parts.push(String(parameters.number));
       return parts.join(" · ");
@@ -358,7 +381,9 @@
         listZone("Opponent Banished", observation.banished[1 - observation.viewer]),
         listZone("Your Graveyard", observation.graveyards[observation.viewer]),
         listZone("Your Banished", observation.banished[observation.viewer]));
-      byId("action").textContent = terminal ? "Duel ended" : actionLabel(observation, record.selected_action, known);
+      byId("action").textContent = terminal ? "Duel ended" : actionLabel(
+        observation, record.selected_action, known,
+        record.legal_actions.findIndex(action => action.id === record.selected_action.id));
       const staged = terminal ? null : record.legal_actions.find(action => action.parameters?.selection_maximum != null);
       const progress = byId("selection-progress");
       progress.hidden = !staged;
@@ -375,7 +400,7 @@
         (action, actionIndex) => {
           const item = node("li");
           const button = node("button", annotations.get(index) === actionIndex ? "annotated" : "",
-                              actionLabel(observation, action, known));
+                              actionLabel(observation, action, known, actionIndex));
           button.type = "button";
           button.addEventListener("click", () => { annotations.set(index, actionIndex); render(); });
           item.append(button);
@@ -494,6 +519,7 @@
     });
     try {
       names = JSON.parse(byId("embedded-names").textContent);
+      optionTexts = JSON.parse(byId("embedded-options").textContent);
       setReplay(JSON.parse(byId("embedded-replay").textContent), "Embedded trajectory",
                 JSON.parse(byId("embedded-sha256").textContent));
     } catch (_) { /* The standalone viewer waits for a chosen JSON file. */ }
