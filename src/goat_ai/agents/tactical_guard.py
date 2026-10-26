@@ -27,18 +27,43 @@ SHEEP_TOKENS = frozenset((73915052, 73915053, 73915054, 73915055))
 
 def safe_position_indices(observation: Observation,
                           legal_actions: Sequence[Action],
-                          admissible: Sequence[int]) -> tuple[int, ...]:
-    """Keep face-up Sheep Tokens in defense when another legal choice exists."""
+                          admissible: Sequence[int], *,
+                          empty_field_attack_guard: bool = True) -> tuple[int, ...]:
+    """Remove position switches with no visible combat upside.
+
+    A defending Sheep Token has no attack power. On an empty opposing field,
+    moving a face-up attacker with at least as much ATK as DEF into defense
+    only loses its ability to attack and does not improve its battle stat.
+    Unknown opposing monsters keep other switches available to the policy.
+    """
     indices = tuple(admissible)
+    own_monsters = {(card.controller, card.sequence): card
+                    for card in observation.field
+                    if card.zone == "monster" and card.controller == observation.viewer}
+    opponent_monsters = any(card.zone == "monster"
+                            and card.controller != observation.viewer
+                            for card in observation.field)
     own_defenders = {(card.controller, card.sequence) for card in observation.field
                      if card.zone == "monster" and card.controller == observation.viewer
                      and card.position == "faceup" and card.orientation == "defense"
                      and card.code in SHEEP_TOKENS and card.attack == 0}
-    kept = tuple(index for index in indices
-                 if not (legal_actions[index].kind == "change_position"
-                         and (legal_actions[index].parameters.get("controller"),
-                              legal_actions[index].parameters.get("sequence"))
-                         in own_defenders))
+    def useful(index: int) -> bool:
+        action = legal_actions[index]
+        if action.kind != "change_position":
+            return True
+        slot = (action.parameters.get("controller"),
+                action.parameters.get("sequence"))
+        if slot in own_defenders:
+            return False
+        card = own_monsters.get(slot)
+        if (empty_field_attack_guard and not opponent_monsters and card is not None
+                and card.position == "faceup" and card.orientation == "attack"
+                and card.attack is not None and card.defense is not None
+                and card.attack >= card.defense):
+            return False
+        return True
+
+    kept = tuple(index for index in indices if useful(index))
     return kept or indices
 
 

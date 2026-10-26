@@ -3,9 +3,11 @@
 from dataclasses import replace
 
 from goat_ai.actions import Action
+from goat_ai.agents import TacticalHeuristicAgent
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
     safe_target_indices,
+    safe_position_indices,
     weak_flip_set_substitute,
 )
 from goat_ai.observations import CardView, ChainLinkView, Observation
@@ -67,6 +69,26 @@ def test_scapegoat_waits_for_end_or_battle_and_can_answer_removal():
 def test_guard_never_eliminates_every_legal_action():
     goat = Action("goat", "chain", 0, {"code": 504700123})
     assert kept(board(phase="draw"), (goat,)) == (goat,)
+
+
+def test_position_guard_avoids_empty_field_attack_defense_oscillation():
+    attacker = CardView(0, "monster", "faceup", 87621407, 2,
+                        "attack", 1400, 1000)
+    defender = replace(attacker, orientation="defense")
+    switch = Action("switch", "change_position", 0,
+                    {"controller": 0, "location": 4, "sequence": 2,
+                     "code": 87621407})
+    end = Action("end", "end_phase", 0)
+    assert safe_position_indices(board(attacker), (switch, end), range(2)) == (1,)
+    assert safe_position_indices(board(defender), (switch, end), range(2)) == (0, 1)
+    assert safe_position_indices(board(attacker), (switch,), range(1)) == (0,)
+    enemy = CardView(1, "monster", "facedown", None, 0, "defense")
+    assert safe_position_indices(board(attacker, enemy), (switch, end), range(2)) == (0, 1)
+    weaker_attacker = replace(attacker, attack=1000, defense=1400)
+    assert safe_position_indices(board(weaker_attacker), (switch, end), range(2)) == (0, 1)
+    agent = TacticalHeuristicAgent()
+    assert agent.select_action(board(attacker), (switch, end)) == end
+    assert agent.select_action(board(defender), (switch, end)) == switch
 
 
 def test_optional_self_target_guard_uses_public_source_and_target_slots():

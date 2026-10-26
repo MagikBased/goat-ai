@@ -1584,3 +1584,11 @@ def test_optional_position_guard_preserves_defending_sheep_token():
     assert PolicyAgent(model, vocabulary).select_action(snapshot, (change, end)) == change
     assert PolicyAgent(model, vocabulary, position_guard=True).select_action(
         snapshot, (change, end)) == end
+    stronger_attacker = replace(sheep, code=87621407, orientation="attack",
+                               attack=1400, defense=1000)
+    snapshot = replace(snapshot, field=(stronger_attacker,))
+    assert PolicyAgent(model, vocabulary, position_guard=True).select_action(
+        snapshot, (change, end)) == end
+    assert PolicyAgent(model, vocabulary, position_guard=True,
+                       position_guard_version=1).select_action(
+        snapshot, (change, end)) == change

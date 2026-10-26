@@ -604,7 +604,8 @@ class PolicyAgent:
                  card_races: Mapping[int, int] | None = None,
                  weak_flip_attacks: Mapping[int, int] | None = None,
                  self_target_guard: bool = False,
-                 position_guard: bool = False) -> None:
+                 position_guard: bool = False,
+                 position_guard_version: int = 2) -> None:
         self.model = model
         self.vocabulary = vocabulary
         self.tactical_guard = tactical_guard
@@ -612,6 +613,9 @@ class PolicyAgent:
         self.weak_flip_attacks = dict(weak_flip_attacks or {})
         self.self_target_guard = self_target_guard
         self.position_guard = position_guard
+        if position_guard_version not in (1, 2):
+            raise ValueError("unknown position guard version")
+        self.position_guard_version = position_guard_version
         self._last_selection: tuple[int, str, tuple] | None = None
         self._cancel_turn: int | None = None
         self._cancelled_prompts: list[tuple[Observation, tuple[tuple, ...]]] = []
@@ -634,7 +638,9 @@ class PolicyAgent:
         if self.self_target_guard:
             admissible = safe_target_indices(observation, legal_actions, admissible)
         if self.position_guard:
-            admissible = safe_position_indices(observation, legal_actions, admissible)
+            admissible = safe_position_indices(
+                observation, legal_actions, admissible,
+                empty_field_attack_guard=self.position_guard_version >= 2)
         chosen = legal_actions[max(admissible, key=lambda i: scores[i].item())]
         if self.tactical_guard and self.weak_flip_attacks:
             chosen = (weak_flip_set_substitute(

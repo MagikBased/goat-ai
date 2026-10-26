@@ -88,7 +88,7 @@ def main() -> None:
                     skill_metadata={
                         "demonstrator_seat": args.policy_seat,
                         "policy_checkpoint_sha256": sha256_file(args.checkpoint),
-                        "policy_inference": ("greedy_position_guard_v1"
+                        "policy_inference": ("greedy_position_guard_v2"
                                              if args.position_guard else
                                              "greedy_tactical_guard_v5"
                                              if args.self_target_guard else

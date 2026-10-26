@@ -50,7 +50,7 @@ def main() -> None:
             inference = metadata.get("policy_inference")
             if inference not in ("greedy", "greedy_tactical_guard_v3",
                                  "greedy_tactical_guard_v4", "greedy_tactical_guard_v5",
-                                 "greedy_position_guard_v1"):
+                                 "greedy_position_guard_v1", "greedy_position_guard_v2"):
                 raise ValueError(f"{path}: unsupported policy inference {inference!r}")
             guarded = inference in ("greedy_tactical_guard_v3", "greedy_tactical_guard_v4",
                                     "greedy_tactical_guard_v5")
@@ -60,7 +60,9 @@ def main() -> None:
                 weak_flip_attacks=(weak_flip_attacks
                                    if inference == "greedy_tactical_guard_v4" else None),
                 self_target_guard=inference == "greedy_tactical_guard_v5",
-                position_guard=inference == "greedy_position_guard_v1")
+                position_guard=inference in ("greedy_position_guard_v1",
+                                             "greedy_position_guard_v2"),
+                position_guard_version=(1 if inference == "greedy_position_guard_v1" else 2))
             if metadata.get("policy_feature_version") != policy.model.feature_version:
                 raise ValueError(f"{path}: policy feature version differs")
             policy_seat = metadata["demonstrator_seat"]

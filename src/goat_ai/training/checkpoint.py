@@ -13,7 +13,8 @@ def load_policy_agent(path: str | Path, *, device: str = "cpu",
                       card_races: Mapping[int, int] | None = None,
                       weak_flip_attacks: Mapping[int, int] | None = None,
                       self_target_guard: bool = False,
-                      position_guard: bool = False) -> PolicyAgent:
+                      position_guard: bool = False,
+                      position_guard_version: int = 2) -> PolicyAgent:
     checkpoint = torch.load(path, map_location=device, weights_only=True)
     if not isinstance(checkpoint, dict) or checkpoint.get("schema_version") != 1:
         raise ValueError("unsupported policy checkpoint schema")
@@ -30,4 +31,5 @@ def load_policy_agent(path: str | Path, *, device: str = "cpu",
                        card_races=card_races,
                        weak_flip_attacks=weak_flip_attacks,
                        self_target_guard=self_target_guard,
-                       position_guard=position_guard)
+                       position_guard=position_guard,
+                       position_guard_version=position_guard_version)

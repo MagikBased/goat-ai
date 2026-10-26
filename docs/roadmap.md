@@ -674,3 +674,25 @@ against the unweighted clone on fresh unseen-deck seeds. M4 therefore stays
 open. Prioritize more independent expert decisions and an algorithm that
 converts tactical decision quality into match wins; do not use imitation
 agreement alone as the promotion gate. See [evaluation](evaluation.md).
+
+### Position-switch correction (October 2026)
+
+A replay review found a second avoidable position pattern besides defending
+Sheep Tokens moving to attack: on an empty opposing field, the tactical teacher
+repeatedly moved monsters whose ATK exceeded their DEF from attack to defense,
+then moved them back on later turns. The visible-state position guard now
+filters those switches when another legal action exists. It still allows a
+defender to move into attack for a possible direct attack, and it leaves
+attack-to-defense choices available when the opponent controls a monster.
+TacticalHeuristicAgent is version 7; the optional policy inference mode is
+`greedy_position_guard_v2`. Version 1 remains available to audit older replays.
+
+In the single paired seed-3901 replay, policy-seat position changes fell from
+6 to 4 and opponent tactical-teacher changes fell from 14 to 6. The former
+replay had three empty-field attack-to-weaker-defense choices across both
+seats; the new replay had none. Both games were won by seat 1. This is a
+behavior regression check, not evidence of improved match strength. The new
+visual replay is `replays/fv21_position_guard_v2_3901_p0.json`; both its
+683 decisions and the older 721-decision replay passed native replay and
+policy-choice verification. Next, run a held-out, seat-swapped tournament
+before making the guard a default policy inference mode.
