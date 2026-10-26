@@ -3207,3 +3207,65 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/train_self_play.py \
   --max-decisions 3000 --record-dir replays/selfplay_fourroles_2800 \
   --output checkpoints/selfplay_fourroles_smoke_2800.pt
 ```
+
+## Four-deck feature-19 self-play continuation
+
+To test the current terminal-reward method with broader deck and seat coverage,
+one predefined run initialized from the unchanged
+`tactical_v3_fv19_2500_2503.pt` checkpoint and used the `four_roles` schedule
+over Goat Control versus Chaos Turbo and Bazoo Return versus Chaos Return.
+Seeds 2820–2883 gave each of the four training decks eight learner games in
+each seat. The experiment used the experimental native adapter, 64 games,
+learning rate 0.0003, sampling temperature 2.0, entropy coefficient 0.01,
+a moving baseline per learner deck, and a 75% historical-snapshot opponent
+mix with an eight-game snapshot interval. The learner won 28, lost 33, and
+drew three against its **training** opponents. No game hit the 3,000-decision
+cap. The resulting checkpoint recorded **8,335 learner decisions** and has
+SHA-256 `c4a7b389d24b270256ca1553f20f8699fed9631811850bbb5e97e084f2ecaed0`.
+All **64 complete trajectories and 49,581 decisions** replay-verified with
+fresh pinned native engines. Their separate visibility audit passed, including
+480 hidden opponent-field choices and 117 opponent-hand choices. The ignored
+checkpoint and replay directory are
+`checkpoints/fv19_fourroles_selfplay_2820_2883.pt` and
+`replays/selfplay_fourroles_2820_2883/`.
+
+A direct child-versus-parent evaluation used Chaos Control, Warrior, and a
+Flip Control guide list, whose exact Main Deck compositions were absent from
+both checkpoints' training records. All three pairings, both deck assignments,
+both seats, and seeds 2900–2907 produced **96 terminal duels** and **48,168
+decisions**. The child scored **42–54** (43.75% of points; paired-bootstrap
+95% interval **37.5–48.96%**). Assigned-deck results were Chaos Control
+**9–23**, Flip Control **7–25**, and Warrior **26–6**; the seat split was
+21–27 in either seat. The four-worker tournament took **39.37 seconds** on
+the reported x86_64 machine. Its ignored report is
+`artifacts/fv19_fourroles_selfplay_vs_parent_2900_2907.json` (SHA-256
+`abb3a47079dd08eac5a8ed58c87aa8d771cb6bc1798166f698455bca5797956c`).
+This run is evidence against promoting the child on the tested deck schedule;
+it does not establish that every self-play algorithm or hyperparameter fails.
+
+An off-policy scorecard on eight independently reviewed, non-training
+decisions retained the parent's ranks: the five seed-2612 alternatives still
+ranked 2nd, and the three BLS/MST corrections still ranked 2nd, 3rd, and
+4th. Its ignored report is
+`artifacts/fv19_fourroles_selfplay_review_scorecard.json` (SHA-256
+`054f0d8d427a5eece26bc8f063d9b0a4089f8d632ba9c6339f9ca1731936285a`).
+This diagnostic does not explain the match loss by itself, but it shows the
+64-game update did not correct those replay errors. The next RL experiment
+should address high-variance terminal returns and deck-specific transfer,
+with a value baseline or another justified algorithm compared on the same
+held-out families before promotion.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_self_play.py \
+  checkpoints/tactical_v3_fv19_2500_2503.pt --engine experimental \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+            examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --schedule-mode four_roles --baseline-scope learner_deck \
+  --seed 2820 --games 64 --learning-rate 0.0003 \
+  --learner-temperature 2.0 --entropy-coefficient 0.01 \
+  --snapshot-every 8 --max-snapshots 8 --max-decisions 3000 \
+  --record-dir replays/selfplay_fourroles_2820_2883 \
+  --output checkpoints/fv19_fourroles_selfplay_2820_2883.pt
+```

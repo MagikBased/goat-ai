@@ -223,6 +223,12 @@ one listed matchup, avoiding reliance on a separately listed reverse pairing.
 Four native smoke duels all terminated; their 5,110 decisions replay-verified
 and passed the visibility audit. This is schedule coverage, not evidence of a
 self-play strength gain; see [evaluation](evaluation.md).
+The first larger four-role run completed 64 verified training duels across
+four decks but scored 42–54 against its parent over 96 held-out direct games,
+with particularly weak Chaos Control and Flip Control assignments. Keep that
+child experimental. Further terminal-reward updates should not be promoted
+without a new variance-reduction or value-learning test and cross-deck wins;
+see [evaluation](evaluation.md).
 
 A fresh feature-version-12 behavioral clone was trained on 3,812 replay-verified CombatHeuristicAgent decisions from eight sourced-deck duels, with explicit teacher provenance and exact tensor reproduction on a repeat CPU run. Held-out multi-option action agreement improved by eight choices over the older version-12 checkpoint, but the new policy split 16–16 against its teacher and scored 16–13 with three draws against that checkpoint on unseen Main Decks, both deck assignments, and fresh seeds. Both paired score intervals include 50%; no learned playing-strength gain is established. See [evaluation](evaluation.md).
 
