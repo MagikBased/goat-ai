@@ -17,7 +17,12 @@ separate action feature. Earlier versions divided the Type mask by
 The change is limited to action encoding: no hidden card identities or native
 state are added. Schema-v24 observations now supply current public Type for
 face-up monsters, including Type-changing effects; the current feature-20
-policy does not yet encode that field-to-announcement relationship.
+policy does not encode that field-to-announcement relationship. Opt-in feature
+version 21 adds four action features for each announced Type: the count and
+current ATK sum of matching opponent and own face-up monsters. It reads only
+schema-v24 public Type values. The training command rejects older replay
+schemas for this version, and feature-20 checkpoints retain their original
+action layer.
 Version-19 checkpoints retain their original 19-number
 action layer; version 20 uses 81 numbers and requires a new checkpoint. A
 replay review found a Tribe-Infecting Virus Type choice whose old policy
@@ -42,7 +47,14 @@ python scripts/train_behavioral_clone.py replays/vanilla_42.json \
   --output checkpoints/vanilla_bc.pt --epochs 1 --seed 42
 ```
 
-The training command first replays every input trajectory against the selected pinned native engine, checking each visible observation, legal-action list, chosen action, result, deck hash, and loaded asset hashes. It accepts fingerprinted schema-v3 through v24 recordings; feature versions 17–18 require schema v22, and versions 19–20 require schema v23. Use `--engine experimental` for an experimental-adapter trajectory. It then fits cross-entropy to selected actions and saves a versioned checkpoint containing model weights, card vocabulary, seed, PyTorch version, source counts, trajectory hashes, and epoch losses. Generated replays and checkpoints live in ignored directories. Only ingest demonstrations whose use is authorized.
+The training command first replays every input trajectory against the selected pinned native engine, checking each visible observation, legal-action list, chosen action, result, deck hash, and loaded asset hashes. It accepts fingerprinted schema-v3 through v24 recordings; feature versions 17–18 require schema v22, versions 19–20 require schema v23, and version 21 requires schema v24. Use `--engine experimental` for an experimental-adapter trajectory. It then fits cross-entropy to selected actions and saves a versioned checkpoint containing model weights, card vocabulary, seed, PyTorch version, source counts, trajectory hashes, and epoch losses. Generated replays and checkpoints live in ignored directories. Only ingest demonstrations whose use is authorized.
+
+To enrich a verified schema-v23 recording with current public Type without
+changing its original bytes or SHA-bound review labels, run
+`scripts/upgrade_trajectory_schema.py` with a **new** `--output` path. It
+verifies the source, deterministically replays the exact legal choices, and
+verifies the resulting schema-v24 file. It accepts v23 only; a newer
+observation or action contract still needs its own compatibility review.
 
 The fixture command demonstrates software integration. Its source is random self-play, not skilled human data, and its training loss says nothing about playing strength. No automated EDOPro or DuelingBook human replay parser, authorized tournament human dataset, or trained competitive checkpoint is available yet. Before using human imitation as a strength baseline, collect authorized trajectories with legal actions and visibility reconstructed, split them by players/decks/matches, verify them, and measure win rate against held-out agents and deck families.
 

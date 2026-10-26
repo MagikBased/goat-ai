@@ -42,6 +42,7 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # Version 19 adds the public turn player, distinct from the actor in response windows.
 # Version 20 represents announced monster Types as exact mask bits. Dividing
 # small Type masks by 2**32 made common choices indistinguishable to float32.
+# Version 21 relates an announced Type to current public face-up monster Types.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 
@@ -109,7 +110,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 21):
+    if feature_version not in range(1, 22):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -302,6 +303,16 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                         (attack - defense) / 8000 if attack is not None
                         and defense is not None else 0.0,
                         float(attack is not None and defense is not None))
+        if feature_version >= 21:
+            matches = (tuple(card for card in observation.field
+                             if action.kind == "announce_race" and race > 0
+                             and card.zone == "monster" and card.position == "faceup"
+                             and card.race is not None and card.race & race))
+            enemy_hits = tuple(card for card in matches if card.controller != own)
+            own_hits = tuple(card for card in matches if card.controller == own)
+            numeric += (len(enemy_hits) / 5, len(own_hits) / 5,
+                        sum(card.attack or 0 for card in enemy_hits) / 8000,
+                        sum(card.attack or 0 for card in own_hits) / 8000)
         action_numbers.append(numeric)
     width = max(1, *(len(row) for row in targets))
     padded_targets = [row + [0] * (width - len(row)) for row in targets]
@@ -359,7 +370,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 21):
+        if feature_version not in range(1, 22):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -379,7 +390,8 @@ class LegalActionPolicy(nn.Module):
                         if feature_version == 15 else 42 if feature_version >= 4 else 10)
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
-        action_number_width = (81 if feature_version >= 20 else 19
+        action_number_width = (85 if feature_version >= 21 else 81
+                               if feature_version >= 20 else 19
                                if feature_version >= 17 else 15
                                if feature_version == 16 else 11
                                if feature_version >= 6 else 8)

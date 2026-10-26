@@ -3522,3 +3522,49 @@ pipeline check rather than a strength estimate. The ignored recording is
 `3550b241f12dbcf282023693647f40c8292f3f005f4208ca3c15e177bdae0635`);
 its ignored audit report is `artifacts/schema24_fv20_smoke_audit_3500.json`
 (SHA-256 `5b398fe6b2a96678fa851edf3dd331e08f3684c08c9304a1581c986e7630e1e7`).
+
+## Current-Type action relation smoke test
+
+Feature version 21 adds four public action features to `announce_race`:
+matching opponent and own face-up monster counts and their current ATK sums.
+The relation uses ocgcore's current Type mask, so DNA Surgery changes the
+feature without changing a monster's printed card identity. A contract test
+swaps public Types between two otherwise identical field states: feature 20
+gives the same Type-action numeric features in both, while feature 21 changes
+them and keeps a face-down card excluded.
+
+The schema-v23 greedy-policy replay
+`replays/policy_batch_v19_daryl_cas_2647_p1.json` was verified and replayed
+into a separate schema-v24 file. The upgraded replay again verified all
+**1,212** decisions; the policy auditor reproduced **632/632** recorded
+choices. At the self-destructive Tribe decisions, viewer frames **252** and
+**358**, the new features correctly show zero matching opposing monsters and
+one matching own monster. The generated file is ignored at
+`replays/schema24_upgraded_daryl_cas_2647_p1.json` (SHA-256
+`153030750f1099a91a9817181daf7c309569edeedc3a03c03013ba1aed52e9db`).
+
+Using this **same single policy-generated game** as imitation data, width 16,
+seed 21, one epoch, batch size 16, feature 20 ended at mean training loss
+**0.3137398898**, while feature 21 ended at **0.3253146349**. Both trained on
+**632** policy-seat decisions and both saved loadable checkpoints. The loss
+numbers do not compare playing strength: the source policy itself made the
+Tribe mistakes, there is no held-out game here, and model dimensions differ.
+The ignored checkpoint SHA-256 values are
+`eb6d27e0762b1d1b529612a25e09f20c402fc443b8e0029f198e404b4b324d55`
+for feature 20 and
+`5c516784c1b8b88b55e91feb8eb469f6efb1514040f62c5e0083489e39131724`
+for feature 21.
+Feature 21 remains an experiment until independently reviewed Type choices
+and held-out, seat-swapped cross-deck results support promotion.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/upgrade_trajectory_schema.py \
+  replays/policy_batch_v19_daryl_cas_2647_p1.json \
+  --engine experimental --native-root .cache/goat-ai \
+  --output replays/schema24_upgraded_daryl_cas_2647_p1.json
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_behavioral_clone.py \
+  replays/schema24_upgraded_daryl_cas_2647_p1.json \
+  --engine experimental --native-root .cache/goat-ai \
+  --feature-version 21 --epochs 1 --width 16 --batch-size 16 --seed 21 \
+  --output .cache/goat-ai/fv21_smoke_2647.pt
+```

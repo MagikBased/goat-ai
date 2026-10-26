@@ -513,9 +513,11 @@ five-review parent-KL child corrected the Tribe training state but split
 49–47 against its feature-20 parent on another 96 held-out duels, with severe
 Flip Control weakness. This improves action representation and diagnosis,
 but does not close M4's competitive gate. Schema-v24 current-Type observations
-now make a player-visible action-to-field Type relation possible. Test that
-representation against a same-data control, add diverse Type/target reviews,
-and require measured cross-deck improvement before promotion; see
+now support opt-in feature version 21, which relates a declared Type to the
+count and ATK of matching face-up monsters on each side. A one-game same-data
+feature-20/21 training smoke test completed; it is not a strength comparison.
+Add diverse Type/target reviews and require held-out cross-deck improvement
+before promotion; see
 [evaluation](evaluation.md).
 
 ## M5 — Search and other formats

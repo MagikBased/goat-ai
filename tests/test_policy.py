@@ -456,6 +456,34 @@ def test_feature_version_twenty_preserves_distinct_tribe_type_choices():
         current).shape == (4,)
 
 
+def test_feature_version_twenty_one_relates_choice_to_current_public_type():
+    vocabulary = CardVocabulary((10, 20))
+    choices = (Action("warrior", "announce_race", 0, {"race": 2}),
+               Action("aqua", "announce_race", 0, {"race": 64}))
+    own = CardView(0, "monster", "faceup", 10, 0, "attack",
+                   1200, 1000, race=2)
+    enemy = CardView(1, "monster", "faceup", 20, 0, "attack",
+                     1800, 1000, race=64)
+    hidden = CardView(1, "monster", "facedown", None, 1, "defense")
+    first = replace(view(), field=(own, enemy, hidden), turn_player=0)
+    changed = replace(first, field=(replace(own, race=64),
+                                    replace(enemy, race=2), hidden))
+    previous = encode_decision(first, choices, vocabulary, feature_version=20)
+    previous_changed = encode_decision(changed, choices, vocabulary,
+                                       feature_version=20)
+    current = encode_decision(first, choices, vocabulary, feature_version=21)
+    current_changed = encode_decision(changed, choices, vocabulary,
+                                      feature_version=21)
+    assert torch.equal(previous.action_numbers, previous_changed.action_numbers)
+    assert current.action_numbers.shape == (2, 85)
+    assert torch.allclose(current.action_numbers[:, -4:], torch.tensor([
+        [0.0, 0.2, 0.0, 0.15], [0.2, 0.0, 0.225, 0.0]]))
+    assert torch.allclose(current_changed.action_numbers[:, -4:], torch.tensor([
+        [0.2, 0.0, 0.225, 0.0], [0.0, 0.2, 0.0, 0.15]]))
+    assert LegalActionPolicy(vocabulary.size, width=16, feature_version=21)(
+        current).shape == (2,)
+
+
 def test_feature_version_nine_uses_only_publicly_known_opponent_hand_cards():
     vocabulary = CardVocabulary((10, 20, 30))
     known = replace(view(), known_opponent_hand_cards=(20,))
