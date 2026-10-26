@@ -381,6 +381,15 @@ Collect authorized skilled-player timing decisions or broader marked
 synthetic scenarios, then test a training method that retains strength
 across Chaos and control decks; see [evaluation](evaluation.md).
 
+Mixed rehearsal now supports verified tactical decisions and separately
+annotated synthetic timing decisions in one run, with explicit source
+weights and a guard against unannotated scripted filler. Two source-weighted
+rehearsals still passed at the target End Phase. Restricting a three-label
+update to the state-number encoder and scorer learned the timing probe but
+lost 8–56 against its parent on unseen Main Decks. Keep both approaches as
+negative experimental results; the next M4 step is a broader decision corpus
+and a measured stability method, not promotion of the probe-fitting policy.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

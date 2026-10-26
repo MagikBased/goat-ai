@@ -60,7 +60,8 @@ Pass one `--annotation` file per positional trajectory to
 `scripts/train_behavioral_clone.py`, in the same order. In annotation mode
 the trainer uses **only** the labeled decisions. It first replay-verifies the
 complete fingerprinted trajectory against pinned native assets and audits
-visible action safety, then checks the exact trajectory byte hash, authorization,
+visible action safety for every training trajectory, then checks the exact
+trajectory byte hash, authorization,
 unique decision indexes, and legal-action indexes. The checkpoint records
 `source=human_annotation`, the reviewer, authorization, annotation hash, and
 selected decision count. These are hindsight choices on recorded states; a
@@ -78,6 +79,17 @@ and legal-action indexes. The trainer records these separately as
 an End Phase Scapegoat diagnostic. This is a narrow curriculum tool, not an
 expert-play dataset. Evaluate any model trained on it on separate seeds and
 decks before claiming a gain.
+
+For rehearsal, pass `--annotation-for TRAJECTORY=LABELS` for the scripted
+replay and leave ordinary teacher trajectories unannotated. A scripted
+trajectory without labels is rejected, so its random filler decisions cannot
+silently become demonstrations. `--source-weight synthetic_annotation=200`
+changes sampling probability while keeping the
+number of optimizer decisions per epoch fixed. The checkpoint records source
+weights and new source counts. `--trainable-module state_numbers` and
+`--trainable-module score` can restrict a warm-start update to those policy
+modules; the tested timing fit using this restriction lost heavily in
+held-out competition. See [evaluation](evaluation.md).
 
 For a controlled baseline, collect heuristic decisions against RandomAgent in both seats and train on only those decisions:
 

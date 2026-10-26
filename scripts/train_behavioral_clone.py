@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from collections import Counter
+from math import isfinite
 from pathlib import Path
 
 import torch
@@ -40,6 +41,62 @@ def focus_opportunity(record, codes: set[int]) -> bool:
         or any(link.card_code in codes for link in record.observation.chain)))
 
 
+def annotation_paths(trajectories: list[Path], ordered: list[Path],
+                     assigned: list[str]) -> dict[Path, Path]:
+    """Resolve optional labels by trajectory without relabeling unannotated games."""
+    available = {path.resolve() for path in trajectories}
+    if len(available) != len(trajectories):
+        raise ValueError("duplicate trajectory path")
+    if ordered and assigned:
+        raise ValueError("use --annotation or --annotation-for, not both")
+    if ordered:
+        if len(ordered) != len(trajectories):
+            raise ValueError("provide one annotation file for each trajectory")
+        return {path.resolve(): label for path, label in zip(trajectories, ordered)}
+    labels: dict[Path, Path] = {}
+    for assignment in assigned:
+        trajectory, separator, label = assignment.partition("=")
+        if not separator or not trajectory or not label:
+            raise ValueError("--annotation-for needs TRAJECTORY=LABELS")
+        resolved = Path(trajectory).resolve()
+        if resolved not in available:
+            raise ValueError(f"annotation trajectory was not supplied: {trajectory}")
+        if resolved in labels:
+            raise ValueError(f"duplicate annotation for trajectory: {trajectory}")
+        labels[resolved] = Path(label)
+    return labels
+
+
+def parse_source_weights(assignments: list[str]) -> dict[str, float]:
+    weights = {}
+    for assignment in assignments:
+        source, separator, raw = assignment.partition("=")
+        if not separator or not source:
+            raise ValueError("--source-weight needs SOURCE=POSITIVE_WEIGHT")
+        if source in weights:
+            raise ValueError(f"duplicate source weight: {source}")
+        try:
+            weight = float(raw)
+        except ValueError as exc:
+            raise ValueError("source weight must be finite and positive") from exc
+        if not isfinite(weight) or weight <= 0:
+            raise ValueError("source weight must be finite and positive")
+        weights[source] = weight
+    return weights
+
+
+def restrict_trainable_modules(model: LegalActionPolicy, modules: list[str]) -> None:
+    """Freeze other modules for a controlled, low-drift warm-start update."""
+    if not modules:
+        return
+    available = dict(model.named_children())
+    unknown = set(modules) - set(available)
+    if unknown:
+        raise ValueError(f"unknown trainable modules: {sorted(unknown)}")
+    for name, parameter in model.named_parameters():
+        parameter.requires_grad = any(name.startswith(f"{module}.") for module in modules)
+
+
 def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
                            vocabulary: CardVocabulary) -> dict:
     """Continue a clone only when weights and held-out provenance are compatible."""
@@ -73,6 +130,10 @@ def main() -> None:
     parser.add_argument("--annotation", type=Path, action="append", default=[],
                         help="authorized self-recorded or scripted-scenario labels, "
                              "one per trajectory in the same order; train only those decisions")
+    parser.add_argument("--annotation-for", action="append", default=[],
+                        metavar="TRAJECTORY=LABELS",
+                        help="label selected trajectories; unlisted demonstrations use their "
+                             "recorded demonstrator seat")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--output", type=Path, required=True)
@@ -90,23 +151,34 @@ def main() -> None:
                         help="increase exposure of decisions offering or responding to this card")
     parser.add_argument("--focus-weight", type=float, default=1.0,
                         help="relative sampling weight for focus-card opportunities")
+    parser.add_argument("--source-weight", action="append", default=[],
+                        metavar="SOURCE=WEIGHT",
+                        help="relative sampling weight for a recorded decision source")
+    parser.add_argument("--trainable-module", action="append", default=[],
+                        metavar="MODULE",
+                        help="train only these top-level policy modules; repeat to include more")
     args = parser.parse_args()
     if (args.epochs < 1 or args.width < 1 or args.learning_rate <= 0
             or args.batch_size < 1 or not 1 <= args.focus_weight < float("inf")
             or any(code <= 0 for code in args.focus_card)
             or args.focus_weight > 1 and not args.focus_card):
         parser.error("training parameters must be positive; focus weight needs focus cards")
-    if args.annotation and len(args.annotation) != len(args.trajectories):
-        parser.error("provide one annotation file for each trajectory")
+    try:
+        labels_by_path = annotation_paths(args.trajectories, args.annotation,
+                                          args.annotation_for)
+        source_weights = parse_source_weights(args.source_weight)
+    except ValueError as exc:
+        parser.error(str(exc))
     if args.init_checkpoint and args.init_checkpoint.resolve() == args.output.resolve():
         parser.error("--output must differ from --init-checkpoint")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     records = []
+    record_sources = []
     sources: Counter[str] = Counter()
     trajectory_hashes = {}
     training_games = []
-    for index, path in enumerate(args.trajectories):
+    for path in args.trajectories:
         raw = path.read_bytes()
         trajectory = read_trajectory(path)
         if trajectory.schema_version not in range(3, 24) or not trajectory.deck_sha256 or not (
@@ -119,17 +191,21 @@ def main() -> None:
         if args.feature_version >= 19 and trajectory.schema_version < 23:
             raise ValueError(f"{path}: feature version 19 requires schema v23 turn owner")
         count = verify_trajectory(trajectory, engine_type(args.native_root))
+        audit_trajectory_visibility(trajectory)
         annotation = None
-        if args.annotation:
-            audit_trajectory_visibility(trajectory)
+        label_path = labels_by_path.get(path.resolve())
+        if label_path is not None:
             annotation, selected = read_decision_annotations(
-                args.annotation[index], hashlib.sha256(raw).hexdigest(), trajectory)
+                label_path, hashlib.sha256(raw).hexdigest(), trajectory)
         else:
+            if trajectory.source.startswith("scripted_"):
+                raise ValueError(f"{path}: scripted replay requires explicit annotations")
             selected = demonstrator_records(trajectory)
-        records.extend(selected)
         source = ({"self_recorded": "human_annotation",
                    "scripted_scenario": "synthetic_annotation"}[annotation.authorization]
                   if annotation is not None else trajectory.source)
+        records.extend(selected)
+        record_sources.extend([source] * len(selected))
         sources[source] += len(selected)
         trajectory_hashes[str(path)] = hashlib.sha256(raw).hexdigest()
         training_games.append({"seed": trajectory.seed,
@@ -141,7 +217,7 @@ def main() -> None:
                                "demonstrator_seat": (None if annotation is not None
                                                      else demonstrator_seat(trajectory)),
                                "annotation_sha256": (hashlib.sha256(
-                                   args.annotation[index].read_bytes()).hexdigest()
+                                   label_path.read_bytes()).hexdigest()
                                    if annotation is not None else None),
                                "authorization": (annotation.authorization if annotation is not None
                                                  else (trajectory.skill_metadata or {}).get(
@@ -160,17 +236,27 @@ def main() -> None:
                               feature_version=args.feature_version)
     parent = (load_parent_checkpoint(args.init_checkpoint, model, vocabulary)
               if args.init_checkpoint else None)
+    try:
+        restrict_trainable_modules(model, args.trainable_module)
+    except ValueError as exc:
+        parser.error(str(exc))
     inherited_hashes = parent.get("trajectory_sha256", {}) if parent else {}
     collisions = {path for path, digest in trajectory_hashes.items()
                   if path in inherited_hashes and inherited_hashes[path] != digest}
     if collisions:
         raise ValueError(f"training trajectory path changed since parent checkpoint: "
                          f"{sorted(collisions)}")
+    unknown_sources = set(source_weights) - set(sources)
+    if unknown_sources:
+        raise ValueError(f"source weights name absent decision sources: "
+                         f"{sorted(unknown_sources)}")
     focus_codes = set(args.focus_card)
     focus_count = sum(focus_opportunity(record, focus_codes) for record in records)
-    sampling_weights = ([args.focus_weight if focus_opportunity(record, focus_codes) else 1.0
-                         for record in records]
-                        if args.focus_weight > 1 else None)
+    sampling_weights = ([source_weights.get(source, 1.0) * (
+        args.focus_weight if focus_opportunity(record, focus_codes) else 1.0)
+        for record, source in zip(records, record_sources)]
+        if args.focus_weight > 1 or any(weight != 1 for weight in source_weights.values())
+        else None)
     losses = fit_behavioral_clone(model, vocabulary, records, epochs=args.epochs,
                                   learning_rate=args.learning_rate, seed=args.seed,
                                   batch_size=args.batch_size,
@@ -194,6 +280,8 @@ def main() -> None:
         "batch_size": args.batch_size,
         "focus_cards": tuple(sorted(focus_codes)),
         "focus_weight": args.focus_weight,
+        "source_weights": source_weights,
+        "trainable_modules": tuple(args.trainable_module) or ("all",),
         "focus_opportunity_decisions": focus_count,
         "sampling_mode": "weighted_with_replacement" if sampling_weights else "shuffle",
         "losses": losses,

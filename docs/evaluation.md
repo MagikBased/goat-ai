@@ -2766,3 +2766,47 @@ and `artifacts/scapegoat_timing_fit500_vs_parent_2548_2555.json` (SHA-256
 The four-worker tournament times were 33.26 and 35.71 seconds respectively.
 The next experiment needs independent timing decisions from competitive
 decks and a training method that preserves broader play while learning them.
+
+## Mixed rehearsal and restricted warm-start ablations
+
+The trainer now accepts `--annotation-for TRAJECTORY=LABELS` so the three
+synthetic timing labels can be mixed with the original 16 replay-verified
+tactical-teacher duels. It refuses an unannotated `scripted_` replay. A
+`--source-weight` option samples rare sources more often while keeping the
+number of optimizer decisions per epoch fixed. Both mixed runs started from
+the feature-19 parent, presented 6,014 tactical decisions plus three
+synthetic ones, and used batch size 32 and seed 19:
+
+| Synthetic weight | Epochs | Learning rate | Probe choices, turns 3/4/5 |
+| ---: | ---: | ---: | --- |
+| 200 | 2 | 0.0001 | pass / pass / pass |
+| 1,000 | 3 | 0.0001 | pass / pass / pass |
+
+These settings raised Scapegoat's chain score at all three probe decisions
+but did not rank `chain` above `pass` at the intended turn-5 activation.
+Neither checkpoint was promoted or subjected to a strength claim.
+The ignored checkpoints are
+`checkpoints/tactical_v3_fv19_rehearsal_s200_52.pt` (SHA-256
+`944fd556f5346b078d25bbd5d979d475d04f63940e012675c5ee708cc381903f`)
+and `checkpoints/tactical_v3_fv19_rehearsal_s1000_52.pt` (SHA-256
+`e9bb505001c8702978f0efd8a6e741b0c5c17b965222bd24d424cfc01c4ea0e3`).
+
+A separate 500-epoch, three-label warm-start updated only the existing
+`state_numbers` and `score` modules. It fit `pass/pass/chain` on seed 52 and
+chose `pass` on its own End Phase and `chain` on the later opponent End Phase
+on all four separate shuffle seeds 56, 64, 69, and 70. The checkpoint is
+`checkpoints/tactical_v3_fv19_timing_state_score_52.pt` (SHA-256
+`c1e3a2027df944bf04bcd9ecc27d8c00e2647a7d722c3aa34d87c5107ba7f3db`).
+
+In a 64-game paired match against its unchanged parent on unseen Michael
+Fukuyama, Chaos Control, Warrior, and Chaos Return Main Decks, both deck
+assignments and both seats at seeds 2560–2567, this restricted child scored
+**8 wins and 56 losses**. Its score rate was 12.5%, paired bootstrap 95%
+interval **4.69–21.88%**; assigned-deck wins were 4/16, 3/16, 1/16, and
+0/16 respectively. The evaluator rejected training deck hashes and required
+unseen Main Deck compositions. The four-worker tournament took 32.54
+seconds. The ignored report is
+`artifacts/timing_state_score_vs_parent_2560_2567.json` (SHA-256
+`d90142a0ba784dd997d41cb8740bfbc37cd8b54a6d7993638577e98a1324780d`).
+The local timing fit badly damaged general play. Neither rehearsal nor
+module restriction is sufficient evidence of a safe competitive update.

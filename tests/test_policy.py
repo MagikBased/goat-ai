@@ -56,7 +56,13 @@ from scripts.evaluate_policy import (
     validate_unseen_deck_hashes,
     validate_unseen_main_decks,
 )
-from scripts.train_behavioral_clone import focus_opportunity, load_parent_checkpoint
+from scripts.train_behavioral_clone import (
+    annotation_paths,
+    focus_opportunity,
+    load_parent_checkpoint,
+    parse_source_weights,
+    restrict_trainable_modules,
+)
 
 
 def view() -> Observation:
@@ -98,6 +104,41 @@ def test_policy_audit_attributes_each_decision_to_its_acting_deck():
                             (left, right), 0)
     assert decision_deck(trajectory, left) == "left.ydk"
     assert decision_deck(trajectory, right) == "right.ydk"
+
+
+def test_mixed_annotation_mapping_rejects_misassigned_or_duplicate_labels(tmp_path):
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    label = tmp_path / "labels.json"
+    assert annotation_paths([first, second], [], [f"{second}={label}"]) == {
+        second.resolve(): label}
+    with pytest.raises(ValueError, match="not supplied"):
+        annotation_paths([first], [], [f"{second}={label}"])
+    with pytest.raises(ValueError, match="duplicate"):
+        annotation_paths([first], [], [f"{first}={label}", f"{first}={label}"])
+    with pytest.raises(ValueError, match="not both"):
+        annotation_paths([first], [label], [f"{first}={label}"])
+    with pytest.raises(ValueError, match="duplicate trajectory"):
+        annotation_paths([first, first], [], [])
+
+
+def test_source_weights_require_finite_positive_unique_values():
+    assert parse_source_weights(["synthetic_annotation=200"]) == {
+        "synthetic_annotation": 200.0}
+    for assignments in (["synthetic_annotation=nan"],
+                        ["synthetic_annotation=0"],
+                        ["synthetic_annotation=2", "synthetic_annotation=3"]):
+        with pytest.raises(ValueError):
+            parse_source_weights(assignments)
+
+
+def test_restricted_warm_start_updates_only_selected_modules():
+    model = LegalActionPolicy(8, width=16, feature_version=19)
+    restrict_trainable_modules(model, ["state_numbers", "score"])
+    assert all(parameter.requires_grad == name.startswith(("state_numbers.", "score."))
+               for name, parameter in model.named_parameters())
+    with pytest.raises(ValueError, match="unknown trainable"):
+        restrict_trainable_modules(model, ["missing"])
 
 
 def test_policy_audit_fingerprint_identifies_visible_decision_and_choice():
