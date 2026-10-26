@@ -661,6 +661,13 @@ with a legal Set available. See [evaluation](evaluation.md). M4 remains open;
 collect independent reviewed decisions and demonstrate a cross-deck strength
 gain before selecting a default inference correction.
 
+A 64-game on-policy Tactical v14 imitation expansion raised exact held-out
+teacher agreement to 1,136/1,292 but scored only 13–51 against Tactical on
+the tested unseen deck schedule. Oversampling response decisions improved
+chain/pass agreement on recorded states yet split 32–32 with the unweighted
+clone on fresh complete duels. See [evaluation](evaluation.md). M4 remains
+open; future training changes must improve held-out game outcomes.
+
 ## M5 — Search and other formats
 
 

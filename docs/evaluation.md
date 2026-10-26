@@ -5204,6 +5204,58 @@ and tournament report is
 `.cache/goat-ai/fv23_full_on_policy_vs_parent_11500_11507.json` (SHA-256
 `f99994ceabc287aa89783df66fb3bea2aebf7e8703b1b0e716638d0bc43c4bdd`).
 
+### Larger on-policy imitation and response weighting
+
+Thirty-two more parent-policy versus Tactical v14 games on the same two
+training deck pairings, both seats and seeds 10408–10415, all reached
+terminal and replay-verified **16,103** decisions. Combined with the
+preceding 32 source games, the 64-game set supplied **5,095** multi-option
+policy decisions for synthetic Tactical labels. A v23 child restarted from
+the same parent and used two epochs, width 32, batch 16, learning rate
+0.0001, seed 48, four verification workers, and opt-in batched forward.
+Training took **41.70 seconds**, including **18.48 seconds** of replay
+verification and **9.65 seconds** of model fitting. The ignored checkpoint
+is `.cache/goat-ai/fv23_full_on_policy_tactical_10400_10415_batched.pt`
+(SHA-256 `36701ac4b143ce0142b89f7231241f1dff96785156ac80df6505ed6b7a53e3d6`).
+
+On 1,292 multi-option decisions from 16 separate parent-policy recordings
+(seeds 11100–11103), exact raw-policy agreement with Tactical v14 rose from
+**1,018** for the parent to **1,094** for the 32-game clone and **1,136**
+for the 64-game clone. This is a fixed-state imitation measure. On the
+previously used held-out tournament schedule, seeds 11500–11507 and two
+unseen deck pairings with both deck assignments and seats, the 64-game
+child scored **32–31 with one draw** directly against its parent (paired
+score interval **37.5%–64.1%**). The earlier 32-game child scored
+27–35 with two draws on the same schedule; their paired score difference
+was **+7.0 percentage points** with a **−4.7 to +19.5** point interval.
+The 64-game child scored only **13–51** against Tactical on that schedule
+(paired score interval **10.9%–31.3%**), versus **16–48** for the parent.
+These results do not establish a competitive gain. The ignored reports are
+`.cache/goat-ai/fv23_full_on_policy_64duels_vs_parent_11500_11507.json`
+(SHA-256 `32e9be6195b601eff3e082c9b6e24ea8d781a3758c00eb21dfaf31a85dde26d6`)
+and `.cache/goat-ai/fv23_full_on_policy_64duels_vs_tactical_11500_11507.json`
+(SHA-256 `caa3ef8314049d383072e38a990dfd452926bf4cb164b331af956ecd842c49b6`).
+The 32-game and 64-game fits also used different forward implementations,
+so their difference cannot be attributed to data volume alone.
+
+The 64-game child disagreed with Tactical on 156 of those 1,292 visible
+decisions, including 30 cases where Tactical passed but it chained and 14
+where Tactical chained but it passed. A controlled second fit oversampled
+selected `pass` and `chain` labels threefold from the same 64-game set.
+It matched Tactical on **228/269** recorded chain/pass opportunities versus
+**223/269** for the unweighted fit, but overall agreement fell slightly
+to **1,129/1,292**. On fresh seeds 11700–11707, two unseen deck pairings,
+both assignments and seats, the response-weighted child split **32–32**
+directly with the unweighted child (paired score interval **42.2%–57.8%**).
+The weighting did not establish a strength gain. The ignored checkpoint
+is `.cache/goat-ai/fv23_full_on_policy_tactical_10400_10415_response3.pt`
+(SHA-256 `58de434f974d0cb52c9e308c6af911d352d1e8e55a608a1475bb80b09f12372d`);
+the tournament report is
+`.cache/goat-ai/fv23_response3_vs_unweighted_11700_11707.json`
+(SHA-256 `ed0644c568f448720c21277a87c24307db6cedf8a0120eff69fdb359b2ff7912`).
+Neither child is promoted. The next policy experiment needs evidence that
+its choices improve complete duels, not only teacher agreement.
+
 For visual review, a new v25-versus-Tactical duel on the *previously reviewed*
 Return/Flip seed 9901 reached terminal in **251 replay-verified decisions**
 with the neural seat winning. Its greedy choices reproduce from the saved
