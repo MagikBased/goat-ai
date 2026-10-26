@@ -5,21 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GOAT AI Replay Viewer</title>
   <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0b111b; color: #eef5f3; }
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0b111b; color: #eef5f3; --sidebar-width: 350px; --load-height: 164px; }
     * { box-sizing: border-box; }
     body { margin: 0; height: 100dvh; overflow: hidden; }
-    .topbar { height: 64px; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #14232f; border-bottom: 1px solid #3e5c67; }
+    .topbar { position: absolute; z-index: 3; top: 10px; right: 10px; width: var(--sidebar-width); height: var(--load-height); padding: 12px; display: flex; flex-direction: column; align-items: stretch; gap: 8px; background: #172731; border: 1px solid #36535e; border-radius: 10px; }
     h1 { margin: 0; font-size: 1.2rem; }
     h2 { margin: 0 0 9px; font-size: .95rem; color: #bde0d1; }
     p { margin: 4px 0; }
     .muted { color: #9bb5bc; }
     .subtitle { margin: 1px 0 0; font-size: .78rem; }
-    main { height: calc(100dvh - 64px); padding: 10px; min-width: 0; overflow: hidden; }
-    #viewer { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 350px); gap: 10px; }
+    main { height: 100dvh; padding: 10px; min-width: 0; overflow: hidden; }
+    #viewer { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, var(--sidebar-width)); gap: 10px; }
     .toolbar, .summary, .player-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .toolbar { justify-content: flex-end; min-width: 0; }
+    .toolbar { display: grid; grid-template-columns: 1fr; gap: 5px; min-width: 0; }
+    .toolbar label { justify-content: space-between; font-size: .8rem; }
     .image-picker { font-size: .78rem; }
-    #file-name { max-width: 185px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; }
+    #file-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .72rem; }
     button, input[type=file], input[type=number], input[type=text] { font: inherit; }
     button { padding: 7px 13px; color: #eef5f3; background: #234854; border: 1px solid #4f7980; border-radius: 7px; cursor: pointer; }
     button:hover, button:focus-visible { background: #306575; }
@@ -27,11 +28,12 @@
     input[type=number] { width: 82px; padding: 6px; color: inherit; background: #14242d; border: 1px solid #4f7980; border-radius: 6px; }
     input[type=text] { width: 100%; padding: 6px; color: inherit; background: #14242d; border: 1px solid #4f7980; border-radius: 6px; }
     input[type=range] { flex: 1; min-width: 170px; accent-color: #7dcab1; }
-    input[type=file] { max-width: 225px; font-size: .78rem; }
+    input[type=file] { max-width: 215px; font-size: .72rem; }
     label { display: inline-flex; align-items: center; gap: 5px; }
     .panel { background: #172731; border: 1px solid #36535e; border-radius: 10px; padding: 12px; margin: 0 0 10px; }
     .summary { justify-content: space-between; }
-    .board { margin: 0; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 10px; background: radial-gradient(circle at 50% 50%, #17424eaa 0%, transparent 55%), repeating-linear-gradient(24deg, transparent 0 54px, #3477773a 55px 57px, transparent 58px 108px), repeating-linear-gradient(-24deg, transparent 0 66px, #33767629 67px 68px, transparent 69px 132px), #071520; border-color: #537884; }
+    .board { margin: 0; min-width: 0; min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 50px; gap: 6px; padding: 10px; background: radial-gradient(circle at 50% 50%, #17424eaa 0%, transparent 55%), repeating-linear-gradient(24deg, transparent 0 54px, #3477773a 55px 57px, transparent 58px 108px), repeating-linear-gradient(-24deg, transparent 0 66px, #33767629 67px 68px, transparent 69px 132px), #071520; border-color: #537884; }
+    .field-stack { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
     .duel-side { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
     .player-header { flex: 0 0 auto; justify-content: space-between; padding: 2px 5px; background: #071924b8; border-radius: 8px; }
     .player-header strong { font-size: 1rem; }
@@ -46,7 +48,6 @@
     .opponent .zones .slot:nth-child(4), .opponent .zones .slot:nth-child(5) { border-color: #d69b18; }
     .viewer-side .zones .slot:nth-child(4), .viewer-side .zones .slot:nth-child(5) { border-color: #7b3ee7; }
     .slot.disabled { border-color: #b86b6b; background: #4d2f35; }
-    .slot-label { font-size: .63rem; color: #c5dcc9; margin-bottom: 3px; }
     .card { position: relative; min-height: 0; min-width: 0; flex: 1; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; justify-content: space-between; font-size: .8rem; overflow-wrap: anywhere; overflow: hidden; box-shadow: 0 2px 7px #0005; isolation: isolate; }
     .card > strong, .card > small { position: relative; z-index: 2; text-shadow: 0 1px 2px #000b; }
     .card.has-art { color: #fff; background: transparent; padding: 0; }
@@ -67,13 +68,24 @@
     .known { outline: 2px solid #e5cb6d; }
     .card small { opacity: .8; }
     .field-zone { border-color: #ce9c52 !important; }
-    .centerline { flex: 0 0 48px; display: flex; justify-content: center; align-items: center; gap: 7px; border-top: 1px solid #678a86; border-bottom: 1px solid #678a86; color: #e8edd4; font-weight: 700; letter-spacing: .03em; background: #071923ba; }
+    .centerline { min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 7px; border-left: 1px solid #678a86; color: #e8edd4; font-weight: 700; background: #071923ba; }
     .phase-chip { flex: 0 0 37px; width: 37px; height: 37px; display: grid; place-items: center; border: 3px solid #718d94; border-radius: 50%; background: radial-gradient(circle, #133853, #061123); color: #8fb0d4; font-size: .7rem; box-shadow: 0 2px 7px #0008; }
     .phase-chip.active { border-color: #faf4b1; background: radial-gradient(circle, #d80d58, #830526); color: #fff; box-shadow: 0 0 15px #fb2c77; animation: phase-glow 1.6s ease-in-out infinite alternate; }
-    .phase-turn { padding: 3px 8px; border-radius: 6px; background: #133342; font-size: .72rem; white-space: nowrap; }
-    .hand { flex: 0 0 75px; min-width: 0; display: flex; gap: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
-    .hand .card { flex: 0 0 56px; }
-    .hand-back { position: relative; flex: 0 0 48px; height: 70px; border: 2px solid #947bb4; border-radius: 5px; background: #3c3156; overflow: hidden; }
+    .phase-turn { width: 39px; padding: 4px 2px; border-radius: 6px; background: #133342; font-size: .72rem; line-height: 1.1; text-align: center; }
+    .phase-turn span { display: block; }
+    .hand { flex: 0 0 48px; min-width: 0; display: flex; align-items: flex-start; gap: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+    .hand-row { flex: 0 0 48px; height: 48px; min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(60px, 10%) minmax(0, 1fr) minmax(60px, 10%); gap: 6px; overflow: hidden; }
+    .hand-row .hand { justify-content: safe center; }
+    .hand-zone { position: relative; min-width: 0; padding: 2px 4px; overflow: hidden; cursor: pointer; }
+    .hand-zone .card-back { inset: 4px 25%; }
+    .hand-zone strong { position: absolute; right: 4px; bottom: 2px; padding: 0 5px; border-radius: 8px; background: #06131bea; }
+    .hand-zone .mini-art { width: 28px; height: 39px; object-fit: contain; }
+    .hand .card { flex: 0 0 62px; height: 90px; cursor: zoom-in; }
+    .hand-back { position: relative; flex: 0 0 58px; height: 88px; border: 2px solid #947bb4; border-radius: 5px; background: #3c3156; overflow: hidden; cursor: zoom-in; }
+    .hand-preview { position: fixed; z-index: 20; width: 115px; height: 166px; padding: 3px; border: 2px solid #e4ca70; border-radius: 8px; background: #11232b; box-shadow: 0 10px 30px #000c; pointer-events: none; animation: drawer-open .18s ease-out both; }
+    .hand-preview .card, .hand-preview .hand-back { display: block; width: 100%; height: 100%; }
+    .hand-preview .card-back { inset: 5px; }
+    @keyframes drawer-open { from { opacity: .4; transform: translateY(14px) scale(.85); } to { opacity: 1; transform: none; } }
     .hand-back .card-back { inset: 3px; }
     .zone-counts { display: flex; gap: 8px; flex-wrap: wrap; color: #c1d7d3; }
     .pile-trigger { padding: 2px 5px; font-size: inherit; color: #d9eeda; background: #254b4b; border: 1px solid #638b7f; }
@@ -104,9 +116,9 @@
     @keyframes card-draw { from { opacity: .4; transform: translateX(45px) rotate(12deg) scale(.75); } to { opacity: 1; transform: none; } }
     @keyframes card-attack { 50% { transform: translateY(-8px) scale(1.07); filter: drop-shadow(0 0 13px #ffca54); } }
     @keyframes phase-glow { to { box-shadow: 0 0 6px #fb2c77; } }
-    @media (prefers-reduced-motion: reduce) { .card-arrive, .card-flip, .card-draw, .card-attack, .phase-chip.active { animation: none; } }
-    .sidebar { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-right: 3px; }
-    .controls { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; background: #203744; }
+    @media (prefers-reduced-motion: reduce) { .card-arrive, .card-flip, .card-draw, .card-attack, .phase-chip.active, .hand-preview { animation: none; } }
+    .sidebar { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding: calc(var(--load-height) + 6px) 3px 0 0; }
+    .controls { position: sticky; top: calc(var(--load-height) + 6px); z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; background: #203744; }
     .controls button { padding: 7px 3px; }
     .controls #slider, .controls .decision-jump, .controls .skip-label { grid-column: 1 / -1; }
     .controls .decision-jump { justify-content: space-between; }
@@ -125,8 +137,8 @@
     #legal-more { margin-top: 7px; width: 100%; }
     .notice { padding: 10px 12px; border-left: 3px solid #e5cb6d; background: #293734; margin: 12px 0; }
     [hidden] { display: none !important; }
-    @media (max-width: 900px) { body { height: auto; overflow: auto; } .topbar { height: auto; flex-wrap: wrap; } main { height: auto; overflow: visible; } #viewer { display: block; } .board { height: min(760px, 75dvh); min-height: 550px; margin-bottom: 10px; } .sidebar { overflow: visible; } .controls { position: static; } }
-    @media (max-width: 650px) { .topbar { padding: 8px; } .toolbar { justify-content: flex-start; } main { padding: 6px; } .board { padding: 5px; } .zones, .zone-line { gap: 3px; } .slot { padding: 2px; } .slot-label { font-size: .55rem; } .card { font-size: .65rem; padding: 3px; } .player-header { gap: 4px; } .player-header .zone-counts { font-size: .65rem; } }
+    @media (max-width: 900px) { body { height: auto; overflow: auto; } .topbar { position: static; width: auto; height: auto; margin: 6px; } main { height: auto; overflow: visible; } #viewer { display: block; } .board { height: min(760px, 75dvh); min-height: 550px; margin-bottom: 10px; } .sidebar { padding: 0; overflow: visible; } .controls { position: static; } }
+    @media (max-width: 650px) { .topbar { padding: 8px; } main { padding: 6px; } .board { padding: 5px; } .zones, .zone-line { gap: 3px; } .slot { padding: 2px; } .card { font-size: .65rem; padding: 3px; } .player-header { gap: 4px; } .player-header .zone-counts { font-size: .65rem; } }
   </style>
 </head>
 <body>
@@ -207,6 +219,7 @@
     <p id="pile-note" class="pile-note"></p>
     <div id="pile-scroll" class="pile-scroll"></div>
   </dialog>
+  <div id="hand-preview" class="hand-preview" hidden aria-hidden="true"></div>
   <script id="embedded-replay" type="application/json">__EMBEDDED_REPLAY__</script>
   <script id="embedded-names" type="application/json">__EMBEDDED_NAMES__</script>
   <script id="embedded-options" type="application/json">__EMBEDDED_OPTIONS__</script>
@@ -275,12 +288,16 @@
     };
     const fieldKey = card => `${card.controller}:${card.zone}:${card.sequence}`;
     const fieldSignature = card => `${card.code ?? "hidden"}:${card.position}:${card.orientation}`;
-    function addCardVisual(element, code, facedown) {
+    function imageSource(code) {
+      if (code == null) return null;
       const key = String(code);
-      if (!facedown && code != null && cardFiles.has(key) && !cardImages.has(key))
+      if (cardFiles.has(key) && !cardImages.has(key))
         cardImages.set(key, URL.createObjectURL(cardFiles.get(key)));
-      const source = cardImages.get(key) || localImages[key];
-      if (!facedown && code != null && source) {
+      return cardImages.get(key) || localImages[key] || null;
+    }
+    function addCardVisual(element, code, facedown) {
+      const source = facedown ? null : imageSource(code);
+      if (source) {
         const art = node("img", "card-art");
         art.src = source;
         art.alt = "";
@@ -310,12 +327,21 @@
       stop();
       const observation = currentObservation;
       const own = player === observation.viewer;
-      const label = `${own ? "Your" : "Opponent"} ${zone === "deck" ? "Deck" : zone === "graveyard" ? "Graveyard" : "Banished cards"}`;
+      const label = `${own ? "Your" : "Opponent"} ${zone === "deck" ? "Deck" : zone === "extra" ? "Extra Deck" : zone === "graveyard" ? "Graveyard" : "Banished cards"}`;
       byId("pile-title").textContent = label;
       const scroll = byId("pile-scroll");
       const grid = node("div", "pile-grid");
       let note;
-      if (zone === "deck") {
+      if (zone === "extra") {
+        const remaining = observation.extra_deck_counts[player];
+        if (own && observation.own_extra_deck?.length) {
+          note = `${remaining} cards in your Extra Deck.`;
+          for (const card of observation.own_extra_deck) grid.append(pileCard(card.code));
+        } else {
+          note = own ? `${remaining} cards. This replay has no recorded Extra Deck identities.`
+            : `${remaining} cards. Opponent Extra Deck identities are hidden.`;
+        }
+      } else if (zone === "deck") {
         const remaining = observation.deck_counts[player];
         if (own && observation.own_main_deck?.length) {
           note = `${remaining} cards remain. Starting Main Deck composition is shown below; the identities and order of the remaining cards are unknown.`;
@@ -394,7 +420,7 @@
       for (let slot = 0; slot < 5; slot++) {
         const disabled = (observation.disabled_zones || []).some(item => item.player === player && item.zone === zone && item.sequence === slot);
         const holder = node("div", disabled ? "slot disabled" : "slot");
-        holder.append(node("span", "slot-label", `${zone === "monster" ? "Monster" : "Spell/Trap"} ${slot + 1}`));
+        holder.setAttribute("aria-label", `${zone === "monster" ? "Monster" : "Spell/Trap"} Zone ${slot + 1}`);
         const card = observation.field.find(item => item.controller === player && item.zone === zone && item.sequence === slot);
         if (card) holder.append(cardElement(observation, card, known));
         else if (disabled) holder.append(node("span", "muted", "Disabled"));
@@ -413,53 +439,90 @@
     }
     function zoneLine(observation, player, zone, known) {
       const line = node("div", "zone-line");
-      const pileZone = zone === "monster" ? "graveyard" : "banished";
-      const pile = pileZone === "graveyard" ? observation.graveyards[player] : observation.banished[player];
-      const pileButton = node("button", "slot pile-slot");
-      pileButton.type = "button";
-      pileButton.setAttribute("aria-label", `View Player ${player} ${pileZone}`);
-      pileButton.addEventListener("click", () => showPile(player, pileZone));
-      pileButton.append(node("span", "slot-label", pileZone === "graveyard" ? "Graveyard" : "Banished"));
-      if (pile.length) {
-        const top = node("div", "card monster");
-        const last = pile[pile.length - 1];
-        addCardVisual(top, last.code, last.code == null);
-        pileButton.append(top);
+      if (zone === "monster") {
+        const pile = observation.graveyards[player];
+        const pileButton = node("button", "slot pile-slot");
+        pileButton.type = "button";
+        pileButton.setAttribute("aria-label", `View Player ${player + 1} Graveyard`);
+        pileButton.title = "Graveyard";
+        pileButton.addEventListener("click", () => showPile(player, "graveyard"));
+        if (pile.length) {
+          const top = node("div", "card monster");
+          const last = pile[pile.length - 1];
+          addCardVisual(top, last.code, last.code == null);
+          pileButton.append(top);
+        }
+        pileButton.append(node("strong", "", pile.length));
+        line.append(pileButton);
+      } else {
+        line.append(node("div", ""));
       }
-      pileButton.append(node("strong", "", pile.length));
-      line.append(pileButton);
       line.append(zoneRow(observation, player, zone, known));
       const auxiliary = node(zone === "spell_trap" ? "div" : "button", "slot field-zone");
       if (zone === "spell_trap") {
-        auxiliary.append(node("span", "slot-label", "Field Spell"));
+        auxiliary.setAttribute("aria-label", `Player ${player + 1} Field Spell Zone`);
+        auxiliary.title = "Field Spell Zone";
         const fieldSpell = observation.field.find(card => card.controller === player && card.zone === "spell_trap" && card.sequence === 5);
         if (fieldSpell) auxiliary.append(cardElement(observation, fieldSpell, known));
       } else {
         auxiliary.type = "button";
         auxiliary.classList.add("deck-slot");
-        auxiliary.setAttribute("aria-label", `View Player ${player} Deck`);
+        auxiliary.setAttribute("aria-label", `View Player ${player + 1} Deck`);
+        auxiliary.title = "Deck";
         auxiliary.addEventListener("click", () => showPile(player, "deck"));
-        auxiliary.append(node("span", "slot-label", "Deck"));
         auxiliary.append(node("span", "card-back"));
         auxiliary.append(node("strong", "", observation.deck_counts[player]));
       }
       line.append(auxiliary);
       return line;
     }
+    function showHandPreview(card, own) {
+      const preview = byId("hand-preview");
+      preview.replaceChildren(card.cloneNode(true));
+      const rect = card.getBoundingClientRect();
+      preview.style.left = `${Math.max(8, Math.min(innerWidth - 123, rect.left + rect.width / 2 - 57))}px`;
+      const above = own || rect.bottom + 174 > innerHeight;
+      preview.style.top = `${Math.max(8, above ? rect.top - 174 : rect.bottom + 8)}px`;
+      preview.hidden = false;
+    }
+    function handRow(observation, player, hand) {
+      const row = node("div", "hand-row");
+      const banished = observation.banished[player];
+      const banishButton = node("button", "slot hand-zone");
+      banishButton.type = "button";
+      banishButton.setAttribute("aria-label", `View Player ${player + 1} Banished cards`);
+      banishButton.title = "Banished cards";
+      banishButton.addEventListener("click", () => showPile(player, "banished"));
+      const last = banished.at(-1);
+      if (last?.code != null) {
+        const source = imageSource(last.code);
+        if (source) {
+          const art = node("img", "mini-art");
+          art.src = source;
+          art.alt = "";
+          banishButton.append(art);
+        }
+      }
+      banishButton.append(node("strong", "", banished.length));
+      row.append(banishButton, hand);
+      const extraButton = node("button", "slot hand-zone");
+      extraButton.type = "button";
+      extraButton.setAttribute("aria-label", `View Player ${player + 1} Extra Deck`);
+      extraButton.title = "Extra Deck";
+      extraButton.addEventListener("click", () => showPile(player, "extra"));
+      extraButton.append(node("span", "card-back"),
+                         node("strong", "", observation.extra_deck_counts[player]));
+      row.append(extraButton);
+      return row;
+    }
     function playerBoard(observation, player, known) {
       const own = player === observation.viewer;
       const section = node("section", `duel-side ${own ? "viewer-side" : "opponent"}`);
       const playerHeader = node("div", "player-header");
-      playerHeader.append(node("strong", "", `Player ${player}${own ? " · your view" : " · opponent"}`));
+      playerHeader.append(node("strong", "", `Player ${player + 1}${own ? " · your view" : " · opponent"}`));
       const handCount = own ? observation.hand.length : observation.opponent_hand_count;
       const counts = node("span", "zone-counts");
-      counts.append(node("span", "", `Hand ${handCount} · Extra ${observation.extra_deck_counts[player]}`));
-      for (const [zone, title, amount] of [["graveyard", "GY", observation.graveyards[player].length], ["banished", "Banished", observation.banished[player].length]]) {
-        const open = node("button", "pile-trigger", `${title} ${amount}`);
-        open.type = "button";
-        open.addEventListener("click", () => showPile(player, zone));
-        counts.append(open);
-      }
+      counts.append(node("span", "", `Hand ${handCount}`));
       playerHeader.append(counts);
       playerHeader.append(node("span", "life", `${observation.life_points[player]} LP`));
       section.append(playerHeader);
@@ -471,17 +534,28 @@
           if (animateNext && previousHand?.viewer === player &&
               cardIndex >= previousHand.count) element.classList.add("card-draw");
           element.title = nameOf(card.code);
+          element.tabIndex = 0;
+          element.addEventListener("mouseenter", () => showHandPreview(element, true));
+          element.addEventListener("mouseleave", () => { byId("hand-preview").hidden = true; });
+          element.addEventListener("focus", () => showHandPreview(element, true));
+          element.addEventListener("blur", () => { byId("hand-preview").hidden = true; });
           element.append(node("strong", "", nameOf(card.code)));
           hand.append(element);
         }
       } else {
         for (let i = 0; i < handCount; i++) {
           const back = node("div", "hand-back");
+          back.tabIndex = 0;
+          back.setAttribute("aria-label", "Hidden opponent hand card");
+          back.addEventListener("mouseenter", () => showHandPreview(back, false));
+          back.addEventListener("mouseleave", () => { byId("hand-preview").hidden = true; });
+          back.addEventListener("focus", () => showHandPreview(back, false));
+          back.addEventListener("blur", () => { byId("hand-preview").hidden = true; });
           back.append(node("span", "card-back"));
           hand.append(back);
         }
       }
-      if (!own) section.append(hand);
+      if (!own) section.append(handRow(observation, player, hand));
       if (own) {
         section.append(zoneLine(observation, player, "monster", known));
         section.append(zoneLine(observation, player, "spell_trap", known));
@@ -489,13 +563,15 @@
         section.append(zoneLine(observation, player, "spell_trap", known));
         section.append(zoneLine(observation, player, "monster", known));
       }
-      if (own) section.append(hand);
+      if (own) section.append(handRow(observation, player, hand));
       return section;
     }
     function phaseRail(observation, terminal) {
       const rail = node("div", "centerline");
-      rail.append(node("span", "phase-turn", terminal ? `TURN ${observation.turn} · END`
-        : `TURN ${observation.turn} · P${observation.acting_player}`));
+      const turn = node("span", "phase-turn");
+      turn.append(node("span", "", `T${observation.turn}`),
+                  node("span", "", terminal ? "END" : `P${observation.acting_player + 1}`));
+      rail.append(turn);
       const current = observation.phase === "draw" ? "DP"
         : observation.phase === "standby" ? "SP"
           : observation.phase === "main1" ? "M1"
@@ -571,9 +647,11 @@
         ? `Seed ${replay.seed} · ${replay.winner == null ? "Draw" : `Winner: Player ${replay.winner}`}`
         : `Seed ${replay.seed} · Outcome hidden`;
       const board = byId("board");
-      board.replaceChildren(playerBoard(observation, 1 - observation.viewer, known),
-                            phaseRail(observation, terminal),
-                            playerBoard(observation, observation.viewer, known));
+      byId("hand-preview").hidden = true;
+      const field = node("div", "field-stack");
+      field.append(playerBoard(observation, 1 - observation.viewer, known),
+                   playerBoard(observation, observation.viewer, known));
+      board.replaceChildren(field, phaseRail(observation, terminal));
       const selected = record?.selected_action;
       if (selected?.kind === "attack") {
         const targetKey = `${selected.actor}:monster:${selected.parameters?.sequence}`;
