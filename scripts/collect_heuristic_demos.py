@@ -27,6 +27,8 @@ def main() -> None:
     parser.add_argument("--teacher", choices=("heuristic", "combat_heuristic",
                                               "combat_flip", "tactical"),
                         default="heuristic")
+    parser.add_argument("--opponent", choices=("random", "heuristic",
+                                               "combat_heuristic"), default="random")
     parser.add_argument("--deck-a", type=Path)
     parser.add_argument("--deck-b", type=Path)
     parser.add_argument("--seed", type=int, default=1000)
@@ -58,8 +60,12 @@ def main() -> None:
                 observation = env.reset()
                 teacher = (TacticalHeuristicAgent(flip_codes, card_races)
                            if args.teacher == "tactical" else teacher_type(flip_codes))
-                agents = (teacher if teacher_seat == 0 else RandomAgent(seed),
-                          teacher if teacher_seat == 1 else RandomAgent(seed))
+                opponent = (RandomAgent(seed) if args.opponent == "random" else {
+                    "heuristic": HeuristicAgent,
+                    "combat_heuristic": CombatHeuristicAgent,
+                }[args.opponent]())
+                agents = (teacher if teacher_seat == 0 else opponent,
+                          teacher if teacher_seat == 1 else opponent)
                 for _ in range(args.max_decisions):
                     action = agents[observation.acting_player].select_action(
                         observation, env.legal_actions())
@@ -70,7 +76,9 @@ def main() -> None:
                             skill_metadata={"demonstrator_seat": teacher_seat,
                                             "teacher": teacher_type.__name__,
                                             "teacher_version": teacher_type.teacher_version,
-                                            "opponent": "RandomAgent"},
+                                            "opponent": type(opponent).__name__,
+                                            "opponent_version": getattr(
+                                                opponent, "teacher_version", 1)},
                         )
                         path = args.output_dir / f"seed_{seed}_seat_{teacher_seat}.json"
                         write_trajectory(path, trajectory)

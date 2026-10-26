@@ -28,7 +28,8 @@ from goat_ai.training import load_policy_agent
 
 SCOPES = ("all", "multi_option", "multiple_kinds", "known_hand",
           "known_hand_multi_option", "chain", "chain_multi_option",
-          "chain_target", "chain_target_multi_option")
+          "chain_target", "chain_target_multi_option", "own_turn",
+          "opponent_turn", "own_end", "opponent_end")
 STAPLES = {
     71413901: "Breaker the Magical Warrior",
     44763025: "Delinquent Duo",
@@ -97,6 +98,12 @@ def decision_scopes(record) -> tuple[str, ...]:
         scopes.append("chain_target")
         if multiple:
             scopes.append("chain_target_multi_option")
+    turn_player = record.observation.turn_player
+    if turn_player is not None:
+        own_turn = turn_player == record.observation.acting_player
+        scopes.append("own_turn" if own_turn else "opponent_turn")
+        if record.observation.phase == "end":
+            scopes.append("own_end" if own_turn else "opponent_end")
     return tuple(scopes)
 
 

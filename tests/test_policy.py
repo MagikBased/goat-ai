@@ -137,6 +137,18 @@ def test_audit_scopes_isolate_public_target_decisions():
         targeted, multiple, multiple[0]))
 
 
+def test_audit_scopes_separate_turn_owner_and_end_phase():
+    action = Action("pass", "pass", 0)
+    record = lambda observation: DecisionRecord(observation, (action,), action)
+    assert "own_turn" in decision_scopes(record(replace(view(), turn_player=0)))
+    assert "opponent_turn" in decision_scopes(record(replace(view(), turn_player=1)))
+    own_end = decision_scopes(record(replace(view(), turn_player=0, phase="end")))
+    opponent_end = decision_scopes(record(replace(view(), turn_player=1, phase="end")))
+    assert "own_end" in own_end and "opponent_end" not in own_end
+    assert "opponent_end" in opponent_end and "own_end" not in opponent_end
+    assert "own_turn" not in decision_scopes(record(view()))
+
+
 def test_staple_audit_matches_shared_tournament_main_deck_cards():
     root = Path(__file__).resolve().parents[1] / "examples" / "decks"
     names = ("goat_control_lolmarcus_2020.ydk", "chaos_turbo_riclar_2020.ydk",

@@ -362,6 +362,16 @@ the same combat teacher, and the child scored 15–17 directly against its
 parent. The experiment and its deck splits are in [evaluation](evaluation.md).
 M4 remains open; more 2005 data alone has not yet produced a measured gain.
 
+Feature version 19 adds the public turn owner to the observation encoder.
+In a matched 6,014-decision TacticalHeuristicAgent v3 cloning experiment,
+it scored 30–33–1 directly against feature 18 over 64 unseen-Main-Deck
+duels. Its held-out Scapegoat-offered agreement improved from 17/20 to
+19/20, but total teacher agreement fell slightly and no held-out Scapegoat
+End Phase opportunity occurred. Keep the feature opt-in. Next collect
+replay-verified demonstrations that actually include both own-turn and
+opponent-turn End Phase Scapegoat choices, then test timing agreement and
+paired strength on separate seeds and decks. See [evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

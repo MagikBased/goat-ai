@@ -2670,3 +2670,48 @@ that the new timing condition did not erase the earlier gain; it does not
 replace the broader 160-game v4 guard evaluation above. The ignored report is
 `artifacts/guard_v5_vs_plain_two_pairs_2410_2414.json` (SHA-256
 `ab5b4f600eb9fbea63daef92b783f85bd60298721e957bb74461f795d26aa173`).
+
+## Turn-owner feature ablation, seeds 2500–2537
+
+To isolate the turn-owner observation feature, TacticalHeuristicAgent v3
+played CombatHeuristicAgent v3 on Cas Flip Control versus Daryl Gravekeepers
+and Matt Peddle versus Jesse Twohig Main Decks. Seeds 2500–2503 and both
+teacher seats produced 16 full schema-v23 duels and **6,014 teacher
+decisions**. The collector now accepts `--opponent combat_heuristic` and
+records the opponent version. Both clones used the same verified trajectories,
+seed 19, width 16, two epochs, batch size 32, and learning rate 0.001. Only
+the feature version differed: 18 omitted explicit turn ownership and 19
+included it. Their checkpoint SHA-256 values are respectively
+`3bd3fcd7212cc8f587ed1cc40c963018348396474913a5457708ddfa9b457201`
+and `fe197724523b33a8d555e90ab9f7b669dab2081b000346b9b31d1788d7e07fc2`.
+The final training losses were 0.2629 and 0.2894; training loss is not a
+strength estimate.
+
+Eight replay-verified teacher duels on unseen Michael Fukuyama, Chaos Control,
+Warrior, and Chaos Return Main Decks at seeds 2520–2521 supplied 2,039
+held-out teacher decisions, including 631 with multiple legal actions. The
+feature-18 and feature-19 models respectively matched **1,903/2,039** and
+**1,899/2,039** exact actions, or **495/631** and **491/631** when more than
+one action was legal. For 20 decisions where Scapegoat was offered, they
+matched **17/20** and **19/20**. The teacher actually chose Scapegoat only
+twice; feature 19 matched one Set, while neither model matched one chain.
+Among all decisions, 1,290 were on the acting player's own turn and 749 on
+the opponent's turn; only eight were in an End Phase and **none offered
+Scapegoat there**. The Scapegoat timing hypothesis therefore remains
+untested by this holdout. The ignored agreement report is
+`artifacts/fv18_fv19_tactical_holdout_2520_2521.json` (SHA-256
+`6a57e00e6d9e39fae45b8b5005adcd4a3afde149e6117e636d349a7fbad9437f`).
+
+In a direct 64-game match on the same unseen Main Deck families, seeds
+2530–2537, both deck assignments, and both player seats, raw feature 19
+scored **30 wins, 33 losses, 1 draw** against raw feature 18: **47.66%** of
+available points, paired bootstrap 95% interval **38.28–57.81%**. The
+evaluator rejected training deck hashes and required unseen Main Deck
+compositions. Four workers completed 41,590 decisions in 36.26 seconds
+(1.77 duels/s, 1,147 decisions/s) on the recorded Linux x86-64 machine.
+The ignored report is
+`artifacts/fv19_vs_fv18_tactical_unseen_2530_2537.json` (SHA-256
+`6186604ab9ca943516b73c51f61381120ab92492f47c50a399f292157a0a48ac`).
+These data show no competitive gain from the feature on this schedule. Keep
+feature 19 opt-in and collect replay-verified own-turn and opponent-turn End
+Phase Scapegoat choices before making a timing-specific learning claim.
