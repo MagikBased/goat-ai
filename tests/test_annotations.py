@@ -79,3 +79,34 @@ def test_scripted_annotations_require_matching_replayed_actions(tmp_path):
     with pytest.raises(ValueError, match="replayed action"):
         read_decision_annotations(annotation_file(
             tmp_path, authorization="scripted_scenario"), "a" * 64, scripted)
+
+
+def test_policy_review_can_correct_only_checkpoint_policy_seat(tmp_path):
+    base = trajectory()
+    opponent_view = replace(base.decisions[0].observation, viewer=1, acting_player=1)
+    opponent_actions = (Action("opp-pass", "pass", 1),)
+    policy = replace(base, source="policy_evaluation",
+                     skill_metadata={"demonstrator_seat": 0,
+                                     "policy_checkpoint_sha256": "b" * 64},
+                     decisions=(*base.decisions,
+                                DecisionRecord(opponent_view, opponent_actions,
+                                               opponent_actions[0])))
+    labels, records = read_decision_annotations(annotation_file(
+        tmp_path, authorization="policy_review"), "a" * 64, policy)
+    assert labels.authorization == "policy_review"
+    assert records[0].selected_action == base.decisions[0].legal_actions[1]
+    assert records[0].selected_action != base.decisions[0].selected_action
+
+    with pytest.raises(ValueError, match="policy seat"):
+        read_decision_annotations(annotation_file(
+            tmp_path, authorization="policy_review",
+            choices=[{"decision_index": 1, "action_index": 0}]),
+            "a" * 64, policy)
+    for invalid in (base, replace(policy, skill_metadata={"demonstrator_seat": 0}),
+                    replace(policy, skill_metadata={"demonstrator_seat": 0,
+                                                    "policy_checkpoint_sha256": "invalid"}),
+                    replace(policy, skill_metadata={"demonstrator_seat": True,
+                                                    "policy_checkpoint_sha256": "b" * 64})):
+        with pytest.raises(ValueError, match="checkpoint-attributed"):
+            read_decision_annotations(annotation_file(
+                tmp_path, authorization="policy_review"), "a" * 64, invalid)

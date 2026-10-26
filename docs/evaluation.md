@@ -2960,3 +2960,47 @@ Ignored local reports: `artifacts/decree_guard_parent_unguarded_2620.json`
 (SHA-256 `6c3d836cc7b0b9f646fe86f056d7ee65cc9d05f3ba0c76669a5ca86c9cd9b8b5`)
 and `artifacts/decree_guard_parent_guarded_2620.json` (SHA-256
 `2fcd0beea46f3c66bb4524607e2bd7084f9d49c2c61c3a0df950165a2b03eb6b`).
+
+### Five-label policy replay review probe
+
+The review pipeline now accepts `policy_review` annotations only for the
+checkpoint-attributed policy seat of a replay-verified `policy_evaluation`
+duel. The five choices in
+`examples/annotations/feature19_seed2612.review.json` refer to the 534-decision
+seed-2612 replay: pass rather than use Sakuretsu under Decree at frame 181,
+then activate Scapegoat at four opponent-turn defensive or End Phase windows.
+The labels are hindsight judgments by a project reviewer, **not** human match
+demonstrations. The trainer separately records them as
+`policy_review_annotation` and checks the exact replay hash, legal choices,
+policy seat, visible-information audit, and full native replay before training.
+
+A 200-step parent-KL fit of these five labels, weighted tenfold for selected
+`chain` actions, preserved 64 multi-option states sampled from four verified
+parent-training games. The experimental child
+`checkpoints/tactical_v3_fv19_policy_review_2612_kl.pt` has SHA-256
+`47a29b5f31f16daa1e6e8bba9e55bda2003bc568960cdc4fdd4ff42d04ab18f2`.
+On the saved seed-2612 observations, it selected all four reviewed Scapegoat
+activations and chose Scapegoat instead of Sakuretsu at frame 181; the latter
+does not match the review's preferred `pass` exactly. On the separate Jesse
+Scapegoat timing probe, it activated at both earlier opponent End Phases and
+the final one, whereas the parent passed at all three. Earlier activation
+may be sound; these fixed-state checks do not measure game strength.
+
+In **64 direct paired duels** versus the parent on unseen Chaos Control,
+Chaos Return, and Warrior Main Decks, both deck assignments and seats,
+seeds 2630–2637, the child scored **31 wins, 32 losses, one draw**:
+49.22% of points, paired-bootstrap 95% interval **40.63–57.03%**. Its assigned
+Chaos Control score was 2–14, Chaos Return 4–12, and Warrior 25–6–1.
+The evaluator enforced unseen Main Deck composition. The ignored report is
+`artifacts/policy_review_2612_child_vs_parent_2630_2637.json` (SHA-256
+`ea14ed3c65c252edff48e7f29ee91eace376eb6c0c7bb7092cbec3b3eb1678a4`).
+This probe shows label transfer to related decisions but no measured
+competitive gain. It remains an experiment, not a promoted policy; M4 stays
+open. Reproduce the source replay with the command in [the replay audit](replay_audit.md).
+The fit used `--engine experimental --width 16 --feature-version 19
+--seed 2612 --parent-kl-steps 200 --preserve-per-trajectory 16
+--preserve-batch 16 --parent-kl-weight 1.0 --label-kind-weight chain=10`, with
+`--init-checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt` and
+`--preserve-trajectories` set to both seat files at seed 2500 in each of
+`replays/tactical_v3_cas_daryl_2500_2503/` and
+`replays/tactical_v3_matt_jesse_2500_2503/`.

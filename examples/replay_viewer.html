@@ -245,6 +245,21 @@
     let legalShown = 100;
     let sourceSha256 = "";
     let annotations = new Map();
+    function annotationAuthorization() {
+      if (!replay) return null;
+      if (replay.source !== "policy_evaluation") return "self_recorded";
+      const seat = replay.skill_metadata?.demonstrator_seat;
+      const checkpoint = replay.skill_metadata?.policy_checkpoint_sha256;
+      return (Number.isInteger(seat) && (seat === 0 || seat === 1) &&
+              typeof checkpoint === "string" && /^[a-f0-9]{64}$/.test(checkpoint))
+        ? "policy_review" : null;
+    }
+    function canAnnotateFrame(observation) {
+      const authorization = annotationAuthorization();
+      return !reviewerData && authorization && observation &&
+        (authorization !== "policy_review" ||
+         observation.acting_player === replay.skill_metadata.demonstrator_seat);
+    }
     let commonFrames = [];
     let cardFiles = new Map();
     let cardImages = new Map();
@@ -791,7 +806,10 @@
           const button = node("button", annotations.get(index) === actionIndex ? "annotated" : "",
                               actionLabel(observation, action, known, actionIndex));
           button.type = "button";
-          button.addEventListener("click", () => { if (!reviewerData) { annotations.set(index, actionIndex); render(); } });
+          button.disabled = !canAnnotateFrame(observation);
+          button.addEventListener("click", () => {
+            if (canAnnotateFrame(observation)) { annotations.set(index, actionIndex); render(); }
+          });
           item.append(button);
           return item;
         })));
@@ -802,7 +820,7 @@
       byId("annotation-status").textContent = `${annotations.size} labeled frame${annotations.size === 1 ? "" : "s"}`
         + (terminal ? " · Final state" : frameLabel == null ? " · This frame is unlabeled"
           : ` · This frame: option ${frameLabel + 1}`);
-      byId("label-recorded").disabled = terminal;
+      byId("label-recorded").disabled = terminal || !canAnnotateFrame(observation);
       byId("clear-label").disabled = terminal || frameLabel == null;
       const knownHand = observation.known_opponent_hand_cards || [];
       byId("known-hand").textContent = (reviewerData ? "AI-visible knowledge: " : "") + (knownHand.length
@@ -909,7 +927,8 @@
     byId("next-common").addEventListener("click", () => moveCommon(1));
     byId("legal-more").addEventListener("click", () => { legalShown += 100; render(); });
     byId("label-recorded").addEventListener("click", () => {
-      if (!replay || reviewerData || index >= replay.decisions.length) return;
+      if (!replay || index >= replay.decisions.length ||
+          !canAnnotateFrame(replay.decisions[index].observation)) return;
       const record = replay.decisions[index];
       const selected = record.legal_actions.findIndex(action => action.id === record.selected_action.id);
       if (selected < 0) return;
@@ -919,6 +938,8 @@
     byId("clear-label").addEventListener("click", () => { annotations.delete(index); render(); });
     byId("download-labels").addEventListener("click", () => {
       if (reviewerData) return;
+      const authorization = annotationAuthorization();
+      if (!authorization) return alert("This replay has no supported label provenance.");
       const reviewer = byId("reviewer").value.trim();
       if (!/^[a-f0-9]{64}$/.test(sourceSha256)) return alert("Load a replay with a source SHA-256 first.");
       if (!reviewer) return alert("Enter a reviewer name or alias.");
@@ -927,7 +948,7 @@
       const choices = [...annotations].sort((a, b) => a[0] - b[0]).map(
         ([decision_index, action_index]) => ({decision_index, action_index}));
       const data = {schema_version: 1, source_trajectory_sha256: sourceSha256,
-                    authorization: "self_recorded", reviewer, choices};
+                    authorization, reviewer, choices};
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2) + "\n"],
                                             {type: "application/json"}));
       const link = document.createElement("a");

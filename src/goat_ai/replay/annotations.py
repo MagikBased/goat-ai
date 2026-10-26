@@ -1,6 +1,7 @@
 """Validated retrospective action labels tied to a replay-verified duel."""
 
 import json
+import re
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -27,11 +28,21 @@ def read_decision_annotations(path: str | Path, trajectory_sha256: str,
     if not isinstance(raw, dict) or raw.get("schema_version") != 1:
         raise ValueError("unsupported decision-annotation schema")
     authorization = raw.get("authorization")
-    if authorization not in ("self_recorded", "scripted_scenario"):
+    if authorization not in ("self_recorded", "scripted_scenario",
+                             "policy_review"):
         raise ValueError("decision annotations require a supported authorization")
     if (authorization == "scripted_scenario"
             and not trajectory.source.startswith("scripted_")):
         raise ValueError("scripted_scenario labels require a scripted trajectory")
+    metadata = trajectory.skill_metadata or {}
+    policy_seat = metadata.get("demonstrator_seat")
+    checkpoint_sha256 = metadata.get("policy_checkpoint_sha256")
+    if (authorization == "policy_review"
+            and (trajectory.source != "policy_evaluation"
+                 or type(policy_seat) is not int or policy_seat not in (0, 1)
+                 or not isinstance(checkpoint_sha256, str)
+                 or re.fullmatch(r"[0-9a-f]{64}", checkpoint_sha256) is None)):
+        raise ValueError("policy_review requires a checkpoint-attributed policy replay")
     if raw.get("source_trajectory_sha256") != trajectory_sha256:
         raise ValueError("annotation source trajectory SHA-256 mismatch")
     reviewer = raw.get("reviewer")
@@ -55,6 +66,9 @@ def read_decision_annotations(path: str | Path, trajectory_sha256: str,
             raise ValueError("duplicate annotated decision")
         seen.add(decision_index)
         record = trajectory.decisions[decision_index]
+        if (authorization == "policy_review"
+                and record.observation.acting_player != policy_seat):
+            raise ValueError("policy_review may label only the policy seat")
         if not 0 <= action_index < len(record.legal_actions):
             raise ValueError("annotation action index is not legal")
         if (authorization == "scripted_scenario"

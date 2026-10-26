@@ -47,9 +47,11 @@ resolved demonstrator seat for each source game.
 
 ## Retrospective decision annotations
 
-The offline replay viewer lets a reviewer label any displayed decision with
-one of that frame's legal actions. The downloaded schema-v1 JSON contains the
-source trajectory SHA-256, reviewer alias, explicit `self_recorded`
+The offline replay viewer lets a reviewer label a displayed decision with
+one of that frame's legal actions. For a checkpoint-attributed policy replay,
+it offers only the policy seat's decisions and exports `policy_review` labels;
+other supported replays export `self_recorded` labels. The downloaded
+schema-v1 JSON contains the source trajectory SHA-256, reviewer alias,
 authorization, and pairs of zero-based decision and legal-action indexes.
 No observation or hidden card state is added to the label file. The viewer
 runs locally and does not submit labels to a server. The checkbox is the
@@ -79,6 +81,16 @@ and legal-action indexes. The trainer records these separately as
 an End Phase Scapegoat diagnostic. This is a narrow curriculum tool, not an
 expert-play dataset. Evaluate any model trained on it on separate seeds and
 decks before claiming a gain.
+
+For project-recorded policy games, `authorization=policy_review` accepts
+retrospective corrections to legal actions **only for the checkpoint's policy
+seat**. The trajectory must have `source=policy_evaluation`, a policy seat,
+and a checkpoint SHA-256 in its metadata. Unlike a scripted-scenario label,
+the reviewed choice may differ from the recorded action. Training provenance
+uses `source=policy_review_annotation`, separate from human and scripted
+labels. The reviewer is evaluating the saved player-visible state, so these
+are hypotheses about better play, not demonstrated expert decisions. The
+complete source duel is replay-verified before the corrected choices are used.
 
 For rehearsal, pass `--annotation-for TRAJECTORY=LABELS` for the scripted
 replay and leave ordinary teacher trajectories unannotated. A scripted

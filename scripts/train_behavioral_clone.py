@@ -131,7 +131,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("trajectories", nargs="+", type=Path)
     parser.add_argument("--annotation", type=Path, action="append", default=[],
-                        help="authorized self-recorded or scripted-scenario labels, "
+                        help="self-recorded, scripted-scenario, or policy-review labels, "
                              "one per trajectory in the same order; train only those decisions")
     parser.add_argument("--annotation-for", action="append", default=[],
                         metavar="TRAJECTORY=LABELS",
@@ -231,7 +231,8 @@ def main() -> None:
                 raise ValueError(f"{path}: scripted replay requires explicit annotations")
             selected = demonstrator_records(trajectory)
         source = ({"self_recorded": "human_annotation",
-                   "scripted_scenario": "synthetic_annotation"}[annotation.authorization]
+                   "scripted_scenario": "synthetic_annotation",
+                   "policy_review": "policy_review_annotation"}[annotation.authorization]
                   if annotation is not None else trajectory.source)
         records.extend(selected)
         record_sources.extend([source] * len(selected))

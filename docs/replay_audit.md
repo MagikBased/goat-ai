@@ -70,6 +70,12 @@ a measured match-strength gain. A small paired held-out check is recorded in
 [evaluation](evaluation.md); it does not establish a gain either. No reviewer
 reveal was used to identify an opponent Set card.
 
+Five high-confidence legal alternatives from this game are saved as
+`examples/annotations/feature19_seed2612.review.json`. They use the separate
+`policy_review` provenance and only the policy seat. A parent-preserving
+training probe learned the Scapegoat choices in fixed states but did not
+improve a 64-game held-out direct match; see [evaluation](evaluation.md).
+
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/record_policy_match.py \
   checkpoints/tactical_v3_fv19_2500_2503.pt \
