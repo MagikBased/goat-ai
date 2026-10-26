@@ -49,13 +49,15 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
         for start in range(0, len(order), batch_size):
             batch = order[start:start + batch_size]
             optimizer.zero_grad()
+            batch_losses = []
             for index in batch:
                 features, target = examples[index]
                 logits = model(features.to(device)).unsqueeze(0)
                 loss = nn.functional.cross_entropy(
                     logits, torch.tensor([target], dtype=torch.long, device=device))
-                (loss / len(batch)).backward()
+                batch_losses.append(loss)
                 total += float(loss.detach())
+            torch.stack(batch_losses).mean().backward()
             optimizer.step()
         losses.append(total / len(examples))
     return tuple(losses)

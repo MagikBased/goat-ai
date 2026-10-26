@@ -4,8 +4,10 @@ import argparse
 import copy
 import hashlib
 import json
+import multiprocessing
 import random
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from math import isfinite
 from pathlib import Path
 from time import perf_counter
@@ -41,6 +43,20 @@ SOURCE_KINDS = frozenset((
     "activate", "attack", "chain", "change_position", "flip_summon",
     "normal_summon", "set_monster", "set_spell_trap", "special_summon",
 ))
+
+
+def verify_training_trajectory(task: tuple[Path, Path, str]) -> tuple[int, str]:
+    """Verify one recorded duel in an isolated native-engine process."""
+    path, native_root, engine = task
+    engine_type = (RestrictedOcgcoreEngine if engine == "restricted"
+                   else ExperimentalOcgcoreEngine)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    trajectory = read_trajectory(path)
+    if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        raise ValueError(f"{path}: trajectory changed during verification")
+    count = verify_trajectory(trajectory, engine_type(native_root))
+    audit_trajectory_visibility(trajectory)
+    return count, digest
 
 
 def focus_opportunity(record, codes: set[int]) -> bool:
@@ -199,6 +215,8 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=1,
                         help="decisions per optimizer update; forward passes remain individual")
+    parser.add_argument("--verification-workers", type=int, default=1,
+                        help="native replay verification processes (default: serial)")
     parser.add_argument("--width", type=int, default=64)
     parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 26)),
                         default=POLICY_FEATURE_VERSION)
@@ -229,7 +247,8 @@ def main() -> None:
                              "weight their loss in parent-KL training")
     args = parser.parse_args()
     if (args.epochs < 1 or args.width < 1 or args.learning_rate <= 0
-            or args.batch_size < 1 or not 1 <= args.focus_weight < float("inf")
+            or args.batch_size < 1 or args.verification_workers < 1
+            or not 1 <= args.focus_weight < float("inf")
             or any(code <= 0 for code in args.focus_card)
             or args.focus_weight > 1 and not args.focus_card):
         parser.error("training parameters must be positive; focus weight needs focus cards")
@@ -280,9 +299,20 @@ def main() -> None:
     sources: Counter[str] = Counter()
     trajectory_hashes = {}
     training_games = []
-    for path in args.trajectories:
+    verification_seconds = 0.0
+    verified_results = None
+    if args.verification_workers > 1:
+        verification_started = perf_counter()
+        tasks = [(path, args.native_root, args.engine) for path in args.trajectories]
+        with ProcessPoolExecutor(max_workers=args.verification_workers,
+                                 mp_context=multiprocessing.get_context("spawn")) as pool:
+            verified_results = list(pool.map(verify_training_trajectory, tasks))
+        verification_seconds = perf_counter() - verification_started
+    for trajectory_index, path in enumerate(args.trajectories):
         raw = path.read_bytes()
         trajectory = read_trajectory(path)
+        if hashlib.sha256(path.read_bytes()).digest() != hashlib.sha256(raw).digest():
+            raise ValueError(f"{path}: trajectory changed while loading")
         if trajectory.schema_version not in range(3, 26) or not trajectory.deck_sha256 or not (
             trajectory.asset_sha256
         ):
@@ -296,8 +326,15 @@ def main() -> None:
         if args.feature_version >= 21 and trajectory.schema_version < 24:
             raise ValueError(f"{path}: feature version {args.feature_version} requires "
                              "schema v24 current monster Type")
-        count = verify_trajectory(trajectory, engine_type(args.native_root))
-        audit_trajectory_visibility(trajectory)
+        if verified_results is None:
+            verification_started = perf_counter()
+            count = verify_trajectory(trajectory, engine_type(args.native_root))
+            audit_trajectory_visibility(trajectory)
+            verification_seconds += perf_counter() - verification_started
+        else:
+            count, verified_digest = verified_results[trajectory_index]
+            if hashlib.sha256(raw).hexdigest() != verified_digest:
+                raise ValueError(f"{path}: trajectory changed after verification")
         annotation = None
         label_path = labels_by_path.get(path.resolve())
         disagreements = None
@@ -410,6 +447,7 @@ def main() -> None:
             preservation.extend(rng.sample(candidates, min(
                 args.preserve_per_trajectory, len(candidates))))
             preservation_hashes[str(path)] = digest
+        fitting_started = perf_counter()
         losses, preservation_losses = fit_with_parent_kl(
             model, reference, vocabulary, records, preservation,
             steps=args.parent_kl_steps, preservation_batch=args.preserve_batch,
@@ -428,10 +466,12 @@ def main() -> None:
             "final_kl": preservation_losses[-1],
         }
     else:
+        fitting_started = perf_counter()
         losses = fit_behavioral_clone(model, vocabulary, records, epochs=args.epochs,
                                       learning_rate=args.learning_rate, seed=args.seed,
                                       batch_size=args.batch_size,
                                       sampling_weights=sampling_weights)
+    fitting_seconds = perf_counter() - fitting_started
     args.output.parent.mkdir(parents=True, exist_ok=True)
     inherited_sources = Counter(parent.get("source_decisions", {})) if parent else Counter()
     checkpoint = {
@@ -478,6 +518,9 @@ def main() -> None:
     else:
         summary["epoch_loss"] = losses
     summary["run_wall_seconds"] = perf_counter() - started
+    summary["verification_seconds"] = verification_seconds
+    summary["fitting_seconds"] = fitting_seconds
+    summary["verification_workers"] = args.verification_workers
     print(json.dumps(summary, indent=2))
 
 

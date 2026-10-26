@@ -69,7 +69,21 @@ python scripts/train_behavioral_clone.py replays/vanilla_42.json \
   --output checkpoints/vanilla_bc.pt --epochs 1 --seed 42
 ```
 
-The training command first replays every input trajectory against the selected pinned native engine, checking each visible observation, legal-action list, chosen action, result, deck hash, and loaded asset hashes. It accepts fingerprinted schema-v3 through v25 recordings; feature versions 17–18 require schema v22, versions 19–20 require schema v23, and version 21 or later requires schema v24. Use `--engine experimental` for an experimental-adapter trajectory. It then fits cross-entropy to selected actions and saves a versioned checkpoint containing model weights, card vocabulary, seed, PyTorch version, source counts, trajectory hashes, and epoch losses. Generated replays and checkpoints live in ignored directories. Only ingest demonstrations whose use is authorized.
+The training command first replays every input trajectory against the selected
+pinned native engine, checking each visible observation, legal-action list,
+chosen action, result, deck hash, and loaded asset hashes. It accepts
+fingerprinted schema-v3 through v25 recordings; feature versions 17–18
+require schema v22, versions 19–20 require schema v23, and version 21 or
+later requires schema v24. Use `--engine experimental` for an
+experimental-adapter trajectory. `--verification-workers 4` optionally
+verifies independent trajectories in isolated processes while retaining
+input order and the same checks; the default is one worker. Parallel
+verification checks each trajectory's byte hash before the main process
+uses it. The trainer then fits cross-entropy to selected actions and saves
+a versioned checkpoint containing model weights, card vocabulary, seed,
+PyTorch version, source counts, trajectory hashes, and epoch losses.
+Generated replays and checkpoints live in ignored directories. Only ingest
+demonstrations whose use is authorized.
 
 To enrich a verified schema-v23 recording with current public Type without
 changing its original bytes or SHA-bound review labels, run
@@ -212,7 +226,12 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clo
 
 The `--batch-size` option belongs to ordinary behavioral cloning; parent-KL
 uses all labeled decisions and `--preserve-batch` reference states at each
-step. This experiment preserved overall win rate against its parent in one
+step. Behavioral cloning now collects each minibatch's losses and makes one
+backward call per optimizer update; model forward passes are still per
+decision because legal-action and visible-state lengths vary. Replay
+verification, model fitting, and total wall time are reported separately.
+The [measured optimization run](benchmarks.md) shows where time went on one
+32-trajectory workload. This experiment preserved overall win rate against its parent in one
 held-out schedule but did not improve it, and Scapegoat agreement worsened
 where the teacher passed. See [evaluation](evaluation.md).
 

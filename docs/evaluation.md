@@ -5189,6 +5189,21 @@ and `.cache/goat-ai/fv23_parent_vs_tactical_11500_11507.json`
 This strengthens the conclusion that the local card-trade correction has
 not established a competitive gain.
 
+A separate full-decision on-policy imitation test relabeled **2,474**
+multi-option neural decisions from the same 32 replay-verified source duels
+with Tactical v14, then continued the original v23 parent for two epochs
+(width 32, batch 16, learning rate 0.0001, seed 48). The source duels span
+Jesse/Warrior and Return/Flip; the held-out schedule used Chaos Control/Bazoo
+Return and two different Goat Control lists, both assignments and seats, on
+seeds 11500–11507. The child scored **27 wins, 35 losses, and 2 draws**
+directly against its parent, with a paired score interval of **33.6%–53.9%**.
+This run did not close the competitive gap. Its ignored checkpoint is
+`.cache/goat-ai/fv23_full_on_policy_tactical_10400_10407.pt` (SHA-256
+`48a356fae3605bec346c2fad48312b47e9243f1bccd4b52d1518cdff2e59461a`)
+and tournament report is
+`.cache/goat-ai/fv23_full_on_policy_vs_parent_11500_11507.json` (SHA-256
+`f99994ceabc287aa89783df66fb3bea2aebf7e8703b1b0e716638d0bc43c4bdd`).
+
 For visual review, a new v25-versus-Tactical duel on the *previously reviewed*
 Return/Flip seed 9901 reached terminal in **251 replay-verified decisions**
 with the neural seat winning. Its greedy choices reproduce from the saved
