@@ -132,11 +132,11 @@ class RestrictedOcgcoreEngine:
                         sequence: int) -> int | None:
             if controller == native.player:
                 return code
-            if location == 0x02 and any(
-                    link.card_code in (5556668, 64697231) for link in observation.chain):
-                # Dustshoot reveals immediately before its only hand choice.
-                # Exchange has two choices after its one pair of reveals, so
-                # the second choice must retain the earlier addressed reveal.
+            if location == 0x02:
+                # A hand choice is legal to expose only after a reveal
+                # addressed to the acting player in this native transition.
+                # Exchange has a second choice after that transition; retain
+                # its earlier addressed reveal while its chain remains open.
                 exchange = any(link.card_code == 5556668 for link in observation.chain)
                 reveals = (observation.private_reveals if exchange else
                            self.probe._decision_private_reveals)
