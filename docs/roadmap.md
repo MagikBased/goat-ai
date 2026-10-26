@@ -881,3 +881,13 @@ now progresses through that native prompt, and the exact seed completes.
 Keep the child experimental. Broader independent labels, robust deck-balanced
 evaluation, and a separate self-play gain are still required for M4; see
 [evaluation](evaluation.md).
+
+Sixteen replay-verified Tactical-v14 demonstrations from four training Main
+Deck compositions supplied 3,786 teacher decisions for a feature-v23 neural
+continuation. On two independent held-out parent comparisons, that child
+scored 79–47–2 over 128 duels (paired-bootstrap score interval 53.9%–70.7%),
+but it scored only 12–52 against Tactical-v14 itself on 64 fresh duels.
+Continue training and evaluation across more independently sourced decks;
+keep the teacher as a baseline, and require a separate measured self-play
+gain before closing M4. The [evaluation log](evaluation.md) records provenance,
+hashes, deck splits, and exact limitations.

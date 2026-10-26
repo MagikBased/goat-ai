@@ -79,6 +79,8 @@ replayed but lack these content checks.
 
 `goat_ai.evaluation.run_tournament` depends only on the `RulesEngine` and agent interfaces. It runs each seed and matchup with both seat assignments and records wins, losses, draws, decisions, and a Wilson interval for decisive wins. The native CLI adds deck and asset fingerprints. This keeps evaluation separate from policy implementation and makes later checkpoint opponents possible without changing the duel engine.
 
+The intended playing agent uses a learned policy over the native engine's legal actions. The engine's legality and information boundaries are permanent constraints. `TacticalHeuristicAgent` is a versioned baseline and synthetic demonstration source; its card-value preferences are training guidance, not part of the neural policy by default. Optional inference guards are experimental and must be evaluated as separate agent variants. A narrow selection-progress rule prevents a known multi-card prompt loop; it is an interface safeguard rather than a strategic card rule. Retain strategic guards in a future release only if independent cross-deck tests show they improve the final agent.
+
 `run_tournament_parallel` executes the same schedule in spawned processes and
 returns results in schedule order. It requires pickleable top-level agent and
 engine factories, such as a class or `functools.partial`; spawning avoids

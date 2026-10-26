@@ -4900,3 +4900,70 @@ identical next observations and legal actions. Both resulting complete duels
 replay-verified and passed the player-visible trajectory audit. This validates
 the staged response and privacy boundary for that exact GOAT card prompt;
 other sum cards and very large worst-case search spaces remain unaudited.
+
+### Tactical-v14 imitation continuation on four new training decks
+
+Sixteen native Tactical-v14-versus-Combat-v3 demonstrations used both seats on
+Jesse Twohig GOAT Control versus Montague Warrior (seeds 9100–9103) and
+Dingosig Chaos Return versus GOAT Guide Flip Control (9110–9113). All games
+reached terminal, replay-verified, and passed the player-visible audit before
+training. The Tactical teacher won 14/16 and supplied 3,786 decisions. Starting
+from the feature-v23 Tactical-v7 64-game clone, a two-epoch width-32
+continuation with seed 31, minibatch 16, and learning rate 0.0003 reduced
+training loss from 0.221115 to 0.155757 in 42.08 seconds. The ignored child is
+`.cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt` (SHA-256
+`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`).
+The unchanged parent SHA-256 is
+`9806d1a9b7830d527c81de959236c5143fd5d0d4afc0c06d13159cb6991b6ceb`.
+
+After [native setup](native_setup.md), reproduce the ignored inputs and child:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher tactical --opponent combat_heuristic \
+  --deck-a examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+  --deck-b examples/decks/warrior_montague_clash.ydk \
+  --seed 9100 --seeds 4 --output-dir .cache/goat-ai/tactical_v14_jesse_warrior_9100_9103
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher tactical --opponent combat_heuristic \
+  --deck-a examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --deck-b examples/decks/flip_control_goatformat_guide.ydk \
+  --seed 9110 --seeds 4 --output-dir .cache/goat-ai/tactical_v14_return_flip_9110_9113
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/tactical_v14_jesse_warrior_9100_9103/seed_*.json \
+  .cache/goat-ai/tactical_v14_return_flip_9110_9113/seed_*.json \
+  --engine experimental --feature-version 23 --width 32 --epochs 2 \
+  --batch-size 16 --learning-rate 0.0003 --seed 31 \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v7_64games_6800_6845.pt \
+  --output .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt
+```
+
+The child and unchanged parent played two independent held-out schedules,
+each using unseen Main Deck compositions, both deck assignments, and both
+agent seats. Chaos Control/Bazoo Return and Lolmarcus/Michael GOAT Control,
+seeds 9300–9307, scored **39–23–2** for the child over 64 duels, with a
+paired-bootstrap 95% score interval of **52.3%–72.7%**. Dimension Fusion Turbo
+against Bazoo Return and Chaos Control, seeds 9400–9407, scored **40–24**
+over 64 duels, interval **50.0%–75.0%**. Combined, the child scored
+**79–47–2**, or 62.5%, with a matchup/seed paired interval of
+**53.9%–70.7%**. Assigned-deck results still ranged from 8–7–1 to 22–10;
+this is evidence of improvement over this parent across the measured schedules,
+not a general playing-strength claim. The ignored reports are
+`.cache/goat-ai/fv23_tactical_v14_continuation_vs_parent_9300_9307.json`
+(SHA-256 `97b4f3123b7b2e99f8ccfb192625ea3db0a1c9a974911b070c4f235a318a8d6d`)
+and `.cache/goat-ai/fv23_tactical_v14_continuation_vs_parent_9400_9407.json`
+(SHA-256 `dbfe70d45931228416bb020f951efb28d5e562a71b488f7436fd6944c2d9eba4`).
+
+Against Tactical-v14 itself on the first deck pairings with fresh seeds
+9500–9507, the child scored only **12–52** over 64 duels, paired interval
+**12.5%–25.0%**. The ignored report is
+`.cache/goat-ai/fv23_tactical_v14_continuation_vs_teacher_9500_9507.json`
+(SHA-256 `24c06cc748801e0fd2a6de19e0f96261714a93a14a09982ef505508d10cc3dc2`).
+All three tournaments used the experimental native adapter, four workers,
+and inference version 6, without optional tactical guards on the neural
+policy. The two parent comparisons took 45.29 and 33.48 seconds; the teacher
+comparison took 29.81 seconds. Synthetic teacher quality, small deck coverage,
+and unaudited historical card interactions limit the result. The child is a
+stronger *neural* checkpoint than this parent under the measured schedules,
+but Tactical-v14 remains far stronger and M4's competitive and self-play gates
+remain open.
