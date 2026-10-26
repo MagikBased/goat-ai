@@ -4287,3 +4287,45 @@ sum control. Replay and visibility checks use `scripts/audit_selfplay_replays.py
 on each recorded directory. The evaluation command follows the preceding
 same-checkpoint example, substituting the two child paths, seeds 6300–6307,
 and then the parent path with seeds 6400–6407.
+## Indianapolis 2005 corpus protocol sweep (2026-10-26)
+
+The evaluator now has a separate `--indianapolis-2005` schedule for the five
+legal, fully transcribed Main Decks from the [published 2005 Top 8](https://www.goatformat.com/home/top-8-decklists7022761).
+It pairs each unordered deck combination once, then swaps RandomAgent seats
+for seeds 5100 and 5101: 10 pairings, 40 duels total. All 40 reached terminal
+under 3,000 decisions; the largest used 1,539 decisions. One-worker and
+four-worker runs had identical ordered winners and decision counts, 39,057
+decisions in total. Five separate full-duel fixtures using these deck files
+already pass exact replay and visibility checks in
+`tests/test_2005_indianapolis_deck.py`; this wider 40-duel sweep tests
+completion and deterministic scheduling, not every replay's full snapshot
+equality or every historical card ruling.
+
+On an Intel Core i7-10700K under Linux 6.8.0-146-generic, the one-worker
+wall time was 52.761 s (0.758 duels/s, 740.3 decisions/s) and the
+four-worker wall time was 13.571 s (2.947 duels/s, 2,877.9 decisions/s).
+These are single runs including the tournament worker lifecycle; they do not
+measure neural inference or establish a general scaling curve. The ignored
+report SHA-256 values are
+`f90526a3eb86e4bf4e01b254b456c7588bf7e6500760ea9c8191c89e72c749a9`
+for one worker and
+`ce54ecca821b08672fbf67115eeebda2a37c72eb16a488102093121ce648c6a9`
+for four. Both reports record source-code hash
+`1a7314b5b785e4332e57d9621fe0e41865dd37fedb54d02fdb07306a397dd506`
+and card-script hash
+`f886f54c419d3792fd69888d74190c070992609caad8f5737e3f563bd736b71c`.
+The agent-vs-agent win rate is not a playing-strength result because both
+agents are RandomAgent and their Deck assignments are fixed by each pairing.
+
+Reproduce after [native setup](native_setup.md):
+
+```bash
+for workers in 1 4; do
+  OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_native.py \
+    --engine experimental --indianapolis-2005 \
+    --agent-a random --agent-b random --seed 5100 --seeds 2 \
+    --workers "$workers" --max-decisions 3000 --native-root .cache/goat-ai \
+    --output ".cache/goat-ai/indianapolis_2005_random_5100_5101_${workers}.json" \
+    > ".cache/goat-ai/indianapolis_2005_random_5100_5101_${workers}.stdout"
+done
+```

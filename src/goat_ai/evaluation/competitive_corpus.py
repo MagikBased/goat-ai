@@ -12,3 +12,13 @@ TOURNAMENT_MAIN_DECKS = (
     "chaos_return_dingosig_worlds_2022.ydk",
     "bazoo_return_weirdchamp_worlds.ydk",
 )
+
+# Five complete legal Main Decks transcribed from the published 2005
+# Indianapolis Top 8. The other printed lists are under 40 cards as printed.
+INDIANAPOLIS_2005_MAIN_DECKS = (
+    "goat_control_matt_peddle_indianapolis_2005.ydk",
+    "goat_control_michael_fukuyama_indianapolis_2005.ydk",
+    "goat_control_jesse_twohig_indianapolis_2005.ydk",
+    "gravekeeper_daryl_gessler_indianapolis_2005.ydk",
+    "flip_control_cas_stomphorst_indianapolis_2005.ydk",
+)

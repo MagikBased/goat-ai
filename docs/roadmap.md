@@ -39,6 +39,14 @@ A documented [competitive Warrior Main Deck](../examples/decks/warrior_montague_
 
 A further 60-duel random-agent sweep on seeds 21–30 covered all three pairings among the sourced Goat Control, Chaos Turbo, and Warrior lists in both seats. All reached terminal under a 3,000-decision cap, with 60,374 decisions total. Goat Control versus Warrior additionally has two complete seat-swapped trajectories that replay-verify. The measured two-worker runtime and limits are in [the evaluation log](evaluation.md). This widens M1 protocol coverage; M2 historical card correctness remains open.
 
+The evaluator also runs all ten pairings of five executable Indianapolis 2005
+Top 8 Main Decks through `--indianapolis-2005`. On two seeds with both agent
+seats, all 40 RandomAgent duels reached terminal under the 3,000-decision
+limit; ordered results and 39,057 total decisions matched between one and
+four workers. This extends protocol coverage across contemporary submitted
+decks, while the separate historical ruling and hidden-information audits
+remain open. See [evaluation](evaluation.md).
+
 A [GoatFormat guide Flip Control Main Deck](../examples/decks/flip_control_goatformat_guide.ydk) adds a fourth archetype centered on Tsukuyomi, Dekoichi, Magician of Faith, Mask of Darkness, and Time Seal. The guide does not name a tournament pilot or list an Extra Deck, so the fixture records neither. Forty random-agent duels against Chaos Turbo and Goat Control, paired across seats on seeds 31–40, all reached terminal under the 3,000-decision cap. Four full-duel fixtures serialize and replay-verify trajectories. A targeted native M2 fixture now checks two Mask of Darkness / Time Seal recoveries and skipped Draw Phases; interruptions and other timing branches remain open. Measured runtime and exact reproduction are in [the evaluation log](evaluation.md).
 
 A [GoatFormat guide Dimension Fusion Turbo Main Deck](../examples/decks/dimension_fusion_turbo_goatformat_guide.ydk) adds a combo archetype centered on Thunder Dragon, Bazoo, and Dimension Fusion. The guide lists no Extra or Side Deck, and this is not a submitted tournament list. Twenty paired random-agent duels against sourced Chaos Turbo reached terminal under 3,000 decisions; two seat-swapped full-duel trajectories replay-verify. Targeted native fixtures verify Dimension Fusion's 2,000 LP cost, empty-banished-zone activation gate, revival of both Chaos Summon costs, both-player revival after D.D. Warrior Lady's battle banish, persistence through the End Phase, and matched Torrential Tribute and Solemn Judgment response windows. See [the evaluation log](evaluation.md) and [GOAT rules](goat_rules.md).

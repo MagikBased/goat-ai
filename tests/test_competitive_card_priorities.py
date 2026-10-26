@@ -2,7 +2,10 @@
 
 from pathlib import Path
 
-from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
+from goat_ai.evaluation.competitive_corpus import (
+    INDIANAPOLIS_2005_MAIN_DECKS,
+    TOURNAMENT_MAIN_DECKS,
+)
 from scripts.evaluate_native import tournament_matchups
 from scripts.report_competitive_card_priorities import priority_rows
 
@@ -24,6 +27,16 @@ def test_tournament_priority_corpus_excludes_guide_and_includes_bazoo():
     assert all("flip_control_goatformat_guide.ydk" not in pair for pair in matchups)
     assert sum("bazoo_return_weirdchamp_worlds.ydk" in pair[1]
                for pair in matchups) == 5
+
+
+def test_indianapolis_2005_corpus_is_separate_and_has_ten_pairs():
+    root = Path(__file__).resolve().parent.parent / "examples/decks"
+    assert len(INDIANAPOLIS_2005_MAIN_DECKS) == 5
+    assert all((root / name).is_file() for name in INDIANAPOLIS_2005_MAIN_DECKS)
+    matchups = tournament_matchups(root, indianapolis_2005=True)
+    assert len(matchups) == 10
+    assert {Path(deck).name for pair in matchups for deck in pair} == set(
+        INDIANAPOLIS_2005_MAIN_DECKS)
 
 
 def test_priority_rows_uses_main_decks_and_exact_card_ids(tmp_path):
