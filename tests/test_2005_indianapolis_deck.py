@@ -16,9 +16,10 @@ from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 ROOT = Path(__file__).resolve().parents[1]
-DECK = ROOT / "examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk"
+MATT_DECK = ROOT / "examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk"
+MICHAEL_DECK = ROOT / "examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk"
 OPPONENT = ROOT / "examples/decks/goat_control_lolmarcus_2020.ydk"
-EXTRA_NAMES = Counter({
+MATT_EXTRA_NAMES = Counter({
     "Thousand-Eyes Restrict": 3,
     "Flame Ghost": 1,
     "Darkfire Dragon": 1,
@@ -31,6 +32,19 @@ EXTRA_NAMES = Counter({
     "Gatling Dragon": 1,
     "The Last Warrior from Another Planet": 1,
 })
+MICHAEL_EXTRA_NAMES = Counter({
+    "Thousand-Eyes Restrict": 3,
+    "Dark Flare Knight": 2,
+    "Ryu Senshi": 3,
+    "Dark Balter the Terrible": 2,
+    "King Dragun": 2,
+    "Dark Blade the Dragon Knight": 2,
+    "Darkfire Dragon": 1,
+    "Charubin the Fire Knight": 1,
+    "Fusionist": 1,
+    "Giltia the D. Knight": 1,
+    "Gatling Dragon": 1,
+})
 
 
 def _source_name(name: str) -> str:
@@ -39,10 +53,17 @@ def _source_name(name: str) -> str:
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_published_2005_main_and_fusions_match_pinned_legal_ids():
+@pytest.mark.parametrize("player, deck_path, extra_names", [
+    ("Matt Peddle", MATT_DECK, MATT_EXTRA_NAMES),
+    ("Michael Fukuyama", MICHAEL_DECK, MICHAEL_EXTRA_NAMES),
+])
+def test_published_2005_main_and_fusions_match_pinned_legal_ids(
+    player, deck_path, extra_names,
+):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    deck = read_ydk(DECK)
-    assert (len(deck.main), len(deck.extra), len(deck.side)) == (40, 16, 0)
+    deck = read_ydk(deck_path)
+    assert (len(deck.main), len(deck.extra), len(deck.side)) == (
+        40, sum(extra_names.values()), 0)
     validate_goat_deck(deck, read_goat_whitelist(root / "banlist/GOAT.lflist.conf"),
                        root / "database/cards.cdb",
                        root / "database/goat-entries.cdb",
@@ -57,26 +78,40 @@ def test_published_2005_main_and_fusions_match_pinned_legal_ids():
                     names[code] = _source_name(row[0])
     assert names.keys() >= set(deck.main + deck.extra)
     expected_main = Counter({_source_name(name): copies for name, copies in
-                             historical_main_decks()["Matt Peddle"].items()})
+                             historical_main_decks()[player].items()})
     expected_extra = Counter({_source_name(name): copies for name, copies in
-                              EXTRA_NAMES.items()})
+                              extra_names.items()})
     assert Counter(names[code] for code in deck.main) == expected_main
     assert Counter(names[code] for code in deck.extra) == expected_extra
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_2005_deck_completes_visible_replay_verified_native_duel(tmp_path):
+@pytest.mark.parametrize("deck_a, deck_b, seed", [
+    (MATT_DECK, OPPONENT, 2070),
+    (MATT_DECK, MICHAEL_DECK, 2072),
+])
+def test_2005_deck_completes_visible_replay_verified_native_duel(
+    tmp_path, deck_a, deck_b, seed,
+):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    agents = (RandomAgent(2070), RandomAgent(2071))
-    with GoatEnvironment(str(DECK), str(OPPONENT), seed=2070,
+    agents = (RandomAgent(seed), RandomAgent(seed + 1))
+    with GoatEnvironment(str(deck_a), str(deck_b), seed=seed,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
+        designator_prompt = False
         for _ in range(3000):
             if env.is_terminal():
                 break
             legal = env.legal_actions()
+            if legal[0].kind == "announce_card":
+                codes = {action.parameters["code"] for action in legal}
+                assert {14087893, 33423043} <= codes  # Book and Designator are names.
+                assert {504700102, 63519819}.isdisjoint(codes)  # Fusion names excluded.
+                designator_prompt = True
             obs = env.step(agents[obs.acting_player].select_action(obs, legal))
         assert env.is_terminal(), "2005 deck duel exceeded 3000 decisions"
+        if deck_b == MICHAEL_DECK:
+            assert designator_prompt
         trajectory = env.trajectory()
         path = tmp_path / "indianapolis_2005.json"
         write_trajectory(path, trajectory)

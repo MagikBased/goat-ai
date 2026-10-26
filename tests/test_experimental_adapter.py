@@ -84,6 +84,11 @@ def test_new_native_choice_formats():
     assert [(choice.kind, choice.announced_card, choice.response)
             for choice in announced.choices] == [
                 ("announce_card", 100, 100), ("announce_card", 200, 200)]
+    designator_prompt = b"\x8e\x01\x03" + struct.pack(
+        "<QQQ", 0x4802040, 0x4000010200000000, 0x4000000700000000)
+    designator = decode_decision(designator_prompt, (100, 200))
+    assert [(choice.kind, choice.announced_card) for choice in designator.choices] == [
+        ("announce_card", 100), ("announce_card", 200)]
     with pytest.raises(NotImplementedError, match="catalog"):
         decode_decision(card_prompt)
     with pytest.raises(NotImplementedError, match="expression"):

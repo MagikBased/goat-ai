@@ -136,7 +136,9 @@ def decode_decision(message: bytes,
         count = reader.integer(1)
         options = tuple(reader.integer(8) for _ in range(count))
         reader.finish()
-        if player not in (0, 1) or options != (1, 0x4000010200000000):
+        supported = ((1, 0x4000010200000000),
+                     (0x4802040, 0x4000010200000000, 0x4000000700000000))
+        if player not in (0, 1) or options not in supported:
             raise NotImplementedError("card announcement expression is not supported")
         if not announcement_codes:
             raise NotImplementedError("historical card announcement catalog is unavailable")

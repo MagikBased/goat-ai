@@ -2416,3 +2416,16 @@ PYTHONPATH=src:. .venv/bin/python -m scripts.evaluate_native \
   --both-deck-assignments --seed 20050 --seeds 2 --max-decisions 3000 \
   --output artifacts/indianapolis_2005_vs_2020_random_20050_20051.json
 ```
+
+The second exact published fixture, [Michael Fukuyama's 2005 deck](../examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk), has a 40-card Main Deck and 19-card Fusion Deck with source-name and whitelist tests. It contains D.D. Designator, whose native name prompt uses `NOT ISTYPE(TYPE_EXTRA)`. The adapter now offers pinned historical card names other than Fusion and other Extra Deck names; an integration test checks that Book of Moon and D.D. Designator are choices while Thousand-Eyes Restrict is not. The seeded complete duel that first exposed this prompt now replay-verifies and passes the visibility audit. The catalog remains bounded by the pinned GOAT whitelist and does not prove every historically declarable printed name.
+
+The two 2005 decks then played both assignments, both seats, and seeds 2072–2073 under RandomAgent: **8/8 terminal duels**, 8,332 decisions, maximum 1,377 decisions. Sequential wall time was **9.84 seconds** on Linux x86_64 (**0.81 duels/s**, **847 decisions/s**). Agent A split 4–4; this is protocol coverage, not a deck-strength estimate. The ignored report `artifacts/indianapolis_2005_peddle_fukuyama_random_2072_2073.json` stores game outcomes and pinned hashes. Reproduce it with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python -m scripts.evaluate_native \
+  --engine experimental \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+            examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --both-deck-assignments --seed 2072 --seeds 2 --max-decisions 3000 \
+  --output artifacts/indianapolis_2005_peddle_fukuyama_random_2072_2073.json
+```

@@ -249,6 +249,7 @@ class OcgcoreProbe:
         self._decision_private_reveals: list[PrivateRevealView] = []
         self._initial_main_decks: tuple[tuple[int, ...], tuple[int, ...]] = ((), ())
         self._announcement_codes: tuple[int, ...] | None = None
+        self._announcement_non_extra_codes: tuple[int, ...] | None = None
         self._disabled_zones: tuple[DisabledZoneView, ...] = ()
         self._bind()
         major, minor = c.c_int(), c.c_int()
@@ -341,10 +342,25 @@ class OcgcoreProbe:
                 if row is not None and row[1] & 1 and row[0]:
                     names.add(row[0])
             # The core rejects aliases and Tokens for this expression.
-            self._announcement_codes = tuple(code for code in sorted(names)
-                if (row := self._card_row(code, "alias, type")) is not None
-                and row[0] == 0 and row[1] & 1 and not row[1] & 0x4000)
-        return decode_decision(self._pending_message, self._announcement_codes)
+            entries = tuple((code, row[1]) for code in sorted(names)
+                            if (row := self._card_row(code, "alias, type")) is not None
+                            and row[0] == 0 and not row[1] & 0x4000)
+            self._announcement_codes = tuple(code for code, card_type in entries
+                                             if card_type & 1)
+            # TYPE_EXTRA in the pinned core excludes Fusion, Synchro, Xyz,
+            # and Link cards. D.D. Designator's native expression applies
+            # NOT ISTYPE(TYPE_EXTRA), so Spells/Traps remain legal names.
+            self._announcement_non_extra_codes = tuple(
+                code for code, card_type in entries if not card_type & 0x4802040)
+        prompt = self._pending_message
+        if len(prompt) < 3 or len(prompt) != 3 + 8 * prompt[2]:
+            return decode_decision(prompt)
+        expression = struct.unpack_from(f"<{prompt[2]}Q", prompt, 3)
+        codes = (self._announcement_non_extra_codes
+                 if expression == (0x4802040, 0x4000010200000000,
+                                   0x4000000700000000)
+                 else self._announcement_codes)
+        return decode_decision(prompt, codes)
 
     def _read_script(self, _payload: int, duel: int, name: bytes) -> int:
         relative = Path(name.decode("utf-8"))
