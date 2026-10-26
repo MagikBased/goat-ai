@@ -68,6 +68,17 @@ reviewer can inspect future frames, so they must not be presented as live
 human-gameplay demonstrations or assumed to reflect expert skill. Hold out
 entire games and decklists before claiming any training benefit.
 
+The same selective-label reader accepts `authorization=scripted_scenario`
+only when the trajectory source begins with `scripted_` and every labeled
+action is the one actually executed in that replay. It still requires the
+source hash, replay verification, visibility audit, unique decision indexes,
+and legal-action indexes. The trainer records these separately as
+`source=synthetic_annotation`; they are never counted as human labels.
+`scripts/generate_scapegoat_timing_probe.py` generates three such labels for
+an End Phase Scapegoat diagnostic. This is a narrow curriculum tool, not an
+expert-play dataset. Evaluate any model trained on it on separate seeds and
+decks before claiming a gain.
+
 For a controlled baseline, collect heuristic decisions against RandomAgent in both seats and train on only those decisions:
 
 ```bash

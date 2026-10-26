@@ -1,6 +1,7 @@
 """Retrospective labels must stay tied to verified visible legal decisions."""
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -36,6 +37,7 @@ def test_annotations_select_only_reviewed_legal_action(tmp_path):
         annotation_file(tmp_path), "a" * 64, trajectory())
     assert labels.choices == ((0, 1),)
     assert labels.reviewer == "Reviewer"
+    assert labels.authorization == "self_recorded"
     assert len(records) == 1
     assert records[0].selected_action == trajectory().decisions[0].legal_actions[1]
     assert records[0].observation == trajectory().decisions[0].observation
@@ -60,3 +62,20 @@ def test_annotations_reject_untrusted_or_invalid_labels(tmp_path, change, messag
 def test_annotations_reject_wrong_source_hash(tmp_path):
     with pytest.raises(ValueError, match="SHA-256"):
         read_decision_annotations(annotation_file(tmp_path), "b" * 64, trajectory())
+
+
+def test_scripted_annotations_require_matching_replayed_actions(tmp_path):
+    scripted = replace(trajectory(), source="scripted_timing_probe")
+    labels, records = read_decision_annotations(annotation_file(
+        tmp_path, authorization="scripted_scenario",
+        choices=[{"decision_index": 0, "action_index": 0}]), "a" * 64, scripted)
+    assert labels.authorization == "scripted_scenario"
+    assert records[0].selected_action == scripted.decisions[0].selected_action
+    with pytest.raises(ValueError, match="scripted trajectory"):
+        read_decision_annotations(annotation_file(
+            tmp_path, authorization="scripted_scenario",
+            choices=[{"decision_index": 0, "action_index": 0}]),
+            "a" * 64, trajectory())
+    with pytest.raises(ValueError, match="replayed action"):
+        read_decision_annotations(annotation_file(
+            tmp_path, authorization="scripted_scenario"), "a" * 64, scripted)

@@ -2721,3 +2721,48 @@ replay-verified native End Phase diagnostic on both turn owners. Both matched
 checkpoints pass when the script activates Scapegoat at the opponent's later
 End Phase, so this targeted case confirms the timing gap left by the holdout
 sample. It is one synthetic scenario, not an independent strength estimate.
+
+## Three-label synthetic Scapegoat timing fit
+
+The timing probe now emits `replays/scapegoat_end_timing_probe_seed52.labels.json`
+(SHA-256 `f14bcb731cf3b0755be735926e52cd4588383384097251bded6431d88ce80e23`).
+It names only replayed choices at decision indexes 20, 28, and 35, with
+`scripted_scenario` authorization tied to the exact trajectory hash. The
+trainer verifies the full 711-decision duel and its visible information,
+then records exactly **three `synthetic_annotation` decisions** separately
+from the parent's 6,014 tactical-teacher decisions. This is synthetic
+curriculum data, not human gameplay.
+
+Warm-starting the feature-19 width-16 parent with five epochs at learning
+rate 0.0001 did not change its `pass/pass/pass` choices on the probe. A
+100-epoch fit at learning rate 0.001 also left the last choice as `pass`.
+A **500-epoch fit** at learning rate 0.001 made the choices
+`pass/pass/chain` (final training loss 0.0107). The resulting checkpoint is
+`checkpoints/tactical_v3_fv19_scapegoat_timing_fit500_52.pt` (SHA-256
+`894261f8cc5c5eb57016aaac80c0f3932a0149aa5e5b1e63ed1a6e0d9125720f`).
+This is an overfit check on the three labeled states, not a held-out result.
+
+Four separate shuffled versions of the same synthetic duel (seeds 56, 64,
+69, and 70) all replay-verified. The parent passed at the later opponent End
+Phase on all four; the child activated at all four and passed at its own End
+Phase on all four. On seed 64 it also activated at the earlier opponent End
+Phase, which may be sensible; that scripted earlier `pass` exists to keep the
+card for the later probe. These variants retain the same fixture deck
+composition and do not establish transfer to competitive decks.
+
+On unseen Michael Fukuyama, Chaos Control, Warrior, and Chaos Return Main
+Decks, the child scored **69 wins, 59 losses** directly against its parent
+across 128 paired games at seeds 2540–2555, both deck assignments and both
+seats. Its score rate was **53.91%**, paired bootstrap 95% interval
+**44.53–62.50%**. The assigned-deck splits were Michael 23–9, Warrior
+25–7, Chaos Control 10–22, and Chaos Return 11–21. The evaluator rejected
+all training deck hashes and required unseen Main Deck compositions. This
+does **not** establish a competitive gain and shows substantial deck
+dependence. The two ignored 64-game reports are
+`artifacts/scapegoat_timing_fit500_vs_parent_2540_2547.json` (SHA-256
+`ff8af0277b3b9852e23fdf38a65a96a2147ba39a9c6898157f95f2b81e81cb64`)
+and `artifacts/scapegoat_timing_fit500_vs_parent_2548_2555.json` (SHA-256
+`0ada91370bca07fbc1dbf77f4a6d5bf0dd15a88079b903fe1013f17a163c60a6`).
+The four-worker tournament times were 33.26 and 35.71 seconds respectively.
+The next experiment needs independent timing decisions from competitive
+decks and a training method that preserves broader play while learning them.

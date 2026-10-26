@@ -71,8 +71,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("trajectories", nargs="+", type=Path)
     parser.add_argument("--annotation", type=Path, action="append", default=[],
-                        help="self-recorded labels, one per trajectory in the same order; "
-                             "train only annotated decisions")
+                        help="authorized self-recorded or scripted-scenario labels, "
+                             "one per trajectory in the same order; train only those decisions")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--output", type=Path, required=True)
@@ -127,7 +127,9 @@ def main() -> None:
         else:
             selected = demonstrator_records(trajectory)
         records.extend(selected)
-        source = "human_annotation" if annotation is not None else trajectory.source
+        source = ({"self_recorded": "human_annotation",
+                   "scripted_scenario": "synthetic_annotation"}[annotation.authorization]
+                  if annotation is not None else trajectory.source)
         sources[source] += len(selected)
         trajectory_hashes[str(path)] = hashlib.sha256(raw).hexdigest()
         training_games.append({"seed": trajectory.seed,
@@ -141,7 +143,7 @@ def main() -> None:
                                "annotation_sha256": (hashlib.sha256(
                                    args.annotation[index].read_bytes()).hexdigest()
                                    if annotation is not None else None),
-                               "authorization": ("self_recorded" if annotation is not None
+                               "authorization": (annotation.authorization if annotation is not None
                                                  else (trajectory.skill_metadata or {}).get(
                                                      "authorization")),
                                "reviewer": annotation.reviewer if annotation is not None else None,

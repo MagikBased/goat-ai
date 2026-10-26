@@ -372,6 +372,15 @@ replay-verified demonstrations that actually include both own-turn and
 opponent-turn End Phase Scapegoat choices, then test timing agreement and
 paired strength on separate seeds and decks. See [evaluation](evaluation.md).
 
+A replay-verified scripted Scapegoat probe now supplies three explicitly
+synthetic End Phase labels. An overfit warm-start learned the probe's later
+opponent-turn activation and repeated it on four new shuffle seeds, but its
+69–59 head-to-head result against the parent on unseen decks has a paired
+interval spanning 50% and large deck splits. Keep the child experimental.
+Collect authorized skilled-player timing decisions or broader marked
+synthetic scenarios, then test a training method that retains strength
+across Chaos and control decks; see [evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

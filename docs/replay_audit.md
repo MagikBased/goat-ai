@@ -61,6 +61,13 @@ PYTHONPATH=src:. .venv/bin/python scripts/generate_scapegoat_timing_probe.py \
   --checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt
 ```
 
+The generator also writes a `.labels.json` file containing only the three
+scripted actions, tagged `scripted_scenario`. The trainer accepts these as
+`synthetic_annotation` after replay and visibility verification; see
+[ML notes](ml.md). A targeted warm-start fit learned the final activation
+on four other shuffle seeds, but its paired competitive result remains
+inconclusive; see [evaluation](evaluation.md).
+
 The next learning experiment should include genuine, authorized End Phase
 choices from skilled players or explicitly marked synthetic timing examples
 in training, then evaluate on separate native scenarios and held-out matches.

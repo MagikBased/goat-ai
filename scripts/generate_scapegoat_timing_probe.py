@@ -4,6 +4,7 @@ This scripted synthetic scenario is an evaluation probe, not human gameplay.
 """
 
 import argparse
+import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
@@ -28,11 +29,11 @@ def timing_records(trajectory):
             yield index, record
 
 
-def run_probe(native_root: Path, output: Path):
+def run_probe(native_root: Path, output: Path, *, seed: int = 52):
     """Complete and verify a native duel with both turn-owner timing windows."""
     plain = DECKS / "vanilla_probe.ydk"
     goat = DECKS / "scapegoat_timing_probe.ydk"
-    with GoatEnvironment(str(plain), str(goat), seed=52,
+    with GoatEnvironment(str(plain), str(goat), seed=seed,
                          engine=ExperimentalOcgcoreEngine(native_root)) as env:
         observation = env.reset()
         tactical = TacticalHeuristicAgent()
@@ -80,18 +81,31 @@ def run_probe(native_root: Path, output: Path):
                                  ExperimentalOcgcoreEngine(native_root))
     if verified != len(trajectory.decisions):
         raise RuntimeError("Scapegoat timing replay was not fully verified")
+    labels = {
+        "schema_version": 1,
+        "source_trajectory_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+        "authorization": "scripted_scenario",
+        "reviewer": "GOAT AI deterministic timing probe",
+        "choices": [{"decision_index": index,
+                     "action_index": record.legal_actions.index(record.selected_action)}
+                    for index, record in timing_records(trajectory)],
+    }
+    output.with_suffix(".labels.json").write_text(json.dumps(labels, indent=2) + "\n")
     return trajectory
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
-    parser.add_argument("--output", type=Path,
-                        default=Path("replays/scapegoat_end_timing_probe_seed52.json"))
+    parser.add_argument("--seed", type=int, default=52)
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--checkpoint", type=Path, action="append", default=[])
     args = parser.parse_args()
-    trajectory = run_probe(args.native_root, args.output)
-    report = {"replay": str(args.output), "verified_decisions": len(trajectory.decisions),
+    output = args.output or Path(f"replays/scapegoat_end_timing_probe_seed{args.seed}.json")
+    trajectory = run_probe(args.native_root, output, seed=args.seed)
+    report = {"replay": str(output),
+              "labels": str(output.with_suffix(".labels.json")),
+              "verified_decisions": len(trajectory.decisions),
               "scripted_choices": [{"decision": i, "turn": record.observation.turn,
                                     "turn_player": record.observation.turn_player,
                                     "selected": record.selected_action.kind}

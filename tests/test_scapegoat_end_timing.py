@@ -1,11 +1,12 @@
 """A replay-verified Scapegoat probe crosses both End Phase turn owners."""
 
+import hashlib
 import os
 from pathlib import Path
 
 import pytest
 
-from goat_ai.replay import read_trajectory
+from goat_ai.replay import read_decision_annotations, read_trajectory
 from scripts.generate_scapegoat_timing_probe import run_probe, timing_records
 
 SCAPEGOAT = 504700123
@@ -25,3 +26,9 @@ def test_scapegoat_end_phase_choices_respect_turn_owner(tmp_path):
          record.observation.acting_player, record.selected_action.kind)
         for _, record in timing_records(read_trajectory(path))
     ] == [(3, 0, 1, "pass"), (4, 1, 1, "pass"), (5, 0, 1, "chain")]
+    labels, selected = read_decision_annotations(
+        path.with_suffix(".labels.json"), hashlib.sha256(path.read_bytes()).hexdigest(),
+        read_trajectory(path))
+    assert labels.authorization == "scripted_scenario"
+    assert labels.choices == ((20, 1), (28, 1), (35, 0))
+    assert [record.selected_action.kind for record in selected] == ["pass", "pass", "chain"]
