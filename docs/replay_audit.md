@@ -33,6 +33,38 @@ the broader timing rule. A stronger policy also needs opponent-aware value
 estimates and training
 examples for these exceptions.
 
+## Scapegoat turn-owner timing probe, seed 52
+
+`scripts/generate_scapegoat_timing_probe.py` creates a complete, native,
+replay-verified 711-decision synthetic duel with checked-in fixture decks.
+Seat 1 Sets Scapegoat, passes at the opponent's End Phase on turn 3 to keep
+the card available, passes on its own End Phase on turn 4, then activates it
+on the opponent's End Phase on turn 5. These are viewer frames **21, 29, and
+36**. The probe deliberately holds Scapegoat through the first opportunity;
+it tests whether the later choices are distinguishable, not whether waiting
+an extra turn is optimal. The fixture has no human-skill label and must not
+be counted as human demonstration data.
+
+Both `tactical_v3_fv18_2500_2503.pt` and `tactical_v3_fv19_2500_2503.pt`
+chose `pass` at all three frames when scored off-policy. The optional tactical
+guard also left the final `pass` intact: it filters bad timings, but does not
+force Scapegoat activation at a good one. This is a concrete remaining policy
+mistake, not evidence that either model is stronger. The generated replay is
+`replays/scapegoat_end_timing_probe_seed52.json` (SHA-256
+`39dd1ab9962555f0cc413720736d632c0bbe109edb2d3684a797beb6922cdbe0`),
+with an offline viewer at the matching `.html` path. Reproduce the policy
+comparison with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/generate_scapegoat_timing_probe.py \
+  --checkpoint checkpoints/tactical_v3_fv18_2500_2503.pt \
+  --checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt
+```
+
+The next learning experiment should include genuine, authorized End Phase
+choices from skilled players or explicitly marked synthetic timing examples
+in training, then evaluate on separate native scenarios and held-out matches.
+
 To inspect the guarded seed 2202 duel, open
 `replays/policy_guard_vs_combat_2202.html`. The JSON trajectory is independently
 replayed through the native engine before the recorder accepts it. Because the

@@ -2715,3 +2715,9 @@ The ignored report is
 These data show no competitive gain from the feature on this schedule. Keep
 feature 19 opt-in and collect replay-verified own-turn and opponent-turn End
 Phase Scapegoat choices before making a timing-specific learning claim.
+
+A subsequent [scripted timing probe](replay_audit.md) now supplies a
+replay-verified native End Phase diagnostic on both turn owners. Both matched
+checkpoints pass when the script activates Scapegoat at the opponent's later
+End Phase, so this targeted case confirms the timing gap left by the holdout
+sample. It is one synthetic scenario, not an independent strength estimate.
