@@ -35,7 +35,7 @@ ACTION_KINDS = (
 ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
 SORT_ACTION_KINDS = ("sort_cards",)
-POLICY_INFERENCE_VERSION = 5  # tactical guard distinguishes current turn owner
+POLICY_INFERENCE_VERSION = 6  # unfinished card selection cannot toggle while adding is legal
 POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experiments
 # Version 16 branches from v12 so its combat relation can be tested without
 # the separate v13-v15 equip, chain-target, and occupancy experiments.
@@ -65,7 +65,7 @@ class CardVocabulary:
         if self.codes != tuple(sorted(set(self.codes))) or any(code <= 0 for code in self.codes):
             raise ValueError("card vocabulary must contain sorted unique positive codes")
         if (tuple(code for code, _, _ in self.card_properties)
-                != tuple(sorted(set(code for code, _, _ in self.card_properties)))
+                != tuple(sorted({code for code, _, _ in self.card_properties}))
                 or any(code not in self.codes or card_type < 0
                        for code, card_type, _ in self.card_properties)):
             raise ValueError("card properties must be sorted unique vocabulary members")
@@ -616,14 +616,8 @@ class PolicyAgent:
         if position_guard_version not in (1, 2):
             raise ValueError("unknown position guard version")
         self.position_guard_version = position_guard_version
-        self._last_selection: tuple[int, str, tuple] | None = None
         self._cancel_turn: int | None = None
         self._cancelled_prompts: list[tuple[Observation, tuple[tuple, ...]]] = []
-
-    @staticmethod
-    def _card_reference(action: Action) -> tuple:
-        return tuple(action.parameters.get(key) for key in
-                     ("code", "controller", "location", "sequence"))
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         features = encode_decision(observation, legal_actions, self.vocabulary,
@@ -670,14 +664,13 @@ class PolicyAgent:
                            if action.kind == "finish_selection"), None)
             if finish is not None:
                 chosen = finish
-            elif self._last_selection == (
-                observation.turn, observation.phase, self._card_reference(chosen)
-            ):
+            else:
+                # Select/unselect prompts can offer several selected cards.
+                # Toggling a different card on each step defeats the old
+                # single-card repeat check and can loop indefinitely. If the
+                # selection is not finishable, add a legal card when possible.
                 alternatives = [(index, action) for index, action in enumerate(legal_actions)
                                 if action.kind == "select_card"]
                 if alternatives:
                     chosen = max(alternatives, key=lambda item: scores[item[0]].item())[1]
-        self._last_selection = ((observation.turn, observation.phase,
-                                 self._card_reference(chosen))
-                                if chosen.kind == "select_card" else None)
         return chosen

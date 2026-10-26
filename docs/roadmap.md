@@ -857,3 +857,14 @@ decisions and a fresh self-play replay passes full verification. Its first
 split and a paired interval touching 50%. Keep M4 open: this heuristic change
 does not establish cross-deck strength or a learned self-play gain. See
 [replay audit](replay_audit.md) and [evaluation](evaluation.md).
+
+The later v13 player review added three resource preferences. A small
+parent-KL neural update improved all three pairwise margins but did not make
+two preferred actions the checkpoint's top choices. On 128 held-out duels
+across four deck pairings, it scored 68–59–1 against its parent, with a paired
+interval crossing 50% and severe assigned-deck splits. A second schedule
+also uncovered a 10,000-decision select/unselect loop; policy inference v6
+now progresses through that native prompt, and the exact seed completes.
+Keep the child experimental. Broader independent labels, robust deck-balanced
+evaluation, and a separate self-play gain are still required for M4; see
+[evaluation](evaluation.md).

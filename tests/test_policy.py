@@ -1520,6 +1520,8 @@ def test_policy_agent_progresses_multi_card_selection():
     toggle = Action("toggle", "unselect_card", 0, {"code": 10, "sequence": 0})
     other = Action("other", "select_card", 0, {"code": 20, "sequence": 1})
     assert agent.select_action(view(), (toggle, other)) == other
+    fresh_agent = PolicyAgent(FavorUnselect(), CardVocabulary((10, 20)))
+    assert fresh_agent.select_action(view(), (toggle, other)) == other
     finish = Action("finish", "finish_selection", 0)
     assert agent.select_action(view(), (toggle, finish)) == finish
 

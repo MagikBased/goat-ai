@@ -4811,3 +4811,50 @@ score interval was **50.0%–57.8%**; the assigned Flip Control split was 5–11
 The ignored report is `.cache/goat-ai/tactical_v14_vs_v13_8900_8907.json`
 (SHA-256 `f29ed64c7dd264d8127a0f2311f0eb14c302008abb42dfc79a5beb9e4a42dde2`).
 This does not demonstrate a cross-deck strength gain or satisfy the M4 gate.
+
+### Three-review neural update and a multi-card selection loop
+
+The three v13 seed-6803 reviewed choices were replay-verified and visibility-
+audited before scoring the feature-v23 Tactical-v6 policy trained on seeds
+4800–4803 and 4810–4813. Neither the review replay nor its seed appears in
+that parent's training provenance. At decisions 83, 84, and 324, the parent's
+preferred-minus-disfavored log-mean-exp margins were **−2.608, −3.530,
++0.737**. A 100-step opt-in preference update with learning rate `1e-4`,
+parent-KL weight 1.0, and 64 sampled preservation decisions from four
+parent-provenance trajectories moved those margins to **+1.513, +0.328,
++2.658**. Its initial/final preference losses were 2.210/0.275 and final
+preservation KL was 0.0100. The preferred action became greedy at only **one
+of three** frames: the other two had an unreviewed action ranked above both
+compared actions. This is a measured pairwise improvement, not a claim that
+the full decision is now correct. The ignored child is
+`.cache/goat-ai/fv23_v13_review3_child.pt` (SHA-256
+`ffb1682c374b272dd5d2d1ebd9af984436fb33b76d5931303258107816a57ece`).
+
+An initial held-out tournament on four unseen Main Deck compositions,
+seeds 9000–9007, scored 36–28 against the unchanged parent. A second
+different-deck schedule initially exceeded both 5,000 and 10,000 decisions
+on Bazoo Return versus Flip Control, seed 9011, candidate in seat 1. Direct
+reproduction found a native `MSG_SELECT_UNSELECT_CARD` prompt on turn 9 at
+which the parent alternated between selecting and unselecting two cards for
+over 9,700 decisions. The policy already preferred `finish_selection` over
+unselecting when offered, but its one-card repeat check did not catch a
+two-card cycle. Inference version 6 adds a legal card whenever the selection
+is unfinished and at least one add action is available. The exact four-game
+seed-9011 pairing then terminated in 330–699 decisions. This is a progress
+rule for policy inference, not a simulator ruling or evidence of stronger play.
+
+Both schedules were rerun with inference version 6, 64 duels each, with
+both deck assignments, both agent seats, held-out seeds, and Main Deck
+composition rejection. The first scored **36–28** with a paired-bootstrap
+95% score interval of **50.0%–62.5%**. The second scored **32–31–1** with an
+interval of **42.2%–60.2%**. Combined across the 128 duels, the child scored
+**68–59–1** with a paired matchup/seed bootstrap interval of **48.0%–59.4%**.
+The assigned-deck results varied sharply, including 1–15 on Chaos Control
+in the first schedule and 1–15 on Flip Control in the second. The ignored
+reports are `.cache/goat-ai/fv23_v13_review3_vs_parent_9000_9007_fixed.json`
+(SHA-256 `c1be00ca3d8b5232dbeb9c76196b397664344796671ec8ac3a7170ca43d80bc5`)
+and `.cache/goat-ai/fv23_v13_review3_vs_parent_9010_9017_fixed.json`
+(SHA-256 `c55a7e114bf0c66e8739604cf4b24e69ed3d78ce1de857be6d556a7a04a5e071`).
+The interval includes 50%, so this child is not promoted and M4 remains
+open. The turn-9 selection loop illustrates why full-duel evaluation is
+necessary even when fixed-state preference scores improve.
