@@ -347,6 +347,14 @@ defect. Four replay-verified Cas-versus-Jesse teacher duels provide a held-out
 card-choice audit, but synthetic teacher agreement remains only a diagnostic.
 See [evaluation](evaluation.md). M4 remains open.
 
+An opt-in warm-start clone now continues compatible weights while preserving
+all parent and new training-game provenance for held-out evaluation. Training
+on four 2005 Cas/Jesse synthetic-teacher duels did not improve the feature-v17
+policy on unseen Matt/Daryl decks: parent and child both scored 6–9–1 against
+the same combat teacher, and the child scored 15–17 directly against its
+parent. The experiment and its deck splits are in [evaluation](evaluation.md).
+M4 remains open; more 2005 data alone has not yet produced a measured gain.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

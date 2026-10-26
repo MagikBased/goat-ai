@@ -2525,3 +2525,44 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/python \
 ```
 
 The saved checkpoint is ignored by Git; its recorded hash identifies the exact local model used here. The CLI validates training provenance and seed separation for new evaluations.
+
+## Warm-start imitation on sourced 2005 decks (2026-10-25)
+
+`train_behavioral_clone.py --init-checkpoint` now loads compatible policy weights and carries forward the parent checkpoint's training seeds, deck hashes, Main Deck composition hashes, and trajectory hashes. It rejects an architecture or vocabulary mismatch and a parent lacking held-out provenance. Continued fitting starts a **new Adam optimizer**; optimizer moments are not restored. The saved child records the parent checkpoint SHA-256 and both cumulative and newly added source counts. This makes the existing evaluation gates apply to all games used in either training stage.
+
+An opt-in feature-v17, width-32 experiment started from `checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt` (SHA-256 `63f300c568a2270510210cf7bd919b94c4519480270caadd7d6890316b807023`). Four replay-verified Cas-versus-Jesse trajectories from seeds 2130–2131 supplied **2,808 CombatHeuristicAgent v3 decisions**. One CPU epoch at learning rate 0.0001, batch size 16, and seed 2140 returned mean cross-entropy 0.09228. The ignored child `checkpoints/combat_2005_warm_cas_jesse_2140.pt` has SHA-256 `5c821318aaf6311af221a54a7d8c447e3835783fe5cba7591f53713dd371592e`, 36 cumulative training games, and 12,972 cumulative synthetic-teacher decisions. It is not a human-demonstration model.
+
+Matt Peddle's Goat Control and Daryl Gessler's Gravekeeper Main Decks were held out by exact file hash and Main Deck composition, with seeds 2145–2148 also absent from both checkpoints. Against CombatHeuristicAgent v3, both parent and child scored **6–9–1** over the same 16-game schedule (40.625% score, paired 95% bootstrap interval 31.25–50%). The parent used 10,609 decisions in 14.27 tournament seconds; the child used 10,714 decisions in 15.87 seconds, each with two workers. In a separate 32-game direct match on those decks and seeds 2150–2157, the child scored **15–17** against the parent (46.875%, paired interval 40.625–50%). It scored 2–14 with Matt's deck and 13–3 with Daryl's, a large deck-assignment effect. None of these data establish an improvement. The child provenance gate rejected a parent training seed, a new training seed, and a Cas training Main Deck while accepting Matt/Daryl.
+
+The ignored evaluation reports are `artifacts/fv17_parent_matt_daryl_2145_2148.json` (SHA-256 `19cc9fab029da2177f1a406510ab26270c93d1f8587b3cc31a273b6516b7e90e`), `artifacts/fv17_warm_matt_daryl_2145_2148.json` (`fdca27229eb5c689b0597fc2a6d25800bc0ab4e97068b1c260c516035ce88c9a`), and `artifacts/fv17_warm_vs_parent_matt_daryl_2150_2157.json` (`494b1be8e210b195c931e14ffe751f11c96adff5f3dcd9da6897444282c2fde8`). Reproduce after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  artifacts/cas_jesse_teacher_2130_2131/*.json \
+  --engine experimental --feature-version 17 --width 32 --epochs 1 \
+  --batch-size 16 --learning-rate 0.0001 --seed 2140 \
+  --init-checkpoint checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt \
+  --output checkpoints/combat_2005_warm_cas_jesse_2140.pt
+
+for candidate in combat_fourdeck_fv17_v3_17000_17003 \
+                 combat_2005_warm_cas_jesse_2140; do
+  OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+    "checkpoints/${candidate}.pt" --engine experimental \
+    --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+              examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+    --both-deck-assignments --opponent combat_heuristic \
+    --seed 2145 --seeds 4 --max-decisions 3000 --workers 2 \
+    --reject-training-deck-hashes --require-unseen-main-decks \
+    --output "artifacts/${candidate}_matt_daryl_2145_2148.json"
+done
+
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+  checkpoints/combat_2005_warm_cas_jesse_2140.pt --engine experimental \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+            examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --both-deck-assignments \
+  --opponent-checkpoint checkpoints/combat_fourdeck_fv17_v3_17000_17003.pt \
+  --seed 2150 --seeds 8 --max-decisions 3000 --workers 2 \
+  --reject-training-deck-hashes --require-unseen-main-decks \
+  --output artifacts/fv17_warm_vs_parent_matt_daryl_2150_2157.json
+```

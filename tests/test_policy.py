@@ -55,7 +55,7 @@ from scripts.evaluate_policy import (
     validate_unseen_deck_hashes,
     validate_unseen_main_decks,
 )
-from scripts.train_behavioral_clone import focus_opportunity
+from scripts.train_behavioral_clone import focus_opportunity, load_parent_checkpoint
 
 
 def view() -> Observation:
@@ -726,6 +726,45 @@ def test_behavioral_clone_weighted_sampling_keeps_update_count_and_is_reproducib
         with pytest.raises(ValueError, match="sampling weights"):
             fit_behavioral_clone(weighted, vocabulary, records,
                                  sampling_weights=bad_weights)
+
+
+def test_warm_start_restores_weights_and_requires_heldout_provenance(tmp_path):
+    vocabulary = CardVocabulary((10, 20))
+    parent_model = LegalActionPolicy(vocabulary.size, width=16, feature_version=17)
+    checkpoint = {
+        "schema_version": 1, "model_state": parent_model.state_dict(),
+        "vocabulary_codes": vocabulary.codes, "width": 16, "feature_version": 17,
+        "trajectory_sha256": {"training.json": "a" * 64},
+        "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                            "main_deck_composition_sha256": ("c", "d")}],
+    }
+    path = tmp_path / "parent.pt"
+    torch.save(checkpoint, path)
+    child = LegalActionPolicy(vocabulary.size, width=16, feature_version=17)
+    with torch.no_grad():
+        child.card.weight.fill_(0)
+    assert not torch.equal(child.card.weight, parent_model.card.weight)
+    loaded = load_parent_checkpoint(path, child, vocabulary)
+    assert loaded["training_games"] == checkpoint["training_games"]
+    assert torch.equal(child.card.weight, parent_model.card.weight)
+
+    for model, codes in (
+        (LegalActionPolicy(vocabulary.size, width=8, feature_version=17), vocabulary),
+        (LegalActionPolicy(vocabulary.size, width=16, feature_version=16), vocabulary),
+        (LegalActionPolicy(4, width=16, feature_version=17), CardVocabulary((10, 30))),
+    ):
+        with pytest.raises(ValueError, match="architecture or vocabulary"):
+            load_parent_checkpoint(path, model, codes)
+
+    checkpoint["training_games"] = [{"seed": 42}]
+    torch.save(checkpoint, path)
+    with pytest.raises(ValueError, match="held-out training provenance"):
+        load_parent_checkpoint(path, child, vocabulary)
+    checkpoint["training_games"] = loaded["training_games"]
+    checkpoint.pop("trajectory_sha256")
+    torch.save(checkpoint, path)
+    with pytest.raises(TypeError, match="trajectory hashes"):
+        load_parent_checkpoint(path, child, vocabulary)
 
 
 def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):
