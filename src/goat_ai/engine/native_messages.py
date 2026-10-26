@@ -6,6 +6,7 @@ the observation and action visibility boundary is audited.
 
 import struct
 from dataclasses import dataclass
+from functools import lru_cache
 from itertools import combinations, permutations
 from math import comb, factorial
 
@@ -317,11 +318,24 @@ def decode_decision(message: bytes,
         minimum = reader.integer(4)
         maximum = reader.integer(4)
         required_count = reader.integer(4)
-        if player not in (0, 1) or mode not in (0, 1) or required_count:
-            raise NotImplementedError("sum selection mode or mandatory cards not decoded")
+        if player not in (0, 1) or mode not in (0, 1):
+            raise NotImplementedError("sum selection mode unsupported")
+        if required_count > (len(reader.data) - reader.offset - 4) // 18:
+            raise ValueError("truncated mandatory sum cards")
+        required = []
+        for _ in range(required_count):
+            code = reader.integer(4)
+            controller = reader.integer(1)
+            location = reader.integer(1)
+            sequence = reader.integer(4)
+            reader.integer(4)  # position
+            sum_param = reader.integer(4)
+            required.append((code, controller, location, sequence, sum_param))
         count = reader.integer(4)
         upper = min(maximum, count) if mode == 0 else count
-        if not count or minimum > upper or target_sum <= 0:
+        if count > (len(reader.data) - reader.offset) // 18:
+            raise ValueError("truncated optional sum cards")
+        if (not count and not required) or minimum > upper or target_sum <= 0:
             raise ValueError("invalid sum selection bounds")
         cards = []
         for _ in range(count):
@@ -338,14 +352,20 @@ def decode_decision(message: bytes,
             raise NotImplementedError("sum selection exceeds bounded legal option count")
 
         def legal_sum(indices: tuple[int, ...]) -> bool:
-            levels = [cards[index][4] for index in indices]
+            levels = [card[4] for card in required]
+            levels.extend(cards[index][4] for index in indices)
+            if not levels:
+                return False
             if mode == 0:
-                reachable = {0}
-                for param in levels:
-                    lower, higher = param & 0xffff, param >> 16
-                    reachable = {current + value for current in reachable
-                                 for value in ((lower, higher) if higher else (lower,))}
-                return target_sum in reachable
+                @lru_cache(None)
+                def exact(index: int, remaining: int) -> bool:
+                    lower, higher = levels[index] & 0xffff, levels[index] >> 16
+                    if index == len(levels) - 1:
+                        return remaining in (lower, higher)
+                    return ((remaining > lower and exact(index + 1, remaining - lower))
+                            or (higher > 0 and remaining > higher
+                                and exact(index + 1, remaining - higher)))
+                return exact(0, target_sum)
             smallest = [min(param & 0xffff, param >> 16)
                         if param >> 16 else param & 0xffff for param in levels]
             largest = [max(param & 0xffff, param >> 16) for param in levels]
@@ -357,8 +377,9 @@ def decode_decision(message: bytes,
                 if not legal_sum(indices):
                     continue
                 response = struct.pack("<II", 0, size) + struct.pack(f"<{size}I", *indices)
-                selected = tuple(cards[index][:4] for index in indices)
-                if size == 1:
+                selected = tuple(card[:4] for card in required) + tuple(
+                    cards[index][:4] for index in indices)
+                if size == 1 and not required:
                     code, controller, location, sequence = selected[0]
                     choices.append(NativeChoice("select_card", response, code,
                                                 controller, location, sequence))

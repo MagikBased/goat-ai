@@ -53,9 +53,13 @@ def test_card_selection_stages_combinations_above_the_flat_action_bound():
 
 
 def test_select_sum_enumerates_only_native_legal_level_combinations():
-    def prompt(target: int, levels: tuple[int, ...], mode: int = 0) -> bytes:
+    def prompt(target: int, levels: tuple[int, ...], mode: int = 0,
+               required: tuple[int, ...] = ()) -> bytes:
         return (struct.pack("<BBBIIII", 23, 0, mode, target, 1,
-                            99 if mode == 0 else 0, 0)
+                            99 if mode == 0 else 0, len(required))
+                + b"".join(struct.pack("<IBBIII", 90 + i, 0, LOCATION_MZONE,
+                                       10 + i, 1, level)
+                           for i, level in enumerate(required))
                 + struct.pack("<I", len(levels))
                 + b"".join(struct.pack("<IBBIII", 100 + i, 0, LOCATION_MZONE,
                                        i, 1, level)
@@ -73,8 +77,17 @@ def test_select_sum_enumerates_only_native_legal_level_combinations():
     exceed = decode_decision(prompt(4, (2, 3), mode=1))
     assert [choice.cards for choice in exceed.choices] == [
         ((100, 0, LOCATION_MZONE, 0), (101, 0, LOCATION_MZONE, 1))]
-    with pytest.raises(NotImplementedError, match="mandatory"):
-        decode_decision(struct.pack("<BBBIIII", 23, 0, 0, 3, 1, 99, 1))
+    required_exact = decode_decision(prompt(3, (4, 1), required=(2,)))
+    assert [(choice.kind, choice.cards, choice.response)
+            for choice in required_exact.choices] == [
+        ("select_cards", ((90, 0, LOCATION_MZONE, 10),
+                          (101, 0, LOCATION_MZONE, 1)),
+         struct.pack("<3I", 0, 1, 1))]
+    required_exceed = decode_decision(prompt(4, (3, 5), mode=1, required=(2,)))
+    assert [choice.cards for choice in required_exceed.choices] == [
+        ((90, 0, LOCATION_MZONE, 10), (100, 0, LOCATION_MZONE, 0))]
+    with pytest.raises(ValueError, match="truncated mandatory"):
+        decode_decision(struct.pack("<BBBIIII", 23, 0, 0, 3, 1, 99, 65))
 
 
 def test_new_native_choice_formats():

@@ -4771,8 +4771,12 @@ reveal (10093, 10107). The original reports are under
 `.cache/goat-ai/firebird-fixed-{10030,10062,10122}/`.
 
 The adapter now enumerates bounded exact/exceed sum selections with native
-response bytes for Puppet Magic's zero-mandatory-card form; other forms still
-fail explicitly. Double Spell copying The Inexperienced Spy now offers blind
+response bytes for Puppet Magic's zero-mandatory-card form. A later parser
+extension includes implicit mandatory cards in the sum check and visible
+selected-card action while keeping native response indices scoped to optional
+cards. Exact and exceed cases pass synthetic protocol tests; a GOAT native duel
+with a mandatory sum card has not yet been observed. Large sum-choice sets
+still fail explicitly. Double Spell copying The Inexperienced Spy now offers blind
 opposing-hand choices, with card codes and native hand positions redacted.
 Dragged Down into the Grave uses its addressed hand reveal through the later
 choice window. Focused native tests replay-verify those original four seeds
@@ -4858,3 +4862,19 @@ and `.cache/goat-ai/fv23_v13_review3_vs_parent_9010_9017_fixed.json`
 The interval includes 50%, so this child is not promoted and M4 remains
 open. The turn-9 selection loop illustrates why full-duel evaluation is
 necessary even when fixed-state preference scores improve.
+
+### Second distinct-whitelist native protocol sweep
+
+Another 100 independently generated whitelist deck pairs, seeds
+10124–10223, ran with RandomAgent through the experimental native adapter
+and a 3,000-decision limit. **100/100** reached terminal; all **103,185**
+decisions replay-verified, with a maximum of **1,663** decisions in one duel.
+There were no recorded adapter errors. The ignored report is
+`.cache/goat-ai/random-probe-distinct-10124-10223/report.json` (SHA-256
+`c087a1ade37f65df7f8877fee33598d5eb4a02422a3eb5ac890c378016b8bd31`).
+The deck generator chose 40 distinct canonical Main Deck cards for each
+player, so this expands protocol breadth but does not sample realistic
+deck construction, prove every native prompt is supported, or validate
+historical rulings. The sweep process loaded the initial mandatory-sum
+decoder; the later wire-length bound change was checked by focused parser
+and Puppet Magic native tests, not by repeating this full sweep.
