@@ -12,7 +12,7 @@ from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.replay import write_trajectory
 from goat_ai.training import load_policy_agent
-from goat_ai.training.self_play import train_against_snapshot_pool
+from goat_ai.training.self_play import VisibleStateValue, train_against_snapshot_pool
 
 
 def sha256(path: Path) -> str:
@@ -42,9 +42,12 @@ def main() -> None:
     parser.add_argument("--entropy-coefficient", type=float, default=0.001)
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
-    parser.add_argument("--baseline-scope", choices=("global", "learner_deck"),
+    parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value"),
                         default="global",
-                        help="track terminal-reward baseline globally or by learner deck")
+                        help="moving global/per-deck return or experimental visible-state critic")
+    parser.add_argument("--value-width", type=int, default=32,
+                        help="hidden width of experimental visible-state critic")
+    parser.add_argument("--value-learning-rate", type=float, default=1e-3)
     parser.add_argument("--max-decisions", type=int, default=5000)
     parser.add_argument("--skip-capped-games", action="store_true",
                         help="record over-cap duels as censored; exclude them from updates and provenance")
@@ -57,6 +60,7 @@ def main() -> None:
             or args.max_snapshots < 1 or args.max_decisions < 1
             or args.entropy_coefficient < 0
             or args.learner_temperature <= 0
+            or args.value_width < 1 or args.value_learning_rate <= 0
             or not 0 <= args.historical_probability <= 1):
         parser.error("invalid training schedule or hyperparameters")
     parent = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
@@ -70,6 +74,17 @@ def main() -> None:
     if overlap:
         parser.error(f"self-play seeds overlap existing training seeds: {sorted(overlap)}")
     agent = load_policy_agent(args.checkpoint)
+    value_model = None
+    if args.baseline_scope == "state_value":
+        torch.manual_seed(args.seed)
+        number_width = agent.model.state_numbers[0].in_features
+        value_model = VisibleStateValue(agent.vocabulary.size, number_width,
+                                        width=args.value_width)
+        if "value_model_state" in parent:
+            if (parent.get("value_model_width") != args.value_width
+                    or parent.get("value_state_number_width") != number_width):
+                parser.error("parent critic architecture differs from requested value model")
+            value_model.load_state_dict(parent["value_model_state"], strict=True)
     fixtures = Path(__file__).resolve().parent.parent / "examples/decks"
     matchups = args.matchup or [[str(fixtures / "vanilla_probe.ydk"),
                                   str(fixtures / "vanilla_reverse.ydk")]]
@@ -94,6 +109,8 @@ def main() -> None:
         learner_temperature=args.learner_temperature,
         baseline_scope=args.baseline_scope,
         schedule_mode=args.schedule_mode,
+        value_model=value_model,
+        value_learning_rate=args.value_learning_rate,
         max_decisions=args.max_decisions, random_seed=args.seed,
         skip_capped_games=args.skip_capped_games,
         skip_unsupported_games=args.skip_unsupported_games,
@@ -120,6 +137,9 @@ def main() -> None:
               "entropy_coefficient": args.entropy_coefficient,
               "learner_temperature": args.learner_temperature,
               "baseline_scope": args.baseline_scope,
+              "value_width": args.value_width if value_model is not None else None,
+              "value_learning_rate": (args.value_learning_rate
+                                      if value_model is not None else None),
               "schedule_mode": args.schedule_mode,
               "max_decisions": args.max_decisions, "seed": args.seed,
               "skip_capped_games": args.skip_capped_games}
@@ -139,6 +159,10 @@ def main() -> None:
         "self_play_config": config, "self_play_reports": reports,
         "torch_version": str(torch.__version__),
     }
+    if value_model is not None:
+        checkpoint["value_model_state"] = value_model.state_dict()
+        checkpoint["value_model_width"] = args.value_width
+        checkpoint["value_state_number_width"] = agent.model.state_numbers[0].in_features
     args.output.parent.mkdir(parents=True, exist_ok=True)
     torch.save(checkpoint, args.output)
     wins = sum(report["reward"] > 0 for report in terminal_reports)

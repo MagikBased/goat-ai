@@ -41,9 +41,12 @@ from goat_ai.training import (
 from goat_ai.training.policy import ACTION_KINDS
 from goat_ai.training.self_play import (
     EpisodeDecisionLimit,
+    VisibleStateValue,
     episode_schedule,
     policy_gradient_update,
+    predict_state_values,
     sample_legal_action,
+    state_value_update,
     train_against_snapshot_pool,
 )
 from scripts.audit_policy_agreement import (
@@ -1026,6 +1029,43 @@ def test_policy_gradient_uses_sampling_temperature_in_log_probability():
     policy_gradient_update(model, CardVocabulary((10, 20)), [record], 1.0, 0.0,
                            optimizer, temperature=2.0, max_gradient_norm=10.0)
     assert torch.allclose(model.logits.detach(), torch.tensor([-0.25, 0.25]))
+
+
+def test_visible_value_baseline_scales_policy_gradient_and_ignores_action_order():
+    class TwoLogitPolicy(torch.nn.Module):
+        feature_version = 1
+
+        def __init__(self):
+            super().__init__()
+            self.logits = torch.nn.Parameter(torch.zeros(2))
+
+        def forward(self, _features):
+            return self.logits
+
+    vocabulary = CardVocabulary((10, 20))
+    record = DecisionRecord(view(), actions(), actions()[1])
+    policy = TwoLogitPolicy()
+    optimizer = torch.optim.SGD(policy.parameters(), lr=1.0)
+    policy_gradient_update(policy, vocabulary, [record], 1.0, 0.0, optimizer,
+                           max_gradient_norm=10.0, state_baselines=(0.5,))
+    assert torch.allclose(policy.logits.detach(), torch.tensor([-0.25, 0.25]))
+    with pytest.raises(ValueError, match="state baselines"):
+        policy_gradient_update(policy, vocabulary, [record], 1.0, 0.0, optimizer,
+                               state_baselines=(float("nan"),))
+
+    torch.manual_seed(42)
+    value = VisibleStateValue(vocabulary.size, state_number_width=10, width=16)
+    reversed_record = DecisionRecord(view(), actions()[::-1], actions()[1])
+    before, reordered = predict_state_values(
+        value, vocabulary, (record, reversed_record), feature_version=1)
+    assert before == pytest.approx(reordered)
+    assert -1 <= before <= 1
+    value_optimizer = torch.optim.Adam(value.parameters(), lr=0.01)
+    value_loss = state_value_update(value, vocabulary, (record,), 1.0, 1,
+                                    value_optimizer)
+    after = predict_state_values(value, vocabulary, (record,), 1)[0]
+    assert value_loss >= 0
+    assert after > before
 
 
 def test_self_play_schedule_covers_each_deck_in_both_seats():

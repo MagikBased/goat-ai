@@ -184,7 +184,23 @@ OMP_NUM_THREADS=1 python scripts/train_self_play.py checkpoints/vanilla_bc.pt \
 python scripts/evaluate_policy.py checkpoints/vanilla_rl.pt --seed 200 --seeds 8
 ```
 
-This is an experiment, not a selected final RL algorithm. Terminal reward is sparse; no value function, PPO update, opponent league, or checkpoint selection by held-out win rate exists. Runs from random imitation and from the stronger heuristic imitation checkpoint did not demonstrate an improvement in greedy playing strength; see [the evaluation log](evaluation.md). Future work should compare a richer action encoder, value baselines and PPO under the same held-out schedule, while keeping training opponents separate from evaluation opponents.
+This is an experiment, not a selected final RL algorithm. Terminal reward is sparse; the original trainer has no value function, PPO update, opponent league, or checkpoint selection by held-out win rate. Runs from random imitation and from the stronger heuristic imitation checkpoint did not demonstrate an improvement in greedy playing strength; see [the evaluation log](evaluation.md). Future work should compare a richer action encoder, value baselines and PPO under the same held-out schedule, while keeping training opponents separate from evaluation opponents.
+
+An opt-in `--baseline-scope state_value` now tests a learned Monte Carlo
+baseline. A separate critic embeds the same **player-visible** card, zone,
+owner, position, phase, and numeric observation features as the policy
+interface; it never receives the simulator's complete state or a selected
+action. Before each policy update, it predicts a value for every learner
+decision, and the policy gradient uses terminal reward minus that frozen
+prediction. The critic then fits the same terminal return by squared error.
+Its architecture, weights, learning rate, per-episode value loss, and source
+provenance are saved with the child checkpoint. Existing global and per-deck
+moving baselines remain unchanged. This is a simple state-value control
+variate related to the [policy-gradient baseline analysis by Sutton et al.](https://papers.nips.cc/paper_files/paper/1999/hash/464d828b85b0bed98e80ade0a5c43b0f-Abstract.html),
+not a bootstrapped or asynchronous actor-critic implementation such as
+[A3C](https://proceedings.mlr.press/v48/mniha16.html), and not PPO. The
+four-game native smoke result is in [evaluation](evaluation.md); competitive
+effectiveness remains unmeasured.
 
 ## Ordered-chain feature check
 

@@ -3269,3 +3269,31 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/train_self_play.py \
   --record-dir replays/selfplay_fourroles_2820_2883 \
   --output checkpoints/fv19_fourroles_selfplay_2820_2883.pt
 ```
+
+## Visible-state value baseline smoke test
+
+An opt-in Monte Carlo critic was initialized alongside the unchanged
+feature-19 parent and trained for one four-role cycle on Goat Control versus
+Chaos Turbo, seeds 3000–3003. All four native duels terminated under the
+3,000-decision cap (three learner wins and one loss against the training
+opponent mixture). The run recorded 574 learner decisions. The four saved
+trajectories replay-verified for **4,145 total decisions** with fresh pinned
+native engines; the visibility audit passed, including 122 opponent-field,
+38 hidden-field, and nine opponent-hand choices. The checkpoint contains the
+critic architecture and weights; the ignored local artifacts are
+`checkpoints/fv19_value_smoke_3000.pt` and
+`replays/selfplay_value_smoke_3000/`. This checks integration and replay
+determinism only. A matched held-out comparison with the existing per-deck
+moving baseline is still needed before any playing-strength claim.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_self_play.py \
+  checkpoints/tactical_v3_fv19_2500_2503.pt --engine experimental \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/chaos_turbo_riclar_2020.ydk \
+  --schedule-mode four_roles --baseline-scope state_value \
+  --value-width 32 --value-learning-rate 0.001 \
+  --seed 3000 --games 4 --max-decisions 3000 \
+  --record-dir replays/selfplay_value_smoke_3000 \
+  --output checkpoints/fv19_value_smoke_3000.pt
+```

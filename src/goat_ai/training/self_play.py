@@ -4,15 +4,51 @@ import copy
 import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
+from math import isfinite
 
 import torch
+from torch import nn
 
 from goat_ai.agents import Agent, RandomAgent
 from goat_ai.engine import RulesEngine
 from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import DecisionRecord, Trajectory
-from goat_ai.training.policy import CardVocabulary, LegalActionPolicy, encode_decision
+from goat_ai.training.policy import (
+    PHASES,
+    POSITIONS,
+    ZONES,
+    CardVocabulary,
+    DecisionFeatures,
+    LegalActionPolicy,
+    encode_decision,
+)
+
+
+class VisibleStateValue(nn.Module):
+    """Estimate learner outcome from the same player-visible contract as the policy."""
+
+    def __init__(self, vocabulary_size: int, state_number_width: int,
+                 width: int = 32) -> None:
+        super().__init__()
+        self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
+        self.zone = nn.Embedding(len(ZONES) + 1, width, padding_idx=0)
+        self.owner = nn.Embedding(3, width, padding_idx=0)
+        self.position = nn.Embedding(len(POSITIONS) + 1, width, padding_idx=0)
+        self.phase = nn.Embedding(len(PHASES) + 1, width, padding_idx=0)
+        self.numbers = nn.Sequential(nn.Linear(state_number_width, width), nn.ReLU(),
+                                     nn.Linear(width, width))
+        self.value = nn.Sequential(nn.Linear(width, width), nn.ReLU(),
+                                   nn.Linear(width, 1), nn.Tanh())
+
+    def forward(self, features: DecisionFeatures) -> torch.Tensor:
+        cards = features.state_cards
+        visible = (self.card(cards[:, 0]) + self.zone(cards[:, 1])
+                   + self.owner(cards[:, 2]) + self.position(cards[:, 3]))
+        mask = (cards[:, 1] != 0).unsqueeze(1)
+        pooled = (visible * mask).sum(0) / mask.sum().clamp(min=1)
+        return self.value(pooled + self.phase(features.phase)
+                          + self.numbers(features.state_numbers)).squeeze()
 
 
 @dataclass(frozen=True)
@@ -124,16 +160,22 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
                            baseline: float, optimizer: torch.optim.Optimizer,
                            entropy_coefficient: float = 0.0,
                            max_gradient_norm: float = 1.0,
-                           temperature: float = 1.0) -> float:
+                           temperature: float = 1.0,
+                           state_baselines: Sequence[float] | None = None) -> float:
     """Apply one terminal-return score-function update; return mean loss."""
     if (not records or entropy_coefficient < 0 or max_gradient_norm <= 0
             or temperature <= 0):
         raise ValueError("update needs decisions, positive temperature, and valid regularization")
+    if (state_baselines is not None
+            and (len(state_baselines) != len(records)
+                 or any(not isfinite(value) for value in state_baselines))):
+        raise ValueError("state baselines must be finite and match decisions")
     optimizer.zero_grad()
     device = next(model.parameters()).device
-    advantage = reward - baseline
     total = 0.0
-    for record in records:
+    for index, record in enumerate(records):
+        advantage = reward - (state_baselines[index]
+                              if state_baselines is not None else baseline)
         features = encode_decision(record.observation, record.legal_actions,
                                    vocabulary, model.feature_version).to(device)
         logits = model(features) / temperature
@@ -149,6 +191,44 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
     return total / len(records)
 
 
+def predict_state_values(value_model: VisibleStateValue,
+                         vocabulary: CardVocabulary,
+                         records: Sequence[DecisionRecord],
+                         feature_version: int) -> tuple[float, ...]:
+    """Freeze critic predictions before updating either model on an episode."""
+    device = next(value_model.parameters()).device
+    value_model.eval()
+    with torch.no_grad():
+        return tuple(float(value_model(encode_decision(
+            record.observation, record.legal_actions, vocabulary,
+            feature_version).to(device))) for record in records)
+
+
+def state_value_update(value_model: VisibleStateValue,
+                       vocabulary: CardVocabulary,
+                       records: Sequence[DecisionRecord], reward: float,
+                       feature_version: int,
+                       optimizer: torch.optim.Optimizer,
+                       max_gradient_norm: float = 1.0) -> float:
+    """Fit visible-state outcome estimates to the completed duel's return."""
+    if not records or max_gradient_norm <= 0 or not isfinite(reward):
+        raise ValueError("value update needs decisions and finite terminal reward")
+    device = next(value_model.parameters()).device
+    value_model.train()
+    optimizer.zero_grad()
+    total = 0.0
+    for record in records:
+        features = encode_decision(record.observation, record.legal_actions,
+                                   vocabulary, feature_version).to(device)
+        prediction = value_model(features)
+        loss = (prediction - reward).square()
+        (loss / len(records)).backward()
+        total += float(loss.detach())
+    torch.nn.utils.clip_grad_norm_(value_model.parameters(), max_gradient_norm)
+    optimizer.step()
+    return total / len(records)
+
+
 def train_against_snapshot_pool(
     model: LegalActionPolicy, vocabulary: CardVocabulary,
     matchups: Sequence[tuple[str, str]], seeds: Sequence[int],
@@ -159,6 +239,8 @@ def train_against_snapshot_pool(
     learner_temperature: float = 1.0,
     baseline_scope: str = "global",
     schedule_mode: str = "paired_seats",
+    value_model: VisibleStateValue | None = None,
+    value_learning_rate: float = 1e-3,
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
@@ -171,12 +253,17 @@ def train_against_snapshot_pool(
     if (not matchups or not seeds or learning_rate <= 0 or snapshot_every < 1
             or max_snapshots < 1 or learner_temperature <= 0
             or not 0 <= historical_probability <= 1
-            or baseline_scope not in ("global", "learner_deck")
+            or baseline_scope not in ("global", "learner_deck", "state_value")
+            or value_learning_rate <= 0
+            or (baseline_scope == "state_value") != (value_model is not None)
             or schedule_mode not in ("paired_seats", "four_roles")):
         raise ValueError("invalid self-play schedule or hyperparameters")
     rng = random.Random(random_seed)
     generator = torch.Generator(device="cpu").manual_seed(random_seed)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    value_optimizer = (torch.optim.Adam(value_model.parameters(),
+                                        lr=value_learning_rate)
+                       if value_model is not None else None)
     snapshots = [copy.deepcopy(model.state_dict())]
     baselines: dict[str, float] = {}
     reports = []
@@ -204,7 +291,8 @@ def train_against_snapshot_pool(
             reports.append({"seed": seed, "learner_seat": learner_seat,
                             "decks": decks, "opponent": opponent_name,
                             "status": "decision_limit", "decisions": max_decisions,
-                            "learner_decisions": 0, "policy_loss": None})
+                            "learner_decisions": 0, "policy_loss": None,
+                            "value_loss": None})
             continue
         except SimulatorUnavailable as exc:
             if not skip_unsupported_games:
@@ -212,18 +300,29 @@ def train_against_snapshot_pool(
             reports.append({"seed": seed, "learner_seat": learner_seat,
                             "decks": decks, "opponent": opponent_name,
                             "status": "simulator_unavailable", "error": str(exc),
-                            "learner_decisions": 0, "policy_loss": None})
+                            "learner_decisions": 0, "policy_loss": None,
+                            "value_loss": None})
             continue
         if record_episode is not None:
             record_episode(index, episode)
         baseline_key = decks[learner_seat] if baseline_scope == "learner_deck" else "global"
-        baseline = baselines.get(baseline_key, 0.0)
+        state_baselines = (predict_state_values(
+            value_model, vocabulary, episode.learner_records, model.feature_version)
+            if value_model is not None and episode.learner_records else None)
+        baseline = (sum(state_baselines) / len(state_baselines)
+                    if state_baselines else baselines.get(baseline_key, 0.0))
         loss = (policy_gradient_update(model, vocabulary, episode.learner_records,
                                        episode.reward, baseline, optimizer,
                                        entropy_coefficient,
-                                       temperature=learner_temperature)
+                                       temperature=learner_temperature,
+                                       state_baselines=state_baselines)
                 if episode.learner_records else None)
-        baselines[baseline_key] = 0.95 * baseline + 0.05 * episode.reward
+        value_loss = (state_value_update(
+            value_model, vocabulary, episode.learner_records, episode.reward,
+            model.feature_version, value_optimizer)
+            if value_model is not None and episode.learner_records else None)
+        if value_model is None:
+            baselines[baseline_key] = 0.95 * baseline + 0.05 * episode.reward
         reports.append({"seed": seed, "learner_seat": learner_seat,
                         "decks": decks, "opponent": opponent_name,
                         "status": "terminal",
@@ -234,7 +333,7 @@ def train_against_snapshot_pool(
                         "baseline": baseline,
                         "decisions": episode.decisions,
                         "learner_decisions": len(episode.learner_records),
-                        "policy_loss": loss})
+                        "policy_loss": loss, "value_loss": value_loss})
         if (index + 1) % snapshot_every == 0:
             snapshots.append(copy.deepcopy(model.state_dict()))
             if len(snapshots) > max_snapshots:
