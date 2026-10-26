@@ -1,5 +1,7 @@
 """Contract checks for the optional PyTorch legal-action policy."""
 
+import copy
+import random
 from dataclasses import replace
 from functools import partial
 from pathlib import Path
@@ -33,6 +35,7 @@ from goat_ai.training import (
     PolicyAgent,
     encode_decision,
     fit_behavioral_clone,
+    fit_with_parent_kl,
     load_policy_agent,
 )
 from goat_ai.training.policy import ACTION_KINDS
@@ -139,6 +142,35 @@ def test_restricted_warm_start_updates_only_selected_modules():
                for name, parameter in model.named_parameters())
     with pytest.raises(ValueError, match="unknown trainable"):
         restrict_trainable_modules(model, ["missing"])
+
+
+def test_parent_kl_fits_labels_while_keeps_reference_frozen():
+    torch.manual_seed(7)
+    vocabulary = CardVocabulary((10, 20))
+    student = LegalActionPolicy(vocabulary.size, width=16, feature_version=19)
+    parent = copy.deepcopy(student)
+    repeat = copy.deepcopy(student)
+    legal = actions()[:2]
+    labeled = DecisionRecord(replace(view(), turn_player=1), legal, legal[1])
+    preservation = DecisionRecord(replace(view(), turn_player=0), legal, legal[0])
+    before = {name: parameter.detach().clone()
+              for name, parameter in parent.named_parameters()}
+    labeled_losses, kl_losses = fit_with_parent_kl(
+        student, parent, vocabulary, (labeled,), (preservation,),
+        steps=8, preservation_batch=1, preservation_weight=1.0,
+        learning_rate=0.001, rng=random.Random(19))
+    assert len(labeled_losses) == len(kl_losses) == 8
+    assert labeled_losses[-1] < labeled_losses[0]
+    assert abs(kl_losses[0]) < 1e-6
+    assert all(torch.equal(parameter, before[name])
+               for name, parameter in parent.named_parameters())
+    repeated_losses = fit_with_parent_kl(
+        repeat, parent, vocabulary, (labeled,), (preservation,),
+        steps=8, preservation_batch=1, preservation_weight=1.0,
+        learning_rate=0.001, rng=random.Random(19))
+    assert repeated_losses == (labeled_losses, kl_losses)
+    assert all(torch.equal(parameter, dict(repeat.named_parameters())[name])
+               for name, parameter in student.named_parameters())
 
 
 def test_policy_audit_fingerprint_identifies_visible_decision_and_choice():

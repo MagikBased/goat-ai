@@ -91,6 +91,34 @@ weights and new source counts. `--trainable-module state_numbers` and
 modules; the tested timing fit using this restriction lost heavily in
 held-out competition. See [evaluation](evaluation.md).
 
+For a separate stability experiment, `--parent-kl-steps` fits the selected
+labels while matching a frozen parent policy on sampled multi-option states.
+`--preserve-trajectories` must name games already fingerprinted in the parent
+checkpoint; the trainer replay-verifies and visibility-audits them, then
+checks their exact byte hashes against parent provenance. The sampled states,
+KL weight, batch size, step count, and parent hash are saved with the child.
+This is policy distillation on visible states, not simulator access to hidden
+cards. Example:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  replays/scapegoat_end_timing_probe_seed52.json \
+  --annotation replays/scapegoat_end_timing_probe_seed52.labels.json \
+  --engine experimental --feature-version 19 --width 16 \
+  --init-checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt \
+  --parent-kl-steps 500 --preserve-per-trajectory 32 \
+  --preserve-batch 8 --parent-kl-weight 1 --learning-rate 0.001 --seed 19 \
+  --preserve-trajectories replays/tactical_v3_cas_daryl_2500_2503/*.json \
+  replays/tactical_v3_matt_jesse_2500_2503/*.json \
+  --output checkpoints/tactical_v3_fv19_timing_parent_kl_52.pt
+```
+
+The `--batch-size` option belongs to ordinary behavioral cloning; parent-KL
+uses all labeled decisions and `--preserve-batch` reference states at each
+step. This experiment preserved overall win rate against its parent in one
+held-out schedule but did not improve it, and Scapegoat agreement worsened
+where the teacher passed. See [evaluation](evaluation.md).
+
 For a controlled baseline, collect heuristic decisions against RandomAgent in both seats and train on only those decisions:
 
 ```bash

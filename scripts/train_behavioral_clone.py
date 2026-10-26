@@ -1,8 +1,10 @@
 """Fit a first policy on replay-verified decision trajectories."""
 
 import argparse
+import copy
 import hashlib
 import json
+import random
 from collections import Counter
 from math import isfinite
 from pathlib import Path
@@ -24,6 +26,7 @@ from goat_ai.training import (
     CardVocabulary,
     LegalActionPolicy,
     fit_behavioral_clone,
+    fit_with_parent_kl,
 )
 from goat_ai.training.policy import POLICY_FEATURE_VERSION
 
@@ -157,6 +160,15 @@ def main() -> None:
     parser.add_argument("--trainable-module", action="append", default=[],
                         metavar="MODULE",
                         help="train only these top-level policy modules; repeat to include more")
+    parser.add_argument("--parent-kl-steps", type=int, default=0,
+                        help="fit selected labels with parent-policy KL preservation")
+    parser.add_argument("--preserve-trajectories", nargs="+", type=Path, default=[],
+                        help="replay-verified parent training games for KL preservation")
+    parser.add_argument("--preserve-per-trajectory", type=int, default=32,
+                        help="multi-option parent states sampled from each preservation game")
+    parser.add_argument("--preserve-batch", type=int, default=8,
+                        help="parent states sampled at each KL optimization step")
+    parser.add_argument("--parent-kl-weight", type=float, default=1.0)
     args = parser.parse_args()
     if (args.epochs < 1 or args.width < 1 or args.learning_rate <= 0
             or args.batch_size < 1 or not 1 <= args.focus_weight < float("inf")
@@ -171,6 +183,16 @@ def main() -> None:
         parser.error(str(exc))
     if args.init_checkpoint and args.init_checkpoint.resolve() == args.output.resolve():
         parser.error("--output must differ from --init-checkpoint")
+    if (args.parent_kl_steps < 0 or args.preserve_per_trajectory < 1
+            or args.preserve_batch < 1 or not isfinite(args.parent_kl_weight)
+            or args.parent_kl_weight <= 0):
+        parser.error("parent KL settings must be finite and positive")
+    if args.parent_kl_steps and (not args.init_checkpoint or not args.preserve_trajectories):
+        parser.error("parent KL requires --init-checkpoint and --preserve-trajectories")
+    if not args.parent_kl_steps and args.preserve_trajectories:
+        parser.error("--preserve-trajectories requires --parent-kl-steps")
+    if args.parent_kl_steps and (source_weights or args.focus_weight > 1):
+        parser.error("parent KL uses labeled decisions directly; omit sampling weights")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     records = []
@@ -257,10 +279,48 @@ def main() -> None:
         for record, source in zip(records, record_sources)]
         if args.focus_weight > 1 or any(weight != 1 for weight in source_weights.values())
         else None)
-    losses = fit_behavioral_clone(model, vocabulary, records, epochs=args.epochs,
-                                  learning_rate=args.learning_rate, seed=args.seed,
-                                  batch_size=args.batch_size,
-                                  sampling_weights=sampling_weights)
+    preservation_metadata = None
+    if args.parent_kl_steps:
+        if len({path.resolve() for path in args.preserve_trajectories}) != len(
+                args.preserve_trajectories):
+            raise ValueError("duplicate preservation trajectory path")
+        reference = copy.deepcopy(model).eval()
+        rng = random.Random(args.seed)
+        preservation = []
+        preservation_hashes = {}
+        for path in args.preserve_trajectories:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            if parent["trajectory_sha256"].get(str(path)) != digest:
+                raise ValueError(f"{path}: preservation replay is absent from parent provenance")
+            trajectory = read_trajectory(path)
+            verify_trajectory(trajectory, engine_type(args.native_root))
+            audit_trajectory_visibility(trajectory)
+            candidates = [record for record in demonstrator_records(trajectory)
+                          if len(record.legal_actions) > 1]
+            if not candidates:
+                raise ValueError(f"{path}: no multi-option preservation decisions")
+            preservation.extend(rng.sample(candidates, min(
+                args.preserve_per_trajectory, len(candidates))))
+            preservation_hashes[str(path)] = digest
+        losses, preservation_losses = fit_with_parent_kl(
+            model, reference, vocabulary, records, preservation,
+            steps=args.parent_kl_steps, preservation_batch=args.preserve_batch,
+            preservation_weight=args.parent_kl_weight,
+            learning_rate=args.learning_rate, rng=rng)
+        preservation_metadata = {
+            "trajectory_sha256": preservation_hashes,
+            "states": len(preservation),
+            "per_trajectory": args.preserve_per_trajectory,
+            "batch": args.preserve_batch,
+            "weight": args.parent_kl_weight,
+            "steps": args.parent_kl_steps,
+            "final_kl": preservation_losses[-1],
+        }
+    else:
+        losses = fit_behavioral_clone(model, vocabulary, records, epochs=args.epochs,
+                                      learning_rate=args.learning_rate, seed=args.seed,
+                                      batch_size=args.batch_size,
+                                      sampling_weights=sampling_weights)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     inherited_sources = Counter(parent.get("source_decisions", {})) if parent else Counter()
     checkpoint = {
@@ -282,14 +342,24 @@ def main() -> None:
         "focus_weight": args.focus_weight,
         "source_weights": source_weights,
         "trainable_modules": tuple(args.trainable_module) or ("all",),
+        "training_method": "parent_kl" if preservation_metadata else "behavioral_clone",
+        "parent_kl": preservation_metadata,
         "focus_opportunity_decisions": focus_count,
-        "sampling_mode": "weighted_with_replacement" if sampling_weights else "shuffle",
+        "sampling_mode": ("parent_kl" if preservation_metadata else
+                          "weighted_with_replacement" if sampling_weights else "shuffle"),
         "losses": losses,
     }
     torch.save(checkpoint, args.output)
-    print(json.dumps({"output": str(args.output), "decisions": len(records),
-                      "sources": sources, "epoch_loss": losses,
-                      "focus_opportunity_decisions": focus_count}, indent=2))
+    summary = {"output": str(args.output), "decisions": len(records),
+               "sources": sources, "focus_opportunity_decisions": focus_count}
+    if preservation_metadata:
+        summary.update({"training_method": "parent_kl",
+                        "final_labeled_loss": losses[-1],
+                        "final_preservation_kl": preservation_losses[-1],
+                        "preservation_states": len(preservation)})
+    else:
+        summary["epoch_loss"] = losses
+    print(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":

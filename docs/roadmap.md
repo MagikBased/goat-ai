@@ -390,6 +390,14 @@ lost 8–56 against its parent on unseen Main Decks. Keep both approaches as
 negative experimental results; the next M4 step is a broader decision corpus
 and a measured stability method, not promotion of the probe-fitting policy.
 
+A frozen-parent KL experiment now supplies one measured stability method:
+it fit the Scapegoat timing probe and split 66–61–1 against its parent over
+128 unseen-Main-Deck games, with a paired interval spanning 50%. Teacher
+agreement where Scapegoat was offered fell from 19/20 to 13/20, and Chaos
+deck assignments remained weak. Keep it experimental. Next obtain more
+independent positive and negative timing examples, then measure both
+card-specific calibration and deck-balanced strength before promotion.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

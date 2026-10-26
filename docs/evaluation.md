@@ -2810,3 +2810,52 @@ seconds. The ignored report is
 `d90142a0ba784dd997d41cb8740bfbc37cd8b54a6d7993638577e98a1324780d`).
 The local timing fit badly damaged general play. Neither rehearsal nor
 module restriction is sufficient evidence of a safe competitive update.
+
+## Parent-policy KL preservation for timing labels
+
+A frozen-parent KL trainer now fits selected labels while matching parent
+action distributions on separately selected, player-visible decisions.
+The replay-verified run used the same three Scapegoat timing labels at seed
+52 and sampled 32 multi-option decisions from each of the 16 original
+tactical-teacher replays (512 preservation states total). At each of 500
+optimizer steps it used all three labeled decisions and eight preservation
+states, KL weight 1, learning rate 0.001, and seed 19. It rejected any
+preservation replay whose byte hash was absent from the parent checkpoint.
+The productized run reproduced the earlier contained prototype's model
+weights **exactly**; its own checkpoint is
+`checkpoints/tactical_v3_fv19_timing_parent_kl_52.pt` (SHA-256
+`0cdcca4569e1d4d781d876d90bd9e4dfb0563db13c3e5bbd4ebb53949ef3254a`).
+Final selected-label cross-entropy was 0.01465 and sampled preservation KL
+was 0.00293. These training losses are diagnostics, not strength estimates.
+
+The child selected `pass/pass/chain` on the training probe and activated at
+the later opponent End Phase while passing on its own End Phase on all four
+separate shuffle seeds 56, 64, 69, and 70. It activated at the earlier
+opponent End Phase on seeds 64 and 69, a choice the probe's scripted pass
+does not establish as wrong. Those seeds use the same fixture deck
+composition. On eight replay-verified teacher holdout games from other
+Main Decks, exact agreement changed from **1,899/2,039** for the parent to
+**1,889/2,039** for the child, and from **491/631** to **481/631** on
+multi-option decisions. Where Scapegoat was offered, agreement fell from
+**19/20** to **13/20**, although agreement on the two teacher-selected
+Scapegoat plays rose from **1/2** to **2/2**. The child therefore appears
+more willing to activate Scapegoat, including where this synthetic teacher
+passed. The ignored audit report is
+`artifacts/timing_parent_kl_teacher_agreement_2520_2521.json` (SHA-256
+`f332b00d1d16dbdcefdd1c04fc9f45ebcd6ed2b1442ba46f8150dc00a5779190`).
+
+In 128 paired games against the same parent on unseen Michael Fukuyama,
+Chaos Control, Warrior, and Chaos Return Main Decks, both assignments and
+seats, seeds 2570–2585, the identical-weight prototype/productized child
+scored **66 wins, 61 losses, 1 draw**: 51.95% of available points, paired
+bootstrap 95% interval **46.48–57.03%**. The assigned-deck splits were
+Michael 24–8, Warrior 25–7, Chaos Control 8–23–1, and Chaos Return 9–23.
+The evaluator rejected training deck hashes and required unseen Main Deck
+compositions. The two four-worker tournament times were 33.15 and 30.86
+seconds. The ignored reports are
+`artifacts/timing_kl_prototype_vs_parent_2570_2577.json` (SHA-256
+`da4dfc9761688976ca1e0434f0e37b6b340003fb7f4f48af6bdbdca360135`)
+and `artifacts/timing_parent_kl_vs_parent_2578_2585.json` (SHA-256
+`b696eeaddd6253d79a9c7d01b7761956acf98f7ea5891765ceb8210453adfe54`).
+The interval includes 50%, and the large assigned-deck differences remain.
+This method did not establish a competitive gain or close M4.
