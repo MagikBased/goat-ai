@@ -476,6 +476,16 @@ Chaos Turbo splits diverged. Keep the child experimental and prioritize
 independent, diverse target/timing demonstrations before more fine-tuning;
 see [evaluation](evaluation.md).
 
+A matched 64-game visible-state value-baseline run completed and replay-verified
+49,531 decisions. On three unseen deck families, it split 49–46–1 directly
+against the scalar-baseline self-play child and lost 44–52 to their unchanged
+parent. Neither comparison meets M4's strength-gain gate. The sampled
+self-play audit also found recurring own-card removal and weak Flip summons;
+these are exploration choices, not proof about greedy checkpoint preferences.
+Prioritize visible activation and target valuation, independently reviewed
+decision data, and a fresh held-out schedule before another checkpoint
+promotion; see [evaluation](evaluation.md) and [replay audit](replay_audit.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
