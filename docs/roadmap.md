@@ -540,6 +540,16 @@ parent in 64 held-out, seat-swapped duels, with a paired interval crossing
 independent Flip-monster decisions and test whether corrections transfer
 across decks before promoting another checkpoint.
 
+Two further feature-21 policy replays supplied independent Faith Set
+preferences, and one supplied a player-visible Ring target correction from
+own Faith to opposing Chaos Sorcerer. A four-review parent-KL child ranked
+all four preferred actions first at those fixed frames, yet scored only
+31–32–1 against its frozen parent on 64 fresh, unseen-composition duels;
+Flip Control and Goat Control splits were weak. This supports adding generic
+Flip-effect readiness and Spell-in-Graveyard context to action scoring before
+another update. Keep the parent as reference and use a new held-out schedule
+for any feature experiment; see [evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

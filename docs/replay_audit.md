@@ -627,3 +627,32 @@ at that training frame, but its separate 64-duel held-out match did not
 establish a strength gain. This is a reviewed tactical preference, not a
 historical legality ruling; [evaluation](evaluation.md) records the full
 comparison and deck splits.
+
+### Cross-deck Faith and Ring follow-up
+
+Four additional feature-21 greedy-policy games against TacticalHeuristicAgent
+v4, seeds **3900–3903**, used Chaos Control, Matt Peddle Goat Control, Flip
+Control, and Chaos Turbo as the policy's decks. All four complete games
+replay-verified, passed the visibility audit, and reproduced every recorded
+policy choice; their ignored aggregate review report is
+`artifacts/fv21_review_scan_3900_3903_audit.json` (SHA-256
+`0e75c5ca97ba4dcf8640c1bb92b447ef19ff69ae0755b9daf3eb125142aa4a20`).
+
+At seed **3900** viewer frame **15**, the policy Normal Summoned a 300-ATK
+Magician of Faith with no monsters on either side and Pot of Greed already in
+its Graveyard; setting that exact card was legal. At seed **3903** frame
+**119**, it again Normal Summoned Faith despite a legal Set and useful Book of
+Moon and Delinquent Duo in its Graveyard. At frame **466** of that same game,
+its Ring of Destruction targeted its own face-up Faith while an opposing
+2300-ATK Chaos Sorcerer was a legal target and the acting player had 5800 LP.
+Set Faith and targeting Sorcerer are review preferences from player-visible
+facts, not claims that every board state has those same best moves.
+
+The two replay-bound files
+`examples/preferences/feature21_faith_set_3900_p0.preference.json` and
+`examples/preferences/feature21_faith_ring_3903_p0.preference.json` encode
+these three exact alternatives. Along with seed 3700's Faith preference, the
+unchanged parent ranked all four preferred actions below its recorded move.
+A parent-KL child ranked all four first at their training frames, but its
+separate 64-duel held-out comparison scored **31–32–1** versus the frozen
+parent. See [evaluation](evaluation.md); the child is not promoted.

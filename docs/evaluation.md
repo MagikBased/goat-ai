@@ -3710,3 +3710,64 @@ benchmark.
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai OMP_NUM_THREADS=1 \
   .venv/bin/python -m pytest -q tests/test_historical_ring_rush_recklessly.py
 ```
+
+## Four-review Faith and Ring policy update
+
+Four new complete feature-21 policy games against TacticalHeuristicAgent v4
+used different policy decks at seeds **3900–3903**; all replay-verified and
+passed the player-visible audit. Two games exposed another Magician of Faith
+Normal Summon despite a legal Set, and one exposed Ring targeting the
+policy's own Faith while an opposing 2300-ATK Chaos Sorcerer was legal and
+safe by the acting player's 5800 LP. Three SHA-256-bound `policy_review`
+files cover those decisions plus the seed-3700 Faith decision. None of the
+three source replays or their seeds were in the unchanged parent's training
+provenance. The parent ranked the preferred actions **4th, 2nd, 2nd, and
+5th** at those four frames.
+
+A 200-step parent-KL update used all **4** reviewed preferences and **128**
+sampled preservation decisions across the eight parent-training games.
+Its preference loss went from **1.1465** to **0.1952**, with last preservation
+KL **0.0381**. It ranked all four preferred actions **1st** at their training
+frames. The ignored child checkpoint is
+`.cache/goat-ai/fv21_faith_ring_four_review_child.pt` (SHA-256
+`77f34e1cc722542cb746053fd27c247c6a8b0c21cc0ddfc0c8b862f1539421e0`).
+
+On fresh seeds **4000–4007**, two unseen-composition matchup pairs (Flip
+Control/Chaos Return and Matt Peddle Goat Control/Dimension Fusion Turbo),
+both deck assignments, and both seats, the child scored **31–32–1** in **64**
+completed duels against its frozen parent. Its score rate was **49.22%**,
+with a paired 95% bootstrap interval of **39.06%–58.59%**. By child deck,
+the decisive splits were Chaos Return **11–4**, Dimension Fusion Turbo
+**9–7**, Flip Control **5–11**, and Goat Control **6–10**. The result is
+inconclusive overall and poor on two deck roles, so the child is **not
+promoted**. The ignored tournament report is
+`artifacts/fv21_four_review_child_vs_parent_4000_4007.json` (SHA-256
+`bb5e8477286dc65d1757aaefa2a60d1c9b5054fd3a44e599384637dd6749cb79`).
+The fixed-state correction did not establish a general Faith strategy; a
+future representation should expose Flip-effect and Graveyard Spell context
+to the action scorer, then use a new held-out comparison.
+
+```bash
+preserve_args=()
+for replay_file in replays/tactical_v3_cas_daryl_schema24_2500_2503/*.json; do
+  preserve_args+=(--preserve-trajectory "$replay_file")
+done
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_review_preferences.py \
+  .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --case replays/fv21_vs_tactical_3700_p0.json examples/preferences/feature21_faith_set_3700_p0.preference.json \
+  --case replays/fv21_review_scan_3900_3903/seed_3900_seat_0.json examples/preferences/feature21_faith_set_3900_p0.preference.json \
+  --case replays/fv21_review_scan_3900_3903/seed_3903_seat_0.json examples/preferences/feature21_faith_ring_3903_p0.preference.json \
+  "${preserve_args[@]}" --native-root .cache/goat-ai \
+  --steps 200 --preserve-per-trajectory 16 --preserve-batch 16 \
+  --parent-kl-weight 1 --learning-rate 0.0001 --seed 21 \
+  --output .cache/goat-ai/fv21_faith_ring_four_review_child.pt
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv21_faith_ring_four_review_child.pt \
+  --opponent-checkpoint .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/flip_control_goatformat_guide.ydk examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 4000 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output artifacts/fv21_four_review_child_vs_parent_4000_4007.json
+```
