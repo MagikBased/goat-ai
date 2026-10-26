@@ -15,6 +15,7 @@ from goat_ai.engine.ocgcore_probe import MSG_SELECT_CHAIN, MSG_SELECT_IDLECMD
 # Preserve the existing flat action contract through the observed 3,003-way
 # Return prompt. Larger card selections use staged, linear-size choices.
 MAX_CARD_SELECTION_COMBINATIONS = 4096
+MAX_SUM_SELECTION_COMBINATIONS = 4096
 
 
 @dataclass(frozen=True)
@@ -58,10 +59,129 @@ class NativeCardSelection:
 
 
 @dataclass(frozen=True)
+class NativeSumSelection:
+    """Implicit required cards plus optional native-index choices."""
+
+    required: tuple[tuple[int, int, int, int, int], ...]
+    cards: tuple[tuple[int, int, int, int, int], ...]
+    minimum: int
+    maximum: int
+    target: int
+    mode: int
+
+    def accepts(self, response: int | bytes) -> bool:
+        if not isinstance(response, bytes) or len(response) < 8:
+            return False
+        kind, size = struct.unpack_from("<II", response)
+        if kind != 0 or len(response) != 8 + 4 * size:
+            return False
+        indices = struct.unpack_from(f"<{size}I", response, 8)
+        return self.accepts_indices(indices)
+
+    def selected_cards(self, indices: tuple[int, ...]) -> tuple[tuple[int, int, int, int], ...]:
+        return tuple(card[:4] for card in self.required) + tuple(
+            self.cards[index][:4] for index in indices)
+
+    def accepts_indices(self, indices: tuple[int, ...]) -> bool:
+        if (not self.minimum <= len(indices) <= self.maximum
+                or any(index < 0 or index >= len(self.cards) for index in indices)
+                or tuple(sorted(set(indices))) != indices):
+            return False
+        params = tuple(card[4] for card in self.required) + tuple(
+            self.cards[index][4] for index in indices)
+        if not params:
+            return False
+        if self.mode == 0:
+            @lru_cache(None)
+            def exact(index: int, remaining: int) -> bool:
+                lower, higher = params[index] & 0xffff, params[index] >> 16
+                if index == len(params) - 1:
+                    return remaining in (lower, higher)
+                return ((remaining > lower and exact(index + 1, remaining - lower))
+                        or (higher > 0 and remaining > higher
+                            and exact(index + 1, remaining - higher)))
+            return exact(0, self.target)
+        smallest = [min(param & 0xffff, param >> 16)
+                    if param >> 16 else param & 0xffff for param in params]
+        largest = [max(param & 0xffff, param >> 16) for param in params]
+        return sum(largest) >= self.target and sum(smallest) - min(smallest) < self.target
+
+    def has_completion(self, prefix: tuple[int, ...]) -> bool:
+        """Check whether a sorted prefix can finish without listing all subsets."""
+        if (len(prefix) > self.maximum
+                or any(index < 0 or index >= len(self.cards) for index in prefix)
+                or tuple(sorted(set(prefix))) != prefix):
+            return False
+        if self.accepts_indices(prefix):
+            return True
+        start = prefix[-1] + 1 if prefix else 0
+        if len(prefix) >= self.maximum or start >= len(self.cards):
+            return False
+        fixed = (*self.required, *(self.cards[index] for index in prefix))
+        if self.mode == 0:
+            remaining = {self.target}
+            for card in fixed:
+                lower, higher = card[4] & 0xffff, card[4] >> 16
+                values = (lower, higher) if higher else (lower,)
+                remaining = {total - value for total in remaining
+                             for value in values if total > value}
+                if not remaining:
+                    return False
+
+            @lru_cache(None)
+            def search(index: int, count: int, total: int) -> bool:
+                if count >= self.maximum:
+                    return False
+                for candidate in range(index, len(self.cards)):
+                    param = self.cards[candidate][4]
+                    low, high = param & 0xffff, param >> 16
+                    for value in ((low, high) if high else (low,)):
+                        if total == value and count + 1 >= self.minimum:
+                            return True
+                        if total > value and search(candidate + 1, count + 1,
+                                                    total - value):
+                            return True
+                return False
+
+            return any(search(start, len(prefix), total) for total in remaining)
+
+        low_sum = high_sum = 0
+        smallest = 0x10000
+        for card in fixed:
+            low, high = card[4] & 0xffff, card[4] >> 16
+            minimum = min(low, high) if high else low
+            low_sum += minimum
+            high_sum += max(low, high)
+            smallest = min(smallest, minimum)
+
+        @lru_cache(None)
+        def search(index: int, count: int, low_total: int,
+                   high_total: int, min_value: int) -> bool:
+            if count >= self.maximum or low_total - min_value >= self.target:
+                return False
+            for candidate in range(index, len(self.cards)):
+                param = self.cards[candidate][4]
+                low, high = param & 0xffff, param >> 16
+                minimum = min(low, high) if high else low
+                next_low = low_total + minimum
+                next_high = high_total + max(low, high)
+                next_min = min(min_value, minimum)
+                if (count + 1 >= self.minimum and next_high >= self.target
+                        and next_low - next_min < self.target):
+                    return True
+                if search(candidate + 1, count + 1, next_low, next_high, next_min):
+                    return True
+            return False
+
+        return search(start, len(prefix), low_sum, high_sum, smallest)
+
+
+@dataclass(frozen=True)
 class NativeDecision:
     player: int
     choices: tuple[NativeChoice, ...]
     card_selection: NativeCardSelection | None = None
+    sum_selection: NativeSumSelection | None = None
 
 
 class _Reader:
@@ -347,38 +467,25 @@ def decode_decision(message: bytes,
             sum_param = reader.integer(4)
             cards.append((code, controller, location, sequence, sum_param))
         reader.finish()
+        selection = NativeSumSelection(tuple(required), tuple(cards), minimum,
+                                       upper, target_sum, mode)
         option_count = sum(comb(count, size) for size in range(minimum, upper + 1))
-        if option_count > MAX_CARD_SELECTION_COMBINATIONS:
-            raise NotImplementedError("sum selection exceeds bounded legal option count")
-
-        def legal_sum(indices: tuple[int, ...]) -> bool:
-            levels = [card[4] for card in required]
-            levels.extend(cards[index][4] for index in indices)
-            if not levels:
-                return False
-            if mode == 0:
-                @lru_cache(None)
-                def exact(index: int, remaining: int) -> bool:
-                    lower, higher = levels[index] & 0xffff, levels[index] >> 16
-                    if index == len(levels) - 1:
-                        return remaining in (lower, higher)
-                    return ((remaining > lower and exact(index + 1, remaining - lower))
-                            or (higher > 0 and remaining > higher
-                                and exact(index + 1, remaining - higher)))
-                return exact(0, target_sum)
-            smallest = [min(param & 0xffff, param >> 16)
-                        if param >> 16 else param & 0xffff for param in levels]
-            largest = [max(param & 0xffff, param >> 16) for param in levels]
-            return sum(largest) >= target_sum and sum(smallest) - min(smallest) < target_sum
+        if option_count > MAX_SUM_SELECTION_COMBINATIONS:
+            choices = tuple(NativeChoice("select_card", index, code, controller,
+                                         location, sequence)
+                            for index, (code, controller, location, sequence, _)
+                            in enumerate(cards))
+            if not selection.has_completion(()):
+                raise ValueError("sum selection has no valid responses")
+            return NativeDecision(player, choices, sum_selection=selection)
 
         choices = []
         for size in range(minimum, upper + 1):
             for indices in combinations(range(count), size):
-                if not legal_sum(indices):
+                if not selection.accepts_indices(indices):
                     continue
                 response = struct.pack("<II", 0, size) + struct.pack(f"<{size}I", *indices)
-                selected = tuple(card[:4] for card in required) + tuple(
-                    cards[index][:4] for index in indices)
+                selected = selection.selected_cards(indices)
                 if size == 1 and not required:
                     code, controller, location, sequence = selected[0]
                     choices.append(NativeChoice("select_card", response, code,

@@ -91,7 +91,25 @@ class RestrictedOcgcoreEngine:
             native = self.probe.decode_pending()
         except NotImplementedError as exc:
             raise SimulatorUnavailable(f"native request unsupported by restricted adapter: {exc}") from exc
-        if native.card_selection is not None:
+        if native.sum_selection is not None:
+            selection = native.sum_selection
+            if self._selection_indices is None:
+                self._selection_indices = ()
+            selected = self._selection_indices
+            selected_cards = selection.selected_cards(selected)
+            last = selected[-1] if selected else -1
+            choices = [replace(choice, cards=selected_cards)
+                       for choice in native.choices
+                       if choice.response > last
+                       and selection.has_completion((*selected, choice.response))]
+            if selection.accepts_indices(selected):
+                choices.append(NativeChoice(
+                    "finish_selection", self._card_selection_response(selected),
+                    cards=selected_cards))
+            if not choices:
+                raise SimulatorUnavailable("staged sum selection has no legal continuation")
+            native = replace(native, choices=tuple(choices))
+        elif native.card_selection is not None:
             selection = native.card_selection
             if self._selection_indices is None:
                 self._selection_indices = ()
@@ -220,6 +238,13 @@ class RestrictedOcgcoreEngine:
                 parameters["selection_minimum"] = native.card_selection.minimum
                 parameters["selection_maximum"] = native.card_selection.maximum
                 parameters["selected_count"] = len(self._selection_indices)
+            if native.sum_selection is not None:
+                parameters["selection_minimum"] = native.sum_selection.minimum
+                parameters["selection_maximum"] = native.sum_selection.maximum
+                parameters["selected_count"] = len(self._selection_indices)
+                parameters["selection_sum_target"] = native.sum_selection.target
+                parameters["selection_sum_mode"] = (
+                    "exact" if native.sum_selection.mode == 0 else "greater")
             if (choice.sequence is not None and choice.location not in (0x01, 0x40)
                     and not (choice.location == 0x02 and choice.controller != native.player)):
                 parameters["sequence"] = choice.sequence
@@ -260,7 +285,11 @@ class RestrictedOcgcoreEngine:
                 if not isinstance(choice.response, int):
                     raise RuntimeError("staged selection candidate has no native index")
                 selected = (*self._selection_indices, choice.response)
-                selection = self.probe.decode_pending().card_selection
+                native = self.probe.decode_pending()
+                if native.sum_selection is not None:
+                    self._selection_indices = selected
+                    return self._decision()
+                selection = native.card_selection
                 if selection is None:
                     raise RuntimeError("staged selection lost its native prompt")
                 if len(selected) < selection.maximum:

@@ -4776,7 +4776,8 @@ extension includes implicit mandatory cards in the sum check and visible
 selected-card action while keeping native response indices scoped to optional
 cards. Exact and exceed cases pass synthetic protocol tests; a GOAT native duel
 with a mandatory sum card has not yet been observed. Large sum-choice sets
-still fail explicitly. Double Spell copying The Inexperienced Spy now offers blind
+now use incremental legal-prefix selection, verified separately below. Double
+Spell copying The Inexperienced Spy now offers blind
 opposing-hand choices, with card codes and native hand positions redacted.
 Dragged Down into the Grave uses its addressed hand reveal through the later
 choice window. Focused native tests replay-verify those original four seeds
@@ -4878,3 +4879,24 @@ deck construction, prove every native prompt is supported, or validate
 historical rulings. The sweep process loaded the initial mandatory-sum
 decoder; the later wire-length bound change was checked by focused parser
 and Puppet Magic native tests, not by repeating this full sweep.
+
+### Incremental native sum choices
+
+`MSG_SELECT_SUM` previously failed explicitly when the number of possible
+subsets exceeded 4,096, even if few subsets met the required Level total.
+The adapter now presents one optional card at a time, filtering out prefixes
+that cannot complete legally. It offers a finish action only for a complete
+native-valid subset. Mandatory cards appear in the selected-card action but
+are not included in the native response indices. Exact and greater-sum
+feasibility use the pinned core's `playerop.cpp` acceptance conditions.
+A synthetic 32-card exact-sum prompt, whose raw subsets far exceed 4,096,
+is decoded without flattening its choices. Synthetic greater-sum and
+mandatory-card tests cover the other parsed forms; those do not substitute
+for a real GOAT duel using them.
+
+On random-deck seed 10097, forcing incremental selection for The Puppet
+Magic of Dark Ruler and choosing the same card as the flat response produced
+identical next observations and legal actions. Both resulting complete duels
+replay-verified and passed the player-visible trajectory audit. This validates
+the staged response and privacy boundary for that exact GOAT card prompt;
+other sum cards and very large worst-case search spaces remain unaudited.

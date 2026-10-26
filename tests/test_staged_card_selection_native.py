@@ -10,11 +10,65 @@ from goat_ai.engine import native_messages
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
+from scripts.probe_random_decks import generate_deck, write_deck
 
 GRACEFUL = 79571449
 SANGAN = 504700178
 THUNDER = 504700054
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_staged_puppet_magic_sum_matches_flat_native_choice(tmp_path, monkeypatch):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    seed = 10097
+    decks = (tmp_path / "sum_first.ydk", tmp_path / "sum_second.ydk")
+    write_deck(decks[0], generate_deck(root, seed))
+    write_deck(decks[1], generate_deck(root, seed + 1_000_000))
+
+    def run(staged: bool, target_code: int | None = None):
+        monkeypatch.setattr(native_messages, "MAX_SUM_SELECTION_COMBINATIONS",
+                            1 if staged else 4096)
+        with GoatEnvironment(*(str(deck) for deck in decks), seed=seed,
+                             engine=ExperimentalOcgcoreEngine(root)) as env:
+            observation = env.reset()
+            agent = RandomAgent(seed)
+            after_sum = None
+            for _ in range(3000):
+                actions = env.legal_actions()
+                if after_sum is None and env.engine.probe._pending_message[0] == 23:
+                    assert observation.chain[-1].card_code == 40703393
+                    if staged:
+                        assert env.engine.probe.decode_pending().sum_selection is not None
+                        choice = next(action for action in actions
+                                      if action.kind == "select_card"
+                                      and action.parameters.get("code") == target_code)
+                        native_prompt = env.engine.probe._pending_message
+                        observation = env.step(choice)
+                        assert env.engine.probe._pending_message == native_prompt
+                        finish = next(action for action in env.legal_actions()
+                                      if action.kind == "finish_selection")
+                        observation = env.step(finish)
+                    else:
+                        choice = actions[0]
+                        target_code = choice.parameters["code"]
+                        observation = env.step(choice)
+                    after_sum = (observation, env.legal_actions())
+                    continue
+                observation = env.step(agent.select_action(observation, actions))
+                if env.is_terminal():
+                    break
+            assert after_sum is not None and env.is_terminal()
+            trajectory = env.trajectory()
+            assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) == len(
+                trajectory.decisions)
+            audit_trajectory_visibility(trajectory)
+            return after_sum, target_code
+
+    flat, selected_code = run(False)
+    staged, _ = run(True, selected_code)
+    assert staged == flat
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

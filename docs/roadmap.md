@@ -117,7 +117,9 @@ reveal handling and blind-choice redaction fixed two more. The corrected sweep
 reached **100/100 terminal**, with **113,037 replay-verified decisions**; see
 [evaluation](evaluation.md). The decoder now parses implicit mandatory cards
 for exact and exceed sums, but that extension has parser-only tests. Large
-sum-choice sets remain unsupported rather than silently pruned.
+sum-choice sets now use incremental legal-prefix selection; a forced staged
+Puppet Magic duel matches the flat native outcome and replay-verifies. A
+native mandatory-card sum prompt has not yet been observed.
 An independent second 100-pair whitelist sweep also reached **100/100
 terminal** with **103,185 replay-verified decisions**; see [evaluation](evaluation.md).
 This is a protocol and reproducibility result, not a historical correctness

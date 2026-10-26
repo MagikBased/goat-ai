@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from goat_ai.agents import RandomAgent
+from goat_ai.engine import native_messages
 from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.native_messages import (
@@ -88,6 +89,40 @@ def test_select_sum_enumerates_only_native_legal_level_combinations():
         ((90, 0, LOCATION_MZONE, 10), (100, 0, LOCATION_MZONE, 0))]
     with pytest.raises(ValueError, match="truncated mandatory"):
         decode_decision(struct.pack("<BBBIIII", 23, 0, 0, 3, 1, 99, 65))
+
+
+def test_large_sum_selection_has_only_completable_staged_prefixes(monkeypatch):
+    monkeypatch.setattr(native_messages, "MAX_SUM_SELECTION_COMBINATIONS", 1)
+
+    def prompt(mode, target, required, optional):
+        return (struct.pack("<BBBIIII", 23, 0, mode, target, 1,
+                            99 if mode == 0 else 0, len(required))
+                + b"".join(struct.pack("<IBBIII", 90 + index, 0, LOCATION_MZONE,
+                                       10 + index, 1, level)
+                           for index, level in enumerate(required))
+                + struct.pack("<I", len(optional))
+                + b"".join(struct.pack("<IBBIII", 100 + index, 0, LOCATION_MZONE,
+                                       index, 1, level)
+                           for index, level in enumerate(optional)))
+
+    exact = decode_decision(prompt(0, 4, (), (1, 1, 3, 3))).sum_selection
+    assert exact is not None
+    assert [exact.has_completion((index,)) for index in range(4)] == [
+        True, True, False, False]
+    assert exact.accepts_indices((0, 2))
+    assert not exact.accepts_indices((0, 1))
+    exceed = decode_decision(prompt(1, 5, (2,), (1, 3, 4))).sum_selection
+    assert exceed is not None
+    assert [exceed.has_completion((index,)) for index in range(3)] == [
+        False, True, True]
+    assert exceed.accepts_indices((1,))
+    assert not exceed.accepts_indices((0, 1))
+    monkeypatch.setattr(native_messages, "MAX_SUM_SELECTION_COMBINATIONS", 4096)
+    large = decode_decision(prompt(0, 10, (), (1,) * 32)).sum_selection
+    assert large is not None
+    assert len(large.cards) == 32
+    assert large.has_completion((0,))
+    assert large.accepts_indices(tuple(range(10)))
 
 
 def test_new_native_choice_formats():
