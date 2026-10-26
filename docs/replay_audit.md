@@ -81,6 +81,34 @@ targets, but does not evaluate the earlier activation. A held-out 48-duel
 comparison scored 25–23 against v3 with an interval including 50%; see
 [evaluation](evaluation.md). Keep v5 experimental.
 
+Three SHA-256-bound `policy_review` annotations preserve the offered opposing
+targets at these decisions without calling them human demonstrations:
+`examples/annotations/feature19_bls_cc_war_2641_p0.review.json`,
+`examples/annotations/feature19_mst_cc_war_2641_p1.review.json`, and
+`examples/annotations/feature19_bls_daryl_cas_2647_p1.review.json`.
+`scripts/score_reviewed_decisions.py` replay-verifies each source duel,
+checks the visibility audit and legal annotation indices, then reports the
+checkpoint's raw action-score margin. Across these three choices, the
+unchanged feature-19 checkpoint ranks the annotated opposing targets
+**2nd, 3rd, and 4th** of their legal sets, respectively, with annotated-minus-
+recorded logit margins of **−1.011, −0.478, and −0.881**. The earlier five
+seed-2612 review choices all rank 2nd. None of the four source trajectories
+or their seeds appear in this checkpoint's training provenance. The ignored
+eight-label report is `artifacts/feature19_review_scorecard.json` (SHA-256
+`0d949e1d64145cef908937f531a27c3b9dac6458bc4d41bb49cda4bf4fb4a9a8`).
+This is a fixed-state diagnostic; eight reviewer choices cannot establish a
+policy's competitive strength or justify training on their replay outcomes.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/score_reviewed_decisions.py \
+  --checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt \
+  --case replays/policy_audit_v19_jesse_daryl_seed2612.json examples/annotations/feature19_seed2612.review.json \
+  --case replays/policy_batch_v19_cc_war_2641_p0.json examples/annotations/feature19_bls_cc_war_2641_p0.review.json \
+  --case replays/policy_batch_v19_cc_war_2641_p1.json examples/annotations/feature19_mst_cc_war_2641_p1.review.json \
+  --case replays/policy_batch_v19_daryl_cas_2647_p1.json examples/annotations/feature19_bls_daryl_cas_2647_p1.review.json \
+  --output artifacts/feature19_review_scorecard.json
+```
+
 The updated local shortlist independently replay-verified and checkpoint-matched
 the three trajectories containing self-targets (712, 649, and 1,212 decisions;
 368, 320, and 632 policy choices). It found the Soldier choices at frames 220

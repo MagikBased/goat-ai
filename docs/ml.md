@@ -12,6 +12,13 @@ Phase. It has not yet been trained or shown to improve playing strength.
 
 This is a first representation, not a validated strong architecture. It does not yet model public event history, recipient-scoped reveals, other restrictions, changes to the Deck since duel start, or individual Damage Step substeps. Unknown card IDs share one embedding. Target context is pooled and may still lose relationships among cards. The model does not infer hidden hands or deck order. It currently scores one decision at a time; opt-in behavioral-clone minibatches accumulate gradients before an optimizer update, but batched inference, recurrent memory, and action-set attention remain open experiments. A held-out three-batch comparison found higher training throughput but no demonstrated strength gain; the original batch size 1 remains the default. See [the measured training comparison](evaluation.md).
 
+For local replay review, `scripts/score_reviewed_decisions.py` verifies the
+native trajectory and its visibility, checks SHA-256-bound annotation indices,
+and reports the model's rank and logit margin for each reviewed legal action.
+It also reports exact replay and seed overlap with the checkpoint's training
+provenance. These margins diagnose fixed decisions; held-out duel results
+remain the playing-strength gate. See [the replay audit](replay_audit.md).
+
 Install the optional ML dependency and record a native fixture duel:
 
 ```bash

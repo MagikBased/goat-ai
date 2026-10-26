@@ -453,6 +453,10 @@ the same 48-game held-out schedule, with an interval including 50%. Keep it
 experimental. The next M4 step remains broader high-quality target and timing
 examples with cross-deck strength measurement, including effect activation
 choices as well as target choices; see the [replay audit](replay_audit.md).
+An eight-label, four-replay scorecard now verifies reviewed alternatives and
+reports their raw checkpoint ranks and margins. All eight alternatives rank
+below the unchanged feature-19 policy's recorded choice; this gives future
+updates a fixed-state diagnostic, not a substitute for held-out duels.
 
 ## M5 — Search and other formats
 
