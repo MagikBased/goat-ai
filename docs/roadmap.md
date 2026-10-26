@@ -433,6 +433,13 @@ see the [replay audit](replay_audit.md). Scapegoat timing prompts still need
 contextual review. Prioritize independent high-quality decision data and
 cross-deck play gains; neither the guard nor review-fit child closes M4.
 
+A versioned experimental guard v4 substitutes a Set when the guarded policy
+would Normal Summon a low-ATK Flip monster, preserving plausible visible direct
+lethal. It corrects three saved Magician of Faith choices, but scored 23–25
+against guard v3 in 48 direct held-out duels. The [evaluation log](evaluation.md)
+records the paired report and a replay-verified full duel. Do not promote v4
+as a strength improvement on these data.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

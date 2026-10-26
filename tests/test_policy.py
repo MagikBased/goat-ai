@@ -1242,3 +1242,28 @@ def test_policy_tactical_guard_is_opt_in_and_uses_visible_state():
     guarded = PolicyAgent(model, vocabulary, tactical_guard=True)
     assert guarded.select_action(replace(view(), phase="draw"), (goat, decline)) == decline
     assert guarded.select_action(replace(view(), phase="end"), (goat, decline)) == goat
+
+
+def test_optional_weak_flip_guard_substitutes_set_for_preferred_summon():
+    class FavorFirst(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, features):
+            return -torch.arange(len(features.action_cards)).float() + self.dummy
+
+    faith = 31560081
+    vocabulary = CardVocabulary((faith,))
+    summon = Action("summon", "normal_summon", 0, {"code": faith})
+    set_faith = Action("set", "set_monster", 0, {"code": faith})
+    snapshot = replace(view(), field=(), life_points=(8000, 8000))
+    model = FavorFirst()
+    assert PolicyAgent(model, vocabulary, tactical_guard=True).select_action(
+        snapshot, (summon, set_faith)) == summon
+    guarded = PolicyAgent(model, vocabulary, tactical_guard=True,
+                          weak_flip_attacks={faith: 300})
+    assert guarded.select_action(snapshot, (summon, set_faith)) == set_faith
+    battle = Action("battle", "battle_phase", 0)
+    assert guarded.select_action(replace(snapshot, life_points=(8000, 300)),
+                                 (summon, set_faith, battle)) == summon

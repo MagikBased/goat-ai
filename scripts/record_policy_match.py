@@ -14,6 +14,7 @@ from goat_ai.agents import (
     load_card_races,
     load_flip_monster_codes,
 )
+from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
@@ -36,13 +37,19 @@ def main() -> None:
     parser.add_argument("--max-decisions", type=int, default=3000)
     parser.add_argument("--tactical-guard", action="store_true",
                         help="apply experimental visible-state action filter to policy")
+    parser.add_argument("--weak-flip-guard", action="store_true",
+                        help="also prefer setting low-ATK Flip monsters; requires tactical guard")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.max_decisions < 1:
         parser.error("--max-decisions must be positive")
+    if args.weak_flip_guard and not args.tactical_guard:
+        parser.error("--weak-flip-guard requires --tactical-guard")
     policy = load_policy_agent(
         args.checkpoint, tactical_guard=args.tactical_guard,
-        card_races=load_card_races(args.native_root) if args.tactical_guard else None)
+        card_races=load_card_races(args.native_root) if args.tactical_guard else None,
+        weak_flip_attacks=(load_weak_flip_monster_attack(args.native_root)
+                           if args.weak_flip_guard else None))
     flip_codes = (load_flip_monster_codes(args.native_root)
                   if args.opponent in ("combat_flip", "tactical") else frozenset())
     opponent = {
@@ -69,8 +76,10 @@ def main() -> None:
                     skill_metadata={
                         "demonstrator_seat": args.policy_seat,
                         "policy_checkpoint_sha256": sha256_file(args.checkpoint),
-                        "policy_inference": ("greedy_tactical_guard_v3" if args.tactical_guard
-                                             else "greedy"),
+                        "policy_inference": ("greedy_tactical_guard_v4"
+                                             if args.weak_flip_guard else
+                                             "greedy_tactical_guard_v3"
+                                             if args.tactical_guard else "greedy"),
                         "policy_inference_version": POLICY_INFERENCE_VERSION,
                         "policy_feature_version": policy.model.feature_version,
                         "opponent": type(opponent).__name__,

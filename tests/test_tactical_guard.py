@@ -3,7 +3,10 @@
 from dataclasses import replace
 
 from goat_ai.actions import Action
-from goat_ai.agents.tactical_guard import admissible_action_indices
+from goat_ai.agents.tactical_guard import (
+    admissible_action_indices,
+    weak_flip_set_substitute,
+)
 from goat_ai.observations import CardView, ChainLinkView, Observation
 
 
@@ -63,6 +66,24 @@ def test_scapegoat_waits_for_end_or_battle_and_can_answer_removal():
 def test_guard_never_eliminates_every_legal_action():
     goat = Action("goat", "chain", 0, {"code": 504700123})
     assert kept(board(phase="draw"), (goat,)) == (goat,)
+
+
+def test_optional_weak_flip_guard_prefers_set_except_visible_direct_lethal():
+    faith = 31560081
+    summon = Action("summon", "normal_summon", 0, {"code": faith})
+    set_faith = Action("set", "set_monster", 0, {"code": faith})
+    actions = (summon, set_faith)
+    weak = {faith: 300}
+    assert kept(board(), actions) == actions  # Existing guard v3 stays unchanged.
+    assert weak_flip_set_substitute(board(), actions, summon, weak) == set_faith
+    opponent = CardView(1, "monster", "facedown", None, 0, "defense")
+    assert weak_flip_set_substitute(board(opponent), actions, summon, weak) == set_faith
+    lethal = replace(board(), life_points=(8000, 300))
+    battle = Action("battle", "battle_phase", 0)
+    assert weak_flip_set_substitute(lethal, (*actions, battle), summon, weak) is None
+    assert weak_flip_set_substitute(replace(lethal, phase="main2"),
+                                    (*actions, battle), summon, weak) == set_faith
+    assert weak_flip_set_substitute(board(opponent), (summon,), summon, weak) is None
 
 
 def test_tribe_requires_visible_enemy_and_names_the_best_race():

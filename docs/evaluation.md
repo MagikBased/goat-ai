@@ -3032,3 +3032,50 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/benchmark_parallel_native.py \
   --native-root .cache/goat-ai --games 8 --workers 2 \
   --output artifacts/parallel_memory_9700_9703.json
 ```
+
+## Feature-19 tactical guard and weak Flip Set experiment
+
+The unchanged `tactical_v3_fv19_2500_2503.pt` checkpoint was evaluated on
+Chaos Control, Chaos Return, and Warrior Main Decks whose compositions were
+excluded from training. Seeds 2670–2673, all three pairings, both deck
+assignments, and both seats gave **48 direct duels** per comparison. The
+existing visible-state guard v3 scored **26–22** against the same checkpoint
+without a guard: **54.17%** of points, paired-bootstrap 95% interval
+**50.0–60.42%**. The 21.00-second four-worker report is
+`artifacts/fv19_guard_vs_plain_holdout_2670_2673.json` (SHA-256
+`5b85d44f3f079e445824b67a86e94d252ace1032e3424317aebe2dbe2a517255`).
+This schedule alone does not establish a reliable gain.
+
+An opt-in guard v4 uses printed Flip type and ATK from the pinned card databases.
+If the guarded policy's preferred legal action is a Normal Summon of a Flip
+monster with at most 500 printed ATK, it chooses the Set of that same card
+when available. It leaves a face-up summon available if an unobstructed
+Battle Phase and visible ATK show a plausible direct lethal attack. This is a
+general play preference, not a simulator legality change or a trained policy.
+On the six saved mistake snapshots, v4 chose Set for all three Magician of
+Faith summons; its inherited v3 guard passed before two wasteful Tribe
+activations and named Beast instead of Spellcaster in the third Tribe case.
+These fixed-state choices do not prove better duel outcomes.
+
+Against guard v3 on the same checkpoint and held-out schedule, guard v4 scored
+**23–25**, or **47.92%** of points, with paired-bootstrap 95% interval
+**43.75–50.0%**. The four-worker tournament took **21.33 seconds**. Its ignored
+report is `artifacts/fv19_guard_v4_vs_v3_holdout_2670_2673.json` (SHA-256
+`62bc2697f0e6bdaad14d8017612d08ec7f7a593a760c3cc0c0b8c9ef0068c356`).
+Guard v4 is retained only as an experiment; the result does **not** support
+promoting it over v3. A full guard-v4 duel against TacticalHeuristicAgent v3
+on Daryl/Cas seed 2647 reached a native terminal result in 399 decisions and
+replay-verified. The corresponding audit matched all 224 policy choices to
+the saved checkpoint and found one Scapegoat timing prompt, with no weak Flip
+or Tribe prompt. The ignored trajectory and audit SHA-256 values are
+`2ff2409512362fcae4980f7d9ff3ba504eb3bbefdc6e80abe042f8bb838b40ee`
+and `67d9eaa6000724d401e03d9cef2b0573b76cba1f03277b8178540a8f932db48b`.
+
+Reproduce the direct ablation with `scripts/evaluate_policy.py` using the
+checkpoint above for both sides, `--engine experimental --tactical-guard
+--weak-flip-guard --opponent-checkpoint` set to that checkpoint,
+`--opponent-tactical-guard --both-deck-assignments --seed 2670 --seeds 4
+--max-decisions 3000 --require-unseen-main-decks --workers 4`, and the three
+matchups named above. The report includes the card databases used for printed
+metadata in its asset hashes. The v3-versus-plain run omits
+`--weak-flip-guard --opponent-tactical-guard`.

@@ -40,6 +40,15 @@ and the eight `replays/policy_batch_v19_*json` files. It contains 14 review
 prompts in total, including the previously reported Heavy Storm and
 Scapegoat prompts. No new training labels or policy weights were changed.
 
+An optional guard v4 changed all three saved Faith choices to Set and retained
+the guard v3 corrections at those three Tribe decisions. A complete guard-v4
+duel replay-verified, but v4 scored 23–25 directly against v3 on held-out deck
+compositions and seeds; see [evaluation](evaluation.md). This preference is an
+experiment, not a promoted stronger agent. Use `--tactical-guard
+--weak-flip-guard` when recording or evaluating guard v4; recordings identify
+it as `greedy_tactical_guard_v4` so the replay auditor can reproduce its
+decisions without confusing it with v3.
+
 ## Seed 2202, policy versus CombatHeuristicAgent v3
 
 Replay: `replays/policy_vs_combat_2202.json`. Policy P0 uses

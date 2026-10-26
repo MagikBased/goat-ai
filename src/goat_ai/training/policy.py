@@ -10,7 +10,10 @@ import torch
 from torch import Tensor, nn
 
 from goat_ai.actions import Action
-from goat_ai.agents.tactical_guard import admissible_action_indices
+from goat_ai.agents.tactical_guard import (
+    admissible_action_indices,
+    weak_flip_set_substitute,
+)
 from goat_ai.engine.decks import read_goat_whitelist
 from goat_ai.observations import Observation
 
@@ -502,11 +505,13 @@ class PolicyAgent:
 
     def __init__(self, model: LegalActionPolicy, vocabulary: CardVocabulary,
                  *, tactical_guard: bool = False,
-                 card_races: Mapping[int, int] | None = None) -> None:
+                 card_races: Mapping[int, int] | None = None,
+                 weak_flip_attacks: Mapping[int, int] | None = None) -> None:
         self.model = model
         self.vocabulary = vocabulary
         self.tactical_guard = tactical_guard
         self.card_races = dict(card_races or {})
+        self.weak_flip_attacks = dict(weak_flip_attacks or {})
         self._last_selection: tuple[int, str, tuple] | None = None
         self._cancel_turn: int | None = None
         self._cancelled_prompts: list[tuple[Observation, tuple[tuple, ...]]] = []
@@ -527,6 +532,10 @@ class PolicyAgent:
                                                 self.card_races)
                       if self.tactical_guard else range(len(legal_actions)))
         chosen = legal_actions[max(admissible, key=lambda i: scores[i].item())]
+        if self.tactical_guard and self.weak_flip_attacks:
+            chosen = (weak_flip_set_substitute(
+                observation, legal_actions, chosen, self.weak_flip_attacks)
+                or chosen)
         if chosen.kind == "cancel":
             if observation.turn != self._cancel_turn:
                 self._cancel_turn = observation.turn

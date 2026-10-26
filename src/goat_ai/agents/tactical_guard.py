@@ -35,9 +35,35 @@ def tribe_race_value(observation: Observation, race: int,
             + sum(c.attack or 0 for c in enemy) - sum(c.attack or 0 for c in own))
 
 
+def weak_flip_set_substitute(observation: Observation,
+                             legal_actions: Sequence[Action],
+                             preferred: Action,
+                             weak_flip_attacks: Mapping[int, int],
+                             ) -> Action | None:
+    """Offer the same low-ATK Flip monster as a Set when no direct lethal is visible."""
+    code = preferred.parameters.get("code")
+    if preferred.kind != "normal_summon" or code not in weak_flip_attacks:
+        return None
+    own = observation.viewer
+    own_attack = sum(c.attack or 0 for c in observation.field
+                     if c.controller == own and c.zone == "monster"
+                     and c.position == "faceup" and c.orientation == "attack")
+    enemy_monsters = any(c.controller != own and c.zone == "monster"
+                         for c in observation.field)
+    if (observation.phase == "main1"
+            and any(a.kind == "battle_phase" for a in legal_actions)
+            and not enemy_monsters
+            and observation.life_points[1 - own]
+            <= own_attack + weak_flip_attacks[code]):
+        return None
+    return next((a for a in legal_actions if a.kind == "set_monster"
+                 and a.parameters.get("code") == code), None)
+
+
 def admissible_action_indices(observation: Observation,
                               legal_actions: Sequence[Action],
-                              card_races: Mapping[int, int] | None = None) -> tuple[int, ...]:
+                              card_races: Mapping[int, int] | None = None,
+                              ) -> tuple[int, ...]:
     """Defer clearly wasteful actions while preserving an engine-legal choice.
 
     Scapegoat is normally held for the opponent's End Phase. Their Battle
