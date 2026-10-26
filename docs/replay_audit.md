@@ -75,6 +75,12 @@ changing the move would reverse a game's result. The separate guard-v4 duel
 399 decisions; this small review found no equally clear example in it. That
 does not establish the guarded policy's overall strength.
 
+An opt-in guard v5 filters own BLS or Typhoon targets at these target prompts
+when an enemy target is legal. It changes all three saved choices to opposing
+targets, but does not evaluate the earlier activation. A held-out 48-duel
+comparison scored 25–23 against v3 with an interval including 50%; see
+[evaluation](evaluation.md). Keep v5 experimental.
+
 The updated local shortlist independently replay-verified and checkpoint-matched
 the three trajectories containing self-targets (712, 649, and 1,212 decisions;
 368, 320, and 632 policy choices). It found the Soldier choices at frames 220

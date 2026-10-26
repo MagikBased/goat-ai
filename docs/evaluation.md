@@ -3079,3 +3079,41 @@ checkpoint above for both sides, `--engine experimental --tactical-guard
 matchups named above. The report includes the card databases used for printed
 metadata in its asset hashes. The v3-versus-plain run omits
 `--weak-flip-guard --opponent-tactical-guard`.
+
+## Experimental self-target guard v5
+
+Replay review found two saved feature-19 policy decisions where Black Luster
+Soldier selected an own monster for its banish effect despite an offered enemy
+target, and one where Mystical Space Typhoon selected the policy's own Set
+Solemn Judgment despite an offered opposing Set card. The opt-in v5 guard
+extends v3 only at those target prompts: if an opposing target is legal, it
+removes own targets from the scored set. It reads the public chain source and
+legal-action target controllers. It does not decide whether activating either
+effect was useful. Guard v4 remains a separate, non-combinable experiment.
+
+On the three original player-visible snapshots, v3 selected the same own
+targets as the replay; v5 selected the offered opposing Set monster, opposing
+Set Spell/Trap, and opposing face-up Sinister Serpent respectively. These are
+off-policy fixed-state checks. A complete v5 duel on Daryl/Cas seed 2647
+reached terminal and replay-verified all **422 decisions**. The audit matched
+its **233 policy choices** to the saved feature-19 checkpoint and found no
+BLS/MST self-target candidate. It still flagged one Scapegoat pass and two
+weak Flip summons, so the guard addresses only the named target mistakes.
+
+Against v3 on the unchanged checkpoint and the same held-out Chaos Control,
+Chaos Return, and Warrior schedule as the v4 comparison above, v5 scored
+**25–23** across **48 direct duels** (52.08% of points; paired-bootstrap 95%
+interval **50.0–56.25%**). All games reached terminal under the 3,000-decision
+cap. The four-worker tournament took **21.58 seconds** on the reported x86_64
+machine. The ignored report is
+`artifacts/fv19_guard_v5_vs_v3_holdout_2670_2673.json` (SHA-256
+`0872db2bebb2817e98cbe84e57d87cbf59360f75f1b867257b19dad35f60782c`).
+The interval includes 50%; this experiment does not establish a competitive
+gain or justify promoting v5 as the default. It may also suppress deliberate
+own-card targets in unusual positions.
+
+Reproduce with `scripts/evaluate_policy.py` using the same three matchups and
+options above, replacing `--weak-flip-guard` with `--self-target-guard`.
+Record and audit the complete duel with `scripts/record_policy_match.py
+--tactical-guard --self-target-guard` and then
+`scripts/audit_policy_replays.py` on the resulting trajectory.

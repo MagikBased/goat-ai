@@ -445,6 +445,15 @@ against guard v3 in 48 direct held-out duels. The [evaluation log](evaluation.md
 records the paired report and a replay-verified full duel. Do not promote v4
 as a strength improvement on these data.
 
+An independent replay review found two Black Luster Soldier self-banishes and
+one Mystical Space Typhoon choice destroying an own Set Solemn Judgment despite
+legal opposing targets. An opt-in guard v5 changes those fixed-state targets
+and replay-verifies as a full-duel policy, but scored only 25–23 against v3 on
+the same 48-game held-out schedule, with an interval including 50%. Keep it
+experimental. The next M4 step remains broader high-quality target and timing
+examples with cross-deck strength measurement, including effect activation
+choices as well as target choices; see the [replay audit](replay_audit.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

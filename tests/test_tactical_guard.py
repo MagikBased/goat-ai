@@ -5,6 +5,7 @@ from dataclasses import replace
 from goat_ai.actions import Action
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
+    safe_target_indices,
     weak_flip_set_substitute,
 )
 from goat_ai.observations import CardView, ChainLinkView, Observation
@@ -66,6 +67,34 @@ def test_scapegoat_waits_for_end_or_battle_and_can_answer_removal():
 def test_guard_never_eliminates_every_legal_action():
     goat = Action("goat", "chain", 0, {"code": 504700123})
     assert kept(board(phase="draw"), (goat,)) == (goat,)
+
+
+def test_optional_self_target_guard_uses_public_source_and_target_slots():
+    bls = 504700118
+    mst = 5318639
+    own_bls = Action("bls", "select_card", 0,
+                     {"code": bls, "controller": 0, "location": 4, "sequence": 0})
+    own_other = Action("other", "select_card", 0,
+                       {"code": 123, "controller": 0, "location": 4, "sequence": 1})
+    unknown_enemy = Action("enemy", "select_card", 0,
+                           {"controller": 1, "location": 4, "sequence": 0})
+    actions = (own_bls, own_other, unknown_enemy)
+    snapshot = board(chain=(ChainLinkView(1, bls, 0, 4, 0),))
+    assert safe_target_indices(snapshot, actions, range(3)) == (2,)
+    assert safe_target_indices(snapshot, actions[:2], range(2)) == (0, 1)
+    assert safe_target_indices(board(chain=(ChainLinkView(1, bls, 1, 4, 0),)),
+                               actions, range(3)) == (0, 1, 2)
+    own_spell = Action("own-spell", "select_card", 0,
+                       {"code": 41420027, "controller": 0,
+                        "location": 8, "sequence": 2})
+    enemy_spell = Action("enemy-spell", "select_card", 0,
+                         {"controller": 1, "location": 8, "sequence": 1})
+    spell_actions = (own_spell, enemy_spell)
+    assert safe_target_indices(board(chain=(ChainLinkView(1, mst, 0, 8, 0),)),
+                               spell_actions, range(2)) == (1,)
+    # The opponent's hidden identity is unavailable in both observations.
+    assert safe_target_indices(board(chain=(ChainLinkView(1, mst, 0, 8, 0),)),
+                               spell_actions[:1], range(1)) == (0,)
 
 
 def test_optional_weak_flip_guard_prefers_set_except_visible_direct_lethal():

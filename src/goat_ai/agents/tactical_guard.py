@@ -18,6 +18,34 @@ BREAKER_THE_MAGICAL_WARRIOR = 71413901
 ENEMY_CONTROLLER = 98045062
 ROYAL_DECREE = 51452091
 SAKURETSU_ARMOR = 56120475
+BLACK_LUSTER_SOLDIER = 504700118
+MYSTICAL_SPACE_TYPHOON = 5318639
+
+
+def safe_target_indices(observation: Observation,
+                        legal_actions: Sequence[Action],
+                        admissible: Sequence[int]) -> tuple[int, ...]:
+    """Avoid observed own-target losses when an enemy target is offered.
+
+    This opt-in preference applies only at the target prompt. It does not
+    decide whether activating the effect was worthwhile in the first place.
+    """
+    indices = tuple(admissible)
+    if not observation.chain or observation.chain[-1].controller != observation.viewer:
+        return indices
+    source = observation.chain[-1]
+    if source.card_code not in (BLACK_LUSTER_SOLDIER, MYSTICAL_SPACE_TYPHOON):
+        return indices
+    own = observation.viewer
+    has_enemy_target = any(legal_actions[i].kind == "select_card"
+                           and legal_actions[i].parameters.get("controller") != own
+                           for i in indices)
+    if not has_enemy_target:
+        return indices
+    kept = tuple(i for i in indices if not (
+        legal_actions[i].kind == "select_card"
+        and legal_actions[i].parameters.get("controller") == own))
+    return kept or indices
 
 
 def tribe_race_value(observation: Observation, race: int,

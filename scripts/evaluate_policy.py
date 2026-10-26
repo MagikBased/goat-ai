@@ -30,10 +30,12 @@ from goat_ai.training.policy import POLICY_INFERENCE_VERSION
 
 def make_policy_agent(_seed: int, checkpoint: str, tactical_guard: bool = False,
                       card_races: dict[int, int] | None = None,
-                      weak_flip_attacks: dict[int, int] | None = None):
+                      weak_flip_attacks: dict[int, int] | None = None,
+                      self_target_guard: bool = False):
     return load_policy_agent(checkpoint, tactical_guard=tactical_guard,
                              card_races=card_races,
-                             weak_flip_attacks=weak_flip_attacks)
+                             weak_flip_attacks=weak_flip_attacks,
+                             self_target_guard=self_target_guard)
 
 
 def make_heuristic_agent(_seed: int):
@@ -114,6 +116,8 @@ def main() -> None:
                         help="apply experimental visible-state action filter to candidate")
     parser.add_argument("--weak-flip-guard", action="store_true",
                         help="also prefer setting low-ATK Flip monsters; requires tactical guard")
+    parser.add_argument("--self-target-guard", action="store_true",
+                        help="avoid observed BLS and MST self-target losses; requires tactical guard")
     parser.add_argument("--opponent-tactical-guard", action="store_true",
                         help="guard the opponent checkpoint for a direct ablation")
     opponents = parser.add_mutually_exclusive_group()
@@ -136,6 +140,10 @@ def main() -> None:
         parser.error("seeds, workers, and max decisions must be positive")
     if args.weak_flip_guard and not args.tactical_guard:
         parser.error("--weak-flip-guard requires --tactical-guard")
+    if args.self_target_guard and not args.tactical_guard:
+        parser.error("--self-target-guard requires --tactical-guard")
+    if args.self_target_guard and args.weak_flip_guard:
+        parser.error("choose one experimental extension of guard v3")
     if args.opponent_tactical_guard and not args.opponent_checkpoint:
         parser.error("--opponent-tactical-guard requires --opponent-checkpoint")
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
@@ -187,7 +195,8 @@ def main() -> None:
         matchups, seeds, partial(make_policy_agent, checkpoint=str(args.checkpoint),
                                  tactical_guard=args.tactical_guard,
                                  card_races=card_races,
-                                 weak_flip_attacks=weak_flip_attacks),
+                                 weak_flip_attacks=weak_flip_attacks,
+                                 self_target_guard=args.self_target_guard),
         opponent, partial(engine_type, args.native_root), args.max_decisions,
         **({"workers": args.workers} if args.workers > 1 else {}),
     )
@@ -208,7 +217,8 @@ def main() -> None:
         "checkpoint_sha256": sha256(args.checkpoint),
         "policy_inference_version": POLICY_INFERENCE_VERSION,
         "tactical_guard": args.tactical_guard,
-        "tactical_guard_version": (4 if args.weak_flip_guard else 3
+        "tactical_guard_version": (5 if args.self_target_guard else
+                                   4 if args.weak_flip_guard else 3
                                    if args.tactical_guard else None),
         "opponent_tactical_guard": args.opponent_tactical_guard,
         "policy_feature_version": checkpoint.get("feature_version", 1),

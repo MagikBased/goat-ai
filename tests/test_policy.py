@@ -1267,3 +1267,27 @@ def test_optional_weak_flip_guard_substitutes_set_for_preferred_summon():
     battle = Action("battle", "battle_phase", 0)
     assert guarded.select_action(replace(snapshot, life_points=(8000, 300)),
                                  (summon, set_faith, battle)) == summon
+
+
+def test_optional_self_target_guard_changes_only_target_choice():
+    class FavorFirst(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, features):
+            return -torch.arange(len(features.action_cards)).float() + self.dummy
+
+    bls = 504700118
+    own = Action("own", "select_card", 0,
+                 {"code": bls, "controller": 0, "location": 4, "sequence": 0})
+    enemy = Action("enemy", "select_card", 0,
+                   {"controller": 1, "location": 4, "sequence": 0})
+    snapshot = replace(view(), chain=(ChainLinkView(1, bls, 0, 4, 0),))
+    vocabulary = CardVocabulary((bls,))
+    model = FavorFirst()
+    assert PolicyAgent(model, vocabulary, tactical_guard=True).select_action(
+        snapshot, (own, enemy)) == own
+    assert PolicyAgent(model, vocabulary, tactical_guard=True,
+                       self_target_guard=True).select_action(
+        snapshot, (own, enemy)) == enemy

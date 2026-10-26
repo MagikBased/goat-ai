@@ -41,14 +41,16 @@ def main() -> None:
             raise ValueError(f"{path}: policy inference version differs")
         inference = metadata.get("policy_inference")
         if inference not in ("greedy", "greedy_tactical_guard_v3",
-                             "greedy_tactical_guard_v4"):
+                             "greedy_tactical_guard_v4", "greedy_tactical_guard_v5"):
             raise ValueError(f"{path}: unsupported policy inference {inference!r}")
-        guarded = inference in ("greedy_tactical_guard_v3", "greedy_tactical_guard_v4")
+        guarded = inference in ("greedy_tactical_guard_v3", "greedy_tactical_guard_v4",
+                                "greedy_tactical_guard_v5")
         policy = load_policy_agent(
             args.checkpoint, tactical_guard=guarded,
             card_races=card_races if guarded else None,
             weak_flip_attacks=(weak_flip_attacks
-                               if inference == "greedy_tactical_guard_v4" else None))
+                               if inference == "greedy_tactical_guard_v4" else None),
+            self_target_guard=inference == "greedy_tactical_guard_v5")
         if metadata.get("policy_feature_version") != policy.model.feature_version:
             raise ValueError(f"{path}: policy feature version differs")
         policy_seat = metadata["demonstrator_seat"]
