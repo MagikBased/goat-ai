@@ -65,6 +65,8 @@
     .card.facedown { background: transparent; box-shadow: none; }
     .card.facedown > strong, .card.facedown > small { display: none; }
     .card.facedown .card-back { inset: 0 auto 0 50%; width: min(80%, 82px); transform: translateX(-50%); }
+    .slot .card.defense { rotate: 90deg; }
+    .hand-preview .card.defense { rotate: 0deg; }
     .known { outline: 2px solid #e5cb6d; }
     .card small { opacity: .8; }
     .field-zone { border-color: #ce9c52 !important; }
@@ -82,9 +84,11 @@
     .hand-zone .mini-art { width: 28px; height: 39px; object-fit: contain; }
     .hand .card { flex: 0 0 62px; height: 90px; cursor: zoom-in; }
     .hand-back { position: relative; flex: 0 0 58px; height: 88px; border: 2px solid #947bb4; border-radius: 5px; background: #3c3156; overflow: hidden; cursor: zoom-in; }
-    .hand-preview { position: fixed; z-index: 20; width: 115px; height: 166px; padding: 3px; border: 2px solid #e4ca70; border-radius: 8px; background: #11232b; box-shadow: 0 10px 30px #000c; pointer-events: none; animation: drawer-open .18s ease-out both; }
+    .hand-preview { position: fixed; z-index: 20; width: 172px; height: 250px; padding: 3px; border: 2px solid #e4ca70; border-radius: 8px; background: #11232b; box-shadow: 0 10px 30px #000c; pointer-events: none; animation: drawer-open .18s ease-out both; }
     .hand-preview .card, .hand-preview .hand-back { display: block; width: 100%; height: 100%; }
-    .hand-preview .card-back { inset: 5px; }
+    .hand-preview .card-back { inset: 3px; }
+    .hand-preview .card.facedown .card-back { inset: 0; width: 100%; height: 100%; transform: none; }
+    .card, .hand-back, .deck-slot, .hand-zone { cursor: zoom-in; }
     @keyframes drawer-open { from { opacity: .4; transform: translateY(14px) scale(.85); } to { opacity: 1; transform: none; } }
     .hand-back .card-back { inset: 3px; }
     .zone-counts { display: flex; gap: 8px; flex-wrap: wrap; color: #c1d7d3; }
@@ -143,9 +147,10 @@
 </head>
 <body>
   <header class="topbar">
-    <div><h1>GOAT AI Replay Viewer</h1><p class="muted subtitle">Player-visible decision snapshots</p></div>
+    <div><h1>GOAT AI Replay Viewer</h1><p id="view-mode" class="muted subtitle">Player-visible decision snapshots</p></div>
     <div class="toolbar">
       <label>Open trajectory <input id="file" type="file" accept=".json,application/json"></label>
+      <label>Reviewer reveals <input id="review-file" type="file" accept=".json,application/json" title="Choose a verified .review.json sidecar"></label>
       <label class="image-picker" title="Select your local card image folder">Card images <input id="images" type="file" webkitdirectory directory multiple accept="image/jpeg,image/png,image/webp"></label>
       <span id="image-count" class="muted subtitle"></span>
       <span id="file-name" class="muted">No replay loaded</span>
@@ -178,7 +183,7 @@
           <p id="legal-count" class="muted"></p>
           <details><summary>All legal actions</summary><ol id="legal" class="legal-list"></ol><button id="legal-more" type="button" hidden>Show more</button></details>
         </div>
-        <div class="panel">
+        <div class="panel" id="review-panel">
           <h2>Review a decision</h2>
           <p class="muted">Choose an action from the legal list above to label this frame. Labels are retrospective and stay on this device until downloaded.</p>
           <p id="annotation-status" class="muted"></p>
@@ -224,6 +229,7 @@
   <script id="embedded-names" type="application/json">__EMBEDDED_NAMES__</script>
   <script id="embedded-options" type="application/json">__EMBEDDED_OPTIONS__</script>
   <script id="embedded-images" type="application/json">__EMBEDDED_IMAGES__</script>
+  <script id="embedded-reviewer" type="application/json">__EMBEDDED_REVIEWER__</script>
   <script id="embedded-sha256" type="application/json">"__SOURCE_SHA256__"</script>
   <script>
     "use strict";
@@ -246,6 +252,10 @@
     let previousHand = null;
     let animateNext = false;
     let currentObservation = null;
+    let embeddedReviewer = null;
+    let reviewerData = null;
+    let previewSource = null;
+    let previewHeight = 250;
     // Card IDs in >=5 of the six sourced tournament Main Decks; tests pin this list.
     const COMMON_CARD_CODES = new Set([
       14087893, 504700116, 44763025, 19613556, 71413901,
@@ -338,6 +348,7 @@
       if (!currentObservation) return;
       stop();
       const observation = currentObservation;
+      const reveal = reviewerData?.frames[index];
       const own = player === observation.viewer;
       const label = `${own ? "Your" : "Opponent"} ${zone === "deck" ? "Deck" : zone === "extra" ? "Extra Deck" : zone === "graveyard" ? "Graveyard" : "Banished cards"}`;
       byId("pile-title").textContent = label;
@@ -346,7 +357,10 @@
       let note;
       if (zone === "extra") {
         const remaining = observation.extra_deck_counts[player];
-        if (own && observation.own_extra_deck?.length) {
+        if (reveal?.extra[player]?.length) {
+          note = `${remaining} cards in Player ${player + 1}'s Extra Deck (reviewer view).`;
+          for (const code of reveal.extra[player]) grid.append(pileCard(code));
+        } else if (own && observation.own_extra_deck?.length) {
           note = `${remaining} cards in your Extra Deck.`;
           for (const card of observation.own_extra_deck) grid.append(pileCard(card.code));
         } else {
@@ -355,10 +369,11 @@
         }
       } else if (zone === "deck") {
         const remaining = observation.deck_counts[player];
-        if (own && observation.own_main_deck?.length) {
+        const decklist = reveal?.decks[player] || (own ? observation.own_main_deck : null);
+        if (decklist?.length) {
           note = `${remaining} cards remain. Starting Main Deck composition is shown below; the identities and order of the remaining cards are unknown.`;
           const counts = new Map();
-          for (const code of observation.own_main_deck) counts.set(code, (counts.get(code) || 0) + 1);
+          for (const code of decklist) counts.set(code, (counts.get(code) || 0) + 1);
           for (const [code, count] of counts) grid.append(pileCard(code, count));
         } else {
           note = own ? `${remaining} cards remain. This replay has no recorded starting decklist.`
@@ -366,8 +381,10 @@
         }
       } else {
         const cards = zone === "graveyard" ? observation.graveyards[player] : observation.banished[player];
-        note = `${cards.length} ${cards.length === 1 ? "card" : "cards"}. ${zone === "graveyard" ? "Graveyard cards are public." : "Concealed banished cards remain hidden."}`;
-        for (const card of cards) grid.append(pileCard(card.code, 1, !own));
+        note = `${cards.length} ${cards.length === 1 ? "card" : "cards"}. ${zone === "graveyard" ? "Graveyard cards are public." : reveal ? "Reviewer view includes concealed banished cards." : "Concealed banished cards remain hidden."}`;
+        for (const [cardIndex, card] of cards.entries()) grid.append(pileCard(
+          zone === "banished" ? (reveal?.banished[player]?.[cardIndex] ?? card.code) : card.code,
+          1, !own));
       }
       byId("pile-note").textContent = note;
       if (!grid.childElementCount) scroll.replaceChildren(node("p", "muted", "No cards to display."));
@@ -410,8 +427,9 @@
     };
     function cardElement(observation, card, known) {
       const code = visibleCode(observation, card, known);
-      const element = node("div", `card ${card.zone} ${card.position === "facedown" ? "facedown" : ""} ${card.code == null && code != null ? "known" : ""}`);
-      element.title = cardLabel(observation, card, known);
+      const element = node("div", `card ${card.zone} ${card.position === "facedown" ? "facedown" : ""} ${card.orientation === "defense" ? "defense" : ""} ${card.code == null && code != null ? "known" : ""}`);
+      const reviewerCode = reviewerData?.frames[index]?.field[fieldKey(card)];
+      element.title = reviewerCode != null ? nameOf(reviewerCode) : cardLabel(observation, card, known);
       element.dataset.fieldKey = fieldKey(card);
       addCardVisual(element, card.code, card.position === "facedown",
                     card.controller !== observation.viewer);
@@ -453,6 +471,17 @@
     function zoneLine(observation, player, zone, known) {
       const line = node("div", "zone-line");
       if (zone === "monster") {
+        const fieldZone = node("div", "slot field-zone");
+        fieldZone.setAttribute("aria-label", `Player ${player + 1} Field Spell Zone`);
+        fieldZone.title = "Field Spell Zone";
+        const fieldSpell = observation.field.find(card => card.controller === player && card.zone === "spell_trap" && card.sequence === 5);
+        if (fieldSpell) fieldZone.append(cardElement(observation, fieldSpell, known));
+        line.append(fieldZone);
+      } else {
+        line.append(node("div", ""));
+      }
+      line.append(zoneRow(observation, player, zone, known));
+      if (zone === "spell_trap") {
         const pile = observation.graveyards[player];
         const pileButton = node("button", "slot pile-slot");
         pileButton.type = "button";
@@ -463,39 +492,75 @@
           const top = node("div", "card monster");
           const last = pile[pile.length - 1];
           addCardVisual(top, last.code, last.code == null, player !== observation.viewer);
+          if (last.code != null) top.dataset.previewCode = String(last.code);
           pileButton.append(top);
         }
         pileButton.append(node("strong", "", pile.length));
         line.append(pileButton);
       } else {
-        line.append(node("div", ""));
-      }
-      line.append(zoneRow(observation, player, zone, known));
-      const auxiliary = node(zone === "spell_trap" ? "div" : "button", "slot field-zone");
-      if (zone === "spell_trap") {
-        auxiliary.setAttribute("aria-label", `Player ${player + 1} Field Spell Zone`);
-        auxiliary.title = "Field Spell Zone";
-        const fieldSpell = observation.field.find(card => card.controller === player && card.zone === "spell_trap" && card.sequence === 5);
-        if (fieldSpell) auxiliary.append(cardElement(observation, fieldSpell, known));
-      } else {
+        const auxiliary = node("button", "slot field-zone deck-slot");
         auxiliary.type = "button";
-        auxiliary.classList.add("deck-slot");
         auxiliary.setAttribute("aria-label", `View Player ${player + 1} Deck`);
         auxiliary.title = "Deck";
         auxiliary.addEventListener("click", () => showPile(player, "deck"));
         auxiliary.append(cardBack(player !== observation.viewer));
         auxiliary.append(node("strong", "", observation.deck_counts[player]));
+        line.append(auxiliary);
       }
-      line.append(auxiliary);
       return line;
     }
-    function showHandPreview(card, own) {
+    function previewLimit() {
+      return Math.max(32, Math.min(innerHeight - 16, (innerWidth - 16) * 700 / 480));
+    }
+    function hidePreview() {
       const preview = byId("hand-preview");
-      preview.replaceChildren(card.cloneNode(true));
-      const rect = card.getBoundingClientRect();
-      preview.style.left = `${Math.max(8, Math.min(innerWidth - 123, rect.left + rect.width / 2 - 57))}px`;
-      const above = own || rect.bottom + 174 > innerHeight;
-      preview.style.top = `${Math.max(8, above ? rect.top - 174 : rect.bottom + 8)}px`;
+      preview.hidden = true;
+      previewSource = null;
+      if (preview.parentElement !== document.body) document.body.append(preview);
+    }
+    function placePreview() {
+      if (!previewSource) return;
+      const preview = byId("hand-preview");
+      const height = Math.min(previewHeight, previewLimit());
+      const width = height * 480 / 700;
+      const rect = previewSource.getBoundingClientRect();
+      preview.style.width = `${width}px`;
+      preview.style.height = `${height}px`;
+      preview.style.left = `${Math.max(8, Math.min(innerWidth - width - 8,
+        rect.left + rect.width / 2 - width / 2))}px`;
+      const above = rect.top - 8;
+      const below = innerHeight - rect.bottom - 8;
+      const preferred = above >= height || above >= below ? rect.top - height - 8 : rect.bottom + 8;
+      preview.style.top = `${Math.max(8, Math.min(innerHeight - height - 8, preferred))}px`;
+    }
+    function showCardPreview(source) {
+      previewSource = source;
+      const preview = byId("hand-preview");
+      let content;
+      const revealedCode = source.dataset.fieldKey
+        ? (reviewerData?.frames[index]?.field[source.dataset.fieldKey]
+          ?? currentObservation?.field.find(card => fieldKey(card) === source.dataset.fieldKey)?.code)
+        : null;
+      if (source.classList.contains("card") && source.classList.contains("facedown") && revealedCode) {
+        content = node("div", "card monster");
+        addCardVisual(content, revealedCode, false);
+        content.append(node("strong", "", nameOf(revealedCode)));
+      } else if (source.classList.contains("card") || source.classList.contains("hand-back")) {
+        content = source.cloneNode(true);
+        content.classList.remove("card-arrive", "card-flip", "card-draw", "card-attack");
+      } else if (source.dataset.previewCode) {
+        content = node("div", "card monster");
+        addCardVisual(content, Number(source.dataset.previewCode), false);
+      } else {
+        content = node("div", "hand-back");
+        content.append(cardBack(Boolean(source.closest(".opponent"))));
+      }
+      preview.replaceChildren(content);
+      if (byId("pile-dialog").open && preview.parentElement !== byId("pile-dialog"))
+        byId("pile-dialog").append(preview);
+      else if (!byId("pile-dialog").open && preview.parentElement !== document.body)
+        document.body.append(preview);
+      placePreview();
       preview.hidden = false;
     }
     function handRow(observation, player, hand) {
@@ -507,8 +572,10 @@
       banishButton.title = "Banished cards";
       banishButton.addEventListener("click", () => showPile(player, "banished"));
       const last = banished.at(-1);
-      if (last?.code != null) {
-        const source = imageSource(last.code);
+      const lastCode = reviewerData?.frames[index]?.banished[player]?.at(-1) ?? last?.code;
+      if (lastCode != null) {
+        banishButton.dataset.previewCode = String(lastCode);
+        const source = imageSource(lastCode);
         if (source) {
           const art = node("img", "mini-art");
           art.src = source;
@@ -540,19 +607,17 @@
       playerHeader.append(node("span", "life", `${observation.life_points[player]} LP`));
       section.append(playerHeader);
       const hand = node("div", "hand");
-      if (own) {
-        for (const [cardIndex, card] of observation.hand.entries()) {
+      const revealedHand = reviewerData?.frames[index]?.hands[player];
+      if (own || revealedHand) {
+        const handCodes = revealedHand || observation.hand.map(card => card.code);
+        for (const [cardIndex, code] of handCodes.entries()) {
           const element = node("div", "card monster");
-          addCardVisual(element, card.code, false);
+          addCardVisual(element, code, false);
           if (animateNext && previousHand?.viewer === player &&
               cardIndex >= previousHand.count) element.classList.add("card-draw");
-          element.title = nameOf(card.code);
+          element.title = nameOf(code);
           element.tabIndex = 0;
-          element.addEventListener("mouseenter", () => showHandPreview(element, true));
-          element.addEventListener("mouseleave", () => { byId("hand-preview").hidden = true; });
-          element.addEventListener("focus", () => showHandPreview(element, true));
-          element.addEventListener("blur", () => { byId("hand-preview").hidden = true; });
-          element.append(node("strong", "", nameOf(card.code)));
+          element.append(node("strong", "", nameOf(code)));
           hand.append(element);
         }
       } else {
@@ -560,10 +625,6 @@
           const back = node("div", "hand-back");
           back.tabIndex = 0;
           back.setAttribute("aria-label", "Hidden opponent hand card");
-          back.addEventListener("mouseenter", () => showHandPreview(back, false));
-          back.addEventListener("mouseleave", () => { byId("hand-preview").hidden = true; });
-          back.addEventListener("focus", () => showHandPreview(back, false));
-          back.addEventListener("blur", () => { byId("hand-preview").hidden = true; });
           back.append(cardBack(true));
           hand.append(back);
         }
@@ -654,13 +715,15 @@
       byId("common-count").textContent = `${commonFrames.length} common-card choices`;
       byId("turn").textContent = `Turn ${observation.turn} · ${phaseName(observation.phase)}`;
       byId("viewpoint").textContent = terminal
-        ? `Final state · Player ${observation.viewer}'s visible view`
-        : `Decision ${index + 1} · Player ${observation.acting_player} acts · Player ${observation.viewer}'s visible view`;
+        ? `Final state · ${reviewerData ? "reviewer view" : `Player ${observation.viewer}'s visible view`}`
+        : `Decision ${index + 1} · Player ${observation.acting_player} acts · ${reviewerData ? "reviewer view" : `Player ${observation.viewer}'s visible view`}`;
       byId("result").textContent = terminal || index === decisions.length - 1 && !replay.terminal_observation
         ? `Seed ${replay.seed} · ${replay.winner == null ? "Draw" : `Winner: Player ${replay.winner}`}`
         : `Seed ${replay.seed} · Outcome hidden`;
       const board = byId("board");
-      byId("hand-preview").hidden = true;
+      hidePreview();
+      byId("view-mode").textContent = reviewerData ? "Reviewer view · both players' cards revealed" : "Player-visible decision snapshots";
+      byId("review-panel").hidden = Boolean(reviewerData);
       const field = node("div", "field-stack");
       field.append(playerBoard(observation, 1 - observation.viewer, known),
                    playerBoard(observation, observation.viewer, known));
@@ -678,9 +741,11 @@
       animateNext = false;
       byId("piles").replaceChildren(node("h2", "", "Graveyards and banished cards"),
         listZone("Opponent Graveyard", observation.graveyards[1 - observation.viewer], 1 - observation.viewer, "graveyard"),
-        listZone("Opponent Banished", observation.banished[1 - observation.viewer], 1 - observation.viewer, "banished"),
+        listZone("Opponent Banished", observation.banished[1 - observation.viewer].map((card, i) =>
+          ({...card, code: reviewerData?.frames[index]?.banished[1 - observation.viewer]?.[i] ?? card.code})), 1 - observation.viewer, "banished"),
         listZone("Your Graveyard", observation.graveyards[observation.viewer], observation.viewer, "graveyard"),
-        listZone("Your Banished", observation.banished[observation.viewer], observation.viewer, "banished"));
+        listZone("Your Banished", observation.banished[observation.viewer].map((card, i) =>
+          ({...card, code: reviewerData?.frames[index]?.banished[observation.viewer]?.[i] ?? card.code})), observation.viewer, "banished"));
       byId("action").textContent = terminal ? "Duel ended" : actionLabel(
         observation, record.selected_action, known,
         record.legal_actions.findIndex(action => action.id === record.selected_action.id));
@@ -702,7 +767,7 @@
           const button = node("button", annotations.get(index) === actionIndex ? "annotated" : "",
                               actionLabel(observation, action, known, actionIndex));
           button.type = "button";
-          button.addEventListener("click", () => { annotations.set(index, actionIndex); render(); });
+          button.addEventListener("click", () => { if (!reviewerData) { annotations.set(index, actionIndex); render(); } });
           item.append(button);
           return item;
         })));
@@ -716,9 +781,9 @@
       byId("label-recorded").disabled = terminal;
       byId("clear-label").disabled = terminal || frameLabel == null;
       const knownHand = observation.known_opponent_hand_cards || [];
-      byId("known-hand").textContent = knownHand.length
+      byId("known-hand").textContent = (reviewerData ? "AI-visible knowledge: " : "") + (knownHand.length
         ? `${knownHand.length} of ${observation.opponent_hand_count} known: ${knownHand.map(nameOf).join(" · ")}`
-        : `No known identities among ${observation.opponent_hand_count} cards`;
+        : `No known identities among ${observation.opponent_hand_count} cards`);
       byId("restrictions").textContent = observation.restrictions?.length ? `Restrictions: ${observation.restrictions.join(" · ")}` : "Restrictions: none recorded";
       byId("chain").textContent = observation.chain?.length ? `Chain: ${observation.chain.map(link => `${link.index}. ${nameOf(link.card_code)} (P${link.controller})`).join(" → ")}` : "Chain: empty";
       byId("reveals").textContent = observation.public_reveals?.length
@@ -759,6 +824,7 @@
     function setReplay(data, label, hash) {
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
       stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map();
+      reviewerData = embeddedReviewer?.source_trajectory_sha256 === hash ? embeddedReviewer : null;
       previousFrame = -1; previousField = new Map(); previousHand = null; animateNext = false;
       commonFrames = data.decisions.flatMap((record, frame) => commonDecision(record) ? [frame] : []);
       const requested = Number(location.hash.match(/^#decision=(\d+)$/)?.[1] || 1);
@@ -776,6 +842,24 @@
         setReplay(JSON.parse(new TextDecoder().decode(bytes)), file.name, hash);
       }
       catch (error) { byId("notice").hidden = false; byId("notice").textContent = `Could not load replay: ${error.message}`; }
+    });
+    byId("review-file").addEventListener("change", async event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        if (!replay) throw new Error("Open a trajectory first.");
+        if (data.schema_version !== 1 || data.source_trajectory_sha256 !== sourceSha256 ||
+            !Array.isArray(data.frames) ||
+            data.frames.length !== replay.decisions.length + Number(Boolean(replay.terminal_observation)))
+          throw new Error("Reviewer data does not match this trajectory.");
+        reviewerData = data;
+        annotations.clear();
+        render();
+      } catch (error) {
+        byId("notice").hidden = false;
+        byId("notice").textContent = `Could not load reviewer data: ${error.message}`;
+      }
     });
     byId("images").addEventListener("change", event => {
       for (const url of cardImages.values()) URL.revokeObjectURL(url);
@@ -801,7 +885,7 @@
     byId("next-common").addEventListener("click", () => moveCommon(1));
     byId("legal-more").addEventListener("click", () => { legalShown += 100; render(); });
     byId("label-recorded").addEventListener("click", () => {
-      if (!replay || index >= replay.decisions.length) return;
+      if (!replay || reviewerData || index >= replay.decisions.length) return;
       const record = replay.decisions[index];
       const selected = record.legal_actions.findIndex(action => action.id === record.selected_action.id);
       if (selected < 0) return;
@@ -810,6 +894,7 @@
     });
     byId("clear-label").addEventListener("click", () => { annotations.delete(index); render(); });
     byId("download-labels").addEventListener("click", () => {
+      if (reviewerData) return;
       const reviewer = byId("reviewer").value.trim();
       if (!/^[a-f0-9]{64}$/.test(sourceSha256)) return alert("Load a replay with a source SHA-256 first.");
       if (!reviewer) return alert("Enter a reviewer name or alias.");
@@ -837,10 +922,36 @@
       if (event.key === "ArrowRight") move(1);
       if (event.key === "ArrowLeft") move(-1);
     });
+    const previewTarget = target => target instanceof Element
+      ? target.closest(".card, .hand-back, .hand-zone, .deck-slot") : null;
+    document.addEventListener("pointerover", event => {
+      const source = previewTarget(event.target);
+      if (!source || source.closest("#hand-preview") || source === previewSource) return;
+      showCardPreview(source);
+    });
+    document.addEventListener("pointerout", event => {
+      if (previewSource && !previewSource.contains(event.relatedTarget)) hidePreview();
+    });
+    document.addEventListener("focusin", event => {
+      const source = previewTarget(event.target);
+      if (source && !source.closest("#hand-preview")) showCardPreview(source);
+    });
+    document.addEventListener("focusout", event => {
+      if (previewSource?.contains(event.target)) hidePreview();
+    });
+    document.addEventListener("wheel", event => {
+      if (!previewSource || !previewSource.contains(event.target)) return;
+      event.preventDefault();
+      previewHeight = Math.max(Math.min(110, previewLimit()), Math.min(previewLimit(),
+        previewHeight * (event.deltaY < 0 ? 1.14 : 1 / 1.14)));
+      placePreview();
+    }, {passive: false});
+    addEventListener("resize", placePreview);
     try {
       names = JSON.parse(byId("embedded-names").textContent);
       optionTexts = JSON.parse(byId("embedded-options").textContent);
       localImages = JSON.parse(byId("embedded-images").textContent);
+      embeddedReviewer = JSON.parse(byId("embedded-reviewer").textContent);
       setReplay(JSON.parse(byId("embedded-replay").textContent), "Embedded trajectory",
                 JSON.parse(byId("embedded-sha256").textContent));
     } catch (_) { /* The standalone viewer waits for a chosen JSON file. */ }

@@ -1,6 +1,7 @@
 """The offline viewer embeds validated visible decisions and escapes replay text."""
 
 import hashlib
+import json
 import re
 import sqlite3
 from collections import Counter
@@ -21,7 +22,7 @@ from goat_ai.observations import (
     RevealedCardView,
 )
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
-from scripts.render_replay import render_catalog_viewer, render_replay
+from scripts.render_replay import _reviewer_frame, render_catalog_viewer, render_replay
 from scripts.setup_card_images import setup_card_backs, setup_card_images
 
 
@@ -37,6 +38,64 @@ def test_common_card_navigation_matches_sourced_main_decks():
     assert viewer_codes == {code for code, count in deck_counts.items() if count >= 5}
     assert 'id="previous-common"' in template
     assert 'id="next-common"' in template
+
+
+def test_reviewer_frame_combines_private_views_without_changing_agent_observation():
+    own = Observation(
+        viewer=0, acting_player=0, turn=1, phase="main1", life_points=(8000, 8000),
+        hand=(CardView(0, "hand", "hidden", 10, 0),),
+        field=(CardView(0, "monster", "facedown", 12, 0, "defense"),
+               CardView(1, "monster", "facedown", None, 0, "defense")),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=1,
+        deck_counts=(34, 34), extra_deck_counts=(0, 0),
+    )
+    opponent = replace(
+        own, viewer=1, hand=(CardView(1, "hand", "hidden", 11, 0),),
+        opponent_hand_count=1,
+        field=(CardView(0, "monster", "facedown", None, 0, "defense"),
+               CardView(1, "monster", "facedown", 13, 0, "defense")),
+    )
+
+    class Probe:
+        def observation(self, viewer, *, terminal=False):
+            return (own, opponent)[viewer]
+
+    engine = type("Engine", (), {"probe": Probe()})()
+    frame = _reviewer_frame(engine)
+    assert frame["hands"] == [[10], [11]]
+    assert frame["field"] == {"0:monster:0": 12, "1:monster:0": 13}
+    assert own.field[1].code is None
+    assert opponent.field[0].code is None
+
+
+def test_reviewer_sidecar_is_separate_from_trajectory(tmp_path, monkeypatch):
+    from scripts import render_replay as renderer
+
+    observation = Observation(
+        viewer=0, acting_player=0, turn=1, phase="main1", life_points=(8000, 8000),
+        hand=(), field=(CardView(1, "monster", "facedown", None, 0, "defense"),),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=1,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0),
+    )
+    action = Action("0", "pass", 0)
+    source = tmp_path / "game.json"
+    output = tmp_path / "game.html"
+    write_trajectory(source, Trajectory(
+        "goat", ("a.ydk", "b.ydk"), 42,
+        (DecisionRecord(observation, (action,), action),), 0))
+    before = source.read_bytes()
+    monkeypatch.setattr(renderer, "_reviewer_data", lambda *args: {
+        "schema_version": 1, "source_trajectory_sha256": hashlib.sha256(before).hexdigest(),
+        "frames": [{"hands": [[], [11]], "field": {"1:monster:0": 13},
+                    "banished": [[], []], "extra": [[], []], "decks": [[], []]}],
+    })
+    render_replay(source, output, tmp_path / "native", reviewer_reveal=True)
+    assert source.read_bytes() == before
+    assert b'"code":13' not in before
+    assert '"1:monster:0":13' in output.read_text()
+    sidecar = output.with_suffix(".review.json")
+    assert sidecar.is_file()
+    assert json.loads(sidecar.read_text())["source_trajectory_sha256"] == hashlib.sha256(before).hexdigest()
 
 
 def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):

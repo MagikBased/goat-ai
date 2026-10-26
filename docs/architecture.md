@@ -42,6 +42,14 @@ supply the terminal observation.
 `goat_ai.replay.verify_trajectory` reconstructs a duel from its seed and
 decklists, compares each player-visible observation and complete legal-action
 set with the recording, applies the selected action, and checks the result.
+The optional replay-viewer reviewer export runs that verifier first, then
+reconstructs the same duel and combines the two player-scoped native views
+at each decision. It stores hand, Set field, banished, and Extra Deck identities
+in a SHA-256-bound `.review.json` sidecar and generated HTML, not in trajectory
+JSON or `GoatEnvironment` observations. Reviewer mode disables action labels
+in the browser to avoid training on decisions inspected with hidden information.
+Neither player-scoped view contains remaining Deck order, so the reviewer
+export shows only starting Main Deck composition and current Deck counts.
 The v19 equip relation comes from ocgcore's `QUERY_EQUIP_CARD` field on the
 Spell/Trap Zone. The adapter exposes only the field slot of a face-up Equip
 Card's current target, including a monster absorbed by Thousand-Eyes Restrict;
