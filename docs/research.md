@@ -58,6 +58,16 @@ matched. A response byte sequence still does not identify the corresponding
 player-visible observation or all legal actions. Do not train on it without
 re-running and validating the duel.
 
+An optional `--goat-whitelist .cache/goat-ai/banlist/GOAT.lflist.conf` screen
+reads the embedded Decks and reports only the number of Main/Extra cards
+absent from or forbidden by the pinned GOAT list, plus whether both Main
+Decks have at least 40 cards. All five real samples fail this screen: their
+Main Deck out-of-pool counts are 40, 53, 81, 112, and 12 respectively by
+file date. This independently rules them out as GOAT training fixtures.
+Passing the screen would only make a replay a candidate: it does not check
+copy limits, historical scripts, rules flags, response reconstruction,
+player visibility, or permission to train on that gameplay.
+
 Reproduce the first real-file intake check without committing the replay:
 
 ```bash

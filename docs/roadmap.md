@@ -227,6 +227,9 @@ an intake inspection tool. Each real packet stream had no selection prompts
 but did contain one valid embedded `yrp1` Deck/response record; the CLI now
 reports its response count without printing private values. It is still
 not replay decision reconstruction or an authorized human-data pipeline.
+An optional private-safe GOAT card-pool screen rejects all five modern
+samples without publishing their Deck card IDs; it is only an intake filter,
+not historical or training validation.
 Before using any `.yrp`/`.yrpX` for imitation, obtain a permitted real GOAT
 replay fixture, match its original core/scripts, recover each legal-action
 set and selected response, and pass the existing visibility and exact replay

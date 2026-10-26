@@ -154,6 +154,29 @@ def test_inspection_cli_outputs_only_structural_summary(tmp_path, monkeypatch, c
     assert "Private player" not in str(report)
 
 
+def test_goat_pool_screen_reports_counts_without_private_card_ids(tmp_path,
+                                                                 monkeypatch, capsys):
+    from scripts.inspect_edopro_replay import main
+
+    legacy_payload = (_prefix(YRP1) + struct.pack("<I2II", 2, 10, 20, 0)
+                      + struct.pack("<I1II", 1, 30, 0)
+                      + struct.pack("<I", 0) + b"\x01\x05\x00")
+    legacy = _container(YRP1, legacy_payload)
+    packet = bytes((231,)) + struct.pack("<I", len(legacy)) + legacy
+    path = tmp_path / "private.yrpX"
+    path.write_bytes(_container(YRPX, _prefix(YRPX) + packet))
+    whitelist = tmp_path / "GOAT.lflist.conf"
+    whitelist.write_text("$whitelist\n10 3\n20 0\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["inspect_edopro_replay.py", str(path),
+                                       "--goat-whitelist", str(whitelist)])
+    main()
+    report = json.loads(capsys.readouterr().out)[0]
+    assert report["goat_main_cards_outside_whitelist"] == 2
+    assert report["goat_extra_cards_outside_whitelist"] == 0
+    assert report["goat_pool_screen"] == "outside_pool_or_deck_size"
+    assert "30" not in str(report)
+
+
 @pytest.mark.parametrize("damage", (
     lambda data: data[:20],
     lambda data: data[:-1],
