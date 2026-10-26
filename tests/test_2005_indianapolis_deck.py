@@ -18,6 +18,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 ROOT = Path(__file__).resolve().parents[1]
 MATT_DECK = ROOT / "examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk"
 MICHAEL_DECK = ROOT / "examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk"
+DARYL_DECK = ROOT / "examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk"
 OPPONENT = ROOT / "examples/decks/goat_control_lolmarcus_2020.ydk"
 MATT_EXTRA_NAMES = Counter({
     "Thousand-Eyes Restrict": 3,
@@ -45,17 +46,19 @@ MICHAEL_EXTRA_NAMES = Counter({
     "Giltia the D. Knight": 1,
     "Gatling Dragon": 1,
 })
+DARYL_EXTRA_NAMES = Counter({"Flame Swordsman": 1, "King Dragun": 2})
 
 
 def _source_name(name: str) -> str:
     return (name.removesuffix(" (GOAT)").removesuffix(" (Pre-Errata)")
-            .replace("D.D.", "D. D.").casefold())
+            .replace("D.D.", "D. D.").casefold().replace("judgement", "judgment"))
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("player, deck_path, extra_names", [
     ("Matt Peddle", MATT_DECK, MATT_EXTRA_NAMES),
     ("Michael Fukuyama", MICHAEL_DECK, MICHAEL_EXTRA_NAMES),
+    ("Daryl Gessler", DARYL_DECK, DARYL_EXTRA_NAMES),
 ])
 def test_published_2005_main_and_fusions_match_pinned_legal_ids(
     player, deck_path, extra_names,
@@ -63,7 +66,7 @@ def test_published_2005_main_and_fusions_match_pinned_legal_ids(
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     deck = read_ydk(deck_path)
     assert (len(deck.main), len(deck.extra), len(deck.side)) == (
-        40, sum(extra_names.values()), 0)
+        sum(historical_main_decks()[player].values()), sum(extra_names.values()), 0)
     validate_goat_deck(deck, read_goat_whitelist(root / "banlist/GOAT.lflist.conf"),
                        root / "database/cards.cdb",
                        root / "database/goat-entries.cdb",
@@ -89,6 +92,7 @@ def test_published_2005_main_and_fusions_match_pinned_legal_ids(
 @pytest.mark.parametrize("deck_a, deck_b, seed", [
     (MATT_DECK, OPPONENT, 2070),
     (MATT_DECK, MICHAEL_DECK, 2072),
+    (DARYL_DECK, MATT_DECK, 2074),
 ])
 def test_2005_deck_completes_visible_replay_verified_native_duel(
     tmp_path, deck_a, deck_b, seed,

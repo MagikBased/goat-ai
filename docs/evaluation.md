@@ -2429,3 +2429,20 @@ PYTHONPATH=src:. .venv/bin/python -m scripts.evaluate_native \
   --both-deck-assignments --seed 2072 --seeds 2 --max-decisions 3000 \
   --output artifacts/indianapolis_2005_peddle_fukuyama_random_2072_2073.json
 ```
+
+The [Daryl Gessler Gravekeeper fixture](../examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk) preserves its published 42-card Main Deck and three-card Fusion Deck. Forty-two Main Deck cards are legal; no padding or trimming was applied. Source-name and whitelist tests cover every ID, and a seeded duel against Matt Peddle's deck reaches terminal, replay-verifies, and passes the visibility audit.
+
+One seed (2080), all three unordered 2005 deck pairings, both deck assignments, and both seats yielded **12/12 terminal random-agent duels** under the 3,000-decision cap. They used 13,102 decisions, at most 1,327 in a duel. Sequential wall time was **15.60 seconds** on Linux x86_64 (**0.77 duels/s**, **840 decisions/s**). Agent A split 6–6 by symmetric design; this measures protocol reach, not card-specific correctness or deck strength. The ignored report `artifacts/indianapolis_2005_three_decks_random_2080.json` stores all games and hashes. Reproduce it with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python -m scripts.evaluate_native \
+  --engine experimental \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+            examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+            examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --matchup examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+            examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --both-deck-assignments --seed 2080 --seeds 1 --max-decisions 3000 \
+  --output artifacts/indianapolis_2005_three_decks_random_2080.json
+```
