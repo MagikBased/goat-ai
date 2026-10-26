@@ -4880,6 +4880,16 @@ historical rulings. The sweep process loaded the initial mandatory-sum
 decoder; the later wire-length bound change was checked by focused parser
 and Puppet Magic native tests, not by repeating this full sweep.
 
+A further 20 distinct whitelist deck pairs, seeds 20000–20019, ran against
+the current adapter with RandomAgent and a 5,000-decision cap. All **20/20**
+reached terminal and all **19,968** decisions replay-verified; the longest
+duel had **1,481** decisions. There were no recorded adapter errors. The
+ignored report is
+`.cache/goat-ai/random_whitelist_20000_20019_distinct/report.json`
+(SHA-256 `89148d79451862cdd771e134caa4b89ed0ff6dc7820a5060b08fdda2f1826b67`).
+This adds protocol coverage after the sum-choice decoder changes. It does
+not validate the historical rulings of those randomly selected cards.
+
 ### Incremental native sum choices
 
 `MSG_SELECT_SUM` previously failed explicitly when the number of possible
