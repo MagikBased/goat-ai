@@ -162,11 +162,16 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
                            max_gradient_norm: float = 1.0,
                            temperature: float = 1.0,
                            state_baselines: Sequence[float] | None = None,
-                           reduction: str = "sum") -> float:
+                           reduction: str = "sum",
+                           parent_model: LegalActionPolicy | None = None,
+                           parent_kl_weight: float = 0.0) -> float:
     """Apply one terminal-return score-function update; return mean loss."""
     if (not records or entropy_coefficient < 0 or max_gradient_norm <= 0
             or temperature <= 0 or reduction not in ("sum", "mean")):
         raise ValueError("update needs decisions, positive temperature, and valid regularization")
+    if (not isfinite(parent_kl_weight) or parent_kl_weight < 0
+            or parent_kl_weight > 0 and parent_model is None):
+        raise ValueError("parent KL needs a frozen parent and nonnegative weight")
     if (state_baselines is not None
             and (len(state_baselines) != len(records)
                  or any(not isfinite(value) for value in state_baselines))):
@@ -185,6 +190,12 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
         selected = record.legal_actions.index(record.selected_action)
         entropy = -(probabilities * log_probabilities).sum()
         loss = -advantage * log_probabilities[selected] - entropy_coefficient * entropy
+        if parent_kl_weight:
+            with torch.no_grad():
+                parent_log_probs = torch.log_softmax(parent_model(features) / temperature, 0)
+                parent_probs = parent_log_probs.exp()
+            loss = loss + parent_kl_weight * (
+                parent_probs * (parent_log_probs - log_probabilities)).sum()
         (loss / len(records) if reduction == "mean" else loss).backward()
         total += float(loss.detach())
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_gradient_norm)
@@ -243,6 +254,7 @@ def train_against_snapshot_pool(
     value_model: VisibleStateValue | None = None,
     value_learning_rate: float = 1e-3,
     policy_gradient_reduction: str = "sum",
+    parent_kl_weight: float = 0.0,
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
@@ -258,12 +270,15 @@ def train_against_snapshot_pool(
             or baseline_scope not in ("global", "learner_deck", "state_value")
             or policy_gradient_reduction not in ("sum", "mean")
             or value_learning_rate <= 0
+            or not isfinite(parent_kl_weight) or parent_kl_weight < 0
             or (baseline_scope == "state_value") != (value_model is not None)
             or schedule_mode not in ("paired_seats", "four_roles")):
         raise ValueError("invalid self-play schedule or hyperparameters")
     rng = random.Random(random_seed)
     generator = torch.Generator(device="cpu").manual_seed(random_seed)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    parent_model = (copy.deepcopy(model).eval().requires_grad_(False)
+                    if parent_kl_weight else None)
     value_optimizer = (torch.optim.Adam(value_model.parameters(),
                                         lr=value_learning_rate)
                        if value_model is not None else None)
@@ -319,7 +334,9 @@ def train_against_snapshot_pool(
                                        entropy_coefficient,
                                        temperature=learner_temperature,
                                        state_baselines=state_baselines,
-                                       reduction=policy_gradient_reduction)
+                                       reduction=policy_gradient_reduction,
+                                       parent_model=parent_model,
+                                       parent_kl_weight=parent_kl_weight)
                 if episode.learner_records else None)
         value_loss = (state_value_update(
             value_model, vocabulary, episode.learner_records, episode.reward,

@@ -5,6 +5,7 @@ import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
+from time import perf_counter
 
 import torch
 
@@ -25,6 +26,7 @@ def sha256(path: Path) -> str:
 
 
 def main() -> None:
+    started = perf_counter()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("checkpoint", type=Path)
     parser.add_argument("--output", type=Path, required=True)
@@ -43,6 +45,8 @@ def main() -> None:
     parser.add_argument("--entropy-coefficient", type=float, default=0.001)
     parser.add_argument("--policy-gradient-reduction", choices=("sum", "mean"),
                         default="sum", help="sum preserves earlier runs; mean normalizes each duel by learner decisions")
+    parser.add_argument("--parent-kl-weight", type=float, default=0.0,
+                        help="penalize divergence from the frozen starting policy on learner decisions")
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
     parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value"),
@@ -62,6 +66,7 @@ def main() -> None:
     if (args.games < 1 or args.learning_rate <= 0 or args.snapshot_every < 1
             or args.max_snapshots < 1 or args.max_decisions < 1
             or args.entropy_coefficient < 0
+            or not 0 <= args.parent_kl_weight < float("inf")
             or args.learner_temperature <= 0
             or args.value_width < 1 or args.value_learning_rate <= 0
             or not 0 <= args.historical_probability <= 1):
@@ -123,6 +128,7 @@ def main() -> None:
         learner_temperature=args.learner_temperature,
         baseline_scope=args.baseline_scope,
         policy_gradient_reduction=args.policy_gradient_reduction,
+        parent_kl_weight=args.parent_kl_weight,
         schedule_mode=args.schedule_mode,
         value_model=value_model,
         value_learning_rate=args.value_learning_rate,
@@ -153,6 +159,7 @@ def main() -> None:
               "learner_temperature": args.learner_temperature,
               "baseline_scope": args.baseline_scope,
               "policy_gradient_reduction": args.policy_gradient_reduction,
+              "parent_kl_weight": args.parent_kl_weight,
               "value_width": args.value_width if value_model is not None else None,
               "value_learning_rate": (args.value_learning_rate
                                       if value_model is not None else None),
@@ -195,6 +202,7 @@ def main() -> None:
                       "draws": len(terminal_reports) - wins - losses,
                       "learner_decisions": sum(report["learner_decisions"]
                                                for report in terminal_reports),
+                      "run_wall_seconds": perf_counter() - started,
                       "reports": reports}, indent=2))
 
 

@@ -259,6 +259,15 @@ four-game native smoke and matched held-out results are in
 [evaluation](evaluation.md). The held-out comparison does not establish an
 improvement over the per-deck baseline or the unchanged parent.
 
+`--parent-kl-weight` optionally adds a per-decision KL penalty toward the
+frozen starting checkpoint's action distribution. The parent and learner
+score only the same visible observation and legal-action list, and the
+weight is stored in `self_play_config`. Zero preserves the original update.
+A matched 32-game pilot found different direct child-versus-child results
+across held-out deck families and no advantage against the unchanged parent;
+see [evaluation](evaluation.md). This is a tested regularizer, not a selected
+self-play algorithm.
+
 ## Ordered-chain feature check
 
 A feature-version-10 checkpoint trained on the same 4,630 replay-verified teacher decisions as version 9 won 20–11 with one draw in 32 paired, seat-swapped duels on sourced Chaos Return and Warrior lists. On separate held-out teacher decisions with a nonempty chain and multiple legal actions, it matched 116/135 choices versus version 9's 114/135; overall teacher agreement was slightly lower (4,073/4,139 versus 4,075/4,139). The small tournament and mixed agreement result are recorded in [the evaluation log](evaluation.md); they do not establish a general strength gain or isolate chain-order encoding from model-capacity changes.

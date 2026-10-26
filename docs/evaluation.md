@@ -4503,3 +4503,70 @@ and Cas/Daryl at seed 6830, each with its own output directory. Train all
 --max-decisions 5000 --workers 4`, using the matchups, seeds, and opponent
 checkpoint or `--opponent tactical` specified above. Generated data remain
 ignored by Git.
+
+## Frozen-parent KL during self-play (2026-10-26)
+
+The self-play trainer now has an opt-in `--parent-kl-weight`. At each sampled
+learner decision it adds the KL divergence from the frozen starting policy's
+legal-action distribution to the current policy's distribution. Both policies
+receive the same player-visible observation and legal actions; the opponent's
+hidden state is never an input. The parent is frozen before the first duel,
+and weight zero preserves the existing update. This tests policy preservation
+under sparse terminal rewards; it is not a search method or a claim of
+competitive improvement.
+
+Two children started from the 21,394-decision feature-v23 Tactical-v7 clone
+above. Both used the same Matt/Chaos Turbo and Cas/Daryl training matchups,
+four-role schedule, seeds 7300–7331, per-learner-deck moving reward baseline,
+learning rate 0.0003, learner temperature 1.5, entropy coefficient 0.001,
+historical opponent probability 0.75, and snapshot interval eight. The only
+change was parent KL weight **0** versus **0.1**. All 32 duels in each run
+terminated below 5,000 decisions. The control recorded 23,340 replay-verified
+decisions and 3,499 multi-option learner decisions; the KL child recorded
+23,006 and 3,479. All 64 complete trajectories also passed the separate
+player-visible information audit. Training-pool results were 20–12 and
+19–13 respectively, which are not strength estimates because opponent pools
+and policies evolve.
+
+On the first unseen-composition schedule (Jesse/Michael, Jesse/Warrior,
+Michael/Chaos Return; both deck assignments and seats, seeds 7400–7403),
+the KL child scored **28–20** directly against the control (58.3%; paired
+bootstrap 95% interval 52.1%–64.6%). On a second, different deck-family
+schedule (Chaos Control/Bazoo Return, Goat Control/Flip Control guide,
+Warrior/Chaos Control; seeds 7500–7503), it scored **21–27** (43.8%; interval
+33.3%–52.1%). The two schedules pooled to **49–47** (51.0%; interval
+43.8%–57.3%). In the second schedule it went 2–14 as Chaos Control and
+0–8 as Flip Control, so the first direct result did not transfer uniformly.
+
+Against the unchanged frozen starting checkpoint on the first schedule,
+**both** children scored **25–23** (52.1%; interval 43.8%–60.4%). Their
+matched score difference was zero, with a paired-bootstrap interval of
+−8.3 to +8.3 percentage points. This experiment establishes that the KL
+penalty changes direct play, but neither a cross-deck advantage nor a
+self-play strength gain over the starting policy. Keep the default weight at
+zero. The self-play command now prints `run_wall_seconds` for later runs;
+these two training runs predated that timer, so no training-throughput figure
+is reported. A separate one-duel timer smoke completed 136 multi-option
+learner decisions and reported 4.399 s run wall time on this host; it does
+not measure the 32-duel runs. The four-worker evaluation wall times were
+34.82 s for the first direct match, 33.62 s for KL versus parent, 27.77 s
+for control versus parent, and 24.60 s for the second direct match.
+
+The ignored control and KL checkpoint SHA-256 values are
+`6dd53eee851c92c980567f203fa8bb243e0b28c14fcbf2a32b8185832643ac02`
+and `db6847072b21bfe99c2690b81762d307dbc6d150bd48e65afa5cc8efdc916614`.
+The four report hashes in the evaluation order above are
+`1f178755fcd6315786b3b0a1e008bdff165b1ce9e716ec08ddf08f34f94aa69d`,
+`dd55b92aaebd215bcb4c38eae81fa111c8cd2db029aedfcf2fccf15cbf2d6dec`,
+`71e91903a7c1921fda52b090899549ea81b594c65ed615ab01ba7922566449e8`,
+and `0e912089262d04f04051a8316a2003f71ef44026d990b39aa84439e7480bc815`.
+
+To reproduce, run `scripts/train_self_play.py` twice from the large clone
+checkpoint with the training settings and matchups above, `--seed 7300
+--games 32 --record-dir` set to distinct ignored directories, and
+`--parent-kl-weight 0` or `0.1`. Verify each saved trajectory with
+`verify_trajectory` and `audit_trajectory_visibility`. Evaluate each child
+against the other and against the unchanged parent using
+`scripts/evaluate_policy.py --engine experimental --both-deck-assignments
+--require-unseen-main-decks --workers 4 --max-decisions 5000` and the stated
+held-out matchups and seeds.

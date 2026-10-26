@@ -1267,6 +1267,34 @@ def test_mean_policy_gradient_is_invariant_to_duplicate_decisions():
                                0.0, optimizer, reduction="unknown")
 
 
+def test_self_play_parent_kl_pulls_policy_toward_frozen_visible_teacher():
+    class TwoLogitPolicy(torch.nn.Module):
+        feature_version = 1
+
+        def __init__(self, logits):
+            super().__init__()
+            self.logits = torch.nn.Parameter(torch.tensor(logits, dtype=torch.float32))
+
+        def forward(self, _features):
+            return self.logits
+
+    vocabulary = CardVocabulary((10, 20))
+    record = DecisionRecord(view(), actions(), actions()[1])
+    policy = TwoLogitPolicy([2.0, 0.0])
+    parent = TwoLogitPolicy([0.0, 0.0]).eval().requires_grad_(False)
+    before = torch.softmax(policy.logits.detach(), 0)[0].item()
+    optimizer = torch.optim.SGD(policy.parameters(), lr=1.0)
+    policy_gradient_update(policy, vocabulary, (record,), 0.0, 0.0, optimizer,
+                           max_gradient_norm=10.0, parent_model=parent,
+                           parent_kl_weight=1.0)
+    after = torch.softmax(policy.logits.detach(), 0)[0].item()
+    assert 0.5 < after < before
+    assert torch.allclose(parent.logits.detach(), torch.zeros(2))
+    with pytest.raises(ValueError, match="parent KL"):
+        policy_gradient_update(policy, vocabulary, (record,), 0.0, 0.0, optimizer,
+                               parent_kl_weight=1.0)
+
+
 def test_visible_value_baseline_scales_policy_gradient_and_ignores_action_order():
     class TwoLogitPolicy(torch.nn.Module):
         feature_version = 1
