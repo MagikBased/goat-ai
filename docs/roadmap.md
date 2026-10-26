@@ -180,11 +180,12 @@ Type remains hidden. Older v23 policy and self-play recordings still verify.
 The tactical Tribe evaluator now uses current Type when present rather than
 printed card metadata. See [GOAT rules](goat_rules.md).
 
-A paired Ring of Destruction / Rush Recklessly fixture now checks the
-historical current-ATK rule: Ring deals 1900 damage to each player when
-Rush is passed and 2600 when the GOAT Rush variant boosts its 1900-ATK
-target before Ring resolves. Both complete native duels replay-verify and
-pass the player-visible trajectory audit; see [GOAT rules](goat_rules.md).
+A three-branch Ring of Destruction / Rush Recklessly fixture now checks the
+historical current-ATK rule and chain order: Ring deals 1900 damage to each
+player when Rush is passed or Ring chains to Rush, and 2600 when the GOAT
+Rush variant chains to Ring and boosts its target first. All three complete
+native duels replay-verify and pass the player-visible trajectory audit; see
+[GOAT rules](goat_rules.md).
 
 ## M3 — Evaluation and data
 

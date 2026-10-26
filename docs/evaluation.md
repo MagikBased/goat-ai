@@ -3696,13 +3696,15 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
 ## Ring / Rush historical rule fixture
 
 The pinned pre-errata Ring (`511000824`) and GOAT Rush Recklessly
-(`504700114`) scripts were exercised in paired seed-316 complete duels.
+(`504700114`) scripts were exercised in three seed-316 complete duels.
 Ring's unmodified 1900-ATK target caused **1900** damage to each player;
 chaining Rush raised it to 2600 ATK before Ring resolved and caused
-**2600** damage to each player. Both trajectories passed the player-visible
-audit and replay-verified against fresh native engines. The native pytest
-command below passed **2/2** cases in **8.00 seconds**. This is a sourced
-rules regression, not a duel-throughput benchmark.
+**2600** damage to each player. In the reverse chain order, Ring destroyed
+the target before Rush resolved and dealt **1900** instead. All three
+trajectories passed the player-visible audit and replay-verified against
+fresh native engines. The native pytest command below passed **3/3** cases
+in **12.71 seconds**. This is a sourced rules regression, not a duel-throughput
+benchmark.
 
 ```bash
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai OMP_NUM_THREADS=1 \
