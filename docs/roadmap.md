@@ -891,3 +891,11 @@ Continue training and evaluation across more independently sourced decks;
 keep the teacher as a baseline, and require a separate measured self-play
 gain before closing M4. The [evaluation log](evaluation.md) records provenance,
 hashes, deck splits, and exact limitations.
+
+A 32-duel snapshot-pool self-play continuation from that stronger neural
+checkpoint replay-verified all 17,103 decisions. On two new unseen-deck
+schedules it scored 66–62 over 128 duels against the unchanged parent,
+with a paired-bootstrap interval of 43.8%–59.4%. This does not satisfy M4's
+self-play strength gate. Keep the imitation checkpoint as the neural reference;
+investigate a stronger learning signal and evaluate any change against the
+same frozen parent on independent deck families.

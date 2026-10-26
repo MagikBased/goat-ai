@@ -4967,3 +4967,34 @@ and unaudited historical card interactions limit the result. The child is a
 stronger *neural* checkpoint than this parent under the measured schedules,
 but Tactical-v14 remains far stronger and M4's competitive and self-play gates
 remain open.
+
+### Snapshot-pool continuation from the stronger neural clone
+
+The neural child above was the frozen parent for 32 native self-play duels on
+the four demonstration Main Decks, seeds 9600–9631, with each deck in both
+seats (`four_roles`). The learner sampled at temperature 1.5 against 75%
+historical snapshots and 25% RandomAgent, with learning rate 0.0003,
+entropy coefficient 0.001, per-learner-deck return baseline, frozen-parent
+KL weight 0.1, and snapshots every eight games. All **32/32** duels reached
+terminal below 5,000 decisions; all **17,103** saved decisions replay-verified
+and passed the visibility audit. Training produced 2,941 multi-option learner
+decisions, 18 training wins and 14 losses, in 74.15 seconds. These outcomes
+reflect a changing training pool, not held-out strength. The ignored child is
+`.cache/goat-ai/fv23_tactical_v14_selfplay_9600_9631.pt` (SHA-256
+`e51909a2fa2b4e1ecf0dbe5e5edf184d0a9fe88284594f533f9675f866ba368f`).
+
+Two fresh held-out comparisons used both deck assignments and seats, with
+Main Deck composition overlap rejected for both checkpoints. On Chaos
+Control/Bazoo Return and Lolmarcus/Michael GOAT Control, seeds 9700–9707,
+the RL child scored **33–31** directly against its unchanged parent; the
+paired-bootstrap score interval was **40.6%–60.9%**. On Dimension Fusion
+Turbo against Bazoo Return and Chaos Control, seeds 9800–9807, it again
+scored **33–31**, interval **40.6%–60.9%**. Combined: **66–62** over 128 duels,
+interval **43.8%–59.4%**. The ignored reports are
+`.cache/goat-ai/fv23_tactical_v14_selfplay_vs_parent_9700_9707.json`
+(SHA-256 `be9843139cbdb3da7c055d34352fcb78a341447d000d7ccc48d30b5b2ac242f5`)
+and `.cache/goat-ai/fv23_tactical_v14_selfplay_vs_parent_9800_9807.json`
+(SHA-256 `3d165f6d5801506a184614d94077df12ca8e16eb0d9ea925c863f45d7a490a22`).
+The tournaments took 49.97 and 34.54 seconds with four workers. No
+cross-deck self-play strength gain is established; keep the RL child
+experimental and the imitation parent as the current neural reference.
