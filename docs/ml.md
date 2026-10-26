@@ -199,8 +199,9 @@ moving baselines remain unchanged. This is a simple state-value control
 variate related to the [policy-gradient baseline analysis by Sutton et al.](https://papers.nips.cc/paper_files/paper/1999/hash/464d828b85b0bed98e80ade0a5c43b0f-Abstract.html),
 not a bootstrapped or asynchronous actor-critic implementation such as
 [A3C](https://proceedings.mlr.press/v48/mniha16.html), and not PPO. The
-four-game native smoke result is in [evaluation](evaluation.md); competitive
-effectiveness remains unmeasured.
+four-game native smoke and matched held-out results are in
+[evaluation](evaluation.md). The held-out comparison does not establish an
+improvement over the per-deck baseline or the unchanged parent.
 
 ## Ordered-chain feature check
 

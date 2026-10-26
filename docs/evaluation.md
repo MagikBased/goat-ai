@@ -3297,3 +3297,74 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/train_self_play.py \
   --record-dir replays/selfplay_value_smoke_3000 \
   --output checkpoints/fv19_value_smoke_3000.pt
 ```
+
+## Matched visible-state value-baseline comparison
+
+The visible-state Monte Carlo critic was tested against the earlier per-deck
+moving-baseline self-play run. Both children started from the same unchanged
+feature-19 checkpoint and used the same four training decks, seeds 2820–2883,
+four-role deck/seat schedule, learning rate 0.0003, sampling temperature 2.0,
+entropy coefficient 0.01, eight-game snapshot interval, and 75% historical
+opponent probability. The only intended training change was the baseline:
+the new child fitted a width-32 critic to terminal returns at learning rate
+0.001. All **64 native games terminated** within 3,000 decisions, with 7,948
+learner decisions, 36 wins, 28 losses, and no draws against its own changing
+training-opponent mixture. These training wins cannot be compared directly
+with the scalar child's 28–33–3 result because their policies and snapshot
+pools diverged during training. All **64 complete trajectories and 49,531
+decisions** replay-verified with fresh pinned engines and passed the separate
+visibility audit. The ignored checkpoint is
+`checkpoints/fv19_fourroles_value_2820_2883.pt` (SHA-256
+`29e4c43938044c286ac4f6b312fdcca669de3b30db84089b952bd549037c2ea8`);
+the ignored recordings are in `replays/selfplay_fourroles_value_2820_2883/`.
+They now record the parent checkpoint hash, episode index, temperature, and
+sampled-action method for replay review.
+
+The two children then played each other on the same held-out Chaos Control,
+Warrior, and Flip Control pairings used for the earlier child-versus-parent
+check: both deck assignments, both seats, and seeds 2900–2907. The evaluator
+rejected any Main Deck composition present in either checkpoint's training
+games. Across **96 terminal duels**, the value child scored **49 wins, 46
+losses, and one draw**, or **51.56%** of points; its paired-bootstrap 95%
+interval was **46.35–56.77%**. By assigned deck it scored Chaos Control
+12–20, Flip Control 9–22–1, and Warrior 28–4. The four-worker tournament took
+**41.84 seconds** and averaged 523.04 decisions per duel. The ignored report
+is `artifacts/fv19_value_vs_scalar_2900_2907.json` (SHA-256
+`4f6d2c6fccb19aab1c67a188577c779a013ad533b7c3896dfff420d94254993d`).
+
+On the same held-out schedule against the unchanged parent, the value child
+scored **44–52** (**45.83%** of points; paired-bootstrap 95% interval
+**40.63–50.00%**), with assigned-deck results of Chaos Control 10–22,
+Flip Control 9–23, and Warrior 25–7. The four-worker tournament took
+**42.58 seconds**. Its ignored report is
+`artifacts/fv19_value_vs_parent_2900_2907.json` (SHA-256
+`6f90d3df22952061507ed76a3b1bd6191bc335b2fca66a64b12e50eba2e5a3af`).
+The parent remains the stronger evidence-backed choice on this schedule.
+The critic reduced neither the known transfer loss nor the observed weakness
+on Chaos Control and Flip Control enough to justify promotion.
+
+Eight separately reviewed, non-training decisions were scored without
+changing weights: the value child ranked one reviewed alternative first,
+six second, and one fourth. This is a narrow fixed-state diagnostic, not a
+playing-strength estimate. Its ignored report is
+`artifacts/fv19_value_review_scorecard.json` (SHA-256
+`d4053c8f839bbda2619f722a530b68a1168cb42f23b23472bd24615be44ed2f9`).
+Further RL changes should address action and target valuation with
+player-visible context and use a fresh held-out deck and seed schedule for
+checkpoint selection. Do not relabel sampled self-play mistakes as expert
+actions or infer success from training-opponent wins.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_self_play.py \
+  checkpoints/tactical_v3_fv19_2500_2503.pt --engine experimental \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+            examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --schedule-mode four_roles --baseline-scope state_value \
+  --value-width 32 --value-learning-rate 0.001 --seed 2820 --games 64 \
+  --learning-rate 0.0003 --learner-temperature 2.0 \
+  --entropy-coefficient 0.01 --snapshot-every 8 --max-snapshots 8 \
+  --max-decisions 3000 --record-dir replays/selfplay_fourroles_value_2820_2883 \
+  --output checkpoints/fv19_fourroles_value_2820_2883.pt
+```
