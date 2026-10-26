@@ -7,6 +7,8 @@ from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from goat_ai.actions import Action
 from goat_ai.engine.decks import read_ydk
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
@@ -19,7 +21,7 @@ from goat_ai.observations import (
     RevealedCardView,
 )
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
-from scripts.render_replay import render_replay
+from scripts.render_replay import render_catalog_viewer, render_replay
 
 
 def test_common_card_navigation_matches_sourced_main_decks():
@@ -124,3 +126,55 @@ def test_render_replay_includes_terminal_frame_and_its_card_names(tmp_path):
     assert '"life_points":[0,0]' in html
     assert '"99":"Final Card"' in html
     assert 'terminal ? "Duel ended"' in html
+
+
+def test_catalog_viewer_names_all_allowed_cards_without_a_replay(tmp_path):
+    native = tmp_path / "native"
+    database = native / "database"
+    database.mkdir(parents=True)
+    banlist = native / "banlist"
+    banlist.mkdir()
+    (banlist / "GOAT.lflist.conf").write_text(
+        "$whitelist\n10 3\n99 1\n88 0\n")
+    for filename, code, name in (
+        ("cards.cdb", 10, "Visible Monster"),
+        ("goat-entries.cdb", 99, "GOAT Variant"),
+    ):
+        with sqlite3.connect(database / filename) as connection:
+            connection.execute("CREATE TABLE texts (id INTEGER PRIMARY KEY, name TEXT)")
+            connection.execute("INSERT INTO texts VALUES (?, ?)", (code, name))
+    output = tmp_path / "viewer.html"
+    assert render_catalog_viewer(output, native) == 2
+    html = output.read_text()
+    assert '<script id="embedded-replay" type="application/json">null</script>' in html
+    assert '"10":"Visible Monster"' in html
+    assert '"99":"GOAT Variant"' in html
+    assert '"88":' not in html
+    assert '"code":99' not in html
+    assert 'missingNames.size' in html
+
+    observation = Observation(
+        viewer=0, acting_player=0, turn=1, phase="main1", life_points=(8000, 8000),
+        hand=(CardView(0, "hand", "hidden", 10, 0),), field=(),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=5,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0),
+    )
+    action = Action("0", "pass", 0)
+    source = tmp_path / "game.json"
+    write_trajectory(source, Trajectory(
+        "goat", ("a.ydk", "b.ydk"), 42,
+        (DecisionRecord(observation, (action,), action),), 0,
+    ))
+    assert render_replay(source, output, native) == (1, 2)
+    assert '"99":"GOAT Variant"' in output.read_text()
+
+    with sqlite3.connect(database / "cards.cdb") as connection:
+        connection.execute("CREATE TABLE datas (id INTEGER PRIMARY KEY, type INTEGER)")
+        connection.execute("INSERT INTO datas VALUES (77, 16384)")
+        connection.execute("INSERT INTO texts VALUES (77, 'Generated Token')")
+    assert render_catalog_viewer(output, native) == 3
+    assert '"77":"Generated Token"' in output.read_text()
+
+    (database / "goat-entries.cdb").unlink()
+    with pytest.raises(ValueError, match="lack 1 GOAT/Token names"):
+        render_catalog_viewer(output, native)
