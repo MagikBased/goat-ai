@@ -216,6 +216,17 @@ reconstructed DuelingBook/EDOPro games or expert demonstrations; see
 
 **Work:** Build seeded agent tournaments with deck and matchup splits, seat swaps, confidence intervals, and held-out evaluation opponents. Measure duel throughput, decisions per second, runtime memory, and initialization overhead on named hardware. Validate self-play trajectory round trips. Investigate `.yrp` and `.yrpX` reconstruction; ingest human games only when permission, legal-action recovery, and player-visible knowledge can be established.
 
+A bounded EDOPro container reader now parses `yrp1` Deck/response records and
+`yrpX` packet streams using the pinned upstream header layout. Its CLI omits
+player names, Deck card IDs, and raw choices from summaries. Tests use
+synthetic source-layout fixtures and reject truncation, oversized payloads,
+and another simulator's `yrp2` magic. This is an intake inspection tool,
+not replay decision reconstruction or an authorized human-data pipeline.
+Before using any `.yrp`/`.yrpX` for imitation, obtain a permitted real GOAT
+replay fixture, match its original core/scripts, recover each legal-action
+set and selected response, and pass the existing visibility and exact replay
+gates. See [research](research.md).
+
 **Exit:** A reproducible benchmark report and tournament report exist for the tested core/assets/decks. Replay support is claimed only for formats that have parser and reconstruction tests.
 
 The sourced-deck single-process benchmark records reset overhead and peak process RSS alongside throughput on named hardware. A separate spawned-worker benchmark now measures one and two workers on the sourced Goat Control/Chaos Turbo decks, including per-worker high-water RSS and native reset time; the seat-swapped game outcomes reproduce across worker counts. [The benchmark log](benchmarks.md) gives the measurements and their limits. Instantaneous total memory use, broader deck families, and a scaling curve remain unmeasured.

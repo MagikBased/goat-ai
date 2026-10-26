@@ -131,6 +131,11 @@ xdg-open replays/goat_viewer.html
 
 Pass several replay paths to cache their combined card set, for example `replays/tournament_verified_18500/*.json`. The images live in ignored `replays/card_images/` and are loaded locally by the generated viewer. The setup script downloads each small card face once at a modest rate from [YGOPRODeck's documented image server](https://ygoprodeck.com/api-guide/); it uses base-card artwork for historical script variant IDs. It also downloads checksum-pinned [EDOPro `cover.png` and `cover2.png` textures](https://github.com/ProjectIgnis/Distribution/tree/master/textures) for the two card backs. To set up only those backs, run `python -m scripts.setup_card_images --card-back-only` and regenerate the viewer. The textures and card art are local visual assets, excluded from the project's MIT-licensed Git repository. Artwork is a visual aid: printed card text in a current image may differ from the historical effect enforced by the pinned simulator. You can also use **Card images** in the viewer sidebar to select your own local folder of numbered JPG, PNG, or WebP files, including `cover.png` and `cover2.png`. The browser reads those files locally and does not upload them; use the picker again after reloading. Without images, names and drawn card backs still display. The viewer does not open EDOPro `.yrp`/`.yrpX` files. Replays and generated HTML live in ignored `replays/`.
 
+To inspect an EDOPro replay container's format and record counts, run
+`python scripts/inspect_edopro_replay.py path/to/replay.yrpX`. The summary
+omits player names and card IDs. This inspection does not reconstruct legal
+decisions or convert the replay for training or the visual viewer.
+
 To review a decision, expand **All legal actions** in the sidebar and click a
 choice. Enter your name or alias, confirm that you created the labels and
 authorize their use, then download the local JSON label file. It stores
