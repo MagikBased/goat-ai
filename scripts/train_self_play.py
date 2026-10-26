@@ -30,6 +30,9 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--matchup", nargs=2, action="append", metavar=("DECK_A", "DECK_B"))
+    parser.add_argument("--schedule-mode", choices=("paired_seats", "four_roles"),
+                        default="paired_seats",
+                        help="four_roles trains both decks in both seats per pairing")
     parser.add_argument("--seed", type=int, default=100)
     parser.add_argument("--games", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
@@ -70,6 +73,8 @@ def main() -> None:
     fixtures = Path(__file__).resolve().parent.parent / "examples/decks"
     matchups = args.matchup or [[str(fixtures / "vanilla_probe.ydk"),
                                   str(fixtures / "vanilla_reverse.ydk")]]
+    if args.schedule_mode == "four_roles" and args.games % (4 * len(matchups)):
+        parser.error("four_roles requires a whole four-role cycle for every matchup")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
 
@@ -88,6 +93,7 @@ def main() -> None:
         entropy_coefficient=args.entropy_coefficient,
         learner_temperature=args.learner_temperature,
         baseline_scope=args.baseline_scope,
+        schedule_mode=args.schedule_mode,
         max_decisions=args.max_decisions, random_seed=args.seed,
         skip_capped_games=args.skip_capped_games,
         skip_unsupported_games=args.skip_unsupported_games,
@@ -114,6 +120,7 @@ def main() -> None:
               "entropy_coefficient": args.entropy_coefficient,
               "learner_temperature": args.learner_temperature,
               "baseline_scope": args.baseline_scope,
+              "schedule_mode": args.schedule_mode,
               "max_decisions": args.max_decisions, "seed": args.seed,
               "skip_capped_games": args.skip_capped_games}
     config["skip_unsupported_games"] = args.skip_unsupported_games

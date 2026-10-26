@@ -1043,6 +1043,28 @@ def test_self_play_schedule_covers_each_deck_in_both_seats():
         episode_schedule((), (100,))
 
 
+def test_four_role_self_play_schedule_covers_both_decks_per_matchup():
+    schedule = episode_schedule(
+        (("goat", "chaos"), ("warrior", "return")), tuple(range(100, 108)),
+        mode="four_roles")
+    assert schedule == (
+        (100, ("goat", "chaos"), 0),
+        (101, ("chaos", "goat"), 1),
+        (102, ("chaos", "goat"), 0),
+        (103, ("goat", "chaos"), 1),
+        (104, ("warrior", "return"), 0),
+        (105, ("return", "warrior"), 1),
+        (106, ("return", "warrior"), 0),
+        (107, ("warrior", "return"), 1),
+    )
+    assert [(decks[seat], seat) for _, decks, seat in schedule] == [
+        ("goat", 0), ("goat", 1), ("chaos", 0), ("chaos", 1),
+        ("warrior", 0), ("warrior", 1), ("return", 0), ("return", 1),
+    ]
+    with pytest.raises(ValueError, match="schedule mode"):
+        episode_schedule((("goat", "chaos"),), (100,), mode="unknown")
+
+
 def test_self_play_can_track_terminal_baseline_by_learner_deck(monkeypatch):
     vocabulary = CardVocabulary((10, 20))
     model = LegalActionPolicy(vocabulary.size, width=16)

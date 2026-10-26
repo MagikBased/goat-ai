@@ -3172,3 +3172,38 @@ and the four seed-2500 preservation files in
 to the parent, six `--matchup` pairs from the four decks above,
 `--both-deck-assignments --seed 2720 --seeds 8 --max-decisions 3000
 --require-unseen-main-decks --workers 4`.
+
+## Four-role self-play schedule smoke test
+
+The original `paired_seats` schedule assigns the learner the first deck of
+each listed matchup in both seats. Earlier balanced two-deck runs therefore
+listed both `(A, B)` and `(B, A)`. The opt-in `four_roles` schedule assigns
+the learner each deck in each seat over four games per matchup, and the CLI
+requires complete cycles. It preserves the old default and records the mode
+in the child checkpoint.
+
+Starting from the unchanged feature-19 tactical-v3 checkpoint, seeds 2800–2803
+used one Goat Control/Chaos Turbo matchup with `--schedule-mode four_roles`,
+the experimental native adapter, the default episodic policy-gradient
+settings, and a 3,000-decision cap. All **four games terminated**; the learner
+played Goat Control in seats 0 and 1, then Chaos Turbo in seats 0 and 1.
+The sampled learner won two and lost two against its snapshot/RandomAgent
+mixture; this is not a strength estimate. All **5,110 decisions** from the
+four recorded trajectories replay-verified against fresh pinned engines.
+The separate visibility audit passed, including 60 opponent hidden-field
+choices and 13 opponent-hand choices. The child checkpoint and trajectories
+are ignored local artifacts:
+`checkpoints/selfplay_fourroles_smoke_2800.pt` and
+`replays/selfplay_fourroles_2800/`. No held-out direct evaluation or policy
+promotion follows from this schedule smoke test.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_self_play.py \
+  checkpoints/tactical_v3_fv19_2500_2503.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/chaos_turbo_riclar_2020.ydk \
+  --schedule-mode four_roles --seed 2800 --games 4 \
+  --max-decisions 3000 --record-dir replays/selfplay_fourroles_2800 \
+  --output checkpoints/selfplay_fourroles_smoke_2800.pt
+```

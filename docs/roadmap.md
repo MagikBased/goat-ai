@@ -218,6 +218,12 @@ An additional held-out Warrior-versus-Chaos check yielded 14/16 for that checkpo
 
 The sourced-deck self-play schedule now covers both learner seats per matchup. A 16-game REINFORCE-style update from the sourced imitation checkpoint replay-verified four deck/seat trajectories but won only 17/32 directly against its parent on fresh paired seeds, with no changed choices on the separate held-out action audit. M4 remains open; see [the evaluation log](evaluation.md).
 
+An opt-in four-role schedule now covers both decks in both learner seats from
+one listed matchup, avoiding reliance on a separately listed reverse pairing.
+Four native smoke duels all terminated; their 5,110 decisions replay-verified
+and passed the visibility audit. This is schedule coverage, not evidence of a
+self-play strength gain; see [evaluation](evaluation.md).
+
 A fresh feature-version-12 behavioral clone was trained on 3,812 replay-verified CombatHeuristicAgent decisions from eight sourced-deck duels, with explicit teacher provenance and exact tensor reproduction on a repeat CPU run. Held-out multi-option action agreement improved by eight choices over the older version-12 checkpoint, but the new policy split 16–16 against its teacher and scored 16–13 with three draws against that checkpoint on unseen Main Decks, both deck assignments, and fresh seeds. Both paired score intervals include 50%; no learned playing-strength gain is established. See [evaluation](evaluation.md).
 
 The combat-clone checkpoint also underwent two snapshot-pool self-play runs. Sixteen default-temperature and 32 temperature-2 training duels all produced replay-verifiable full trajectories; the learner used each of the two training decks equally. On unseen-deck, both-assignment head-to-head tests against its parent, the children scored 16–16 and 17–15 respectively, with intervals including 50%. A held-out action audit found zero and one changed choices out of 745 multi-option decisions. Exploration temperature is now applied consistently during sampling and policy updates, but these experiments do not establish a self-play strength gain; see [evaluation](evaluation.md).

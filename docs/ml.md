@@ -201,3 +201,12 @@ A feature-version-8 checkpoint was trained on 6,999 replay-verified HeuristicAge
 ## Balanced sourced-deck self-play
 
 The self-play schedule now cycles each matchup through both learner seats before advancing, preventing a reversed two-matchup list from training one deck exclusively. A 16-game experiment from the sourced imitation checkpoint covered both sourced decks in both seats. Four recorded duels replay-verified, but the resulting child won only 17/32 in a fresh direct paired comparison with its parent. It made the same choices as the parent on the held-out teacher-action audit. See [the evaluation log](evaluation.md) for the schedule, hashes, measurements, and limitations. This update remains an experimental terminal-reward baseline; it does not meet M4's competitive improvement gate.
+
+The opt-in `--schedule-mode four_roles` now makes one listed matchup cover
+**both decks in both learner seats** in four consecutive games. The CLI requires
+a whole cycle for every listed matchup. The older `paired_seats` default is
+retained for exact reproduction of previous runs; it trains the first listed
+deck in both seats unless the reversed pairing is listed separately. The
+chosen mode is saved in `self_play_config`. A four-game native smoke run and
+its full replay/visibility checks are in [evaluation](evaluation.md). This
+schedule fixes training coverage, not the sparse-reward learning problem.
