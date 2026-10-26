@@ -554,3 +554,36 @@ than a single unexplained loss.
 5. Replay a complete duel, then evaluate against an unchanged checkpoint on
    held-out decks and seeds. A single improved frame or win is not sufficient
    evidence of stronger play.
+
+## Additional self-destruction review prompts
+
+The reviewer now flags a Tribe-Infecting Virus Type declaration that would
+destroy only the acting player's face-up monsters even when **no** opposing
+Type was available, as well as a Ring of Destruction choice targeting the
+acting player's monster when a legal opposing face-up target has known ATK
+below the acting player's LP. These remain human-review candidates: a
+friendly monster may have a useful Graveyard effect, and chains may change
+the field before resolution.
+
+Re-auditing the saved greedy-policy game
+`replays/policy_batch_v19_daryl_cas_2647_p1.json` verified all **1,212**
+decisions and reproduced **632/632** policy choices. The new Tribe prompt
+found two concrete decisions. At viewer frame **252**, after discarding
+Sangan, the policy declared Warrior with no opposing monster and destroyed
+its own Airknight Parshath. At frame **358**, after discarding Tsukuyomi,
+it declared Aqua with only its own Tribe-Infecting Virus face-up and destroyed
+Tribe. The auditor also flags the earlier activations at frames 250 and 356,
+where `pass` was legal. A useful correction is to preserve the discard and
+monster when no opposing Type can be hit, then test any proposed exception
+against later game outcomes. No claim of improved win rate follows from the
+new flags. The generated, ignored audit report is
+`artifacts/policy_review_new_candidates_2647.json` (SHA-256
+`d3b34dc763030383a2c77b621429e5bcae8ada58c23bea126a2f231137372bc7`).
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/audit_policy_replays.py \
+  replays/policy_batch_v19_daryl_cas_2647_p1.json \
+  --checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt \
+  --native-root .cache/goat-ai \
+  --output artifacts/policy_review_new_candidates_2647.json
+```

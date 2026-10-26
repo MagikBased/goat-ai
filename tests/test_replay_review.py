@@ -162,6 +162,21 @@ def test_tribe_review_uses_current_type_over_printed_metadata():
         "tribe_race_hits_only_own_with_enemy_option"]
 
 
+def test_tribe_review_flags_only_own_type_even_without_enemy_type_option():
+    tribe = 33184167
+    own = CardView(0, "monster", "faceup", 101, 0, "attack",
+                   1200, 1000, race=2)
+    enemy_set = CardView(1, "monster", "facedown", None, 0, "defense")
+    obs = replace(view(own, enemy_set),
+                  chain=(ChainLinkView(1, tribe, 0, 4, 1),))
+    own_type = Action("own", "announce_race", 0, {"race": 2})
+    found = review_candidates(policy(record(obs, own_type)))
+    assert [(c.category, c.evidence) for c in found] == [
+        ("tribe_race_hits_only_own_no_enemy_option",
+         {"race": 2, "own_hits": 1,
+          "visible_enemy_hits": 0, "enemy_race_options": 0})]
+
+
 def test_shortlist_flags_tribe_activation_before_forced_type_choice():
     tribe = 33184167
     own_monster = CardView(0, "monster", "faceup", tribe, 0,
@@ -177,6 +192,7 @@ def test_shortlist_flags_tribe_activation_before_forced_type_choice():
                               card_races={tribe: 64})
     assert [(c.viewer_frame, c.category) for c in found] == [
         (1, "tribe_activation_without_visible_enemy"),
+        (2, "tribe_race_hits_only_own_no_enemy_option"),
         (3, "tribe_activation_without_visible_enemy")]
 
 
@@ -214,6 +230,30 @@ def test_shortlist_flags_bls_self_target_and_mst_own_target():
         (1, "bls_targets_itself_with_enemy_option"),
         (2, "mst_targets_own_card_with_enemy_option"),
     ]
+
+
+def test_ring_review_flags_own_target_only_with_safe_enemy_option():
+    ring = 511000824
+    own = CardView(0, "monster", "faceup", 101, 0, "attack",
+                   1500, 1000)
+    enemy = CardView(1, "monster", "faceup", 202, 1, "attack",
+                     1800, 1000)
+    obs = replace(view(own, enemy),
+                  chain=(ChainLinkView(1, ring, 0, 8, 2),))
+    own_target = Action("own", "select_card", 0,
+                        {"code": 101, "controller": 0,
+                         "location": 4, "sequence": 0})
+    enemy_target = Action("enemy", "select_card", 0,
+                          {"code": 202, "controller": 1,
+                           "location": 4, "sequence": 1})
+    saved = policy(record(obs, own_target, enemy_target),
+                   record(obs, enemy_target, own_target))
+    found = review_candidates(saved)
+    assert [(c.viewer_frame, c.category, c.evidence) for c in found] == [
+        (1, "ring_targets_own_with_safe_enemy_option",
+         {"safe_enemy_targets": 1})]
+    lethal = replace(obs, life_points=(1800, 8000))
+    assert not review_candidates(policy(record(lethal, own_target, enemy_target)))
 
 
 def test_selfplay_shortlist_uses_learner_seat_and_flags_breaker_target():

@@ -147,6 +147,11 @@ def review_candidates(trajectory: Trajectory,
                               {"race": race, "own_hits": own_hits,
                                "visible_enemy_hits": 0,
                                "enemy_race_options": len(enemy_races_offered)}))
+            elif own_hits and not enemy_hits:
+                found.append(("tribe_race_hits_only_own_no_enemy_option",
+                              {"race": race, "own_hits": own_hits,
+                               "visible_enemy_hits": 0,
+                               "enemy_race_options": 0}))
         if (selected.kind == "select_card" and obs.chain
                 and obs.chain[-1].controller == seat
                 and selected.parameters.get("controller") == seat
@@ -166,6 +171,19 @@ def review_candidates(trajectory: Trajectory,
             elif source == BREAKER_THE_MAGICAL_WARRIOR:
                 found.append(("breaker_targets_own_card_with_enemy_option",
                               {"source_card_code": source}))
+            elif source == RING_OF_DESTRUCTION:
+                safe_enemy_targets = sum(
+                    a.kind == "select_card" and a.parameters.get("controller") != seat
+                    and any(c.zone == "monster" and c.position == "faceup"
+                            and c.controller != seat
+                            and c.sequence == a.parameters.get("sequence")
+                            and c.attack is not None
+                            and c.attack < obs.life_points[seat]
+                            for c in enemy_monsters)
+                    for a in record.legal_actions)
+                if safe_enemy_targets:
+                    found.append(("ring_targets_own_with_safe_enemy_option",
+                                  {"safe_enemy_targets": safe_enemy_targets}))
         if (selected.kind == "pass" and goat_offered
                 and obs.turn_player is not None and obs.turn_player != seat):
             if (obs.phase in ("battle_start", "battle_step")
