@@ -1239,6 +1239,34 @@ def test_policy_gradient_uses_sampling_temperature_in_log_probability():
     assert torch.allclose(model.logits.detach(), torch.tensor([-0.25, 0.25]))
 
 
+def test_mean_policy_gradient_is_invariant_to_duplicate_decisions():
+    class TwoLogitPolicy(torch.nn.Module):
+        feature_version = 1
+
+        def __init__(self):
+            super().__init__()
+            self.logits = torch.nn.Parameter(torch.zeros(2))
+
+        def forward(self, _features):
+            return self.logits
+
+    record = DecisionRecord(view(), actions(), actions()[1])
+    vocabulary = CardVocabulary((10, 20))
+    results = {}
+    for reduction, count in (("mean", 1), ("mean", 2), ("sum", 2)):
+        model = TwoLogitPolicy()
+        optimizer = torch.optim.SGD(model.parameters(), lr=1.0)
+        policy_gradient_update(model, vocabulary, (record,) * count, 1.0, 0.0,
+                               optimizer, max_gradient_norm=10.0,
+                               reduction=reduction)
+        results[(reduction, count)] = model.logits.detach().clone()
+    assert torch.allclose(results[("mean", 1)], results[("mean", 2)])
+    assert torch.allclose(results[("sum", 2)], 2 * results[("mean", 1)])
+    with pytest.raises(ValueError, match="regularization"):
+        policy_gradient_update(TwoLogitPolicy(), vocabulary, (record,), 1.0,
+                               0.0, optimizer, reduction="unknown")
+
+
 def test_visible_value_baseline_scales_policy_gradient_and_ignores_action_order():
     class TwoLogitPolicy(torch.nn.Module):
         feature_version = 1

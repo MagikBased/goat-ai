@@ -161,10 +161,11 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
                            entropy_coefficient: float = 0.0,
                            max_gradient_norm: float = 1.0,
                            temperature: float = 1.0,
-                           state_baselines: Sequence[float] | None = None) -> float:
+                           state_baselines: Sequence[float] | None = None,
+                           reduction: str = "sum") -> float:
     """Apply one terminal-return score-function update; return mean loss."""
     if (not records or entropy_coefficient < 0 or max_gradient_norm <= 0
-            or temperature <= 0):
+            or temperature <= 0 or reduction not in ("sum", "mean")):
         raise ValueError("update needs decisions, positive temperature, and valid regularization")
     if (state_baselines is not None
             and (len(state_baselines) != len(records)
@@ -184,7 +185,7 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
         selected = record.legal_actions.index(record.selected_action)
         entropy = -(probabilities * log_probabilities).sum()
         loss = -advantage * log_probabilities[selected] - entropy_coefficient * entropy
-        loss.backward()
+        (loss / len(records) if reduction == "mean" else loss).backward()
         total += float(loss.detach())
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_gradient_norm)
     optimizer.step()
@@ -241,6 +242,7 @@ def train_against_snapshot_pool(
     schedule_mode: str = "paired_seats",
     value_model: VisibleStateValue | None = None,
     value_learning_rate: float = 1e-3,
+    policy_gradient_reduction: str = "sum",
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
@@ -254,6 +256,7 @@ def train_against_snapshot_pool(
             or max_snapshots < 1 or learner_temperature <= 0
             or not 0 <= historical_probability <= 1
             or baseline_scope not in ("global", "learner_deck", "state_value")
+            or policy_gradient_reduction not in ("sum", "mean")
             or value_learning_rate <= 0
             or (baseline_scope == "state_value") != (value_model is not None)
             or schedule_mode not in ("paired_seats", "four_roles")):
@@ -315,7 +318,8 @@ def train_against_snapshot_pool(
                                        episode.reward, baseline, optimizer,
                                        entropy_coefficient,
                                        temperature=learner_temperature,
-                                       state_baselines=state_baselines)
+                                       state_baselines=state_baselines,
+                                       reduction=policy_gradient_reduction)
                 if episode.learner_records else None)
         value_loss = (state_value_update(
             value_model, vocabulary, episode.learner_records, episode.reward,

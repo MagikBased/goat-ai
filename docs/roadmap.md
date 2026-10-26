@@ -713,3 +713,11 @@ varied widely. Against TacticalHeuristicAgent v7 it scored 14–49–1 over
 optional behavior correction; it does not meet M4's cross-deck strength or
 self-play improvement gates. See [evaluation](evaluation.md) for confidence
 intervals, hashes, and reproduction commands.
+
+An opt-in per-decision mean policy-gradient reduction was compared with the
+legacy summed update in matched eight-duel native self-play runs. All 16
+trajectories replay-verified and passed visibility checks. On held-out decks,
+the mean and sum children split 32–32; the mean child scored 33–30–1 against
+its parent, with a severe assigned-deck split. No self-play gain is established.
+Keep the legacy reduction as default while testing stronger credit assignment
+and larger independent training sets; see [evaluation](evaluation.md).

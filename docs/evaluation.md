@@ -4229,3 +4229,61 @@ direct schedule. For the tactical comparison, replace
 `--opponent-checkpoint ...` with `--opponent tactical`, use `--seed 4200`,
 and write to the matching tactical report path. The `--opponent-position-guard`
 option allows a same-checkpoint reverse-role ablation.
+
+## Self-play policy-gradient reduction pilot
+
+The previous episodic update summed one policy-gradient loss per learner
+decision before clipping the gradient. A new opt-in `mean` reduction divides
+each decision loss by that episode's number of learner decisions. The legacy
+`sum` behavior remains the default and both modes are recorded in checkpoint
+configuration. A unit test confirms that duplicating the same decision leaves
+the mean update unchanged under SGD, whereas the sum update doubles it.
+
+Starting from the same feature-v23 Tactical-v6 clone checkpoint
+(`1f0b57d517fc7e2475b7d81b072ac0fda47ff1d744ef5855dd767e355586e090`),
+both modes trained on seeds 6000–6007 with the same two four-role matchups:
+Cas Stomphorst Flip Control versus Daryl Gessler Gravekeepers, and Matt Peddle
+Goat Control versus Riclar Chaos Turbo. Each run finished 8/8 duels with
+5 wins and 3 losses for the learner, 6,993 total decisions and 1,406
+multi-option learner decisions. All 16 saved trajectories replay-verified
+and passed the player-visible information audit. This matched result says
+nothing about strength; the model weights diverged after their updates.
+
+On unseen Chaos Control, Warrior, Chaos Return, and Flip Control Main Deck
+compositions, with both deck assignments and agent seats, the mean child
+split **32–32** directly against the sum child over seeds 6300–6307.
+Its paired-bootstrap 95% score interval was **45.3%–54.7%**. Against the
+unchanged parent on fresh seeds 6400–6407 it scored **33–30–1**; the paired
+interval was **50.0%–56.3%**, and the decisive-win Wilson interval was
+**40.3%–64.2%**. Assigned-deck parent-match results ranged from 1–15
+on Flip Control to 15–1 on Chaos Return. These pilots do not demonstrate
+a cross-deck strength gain or satisfy M4's self-play exit criterion.
+
+The ignored checkpoint SHA-256 values are
+`f31d4abf8a5b5db72f242bcb47250fd2fe97d2f15b4fdb39c09558bab6740937`
+for sum and `664e8553a377e83b95611ed3e51314fe6ed9cd418ee774d8d65afb06843`
+for mean. The ignored detailed evaluation reports
+`.cache/goat-ai/fv23_selfplay_mean_vs_sum_6300_6307.json` and
+`.cache/goat-ai/fv23_selfplay_mean_vs_parent_6400_6407.json` have SHA-256
+`9fd6bbee7d40db887b6517767da068ba6e7b6aefe42ea8d013b41486ff0fe7da`
+and `4ec1ff926830cd6d384f6a05d38590f9398e6a3dee6b9616ef5e86ea2fc40461`.
+The four-worker evaluation wall times were 32.75 s and 33.37 s on Linux
+6.8.0-146-generic. All games terminated below the 5,000-decision cap.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v6_four_decks_4800_4813.pt \
+  --output .cache/goat-ai/fv23_selfplay_mean_6000_6007.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --matchup examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --schedule-mode four_roles --seed 6000 --games 8 \
+  --policy-gradient-reduction mean \
+  --record-dir .cache/goat-ai/fv23_selfplay_mean_6000_6007_replays
+```
+
+Omit `--policy-gradient-reduction mean` and change the output paths for the
+sum control. Replay and visibility checks use `scripts/audit_selfplay_replays.py`
+on each recorded directory. The evaluation command follows the preceding
+same-checkpoint example, substituting the two child paths, seeds 6300–6307,
+and then the parent path with seeds 6400–6407.

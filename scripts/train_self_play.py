@@ -41,6 +41,8 @@ def main() -> None:
     parser.add_argument("--snapshot-every", type=int, default=4)
     parser.add_argument("--max-snapshots", type=int, default=8)
     parser.add_argument("--entropy-coefficient", type=float, default=0.001)
+    parser.add_argument("--policy-gradient-reduction", choices=("sum", "mean"),
+                        default="sum", help="sum preserves earlier runs; mean normalizes each duel by learner decisions")
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
     parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value"),
@@ -120,6 +122,7 @@ def main() -> None:
         entropy_coefficient=args.entropy_coefficient,
         learner_temperature=args.learner_temperature,
         baseline_scope=args.baseline_scope,
+        policy_gradient_reduction=args.policy_gradient_reduction,
         schedule_mode=args.schedule_mode,
         value_model=value_model,
         value_learning_rate=args.value_learning_rate,
@@ -149,6 +152,7 @@ def main() -> None:
               "entropy_coefficient": args.entropy_coefficient,
               "learner_temperature": args.learner_temperature,
               "baseline_scope": args.baseline_scope,
+              "policy_gradient_reduction": args.policy_gradient_reduction,
               "value_width": args.value_width if value_model is not None else None,
               "value_learning_rate": (args.value_learning_rate
                                       if value_model is not None else None),
