@@ -9,6 +9,7 @@ from goat_ai.engine.native_queries import (
     QUERY_CODE,
     QUERY_END,
     QUERY_EQUIP_CARD,
+    QUERY_OWNER,
     QUERY_POSITION,
     QUERY_RACE,
     decode_location,
@@ -63,6 +64,21 @@ def test_query_location_decodes_current_monster_type_as_uint64():
         decode_location(struct.pack("<I", len(malformed)) + malformed)
 
 
+def test_query_location_decodes_original_owner():
+    def record(flag, payload=b""):
+        return struct.pack("<HI", 4 + len(payload), flag) + payload
+
+    card = (record(QUERY_CODE, struct.pack("<I", 504700118))
+            + record(QUERY_POSITION, struct.pack("<I", 1))
+            + record(QUERY_OWNER, b"\x01") + record(QUERY_END))
+    assert decode_location(struct.pack("<I", len(card)) + card)[0].owner == 1
+    malformed = (record(QUERY_CODE, struct.pack("<I", 504700118))
+                 + record(QUERY_POSITION, struct.pack("<I", 1))
+                 + record(QUERY_OWNER, b"\x02") + record(QUERY_END))
+    with pytest.raises(ValueError, match="owner query"):
+        decode_location(struct.pack("<I", len(malformed)) + malformed)
+
+
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_native_observation_hides_opponent_hand_and_deck_order():
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
@@ -108,3 +124,4 @@ def test_native_observation_redacts_opponent_facedown_monster():
         assert opponent.field[0].defense is None
         assert opponent.field[0].counters == ()
         assert opponent.field[0].race is None
+        assert opponent.field[0].owner is None

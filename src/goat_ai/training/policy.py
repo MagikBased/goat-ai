@@ -13,6 +13,7 @@ from goat_ai.actions import Action
 from goat_ai.agents.card_metadata import FLIP_MONSTER_TYPE, load_card_properties
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
+    safe_position_indices,
     safe_target_indices,
     weak_flip_set_substitute,
 )
@@ -579,13 +580,15 @@ class PolicyAgent:
                  *, tactical_guard: bool = False,
                  card_races: Mapping[int, int] | None = None,
                  weak_flip_attacks: Mapping[int, int] | None = None,
-                 self_target_guard: bool = False) -> None:
+                 self_target_guard: bool = False,
+                 position_guard: bool = False) -> None:
         self.model = model
         self.vocabulary = vocabulary
         self.tactical_guard = tactical_guard
         self.card_races = dict(card_races or {})
         self.weak_flip_attacks = dict(weak_flip_attacks or {})
         self.self_target_guard = self_target_guard
+        self.position_guard = position_guard
         self._last_selection: tuple[int, str, tuple] | None = None
         self._cancel_turn: int | None = None
         self._cancelled_prompts: list[tuple[Observation, tuple[tuple, ...]]] = []
@@ -607,6 +610,8 @@ class PolicyAgent:
                       if self.tactical_guard else range(len(legal_actions)))
         if self.self_target_guard:
             admissible = safe_target_indices(observation, legal_actions, admissible)
+        if self.position_guard:
+            admissible = safe_position_indices(observation, legal_actions, admissible)
         chosen = legal_actions[max(admissible, key=lambda i: scores[i].item())]
         if self.tactical_guard and self.weak_flip_attacks:
             chosen = (weak_flip_set_substitute(

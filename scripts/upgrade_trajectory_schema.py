@@ -1,4 +1,4 @@
-"""Replay a verified schema-v23 duel into a separate schema-v24 trajectory."""
+"""Replay a verified older duel into a separate current-schema trajectory."""
 
 import argparse
 from dataclasses import replace

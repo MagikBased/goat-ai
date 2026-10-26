@@ -204,6 +204,21 @@ def test_opponent_review_keeps_bls_and_solemn_findings_separate():
         review_candidates(saved, review_seat=True)
 
 
+def test_shortlist_flags_zero_attack_defender_changed_to_attack():
+    sheep = CardView(0, "monster", "faceup", 73915053, 2,
+                     "defense", 0, 0)
+    change = Action("change", "change_position", 0,
+                    {"code": 73915053, "controller": 0,
+                     "location": 4, "sequence": 2})
+    end = Action("end", "end_phase", 0)
+    found = review_candidates(policy(record(view(sheep), change, end)))
+    assert [(item.category, item.evidence) for item in found] == [
+        ("zero_attack_defender_changed_to_attack",
+         {"card_code": 73915053, "current_defense": 0})]
+    attacker = replace(sheep, orientation="attack")
+    assert review_candidates(policy(record(view(attacker), change, end))) == ()
+
+
 def test_shortlist_flags_tribe_type_that_hits_only_own_visible_monsters():
     tribe = 33184167
     own_spellcaster = CardView(0, "monster", "faceup", 101, 0,

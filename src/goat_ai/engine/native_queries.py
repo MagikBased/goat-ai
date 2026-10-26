@@ -10,6 +10,7 @@ QUERY_ATTACK = 0x100
 QUERY_DEFENSE = 0x200
 QUERY_EQUIP_CARD = 0x4000
 QUERY_COUNTERS = 0x20000
+QUERY_OWNER = 0x40000
 QUERY_IS_PUBLIC = 0x100000
 QUERY_END = 0x80000000
 
@@ -24,6 +25,7 @@ class QueriedCard:
     counters: tuple[tuple[int, int], ...] = ()
     equip_target: tuple[int, int, int] | None = None  # controller, location, sequence
     race: int | None = None  # Current Type mask; public only for face-up monsters.
+    owner: int | None = None
 
 
 def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
@@ -85,6 +87,10 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
                 if len(payload) != 1:
                     raise ValueError("invalid public query flag")
                 values[flag] = payload[0]
+            elif flag == QUERY_OWNER:
+                if len(payload) != 1 or payload[0] not in (0, 1):
+                    raise ValueError("invalid owner query flag")
+                values[flag] = payload[0]
             elif flag == QUERY_EQUIP_CARD:
                 if len(payload) != 10:
                     raise ValueError("invalid equip target query")
@@ -99,7 +105,8 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
         cards.append(QueriedCard(values[QUERY_CODE], values[QUERY_POSITION],
                                  bool(values.get(QUERY_IS_PUBLIC, 0)),
                                  values.get(QUERY_ATTACK), values.get(QUERY_DEFENSE),
-                                 counters, equip_target, values.get(QUERY_RACE)))
+                                 counters, equip_target, values.get(QUERY_RACE),
+                                 values.get(QUERY_OWNER)))
     return tuple(cards)
 
 

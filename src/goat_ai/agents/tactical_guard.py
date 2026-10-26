@@ -22,6 +22,24 @@ BLACK_LUSTER_SOLDIER = 504700118
 MYSTICAL_SPACE_TYPHOON = 5318639
 SNATCH_STEAL = 45986603
 SOLEMN_JUDGMENT = 41420027
+SHEEP_TOKENS = frozenset((73915052, 73915053, 73915054, 73915055))
+
+
+def safe_position_indices(observation: Observation,
+                          legal_actions: Sequence[Action],
+                          admissible: Sequence[int]) -> tuple[int, ...]:
+    """Keep face-up Sheep Tokens in defense when another legal choice exists."""
+    indices = tuple(admissible)
+    own_defenders = {(card.controller, card.sequence) for card in observation.field
+                     if card.zone == "monster" and card.controller == observation.viewer
+                     and card.position == "faceup" and card.orientation == "defense"
+                     and card.code in SHEEP_TOKENS and card.attack == 0}
+    kept = tuple(index for index in indices
+                 if not (legal_actions[index].kind == "change_position"
+                         and (legal_actions[index].parameters.get("controller"),
+                              legal_actions[index].parameters.get("sequence"))
+                         in own_defenders))
+    return kept or indices
 
 
 def safe_target_indices(observation: Observation,
@@ -39,6 +57,14 @@ def safe_target_indices(observation: Observation,
     if source.card_code not in (BLACK_LUSTER_SOLDIER, MYSTICAL_SPACE_TYPHOON):
         return indices
     own = observation.viewer
+    if source.card_code == BLACK_LUSTER_SOLDIER and any(
+        card.controller == own and card.zone == "monster"
+        and card.sequence == source.sequence and card.owner is not None
+        and card.owner != own for card in observation.field
+    ):
+        # Original ownership is public for a face-up monster. A borrowed BLS
+        # may be worth banishing before its control-changing effect expires.
+        return indices
     if source.card_code == BLACK_LUSTER_SOLDIER and any(
         card.controller == own and card.zone == "spell_trap"
         and card.position == "faceup" and card.code == SNATCH_STEAL
@@ -189,6 +215,11 @@ def admissible_action_indices(observation: Observation,
                 and observation.chain and observation.chain[-1].card_code == SCAPEGOAT
                 and observation.chain[-1].controller != own
                 and observation.turn_player != own):
+            continue
+        if (code == SOLEMN_JUDGMENT and action.kind == "chain" and can_pass
+                and observation.pending_summon is not None
+                and observation.pending_summon.controller != own
+                and observation.pending_summon.code == 511000818):  # Sinister Serpent
             continue
         if (code == TORRENTIAL_TRIBUTE and action.kind == "chain" and can_pass
                 and len(opponent_monsters) <= len(own_monsters)):

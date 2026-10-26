@@ -4,6 +4,7 @@ from .model import (
     DisabledZoneView,
     KnownCardView,
     Observation,
+    PendingSummonView,
     PrivateRevealView,
     PublicRevealView,
     RevealedCardView,
@@ -11,5 +12,6 @@ from .model import (
 )
 
 __all__ = ["CardView", "ChainLinkView", "DisabledZoneView", "KnownCardView", "Observation",
-           "PrivateRevealView", "PublicRevealView", "RevealedCardView", "TargetSlotView"]
+           "PendingSummonView", "PrivateRevealView", "PublicRevealView", "RevealedCardView",
+           "TargetSlotView"]
 

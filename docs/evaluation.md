@@ -3844,3 +3844,29 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
   --seed 4200 --seeds 8 --max-decisions 3000 --workers 2 \
   --output artifacts/fv22_vs_fv21_4200_4207.json
 ```
+
+## Sheep Token position-guard ablation
+
+The feature-21 checkpoint was compared against an identical copy with the
+optional `--position-guard` at inference, using unseen Main Deck compositions,
+two sourced matchups, both deck assignments, both seats, seeds 4300–4307, and
+a 3,000-decision cap. All **64** native duels terminated. The guarded seat
+scored **31–33** (48.44%); its Wilson 95% decisive-win interval was
+**36.63%–60.42%**. It scored **17–15** as first player and **14–18** as second.
+The two-worker tournament took **104.18 s**, or **0.614 duels/s** and **632.68
+decisions/s** on the recorded Linux x86_64 host. The ignored report is
+`artifacts/fv21_position_guard_vs_plain_4300_4307.json`. These results do not
+support promoting the guard as an overall playing-strength improvement. It
+remains a targeted, optional fix for an observed Sheep Token blunder.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --opponent-checkpoint .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --position-guard --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk examples/decks/warrior_montague_clash.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 4300 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output artifacts/fv21_position_guard_vs_plain_4300_4307.json
+```

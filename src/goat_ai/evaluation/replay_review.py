@@ -98,6 +98,14 @@ def review_candidates(trajectory: Trajectory,
                            for a in record.legal_actions)
         selected = record.selected_action
         found: list[tuple[str, dict[str, int]]] = []
+        if selected.kind == "change_position":
+            changed = next((card for card in own_monsters
+                            if card.sequence == selected.parameters.get("sequence")), None)
+            if (changed is not None and changed.position == "faceup"
+                    and changed.orientation == "defense" and changed.attack == 0):
+                found.append(("zero_attack_defender_changed_to_attack",
+                              {"card_code": changed.code or 0,
+                               "current_defense": changed.defense or 0}))
         if (_is_action(selected, "activate", POT_OF_GREED)
                 and any(_is_action(a, "activate", THUNDER_DRAGON)
                         for a in record.legal_actions)):

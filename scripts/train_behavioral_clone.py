@@ -213,10 +213,10 @@ def main() -> None:
     for path in args.trajectories:
         raw = path.read_bytes()
         trajectory = read_trajectory(path)
-        if trajectory.schema_version not in range(3, 25) or not trajectory.deck_sha256 or not (
+        if trajectory.schema_version not in range(3, 26) or not trajectory.deck_sha256 or not (
             trajectory.asset_sha256
         ):
-            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v24")
+            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v25")
         if args.feature_version >= 17 and trajectory.schema_version < 22:
             raise ValueError(f"{path}: feature version {args.feature_version} requires "
                              "schema v22 attack context")

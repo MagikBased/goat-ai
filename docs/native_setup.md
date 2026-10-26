@@ -99,3 +99,13 @@ identities. A differential test changes only the opponent's Fusion cards and
 confirms the acting player's observation and legal actions stay identical.
 
 Use this binding for M1 unless broader protocol coverage or measured throughput shows a concrete reason to adopt a patched ygoenv fork. Expand request and response handling, effect-card support, and visibility audits before claiming general GOAT coverage.
+
+Schema-v25 observations also carry `pending_summon` while ocgcore's public
+Normal, Special, or Flip Summon announcement awaits a response; the field
+slot and card identity are checked against the visible queried field. A
+face-up monster's original owner comes from `QUERY_OWNER`. The adapter redacts
+owner on face-down monsters and drops the announcement once the summon
+completes or leaves the announced slot. These facts help baseline agents
+interpret Solemn Judgment and temporary control changes without consulting
+hidden state. The schema-v25 native replay fixture has been verified to
+terminal; broader announcement and control-change branches remain to audit.

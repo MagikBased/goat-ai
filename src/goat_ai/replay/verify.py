@@ -65,6 +65,16 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                            banished=tuple(cards(zone) for zone in view.banished),
                            own_extra_deck=cards(view.own_extra_deck))
 
+        def without_summon_context(view):
+            def cards(items):
+                return tuple(replace(card, owner=None) for card in items)
+
+            return replace(view, pending_summon=None,
+                           hand=cards(view.hand), field=cards(view.field),
+                           graveyards=tuple(cards(zone) for zone in view.graveyards),
+                           banished=tuple(cards(zone) for zone in view.banished),
+                           own_extra_deck=cards(view.own_extra_deck))
+
         observation = env.reset()
         for index, record in enumerate(trajectory.decisions):
             if env.is_terminal():
@@ -74,6 +84,9 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             if trajectory.schema_version < 24:
                 compared_observation = without_races(compared_observation)
                 recorded_observation = without_races(recorded_observation)
+            if trajectory.schema_version < 25:
+                compared_observation = without_summon_context(compared_observation)
+                recorded_observation = without_summon_context(recorded_observation)
             if trajectory.schema_version < 19:
                 compared_observation = without_equips(compared_observation)
             elif trajectory.schema_version == 19:
@@ -140,6 +153,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                                 if trajectory.schema_version == 19 else observation)
         if trajectory.schema_version < 24:
             terminal_observation = without_races(terminal_observation)
+        if trajectory.schema_version < 25:
+            terminal_observation = without_summon_context(terminal_observation)
         if trajectory.schema_version < 21:
             terminal_observation = without_chain_targets(terminal_observation)
         if trajectory.schema_version < 22:
@@ -149,6 +164,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
         recorded_terminal = trajectory.terminal_observation
         if trajectory.schema_version < 24 and recorded_terminal is not None:
             recorded_terminal = without_races(recorded_terminal)
+        if trajectory.schema_version < 25 and recorded_terminal is not None:
+            recorded_terminal = without_summon_context(recorded_terminal)
         if (trajectory.schema_version >= 18
                 and recorded_terminal is not None
                 and terminal_observation != recorded_terminal):

@@ -80,6 +80,7 @@ def test_brain_control_and_book_timing(tmp_path, book_timing):
                            and c.controller == 0 and c.code == target_code), None)
             if stolen is not None and brain_used:
                 took_control = True
+                assert stolen.owner == (1 if stolen.position == "faceup" else None)
                 if book_timing == "after_control" and not book_used \
                         and observation.acting_player == 0:
                     option = next((a for a in actions if a.kind == "activate"
@@ -106,6 +107,7 @@ def test_brain_control_and_book_timing(tmp_path, book_timing):
                 returned = next(c for c in own.field if c.zone == "monster"
                                 and c.code == target_code)
                 assert returned.controller == 1
+                assert returned.owner == (None if book_timing == "after_control" else 1)
                 assert returned.position == (
                     "facedown" if book_timing == "after_control" else "faceup")
                 assert observation.life_points == (7200, 8000)
@@ -115,6 +117,7 @@ def test_brain_control_and_book_timing(tmp_path, book_timing):
                     hidden = next(c for c in attacker_view.field
                                   if c.controller == 1 and c.zone == "monster")
                     assert hidden.code is None and hidden.position == "facedown"
+                    assert hidden.owner is None
                     assert (1, "monster", hidden.sequence, target_code) in {
                         (c.controller, c.zone, c.sequence, c.code)
                         for c in attacker_view.known_opponent_field_cards}
@@ -125,7 +128,7 @@ def test_brain_control_and_book_timing(tmp_path, book_timing):
                         observation = env.step(action)
                         if env.is_terminal():
                             trajectory = env.trajectory()
-                            assert trajectory.schema_version == 24
+                            assert trajectory.schema_version == 25
                             path = tmp_path / "brain_control.json"
                             write_trajectory(path, trajectory)
                             assert verify_trajectory(read_trajectory(path),

@@ -765,3 +765,37 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/audit_policy_replays.py \
   --native-root .cache/goat-ai --include-opponent \
   --output artifacts/fv21_user_notes_both_seats_audit.json
 ```
+
+### Position changes and public summon context (schema v25)
+
+In the original feature-21 seed-3901, seat-0 replay, the learned policy moved a
+face-up, defending, 0-ATK Sheep Token to attack at **12** decisions (viewer
+frames 78, 92, 99, 227, 237, 240, 358, 365, 368, 495, 769, and 772).
+This is an observed bad pattern, especially when Pass and other legal actions
+are available. It is narrower than all position changes: a monster may
+reasonably change position to attack, avoid destruction, or use an effect.
+The review scanner now reports `zero_attack_defender_changed_to_attack` as a
+candidate. TacticalHeuristicAgent v6 filters this specific Sheep Token move
+when another legal choice exists. The learned policy can use the same filter
+with `--position-guard`; its default greedy inference is unchanged. At the
+old frame 78 state, the unguarded policy selected the token position change
+while the guarded policy selected a Normal Summon.
+
+A new seed-3901 policy-versus-Tactical-v6 duel using that flag completed and
+all **721** decisions replay-verified. Its audit found **zero** position
+candidates. The ignored trajectory and audit are
+`replays/fv21_position_guard_3901_p0.json` and
+`artifacts/fv21_position_guard_3901_audit.json`. This only establishes that
+the guard prevents the identified token move; it does not establish improved
+competitive play or solve repeated position changes by other monsters.
+
+The adapter now records a native public summon announcement during its
+negation response window. It also queries the original owner of face-up field
+monsters. These visible facts let Tactical v6 decline Solemn Judgment on an
+opponent's announced Sinister Serpent Summon when Pass is legal, and distinguish
+an originally opposing Black Luster Soldier currently controlled by the agent
+from its own BLS. The original seed-3900 frame 99 exposed the announced
+Sinister Serpent and the updated tactical agent passed at that decision. A
+new schema-v25 policy-versus-tactical duel completed and all **149** decisions
+replay-verified. A legacy schema-v24 duel still replay-verified at **152**
+decisions; the verifier compares only fields available in that schema.

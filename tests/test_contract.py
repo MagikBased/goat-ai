@@ -20,6 +20,7 @@ from goat_ai.observations import (
     DisabledZoneView,
     KnownCardView,
     Observation,
+    PendingSummonView,
     PrivateRevealView,
     PublicRevealView,
     RevealedCardView,
@@ -340,6 +341,8 @@ def test_tactical_bls_target_prefers_enemy_unless_snatch_equip_is_visible():
         CardView(0, "spell_trap", "faceup", 45986603, 2,
                  equipped_to=(0, 0)),))
     assert agent.select_action(equipped, (self_target, enemy_target)) == self_target
+    borrowed = replace(snapshot, field=(replace(own_bls, owner=1), opponent))
+    assert agent.select_action(borrowed, (self_target, enemy_target)) == self_target
 
 
 def test_tactical_agent_preserves_solemn_against_opponent_scapegoat():
@@ -350,6 +353,29 @@ def test_tactical_agent_preserves_solemn_against_opponent_scapegoat():
                        life_points=(8000, 3500),
                        chain=(ChainLinkView(1, 504700123, 0, 8, 3),))
     assert TacticalHeuristicAgent().select_action(snapshot, (solemn, decline)) == decline
+
+
+def test_tactical_agent_preserves_solemn_against_pending_sinister_summon():
+    sinister = 511000818
+    solemn = Action("solemn", "chain", 1, {"code": 41420027})
+    decline = Action("pass", "pass", 1)
+    snapshot = replace(view(), viewer=1, acting_player=1, hand=(), turn_player=0,
+                       field=(CardView(0, "monster", "faceup", sinister, 1,
+                                       "attack", 300, 250, owner=0),),
+                       pending_summon=PendingSummonView("normal", 0, 1, sinister))
+    assert TacticalHeuristicAgent().select_action(snapshot, (solemn, decline)) == decline
+
+
+def test_tactical_agent_keeps_sheep_token_in_defense():
+    sheep = CardView(0, "monster", "faceup", 73915053, 2,
+                     "defense", 0, 0)
+    snapshot = replace(view(), field=(sheep,))
+    change = Action("change", "change_position", 0,
+                    {"code": 73915053, "controller": 0,
+                     "location": 4, "sequence": 2})
+    end = Action("end", "end_phase", 0)
+    assert HeuristicAgent().select_action(snapshot, (change, end)) == change
+    assert TacticalHeuristicAgent().select_action(snapshot, (change, end)) == end
 
 
 def test_combat_heuristic_uses_only_visible_battle_stats():
@@ -460,13 +486,13 @@ def test_replay_verifier_detects_changed_decision_and_outcome():
                           ContractEngine())
 
 
-def test_schema_twenty_four_terminal_observation_round_trip_and_verification(tmp_path):
+def test_schema_twenty_five_terminal_observation_round_trip_and_verification(tmp_path):
     with GoatEnvironment("a", "b", seed=42, engine=ContractEngine()) as env:
         env.reset()
         final = env.step(env.legal_actions()[0])
         assert env.is_terminal()
         trajectory = env.trajectory()
-    assert trajectory.schema_version == 24
+    assert trajectory.schema_version == 25
     assert trajectory.terminal_observation == final
     path = tmp_path / "terminal.json"
     write_trajectory(path, trajectory)
@@ -530,6 +556,33 @@ def test_current_monster_type_requires_schema_twenty_four_and_stays_public(tmp_p
         read_trajectory(path)
     with pytest.raises(ValueError, match="face-up monster"):
         replace(view(), field=(replace(visible, position="facedown", code=None),))
+
+
+def test_schema_twenty_five_records_public_owner_and_pending_summon(tmp_path):
+    sinister = 511000818
+    visible = CardView(0, "monster", "faceup", sinister, 1, "attack",
+                       300, 250, race=2, owner=0)
+    pending = PendingSummonView("normal", 0, 1, sinister)
+    observation = replace(view(), viewer=1, acting_player=1, hand=(),
+                          turn_player=0, field=(visible,), pending_summon=pending)
+    action = Action("pass", "pass", 1)
+    trajectory = Trajectory("goat", ("a", "b"), 7,
+                            (DecisionRecord(observation, (action,), action),), 0,
+                            schema_version=25, terminal_observation=replace(
+                                observation, pending_summon=None))
+    path = tmp_path / "summon.json"
+    write_trajectory(path, trajectory)
+    assert read_trajectory(path) == trajectory
+    with pytest.raises(ValueError, match="schema v25"):
+        write_trajectory(path, replace(trajectory, schema_version=24))
+    raw = json.loads(path.read_text())
+    raw["decisions"][0]["observation"]["field"][0].pop("owner")
+    path.write_text(json.dumps(raw))
+    with pytest.raises(ValueError, match="schema v25"):
+        read_trajectory(path)
+    with pytest.raises(ValueError, match="pending summon"):
+        replace(observation, pending_summon=PendingSummonView(
+            "normal", 0, 1, 31560081))
 
 
 def test_old_position_action_replays_as_flip_summon():

@@ -197,7 +197,7 @@ def test_recruited_old_vindictive_flips_next_turn_and_destroys_attacker(tmp_path
                     observation = env.step(action)
                     if env.is_terminal():
                         trajectory = env.trajectory()
-                        assert trajectory.schema_version == 24
+                        assert trajectory.schema_version == 25
                         path = tmp_path / "apprentice_old_vindictive.json"
                         write_trajectory(path, trajectory)
                         assert verify_trajectory(read_trajectory(path),

@@ -56,6 +56,7 @@ def test_snatch_steal_upkeep_and_heavy_storm_return_control(tmp_path):
             snatch_on_field = any(card.code == SNATCH_STEAL for card in observation.field)
             if (snatched and observation.turn == 3 and monsters and snatch_on_field
                     and monsters[0].controller == 0):
+                assert monsters[0].owner == 1
                 assert observation.life_points == (8000, 8000)
                 snatch = next(card for card in observation.field
                               if card.code == SNATCH_STEAL)
@@ -70,6 +71,7 @@ def test_snatch_steal_upkeep_and_heavy_storm_return_control(tmp_path):
             if stormed and any(card.code == HEAVY_STORM
                                for card in observation.graveyards[0]):
                 assert monsters and monsters[0].controller == 1
+                assert monsters[0].owner == 1
                 assert not snatch_on_field
                 assert any(card.code == SNATCH_STEAL
                            for card in observation.graveyards[0])
@@ -83,7 +85,7 @@ def test_snatch_steal_upkeep_and_heavy_storm_return_control(tmp_path):
                 else:
                     pytest.fail("Snatch / Heavy duel exceeded 3000 decisions")
                 trajectory = env.trajectory()
-                assert trajectory.schema_version == 24
+                assert trajectory.schema_version == 25
                 assert any(card.equipped_to is not None
                            for decision in trajectory.decisions
                            for card in decision.observation.field)

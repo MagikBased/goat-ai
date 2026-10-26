@@ -11,6 +11,7 @@ from goat_ai.observations import (
     DisabledZoneView,
     KnownCardView,
     Observation,
+    PendingSummonView,
     PrivateRevealView,
     PublicRevealView,
     RevealedCardView,
@@ -49,7 +50,7 @@ class Trajectory:
 
 def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
     version = trajectory.schema_version
-    if version not in range(1, 25):
+    if version not in range(1, 26):
         raise ValueError("unsupported trajectory schema")
     if version >= 18 and trajectory.terminal_observation is None:
         raise ValueError("schema v18 requires a terminal observation")
@@ -93,13 +94,19 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
         if version >= 24 and any(card.zone == "monster" and card.position == "faceup"
                                  and card.race is None for card in view.field):
             raise ValueError("schema v24 requires current Type for face-up monsters")
+        if version < 25 and (view.pending_summon is not None
+                             or any(card.owner is not None for card in cards)):
+            raise ValueError("summon context and original owner require schema v25")
+        if version >= 25 and any(card.zone == "monster" and card.position == "faceup"
+                                 and card.owner is None for card in view.field):
+            raise ValueError("schema v25 requires owner for face-up monsters")
     Path(path).write_text(json.dumps(asdict(trajectory), separators=(",", ":")) + "\n", encoding="utf-8")
 
 
 def read_trajectory(path: str | Path) -> Trajectory:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     version = raw.get("schema_version")
-    if version not in range(1, 25):
+    if version not in range(1, 26):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
@@ -116,6 +123,8 @@ def read_trajectory(path: str | Path) -> Trajectory:
                 item.pop("equipped_to", None)
             if version < 24:
                 item.pop("race", None)
+            if version < 25:
+                item.pop("owner", None)
             result.append(CardView(**item))
         return tuple(result)
 
@@ -127,6 +136,9 @@ def read_trajectory(path: str | Path) -> Trajectory:
         if version >= 24 and any(card.zone == "monster" and card.position == "faceup"
                                  and card.race is None for card in view["field"]):
             raise ValueError("schema v24 requires current Type for face-up monsters")
+        if version >= 25 and any(card.zone == "monster" and card.position == "faceup"
+                                 and card.owner is None for card in view["field"]):
+            raise ValueError("schema v25 requires owner for face-up monsters")
         view["graveyards"] = tuple(cards(zone) for zone in view["graveyards"])
         view["banished"] = tuple(cards(zone) for zone in view["banished"])
         if version >= 6:
@@ -164,6 +176,10 @@ def read_trajectory(path: str | Path) -> Trajectory:
             view["pending_attack"] = TargetSlotView(**view["pending_attack"])
         else:
             view.pop("pending_attack", None)
+        if version >= 25 and view.get("pending_summon") is not None:
+            view["pending_summon"] = PendingSummonView(**view["pending_summon"])
+        else:
+            view.pop("pending_summon", None)
         if version >= 23:
             if (type(view.get("turn_player")) is not int
                     or view["turn_player"] not in (0, 1)):

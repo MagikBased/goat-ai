@@ -20,6 +20,7 @@ from goat_ai.observations import (
     DisabledZoneView,
     KnownCardView,
     Observation,
+    PendingSummonView,
     PrivateRevealView,
     PublicRevealView,
     RevealedCardView,
@@ -115,6 +116,12 @@ MSG_POS_CHANGE = 53
 MSG_SET = 54
 MSG_SWAP = 55
 MSG_SHUFFLE_SET_CARD = 36
+MSG_SUMMONING = 60
+MSG_SUMMONED = 61
+MSG_SPSUMMONING = 62
+MSG_SPSUMMONED = 63
+MSG_FLIPSUMMONING = 64
+MSG_FLIPSUMMONED = 65
 MSG_CONFIRM_DECKTOP = 30
 MSG_CONFIRM_CARDS = 31
 MSG_FIELD_DISABLED = 56
@@ -242,6 +249,7 @@ class OcgcoreProbe:
         self._chain: list[ChainLinkView] = []
         self._resolving_chain_index: int | None = None
         self._public_history: list[str] = []
+        self._pending_summon: PendingSummonView | None = None
         self._known_facedown: dict[tuple[int, int, int], int] = {}
         self._known_hand: dict[int, list[int]] = {0: [], 1: []}
         self._restriction_hints: dict[tuple[int, int], int] = {}
@@ -545,6 +553,13 @@ class OcgcoreProbe:
                            struct.unpack_from("<I", message, 7)[0])
                 new_key = (new_controller, new_location,
                            struct.unpack_from("<I", message, 17)[0])
+                pending_summon = getattr(self, "_pending_summon", None)
+                if (pending_summon is not None
+                        and old_key == (pending_summon.controller,
+                                        LOCATION_MZONE,
+                                        pending_summon.sequence)
+                        and new_key != old_key):
+                    self._pending_summon = None
                 known_code = self._known_facedown.get(old_key)
                 known_hand = getattr(self, "_known_hand", None)
                 if known_hand is not None:
@@ -709,6 +724,21 @@ class OcgcoreProbe:
                             del self._restriction_hints[key]
                         else:
                             self._restriction_hints[key] = count - 1
+            if message[0] in (MSG_SUMMONING, MSG_SPSUMMONING, MSG_FLIPSUMMONING):
+                if len(message) != 15:
+                    raise ValueError("invalid summon announcement length")
+                code, controller, location, sequence, _position = struct.unpack_from(
+                    "<IBBII", message, 1)
+                if controller not in (0, 1) or location != LOCATION_MZONE or sequence >= 7:
+                    raise ValueError("invalid summon announcement slot")
+                kind = {MSG_SUMMONING: "normal", MSG_SPSUMMONING: "special",
+                        MSG_FLIPSUMMONING: "flip"}[message[0]]
+                self._pending_summon = PendingSummonView(
+                    kind, controller, sequence, code or None)
+            elif message[0] in (MSG_SUMMONED, MSG_SPSUMMONED, MSG_FLIPSUMMONED):
+                if len(message) != 1:
+                    raise ValueError("invalid summon completion length")
+                self._pending_summon = None
             if message[0] == 40:
                 if len(message) != 2 or message[1] not in (0, 1):
                     raise ValueError("invalid MSG_NEW_TURN player")
@@ -788,6 +818,7 @@ class OcgcoreProbe:
             QUERY_COUNTERS,
             QUERY_DEFENSE,
             QUERY_EQUIP_CARD,
+            QUERY_OWNER,
             QUERY_POSITION,
             QUERY_RACE,
             decode_location,
@@ -795,7 +826,7 @@ class OcgcoreProbe:
 
         flags = QUERY_CODE | QUERY_POSITION
         if location == LOCATION_MZONE:
-            flags |= QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE | QUERY_COUNTERS
+            flags |= QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE | QUERY_COUNTERS | QUERY_OWNER
         elif location == LOCATION_SZONE:
             flags |= QUERY_EQUIP_CARD
         query = QueryInfo(flags, player, location, 0, 0)
@@ -854,7 +885,8 @@ class OcgcoreProbe:
                             (card.equip_target[0], card.equip_target[2])
                             if location == LOCATION_SZONE and card.equip_target
                             and card.equip_target[1] == LOCATION_MZONE else None,
-                            card.race if location == LOCATION_MZONE and faceup else None)
+                            card.race if location == LOCATION_MZONE and faceup else None,
+                            card.owner if location == LOCATION_MZONE and faceup else None)
 
         field = tuple(view_card(player, location, sequence, card)
                       for player in (0, 1) for location in (LOCATION_MZONE, LOCATION_SZONE)
@@ -913,6 +945,14 @@ class OcgcoreProbe:
                                   if reveal.recipient == viewer),
             own_main_deck=self._initial_main_decks[viewer],
             known_opponent_hand_cards=tuple(sorted(self._known_hand[1 - viewer])),
+            pending_summon=(self._pending_summon if not terminal and
+                            self._pending_summon is not None and any(
+                                card.zone == "monster"
+                                and card.controller == self._pending_summon.controller
+                                and card.sequence == self._pending_summon.sequence
+                                and (self._pending_summon.code is None
+                                     or card.code == self._pending_summon.code)
+                                for card in field) else None),
         )
 
     def pass_empty_chain(self) -> tuple[int, ...]:

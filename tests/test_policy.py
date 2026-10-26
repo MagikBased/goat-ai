@@ -1505,3 +1505,26 @@ def test_optional_self_target_guard_changes_only_target_choice():
     assert PolicyAgent(model, vocabulary, tactical_guard=True,
                        self_target_guard=True).select_action(
         snapshot, (own, enemy)) == enemy
+
+
+def test_optional_position_guard_preserves_defending_sheep_token():
+    class FavorFirst(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, features):
+            return -torch.arange(len(features.action_cards)).float() + self.dummy
+
+    sheep = CardView(0, "monster", "faceup", 73915053, 2,
+                     "defense", 0, 0)
+    snapshot = replace(view(), field=(sheep,))
+    change = Action("change", "change_position", 0,
+                    {"code": 73915053, "controller": 0,
+                     "location": 4, "sequence": 2})
+    end = Action("end", "end_phase", 0)
+    model = FavorFirst()
+    vocabulary = CardVocabulary((73915053,))
+    assert PolicyAgent(model, vocabulary).select_action(snapshot, (change, end)) == change
+    assert PolicyAgent(model, vocabulary, position_guard=True).select_action(
+        snapshot, (change, end)) == end

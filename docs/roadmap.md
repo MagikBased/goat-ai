@@ -638,3 +638,14 @@ An independent April 2005 list checks the pinned card IDs and copy limits for th
 4. Cover other cards when they block a representative full duel, expose a general engine or observation defect, or appear in additional sourced competitive decks. Defer isolated low-play card edge cases until the staple paths work reliably.
 
 Use the [SJC Indianapolis 2005 Top 8 card ranking](card_priorities.md) to select the next fixture: common contemporary cards such as Tsukuyomi, Scapegoat, Magician of Faith, Metamorphosis, and Sinister Serpent take precedence over isolated low-use cases. Five legal 40- or 42-card published lists are executable deck fixtures; printed 38- and 39-card lists remain ranking evidence only unless an independently sourced correction is found. For each fixture, record the historical source, native script and rules profile, expected outcome, and any unresolved discrepancy in [GOAT rules](goat_rules.md). Keep implementation changes small enough to demonstrate with a command, test, and documented limitation. Resume strength experiments after the audited deck corpus is broad enough to support meaningful evaluation.
+
+## Next position-decision experiment
+
+The feature-21 replay audit found 12 decisions moving defending 0-ATK Sheep
+Tokens into attack. A narrow optional inference guard prevents that pattern,
+but a 64-duel comparison against the unguarded identical checkpoint scored
+31–33. Keep the guard as an ablation until independently reviewed examples
+show when staying in defense is best. Next, label repeated position changes
+for non-token monsters with board context and run a held-out, seat-swapped
+comparison before changing the default policy. See
+[replay audit](replay_audit.md) and [evaluation](evaluation.md).

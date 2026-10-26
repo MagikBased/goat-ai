@@ -16,6 +16,7 @@ class CardView:
     counters: tuple[tuple[int, int], ...] = ()  # (counter type, count) on face-up monsters.
     equipped_to: tuple[int, int] | None = None  # Public target monster slot; card ID may be hidden.
     race: int | None = None  # Current Type mask of a face-up monster, including field effects.
+    owner: int | None = None  # Original owner of a face-up field monster; public in a duel.
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,16 @@ class TargetSlotView:
     controller: int
     zone: str
     sequence: int
+
+
+@dataclass(frozen=True)
+class PendingSummonView:
+    """Public monster being summoned while a negation response is offered."""
+
+    kind: str  # normal, flip, or special
+    controller: int
+    sequence: int
+    code: int | None  # None for a face-down Special Summon.
 
 
 @dataclass(frozen=True)
@@ -107,6 +118,7 @@ class Observation:
     known_opponent_hand_cards: tuple[int, ...] = ()  # Publicly tracked multiset, no hand slots.
     pending_attack: TargetSlotView | None = None  # Own attacker while choosing its target.
     turn_player: int | None = None  # Current turn owner; differs from actor during responses.
+    pending_summon: PendingSummonView | None = None
 
     def __post_init__(self) -> None:
         if self.viewer not in (0, 1) or self.acting_player not in (0, 1):
@@ -114,6 +126,14 @@ class Observation:
         if self.turn_player is not None and (
                 type(self.turn_player) is not int or self.turn_player not in (0, 1)):
             raise ValueError("turn player must be 0 or 1 when recorded")
+        if self.pending_summon is not None and (
+                self.pending_summon.kind not in ("normal", "flip", "special")
+                or self.pending_summon.controller not in (0, 1)
+                or not 0 <= self.pending_summon.sequence < 7
+                or self.pending_summon.code is not None
+                and (type(self.pending_summon.code) is not int
+                     or self.pending_summon.code <= 0)):
+            raise ValueError("invalid pending summon")
         if any(card.controller != self.viewer for card in self.hand):
             raise ValueError("observation hand must contain viewer's cards only")
         if self.pending_attack is not None and (
@@ -136,15 +156,26 @@ class Observation:
         if any(card.controller != self.viewer and card.position == "facedown" and card.code is not None
                for card in self.field):
             raise ValueError("opponent facedown identity must be hidden")
+        if self.pending_summon is not None:
+            pending_card = next((card for card in self.field
+                                 if card.zone == "monster"
+                                 and card.controller == self.pending_summon.controller
+                                 and card.sequence == self.pending_summon.sequence), None)
+            if (pending_card is None or self.pending_summon.code is not None
+                    and (pending_card.position != "faceup"
+                         or pending_card.code != self.pending_summon.code)):
+                raise ValueError("pending summon must identify a visible field slot")
         for card in (*self.hand, *self.field, *self.graveyards[0], *self.graveyards[1],
                      *self.banished[0], *self.banished[1], *self.own_extra_deck):
             if (card.zone != "monster" or card.position != "faceup") and (
                     card.attack is not None or card.defense is not None
-                    or card.counters or card.race is not None):
+                    or card.counters or card.race is not None or card.owner is not None):
                 raise ValueError("dynamic monster data require a face-up monster")
             if ((card.attack is None) != (card.defense is None)
                     or (card.race is not None and (type(card.race) is not int
                                                    or not 0 < card.race < 1 << 64))
+                    or (card.owner is not None and
+                        (type(card.owner) is not int or card.owner not in (0, 1)))
                     or any(kind <= 0 or count <= 0 for kind, count in card.counters)
                     or tuple(sorted(card.counters)) != card.counters):
                 raise ValueError("invalid visible monster stats or counters")
