@@ -897,3 +897,28 @@ card-image cache. Both seats use Tactical v8, so this is
 the cleaner replay for future human review. `scripts/collect_heuristic_demos.py`
 now accepts `--opponent tactical` to regenerate this pairing. The teacher
 version is recorded so a v7 replay remains reproducible after these changes.
+
+### Reviewed preferences from the player's notes
+
+The player's notes are also encoded as seven **retrospective preferences** in
+`examples/preferences/tactical_v7_seed6803_player1_baseline.preference.json`
+and `tactical_v7_seed6803_player2_baseline.preference.json`. They are bound to
+the complete source replay SHA-256
+`1417fa6a273a5f7b19ed3b96bcda333144c825a8f125c520d786dd0f210e915f`.
+The first file reviews three Combat v3 decisions: Thunder Dragon taking both
+copies, passing on BLS's own-only banish, and passing on a Raigeki Break that
+would spend Heavy Storm to destroy an own Set card. The second reviews four
+Tactical v7 decisions: discarding Sinister Serpent to Delinquent Duo, holding
+Sinister's Normal Summon for another monster or setting it, passing on Dust
+Tornado chained to Book of Moon, and setting Nobleman instead of targeting its
+own monster. Other legal choices are deliberately left unranked where the
+notes do not determine their value.
+
+`baseline_review` requires an explicitly recorded player seat and the
+replay's teacher/opponent metadata. The reader checks the source hash, legal
+indices, disjoint preference sets, selected disfavored action, and acting
+seat. Scoring and training first replay-verify the full duel and audit both
+players' information boundaries. These reviews are **not human gameplay
+demonstrations** and do not turn a baseline's other decisions into expert
+labels. Both the score report and a small opt-in parent-KL experiment are
+recorded in [evaluation](evaluation.md).

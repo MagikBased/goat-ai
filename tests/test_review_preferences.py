@@ -94,6 +94,26 @@ def test_preference_restricts_source_and_learner_seat(tmp_path):
         read_decision_preferences(preference_file(tmp_path), "a" * 64, wrong_seat)
 
 
+def test_baseline_review_binds_either_recorded_agent_seat(tmp_path):
+    base = trajectory()
+    metadata = {"demonstrator_seat": 1, "teacher": "TacticalHeuristicAgent",
+                "teacher_version": 7, "opponent": "CombatHeuristicAgent",
+                "opponent_version": 3}
+    duel = replace(base, source="tactical", skill_metadata=metadata)
+    path = preference_file(tmp_path, authorization="baseline_review", reviewed_seat=0)
+    assert read_decision_preferences(path, "a" * 64, duel).authorization == "baseline_review"
+    wrong_seat = preference_file(tmp_path, authorization="baseline_review", reviewed_seat=1)
+    with pytest.raises(ValueError, match="reviewed agent seat"):
+        read_decision_preferences(wrong_seat, "a" * 64, duel)
+    with pytest.raises(ValueError, match="agent seat"):
+        read_decision_preferences(path, "a" * 64,
+                                  replace(duel, source="self_play_rl"))
+    with pytest.raises(ValueError, match="agent seat"):
+        read_decision_preferences(path, "a" * 64,
+                                  replace(duel, skill_metadata={**metadata,
+                                                                "teacher_version": True}))
+
+
 def test_score_prefers_either_good_target_without_set_size_bonus():
     torch = pytest.importorskip("torch")
     from goat_ai.training.policy import CardVocabulary

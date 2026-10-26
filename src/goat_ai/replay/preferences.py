@@ -20,6 +20,7 @@ class DecisionPreferences:
     source_trajectory_sha256: str
     reviewer: str
     authorization: str
+    reviewed_seat: int
     preferences: tuple[ReviewedPreference, ...]
 
 
@@ -51,6 +52,18 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
                  and type(seat) is int and seat in (0, 1)
                  and isinstance(checkpoint, str)
                  and re.fullmatch(r"[0-9a-f]{64}", checkpoint) is not None)
+    elif authorization == "baseline_review":
+        seat = raw.get("reviewed_seat")
+        teacher_seat = metadata.get("demonstrator_seat")
+        valid = (trajectory.source == "tactical"
+                 and type(seat) is int and seat in (0, 1)
+                 and type(teacher_seat) is int and teacher_seat in (0, 1)
+                 and metadata.get("teacher") == "TacticalHeuristicAgent"
+                 and type(metadata.get("teacher_version")) is int
+                 and metadata["teacher_version"] > 0
+                 and isinstance(metadata.get("opponent"), str)
+                 and type(metadata.get("opponent_version")) is int
+                 and metadata["opponent_version"] > 0)
     else:
         raise ValueError("preferences require agent-review authorization")
     if not valid:
@@ -93,4 +106,4 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
             raise ValueError("disfavored actions must include the recorded choice")
         parsed.append(ReviewedPreference(index, preferred, disfavored))
     return DecisionPreferences(trajectory_sha256, reviewer.strip(), authorization,
-                               tuple(parsed))
+                               seat, tuple(parsed))

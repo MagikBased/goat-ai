@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "source_trajectory_sha256": "1417fa6a273a5f7b19ed3b96bcda333144c825a8f125c520d786dd0f210e915f",
+  "authorization": "baseline_review",
+  "reviewed_seat": 0,
+  "reviewer": "GOAT AI user replay notes, Matt versus Chaos v7 seed 6803",
+  "preferences": [
+    {
+      "decision_index": 42,
+      "preferred_action_indices": [3],
+      "disfavored_action_indices": [0]
+    },
+    {
+      "decision_index": 118,
+      "preferred_action_indices": [1],
+      "disfavored_action_indices": [0]
+    },
+    {
+      "decision_index": 167,
+      "preferred_action_indices": [1],
+      "disfavored_action_indices": [0]
+    }
+  ]
+}

@@ -74,15 +74,23 @@ def main() -> None:
                         for item in preferences.preferences)
         new_hashes[str(replay_path)] = replay_hash
         preference_hashes[str(preferences_path)] = sha256_file(preferences_path)
+        replay_metadata = trajectory.skill_metadata or {}
+        reviewed_agent = (replay_metadata.get(
+            "teacher" if preferences.reviewed_seat ==
+            replay_metadata.get("demonstrator_seat") else "opponent")
+            if preferences.authorization == "baseline_review" else "policy")
         training_games.append({
             "seed": trajectory.seed,
             "deck_sha256": trajectory.deck_sha256,
             "main_deck_composition_sha256": tuple(
                 main_deck_composition_sha256(read_ydk(deck)) for deck in trajectory.decks),
-            "source": "self_play_preference" if preferences.authorization == "self_play_review"
-                      else "policy_preference",
+            "source": {"self_play_review": "self_play_preference",
+                       "policy_review": "policy_preference",
+                       "baseline_review": "baseline_preference"}[preferences.authorization],
             "authorization": preferences.authorization,
             "reviewer": preferences.reviewer,
+            "reviewed_seat": preferences.reviewed_seat,
+            "reviewed_agent": reviewed_agent,
             "preference_sha256": preference_hashes[str(preferences_path)],
             "selected_decisions": len(preferences.preferences),
         })

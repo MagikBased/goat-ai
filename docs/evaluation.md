@@ -4603,3 +4603,45 @@ The Matt/Chaos tournament can be reproduced with:
   --seed 7700 --seeds 16 --workers 4 \
   --output .cache/goat-ai/tactical_v8_vs_v7_matt_chaos_7700_7715.json
 ```
+
+### Seed-6803 baseline review as an opt-in policy preference experiment
+
+Seven player-reviewed preferences from the verified Matt/Chaos seed-6803
+trajectory were scored against the earlier feature-v23 Tactical-v6 clone
+(`.cache/goat-ai/fv23_tactical_v6_current_assets.pt`, SHA-256
+`93ca70795e2c5316ab349a4e5c61ebd553915e49abdbe469d0976d3bebe3d9b2`).
+That parent was trained on seeds 4800–4803 and 4810–4813; neither the exact
+replay nor seed 6803 appears in its training provenance. Its greedy action
+fell in the preferred set at **0 of 7** reviewed states. This is a diagnostic
+of those fixed decisions, not an estimate of whole-duel strength; at some
+states its best action was unranked, rather than labeled bad.
+
+An opt-in `baseline_review` input now lets the existing parent-KL preference
+trainer use those explicit decisions while recording the reviewed agent and
+seat. With 100 updates, learning rate `1e-4`, KL weight 1.0, and 64 sampled
+preservation states from four parent-training trajectories, the preference
+loss moved from **1.742 to 0.670** and final preservation KL was **0.0188**.
+The child greedily chose a preferred action at **3 of 7** source states;
+five of seven preferred-minus-disfavored pairwise margins were positive.
+The ignored child checkpoint is
+`.cache/goat-ai/fv23_seed6803_baseline_review_child.pt` (SHA-256
+`d80b38e39aa08dc0d925ea7a504f66774ddb8da25f6c81aa3ebe2342b3ce1129`).
+
+On held-out Jesse/Michael and Chaos Control/Warrior Main Decks, seeds
+8200–8207 with both seats and deck assignments, the child scored **15–16–1**
+and **18–13–1** directly against its parent: combined **33–29–2** over 64
+duels. The outcomes do not establish a competitive improvement. Those reports
+were recorded just before a metadata-only change that added reviewed seat and
+agent fields to the child checkpoint; all model-state tensors in the reported
+and final checkpoint were compared and were exactly equal. The ignored reports
+are `.cache/goat-ai/fv23_seed6803_review_child_vs_parent_heldout_0.json` and
+`..._1.json`. Neither the reviews nor this small experiment close M4.
+
+Reproduce scoring with `scripts/score_reviewed_preferences.py --checkpoint`
+and both `--case` pairs listed in [replay audit](replay_audit.md). Reproduce
+training with `scripts/train_review_preferences.py`, the same cases, four
+parent-provenance preservation trajectories at seeds 4800 and 4810, and the
+settings above. Direct evaluation used `scripts/evaluate_policy.py
+--engine experimental --both-deck-assignments --opponent-checkpoint
+.cache/goat-ai/fv23_tactical_v6_current_assets.pt --require-unseen-main-decks
+--seed 8200 --seeds 8 --workers 4` for each held-out pair.

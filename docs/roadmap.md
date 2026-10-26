@@ -790,3 +790,11 @@ discard costs, removal targets, and backrow commitment. Compare each change
 against unchanged v8 across unseen deck compositions and audit fresh replays
 for new waste patterns before promoting it to training data. See
 [replay audit](replay_audit.md) and [evaluation](evaluation.md).
+
+Seven explicit seed-6803 user reviews can now enter the optional preference
+pipeline as `baseline_review`, bound to the replay hash and reviewed seat.
+A small parent-KL child changed three greedy fixed-state choices but split
+33–29–2 against its parent across two held-out deck pairings. This is useful
+feedback plumbing, not the M4 strength gate. Collect more independently
+reviewed decisions, including target and resource-cost comparisons, before
+another promotion attempt; keep evaluation decks and seeds separate.

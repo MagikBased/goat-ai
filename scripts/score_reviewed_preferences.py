@@ -93,6 +93,7 @@ def main() -> None:
             "preferences_sha256": sha256_file(preferences_path),
             "authorization": reviewed.authorization,
             "reviewer": reviewed.reviewer,
+            "reviewed_seat": reviewed.reviewed_seat,
             "verified_decisions": verified,
             "exact_replay_in_training": replay_hash in training_hashes,
             "seed_in_training": trajectory.seed in training_seeds,
