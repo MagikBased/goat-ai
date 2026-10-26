@@ -123,6 +123,11 @@ in the sample. Trap Dustshoot chained to another Trap Dustshoot appeared three
 times and now has a native two-hand reveal and full-duel replay regression.
 Solemn Judgment responding to Dustshoot appeared twice and now has a paired
 negated-versus-resolved hand-visibility regression.
+Solemn Judgment responding to Time Seal appeared four times. A paired native
+fixture now checks Time Seal's next Draw Phase skip against Solemn's activation
+negation: the opponent draws only in the negated branch. Both complete duels
+replay-verify and pass the legal-choice visibility audit; see
+[GOAT rules](goat_rules.md).
 Raigeki Break responding to Book of Moon appeared three times and has a paired
 target-removal fixture. The reverse Book response to Raigeki Break now has a
 paired native fixture showing that changing the targeted monster face-down

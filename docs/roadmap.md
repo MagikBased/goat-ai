@@ -166,6 +166,11 @@ Flip Summoned Faith still recovers its chosen Spell after Torrential destroys
 it, including the opponent-only recovery reveal. It replay-verifies both
 branches; broader high-play interaction coverage remains open.
 
+A paired Time Seal/Solemn Judgment fixture now checks the next Draw Phase in
+both the resolved and negated branches. Each full duel replay-verifies and
+passes the player-visible legal-choice audit. This closes one frequent
+competitive-probe response pair, not general chain correctness.
+
 ## M3 — Evaluation and data
 
 An eight-duel two-worker native pilot now reports per-process Linux peak RSS,
