@@ -267,6 +267,30 @@ Reproduce the Daryl/Cas lines with the same recorder and checkpoint using
 `--seed 2647 --policy-seat 1 --opponent tactical`, and output
 `replays/policy_batch_v19_daryl_cas_2647_p1.json`.
 
+### Tribe Type choice from the verified policy replay
+
+At viewer frame **115** (decision index 114) of
+`replays/policy_batch_v19_jesse_daryl_2644_p1.json`, the greedy feature-19
+policy's Tribe-Infecting Virus chose Spellcaster. The acting player's visible
+field held two face-up Gravekeeper's Spies and Tribe; the opponent held four
+face-up Sheep Tokens. The offered Type choices were Spellcaster, Machine, and
+Beast. Spellcaster destroys the two own Spies, while Beast removes the four
+opposing Tokens without hitting an own monster. This judgment uses only the
+acting player's visible cards and published card Types. The complete
+801-decision duel replay-verified and passed the visibility audit.
+
+`examples/preferences/feature19_tribe_spies_tokens_2644_p1.preference.json`
+binds that replay's SHA-256 and prefers Beast (legal index 2) over the
+recorded Spellcaster (index 0); it leaves Machine unlabeled. The unchanged
+feature-19 checkpoint ranks Beast third, with an almost-zero score margin
+against Spellcaster (−0.00000018). Its old action encoding scaled the Type
+bitmask by `2**32 - 1`, making these choices nearly identical in float32.
+Opt-in feature version 20 encodes the exact Type bits. A same-data feature-20
+clone still ranks Beast second and chooses Spellcaster in this state; after an
+opt-in five-review preference update, Beast ranks first. Those are
+**training-state diagnostics** for the update, not competitive evidence. The
+held-out results and checkpoint hashes are in [evaluation](evaluation.md).
+
 ## Seed 2202, policy versus CombatHeuristicAgent v3
 
 Replay: `replays/policy_vs_combat_2202.json`. Policy P0 uses

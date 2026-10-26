@@ -436,6 +436,26 @@ def test_feature_version_nineteen_distinguishes_turn_owner_from_actor():
         own_turn).shape == (1,)
 
 
+def test_feature_version_twenty_preserves_distinct_tribe_type_choices():
+    vocabulary = CardVocabulary((33184167,))
+    choices = tuple(Action(str(race), "announce_race", 0, {"race": race})
+                    for race in (2, 64, 16384, 2 | 16384))
+    current = encode_decision(view(), choices, vocabulary, feature_version=20)
+    legacy = encode_decision(view(), choices, vocabulary, feature_version=19)
+    assert current.action_numbers.shape == (4, 81)
+    assert current.action_numbers[:, 4:68].sum(1).tolist() == [1, 1, 1, 2]
+    assert current.action_numbers[0, 5] == 1
+    assert current.action_numbers[1, 10] == 1
+    assert current.action_numbers[2, 18] == 1
+    assert torch.equal(current.action_numbers[3, 4:68],
+                       current.action_numbers[0, 4:68]
+                       + current.action_numbers[2, 4:68])
+    assert torch.dist(legacy.action_numbers[0], legacy.action_numbers[2]) < 1e-5
+    assert torch.dist(current.action_numbers[0], current.action_numbers[2]) > 1
+    assert LegalActionPolicy(vocabulary.size, width=16, feature_version=20)(
+        current).shape == (4,)
+
+
 def test_feature_version_nine_uses_only_publicly_known_opponent_hand_cards():
     vocabulary = CardVocabulary((10, 20, 30))
     known = replace(view(), known_opponent_hand_cards=(20,))

@@ -40,6 +40,8 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # Version 17 adds attacker-to-target combat stats using schema-v22 context.
 # Version 18 adds an explicit public chain-source/candidate-card relation.
 # Version 19 adds the public turn player, distinct from the actor in response windows.
+# Version 20 represents announced monster Types as exact mask bits. Dividing
+# small Type masks by 2**32 made common choices indistinguishable to float32.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 
@@ -107,7 +109,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 20):
+    if feature_version not in range(1, 21):
         raise ValueError("unsupported policy feature version")
 
     zone_locations = {"monster": 0x04, "spell_trap": 0x08}
@@ -252,16 +254,17 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         ])
         prompt_id = int(params.get("prompt_id", 0))
         race = int(params.get("race", 0))
+        race_numbers = (tuple(float(bool(race & (1 << bit))) for bit in range(64))
+                        if feature_version >= 20 else
+                        ((race & 0xFFFFFFFF) / 0xFFFFFFFF,
+                         (race >> 32) / 0xFFFFFFFF))
         numeric = (
             float(params.get("controller", own) != own),
             int(params.get("location", 0)) / 64,
             int(params.get("sequence", 0)) / 8,
             int(params.get("position", 0)) / 8,
-            (race & 0xFFFFFFFF) / 0xFFFFFFFF,
-            (race >> 32) / 0xFFFFFFFF,
-            (prompt_id & 0xFFFFFFFF) / 0xFFFFFFFF,
-            len(selected) / 5,
-        )
+        ) + race_numbers + ((prompt_id & 0xFFFFFFFF) / 0xFFFFFFFF,
+                            len(selected) / 5)
         if feature_version >= 6:
             announced = int(params.get("number", 0))
             numeric += (int(params.get("attribute", 0)) / 127,
@@ -356,7 +359,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 20):
+        if feature_version not in range(1, 21):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -376,7 +379,8 @@ class LegalActionPolicy(nn.Module):
                         if feature_version == 15 else 42 if feature_version >= 4 else 10)
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
-        action_number_width = (19 if feature_version >= 17 else 15
+        action_number_width = (81 if feature_version >= 20 else 19
+                               if feature_version >= 17 else 15
                                if feature_version == 16 else 11
                                if feature_version >= 6 else 8)
         self.action_numbers = nn.Sequential(nn.Linear(action_number_width, width), nn.ReLU(),

@@ -495,6 +495,18 @@ coverage across decks and effects before another preference fit; evaluate on
 new seeds and compositions, not the four training decisions. See
 [evaluation](evaluation.md).
 
+A replay-bound Tribe-Infecting Virus review identified a feature-19 Type-mask
+scaling fault: the policy nearly tied Spellcaster, Aqua, and Beast despite
+their very different visible consequences. Opt-in feature version 20 encodes
+the 64 Type bits exactly and keeps older checkpoints readable. A same-data
+feature-20 clone scored 42–53–1 against feature 19 on 96 held-out duels. A
+five-review parent-KL child corrected the Tribe training state but split
+49–47 against its feature-20 parent on another 96 held-out duels, with severe
+Flip Control weakness. This improves action representation and diagnosis,
+but does not close M4's competitive gate. Add diverse Type/target reviews
+and measured cross-deck improvement before promotion; see
+[evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

@@ -147,7 +147,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=1,
                         help="decisions per optimizer update; forward passes remain individual")
     parser.add_argument("--width", type=int, default=64)
-    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 20)),
+    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 21)),
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
@@ -219,7 +219,8 @@ def main() -> None:
             raise ValueError(f"{path}: feature version {args.feature_version} requires "
                              "schema v22 attack context")
         if args.feature_version >= 19 and trajectory.schema_version < 23:
-            raise ValueError(f"{path}: feature version 19 requires schema v23 turn owner")
+            raise ValueError(f"{path}: feature version {args.feature_version} requires "
+                             "schema v23 turn owner")
         count = verify_trajectory(trajectory, engine_type(args.native_root))
         audit_trajectory_visibility(trajectory)
         annotation = None

@@ -3413,3 +3413,69 @@ the child. The four-worker tournament took **51.05 seconds** and averaged
 The current parent remains the reference checkpoint. More independently
 reviewed, varied decisions and a separate held-out tournament are needed
 before preference learning can claim a competitive gain.
+
+## Exact Type-bit action representation and five-review fit
+
+The verified Tribe-Infecting Virus replay at viewer frame 115 exposed a
+representation fault: feature version 19 encoded Spellcaster (`2`), Aqua
+(`64`), and Beast (`16384`) Type masks as approximately 0.0000000005,
+0.000000015, and 0.000003815. Its three action logits were effectively tied;
+the greedy first action named Spellcaster, destroying two own Spies instead
+of four opposing Sheep Tokens. The replay-bound Beast-over-Spellcaster
+preference and the player-visible evidence are in [replay audit](replay_audit.md).
+Feature version 20 replaces the two scaled-mask numbers with 64 exact bit
+features. It does not change legal actions, rules, or hidden information.
+Feature-19 checkpoints keep their earlier encoder and remain loadable.
+
+A width-16, one-epoch feature-20 clone trained on the **same 6,014 tactical
+teacher decisions** as the feature-19 parent, from the same 16 replay-verified
+seed-2500–2503 trajectories (batch size 32, learning rate 0.001, seed 19).
+Its epoch loss was 0.3258. The ignored checkpoint is
+`checkpoints/tactical_v3_fv20_typebits_2500_2503.pt` (SHA-256
+`1d9073e2b8cfb2ccef6591a8787ab59b074f3ad8b737b3cd72848ca9f4e4938d`).
+Only eight teacher choices announced a Type, none chose Beast, so this data
+cannot teach the reviewed four-Token line by direct imitation. On the
+reviewed state, the new clone distinguished the actions but still selected
+Spellcaster; Beast ranked second. The scored report is
+`artifacts/feature20_tribe_spies_tokens_preference_scorecard.json` (SHA-256
+`b8f0564436dda284b99713eeba7325ea3563a47e5d3e7a8b51feaa9048910566`).
+
+On three held-out Main Deck pairings (Chaos Control, Warrior, Flip Control),
+both assignments and seats, seeds 3300–3307, the feature-20 clone scored
+**42–53–1** in **96 terminal duels** against the unchanged feature-19 clone:
+**44.27%** of points, paired-bootstrap 95% interval **37.50–51.04%**. Its
+assigned-deck splits were Chaos Control 11–21, Flip Control 6–26, and Warrior
+25–6–1. The evaluator enforced Main Deck compositions unseen in either
+checkpoint. The four-worker tournament took **40.95 seconds**. This does not
+show a generalization or playing-strength gain; widening the action layer
+also changes model capacity, so this is not an isolated Type-encoding
+ablation. The ignored report is
+`artifacts/feature20_typebits_vs_feature19_3300_3307.json` (SHA-256
+`57e62fdfcd3836c7762bedac714aa16af7455631ff5a3afb52b01d2f5aaddbb1`).
+
+A separate opt-in preference update used the new Tribe review plus the four
+earlier Faith, Heavy Storm, Breaker, and MST reviews, with 200 steps, learning
+rate 0.0001, weight-1 frozen-parent KL, and 64 sampled preservation states
+from four parent-provenance trajectories. All five source duels and all four
+preservation duels replay-verified and passed visibility audits. Preference
+loss fell from 0.9058 to 0.4753; final sampled KL was 0.00443. On the **five
+training decisions**, the child ranked the preferred action/set first for
+Tribe, Heavy Storm, Breaker, and MST; Faith Set still ranked fourth. Its
+ignored checkpoint is `checkpoints/tactical_v3_fv20_preference5_parent_kl_3100.pt`
+(SHA-256 `98c646227574dbd0b7cf09b1713b09ce3fa752566d39385b654c6a382afc51a3`),
+and its fixed-state scorecard is
+`artifacts/feature20_preference5_child_scorecard.json` (SHA-256
+`c473344db2d58b48123078f827bd990c1bd334686bcc807821290dc5eaef4f3a`).
+
+Against the unchanged feature-20 parent on the same three unseen deck
+families, both assignments and seats, fresh seeds 3400–3407, the updated
+child scored **49–47** over **96 terminal duels**: **51.04%** of points,
+paired-bootstrap 95% interval **46.88–55.21%**. Its assigned-deck splits
+were Chaos Control 13–19, Flip Control 5–27, and Warrior 31–1. The
+four-worker tournament took **41.63 seconds** and averaged 545.01 decisions
+per duel. The ignored report is
+`artifacts/feature20_preference5_vs_base_3400_3407.json` (SHA-256
+`4eb31bcc083efa67cb78509f0a487446e5fd711957aff0574c78062de284fb8e`).
+The tiny review set corrected a concrete state, but neither held-out
+comparison supports promoting a new checkpoint. Broader player-visible
+Type/context examples and independently reviewed decisions are needed.
