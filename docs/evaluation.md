@@ -4765,8 +4765,49 @@ SHA-guarded in-memory patch uses the effect handler's player; all three
 original seeds (10030, 10062, 10122) now reach terminal and replay-verify
 individually. Two more games stopped at undecoded native `MSG_SELECT_SUM`
 prompts (10097, 10102), and two at opponent-hand choices lacking an addressed
-reveal (10093, 10107). Those four cases remain open; this is not a 100/100
-completion claim. Reports are under
+reveal (10093, 10107). The original reports are under
 `.cache/goat-ai/random-probe-distinct-10024-10123/` (report SHA-256
 `08933bbbd10661ba48b632750ddc1078f1f4362dd017c14c5ae2955fcf0f350c`) and
 `.cache/goat-ai/firebird-fixed-{10030,10062,10122}/`.
+
+The adapter now enumerates bounded exact/exceed sum selections with native
+response bytes for Puppet Magic's zero-mandatory-card form; other forms still
+fail explicitly. Double Spell copying The Inexperienced Spy now offers blind
+opposing-hand choices, with card codes and native hand positions redacted.
+Dragged Down into the Grave uses its addressed hand reveal through the later
+choice window. Focused native tests replay-verify those original four seeds
+and check the visible-choice boundary. Re-running the same 100 independently
+constructed deck pairs after all corrections yielded **100/100 terminal**,
+**100/100 full-replay verified**, **113,037 verified decisions**, and a
+maximum of **1,698** decisions. The ignored report is
+`.cache/goat-ai/random-probe-distinct-10024-10123-fixed/report.json`
+(SHA-256 `5b87f6c17c7c99058ce5fd3f12ed609267f8beec88f4f3a984ac373e88d6b075`).
+This establishes protocol coverage for this finite random sweep, not
+historical correctness or general protocol completeness.
+
+### Tactical v14: preserving Raigeki Break and valuing Snatch targets
+
+In the replay-verified v13 seed-6803 game, player 2 chained Raigeki Break to
+the opponent's resolving Metamorphosis at decision 83, discarded Mystic
+Tomato instead of an expendable Thunder Dragon at 84, and later selected a
+Sheep Token for Snatch Steal over the opposing Breaker at 324. The three
+player-reviewed alternatives are bound to the source replay SHA-256 in
+`examples/preferences/tactical_v13_seed6803_player2_resource.preference.json`.
+On those same visible states, v14 passes on the Raigeki chain, chooses Thunder
+Dragon, and targets Breaker. Its Raigeki guard holds the card when the only
+chain prompt is an unrelated resolving Normal Spell/Trap; a visible threat to
+its own Set card or an incoming attack remains a valid response window.
+Snatch is held when only opposing Sheep Tokens are available unless the
+player has Metamorphosis in hand. These are tactical preferences, not rules
+or hidden-information access.
+
+Both v13 and both fresh v14 seed-6803 complete trajectories replay-verified,
+passed the visibility audit, and reproduced their versioned teacher actions.
+The v14 seat-0 viewer is `replays/tactical_v14_self_seed6803.html` (871
+decisions); its seat-1 trajectory contains 953 decisions. A direct 64-duel
+v14-versus-v13 tournament on Matt/Chaos and Cas/Daryl with both seats and
+deck assignments, seeds 8900–8907, scored **34–30**. The paired-bootstrap 95%
+score interval was **50.0%–57.8%**; the assigned Flip Control split was 5–11.
+The ignored report is `.cache/goat-ai/tactical_v14_vs_v13_8900_8907.json`
+(SHA-256 `f29ed64c7dd264d8127a0f2311f0eb14c302008abb42dfc79a5beb9e4a42dde2`).
+This does not demonstrate a cross-deck strength gain or satisfy the M4 gate.

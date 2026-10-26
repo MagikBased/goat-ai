@@ -52,6 +52,31 @@ def test_card_selection_stages_combinations_above_the_flat_action_bound():
     assert not selection.accepts(-1)
 
 
+def test_select_sum_enumerates_only_native_legal_level_combinations():
+    def prompt(target: int, levels: tuple[int, ...], mode: int = 0) -> bytes:
+        return (struct.pack("<BBBIIII", 23, 0, mode, target, 1,
+                            99 if mode == 0 else 0, 0)
+                + struct.pack("<I", len(levels))
+                + b"".join(struct.pack("<IBBIII", 100 + i, 0, LOCATION_MZONE,
+                                       i, 1, level)
+                           for i, level in enumerate(levels)))
+
+    exact = decode_decision(prompt(3, (2, 1, 4)))
+    assert [(choice.kind, choice.cards) for choice in exact.choices] == [
+        ("select_cards", ((100, 0, LOCATION_MZONE, 0),
+                          (101, 0, LOCATION_MZONE, 1)))
+    ]
+    assert exact.choices[0].response == struct.pack("<4I", 0, 2, 0, 1)
+    dual = decode_decision(prompt(3, ((3 << 16) | 2, 4)))
+    assert [(choice.kind, choice.code) for choice in dual.choices] == [
+        ("select_card", 100)]
+    exceed = decode_decision(prompt(4, (2, 3), mode=1))
+    assert [choice.cards for choice in exceed.choices] == [
+        ((100, 0, LOCATION_MZONE, 0), (101, 0, LOCATION_MZONE, 1))]
+    with pytest.raises(NotImplementedError, match="mandatory"):
+        decode_decision(struct.pack("<BBBIIII", 23, 0, 0, 3, 1, 99, 1))
+
+
 def test_new_native_choice_formats():
     effect_yes_no = decode_decision(
         b"\x0c\x01" + struct.pack("<IBBIIQ", 87621407, 1, 4, 0, 1, 95))

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "source_trajectory_sha256": "cfdca8fede4d51d42f662b653470297d26fde5650270d7958ba74bab4e95caae",
+  "authorization": "baseline_review",
+  "reviewed_seat": 1,
+  "reviewer": "GOAT AI user replay notes, Tactical v13 self-play seed 6803",
+  "preferences": [
+    {
+      "decision_index": 83,
+      "preferred_action_indices": [
+        2
+      ],
+      "disfavored_action_indices": [
+        1
+      ]
+    },
+    {
+      "decision_index": 84,
+      "preferred_action_indices": [
+        2
+      ],
+      "disfavored_action_indices": [
+        0
+      ]
+    },
+    {
+      "decision_index": 324,
+      "preferred_action_indices": [
+        2
+      ],
+      "disfavored_action_indices": [
+        0
+      ]
+    }
+  ]
+}

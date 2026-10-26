@@ -10,7 +10,7 @@ from goat_ai.agents.tactical_guard import (
     safe_target_indices,
     weak_flip_set_substitute,
 )
-from goat_ai.observations import CardView, ChainLinkView, Observation
+from goat_ai.observations import CardView, ChainLinkView, Observation, TargetSlotView
 
 
 def board(*cards, phase="main1", turn=1, viewer=0, chain=(), turn_player=None):
@@ -555,6 +555,110 @@ def test_v13_preserves_bls_against_sheep_and_weak_tribute():
         board(bls, other, turn_player=0), (thunder, position, battle)) == battle
     assert TacticalHeuristicAgent(v13_guards=False).select_action(
         board(bls, other, turn_player=0), (thunder, position, battle)) == thunder
+
+
+def test_v14_holds_raigeki_break_against_resolving_normal_spell():
+    metamorphosis = CardView(1, "spell_trap", "faceup", 46411259, 0)
+    sheep = CardView(1, "monster", "faceup", 73915052, 0,
+                     "defense", 0, 0)
+    chain = (ChainLinkView(1, 46411259, 1, 8, 0),)
+    view = board(metamorphosis, sheep, chain=chain, turn_player=1)
+    break_card = Action("break", "chain", 0, {"code": 4178474, "location": 8})
+    decline = Action("decline", "pass", 0)
+    facts = {46411259: (2, 0, 0)}
+    assert TacticalHeuristicAgent(card_facts=facts).select_action(
+        view, (break_card, decline)) == decline
+    assert TacticalHeuristicAgent(card_facts=facts, v14_guards=False).select_action(
+        view, (break_card, decline)) == break_card
+    targeted = replace(view, chain=(*chain, ChainLinkView(2, 4178474, 0, 8, 0)))
+    spell = Action("spell", "select_card", 0,
+                   {"code": 46411259, "controller": 1, "location": 8, "sequence": 0})
+    token = Action("token", "select_card", 0,
+                   {"code": 73915052, "controller": 1, "location": 4, "sequence": 0})
+    assert TacticalHeuristicAgent(card_facts=facts).select_action(
+        targeted, (spell, token)) == token
+    breaker = CardView(1, "monster", "faceup", 71413901, 1,
+                       "attack", 1900, 1000)
+    set_card = CardView(1, "spell_trap", "facedown", None, 1)
+    unrelated_spell = board(metamorphosis, breaker, set_card,
+                            chain=chain, turn_player=1)
+    assert TacticalHeuristicAgent(card_facts=facts).select_action(
+        unrelated_spell, (break_card, decline)) == decline
+
+
+def test_v14_raigeki_break_can_answer_removal_or_battle_threat():
+    own_break = CardView(0, "spell_trap", "facedown", 4178474, 0)
+    enemy_mst = CardView(1, "spell_trap", "faceup", 5318639, 0)
+    mst_chain = (ChainLinkView(1, 5318639, 1, 8, 0,
+                               (TargetSlotView(0, "spell_trap", 0),)),)
+    break_card = Action("break", "chain", 0, {"code": 4178474, "location": 8})
+    decline = Action("decline", "pass", 0)
+    assert TacticalHeuristicAgent().select_action(
+        board(own_break, enemy_mst, chain=mst_chain, turn_player=1),
+        (break_card, decline)) == break_card
+    own_weak = CardView(0, "monster", "faceup", 504700129, 0,
+                        "attack", 100, 1000)
+    attacker = CardView(1, "monster", "faceup", 60802233, 0,
+                        "attack", 500, 500)
+    battle = board(own_weak, attacker, phase="battle_step", turn_player=1)
+    assert TacticalHeuristicAgent().select_action(
+        battle, (break_card, decline)) == break_card
+
+
+def test_v14_uses_exhausted_thunder_as_raigeki_discard():
+    thunder = 504700054
+    tomato = 504700142
+    view = replace(board(chain=(ChainLinkView(1, 4178474, 0, 8, 0),)),
+                   own_main_deck=(thunder,) * 3,
+                   hand=(CardView(0, "hand", "hidden", tomato),
+                         CardView(0, "hand", "hidden", thunder)),
+                   graveyards=((CardView(0, "graveyard", "faceup", thunder),
+                                CardView(0, "graveyard", "faceup", thunder)), ()))
+    choices = (Action("tomato", "select_card", 0,
+                      {"code": tomato, "controller": 0, "location": 2}),
+               Action("thunder", "select_card", 0,
+                      {"code": thunder, "controller": 0, "location": 2}))
+    assert TacticalHeuristicAgent().select_action(view, choices) == choices[1]
+    assert TacticalHeuristicAgent(v14_guards=False).select_action(view, choices) == choices[0]
+    one_left = replace(view, graveyards=((view.graveyards[0][0],), ()))
+    assert TacticalHeuristicAgent().select_action(one_left, choices) == choices[0]
+
+
+def test_v14_snatch_steal_prefers_breaker_over_sheep():
+    sheep = CardView(1, "monster", "faceup", 73915052, 0,
+                     "defense", 0, 0)
+    breaker = CardView(1, "monster", "faceup", 71413901, 1,
+                       "attack", 1900, 1000)
+    view = board(sheep, breaker,
+                 chain=(ChainLinkView(1, 45986603, 0, 8, 0),))
+    choices = (Action("sheep", "select_card", 0,
+                      {"code": 73915052, "controller": 1, "location": 4,
+                       "sequence": 0}),
+               Action("breaker", "select_card", 0,
+                      {"code": 71413901, "controller": 1, "location": 4,
+                       "sequence": 1}))
+    assert TacticalHeuristicAgent().select_action(view, choices) == choices[1]
+    assert TacticalHeuristicAgent(v14_guards=False).select_action(view, choices) == choices[0]
+    steal = Action("steal", "activate", 0, {"code": 45986603, "location": 2})
+    end = Action("end", "end_phase", 0)
+    assert TacticalHeuristicAgent().select_action(
+        board(sheep, turn_player=0), (steal, end)) == end
+    with_metamorphosis = replace(board(sheep, turn_player=0), hand=(
+        CardView(0, "hand", "hidden", 46411259),))
+    assert TacticalHeuristicAgent().select_action(
+        with_metamorphosis, (steal, end)) == steal
+
+
+def test_v14_holds_idle_raigeki_break_on_set_board():
+    hidden = CardView(1, "monster", "facedown", None, 0, "defense")
+    sheep = CardView(1, "monster", "faceup", 73915052, 1,
+                     "defense", 0, 0)
+    view = board(hidden, sheep, turn_player=1)
+    break_card = Action("break", "chain", 0, {"code": 4178474, "location": 8})
+    decline = Action("decline", "pass", 0)
+    assert TacticalHeuristicAgent().select_action(view, (break_card, decline)) == decline
+    assert TacticalHeuristicAgent(v14_guards=False).select_action(
+        view, (break_card, decline)) == break_card
 
 
 def test_v9_creature_swap_prefers_token_and_tsukuyomi_resets_equipped_restrict():

@@ -37,7 +37,7 @@ def test_tactical_teacher_against_combat_baseline_records_verified_seats(
         assert replay.source == "tactical"
         assert replay.skill_metadata == {
             "demonstrator_seat": seat,
-            "teacher": "TacticalHeuristicAgent", "teacher_version": 13,
+            "teacher": "TacticalHeuristicAgent", "teacher_version": 14,
             "opponent": "CombatHeuristicAgent", "opponent_version": 3,
         }
         assert game["teacher_decisions"] == sum(

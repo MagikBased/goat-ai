@@ -128,28 +128,23 @@ class RestrictedOcgcoreEngine:
         visible_cards = (*observation.field, *observation.graveyards[0],
                          *observation.graveyards[1], *observation.banished[0],
                          *observation.banished[1])
-        blind_spy_choice = (observation.chain
-                            and observation.chain[-1].card_code == 81820689
-                            and observation.chain[-1].controller == native.player
-                            and all(choice.kind == "select_card"
-                                    and choice.location == 0x02
-                                    and choice.controller == 1 - native.player
-                                    for choice in native.choices))
+        blind_opponent_hand_choice = (bool(native.choices)
+                                      and all(choice.kind == "select_card"
+                                              and choice.location == 0x02
+                                              and choice.controller == 1 - native.player
+                                              for choice in native.choices))
         def public_code(code: int, controller: int, location: int,
                         sequence: int) -> int | None:
             if controller == native.player:
                 return code
             if location == 0x02:
-                if blind_spy_choice:
-                    # The Inexperienced Spy chooses an opponent hand position
-                    # before showing that one card to its controller.
-                    return None
                 # A hand choice is legal to expose only after a reveal
                 # addressed to the acting player in this native transition.
-                # Exchange has a second choice after that transition; retain
-                # its earlier addressed reveal while its chain remains open.
-                exchange = any(link.card_code == 5556668 for link in observation.chain)
-                reveals = (observation.private_reveals if exchange else
+                # Exchange and Dragged Down can choose after a response window;
+                # retain the addressed reveal while that chain remains open.
+                persistent_reveal = any(link.card_code in (5556668, 16435215)
+                                        for link in observation.chain)
+                reveals = (observation.private_reveals if persistent_reveal else
                            self.probe._decision_private_reveals)
                 reveal = next((event for event in reversed(reveals)
                                if event.recipient == native.player
@@ -158,6 +153,11 @@ class RestrictedOcgcoreEngine:
                                    for card in event.cards)), None)
                 if reveal is not None and any(card.code == code for card in reveal.cards):
                     return code
+                if blind_opponent_hand_choice:
+                    # A copied Inexperienced Spy, for example, offers hand
+                    # positions before revealing its selected card. Keep all
+                    # choices but omit identities and native hand indices.
+                    return None
                 raise SimulatorUnavailable("hand choice lacks a recipient-scoped reveal")
             visible = next((card for card in visible_cards
                             if card.controller == controller

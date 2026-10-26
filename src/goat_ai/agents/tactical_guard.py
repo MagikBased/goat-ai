@@ -98,7 +98,10 @@ def safe_target_indices(observation: Observation,
                         legal_actions: Sequence[Action],
                         admissible: Sequence[int], *,
                         protect_removal_targets: bool = False,
-                        prioritize_non_token_removal: bool = False) -> tuple[int, ...]:
+                        prioritize_non_token_removal: bool = False,
+                        avoid_resolving_normal_spell_targets: bool = False,
+                        card_facts: Mapping[int, tuple[int, int, int]] | None = None,
+                        ) -> tuple[int, ...]:
     """Avoid observed own-target losses when an enemy target is offered.
 
     This opt-in preference applies only at the target prompt. It does not
@@ -140,6 +143,16 @@ def safe_target_indices(observation: Observation,
     kept = tuple(i for i in indices if not (
         legal_actions[i].kind == "select_card"
         and legal_actions[i].parameters.get("controller") == own))
+    if avoid_resolving_normal_spell_targets and source.card_code == RAIGEKI_BREAK \
+            and len(observation.chain) > 1:
+        earlier = observation.chain[-2]
+        earlier_type = (card_facts or {}).get(earlier.card_code, (None, 0, 0))[0]
+        if earlier_type in (2, 4) and earlier.location == 8:
+            other = tuple(i for i in kept if not (
+                legal_actions[i].parameters.get("controller") == earlier.controller
+                and legal_actions[i].parameters.get("location") == earlier.location
+                and legal_actions[i].parameters.get("sequence") == earlier.sequence))
+            kept = other or kept
     if prioritize_non_token_removal and source.card_code == RAIGEKI_BREAK:
         sheep_slots = {(card.controller, 4, card.sequence) for card in observation.field
                        if card.zone == "monster" and card.code in SHEEP_TOKENS
@@ -250,6 +263,7 @@ def admissible_action_indices(observation: Observation,
                               tactical_v11_guards: bool = False,
                               tactical_v12_guards: bool = False,
                               tactical_v13_guards: bool = False,
+                              tactical_v14_guards: bool = False,
                               card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                               ) -> tuple[int, ...]:
     """Defer clearly wasteful actions while preserving an engine-legal choice.
@@ -275,6 +289,9 @@ def admissible_action_indices(observation: Observation,
                             for c in opponent_monsters)
     own_monster_threatened = any(
         target.zone == "monster" and target.controller == own
+        for link in observation.chain for target in link.targets)
+    own_card_targeted = any(
+        target.controller == own
         for link in observation.chain for target in link.targets)
     opponent_non_token = [c for c in opponent_monsters
                           if c.code not in SHEEP_TOKENS]
@@ -382,7 +399,27 @@ def admissible_action_indices(observation: Observation,
         if (tactical_v13_guards and code == RAIGEKI_BREAK
                 and action.kind == "chain" and can_pass and not opponent_backrow
                 and only_weak_opponent_monsters and not own_monster_threatened
-                and observation.pending_attack is None):
+                and observation.pending_attack is None
+                and (not tactical_v14_guards or observation.phase not in (
+                    "battle_start", "battle_step", "damage_step",
+                    "damage_calculation"))):
+            continue
+        if (tactical_v14_guards and code == RAIGEKI_BREAK
+                and action.kind == "chain" and can_pass
+                and latest_chain_type in (2, 4) and not own_card_targeted):
+            continue
+        if (tactical_v14_guards and code == RAIGEKI_BREAK
+                and action.kind == "chain" and can_pass
+                and not observation.chain and observation.turn_player != own
+                and observation.phase in ("main1", "main2")
+                and not any(c.position == "faceup" and c.code not in SHEEP_TOKENS
+                            for c in opponent_monsters)):
+            continue
+        if (tactical_v14_guards and code == SNATCH_STEAL
+                and action.kind in ("activate", "chain")
+                and opponent_monsters
+                and all(c.code in SHEEP_TOKENS for c in opponent_monsters)
+                and not any(c.code == METAMORPHOSIS for c in observation.hand)):
             continue
         if (tactical_v12_guards and code == RAIGEKI_BREAK
                 and action.kind == "chain" and can_pass and observation.chain

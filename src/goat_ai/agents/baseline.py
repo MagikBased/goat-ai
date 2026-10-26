@@ -11,8 +11,10 @@ from .tactical_guard import (
     BLACK_LUSTER_SOLDIER,
     SHEEP_TOKENS,
     THOUSAND_EYES_RESTRICT,
+    THUNDER_DRAGON,
     TSUKUYOMI,
     admissible_action_indices,
+    known_thunder_copies_in_deck,
     safe_position_indices,
     safe_target_indices,
     tribe_race_value,
@@ -151,7 +153,7 @@ class CombatFlipHeuristicAgent(CombatHeuristicAgent):
 class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
     """Flip-aware baseline with conservative, visible-board Trap decisions."""
 
-    teacher_version: ClassVar[int] = 13  # reviewed chain and tribute value
+    teacher_version: ClassVar[int] = 14  # reviewed removal and discard value
     RING: ClassVar[int] = 511000824
     TORRENTIAL: ClassVar[int] = 53582587
     SINISTER: ClassVar[int] = 511000818
@@ -164,7 +166,8 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                  v10_guards: bool | None = None,
                  v11_guards: bool | None = None,
                  v12_guards: bool | None = None,
-                 v13_guards: bool | None = None) -> None:
+                 v13_guards: bool | None = None,
+                 v14_guards: bool | None = None) -> None:
         super().__init__(flip_monster_codes)
         self.card_races = dict(card_races or {})
         self.card_facts = dict(card_facts or {})
@@ -174,6 +177,7 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
         self.v11_guards = self.v10_guards if v11_guards is None else v11_guards
         self.v12_guards = self.v11_guards if v12_guards is None else v12_guards
         self.v13_guards = self.v12_guards if v13_guards is None else v13_guards
+        self.v14_guards = self.v13_guards if v14_guards is None else v14_guards
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
@@ -185,6 +189,34 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
 
         if self.v8_guards and observation.chain:
             source = observation.chain[-1]
+            if (self.v14_guards and source.controller == observation.viewer
+                    and source.card_code == 4178474
+                    and known_thunder_copies_in_deck(observation) == 0
+                    and all(action.kind == "select_card"
+                            and action.parameters.get("location") == 2
+                            and action.parameters.get("controller") == observation.viewer
+                            for action in legal_actions)):
+                thunder = next((action for action in legal_actions
+                                if action.parameters.get("code") == THUNDER_DRAGON), None)
+                if thunder is not None:
+                    return thunder
+            if (self.v14_guards and source.controller == observation.viewer
+                    and source.card_code == 45986603
+                    and all(action.kind == "select_card"
+                            and action.parameters.get("location") == 4
+                            and action.parameters.get("controller") != observation.viewer
+                            for action in legal_actions)):
+                opponents = {(card.controller, card.sequence): card
+                             for card in observation.field
+                             if card.zone == "monster" and card.controller != observation.viewer
+                             and card.position == "faceup" and card.code not in SHEEP_TOKENS}
+                valuable = [action for action in legal_actions
+                            if (action.parameters.get("controller"),
+                                action.parameters.get("sequence")) in opponents]
+                if valuable:
+                    return max(valuable, key=lambda action: opponents[
+                        (action.parameters["controller"],
+                         action.parameters["sequence"])].attack or 0)
             if self.v9_guards and source.controller == observation.viewer:
                 if (source.card_code == 31036355
                         and legal_actions[0].kind == "select_card"):
@@ -263,11 +295,14 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
             tactical_v10_guards=self.v10_guards,
             tactical_v11_guards=self.v11_guards,
             tactical_v12_guards=self.v12_guards,
-            tactical_v13_guards=self.v13_guards, card_facts=self.card_facts)
+            tactical_v13_guards=self.v13_guards,
+            tactical_v14_guards=self.v14_guards, card_facts=self.card_facts)
         targets = safe_target_indices(
             observation, legal_actions, admissible,
             protect_removal_targets=self.v9_guards,
-            prioritize_non_token_removal=self.v12_guards)
+            prioritize_non_token_removal=self.v12_guards,
+            avoid_resolving_normal_spell_targets=self.v14_guards,
+            card_facts=self.card_facts)
         filtered = [legal_actions[i] for i in safe_position_indices(
             observation, legal_actions, targets,
             v10_guard=self.v10_guards)]

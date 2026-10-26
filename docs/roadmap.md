@@ -109,13 +109,13 @@ all **25,833** decisions replay-verified. The ignored report is
 `.cache/goat-ai/random-probe-distinct-10000-fixed/report.json` (SHA-256
 `86576a1cf12a0836956348ee6a48735d1698e96295de1cc1f049654a038fd378`).
 
-The next 100 independent whitelist-deck pairs on seeds 10024–10123 yielded
-93 terminal, replay-verified duels. A pinned Firebird battle callback crashed
-three games; a SHA-guarded in-memory correction allowed all three original
-seeds to complete and replay-verify. Four cases remain open: two native
-`MSG_SELECT_SUM` prompts and two opposing-hand choices without a
-recipient-scoped reveal. Resolve those exact seeds before claiming broader
-M1 protocol coverage; see [evaluation](evaluation.md).
+The next 100 independent whitelist-deck pairs on seeds 10024–10123 initially
+yielded 93 terminal, replay-verified duels. A SHA-guarded in-memory correction
+fixed three pinned Firebird battle callback crashes. Bounded native
+`MSG_SELECT_SUM` decoding fixed two Puppet Magic seeds; recipient-scoped hand
+reveal handling and blind-choice redaction fixed two more. The corrected sweep
+reached **100/100 terminal**, with **113,037 replay-verified decisions**; see
+[evaluation](evaluation.md). Other `MSG_SELECT_SUM` forms remain unsupported.
 This is a protocol and reproducibility result, not a historical correctness
 certificate for arbitrary decks. Focused native fixtures verify the
 declaration catalogs against two hidden opponent Decks and the Spy reveal

@@ -26,13 +26,13 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--teacher", choices=("heuristic", "combat_heuristic",
-                                              "combat_flip", "tactical", "tactical_v12",
+                                              "combat_flip", "tactical", "tactical_v13", "tactical_v12",
                                               "tactical_v11", "tactical_v10",
                                               "tactical_v9", "tactical_v8"),
                         default="heuristic")
     parser.add_argument("--opponent", choices=("random", "heuristic",
                                                "combat_heuristic", "tactical",
-                                               "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9",
+                                               "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9",
                                                "tactical_v8"), default="random")
     parser.add_argument("--deck-a", type=Path)
     parser.add_argument("--deck-b", type=Path)
@@ -52,14 +52,15 @@ def main() -> None:
                     "combat_heuristic": CombatHeuristicAgent,
                     "combat_flip": CombatFlipHeuristicAgent,
                     "tactical": TacticalHeuristicAgent,
+                    "tactical_v13": TacticalHeuristicAgent,
                     "tactical_v12": TacticalHeuristicAgent,
                     "tactical_v11": TacticalHeuristicAgent,
                     "tactical_v10": TacticalHeuristicAgent,
                     "tactical_v9": TacticalHeuristicAgent,
                     "tactical_v8": TacticalHeuristicAgent}[args.teacher]
-    tactical_teacher = args.teacher in ("tactical", "tactical_v12", "tactical_v11", "tactical_v10",
+    tactical_teacher = args.teacher in ("tactical", "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10",
                                          "tactical_v9", "tactical_v8")
-    tactical_opponent = args.opponent in ("tactical", "tactical_v12", "tactical_v11", "tactical_v10",
+    tactical_opponent = args.opponent in ("tactical", "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10",
                                            "tactical_v9", "tactical_v8")
     flip_codes = (load_flip_monster_codes(args.native_root)
                   if args.teacher == "combat_flip" or tactical_teacher
@@ -67,8 +68,8 @@ def main() -> None:
     card_races = (load_card_races(args.native_root)
                   if tactical_teacher or tactical_opponent else {})
     card_facts = (load_card_facts(args.native_root)
-                  if args.teacher in ("tactical", "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9")
-                  or args.opponent in ("tactical", "tactical_v12", "tactical_v11", "tactical_v10",
+                  if args.teacher in ("tactical", "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9")
+                  or args.opponent in ("tactical", "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10",
                                       "tactical_v9") else {})
     args.output_dir.mkdir(parents=True, exist_ok=True)
     games = []
@@ -81,27 +82,29 @@ def main() -> None:
                 teacher = (TacticalHeuristicAgent(flip_codes, card_races,
                                                   card_facts=card_facts,
                                                   v9_guards=args.teacher in (
-                                                      "tactical", "tactical_v12", "tactical_v11", "tactical_v10",
+                                                      "tactical", "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10",
                                                       "tactical_v9"),
                                                   v10_guards=args.teacher in (
-                                                      "tactical", "tactical_v12", "tactical_v11", "tactical_v10"),
+                                                      "tactical", "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10"),
                                                   v11_guards=args.teacher in (
-                                                      "tactical", "tactical_v12", "tactical_v11"),
-                                                  v12_guards=args.teacher in ("tactical", "tactical_v12"),
-                                                  v13_guards=args.teacher == "tactical")
+                                                      "tactical", "tactical_v13", "tactical_v12", "tactical_v11"),
+                                                  v12_guards=args.teacher in ("tactical", "tactical_v13", "tactical_v12"),
+                                                  v13_guards=args.teacher in ("tactical", "tactical_v13"),
+                                                  v14_guards=args.teacher == "tactical")
                            if tactical_teacher else teacher_type(flip_codes))
                 opponent = (RandomAgent(seed) if args.opponent == "random" else
                             TacticalHeuristicAgent(flip_codes, card_races,
                                                    card_facts=card_facts,
                                                    v9_guards=args.opponent in (
-                                                       "tactical", "tactical_v12", "tactical_v11", "tactical_v10",
+                                                       "tactical", "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10",
                                                        "tactical_v9"),
                                                    v10_guards=args.opponent in (
-                                                       "tactical", "tactical_v12", "tactical_v11", "tactical_v10"),
+                                                       "tactical", "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10"),
                                                    v11_guards=args.opponent in (
-                                                       "tactical", "tactical_v12", "tactical_v11"),
-                                                   v12_guards=args.opponent in ("tactical", "tactical_v12"),
-                                                   v13_guards=args.opponent == "tactical")
+                                                       "tactical", "tactical_v13", "tactical_v12", "tactical_v11"),
+                                                   v12_guards=args.opponent in ("tactical", "tactical_v13", "tactical_v12"),
+                                                   v13_guards=args.opponent in ("tactical", "tactical_v13"),
+                                                   v14_guards=args.opponent == "tactical")
                             if tactical_opponent else {
                                 "heuristic": HeuristicAgent,
                                 "combat_heuristic": CombatHeuristicAgent,
@@ -123,6 +126,7 @@ def main() -> None:
                                                                 else 10 if args.teacher == "tactical_v10"
                                                                 else 11 if args.teacher == "tactical_v11"
                                                                 else 12 if args.teacher == "tactical_v12"
+                                                                else 13 if args.teacher == "tactical_v13"
                                                                 else teacher_type.teacher_version),
                                             "opponent": type(opponent).__name__,
                                             "opponent_version": (8 if args.opponent == "tactical_v8"
@@ -130,6 +134,7 @@ def main() -> None:
                                                                  else 10 if args.opponent == "tactical_v10"
                                                                  else 11 if args.opponent == "tactical_v11"
                                                                  else 12 if args.opponent == "tactical_v12"
+                                                                 else 13 if args.opponent == "tactical_v13"
                                                                  else getattr(
                                                                      opponent, "teacher_version", 1))},
                         )

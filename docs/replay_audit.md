@@ -1076,3 +1076,28 @@ v13. Its two underlying complete duels, 530 and 953 decisions, replay-verified,
 passed visibility checks, and reproduced teacher choices. Neither replay
 reached one of the six exact bad-play patterns, but the different game paths
 do not prove that every Book, Raigeki, or tribute decision is sound.
+
+### Tactical v14 review of seed 6803
+
+In `replays/tactical_v13_self_6803/seed_6803_seat_0.json` (SHA-256
+`cfdca8fede4d51d42f662b653470297d26fde5650270d7958ba74bab4e95caae`),
+player 2 chained Raigeki Break to a resolving Metamorphosis at decision 83,
+discarded Mystic Tomato although Thunder Dragon had zero known remaining
+Deck copies at 84, and later Snatch Stole a Sheep Token rather than the
+opposing Breaker at 324. The reviewed alternatives are stored in
+`examples/preferences/tactical_v13_seed6803_player2_resource.preference.json`.
+The full source replay, visibility boundary, and all three alternative actions
+were validated before changing the teacher.
+
+Tactical v14 passes on the unrelated Metamorphosis chain, chooses the spent
+Thunder Dragon when a discard is already required, and targets Breaker with
+Snatch on those same source observations. It also defers idle Raigeki Break
+against a field of only Sheep Tokens and defers Snatch when only Sheep are
+available unless Metamorphosis is in hand. An incoming attack or a chain
+visibly targeting its own Set card can still justify a Raigeki response.
+The new complete v14-versus-v14 seed-6803 seat-0 replay has 871 decisions
+and can be opened at `replays/tactical_v14_self_seed6803.html`. Seat 1 has
+953 decisions. Both v13 source trajectories and both new v14 trajectories
+replay-verified, passed visibility checks, and reproduced their versioned
+teacher actions. See [evaluation](evaluation.md) for the paired tournament;
+these exact-state corrections do not establish overall playing strength.
