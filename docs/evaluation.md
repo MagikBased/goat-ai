@@ -3004,3 +3004,31 @@ The fit used `--engine experimental --width 16 --feature-version 19
 `--preserve-trajectories` set to both seat files at seed 2500 in each of
 `replays/tactical_v3_cas_daryl_2500_2503/` and
 `replays/tactical_v3_matt_jesse_2500_2503/`.
+
+## Native worker memory pilot
+
+At project commit `30d9889`, `scripts/benchmark_parallel_native.py` ran
+RandomAgent against RandomAgent on the sourced Goat Control and Chaos Turbo
+decks, seeds 9700–9703 with both seat assignments, two spawned workers, and a
+3,000-decision cap. All **8/8 duels** reached a native terminal result after
+**8,069 decisions**. On Linux 6.8.0 x86-64 with an Intel i7-10700K and
+`OMP_NUM_THREADS=1`, wall time including worker spawn was **5.36 seconds**:
+**1.49 duels/s** and **1,506 decisions/s**. Mean reset time was **0.0903
+seconds per duel**. These are protocol throughput measurements, not an agent
+strength or full GOAT correctness result.
+
+The parent process's Linux `VmHWM` was **25,840 KB**. The two workers' final
+`VmHWM` values were **67,140 KB** and **64,304 KB**, with **131,444 KB** as
+their sum. Each is a process high-water mark; the sum is **not** an
+instantaneous machine-wide peak, and this eight-game pilot does not establish
+memory scaling at larger worker counts. The ignored report
+`artifacts/parallel_memory_9700_9703.json` records each game, worker PID,
+deck and native asset hashes, and timing (SHA-256
+`9389d549bad43c4b30d163c670c3635e4f220c5ed4de3ab8010b65b185954c8f`).
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/benchmark_parallel_native.py \
+  --native-root .cache/goat-ai --games 8 --workers 2 \
+  --output artifacts/parallel_memory_9700_9703.json
+```
