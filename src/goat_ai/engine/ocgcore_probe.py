@@ -58,6 +58,29 @@ METAMORPHOSIS_COST_FILTER_GOAT = (
     b"\tif not c:IsControler(tp) and not c:IsFaceup() then return false end\n"
     b"\tlocal lv=c:GetLevel()"
 )
+UPSTREAM_BOOK_SHA256 = "25848f596f425817a250bef9038343fbbcd482b40a0312d84c143e927b12083d"
+BOOK_TARGET_OLD = b"""function s.target(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
+\tif chkc then return chkc:IsLocation(LOCATION_MZONE) and chkc:IsCanTurnSet() end
+\tif chk==0 then return Duel.IsExistingTarget(Card.IsCanTurnSet,tp,LOCATION_MZONE,LOCATION_MZONE,1,nil) end
+\tDuel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
+\tlocal g=Duel.SelectTarget(tp,Card.IsCanTurnSet,tp,LOCATION_MZONE,LOCATION_MZONE,1,1,nil)"""
+BOOK_TARGET_HISTORICAL = b"""-- UDE June 2005: a pending Desert Sunlight can make a face-down target
+-- face-up before Book of Moon resolves. Restrict this exception to a
+-- face-down monster controlled by the player whose Desert is on the chain.
+function s.goat_can_target(c)
+\tif c:IsCanTurnSet() then return true end
+\tif not c:IsFacedown() or not c:IsCanChangePosition() then return false end
+\tfor i=1,Duel.GetCurrentChain() do
+\t\tlocal te,p=Duel.GetChainInfo(i,CHAININFO_TRIGGERING_EFFECT,CHAININFO_TRIGGERING_PLAYER)
+\t\tif te and te:GetHandler():IsCode(93747864) and p==c:GetControler() then return true end
+\tend
+\treturn false
+end
+function s.target(e,tp,eg,ep,ev,re,r,rp,chk,chkc)
+\tif chkc then return chkc:IsLocation(LOCATION_MZONE) and s.goat_can_target(chkc) end
+\tif chk==0 then return Duel.IsExistingTarget(s.goat_can_target,tp,LOCATION_MZONE,LOCATION_MZONE,1,nil) end
+\tDuel.Hint(HINT_SELECTMSG,tp,HINTMSG_TARGET)
+\tlocal g=Duel.SelectTarget(tp,s.goat_can_target,tp,LOCATION_MZONE,LOCATION_MZONE,1,1,nil)"""
 GOAT_RESTRICT_EFFECT_MARKER = b"\tc:RegisterEffect(e5)\nend\n"
 GOAT_RESTRICT_EQUIP_MARKER = (
     b"\tif not c:EquipByEffectAndLimitRegister(e,tp,tc,id) then return end\n"
@@ -456,6 +479,12 @@ class OcgcoreProbe:
                 return 0
             contents = contents.replace(METAMORPHOSIS_COST_FILTER_OLD,
                                         METAMORPHOSIS_COST_FILTER_GOAT)
+        if path.relative_to(self.scripts) == Path("official/c14087893.lua"):
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_BOOK_SHA256 \
+                    or contents.count(BOOK_TARGET_OLD) != 1:
+                self.errors.append("pinned Book script changed; historical Desert target patch not applied")
+                return 0
+            contents = contents.replace(BOOK_TARGET_OLD, BOOK_TARGET_HISTORICAL)
         self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
             hashlib.sha256(contents).hexdigest()
         )

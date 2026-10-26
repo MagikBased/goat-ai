@@ -143,6 +143,14 @@ Paired Zombyra the Dark fixtures cover its post-battle 200 ATK loss, direct-atta
 
 Four Morphing Jar deck-out fixtures now verify the historical five-card draw boundary for either player: with four Deck cards the effect ends the duel, while with five it resolves and the next required draw ends the duel. Two additional native fixtures check equal Deck counts: four each gives a draw, while five each resolves and the next required draw determines the loser. All six terminal trajectories replay-verify. A contemporaneous 2005 TCG source for the simultaneous failed-draw outcome remains to be located, so that historical interpretation is provisional. See [GOAT rules](goat_rules.md).
 
+A June 2005 Desert Sunlight / Book of Moon correction now enables the recorded
+four-link Nobleman response against a Set Morphing Jar. The fixture observes
+two delayed Flip Effects, ten draws per player in two batches, and a full
+terminal trajectory with replay and visibility checks. The correction is
+scoped to a pending Desert Sunlight from the target's controller; other
+face-down Book-target cases still need independent rulings. See
+[GOAT rules](goat_rules.md) and [native setup](native_setup.md).
+
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
 
 **Exit:** Every required fixture passes with pinned engine assets, or is marked as a known incompatibility that blocks a GOAT-correct claim. Run differential checks against documented examples or independently observed duels where practical. Expand the legal-card test corpus beyond the initial fixture decks.

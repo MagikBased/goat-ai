@@ -22,6 +22,8 @@ The pinned Graceful Charity script has upstream SHA-256 `12b5a5730b6dea2c1bf3eb3
 
 The pinned Dekoichi script has upstream SHA-256 `567bbe75ff84936c93419f54fa2f5cea8ba311921403fb5b85f3ea23263c24ba`. A SHA-guarded in-memory correction moves its Bokoichi count from Flip Effect activation to resolution, as required by the [historical Dekoichi FAQ](https://www.goatformat.com/rulings2.html). The loaded-script SHA-256 is `abe2c94e465d1b5a7ed4e3afb0fd5865577767f74f6671aa253f392f3a3e8880`. Existing replay manifests that loaded Dekoichi have the earlier effective hash and need fresh recordings for exact verification. The pinned script's activation-time draw-count metadata is unchanged; the correction governs the actual number drawn on resolution.
 
+The pinned Book of Moon script has upstream SHA-256 `25848f596f425817a250bef9038343fbbcd482b40a0312d84c143e927b12083d`. A SHA-guarded in-memory correction permits a face-down monster to be selected while its controller's Desert Sunlight is already pending on the chain; the ordinary face-up target rule remains in effect elsewhere. The loaded-script SHA-256 is `6c6460ac13bfbc961c197d938768cb4a35bc56b3b57e9f382f5593478f0f3ce9`. This follows the [contemporary June 2005 chain report](https://www.cogonline.net/threads/ruling-changes.40395/) and the [UDE game designer's double-Flip explanation](https://www.pojo.com/yu-gi-oh/FeaturedWriters/GSAttack/2005/6-13.shtml). Existing replay manifests that loaded Book have the earlier effective hash and need fresh recordings for exact verification. The upstream AGPL CardScripts file is unchanged on disk.
+
 Requires Linux, Git, a C++17 compiler, Python 3.10+, Meson 1.7+, and Ninja. From a clean clone:
 
 ```bash
