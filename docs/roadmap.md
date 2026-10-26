@@ -524,6 +524,15 @@ fresh seeds and additional training runs, and require consistent cross-deck
 improvement before promotion; see
 [evaluation](evaluation.md).
 
+A fresh feature-21 replay again exposed a weak Magician of Faith Normal
+Summon where setting that same card was legal and its Flip effect had useful
+Spell targets. One reviewed preference corrected the child checkpoint's
+ranking at that frame, but the child scored only 31–29–4 against its frozen
+parent in 64 held-out, seat-swapped duels, with a paired interval crossing
+50% and large deck splits. Keep the parent as reference. Collect diverse
+independent Flip-monster decisions and test whether corrections transfer
+across decks before promoting another checkpoint.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

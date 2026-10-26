@@ -596,3 +596,34 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/audit_policy_replays.py \
   --native-root .cache/goat-ai \
   --output artifacts/policy_review_new_candidates_2647.json
 ```
+
+The schema-v24 version of that replay also has a SHA-256-bound review at
+`examples/preferences/feature21_tribe_empty_board_2647_p1.preference.json`:
+at viewer frames **250** and **356**, `pass` is preferred over activating
+Tribe when no opposing monster is face-up. These are two decisions in one
+game, not independent duel evidence. The unchanged feature-21 checkpoint
+already ranked `pass` first at both frames, with respective logit margins
+**+0.437** and **+0.490**. No update was fitted to these already-correct
+choices.
+
+## Feature-21 Magician of Faith review
+
+In the complete seed-3700 feature-21 policy versus TacticalHeuristicAgent
+replay (`replays/fv21_vs_tactical_3700_p0.json`), the policy Normal Summoned
+Magician of Faith in 300 ATK at viewer frame **22**. Both Monster Zones were
+empty, `set_monster` for the same Faith was legal, and its own Graveyard
+already contained Book of Moon, Graceful Charity, and Upstart Goblin. Setting
+Faith preserves the Flip effect and avoids exposing a weak attacker. The
+policy's exact replay verified all **358** decisions; the audit reproduced
+**177/177** policy choices and found this one candidate. The ignored replay
+SHA-256 is `fd5b8dc9830bdecd826a83b673a6c27994018b8af24775eb53c9f8b7dea7732a`.
+
+`examples/preferences/feature21_faith_set_3700_p0.preference.json` binds
+that exact replay (SHA-256 of the preference file:
+`d7065658f0fe0860f518085dfb5cb4c3f385c8860ddee0183cd90e841db11308`)
+and prefers the legal Faith Set over its recorded Normal Summon. The parent
+ranked Set **4th of 10**. A one-review parent-KL child moved Set to **1st**
+at that training frame, but its separate 64-duel held-out match did not
+establish a strength gain. This is a reviewed tactical preference, not a
+historical legality ruling; [evaluation](evaluation.md) records the full
+comparison and deck splits.

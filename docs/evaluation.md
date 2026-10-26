@@ -3640,3 +3640,55 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
   --seed 3600 --seeds 8 --max-decisions 3000 --workers 2 \
   --output artifacts/fv21_vs_fv20_type_relation_3600_3607.json
 ```
+
+## Feature-21 Magician of Faith review update
+
+A fresh feature-21 policy game against TacticalHeuristicAgent v4 on Chaos
+Control/Warrior, seed **3700**, policy seat 0, completed in **358** decisions
+and replay-verified. The policy auditor reproduced **177/177** policy
+decisions. At viewer frame **22**, the policy Normal Summoned Magician of
+Faith in 300 ATK with no monsters on either side; Set of the same card was
+legal and useful Spells were already in its Graveyard. The policy lost this
+duel. This is a concrete replay review, not a strength estimate.
+
+A SHA-256-bound `policy_review` preference labels Set over the recorded
+Summon. The unchanged feature-21 parent ranked Set **4th of 10** with a
+Set-minus-Summon logit margin of **−0.405**. A 200-step parent-KL update
+using this one label and **128** sampled preservation states from all eight
+parent-training trajectories moved Set to **1st** with margin **+1.595**;
+last preservation KL was **0.0371**. The child checkpoint is ignored at
+`.cache/goat-ai/fv21_faith_review_child_3700.pt` (SHA-256
+`b05ae2b3e7f77f4f9ebbaf94394286e1d584faf1a4ee8cb4d0717628d184ba95`).
+
+A direct held-out comparison against the frozen feature-21 parent used seeds
+**3800–3807**, both seats, both deck assignments, and two matchup pairs:
+Flip Control/Chaos Return and Goat Control/Chaos Turbo. The evaluator
+confirmed all four Main Deck compositions were absent from both checkpoints'
+training games. All **64** games completed below 3,000 decisions. The child
+went **31–29–4**, scoring **51.56%** with paired 95% bootstrap interval
+**41.41%–60.94%**. By child deck, its decisive splits were Chaos Return
+**8–5**, Chaos Turbo **6–10**, Flip Control **5–10**, and Goat Control
+**12–4**. This wide, deck-dependent result does **not** establish improved
+playing strength. Keep the parent as the reference; gather independent
+Faith contexts and test a fresh schedule before trying to promote a child.
+The ignored tournament report is
+`artifacts/fv21_faith_child_vs_parent_3800_3807.json` (SHA-256
+`893641fe18ee50998e01f58b0f61a777b9dcfd7608c7fcf55ad34ac3cd2189b8`).
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/record_policy_match.py \
+  .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --deck1 examples/decks/chaos_control_insids_worlds_2022.ydk \
+  --deck2 examples/decks/warrior_montague_clash.ydk \
+  --seed 3700 --policy-seat 0 --opponent tactical --max-decisions 3000 \
+  --output replays/fv21_vs_tactical_3700_p0.json
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv21_faith_review_child_3700.pt \
+  --opponent-checkpoint .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/flip_control_goatformat_guide.ydk examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 3800 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output artifacts/fv21_faith_child_vs_parent_3800_3807.json
+```
