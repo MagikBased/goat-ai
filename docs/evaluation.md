@@ -4025,3 +4025,147 @@ parent versus Tactical) are
 `28ba40c736321ce59bbd363ae74ed94a163f382814ae0fe0853316aca255f10c`,
 and
 `fc1f4ec8521d0f3d37be494bdbca1664bc3dc162762cbb8b444565621dea7516`.
+
+## Four-deck Tactical-v6 imitation pilot
+
+To test whether broader, more recent tactical demonstrations help, the native
+collector ran TacticalHeuristicAgent v6 against CombatHeuristicAgent v3 on
+Matt Peddle Goat Control versus Riclar Chaos Turbo (seeds 4800–4803) and Cas
+Stomphorst Flip Control versus Daryl Gessler Gravekeepers (seeds 4810–4813).
+Both deck assignments were played through the teacher's two seats. All
+**16** duels terminated below the 3,000-decision cap: **10,590** total
+and **5,445** labeled teacher decisions. Tactical won **7/8** in the first
+pair and **4/8** in the second. The 16 schema-v25 trajectory files are ignored
+local artifacts under `replays/tactical_v6_matt_chaos_4800_4803/` and
+`replays/tactical_v6_cas_daryl_4810_4813/`; they were independently replay-
+verified and visibility-audited by the training command.
+
+A feature-v23, width-32 policy trained on those **5,445** decisions for two
+epochs, batch size 16, learning rate 0.001, seed 27. Mean training losses
+were **0.28298** and **0.16654**. The ignored checkpoint
+`.cache/goat-ai/fv23_tactical_v6_four_decks_4800_4813.pt` has SHA-256
+`1f0b57d517fc7e2475b7d81b072ac0fda47ff1d744ef5855dd767e355586e090`.
+Its checkpoint contains input trajectory, deck-composition, model-version,
+and native-asset provenance. Training loss and teacher win rate do not prove
+that the clone itself is strong; evaluate on other Main Decks.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/collect_heuristic_demos.py \
+  --engine experimental --native-root .cache/goat-ai \
+  --teacher tactical --opponent combat_heuristic \
+  --deck-a examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+  --deck-b examples/decks/chaos_turbo_riclar_2020.ydk \
+  --seed 4800 --seeds 4 --max-decisions 3000 \
+  --output-dir replays/tactical_v6_matt_chaos_4800_4803
+OMP_NUM_THREADS=1 .venv/bin/python scripts/collect_heuristic_demos.py \
+  --engine experimental --native-root .cache/goat-ai \
+  --teacher tactical --opponent combat_heuristic \
+  --deck-a examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk \
+  --deck-b examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --seed 4810 --seeds 4 --max-decisions 3000 \
+  --output-dir replays/tactical_v6_cas_daryl_4810_4813
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_behavioral_clone.py \
+  replays/tactical_v6_matt_chaos_4800_4803/*.json \
+  replays/tactical_v6_cas_daryl_4810_4813/*.json \
+  --engine experimental --native-root .cache/goat-ai \
+  --feature-version 23 --epochs 2 --width 32 --batch-size 16 --seed 27 \
+  --output .cache/goat-ai/fv23_tactical_v6_four_decks_4800_4813.pt
+```
+
+On four held-out schema-v25 Tactical-v6 versus Combat-v3 trajectories from
+Flip Control/Chaos Return (seed 5000) and Chaos Control/Warrior (seed 5010),
+both teacher seats, the trajectories replay-verified before scoring. The
+broader feature-v23 clone matched the teacher on **221/267** multi-option
+choices versus the old feature-v21 reference's **199/267**. This agreement
+improves without establishing playing strength. Of the **11** held-out
+`set_monster` choices, the unweighted clone matched **0**; nine misses were
+face-up Normal Summons in place of the teacher's Sets for Dekoichi, Mask of
+Darkness, or Magician of Faith. The ignored audit report is
+`artifacts/fv23_tactical_v6_heldout_agreement_5000_5010.json`.
+
+The unweighted feature-v23 clone scored **48–16** directly against the old
+feature-v21 learned reference over 64 complete, seat-swapped, both-deck-
+assignment games on unseen Flip Control, Chaos Return, Chaos Control, and
+Warrior Main Deck compositions (seeds 4900–4907). Its paired-bootstrap 95%
+score interval was **65.63%–82.81%**. Deck splits were **9–7** Flip Control,
+**16–0** Chaos Return, **8–8** Chaos Control, and **15–1** Warrior. Both seats
+went 24–8. The two-worker tournament took **63.15 s** locally; the maximum
+game was 1,445 decisions. The ignored report is
+`artifacts/fv23_tactical_v6_vs_fv21_4900_4907.json`.
+
+Against Tactical-v6 on that exact schedule, the clone scored **14–48–2**
+(23.44% score, paired interval **14.84%–32.03%**) while the old learned
+reference scored **11–53** (17.19%). Their matched difference was
+**+6.25 percentage points**, paired interval **−1.56 to +14.84**. The clone
+went **4–27–1** as first player and **10–21–1** as second. The tactical
+opponent remains substantially stronger; the direct learned-policy result
+must not be read as a superhuman or even baseline-beating claim. The ignored
+reports are `artifacts/fv23_tactical_v6_vs_tactical_4900_4907.json` and
+`artifacts/fv21_vs_tactical_4900_4907.json`.
+
+## Set-monster sampling ablation
+
+In the four-deck Tactical-v6 data, only **34 of 5,445** selected teacher
+choices were `set_monster`; **21** occurred at a multi-option opportunity
+involving Dekoichi, Mask of Darkness, or Magician of Faith. The unweighted
+clone chose none of the teacher's **11** held-out Set actions across four
+verified evaluation trajectories, including nine face-up Normal Summons of
+those Flip monsters instead. The cloning CLI now permits an opt-in selected-
+action-kind sampling factor. A matched feature-v23 model used the same 16
+source trajectories, architecture, two epochs, batch size, and seed as the
+unweighted clone, but `--label-kind-weight set_monster=12`. It used weighted
+sampling with replacement without increasing the number of optimizer
+examples per epoch. Mean training losses were **0.30568** and **0.17738**;
+these differ in sampling distribution and should not be compared directly
+to the unweighted losses.
+
+On the same four held-out teacher trajectories, the weighted model matched
+**9/11** Set choices and **232/267** multi-option choices overall, versus
+**0/11** and **221/267** for the unweighted model. This is an off-policy
+imitation diagnostic, not competitive evidence. The ignored checkpoint
+`.cache/goat-ai/fv23_tactical_v6_set12_4800_4813.pt` has SHA-256
+`b32e5e91bba4fe75ccadfbbfa2de1992d20230020e8042d4533cf12658b602bd`
+and explicitly records `label_kind_weights={set_monster: 12.0}`.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_behavioral_clone.py \
+  replays/tactical_v6_matt_chaos_4800_4803/*.json \
+  replays/tactical_v6_cas_daryl_4810_4813/*.json \
+  --engine experimental --native-root .cache/goat-ai \
+  --feature-version 23 --epochs 2 --width 32 --batch-size 16 --seed 27 \
+  --label-kind-weight set_monster=12 \
+  --output .cache/goat-ai/fv23_tactical_v6_set12_4800_4813.pt
+```
+
+The weighted model split **32–32** directly against the unweighted clone
+on 64 complete native duels, seeds 5100–5107, both seats and deck assignments
+on the same four unseen Main Deck compositions. The paired-bootstrap 95%
+score interval was **43.75%–56.25%**. By assigned deck it went **4–12** Chaos
+Control, **12–4** Chaos Return, **6–10** Flip Control, and **10–6** Warrior.
+All games terminated under the cap (maximum 1,317 decisions); the two-worker
+local run took **61.43 s**. The ignored report is
+`artifacts/fv23_set12_vs_unweighted_5100_5107.json`. Improved Set-action
+agreement did not translate into a measured overall competitive gain, so
+weighting remains opt-in. This also reinforces why action imitation alone is
+not M4's exit criterion.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv23_tactical_v6_set12_4800_4813.pt \
+  --opponent-checkpoint .cache/goat-ai/fv23_tactical_v6_four_decks_4800_4813.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/flip_control_goatformat_guide.ydk examples/decks/chaos_return_dingosig_worlds_2022.ydk \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk examples/decks/warrior_montague_clash.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 5100 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output artifacts/fv23_set12_vs_unweighted_5100_5107.json
+```
+
+The five ignored report SHA-256 values, in the order the reports are named
+above (new versus old, new versus Tactical, old versus Tactical, held-out
+agreement, weighted versus unweighted), are
+`793e6c87b268b42b8aca069d2070f9adc4c6ecd477ece87240f516146a49df16`,
+`8be3cbce9ea5da157b4cf78186ad9c27730199c0b1f33e332c140ec681dae3d2`,
+`e1180b280845881ea5b491e15afd46a2ef28adaa9826f684f04ff434c2aa94c2`,
+`1f927478b735f9fa9130ce4cc73b054e88392bfce1249db5fbef9dc4694f8d9b`,
+and `70c4d807a226e94b0331586ac5ba6d49b67155ec9b6f1680dbcd692bee4bc1f7`.

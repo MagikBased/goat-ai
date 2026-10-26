@@ -66,11 +66,28 @@ from scripts.evaluate_policy import (
 )
 from scripts.train_behavioral_clone import (
     annotation_paths,
+    decision_sampling_weights,
     focus_opportunity,
     load_parent_checkpoint,
     parse_source_weights,
     restrict_trainable_modules,
 )
+
+
+def test_clone_sampling_composes_source_focus_and_selected_kind_weights():
+    base = view()
+    set_action = Action("set", "set_monster", 0,
+                        {"code": 10, "location": 2})
+    other = Action("end", "end_phase", 0)
+    records = (DecisionRecord(base, (set_action, other), set_action),
+               DecisionRecord(base, (set_action, other), other))
+    assert decision_sampling_weights(records, ("teacher", "teacher"), {},
+                                     set(), 1.0, {}) is None
+    assert decision_sampling_weights(records, ("teacher", "teacher"),
+                                     {"teacher": 2.0}, {10}, 3.0,
+                                     {"set_monster": 5.0}) == [30.0, 6.0]
+    with pytest.raises(ValueError, match="source"):
+        decision_sampling_weights(records, ("teacher",), {}, set(), 1.0, {})
 
 
 def view() -> Observation:

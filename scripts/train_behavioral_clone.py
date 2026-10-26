@@ -88,6 +88,20 @@ def parse_source_weights(assignments: list[str], *, option: str = "source") -> d
     return weights
 
 
+def decision_sampling_weights(records, sources, source_weights, focus_codes,
+                              focus_weight, kind_weights):
+    """Compose opt-in BC sampling factors without changing unweighted runs."""
+    if not (len(records) == len(sources)):
+        raise ValueError("one source is required for each decision")
+    if (not kind_weights and focus_weight == 1
+            and all(weight == 1 for weight in source_weights.values())):
+        return None
+    return [source_weights.get(source, 1.0)
+            * (focus_weight if focus_opportunity(record, focus_codes) else 1.0)
+            * kind_weights.get(record.selected_action.kind, 1.0)
+            for record, source in zip(records, sources)]
+
+
 def restrict_trainable_modules(model: LegalActionPolicy, modules: list[str]) -> None:
     """Freeze other modules for a controlled, low-drift warm-start update."""
     if not modules:
@@ -174,7 +188,8 @@ def main() -> None:
     parser.add_argument("--parent-kl-weight", type=float, default=1.0)
     parser.add_argument("--label-kind-weight", action="append", default=[],
                         metavar="ACTION_KIND=WEIGHT",
-                        help="relative weight for selected labels in parent-KL training")
+                        help="sample rare selected action kinds more often in cloning; "
+                             "weight their loss in parent-KL training")
     args = parser.parse_args()
     if (args.epochs < 1 or args.width < 1 or args.learning_rate <= 0
             or args.batch_size < 1 or not 1 <= args.focus_weight < float("inf")
@@ -199,8 +214,6 @@ def main() -> None:
         parser.error("parent KL requires --init-checkpoint and --preserve-trajectories")
     if not args.parent_kl_steps and args.preserve_trajectories:
         parser.error("--preserve-trajectories requires --parent-kl-steps")
-    if not args.parent_kl_steps and label_kind_weights:
-        parser.error("--label-kind-weight requires --parent-kl-steps")
     if args.parent_kl_steps and (source_weights or args.focus_weight > 1):
         parser.error("parent KL uses labeled decisions directly; omit sampling weights")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
@@ -296,11 +309,9 @@ def main() -> None:
                          f"{sorted(unknown_kinds)}")
     focus_codes = set(args.focus_card)
     focus_count = sum(focus_opportunity(record, focus_codes) for record in records)
-    sampling_weights = ([source_weights.get(source, 1.0) * (
-        args.focus_weight if focus_opportunity(record, focus_codes) else 1.0)
-        for record, source in zip(records, record_sources)]
-        if args.focus_weight > 1 or any(weight != 1 for weight in source_weights.values())
-        else None)
+    sampling_weights = decision_sampling_weights(
+        records, record_sources, source_weights, focus_codes,
+        args.focus_weight, label_kind_weights)
     preservation_metadata = None
     if args.parent_kl_steps:
         if len({path.resolve() for path in args.preserve_trajectories}) != len(
@@ -368,6 +379,7 @@ def main() -> None:
         "focus_cards": tuple(sorted(focus_codes)),
         "focus_weight": args.focus_weight,
         "source_weights": source_weights,
+        "label_kind_weights": label_kind_weights,
         "trainable_modules": tuple(args.trainable_module) or ("all",),
         "training_method": "parent_kl" if preservation_metadata else "behavioral_clone",
         "parent_kl": preservation_metadata,

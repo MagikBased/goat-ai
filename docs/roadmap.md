@@ -665,3 +665,12 @@ matched schedule, with an interval crossing zero. It remains experimental;
 M4 still needs a policy with measured strength across audited deck families
 and a demonstrated self-play gain. The next training-data priority is
 independent, high-quality tactical decisions beyond a single replay and card.
+
+A four-deck Tactical-v6 clone now has 5,445 replay-verified teacher decisions
+and scored 48–16 against the older learned reference on unseen Main Decks,
+but only 14–48–2 against Tactical v6. An opt-in rare-Set sampling run improved
+held-out teacher Set agreement from 0/11 to 9/11, yet split 32–32 directly
+against the unweighted clone on fresh unseen-deck seeds. M4 therefore stays
+open. Prioritize more independent expert decisions and an algorithm that
+converts tactical decision quality into match wins; do not use imitation
+agreement alone as the promotion gate. See [evaluation](evaluation.md).

@@ -297,3 +297,16 @@ test verifies that changing only the selected monster's current ATK changes
 v23 action features while leaving v22 action features unchanged. Existing
 checkpoints retain their feature versions. This is an experiment, not a
 promotion of a stronger policy.
+
+### Action-kind sampling in behavioral cloning
+
+The cloning CLI accepts an opt-in `--label-kind-weight KIND=WEIGHT` for a
+selected teacher action kind. Ordinary behavioral cloning multiplies this
+factor by any source and card-opportunity factors, then draws the same total
+number of decisions per epoch with replacement. Parent-KL continuation uses
+the same option as a label-loss weight, retaining its existing behavior.
+Unweighted runs still shuffle every input once per epoch. Checkpoints record
+the action-kind weights and sampling mode. This changes the training
+distribution, not the engine's legal actions or what the acting player can
+observe. A matched experiment must check both held-out choices and competitive
+results before using an oversampled checkpoint by default.
