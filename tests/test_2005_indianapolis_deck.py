@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MATT_DECK = ROOT / "examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk"
 MICHAEL_DECK = ROOT / "examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk"
 DARYL_DECK = ROOT / "examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk"
+JESSE_DECK = ROOT / "examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk"
 OPPONENT = ROOT / "examples/decks/goat_control_lolmarcus_2020.ydk"
 MATT_EXTRA_NAMES = Counter({
     "Thousand-Eyes Restrict": 3,
@@ -47,6 +48,21 @@ MICHAEL_EXTRA_NAMES = Counter({
     "Gatling Dragon": 1,
 })
 DARYL_EXTRA_NAMES = Counter({"Flame Swordsman": 1, "King Dragun": 2})
+JESSE_EXTRA_NAMES = Counter({
+    "Thousand-Eyes Restrict": 3,
+    "Dark Balter the Terrible": 3,
+    "Dragoness the Wicked Knight": 1,
+    "Darkfire Dragon": 1,
+    "Reaper on the Nightmare": 3,
+    "Master of Oz": 3,
+    "Ryu Senshi": 2,
+    "Fiend Skull Dragon": 2,
+    "Gatling Dragon": 1,
+    "Ojama King": 1,
+    "The Last Warrior from Another Planet": 1,
+    "King Dragun": 1,
+    "Thousand Dragon": 1,
+})
 
 
 def _source_name(name: str) -> str:
@@ -59,6 +75,7 @@ def _source_name(name: str) -> str:
     ("Matt Peddle", MATT_DECK, MATT_EXTRA_NAMES),
     ("Michael Fukuyama", MICHAEL_DECK, MICHAEL_EXTRA_NAMES),
     ("Daryl Gessler", DARYL_DECK, DARYL_EXTRA_NAMES),
+    ("Jesse Twohig", JESSE_DECK, JESSE_EXTRA_NAMES),
 ])
 def test_published_2005_main_and_fusions_match_pinned_legal_ids(
     player, deck_path, extra_names,
@@ -93,6 +110,7 @@ def test_published_2005_main_and_fusions_match_pinned_legal_ids(
     (MATT_DECK, OPPONENT, 2070),
     (MATT_DECK, MICHAEL_DECK, 2072),
     (DARYL_DECK, MATT_DECK, 2074),
+    (JESSE_DECK, DARYL_DECK, 2076),
 ])
 def test_2005_deck_completes_visible_replay_verified_native_duel(
     tmp_path, deck_a, deck_b, seed,

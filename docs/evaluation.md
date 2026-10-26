@@ -2446,3 +2446,18 @@ PYTHONPATH=src:. .venv/bin/python -m scripts.evaluate_native \
   --both-deck-assignments --seed 2080 --seeds 1 --max-decisions 3000 \
   --output artifacts/indianapolis_2005_three_decks_random_2080.json
 ```
+
+The [Jesse Twohig 2005 deck](../examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk) preserves the published 42-card Main Deck and 23-card Fusion Deck. The historical Main Deck minimum is satisfied without padding. Source-name and pinned whitelist tests cover every Main and Fusion ID; a seeded duel against Daryl Gessler's deck reaches terminal, serializes, replay-verifies, and passes the visibility audit. Juan Cardenas's printed list totals only 38 Main Deck cards and remains in the source corpus without an invented executable version.
+
+With RandomAgent on both sides, Jesse's deck versus Matt Peddle's and Daryl Gessler's decks, seeds 2100–2102 in both seats, completed **12/12 terminal duels** under the 3,000-decision cap. They used **13,110 decisions**, with a maximum of **1,392** in one duel. Sequential wall time was **15.39 seconds** on Linux x86_64 (**0.780 duels/s**, **852 decisions/s**). Jesse's assigned random agent won 7 and lost 5; these outcomes measure protocol reach, not deck strength or full historical correctness. The ignored report `artifacts/jesse_2005_protocol_3seeds.json` stores game outcomes and pinned hashes. Reproduce it with:
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/python scripts/evaluate_native.py \
+  --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --agent-a random --agent-b random --seed 2100 --seeds 3 \
+  --max-decisions 3000 --output artifacts/jesse_2005_protocol_3seeds.json
+```
