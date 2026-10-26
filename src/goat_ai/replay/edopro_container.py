@@ -25,6 +25,7 @@ HEADER = struct.Struct("<6I8s")
 EXTENSION = struct.Struct("<5Q")  # header version, four native RNG words
 MAX_FILE_BYTES = 32 * 1024 * 1024
 MAX_PAYLOAD_BYTES = 128 * 1024 * 1024
+MAX_LZMA_PADDING_BYTES = 8
 MAX_PLAYERS = 16
 MAX_CARDS_PER_ZONE = 255
 
@@ -131,13 +132,21 @@ def _payload(data: bytes, flags: int, expected_size: int, properties: bytes) -> 
             filters=[{"id": lzma.FILTER_LZMA1, "dict_size": dictionary,
                       "lc": lc, "lp": lp, "pb": pb}],
         )
-        result = decoder.decompress(data, max_length=MAX_PAYLOAD_BYTES + 1)
+        # EDOPro's LzmaCompress stream has no required EOS marker. Its C++
+        # reader allocates exactly the declared output size, so bytes emitted
+        # by the raw decoder after that size are discarded. Real yrpX files
+        # can emit a few zero bytes beyond the declaration.
+        result = decoder.decompress(
+            data, max_length=expected_size + MAX_LZMA_PADDING_BYTES + 1)
     except lzma.LZMAError as exc:
         raise ReplayContainerError("invalid compressed replay payload") from exc
-    if (len(result) != expected_size or not decoder.eof
+    if (len(result) < expected_size
+            or len(result) > expected_size + MAX_LZMA_PADDING_BYTES
+            or any(result[expected_size:])
+            or (not decoder.eof and not decoder.needs_input)
             or decoder.unused_data):
         raise ReplayContainerError("compressed replay size or end marker mismatch")
-    return result
+    return result[:expected_size]
 
 
 def parse_edopro_container(data: bytes) -> EdoReplayContainer:

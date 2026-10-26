@@ -220,7 +220,10 @@ A bounded EDOPro container reader now parses `yrp1` Deck/response records and
 `yrpX` packet streams using the pinned upstream header layout. Its CLI omits
 player names, Deck card IDs, and raw choices from summaries. Tests use
 synthetic source-layout fixtures and reject truncation, oversized payloads,
-and another simulator's `yrp2` magic. This is an intake inspection tool,
+and another simulator's `yrp2` magic. Five real modern `.yrpX` samples from
+an MIT-licensed replay-tool repository now pass intake inspection, including
+raw LZMA streams without end markers and one extended-header replay. This is
+an intake inspection tool,
 not replay decision reconstruction or an authorized human-data pipeline.
 Before using any `.yrp`/`.yrpX` for imitation, obtain a permitted real GOAT
 replay fixture, match its original core/scripts, recover each legal-action

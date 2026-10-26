@@ -25,7 +25,34 @@ Required regression cases: first-turn draw; summon response and Ignition priorit
 
 ## Replay and demonstration data
 
-[Project Ignis FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html) says old `.yrp` replays re-enact decisions against a matching core and scripts, whereas `.yrpX` stores resulting actions and remains viewable across engine updates. Neither statement guarantees the complete legal action set or each player's knowledge at every choice. The [EDOPro replay header and flags](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.h) and [container reader](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp) define `yrp1` as saved Decks plus engine responses and `yrpX` as a packet stream, with optional LZMA compression and an extended four-word seed. GOAT AI now has a bounded structural reader for these two EDOPro containers. It returns raw records only for future reconstruction and prints a privacy-preserving summary by default. Synthetic layout tests pass; an independent real `yrp1`/`yrpX` fixture has not yet been obtained. A public YGOPro `yrp2` sample from [ygopro-yrp-encode](https://github.com/purerosefallen/ygopro-yrp-encode) is a distinct format and is rejected explicitly. Decision reconstruction, legal action recovery, and player-knowledge validation are **not implemented**. No EDOPro replay is yet admitted as a training trajectory. DuelingBook data and video-derived trajectories require rights and a separate extraction pipeline.
+[Project Ignis FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html) says old `.yrp` replays re-enact decisions against a matching core and scripts, whereas `.yrpX` stores resulting actions and remains viewable across engine updates. Neither statement guarantees the complete legal action set or each player's knowledge at every choice. The [EDOPro replay header and flags](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.h) and [container reader](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp) define `yrp1` as saved Decks plus engine responses and `yrpX` as a packet stream, with optional LZMA compression and an extended four-word seed. GOAT AI has a bounded structural reader for these two EDOPro containers. It returns raw records only for future reconstruction and prints a privacy-preserving summary by default. A public YGOPro `yrp2` sample from [ygopro-yrp-encode](https://github.com/purerosefallen/ygopro-yrp-encode) is a distinct format and is rejected explicitly. Decision reconstruction, legal action recovery, and player-knowledge validation are **not implemented**. No EDOPro replay is yet admitted as a training trajectory. DuelingBook data and video-derived trajectories require rights and a separate extraction pipeline.
+
+The reader was also checked against five actual `.yrpX` files from the
+[MIT-licensed Project Echelon repository at commit `cc969ba`](https://github.com/COTFK/project-echelon/tree/cc969ba7ebfa48fbe149287d14aee096e4dfe422/replays),
+kept only in ignored local cache. A 2021 file with SHA-256
+`1bf72a6f2994e04bf64900c2caeec60e5d148e01eab224cd3cf2cc23a1f30ba5`
+parsed as 497 packets; three other 2021–2022 files parsed as 443, 1,825,
+and 157 packets; a 2023 extended-header file parsed as 268 packets. The
+first real file exposed a difference from Python-produced synthetic LZMA:
+EDOPro's raw stream can omit the end marker and emit one to three zero bytes
+past the declared uncompressed size. The [upstream reader](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp)
+allocates only the declared output size. Our reader accepts at most eight
+extra zero bytes and still rejects nonzero or excessive output; that eight-byte
+bound is a defensive parser limit, not an EDOPro format guarantee. These are
+modern packet-stream samples, not GOAT duels or demonstrations of recoverable
+player decisions. A real `yrp1` sample and a permitted GOAT replay remain
+unvalidated.
+
+Reproduce the first real-file intake check without committing the replay:
+
+```bash
+mkdir -p .cache/goat-ai/replay_samples
+curl -L --fail 'https://raw.githubusercontent.com/COTFK/project-echelon/cc969ba7ebfa48fbe149287d14aee096e4dfe422/replays/2021-02-15_02-41-18.yrpX' \
+  -o .cache/goat-ai/replay_samples/echelon_2021_02_15.yrpX
+sha256sum .cache/goat-ai/replay_samples/echelon_2021_02_15.yrpX
+.venv/bin/python scripts/inspect_edopro_replay.py \
+  .cache/goat-ai/replay_samples/echelon_2021_02_15.yrpX
+```
 
 ## Licensing
 

@@ -85,6 +85,29 @@ def test_yrpx_reads_packet_stream_without_mislabeling_as_decisions():
     assert not replay.decks
 
 
+def test_yrpx_accepts_bounded_zero_padding_without_lzma_end_marker():
+    payload = _prefix(YRPX) + bytes((40,)) + struct.pack("<I", 1) + b"A"
+    flags = NEW_REPLAY | DUEL_FLAG_64BIT | COMPRESSED
+    dictionary = 1 << 20
+    filters = [{"id": lzma.FILTER_LZMA1, "dict_size": dictionary,
+                "lc": 3, "lp": 0, "pb": 2}]
+    props = bytes((93,)) + dictionary.to_bytes(4, "little") + b"\x00" * 3
+
+    def packed(suffix: bytes) -> bytes:
+        # EDOPro's raw LZMA stream need not carry an EOS marker. A real
+        # yrpX may emit zero padding beyond its declared payload size.
+        compressed = lzma.compress(payload + suffix, format=lzma.FORMAT_RAW,
+                                   filters=filters)[:-1]
+        return HEADER.pack(YRPX, 1, flags, 12345, len(payload), 0, props) + compressed
+
+    replay = parse_edopro_container(packed(b"\x00" * 3))
+    assert [(packet.message, packet.payload) for packet in replay.packets] == [(40, b"A")]
+    with pytest.raises(ReplayContainerError, match="compressed replay"):
+        parse_edopro_container(packed(b"\x00X"))
+    with pytest.raises(ReplayContainerError, match="compressed replay"):
+        parse_edopro_container(packed(b"\x00" * 9))
+
+
 def test_inspection_cli_outputs_only_structural_summary(tmp_path, monkeypatch, capsys):
     from scripts.inspect_edopro_replay import main
 
