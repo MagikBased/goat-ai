@@ -106,6 +106,14 @@ def review_candidates(trajectory: Trajectory,
                 found.append(("zero_attack_defender_changed_to_attack",
                               {"card_code": changed.code or 0,
                                "current_defense": changed.defense or 0}))
+            if (changed is not None and changed.position == "faceup"
+                    and changed.orientation == "attack" and not enemy_monsters
+                    and changed.attack is not None and changed.defense is not None
+                    and changed.attack > changed.defense):
+                found.append(("empty_field_attacker_changed_to_weaker_defense",
+                              {"card_code": changed.code or 0,
+                               "current_attack": changed.attack,
+                               "new_defense": changed.defense}))
         if (_is_action(selected, "activate", POT_OF_GREED)
                 and any(_is_action(a, "activate", THUNDER_DRAGON)
                         for a in record.legal_actions)):

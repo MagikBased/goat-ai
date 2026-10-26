@@ -219,6 +219,24 @@ def test_shortlist_flags_zero_attack_defender_changed_to_attack():
     assert review_candidates(policy(record(view(attacker), change, end))) == ()
 
 
+def test_shortlist_flags_empty_field_attacker_changed_to_weaker_defense():
+    attacker = CardView(0, "monster", "faceup", 87621407, 2,
+                        "attack", 1400, 1000)
+    change = Action("change", "change_position", 0,
+                    {"code": attacker.code, "controller": 0,
+                     "location": 4, "sequence": 2})
+    end = Action("end", "end_phase", 0)
+    found = review_candidates(policy(record(view(attacker), change, end)))
+    assert [(item.category, item.evidence) for item in found] == [
+        ("empty_field_attacker_changed_to_weaker_defense",
+         {"card_code": 87621407, "current_attack": 1400,
+          "new_defense": 1000})]
+    enemy = CardView(1, "monster", "facedown", None, 0, "defense")
+    assert review_candidates(policy(record(view(attacker, enemy), change, end))) == ()
+    assert review_candidates(policy(record(view(replace(attacker, attack=900)),
+                                           change, end))) == ()
+
+
 def test_shortlist_flags_tribe_type_that_hits_only_own_visible_monsters():
     tribe = 33184167
     own_spellcaster = CardView(0, "monster", "faceup", 101, 0,

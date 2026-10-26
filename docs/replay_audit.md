@@ -808,6 +808,12 @@ Spy, and other non-token monsters still need board-context review. See the
 [held-out feature-v23 experiment](evaluation.md) before treating this as a
 strength improvement.
 
+The shortlist also flags `empty_field_attacker_changed_to_weaker_defense`
+when a face-up attacker moves to a lower DEF while the opponent has no
+monsters. It records the visible ATK and DEF and leaves switches against any
+opposing monster for human review. This mirrors the narrow position guard v2;
+it is a review candidate rather than proof that every such switch loses value.
+
 ### Retrospective Sheep Token preference labels
 
 The seed-3901 feature-v21 replay contains 12 policy-seat decisions that move
