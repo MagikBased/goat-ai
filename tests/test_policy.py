@@ -40,16 +40,18 @@ from goat_ai.training import (
     fit_with_parent_kl,
     load_policy_agent,
 )
-from goat_ai.training.policy import ACTION_KINDS
 from goat_ai.training.on_policy_teacher import (
     filter_activation_opportunities,
     label_policy_trajectory,
 )
+from goat_ai.training.policy import ACTION_KINDS
 from goat_ai.training.self_play import (
     EpisodeDecisionLimit,
     VisibleStateValue,
+    clipped_surrogate,
     episode_schedule,
     policy_gradient_update,
+    ppo_clipped_update,
     predict_state_values,
     sample_legal_action,
     state_value_update,
@@ -1456,6 +1458,40 @@ def test_terminal_reward_moves_selected_action_probability():
                                optimizer, temperature=0)
     generator = torch.Generator().manual_seed(9)
     assert sample_legal_action(model, vocabulary, view(), actions(), generator) in actions()
+
+
+def test_ppo_clipped_surrogate_handles_both_advantage_signs():
+    ratio = torch.tensor([1.5, 0.5])
+    advantage = torch.tensor([1.0, -1.0])
+    assert torch.allclose(clipped_surrogate(ratio, advantage, 0.2),
+                          torch.tensor([1.2, -0.8]))
+    with pytest.raises(ValueError, match="clip epsilon"):
+        clipped_surrogate(ratio, advantage, 0)
+
+
+def test_ppo_update_uses_visible_variable_action_sets_and_terminal_reward():
+    vocabulary = CardVocabulary((10, 20))
+    choices = actions()
+    records = (
+        DecisionRecord(view(), choices, choices[1]),
+        DecisionRecord(replace(view(), chain=(ChainLinkView(1, 20, 1, 8, 0),)),
+                       choices[:2], choices[1]),
+    )
+    for reward, direction in ((1.0, 1), (-1.0, -1)):
+        torch.manual_seed(44)
+        policy = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+        features = encode_decision(view(), choices, vocabulary, 10)
+        before = torch.softmax(policy(features), 0)[1].item()
+        optimizer = torch.optim.SGD(policy.parameters(), lr=0.01)
+        loss = ppo_clipped_update(policy, vocabulary, records, reward, 0.0,
+                                  optimizer, epochs=2, batch_size=2,
+                                  entropy_coefficient=0, random_seed=44)
+        after = torch.softmax(policy(features), 0)[1].item()
+        assert isinstance(loss, float)
+        assert (after - before) * direction > 0
+    with pytest.raises(ValueError, match="state baselines"):
+        ppo_clipped_update(policy, vocabulary, records, 1.0, 0.0,
+                           optimizer, state_baselines=(0.0,))
 
 
 def test_policy_gradient_uses_sampling_temperature_in_log_probability():

@@ -5256,6 +5256,58 @@ the tournament report is
 Neither child is promoted. The next policy experiment needs evidence that
 its choices improve complete duels, not only teacher agreement.
 
+### Clipped self-play update pilot
+
+An opt-in single-duel clipped PPO update was compared with the existing
+REINFORCE update from the same feature-v23 parent checkpoint,
+`.cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt`.
+Both trained for 32 native duels on the four-role schedule using Jesse Goat
+Control versus Montague Warrior and DingoSig Chaos Return versus the
+GoatFormat Guide Flip Control list, seeds 11820–11851. Both used learning
+rate 0.0003, historical-opponent probability 0.75, a frozen-parent KL
+weight of 0.1, and the learner-deck moving baseline. PPO used three epochs,
+batch size 16, and clip epsilon 0.2; REINFORCE used the per-decision mean
+reduction. Because policy updates change subsequent play, matched initial
+seeds do not imply identical later training trajectories.
+
+The PPO run completed 32/32 duels (20 wins, 12 losses; 3,185 learner
+decisions) in 73.65 seconds. REINFORCE completed 32/32 (20 wins, 11 losses,
+one draw; 2,995 learner decisions) in 76.21 seconds. All 64 recorded
+training duels passed native replay verification and the visibility audit:
+16,851 and 16,873 total decisions respectively. These elapsed times are
+small-run measurements, not a simulator-throughput claim. The ignored PPO
+checkpoint is `.cache/goat-ai/ppo32_11820_11851.pt` (SHA-256
+`6bc715e0bd0977d9a1f0ee597f6db7e28126ec2012e5df4c046aecb16f706e57`);
+the REINFORCE checkpoint is `.cache/goat-ai/reinforce32_11820_11851.pt`
+(SHA-256 `f048bc23e99e34cbae457b2b8fa8e3490aff54105f4a3e3d2b99acdb7a5fcbe3`).
+
+Evaluation used unseen Main Deck compositions: Insids Chaos Control versus
+Weirdchamp Bazoo Return and Lolmarcus Goat Control versus Fukuyama Goat
+Control, with both deck assignments and both policy seats. On held-out seeds
+11900–11923, PPO scored **122 wins, 69 losses, one draw** directly against
+REINFORCE in 192 games (63.8% score, paired 95% interval 57.0%–70.3%).
+The two ignored report files are
+`.cache/goat-ai/ppo32_vs_reinforce32_11900_11907.json` (SHA-256
+`c128e96c55a245ca54bfd5a0f9eb5e93a7ac750d505d05d3e8a0a28fcfa76db7`)
+and `.cache/goat-ai/ppo32_vs_reinforce32_11908_11923.json` (SHA-256
+`fa402200321df57e50bcaaef2ca7cbda058233e8c57c7a1be29beae5d12a5e58`).
+
+On a separate 64-game schedule, seeds 11924–11931, PPO scored **31–33**
+against its unchanged parent (paired score interval 42.2%–54.7%) and
+**11–52 with one draw** against Tactical (9.4%–27.3%). The unchanged
+parent scored **13–50 with one draw** against Tactical on that schedule;
+PPO's paired score difference against Tactical was −3.1 percentage points
+with an interval of −14.1 to +8.6 points. These reports are
+`.cache/goat-ai/ppo32_vs_parent_11924_11931.json` (SHA-256
+`ce57116035fefd4357948b12128f18d5a485dc5ad74ec99b333e5a4d10cf9a2f`),
+`.cache/goat-ai/ppo32_vs_tactical_11924_11931.json` (SHA-256
+`975b6c66f420bc3a35daab72f4cb3753a01f42d17b363be30c618917dda12c4a`),
+and `.cache/goat-ai/parent_vs_tactical_11924_11931.json` (SHA-256
+`2b32c5f2a5ad2829930c6e8dced274aaa0579a42c7df90c17bc5e40c4ad3bef5`).
+PPO improved relative to this REINFORCE child, but did not demonstrate an
+absolute playing-strength gain. The parent remains the neural reference;
+PPO remains opt-in and M4's self-play strength gate remains open.
+
 ### Batch policy replay collection
 
 `scripts/collect_policy_matches.py` now records a deterministic schedule of

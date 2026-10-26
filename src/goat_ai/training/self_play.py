@@ -203,6 +203,104 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
     return total / len(records)
 
 
+def clipped_surrogate(ratio: torch.Tensor, advantage: torch.Tensor,
+                      clip_epsilon: float) -> torch.Tensor:
+    """PPO's pessimistic per-decision clipped probability-ratio objective."""
+    if not 0 < clip_epsilon < 1:
+        raise ValueError("PPO clip epsilon must be between zero and one")
+    return torch.minimum(ratio * advantage,
+                         ratio.clamp(1 - clip_epsilon, 1 + clip_epsilon) * advantage)
+
+
+def ppo_clipped_update(
+    model: LegalActionPolicy, vocabulary: CardVocabulary,
+    records: Sequence[DecisionRecord], reward: float, baseline: float,
+    optimizer: torch.optim.Optimizer, *, epochs: int = 2,
+    batch_size: int = 16, clip_epsilon: float = 0.2,
+    entropy_coefficient: float = 0.0, max_gradient_norm: float = 1.0,
+    temperature: float = 1.0,
+    state_baselines: Sequence[float] | None = None,
+    parent_model: LegalActionPolicy | None = None,
+    parent_kl_weight: float = 0.0,
+    random_seed: int = 0,
+) -> float:
+    """Reuse one on-policy duel with a clipped objective and visible actions.
+
+    The pre-update policy supplies fixed action log probabilities. Advantages
+    are terminal returns minus the supplied baseline; there is no GAE or
+    multi-episode rollout batch in this first PPO experiment.
+    """
+    if (not records or epochs < 1 or batch_size < 1 or temperature <= 0
+            or entropy_coefficient < 0 or max_gradient_norm <= 0
+            or not isfinite(reward) or not isfinite(baseline)
+            or not isfinite(parent_kl_weight) or parent_kl_weight < 0
+            or parent_kl_weight > 0 and parent_model is None):
+        raise ValueError("PPO update needs valid decisions, rewards, and regularization")
+    if (model.feature_version < 10 or model.feature_version in (14, 15)):
+        raise ValueError("PPO batching requires a supported v10+ feature version")
+    if (state_baselines is not None
+            and (len(state_baselines) != len(records)
+                 or any(not isfinite(value) for value in state_baselines))):
+        raise ValueError("state baselines must be finite and match decisions")
+    if not 0 < clip_epsilon < 1:
+        raise ValueError("PPO clip epsilon must be between zero and one")
+    device = next(model.parameters()).device
+    features = [encode_decision(record.observation, record.legal_actions,
+                                vocabulary, model.feature_version).to(device)
+                for record in records]
+    selected = [record.legal_actions.index(record.selected_action) for record in records]
+    old_log_probs = []
+    model.eval()
+    with torch.no_grad():
+        for start in range(0, len(records), batch_size):
+            batch = features[start:start + batch_size]
+            logits, _ = model.forward_batch(batch)
+            choices = torch.tensor(selected[start:start + batch_size],
+                                   dtype=torch.long, device=device)
+            log_probs = torch.log_softmax(logits / temperature, dim=1)
+            old_log_probs.extend(log_probs.gather(1, choices[:, None]).squeeze(1).tolist())
+    model.train()
+    rng = random.Random(random_seed)
+    total_loss = 0.0
+    updates = 0
+    for _ in range(epochs):
+        order = list(range(len(records)))
+        rng.shuffle(order)
+        for start in range(0, len(order), batch_size):
+            indices = order[start:start + batch_size]
+            logits, _ = model.forward_batch([features[index] for index in indices])
+            log_probs = torch.log_softmax(logits / temperature, dim=1)
+            probabilities = log_probs.exp()
+            choices = torch.tensor([selected[index] for index in indices],
+                                   dtype=torch.long, device=device)
+            chosen_log_probs = log_probs.gather(1, choices[:, None]).squeeze(1)
+            previous = torch.tensor([old_log_probs[index] for index in indices],
+                                    dtype=chosen_log_probs.dtype, device=device)
+            advantage = torch.tensor([
+                reward - (state_baselines[index] if state_baselines is not None
+                          else baseline) for index in indices],
+                dtype=chosen_log_probs.dtype, device=device)
+            ratio = (chosen_log_probs - previous).exp()
+            entropy = -(probabilities * log_probs).sum(1)
+            loss = (-clipped_surrogate(ratio, advantage, clip_epsilon).mean()
+                    - entropy_coefficient * entropy.mean())
+            if parent_kl_weight:
+                with torch.no_grad():
+                    parent_logits, _ = parent_model.forward_batch(
+                        [features[index] for index in indices])
+                    parent_log_probs = torch.log_softmax(parent_logits / temperature, 1)
+                    parent_probs = parent_log_probs.exp()
+                loss = loss + parent_kl_weight * (
+                    parent_probs * (parent_log_probs - log_probs)).sum(1).mean()
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_gradient_norm)
+            optimizer.step()
+            total_loss += float(loss.detach())
+            updates += 1
+    return total_loss / updates
+
+
 def predict_state_values(value_model: VisibleStateValue,
                          vocabulary: CardVocabulary,
                          records: Sequence[DecisionRecord],
@@ -255,6 +353,10 @@ def train_against_snapshot_pool(
     value_learning_rate: float = 1e-3,
     policy_gradient_reduction: str = "sum",
     parent_kl_weight: float = 0.0,
+    policy_update: str = "reinforce",
+    ppo_epochs: int = 2,
+    ppo_batch_size: int = 16,
+    ppo_clip_epsilon: float = 0.2,
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
@@ -262,7 +364,8 @@ def train_against_snapshot_pool(
     """Train one learner seat per duel against random or frozen past policies.
 
     Frozen snapshots prevent the opponent from changing within an episode.
-    This is an initial REINFORCE-style experiment, not PPO or league training.
+    PPO is an opt-in, single-episode clipped update. Neither branch is league
+    training or an established competitive policy.
     """
     if (not matchups or not seeds or learning_rate <= 0 or snapshot_every < 1
             or max_snapshots < 1 or learner_temperature <= 0
@@ -274,6 +377,12 @@ def train_against_snapshot_pool(
             or (baseline_scope == "state_value") != (value_model is not None)
             or schedule_mode not in ("paired_seats", "four_roles")):
         raise ValueError("invalid self-play schedule or hyperparameters")
+    if (policy_update not in ("reinforce", "clipped_ppo") or ppo_epochs < 1
+            or ppo_batch_size < 1 or not 0 < ppo_clip_epsilon < 1):
+        raise ValueError("invalid self-play policy update")
+    if (policy_update == "clipped_ppo" and
+            (model.feature_version < 10 or model.feature_version in (14, 15))):
+        raise ValueError("clipped PPO requires a supported batched policy version")
     rng = random.Random(random_seed)
     generator = torch.Generator(device="cpu").manual_seed(random_seed)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -329,15 +438,30 @@ def train_against_snapshot_pool(
             if value_model is not None and episode.learner_records else None)
         baseline = (sum(state_baselines) / len(state_baselines)
                     if state_baselines else baselines.get(baseline_key, 0.0))
-        loss = (policy_gradient_update(model, vocabulary, episode.learner_records,
-                                       episode.reward, baseline, optimizer,
-                                       entropy_coefficient,
-                                       temperature=learner_temperature,
-                                       state_baselines=state_baselines,
-                                       reduction=policy_gradient_reduction,
-                                       parent_model=parent_model,
-                                       parent_kl_weight=parent_kl_weight)
-                if episode.learner_records else None)
+        loss = None
+        if episode.learner_records:
+            if policy_update == "clipped_ppo":
+                loss = ppo_clipped_update(
+                    model, vocabulary, episode.learner_records,
+                    episode.reward, baseline, optimizer,
+                    epochs=ppo_epochs, batch_size=ppo_batch_size,
+                    clip_epsilon=ppo_clip_epsilon,
+                    entropy_coefficient=entropy_coefficient,
+                    temperature=learner_temperature,
+                    state_baselines=state_baselines,
+                    parent_model=parent_model,
+                    parent_kl_weight=parent_kl_weight,
+                    random_seed=random_seed + seed)
+            else:
+                loss = policy_gradient_update(
+                    model, vocabulary, episode.learner_records,
+                    episode.reward, baseline, optimizer,
+                    entropy_coefficient,
+                    temperature=learner_temperature,
+                    state_baselines=state_baselines,
+                    reduction=policy_gradient_reduction,
+                    parent_model=parent_model,
+                    parent_kl_weight=parent_kl_weight)
         value_loss = (state_value_update(
             value_model, vocabulary, episode.learner_records, episode.reward,
             model.feature_version, value_optimizer)

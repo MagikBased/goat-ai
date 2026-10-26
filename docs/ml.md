@@ -306,7 +306,12 @@ OMP_NUM_THREADS=1 python scripts/train_self_play.py checkpoints/vanilla_bc.pt \
 python scripts/evaluate_policy.py checkpoints/vanilla_rl.pt --seed 200 --seeds 8
 ```
 
-This is an experiment, not a selected final RL algorithm. Terminal reward is sparse; the original trainer has no value function, PPO update, opponent league, or checkpoint selection by held-out win rate. Runs from random imitation and from the stronger heuristic imitation checkpoint did not demonstrate an improvement in greedy playing strength; see [the evaluation log](evaluation.md). Future work should compare a richer action encoder, value baselines and PPO under the same held-out schedule, while keeping training opponents separate from evaluation opponents.
+This is an experiment, not a selected final RL algorithm. Terminal reward
+is sparse, and neither update has an opponent league or checkpoint selection
+by held-out win rate. Early runs from random and heuristic imitation did not
+demonstrate an improvement in greedy playing strength; see
+[evaluation](evaluation.md). Keep training opponents separate from evaluation
+opponents when comparing future updates.
 
 An opt-in `--baseline-scope state_value` now tests a learned Monte Carlo
 baseline. A separate critic embeds the same **player-visible** card, zone,
@@ -320,7 +325,7 @@ provenance are saved with the child checkpoint. Existing global and per-deck
 moving baselines remain unchanged. This is a simple state-value control
 variate related to the [policy-gradient baseline analysis by Sutton et al.](https://papers.nips.cc/paper_files/paper/1999/hash/464d828b85b0bed98e80ade0a5c43b0f-Abstract.html),
 not a bootstrapped or asynchronous actor-critic implementation such as
-[A3C](https://proceedings.mlr.press/v48/mniha16.html), and not PPO. The
+[A3C](https://proceedings.mlr.press/v48/mniha16.html). The
 four-game native smoke and matched held-out results are in
 [evaluation](evaluation.md). The held-out comparison does not establish an
 improvement over the per-deck baseline or the unchanged parent.
@@ -333,6 +338,18 @@ A matched 32-game pilot found different direct child-versus-child results
 across held-out deck families and no advantage against the unchanged parent;
 see [evaluation](evaluation.md). This is a tested regularizer, not a selected
 self-play algorithm.
+
+`--policy-update clipped_ppo` is an opt-in implementation of the clipped
+probability-ratio objective from [Schulman et al., 2017](https://arxiv.org/abs/1707.06347).
+It freezes the pre-update action probabilities for each sampled duel, then
+reuses that duel's player-visible decisions for `--ppo-epochs` minibatch
+passes with `--ppo-batch-size` and `--ppo-clip-epsilon`. It supports policy
+feature versions 10–13 and 16–25. The advantage is still terminal outcome
+minus the chosen baseline. This initial experiment lacks generalized
+advantage estimation and multi-episode rollout batches; it is not evidence
+of superhuman play. The original REINFORCE path remains the default.
+The controlled native comparison and held-out results are in
+[evaluation](evaluation.md).
 
 ## Ordered-chain feature check
 

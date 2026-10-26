@@ -943,3 +943,14 @@ fresh held-out duels. Keep both experimental. The next M4 step is a broader
 card-value and timing signal that improves independent match outcomes while
 preserving profitable resource use, followed by a separately demonstrated
 self-play gain; see [the evaluation](evaluation.md).
+
+An opt-in clipped PPO update now reuses each native self-play duel for
+minibatch policy updates. In matched 32-duel training runs from the v23
+parent, PPO scored 122–69 with one draw against the REINFORCE child over
+192 held-out games. It scored only 31–33 against its unchanged parent and
+11–52 with one draw against Tactical on another held-out schedule; the
+parent scored 13–50 with one draw against Tactical there. This relative
+algorithm gain does not satisfy M4's absolute strength gate. Keep the parent
+as the neural reference and require a measured gain against the parent and
+Tactical across deck families before promoting an RL update; see
+[the evaluation](evaluation.md).

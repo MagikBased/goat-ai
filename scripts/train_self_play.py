@@ -44,9 +44,15 @@ def main() -> None:
     parser.add_argument("--max-snapshots", type=int, default=8)
     parser.add_argument("--entropy-coefficient", type=float, default=0.001)
     parser.add_argument("--policy-gradient-reduction", choices=("sum", "mean"),
-                        default="sum", help="sum preserves earlier runs; mean normalizes each duel by learner decisions")
+                        default="sum", help="REINFORCE only: sum preserves earlier runs; mean normalizes by learner decisions")
     parser.add_argument("--parent-kl-weight", type=float, default=0.0,
                         help="penalize divergence from the frozen starting policy on learner decisions")
+    parser.add_argument("--policy-update", choices=("reinforce", "clipped_ppo"),
+                        default="reinforce",
+                        help="clipped_ppo reuses each on-policy duel for minibatch updates")
+    parser.add_argument("--ppo-epochs", type=int, default=2)
+    parser.add_argument("--ppo-batch-size", type=int, default=16)
+    parser.add_argument("--ppo-clip-epsilon", type=float, default=0.2)
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
     parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value"),
@@ -69,6 +75,8 @@ def main() -> None:
             or not 0 <= args.parent_kl_weight < float("inf")
             or args.learner_temperature <= 0
             or args.value_width < 1 or args.value_learning_rate <= 0
+            or args.ppo_epochs < 1 or args.ppo_batch_size < 1
+            or not 0 < args.ppo_clip_epsilon < 1
             or not 0 <= args.historical_probability <= 1):
         parser.error("invalid training schedule or hyperparameters")
     parent = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
@@ -129,6 +137,10 @@ def main() -> None:
         baseline_scope=args.baseline_scope,
         policy_gradient_reduction=args.policy_gradient_reduction,
         parent_kl_weight=args.parent_kl_weight,
+        policy_update=args.policy_update,
+        ppo_epochs=args.ppo_epochs,
+        ppo_batch_size=args.ppo_batch_size,
+        ppo_clip_epsilon=args.ppo_clip_epsilon,
         schedule_mode=args.schedule_mode,
         value_model=value_model,
         value_learning_rate=args.value_learning_rate,
@@ -160,6 +172,12 @@ def main() -> None:
               "baseline_scope": args.baseline_scope,
               "policy_gradient_reduction": args.policy_gradient_reduction,
               "parent_kl_weight": args.parent_kl_weight,
+              "policy_update": args.policy_update,
+              "ppo_epochs": args.ppo_epochs if args.policy_update == "clipped_ppo" else None,
+              "ppo_batch_size": (args.ppo_batch_size
+                                 if args.policy_update == "clipped_ppo" else None),
+              "ppo_clip_epsilon": (args.ppo_clip_epsilon
+                                   if args.policy_update == "clipped_ppo" else None),
               "value_width": args.value_width if value_model is not None else None,
               "value_learning_rate": (args.value_learning_rate
                                       if value_model is not None else None),
