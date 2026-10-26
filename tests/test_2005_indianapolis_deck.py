@@ -20,6 +20,7 @@ MATT_DECK = ROOT / "examples/decks/goat_control_matt_peddle_indianapolis_2005.yd
 MICHAEL_DECK = ROOT / "examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk"
 DARYL_DECK = ROOT / "examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk"
 JESSE_DECK = ROOT / "examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk"
+CAS_DECK = ROOT / "examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk"
 OPPONENT = ROOT / "examples/decks/goat_control_lolmarcus_2020.ydk"
 MATT_EXTRA_NAMES = Counter({
     "Thousand-Eyes Restrict": 3,
@@ -63,6 +64,31 @@ JESSE_EXTRA_NAMES = Counter({
     "King Dragun": 1,
     "Thousand Dragon": 1,
 })
+CAS_EXTRA_NAMES = Counter({
+    "Thousand-Eyes Restrict": 3,
+    "Gatling Dragon": 2,
+    "Ojama King": 3,
+    "Reaper on the Nightmare": 3,
+    "Dark Flare Knight": 3,
+    "Ryu Senshi": 3,
+    "Dark Balter the Terrible": 3,
+    "Twin-Headed Thunder Dragon": 1,
+    "Dark Blade the Dragon Knight": 2,
+    "King Dragun": 2,
+    "The Last Warrior from Another Planet": 1,
+    "Dragoness the Wicked Knight": 3,
+    "Charubin the Fire Knight": 3,
+    "Fusionist": 2,
+    "Flame Ghost": 3,
+    "Darkfire Dragon": 3,
+    "Karbonala Warrior": 3,
+    "Musician King": 2,
+    "Giltia the D. Knight": 2,
+    "Metal Dragon": 1,
+    "Flower Wolf": 1,
+    "Flame Swordsman": 1,
+    "St. Joan": 1,
+})
 
 
 def _source_name(name: str) -> str:
@@ -76,6 +102,7 @@ def _source_name(name: str) -> str:
     ("Michael Fukuyama", MICHAEL_DECK, MICHAEL_EXTRA_NAMES),
     ("Daryl Gessler", DARYL_DECK, DARYL_EXTRA_NAMES),
     ("Jesse Twohig", JESSE_DECK, JESSE_EXTRA_NAMES),
+    ("Cas Stomphorst", CAS_DECK, CAS_EXTRA_NAMES),
 ])
 def test_published_2005_main_and_fusions_match_pinned_legal_ids(
     player, deck_path, extra_names,
@@ -111,6 +138,7 @@ def test_published_2005_main_and_fusions_match_pinned_legal_ids(
     (MATT_DECK, MICHAEL_DECK, 2072),
     (DARYL_DECK, MATT_DECK, 2074),
     (JESSE_DECK, DARYL_DECK, 2076),
+    (CAS_DECK, JESSE_DECK, 2078),
 ])
 def test_2005_deck_completes_visible_replay_verified_native_duel(
     tmp_path, deck_a, deck_b, seed,

@@ -2461,3 +2461,18 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/python scripts/eva
   --agent-a random --agent-b random --seed 2100 --seeds 3 \
   --max-decisions 3000 --output artifacts/jesse_2005_protocol_3seeds.json
 ```
+
+The [Cas Stomphorst 2005 Flip Control deck](../examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk) preserves the published 40-card Main Deck and 51-card Fusion Deck. The large Fusion Deck is printed in the historical source and is legal under the project's pinned historical deck validator; no modern 15-card Extra Deck limit was imposed. Source-name and pinned whitelist tests cover every ID. A seeded full duel against Jesse Twohig's deck reaches terminal, serializes, replay-verifies, and passes the visibility audit.
+
+With RandomAgent on both sides, Cas's deck versus Jesse Twohig's and Daryl Gessler's decks, seeds 2110–2112 in both seats, completed **12/12 terminal duels** under the 3,000-decision cap. They used **10,983 decisions**, with a maximum of **1,400** in one duel. Sequential wall time was **14.85 seconds** on Linux x86_64 (**0.808 duels/s**, **740 decisions/s**). Cas's assigned random agent won 3 and lost 9; this is protocol coverage, not a deck-strength or historical-rules estimate. The ignored report `artifacts/cas_2005_protocol_3seeds.json` stores outcomes and pinned hashes. Reproduce it with:
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/python scripts/evaluate_native.py \
+  --engine experimental \
+  --matchup examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk \
+            examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+  --matchup examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk \
+            examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --agent-a random --agent-b random --seed 2110 --seeds 3 \
+  --max-decisions 3000 --output artifacts/cas_2005_protocol_3seeds.json
+```
