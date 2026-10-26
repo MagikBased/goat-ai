@@ -3870,3 +3870,50 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
   --seed 4300 --seeds 8 --max-decisions 3000 --workers 2 \
   --output artifacts/fv21_position_guard_vs_plain_4300_4307.json
 ```
+
+## Experimental position-action feature version 23
+
+The same eight replay-verified Tactical-v3 demonstration trajectories used by
+the feature-21 reference trained a width-32 feature-v23 policy for two epochs,
+seed 21, batch size 16, learning rate 0.001. It saw **2,459** teacher
+choices, of which only **23** selected `change_position`. Mean training
+cross-entropy was **0.30092** then **0.21869**. The ignored checkpoint is
+`.cache/goat-ai/fv23_casdaryl_schema24_position_experiment.pt`.
+
+On the *old* feature-21 seed-3901 decision states, v21 chose the recorded
+0-ATK Sheep Token position change at all **12** flagged frames; v23 still
+chose it at **9**. Across all 47 seat-0 decision states that offered a position
+change in that replay, v21 selected one 33 times and v23 28 times. These are
+counterfactual choices on fixed replay states, not a fresh game result. The
+new action representation makes visible current monster stats available to
+position-change scoring, but the small teacher set may not teach a reliable
+position strategy.
+
+Against the frozen feature-21 checkpoint on unseen Main Deck compositions,
+feature 23 scored **33–30–1** over **64** native duels, seeds 4400–4407,
+both seats and deck assignments, with a 3,000-decision cap. Its point score
+was **52.34%** and the paired 95% bootstrap interval was **45.31%–59.38%**.
+It went 16–16 as first player and 17–14–1 as second. Deck splits were
+3–13 as Chaos Control, 11–5 as Chaos Turbo, 6–9–1 as Goat Control, and
+13–3 as Warrior. All games terminated; the largest decision count was
+1,987. The two-worker tournament took **105.61 s** (0.606 duels/s,
+618.58 decisions/s on the recorded Linux x86_64 host). The ignored report is
+`artifacts/fv23_vs_fv21_4400_4407.json`. This sample does not establish an
+overall gain, and version 21 remains the reference.
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/train_behavioral_clone.py \
+  replays/tactical_v3_cas_daryl_schema24_2500_2503/*.json \
+  --engine experimental --native-root .cache/goat-ai \
+  --feature-version 23 --epochs 2 --width 32 --batch-size 16 --seed 21 \
+  --output .cache/goat-ai/fv23_casdaryl_schema24_position_experiment.pt
+OMP_NUM_THREADS=1 .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv23_casdaryl_schema24_position_experiment.pt \
+  --opponent-checkpoint .cache/goat-ai/fv21_casdaryl_schema24_experiment.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk examples/decks/warrior_montague_clash.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 4400 --seeds 8 --max-decisions 3000 --workers 2 \
+  --output artifacts/fv23_vs_fv21_4400_4407.json
+```

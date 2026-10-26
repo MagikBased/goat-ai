@@ -799,3 +799,11 @@ Sinister Serpent and the updated tactical agent passed at that decision. A
 new schema-v25 policy-versus-tactical duel completed and all **149** decisions
 replay-verified. A legacy schema-v24 duel still replay-verified at **152**
 decisions; the verifier compares only fields available in that schema.
+
+The experimental feature-v23 policy binds `change_position` to the selected
+monster's visible stats and orientation. It reduced, but did not eliminate,
+the original seed-3901 Sheep Token choices: **9 of 12** remain when rescoring
+those recorded states. Position changes by Magician of Faith, Gravekeeper's
+Spy, and other non-token monsters still need board-context review. See the
+[held-out feature-v23 experiment](evaluation.md) before treating this as a
+strength improvement.

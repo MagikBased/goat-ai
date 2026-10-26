@@ -649,3 +649,10 @@ show when staying in defense is best. Next, label repeated position changes
 for non-token monsters with board context and run a held-out, seat-swapped
 comparison before changing the default policy. See
 [replay audit](replay_audit.md) and [evaluation](evaluation.md).
+
+The first action-conditioned position representation (feature v23) reduced
+0-ATK token changes from 12 to 9 on the reviewed replay states but scored
+33–30–1 against the v21 reference over 64 held-out duels, with large deck
+splits. Do not promote it on this evidence. Collect independent position
+labels across several decks and compare both decision quality and match
+results before changing the default checkpoint.

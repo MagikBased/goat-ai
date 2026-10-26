@@ -89,6 +89,45 @@ def actions() -> tuple[Action, ...]:
             Action("native-2", "end_phase", 0))
 
 
+def test_position_action_features_bind_visible_stats_without_hidden_enemy_stats():
+    vocabulary = CardVocabulary((10, 20, 30), ((10, 0, 0), (20, 0, 1900),
+                                               (30, 0, 1800)))
+    token = CardView(0, "monster", "faceup", 10, 0, "defense",
+                     attack=0, defense=0)
+    strong = CardView(0, "monster", "faceup", 20, 1, "defense",
+                      attack=1900, defense=1400)
+    hidden = CardView(1, "monster", "facedown", None, 0, "defense")
+    observation = replace(view(), field=(token, strong, hidden))
+    options = (Action("token", "change_position", 0,
+                      {"code": 10, "controller": 0, "location": 4, "sequence": 0}),
+               Action("strong", "change_position", 0,
+                      {"code": 20, "controller": 0, "location": 4, "sequence": 1}),
+               Action("end", "end_phase", 0))
+    features = encode_decision(observation, options, vocabulary, feature_version=23)
+    assert features.action_numbers.shape == (3, 101)
+    assert features.action_numbers[0, -6] == 0
+    assert features.action_numbers[1, -6] == pytest.approx(1900 / 8000)
+    assert features.action_numbers[0, -1] == 0  # Opponent face-down stat is unknown.
+    changed_hidden = replace(observation, field=(token, strong,
+                                                   replace(hidden, sequence=2)))
+    assert torch.equal(features.action_numbers,
+                       encode_decision(changed_hidden, options, vocabulary,
+                                       feature_version=23).action_numbers)
+    stronger_token = replace(observation, field=(replace(token, attack=1600),
+                                                  strong, hidden))
+    assert torch.equal(
+        encode_decision(observation, options, vocabulary,
+                        feature_version=22).action_numbers,
+        encode_decision(stronger_token, options, vocabulary,
+                        feature_version=22).action_numbers)
+    assert not torch.equal(
+        features.action_numbers[0],
+        encode_decision(stronger_token, options, vocabulary,
+                        feature_version=23).action_numbers[0])
+    assert torch.isfinite(LegalActionPolicy(vocabulary.size, width=8,
+                                             feature_version=23)(features)).all()
+
+
 def test_staple_audit_distinguishes_played_cards_from_target_codes():
     played = Action("play", "activate", 0, {"code": 10})
     target = Action("target", "select_card", 0, {"code": 20})

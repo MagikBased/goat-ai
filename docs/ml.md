@@ -283,3 +283,17 @@ deck in both seats unless the reversed pairing is listed separately. The
 chosen mode is saved in `self_play_config`. A four-game native smoke run and
 its full replay/visibility checks are in [evaluation](evaluation.md). This
 schedule fixes training coverage, not the sparse-reward learning problem.
+
+### Experimental feature version 23: position decisions
+
+Version 23 extends opt-in version 22 with eight action-specific values for a
+`change_position` choice: whether its own visible monster was found, whether
+it is currently defending, its current ATK and DEF, their difference, and the
+maximum and minimum **visible** opposing battle stats plus a complete-
+visibility flag. A face-down opposing monster contributes no battle stat. The
+values come from the same player-visible observation given to baseline agents;
+no native hidden state or inferred card identity is used. A representation
+test verifies that changing only the selected monster's current ATK changes
+v23 action features while leaving v22 action features unchanged. Existing
+checkpoints retain their feature versions. This is an experiment, not a
+promotion of a stronger policy.

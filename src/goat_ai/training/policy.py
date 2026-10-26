@@ -47,6 +47,8 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # Version 21 relates an announced Type to current public face-up monster Types.
 # Version 22 adds printed Flip/ATK metadata and public board-resource context
 # for the reviewed Faith, Heavy Storm, and Ring choices. It is opt-in.
+# Version 23 binds a position-change action to that monster's visible battle
+# stats and orientation, with only publicly visible opposing battle stats.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 SPELL_TYPE = 0x2  # TYPE_SPELL in pinned ocgcore constant.lua
@@ -137,7 +139,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 23):
+    if feature_version not in range(1, 24):
         raise ValueError("unsupported policy feature version")
     if feature_version >= 22 and not vocabulary.card_properties:
         raise ValueError("feature version 22 requires pinned printed card properties")
@@ -368,6 +370,26 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                         own_monster_count / 5, enemy_monster_count / 5,
                         (selected_monster.attack or 0) / 8000
                         if selected_monster is not None else 0.0)
+        if feature_version >= 23:
+            moved = (own_field_monsters.get((own, params.get("sequence")))
+                     if action.kind == "change_position" else None)
+            visible_enemy_stats = tuple(
+                (card.attack if card.orientation == "attack" else card.defense)
+                for card in opponent_monsters if card.position == "faceup"
+                and (card.attack if card.orientation == "attack"
+                     else card.defense) is not None)
+            attack = moved.attack if moved is not None else None
+            defense = moved.defense if moved is not None else None
+            numeric += (float(moved is not None),
+                        float(moved is not None and moved.orientation == "defense"),
+                        attack / 8000 if attack is not None else 0.0,
+                        defense / 8000 if defense is not None else 0.0,
+                        (attack - defense) / 8000
+                        if attack is not None and defense is not None else 0.0,
+                        max(visible_enemy_stats, default=0) / 8000,
+                        min(visible_enemy_stats, default=0) / 8000,
+                        float(bool(opponent_monsters) and
+                              len(visible_enemy_stats) == len(opponent_monsters)))
         action_numbers.append(numeric)
     width = max(1, *(len(row) for row in targets))
     padded_targets = [row + [0] * (width - len(row)) for row in targets]
@@ -425,7 +447,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 23):
+        if feature_version not in range(1, 24):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -445,7 +467,8 @@ class LegalActionPolicy(nn.Module):
                         if feature_version == 15 else 42 if feature_version >= 4 else 10)
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
-        action_number_width = (93 if feature_version >= 22 else 85
+        action_number_width = (101 if feature_version >= 23 else 93
+                               if feature_version >= 22 else 85
                                if feature_version >= 21 else 81
                                if feature_version >= 20 else 19
                                if feature_version >= 17 else 15
