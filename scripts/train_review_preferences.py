@@ -1,0 +1,154 @@
+"""Experimentally fit replay-reviewed action preferences with parent KL."""
+
+import argparse
+import copy
+import json
+import random
+from math import isfinite
+from pathlib import Path
+
+import torch
+
+from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import (
+    demonstrator_records,
+    read_decision_preferences,
+    read_trajectory,
+    verify_trajectory,
+)
+from goat_ai.replay.fingerprint import sha256_file
+from goat_ai.training import fit_preferences_with_parent_kl, load_policy_agent
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("checkpoint", type=Path)
+    parser.add_argument("--case", nargs=2, action="append", metavar=("REPLAY", "PREFERENCES"),
+                        required=True)
+    parser.add_argument("--preserve-trajectory", type=Path, action="append", required=True)
+    parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
+    parser.add_argument("--steps", type=int, default=200)
+    parser.add_argument("--preserve-per-trajectory", type=int, default=16)
+    parser.add_argument("--preserve-batch", type=int, default=16)
+    parser.add_argument("--parent-kl-weight", type=float, default=1.0)
+    parser.add_argument("--learning-rate", type=float, default=1e-4)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    if (args.steps < 1 or args.preserve_per_trajectory < 1
+            or args.preserve_batch < 1 or not isfinite(args.parent_kl_weight)
+            or args.parent_kl_weight <= 0 or not isfinite(args.learning_rate)
+            or args.learning_rate <= 0 or args.output.resolve() == args.checkpoint.resolve()):
+        parser.error("invalid optimization settings or output overlaps parent")
+    metadata = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
+    if (not isinstance(metadata, dict) or metadata.get("schema_version") != 1
+            or not isinstance(metadata.get("training_games"), list)
+            or not isinstance(metadata.get("trajectory_sha256"), dict)):
+        parser.error("parent checkpoint lacks replay training provenance")
+    agent = load_policy_agent(args.checkpoint)
+    model = agent.model
+    parent = copy.deepcopy(model).eval()
+    rng = random.Random(args.seed)
+    torch.manual_seed(args.seed)
+    old_hashes = metadata["trajectory_sha256"]
+    old_seeds = {game["seed"] for game in metadata["training_games"]}
+    reviewed = []
+    new_hashes = {}
+    training_games = []
+    preference_hashes = {}
+    for replay_path, preferences_path in args.case:
+        replay_path = Path(replay_path)
+        preferences_path = Path(preferences_path)
+        replay_hash = sha256_file(replay_path)
+        if replay_path.as_posix() in old_hashes or replay_hash in old_hashes.values():
+            raise ValueError(f"preference replay already used to train parent: {replay_path}")
+        trajectory = read_trajectory(replay_path)
+        if trajectory.seed in old_seeds:
+            raise ValueError(f"preference seed already used to train parent: {trajectory.seed}")
+        verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
+        audit_trajectory_visibility(trajectory)
+        preferences = read_decision_preferences(preferences_path, replay_hash, trajectory)
+        reviewed.extend((trajectory.decisions[item.decision_index], item)
+                        for item in preferences.preferences)
+        new_hashes[str(replay_path)] = replay_hash
+        preference_hashes[str(preferences_path)] = sha256_file(preferences_path)
+        training_games.append({
+            "seed": trajectory.seed,
+            "deck_sha256": trajectory.deck_sha256,
+            "main_deck_composition_sha256": tuple(
+                main_deck_composition_sha256(read_ydk(deck)) for deck in trajectory.decks),
+            "source": "self_play_preference" if preferences.authorization == "self_play_review"
+                      else "policy_preference",
+            "authorization": preferences.authorization,
+            "reviewer": preferences.reviewer,
+            "preference_sha256": preference_hashes[str(preferences_path)],
+            "selected_decisions": len(preferences.preferences),
+        })
+    if len({str(path) for path in args.preserve_trajectory}) != len(args.preserve_trajectory):
+        raise ValueError("duplicate preservation trajectory")
+    preservation = []
+    preservation_hashes = {}
+    for path in args.preserve_trajectory:
+        digest = sha256_file(path)
+        if old_hashes.get(str(path)) != digest:
+            raise ValueError(f"preservation replay is absent from parent provenance: {path}")
+        trajectory = read_trajectory(path)
+        verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
+        audit_trajectory_visibility(trajectory)
+        candidates = [record for record in demonstrator_records(trajectory)
+                      if len(record.legal_actions) > 1]
+        if not candidates:
+            raise ValueError(f"no multi-option preservation decisions: {path}")
+        preservation.extend(rng.sample(candidates, min(
+            args.preserve_per_trajectory, len(candidates))))
+        preservation_hashes[str(path)] = digest
+    if args.preserve_batch > len(preservation):
+        parser.error("preserve batch exceeds available preservation decisions")
+    preference_losses, kl_losses = fit_preferences_with_parent_kl(
+        model, parent, agent.vocabulary, reviewed, preservation,
+        steps=args.steps, preservation_batch=args.preserve_batch,
+        preservation_weight=args.parent_kl_weight,
+        learning_rate=args.learning_rate, rng=rng)
+    sources = dict(metadata.get("source_decisions", {}))
+    for game in training_games:
+        source = game["source"]
+        sources[source] = sources.get(source, 0) + game["selected_decisions"]
+    child = {
+        "schema_version": 1, "model_state": model.state_dict(),
+        "vocabulary_codes": agent.vocabulary.codes,
+        "width": model.card.embedding_dim, "feature_version": model.feature_version,
+        "parent_checkpoint_sha256": sha256_file(args.checkpoint),
+        "training_games": [*metadata["training_games"], *training_games],
+        "trajectory_sha256": old_hashes | new_hashes,
+        "source_decisions": sources,
+        "new_source_decisions": {
+            source: sum(game["selected_decisions"] for game in training_games
+                        if game["source"] == source)
+            for source in {game["source"] for game in training_games}},
+        "training_method": "review_preference_parent_kl",
+        "preference_sha256": preference_hashes,
+        "preservation_sha256": preservation_hashes,
+        "preference_config": {
+            "steps": args.steps, "preserve_per_trajectory": args.preserve_per_trajectory,
+            "preserve_batch": args.preserve_batch,
+            "parent_kl_weight": args.parent_kl_weight,
+            "learning_rate": args.learning_rate, "seed": args.seed,
+        },
+        "preference_loss_first": preference_losses[0],
+        "preference_loss_last": preference_losses[-1],
+        "preservation_kl_last": kl_losses[-1],
+        "torch_version": str(torch.__version__),
+    }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(child, args.output)
+    print(json.dumps({"output": str(args.output), "preferences": len(reviewed),
+                      "preservation_states": len(preservation),
+                      "preference_loss_first": preference_losses[0],
+                      "preference_loss_last": preference_losses[-1],
+                      "preservation_kl_last": kl_losses[-1]}, indent=2))
+
+
+if __name__ == "__main__":
+    main()

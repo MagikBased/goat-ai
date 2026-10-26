@@ -112,9 +112,10 @@ The ignored report is `artifacts/feature19_selfplay_preference_scorecard.json`
 The scalar seed-2883 replay was regenerated with current recording metadata;
 its full trajectory matched the earlier saved version after removing only
 those added metadata fields. The original scalar checkpoint byte hash was
-preserved as recorded in [evaluation](evaluation.md). These preferences are
-diagnostics, not training labels consumed by the current trainer, and four
-fixed states cannot establish a strength gain.
+preserved as recorded in [evaluation](evaluation.md). An opt-in preference
+trainer now consumes these four reviews; its corrected-state results and
+held-out comparison are recorded in [evaluation](evaluation.md). Four fixed
+states cannot establish a strength gain.
 
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/score_reviewed_preferences.py \

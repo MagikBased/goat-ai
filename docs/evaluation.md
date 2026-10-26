@@ -3368,3 +3368,48 @@ OMP_NUM_THREADS=1 .venv/bin/python scripts/train_self_play.py \
   --max-decisions 3000 --record-dir replays/selfplay_fourroles_value_2820_2883 \
   --output checkpoints/fv19_fourroles_value_2820_2883.pt
 ```
+
+## Four-review preference update against a frozen parent
+
+An opt-in preference experiment started from the unchanged feature-19 parent
+(`checkpoints/tactical_v3_fv19_2500_2503.pt`, SHA-256
+`fe197724523b33a8d555e90ab9f7b669dab2081b000346b9b31d1788d7e07fc2`).
+Four self-play review files compared acceptable and disfavored legal-action
+sets at the Magician of Faith, Heavy Storm, Breaker, and Mystical Space
+Typhoon decisions documented in [replay audit](replay_audit.md). Each complete
+source duel replay-verified with the pinned native engine and passed the
+visibility audit. None of the four source seeds or exact replays trained the
+parent. The learner used 200 optimizer steps, learning rate 0.0001, and
+pairwise logistic preference loss plus weight-1 frozen-parent KL. It sampled
+64 multi-option preservation decisions from four replay-verified trajectories
+already in the parent's training provenance, drawing 16 per step. The
+preference loss fell from 1.1160 to 0.5113; final sampled preservation KL was
+0.00537. These are optimization diagnostics, not playing-strength results.
+
+On the **four training decisions**, preferred-minus-disfavored log-mean-exp
+margins moved from −2.253 to −1.125 (Faith), +0.583 to +1.932 (Heavy Storm),
++0.019 to +1.439 (Breaker), and −0.515 to +1.116 (MST). The child's greedy
+choice belonged to a preferred set for Heavy Storm and Breaker only. In
+particular, setting Magician of Faith still ranked fifth in that state.
+The ignored checkpoint is
+`checkpoints/tactical_v3_fv19_preference4_parent_kl_3100.pt` (SHA-256
+`b9dbd7fced686f719bcef24eea070e2167d726d302fd3d475da25b525098d28e`);
+the ignored corrected-state report is
+`artifacts/feature19_preference4_child_scorecard.json` (SHA-256
+`c0f309b02e1896eefd8c7bdba1146b9faa88f9e745c93517a5c095edf319b24b`).
+
+The child then played its unchanged parent on held-out Chaos Control, Warrior,
+and Flip Control Main Deck compositions, all three deck pairings in both
+assignments and both seats, seeds 3200–3207. The evaluator enforced unseen
+Main Deck compositions against both checkpoint provenances. All **96 duels
+terminated** within 3,000 decisions. The child scored **49–47**, or **51.04%**;
+its paired-bootstrap 95% score interval was **44.79–57.29%**. As the assigned
+deck it scored Chaos Control 11–21, Flip Control 9–23, and Warrior 29–3. This
+large deck dependence and an interval spanning 50% do not justify promoting
+the child. The four-worker tournament took **51.05 seconds** and averaged
+673.35 decisions per duel. The ignored report is
+`artifacts/feature19_preference4_vs_parent_3200_3207.json` (SHA-256
+`f843043fa7699336ab6eddafe6693b3d4ec8f3ef5d65a9bfdfc375b0554a01d3`).
+The current parent remains the reference checkpoint. More independently
+reviewed, varied decisions and a separate held-out tournament are needed
+before preference learning can claim a competitive gain.

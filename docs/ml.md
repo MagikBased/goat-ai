@@ -119,10 +119,15 @@ complete native replay and its visibility, checks the source hash, agent
 seat, and legal indices, then scores the two sets without assigning an
 arbitrary winner among equally plausible options. It subtracts the log of
 each set's size from its log-sum-exp score so a set is not rewarded merely
-for containing more actions. These preferences are fixed-state diagnostics;
-the current trainer does not consume them, and no playing-strength gain is
-claimed from their margins. A preference-training objective needs a
-separate controlled experiment and held-out evaluation.
+for containing more actions. `scripts/train_review_preferences.py` is an
+opt-in experiment that consumes the same replay-verified preferences. It
+minimizes a pairwise logistic loss between the preferred and disfavored sets,
+while matching a frozen parent policy on sampled, parent-provenance states.
+The training checkpoint records both source hashes and counts these reviews
+separately from demonstrations. The four current reviews come from sampled AI
+self-play; they are retrospective play hypotheses, not expert human data.
+Their fixed-state margins alone do not establish playing strength. See the
+held-out child-versus-parent result in [evaluation](evaluation.md).
 
 For rehearsal, pass `--annotation-for TRAJECTORY=LABELS` for the scripted
 replay and leave ordinary teacher trajectories unannotated. A scripted

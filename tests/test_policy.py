@@ -25,6 +25,7 @@ from goat_ai.observations import (
 )
 from goat_ai.replay import (
     DecisionRecord,
+    ReviewedPreference,
     Trajectory,
     demonstrator_records,
     demonstrator_seat,
@@ -35,6 +36,7 @@ from goat_ai.training import (
     PolicyAgent,
     encode_decision,
     fit_behavioral_clone,
+    fit_preferences_with_parent_kl,
     fit_with_parent_kl,
     load_policy_agent,
 )
@@ -179,6 +181,43 @@ def test_parent_kl_fits_labels_while_keeps_reference_frozen():
                            steps=1, preservation_batch=1, preservation_weight=1.0,
                            learning_rate=0.001, rng=random.Random(19),
                            labeled_weights=(0.0,))
+
+
+def test_preference_kl_raises_a_reviewed_set_without_forcing_one_target():
+    torch.manual_seed(7)
+    vocabulary = CardVocabulary((10, 20))
+    student = LegalActionPolicy(vocabulary.size, width=16, feature_version=19)
+    parent = copy.deepcopy(student)
+    legal = actions()
+    record = DecisionRecord(replace(view(), turn_player=0), legal, legal[0])
+    preference = ReviewedPreference(0, (1, 2), (0,))
+    preservation = DecisionRecord(replace(view(), turn_player=1), legal, legal[0])
+    features = encode_decision(record.observation, legal, vocabulary, 19)
+
+    def set_margin():
+        with torch.no_grad():
+            logits = student(features)
+            return float(torch.logsumexp(logits[[1, 2]], dim=0)
+                         - torch.log(torch.tensor(2.0)) - logits[0])
+
+    before = set_margin()
+    frozen = {name: parameter.detach().clone()
+              for name, parameter in parent.named_parameters()}
+    losses, kl = fit_preferences_with_parent_kl(
+        student, parent, vocabulary, ((record, preference),), (preservation,),
+        steps=8, preservation_batch=1, preservation_weight=1.0,
+        learning_rate=0.001, rng=random.Random(19))
+    assert len(losses) == len(kl) == 8
+    assert losses[-1] < losses[0]
+    assert set_margin() > before
+    assert all(torch.equal(parameter, frozen[name])
+               for name, parameter in parent.named_parameters())
+    with pytest.raises(ValueError, match="disjoint legal sets"):
+        fit_preferences_with_parent_kl(
+            student, parent, vocabulary,
+            ((record, ReviewedPreference(0, (0, 1), (0,))),), (preservation,),
+            steps=1, preservation_batch=1, preservation_weight=1.0,
+            learning_rate=0.001, rng=random.Random(19))
 
 
 def test_policy_audit_fingerprint_identifies_visible_decision_and_choice():

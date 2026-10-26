@@ -486,6 +486,15 @@ Prioritize visible activation and target valuation, independently reviewed
 decision data, and a fresh held-out schedule before another checkpoint
 promotion; see [evaluation](evaluation.md) and [replay audit](replay_audit.md).
 
+An opt-in four-review preference update with frozen-parent KL improved the
+reviewed action margins but still ranked setting Magician of Faith fifth in
+its training state. Its held-out 96-game score against the unchanged parent
+was 49–47, with a paired interval spanning 50% and poor Chaos Control and
+Flip Control splits. Keep the parent as reference. Expand independent review
+coverage across decks and effects before another preference fit; evaluate on
+new seeds and compositions, not the four training decisions. See
+[evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
