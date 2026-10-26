@@ -70,14 +70,14 @@ def annotation_paths(trajectories: list[Path], ordered: list[Path],
     return labels
 
 
-def parse_source_weights(assignments: list[str]) -> dict[str, float]:
+def parse_source_weights(assignments: list[str], *, option: str = "source") -> dict[str, float]:
     weights = {}
     for assignment in assignments:
         source, separator, raw = assignment.partition("=")
         if not separator or not source:
-            raise ValueError("--source-weight needs SOURCE=POSITIVE_WEIGHT")
+            raise ValueError(f"--{option}-weight needs NAME=POSITIVE_WEIGHT")
         if source in weights:
-            raise ValueError(f"duplicate source weight: {source}")
+            raise ValueError(f"duplicate {option} weight: {source}")
         try:
             weight = float(raw)
         except ValueError as exc:
@@ -169,6 +169,9 @@ def main() -> None:
     parser.add_argument("--preserve-batch", type=int, default=8,
                         help="parent states sampled at each KL optimization step")
     parser.add_argument("--parent-kl-weight", type=float, default=1.0)
+    parser.add_argument("--label-kind-weight", action="append", default=[],
+                        metavar="ACTION_KIND=WEIGHT",
+                        help="relative weight for selected labels in parent-KL training")
     args = parser.parse_args()
     if (args.epochs < 1 or args.width < 1 or args.learning_rate <= 0
             or args.batch_size < 1 or not 1 <= args.focus_weight < float("inf")
@@ -179,6 +182,8 @@ def main() -> None:
         labels_by_path = annotation_paths(args.trajectories, args.annotation,
                                           args.annotation_for)
         source_weights = parse_source_weights(args.source_weight)
+        label_kind_weights = parse_source_weights(args.label_kind_weight,
+                                                  option="label-kind")
     except ValueError as exc:
         parser.error(str(exc))
     if args.init_checkpoint and args.init_checkpoint.resolve() == args.output.resolve():
@@ -191,6 +196,8 @@ def main() -> None:
         parser.error("parent KL requires --init-checkpoint and --preserve-trajectories")
     if not args.parent_kl_steps and args.preserve_trajectories:
         parser.error("--preserve-trajectories requires --parent-kl-steps")
+    if not args.parent_kl_steps and label_kind_weights:
+        parser.error("--label-kind-weight requires --parent-kl-steps")
     if args.parent_kl_steps and (source_weights or args.focus_weight > 1):
         parser.error("parent KL uses labeled decisions directly; omit sampling weights")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
@@ -272,6 +279,11 @@ def main() -> None:
     if unknown_sources:
         raise ValueError(f"source weights name absent decision sources: "
                          f"{sorted(unknown_sources)}")
+    unknown_kinds = set(label_kind_weights) - {record.selected_action.kind
+                                               for record in records}
+    if unknown_kinds:
+        raise ValueError(f"label kind weights name absent selected actions: "
+                         f"{sorted(unknown_kinds)}")
     focus_codes = set(args.focus_card)
     focus_count = sum(focus_opportunity(record, focus_codes) for record in records)
     sampling_weights = ([source_weights.get(source, 1.0) * (
@@ -306,13 +318,16 @@ def main() -> None:
             model, reference, vocabulary, records, preservation,
             steps=args.parent_kl_steps, preservation_batch=args.preserve_batch,
             preservation_weight=args.parent_kl_weight,
-            learning_rate=args.learning_rate, rng=rng)
+            learning_rate=args.learning_rate, rng=rng,
+            labeled_weights=[label_kind_weights.get(record.selected_action.kind, 1.0)
+                             for record in records])
         preservation_metadata = {
             "trajectory_sha256": preservation_hashes,
             "states": len(preservation),
             "per_trajectory": args.preserve_per_trajectory,
             "batch": args.preserve_batch,
             "weight": args.parent_kl_weight,
+            "label_kind_weights": label_kind_weights,
             "steps": args.parent_kl_steps,
             "final_kl": preservation_losses[-1],
         }

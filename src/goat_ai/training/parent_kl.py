@@ -24,6 +24,7 @@ def fit_with_parent_kl(
     preservation_weight: float,
     learning_rate: float,
     rng: random.Random,
+    labeled_weights: Sequence[float] | None = None,
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """Fit selected labels while matching the parent on separate visible states.
 
@@ -36,6 +37,10 @@ def fit_with_parent_kl(
         raise ValueError("parent KL needs records and positive finite settings")
     if parent is model or parent.feature_version != model.feature_version:
         raise ValueError("parent KL needs a separate compatible reference policy")
+    if labeled_weights is not None and (len(labeled_weights) != len(labeled)
+                                        or any(not isfinite(weight) or weight <= 0
+                                               for weight in labeled_weights)):
+        raise ValueError("labeled weights must be finite, positive, and match labels")
     device = next(model.parameters()).device
     if next(parent.parameters()).device != device:
         raise ValueError("parent and student must use the same device")
@@ -43,6 +48,8 @@ def fit_with_parent_kl(
                                         vocabulary, model.feature_version),
                         record.legal_actions.index(record.selected_action))
                        for record in labeled]
+    weights = tuple(labeled_weights) if labeled_weights is not None else (1.0,) * len(labeled)
+    weight_total = sum(weights)
     preserve_features = [encode_decision(record.observation, record.legal_actions,
                                          vocabulary, model.feature_version)
                          for record in preservation]
@@ -57,11 +64,11 @@ def fit_with_parent_kl(
     for _ in range(steps):
         model.train()
         optimizer.zero_grad()
-        labeled_loss = sum(
+        labeled_loss = sum(weight *
             nn.functional.cross_entropy(
                 model(features.to(device)).unsqueeze(0),
                 torch.tensor([target], dtype=torch.long, device=device))
-            for features, target in target_examples) / len(target_examples)
+            for (features, target), weight in zip(target_examples, weights)) / weight_total
         picks = rng.sample(range(len(preserve_features)), preservation_batch)
         preservation_loss = sum(
             nn.functional.kl_div(

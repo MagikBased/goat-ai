@@ -2859,3 +2859,74 @@ and `artifacts/timing_parent_kl_vs_parent_2578_2585.json` (SHA-256
 `b696eeaddd6253d79a9c7d01b7761956acf98f7ea5891765ceb8210453adfe54`).
 The interval includes 50%, and the large assigned-deck differences remain.
 This method did not establish a competitive gain or close M4.
+
+## Published-deck Scapegoat timing curriculum
+
+The native timing generator was repeated with the published Daryl
+Gravekeepers deck against Cas Flip Control at seed 2601, Matt Goat Control
+at seed 2604, and Jesse Goat Control at seed 2610. The complete duels
+replay-verified at **1,119**, **1,255**, and **872** decisions. In each,
+Scapegoat was Set on its controller's turn 2, held through an opponent End
+Phase and its own End Phase, then activated at the next opponent End Phase.
+The three timing labels occur at decision indexes 20, 28, and 35. A second
+synthetic label file per duel includes **19** early Scapegoat opportunities:
+Draw, Standby, Main Phase, the Set choice, and the End Phase windows. These
+are scripted curriculum choices, not skilled-player demonstrations. The
+Cas, Matt, and Jesse replay SHA-256 values are respectively
+`3d4fcdd12fbc81301dca7f267a14f298c88f44f1f9e24ec990356fa3fbdd4cce`,
+`2904c3fe05e1593c4a29eb4e26c9fa8ab71452b4676cb6293776c9390d098879`,
+and `30961ace581fda3e6e0a0077de173bb982fc2b79587586240de72c78be09ec48`.
+
+The feature-19 parent and the earlier three-label parent-KL child both
+passed at the final opponent End Phase in all three published-deck probes.
+A parent-KL run trained on Cas and Matt's **six** End Phase labels chose
+`pass/pass/chain` on the two updated timing replays and the separate Jesse
+timing replay. Jesse's Main Deck already appeared in the parent checkpoint's
+Matt-versus-Jesse training games, so this tests a new decision context, not
+an unseen Main Deck. Its
+checkpoint is `checkpoints/tactical_v3_fv19_timing_cas_matt_parent_kl.pt`
+(SHA-256 `5351809b267317a717c32755cd20faab83954ac1b0f29c5adc167e13dcdf597c`).
+On the separate eight-game teacher holdout, however, its exact agreement
+fell from the parent's 1,899/2,039 to **1,883/2,039** and Scapegoat-offered
+agreement fell from 19/20 to **12/20**. It scored **33–31** directly against
+the parent in 64 unseen-Main-Deck paired games at seeds 2590–2597, 51.56%
+of points with paired 95% interval **42.19–62.50%**. The assigned-deck
+splits were Michael 13–3, Warrior 12–4, Chaos Control 3–13, and Chaos
+Return 5–11. The ignored reports are
+`artifacts/timing_cas_matt_teacher_agreement_2520_2521.json` (SHA-256
+`8e0b9668877653246849c9b99930c4cafc35e703c7aa602f2b22af11862085da`)
+and `artifacts/timing_cas_matt_parent_kl_vs_parent_2590_2597.json` (SHA-256
+`1cb75a51742dd9323e5f30d671b5548519388ca29cdf17480fe9f53f8386179c`).
+
+Training on all **38** Cas and Matt curriculum choices without action-kind
+weight learned the Set choice and early passes but still passed at the final
+opponent End Phase on Cas, Matt, and Jesse. Giving selected `chain` actions
+ten times the ordinary label loss weight learned the final activation while
+retaining the early Draw, Standby, and Main Phase passes on Jesse. On Cas,
+Matt, and Jesse it activated at the *earlier* opponent End Phase, which the
+script passes only to expose the later window and which may be reasonable.
+The weighted checkpoint is
+`checkpoints/tactical_v3_fv19_timing_curriculum_chain10_kl.pt` (SHA-256
+`07baac3ef5ef212fb75188c76e26c39c655bf067c43948e1f6ec1104a777b7a8`).
+The unweighted checkpoint is
+`checkpoints/tactical_v3_fv19_timing_curriculum_cas_matt_kl.pt` (SHA-256
+`a270b586b655d22c643ff13c9ef4d21dad11674f3983efb338335d56013e4d99`).
+
+On the eight-game teacher holdout, the weighted child matched
+**1,893/2,039** decisions, **485/631** multi-option decisions, **15/20**
+Scapegoat-offered decisions, and **2/2** teacher-selected Scapegoat plays.
+Four of its five Scapegoat-offered mismatches were premature activations in
+one opponent Main Phase; the fifth was setting Scapegoat instead of a normal
+summon. In 64 paired games against its parent on unseen Michael, Chaos
+Control, Warrior, and Chaos Return Main Decks, both deck assignments and
+seats, seeds 2620–2627, it scored **29 wins, 35 losses**: 45.31%, paired
+95% interval **37.50–54.69%**. The assigned-deck splits were Michael 12–4,
+Warrior 11–5, Chaos Control 4–12, and Chaos Return 2–14. The evaluator
+rejected training deck hashes and required unseen Main Deck compositions.
+The four-worker tournament took 31.37 seconds. The ignored reports are
+`artifacts/timing_curriculum_chain10_agreement_2520_2521.json` (SHA-256
+`6311514196f434fe6b5ac25b17aafc0ac9902c08db4f3852d905801a82614bc2`)
+and `artifacts/timing_curriculum_chain10_vs_parent_2620_2627.json` (SHA-256
+`7643e5c087fcfbdb68a5236262651a46e468eef8f13dc1351204fc3c7dace95d`).
+The choice transfer is real in these scripted replays; competitive strength
+has not improved in the measured sample, and M4 remains open.

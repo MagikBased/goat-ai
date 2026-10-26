@@ -398,6 +398,15 @@ deck assignments remained weak. Keep it experimental. Next obtain more
 independent positive and negative timing examples, then measure both
 card-specific calibration and deck-balanced strength before promotion.
 
+Published 2005 deck probes now provide 19 explicitly synthetic Scapegoat
+choices per duel, including early passes and a later opponent End Phase
+activation. Training on Cas and Matt transferred the final timing choice to
+Jesse, but the weighted child scored 29–35 against its parent on unseen
+Main Decks and still activated prematurely during one held-out opponent
+Main Phase. The next data pass should add independent threat and no-threat
+board contexts and authorized expert examples where available; evaluate
+Scapegoat calibration and win rate together. See [evaluation](evaluation.md).
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

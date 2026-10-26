@@ -171,6 +171,11 @@ def test_parent_kl_fits_labels_while_keeps_reference_frozen():
     assert repeated_losses == (labeled_losses, kl_losses)
     assert all(torch.equal(parameter, dict(repeat.named_parameters())[name])
                for name, parameter in student.named_parameters())
+    with pytest.raises(ValueError, match="labeled weights"):
+        fit_with_parent_kl(student, parent, vocabulary, (labeled,), (preservation,),
+                           steps=1, preservation_batch=1, preservation_weight=1.0,
+                           learning_rate=0.001, rng=random.Random(19),
+                           labeled_weights=(0.0,))
 
 
 def test_policy_audit_fingerprint_identifies_visible_decision_and_choice():

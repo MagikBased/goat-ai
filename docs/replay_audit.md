@@ -33,6 +33,11 @@ the broader timing rule. A stronger policy also needs opponent-aware value
 estimates and training
 examples for these exceptions.
 
+To inspect the guarded seed 2202 duel, open
+`replays/policy_guard_vs_combat_2202.html`. The JSON trajectory is independently
+replayed through the native engine before the recorder accepts it. Because the
+guard changes early actions, later frame numbers differ from the original.
+
 ## Scapegoat turn-owner timing probe, seed 52
 
 `scripts/generate_scapegoat_timing_probe.py` creates a complete, native,
@@ -72,10 +77,39 @@ The next learning experiment should include genuine, authorized End Phase
 choices from skilled players or explicitly marked synthetic timing examples
 in training, then evaluate on separate native scenarios and held-out matches.
 
-To inspect the guarded seed 2202 duel, open
-`replays/policy_guard_vs_combat_2202.html`. The JSON trajectory is independently
-replayed through the native engine before the recorder accepts it. Because the
-guard changes early actions, later frame numbers differ from the original.
+### Published-deck timing context
+
+The same generator accepts `--deck-a` and `--deck-b`. Native duels with the
+published Daryl Gravekeepers list opposite Cas Flip Control (seed 2601),
+Matt Goat Control (seed 2604), and Jesse Goat Control (seed 2610) each reach
+the scripted End Phase choices at viewer frames **21, 29, and 36**. Their
+complete duels replay-verify, with 1,119, 1,255, and 872 decisions. Open
+`replays/scapegoat_timing_jesse_seed2610.html` for the separate Jesse
+timing replay. The parent checkpoint had already seen Jesse's Main Deck in
+other duels. The generator exports both the original three-choice
+`.labels.json` and a `.curriculum.labels.json` containing 19 choices per
+duel: early Draw, Standby, and Main Phase passes, a Scapegoat Set, and the
+later End Phase activation. All labels are marked synthetic.
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/generate_scapegoat_timing_probe.py \
+  --seed 2610 \
+  --deck-a examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --deck-b examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+  --output replays/scapegoat_timing_jesse_seed2610.json
+PYTHONPATH=src:. .venv/bin/python scripts/render_replay.py \
+  replays/scapegoat_timing_jesse_seed2610.json --reviewer-reveal \
+  --output replays/scapegoat_timing_jesse_seed2610.html
+```
+
+The three-choice policy trained on Cas and Matt passed at the later opponent
+End Phase in the Jesse replay. With the broader curriculum and a tenfold
+`chain` label weight, it activated there and passed at Jesse's early Draw,
+Standby, and Main Phase prompts. It also activated at the *earlier* opponent
+End Phase, which may be reasonable. On a separate teacher holdout, it still
+activated Scapegoat four times during an opponent Main Phase when the
+teacher passed. The [evaluation log](evaluation.md) records the exact
+agreement and tournament limits; this is not a promoted policy.
 
 ## Repeatable review process
 

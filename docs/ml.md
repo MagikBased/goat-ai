@@ -119,6 +119,17 @@ step. This experiment preserved overall win rate against its parent in one
 held-out schedule but did not improve it, and Scapegoat agreement worsened
 where the teacher passed. See [evaluation](evaluation.md).
 
+The timing generator also supports `--deck-a`, `--deck-b`, and a required
+`--output` for custom decks. Beside the trajectory, it writes a
+`.curriculum.labels.json` with early Scapegoat passes and the later
+activation. `--label-kind-weight chain=10` raises the training loss weight
+of selected chain responses without hiding the early-pass labels. This
+weight changes only the learning objective; the engine still supplies all
+legal actions. The tested published-deck curriculum transferred its timing
+choice to a separate Jesse replay, although Jesse's Main Deck was present
+in the parent checkpoint's training games. It did not establish better duel
+results.
+
 For a controlled baseline, collect heuristic decisions against RandomAgent in both seats and train on only those decisions:
 
 ```bash
