@@ -407,6 +407,16 @@ Main Phase. The next data pass should add independent threat and no-threat
 board contexts and authorized expert examples where available; evaluate
 Scapegoat calibration and win rate together. See [evaluation](evaluation.md).
 
+An opt-in visible-state guard now rejects Sakuretsu Armor under face-up Royal
+Decree. A separate `policy_review` annotation source lets reviewers correct
+checkpoint-attributed policy decisions without misclassifying them as human
+demonstrations. Five such choices transferred to fixed Scapegoat states, but
+the child split 31–32–1 against its parent in 64 unseen-Main-Deck games.
+The new verified replay shortlist found only one clear Heavy Storm resource
+error across eight additional games; its Scapegoat prompts need contextual
+review before labeling. Prioritize independent high-quality decision data and
+cross-deck play gains; neither the guard nor review-fit child closes M4.
+
 ## M5 — Search and other formats
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

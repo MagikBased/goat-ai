@@ -85,6 +85,76 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/record_policy_match.
   --output replays/policy_audit_v19_jesse_daryl_seed2612.json
 ```
 
+## Repeatable policy replay shortlist, seeds 2640–2647
+
+`scripts/audit_policy_replays.py` replays each complete duel against the pinned
+native assets, runs the legal-choice visibility audit, verifies every recorded
+policy action against the named checkpoint and inference version, then searches
+**only the policy seat's player-visible decisions** for review candidates.
+It reports selected Heavy Storm with only other own backrow, Sakuretsu under
+visible Royal Decree, own-only Torrential or Ring use, and Scapegoat passes in
+an opponent Battle or End Phase with an open monster field. Repeated priority
+passes in the same turn and phase are collapsed. The script never produces
+training labels or claims that each candidate is a mistake; the reviewer must
+check card context, alternatives, and later outcomes.
+The recorder now tags the updated opt-in guard as
+`greedy_tactical_guard_v3`; the audit rejects older guard versions rather
+than silently rescoring them with changed filters. A guarded seed-2648
+Chaos Return/Warrior duel replay-verified for 803 decisions, and all its
+checkpoint actions reproduced under the v3 tag.
+
+Eight new greedy feature-19 checkpoint games against TacticalHeuristicAgent v3
+completed and replay-verified, totaling **5,478 decisions**, including **2,780
+checkpoint-matched policy decisions**. Chaos Return and
+Chaos Control each played Warrior with the policy in both seats; four other
+games paired Jesse Goat Control, Matt Goat Control, Daryl Gravekeepers, and Cas
+Flip Control at seeds 2644–2647. The shortlist found **eight candidates**:
+one Heavy Storm, six Battle Phase Scapegoat passes, and one opponent End Phase
+Scapegoat pass. These eight games are a diagnostic sample, not a balanced
+strength estimate. Both batches passed the separate visibility audit.
+
+The strongest new finding is viewer frame **785** of
+`replays/policy_batch_v19_jesse_daryl_2644_p1.json`: policy P1 activated a
+previously Set Heavy Storm while its own face-up pre-errata Necrovalley was
+the only *other* Spell/Trap on the field. The opponent had no backrow and
+`battle_phase` was legal. The opponent had 100 LP and a face-up 1500 ATK
+monster; P1 had a ready 1600 ATK Breaker, so proceeding to battle offered an
+immediate visible winning attack. The Storm consumed the policy's Field Spell
+without removing an opposing Spell/Trap. This is one action-level resource
+error in a game P1 eventually won, not evidence of an outcome change.
+Open `replays/policy_batch_v19_jesse_daryl_2644_p1.html#decision=785` for the
+player-visible frame.
+
+Frames **849** and **867** of
+`replays/policy_batch_v19_jesse_cas_2646_p0.json` merit review: P0 had no
+monsters and passed on a legal Set Scapegoat during the opponent's Battle Step
+at 2400 LP, then again at that opponent's End Phase at 1300 LP after taking
+1100 damage. In contrast, frames 132 and 137 of the Chaos Control/Warrior
+game show only one 2000 ATK attacker against 6000 LP; preserving Scapegoat
+there may be sound. None of these seven timing prompts has been added as a
+training label. The classifier uses no future state; the damage comparison
+above is a reviewer observation after the game.
+
+The two ignored local shortlist reports are
+`artifacts/policy_review_candidates_batch_2640_2641.json` (SHA-256
+`fb861d1004ab3ceb8259973045efe22d156bd6a873fa0c7a050bfaad3904c48b`)
+and `artifacts/policy_review_candidates_batch_2644_2647.json` (SHA-256
+`d8eb6361a54c35358eee2febf84b8098f1470fc0671242de1e0a7fa396768cdb`).
+For example, regenerate the strong Heavy Storm case and its shortlist with:
+
+```bash
+OMP_NUM_THREADS=1 .venv/bin/python scripts/record_policy_match.py \
+  checkpoints/tactical_v3_fv19_2500_2503.pt \
+  --deck1 examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+  --deck2 examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --seed 2644 --policy-seat 1 --opponent tactical \
+  --output replays/policy_batch_v19_jesse_daryl_2644_p1.json
+PYTHONPATH=src .venv/bin/python scripts/audit_policy_replays.py \
+  --checkpoint checkpoints/tactical_v3_fv19_2500_2503.pt \
+  replays/policy_batch_v19_jesse_daryl_2644_p1.json \
+  --output artifacts/policy_review_candidates_2644.json
+```
+
 ## Scapegoat turn-owner timing probe, seed 52
 
 `scripts/generate_scapegoat_timing_probe.py` creates a complete, native,
