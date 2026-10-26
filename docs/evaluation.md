@@ -4329,3 +4329,48 @@ for workers in 1 4; do
     > ".cache/goat-ai/indianapolis_2005_random_5100_5101_${workers}.stdout"
 done
 ```
+
+## Feature-v23 policy on unseen 2005 and later tournament decks
+
+The feature-v23 clone of TacticalHeuristicAgent v6, checkpoint SHA-256
+`1f0b57d517fc7e2475b7d81b072ac0fda47ff1d744ef5855dd767e355586e090`,
+was evaluated against TacticalHeuristicAgent v7. Three pairings used Jesse
+Twohig versus Michael Fukuyama, Jesse versus the sourced Warrior deck, and
+Michael versus Chaos Return. All four Main Deck compositions passed the
+checkpoint's strict unseen-Main-Deck gate. Seeds 6600–6603, both deck
+assignments, and both agent seats produced 48 complete duels per mode under
+the 5,000-decision cap. The opponent is a revised version of the policy's
+training teacher, so this is a useful baseline rather than an independent
+human-strength benchmark.
+
+| Candidate inference | Wins–losses | Score | Paired-bootstrap 95% score interval |
+| --- | ---: | ---: | ---: |
+| Greedy checkpoint | 16–32 | 33.3% | 20.8%–45.8% |
+| Greedy with tactical v3 and weak-Flip guard | 18–30 | 37.5% | 25.0%–50.0% |
+
+The guarded-minus-unguarded score difference on the matched schedule was
+**+4.2 percentage points** with a paired-bootstrap 95% interval of
+**−8.3 to +16.7 points**. It is not a demonstrated gain. Guarded assigned-deck
+scores were 4–4 on Chaos Return, 5–11 on Jesse Goat Control, 6–10 on Michael
+Goat Control, and 3–5 on Warrior. The one-run four-worker wall times were
+24.84 s unguarded and 19.77 s guarded on Linux 6.8.0-146-generic; inference
+mode changes game lengths, so these times do not isolate model speed.
+
+In a separate seed-6600 Jesse-versus-Warrior recording, the unguarded policy
+Normal Summoned Magician of Faith in 300 ATK while an opposing Set monster and
+Set back row were present. Setting Faith was legal at viewer frame 90. The
+408-decision complete duel replay-verified; the replay audit reproduced all
+196 policy choices and shortlisted that weak-Flip summon. This is a specific
+visible decision candidate for review, not proof that setting would have won
+that duel. The ignored report SHA-256 values are
+`dc5a655cdcf66e7499602de4a687f2ef0cfe50a2536395ce5614978c243754d9`
+and `8c30b65c505447960cb83b99f6c3587a4de4d8a8392787c3383f7632ba92f652`.
+The ignored trajectory SHA-256 is
+`d6eafe847bd8cfbdc07b205655ceccef5d7079f29b9772b3f1e5654c8579f87a`.
+
+Reproduce by invoking `scripts/evaluate_policy.py` with the checkpoint above,
+`--engine experimental --opponent tactical --require-unseen-main-decks`,
+`--both-deck-assignments --seed 6600 --seeds 4 --workers 4`, and the three
+`--matchup` pairs listed above. Add `--tactical-guard --weak-flip-guard` for
+the second mode. The next training step needs independent, reviewed examples
+across decks and a held-out result against opponents not used as teachers.

@@ -605,7 +605,18 @@ addresses those visible cases, but its broader strength is unmeasured.
 Next, train on more independent reviewed decisions and add public context for
 control-change and summon-response value before any promotion claim.
 
+An additional strict unseen-Main-Deck evaluation of the feature-v23 tactical
+clone on Jesse/Michael 2005 Goat Control, Warrior, and Chaos Return pairings
+scored 16–32 against Tactical v7 over 48 seat-swapped duels. Applying the
+optional tactical and weak-Flip guard scored 18–30 on the same schedule; the
+paired difference interval spans a loss and a gain. A complete replay in that
+schedule confirms the unguarded policy still Normal Summoned Magician of Faith
+with a legal Set available. See [evaluation](evaluation.md). M4 remains open;
+collect independent reviewed decisions and demonstrate a cross-deck strength
+gain before selecting a default inference correction.
+
 ## M5 — Search and other formats
+
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
 
