@@ -1386,6 +1386,14 @@ training time by about 2% and increasing observed peak RSS by 3,604 KiB. This
 is a modest local saving, not a change to the default or evidence of stronger
 play; see [the benchmark](benchmarks.md#reusing-visible-ppo-features-from-rollout-27-october-2026).
 
+A separate four-duel PPO profile on sourced decks found native observation
+construction, policy forward calls, and visible feature encoding to be the
+largest recurring Python costs in that sample. Its four replays and checkpoint
+matched an unprofiled reference exactly; the observed profile overhead is
+reported separately. The next speed experiment should target the frequent
+observation path and preserve exact visible decisions; see
+[the profile](benchmarks.md#four-duel-ppo-training-profile-27-october-2026).
+
 Clipped PPO with frozen-parent KL now caches parent action probabilities once
 per recorded decision instead of recomputing them in each epoch. One matched
 native training game kept its 2,384-decision trajectory byte-identical and

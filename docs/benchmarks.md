@@ -1,5 +1,54 @@
 # Native benchmark log
 
+## Four-duel PPO training profile (27 October 2026)
+
+One complete feature-v23 PPO rollout was profiled to choose a measured next
+speed experiment. The parent checkpoint was
+`fv23_tactical_v14_unseen_fourdeck_continuation.pt` (SHA-256
+`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`).
+On an Intel Core i7-10700K, one Torch CPU thread, Jesse Goat Control versus
+Warrior, seeds 23400–23403, four terminal duels produced **2,126 total
+decisions** and **417 learner decisions**. Two PPO epochs used minibatches of
+16. Every recorded duel replay-verified on the pinned native assets and passed
+the player-visibility audit.
+
+The `cProfile` run reported 5.570 seconds inside the trainer, while one
+unprofiled run on identical seeds and settings reported 3.946 seconds. Each
+duel had the same decision count in both runs; all four trajectory files were
+byte-identical and all 38 model tensors were exactly equal. The 1.624-second
+timing difference is profiling overhead plus ordinary run variation, **not**
+an optimization gain. The profile's cumulative Python times overlap callers:
+
+| Repeated function | Calls | Profile cumulative time |
+| :--- | ---: | ---: |
+| Native observation construction | 2,130 | 1.040 s |
+| Policy forward (internal) | 605 | 0.848 s |
+| Visible decision encoding | 941 | 0.658 s |
+| Native response processing | 2,126 | 0.450 s |
+| Replay JSON writing | 4 | 0.055 s |
+
+Observation construction is the next candidate for a matched optimization
+experiment because it runs at nearly every native decision. The profile does
+not justify removing observations, weakening hidden-information redaction, or
+assuming these cumulative times translate directly into whole-run savings.
+PyTorch imports also appeared prominently in this short-process profile, so
+future comparisons should use longer runs and report complete wall time.
+The ignored profile, checkpoints, reports, trajectories, and replay audit use
+the `ppo_profile_23400` and `ppo_reference_23400` prefixes under
+`.cache/goat-ai/`. Reproduce the profiled arm with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python -m cProfile \
+  -o .cache/goat-ai/ppo_profile_23400.prof scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/ppo_profile_23400.pt --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --seed 23400 --games 4 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 \
+  --ppo-epochs 2 --ppo-batch-size 16 --snapshot-every 4
+```
+
 ## Reusing visible PPO features from rollout (27 October 2026)
 
 The opt-in `--reuse-rollout-features` path retains the learner's already
