@@ -1,6 +1,7 @@
 """Downloaded review labels must match the shortlisted visible decisions."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -8,6 +9,7 @@ from goat_ai.actions import Action
 from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
+from scripts import merge_review_queue_labels as merger
 from scripts import validate_review_queue_labels as validator
 
 
@@ -104,3 +106,56 @@ def test_queue_label_validation_rejects_stale_display_metadata(
     queue.write_text(json.dumps(data))
     with pytest.raises(ValueError, match=message):
         validator.validate_labels(queue, [labels], tmp_path)
+
+
+def test_merge_reviewers_requires_agreement_and_preserves_sources(tmp_path, monkeypatch):
+    queue, first, _ = review_files(tmp_path)
+    monkeypatch.setattr(validator, "verify_trajectory", lambda *_: 2)
+    monkeypatch.setattr(validator, "audit_trajectory_visibility", lambda *_: None)
+    second = tmp_path / "second.json"
+    raw = json.loads(first.read_text())
+    raw["reviewer"] = "Second reviewer"
+    second.write_text(json.dumps(raw))
+    result = merger.merge_labels(queue, [first, second], tmp_path,
+                                 tmp_path / "merged", min_reviewers=2)
+    assert len(result["merged"]) == 1
+    assert result["merged"][0]["decisions"] == 1
+    assert not result["unresolved"]
+    annotation = json.loads(Path(result["merged"][0]["annotation"]).read_text())
+    assert annotation["choices"] == [{"decision_index": 0, "action_index": 1}]
+    assert annotation["aggregation"]["decision_provenance"] == [
+        {"decision_index": 0, "reviewers": ["Second reviewer", "Test reviewer"]}]
+    assert len(annotation["aggregation"]["source_label_sha256"]) == 2
+
+
+def test_merge_reviewers_holds_conflicts_and_insufficient_votes(tmp_path, monkeypatch):
+    queue, first, _ = review_files(tmp_path)
+    monkeypatch.setattr(validator, "verify_trajectory", lambda *_: 2)
+    monkeypatch.setattr(validator, "audit_trajectory_visibility", lambda *_: None)
+    second = tmp_path / "second.json"
+    raw = json.loads(first.read_text())
+    raw["reviewer"] = "Second reviewer"
+    raw["choices"][0]["action_index"] = 0
+    second.write_text(json.dumps(raw))
+    result = merger.merge_labels(queue, [first, second], tmp_path,
+                                 tmp_path / "conflict", min_reviewers=1)
+    assert not result["merged"]
+    assert result["unresolved"][0]["reason"] == "conflict"
+    single = merger.merge_labels(queue, [first], tmp_path,
+                                 tmp_path / "single", min_reviewers=2)
+    assert not single["merged"]
+    assert single["unresolved"][0]["reason"] == "insufficient_reviews"
+
+
+def test_merge_rejects_same_reviewer_contradiction(tmp_path, monkeypatch):
+    queue, first, _ = review_files(tmp_path)
+    monkeypatch.setattr(validator, "verify_trajectory", lambda *_: 2)
+    monkeypatch.setattr(validator, "audit_trajectory_visibility", lambda *_: None)
+    second = tmp_path / "second.json"
+    raw = json.loads(first.read_text())
+    raw["reviewer"] = "test REVIEWER"
+    raw["choices"][0]["action_index"] = 0
+    second.write_text(json.dumps(raw))
+    with pytest.raises(ValueError, match="contradicted their choice"):
+        merger.merge_labels(queue, [first, second], tmp_path, tmp_path / "merged")
+    assert not (tmp_path / "merged").exists()

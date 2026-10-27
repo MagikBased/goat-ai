@@ -263,6 +263,28 @@ The validator checks the exact replay SHA-256, native replay, player-visible
 audit, policy-seat authorization, legal action index, shortlist membership,
 checkpoint identity, and each shortlisted frame's displayed action and decision
 metadata against the replay. Its report records the policy checkpoint SHA-256.
+
+When several people review the same duel, use the separate merge command to
+combine their downloaded exports. It validates every input against the native
+duel and original queue, accepts a decision only when all distinct reviewer
+names choose the same legal action, and writes one annotation per replay for
+the cloning trainer. Conflicts and decisions below the chosen reviewer count
+stay in `manifest.json` without becoming training labels. Reviewer names are
+self-reported; the merge does not authenticate independent people.
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/merge_review_queue_labels.py \
+  replays/review_fixed_policy_44000_full/queue.json \
+  /path/to/reviewer_one.json /path/to/reviewer_two.json \
+  --native-root .cache/goat-ai --min-reviewers 2 \
+  --output-dir .cache/goat-ai/merged_human_review_example
+```
+
+The output manifest records the queue and input label hashes, source replay
+paths, merged annotation paths, and unresolved votes. Supply each merged
+replay/annotation pair to `train_behavioral_clone.py` with its existing
+`--annotation-for TRAJECTORY=LABELS` option; keep these human-reviewed labels
+distinct from synthetic Tactical suggestions in checkpoint provenance.
 It reports the changed-choice count and the replay/label pairs needed by
 `train_behavioral_clone.py --annotation-for`. It does not infer that the
 reviewer's action is strategically optimal. A synthetic recorded-action
