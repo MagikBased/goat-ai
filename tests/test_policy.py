@@ -1572,6 +1572,30 @@ def test_ppo_decision_weights_change_conflicting_updates():
     assert probabilities[0] > probabilities[1]
 
 
+def test_ppo_caches_frozen_parent_scores_across_epochs(monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    choices = actions()
+    records = tuple(DecisionRecord(view(), choices[:2 + index % 2],
+                                   choices[index % 2]) for index in range(5))
+    torch.manual_seed(85)
+    policy = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    parent = copy.deepcopy(policy).eval().requires_grad_(False)
+    calls = 0
+    original = parent.forward_batch
+
+    def counted(features):
+        nonlocal calls
+        calls += 1
+        return original(features)
+
+    monkeypatch.setattr(parent, "forward_batch", counted)
+    optimizer = torch.optim.SGD(policy.parameters(), lr=0.001)
+    ppo_clipped_update(policy, vocabulary, records, 1.0, 0.0, optimizer,
+                       epochs=3, batch_size=2, parent_model=parent,
+                       parent_kl_weight=0.1)
+    assert calls == 3  # one pass over five records, independent of PPO epochs
+
+
 def test_policy_gradient_uses_sampling_temperature_in_log_probability():
     class TwoLogitPolicy(torch.nn.Module):
         feature_version = 1

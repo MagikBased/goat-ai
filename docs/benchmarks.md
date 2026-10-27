@@ -1,5 +1,48 @@
 # Native benchmark log
 
+## Cached frozen-parent scores for PPO (27 October 2026)
+
+With `--parent-kl-weight`, clipped PPO previously re-ran the unchanged
+parent model for every shuffled minibatch in every epoch. It now scores each
+record once, before the update, and reuses those player-visible probabilities.
+The cache stores two float vectors per recorded legal-action set; its memory
+use grows with the total number of legal actions in the update. A focused test
+confirms that five records in three epochs cause three parent batch calls at
+batch size two, rather than nine.
+
+A single matched native training game used the feature-v23 checkpoint SHA-256
+`93ca70795e2c5316ab349a4e5c61ebd553915e49abdbe469d0976d3bebe3d9b2`,
+control/Chaos probe decks, seed 18101, three PPO epochs, batch size 16,
+parent KL weight 0.1, and one Torch CPU thread. Complete reported training
+time was **8.203 s before** and **7.586 s after** (1.081× in this one pair).
+Both arms recorded 2,384 decisions, including 965 learner decisions, in
+byte-identical trajectories (SHA-256
+`818e97d173fa41ffcc527ffd6b2772f7e7f05780ee4a779a43a5def717d6883a`).
+The updated trajectory replay-verified all 2,384 decisions and passed the
+visibility audit. The reported PPO loss was identical. Changed minibatch
+grouping for frozen-parent inference gives slightly different floating-point
+weights: all 965 recorded learner decisions retained the same top action,
+and the maximum logit difference was 0.000727. This is a one-game CPU timing,
+not evidence of a strength gain or a reliable scaling factor.
+
+Reproduce each arm at its corresponding source revision with a fresh output
+name:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v6_current_assets.pt \
+  --output .cache/goat-ai/ppo_parent_kl_MODE_18101.pt \
+  --engine experimental \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk \
+  --seed 18101 --games 1 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-epochs 3 --ppo-batch-size 16 \
+  --parent-kl-weight 0.1
+```
+
+The pre-cache arm used commit `b8acffb`; the cached arm uses the current
+revision. Both ignored output logs and checkpoints are under `.cache/goat-ai/`
+with `ppo_parent_kl_before_18101` and `ppo_parent_kl_after_18101` prefixes.
+
 ## Single-process batched PPO inference (27 October 2026)
 
 The optional `--rollout-batch-inference` path advances independent native

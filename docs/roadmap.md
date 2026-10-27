@@ -1294,3 +1294,11 @@ measured CPU. Four process workers remain faster for this workload; the new
 mode is an experiment for machines where process scaling or accelerator
 inference changes that tradeoff. See
 [the full benchmark](benchmarks.md#single-process-batched-ppo-inference-27-october-2026).
+
+Clipped PPO with frozen-parent KL now caches parent action probabilities once
+per recorded decision instead of recomputing them in each epoch. One matched
+native training game kept its 2,384-decision trajectory byte-identical and
+reduced reported training time from 8.203 to 7.586 seconds; minor floating-point
+weight differences left all 965 recorded learner top actions unchanged. This
+speeds a regularized update but does not address M4's held-out strength gate;
+see [the measurement](benchmarks.md#cached-frozen-parent-scores-for-ppo-27-october-2026).

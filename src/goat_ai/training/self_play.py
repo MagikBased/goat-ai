@@ -444,6 +444,8 @@ def ppo_clipped_update(
                 for record in records]
     selected = [record.legal_actions.index(record.selected_action) for record in records]
     old_log_probs = []
+    parent_log_prob_rows: list[torch.Tensor] = []
+    parent_prob_rows: list[torch.Tensor] = []
     model.eval()
     with torch.no_grad():
         for start in range(0, len(records), batch_size):
@@ -453,6 +455,14 @@ def ppo_clipped_update(
                                    dtype=torch.long, device=device)
             log_probs = torch.log_softmax(logits / temperature, dim=1)
             old_log_probs.extend(log_probs.gather(1, choices[:, None]).squeeze(1).tolist())
+            if parent_kl_weight:
+                parent_logits, _ = parent_model.forward_batch(batch)
+                parent_log_probs = torch.log_softmax(parent_logits / temperature, dim=1)
+                for row, record in zip(parent_log_probs, records[start:start + batch_size],
+                                       strict=True):
+                    trimmed = row[:len(record.legal_actions)].clone()
+                    parent_log_prob_rows.append(trimmed)
+                    parent_prob_rows.append(trimmed.exp())
     model.train()
     rng = random.Random(random_seed)
     total_loss = 0.0
@@ -484,11 +494,12 @@ def ppo_clipped_update(
                 ratio, advantage, clip_epsilon)).mean()
                     - entropy_coefficient * (weights * entropy).mean())
             if parent_kl_weight:
-                with torch.no_grad():
-                    parent_logits, _ = parent_model.forward_batch(
-                        [features[index] for index in indices])
-                    parent_log_probs = torch.log_softmax(parent_logits / temperature, 1)
-                    parent_probs = parent_log_probs.exp()
+                parent_log_probs = torch.nn.utils.rnn.pad_sequence(
+                    [parent_log_prob_rows[index] for index in indices],
+                    batch_first=True, padding_value=0.0)
+                parent_probs = torch.nn.utils.rnn.pad_sequence(
+                    [parent_prob_rows[index] for index in indices],
+                    batch_first=True, padding_value=0.0)
                 loss = loss + parent_kl_weight * (
                     weights * (parent_probs * (
                         parent_log_probs - log_probs)).sum(1)).mean()
