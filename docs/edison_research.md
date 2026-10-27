@@ -100,6 +100,30 @@ PYTHONPATH=src:. .venv/bin/python scripts/probe_native.py --mode mr1_startup --s
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q tests/test_mr1_startup.py
 ```
 
+The separate `Mr1VanillaEngine` now runs **complete Normal Monster duels**
+under the same unmodified MR1 mode, using the common observation, action,
+trajectory, replay-verification, and visibility-audit boundaries. Its ruleset
+label is `mr1-vanilla-protocol`, separate from GOAT and Edison. It accepts only
+40–60 pinned-database Normal Monsters in the Main Deck, with at most three
+canonical copies and empty Extra/Side Decks. No card-specific scripts or GOAT
+metadata overrides are loaded. The seed-42 fixture finished in 1,368 decisions with
+winner seat 1; its complete trajectory replay-verified and passed the
+player-visibility audit. An opening-decision differential also produced equal
+observations and legal actions when only the hidden opponent Deck changed.
+Run the example after native setup:
+
+```sh
+PYTHONPATH=src:. .venv/bin/python examples/play_mr1_vanilla.py \
+  --seed 42 --trajectory replays/mr1_vanilla_42.json
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_startup.py tests/test_mr1_vanilla_duel.py
+```
+
+This establishes a second native mode's complete-duel protocol only. It does
+not apply the March 2010 restriction list or release cutoff and does not test
+effect cards, Synchro Summoning, 2010 rulings, or Edison deck legality. The
+`mr1_startup` mode remains read-only and refuses gameplay responses.
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including
@@ -114,6 +138,7 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q tests/te
    should settle individual cases.
 4. Audit player-visible observations and legal actions in Edison fixtures, then
    complete seeded duels and replay verification before benchmarking throughput.
+   The MR1 vanilla fixture checks this protocol for Normal Monsters only.
 
 No Edison simulator, deck-legality claim, or Edison training data is available
 yet. Keep GOAT and Edison trajectory ruleset versions distinct.

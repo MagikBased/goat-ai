@@ -929,9 +929,12 @@ The [Edison feasibility audit](edison_research.md) records the official March
 2010 Advanced Format restrictions as a checked data asset and lists the
 remaining card-pool, native-rule, and observation validation gates. This is
 M5 preparation; Edison duels are not yet supported.
-The pinned core's MR1 mode now has a separate vanilla-only first-decision
-startup probe. It confirms the mode can initialize and draw on turn one;
-2010 effects, Synchro actions, observations, and complete duels remain open.
+The pinned core's MR1 mode now has a separate vanilla-only startup probe and
+complete-duel adapter. The seed-42 Normal Monster fixture completes 1,368
+decisions through the common environment, then replay-verifies and passes the
+visibility audit. This is an MR1 protocol result, not an Edison duel: the
+2010 release pool, restrictions, effect scripts, Synchro actions, and historical
+rulings remain open.
 An independent 2009 deck-construction validator now accepts an explicitly
 audited eligible-card set and checks Main, Extra, and Side sizes, Fusion/Synchro
 placement, and shared canonical copy caps. It deliberately does not infer

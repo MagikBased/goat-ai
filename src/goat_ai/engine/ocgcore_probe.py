@@ -280,11 +280,11 @@ def split_messages(buffer: bytes) -> tuple[bytes, ...]:
 class OcgcoreProbe:
     # The reference path remains available for a matched native ablation.
     use_field_summary_queries = True
-    """Owns one native duel; intended only for startup verification."""
+    """Owns one native duel; MR1 gameplay remains restricted to vanilla cards."""
 
     def __init__(self, library: Path, database: Path, scripts: Path, *,
-                 mode: Literal["goat", "mr1_startup"] = "goat") -> None:
-        if mode not in ("goat", "mr1_startup"):
+                 mode: Literal["goat", "mr1_startup", "mr1_vanilla"] = "goat") -> None:
+        if mode not in ("goat", "mr1_startup", "mr1_vanilla"):
             raise ValueError("unsupported native startup mode")
         self.mode = mode
         self.flags = GOAT_FLAGS if mode == "goat" else MR1_FLAGS
@@ -293,7 +293,7 @@ class OcgcoreProbe:
         self.db = sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True)
         goat_database = database.parent / "goat-entries.cdb"
         self._has_goat_database = goat_database.is_file()
-        if self._has_goat_database:
+        if self.mode == "goat" and self._has_goat_database:
             self.db.execute("ATTACH DATABASE ? AS goat",
                             (f"file:{goat_database.resolve()}?mode=ro",))
         unofficial_database = database.parent / "cards-unofficial.cdb"
@@ -383,7 +383,7 @@ class OcgcoreProbe:
             data.setcodes = self._setcodes[code]
 
     def _card_row(self, code: int, columns: str):
-        if self._has_goat_database:
+        if self.mode == "goat" and self._has_goat_database:
             row = self.db.execute(f"SELECT {columns} FROM goat.datas WHERE id=?",
                                   (code,)).fetchone()
             if row is not None:
@@ -398,7 +398,7 @@ class OcgcoreProbe:
 
     def decode_pending(self):
         """Decode the native prompt using the pinned historical card-name catalog."""
-        if getattr(self, "mode", "goat") != "goat":
+        if getattr(self, "mode", "goat") == "mr1_startup":
             raise RuntimeError("MR1 startup probe does not expose gameplay decisions")
         from goat_ai.engine.native_messages import decode_decision
 
@@ -466,7 +466,7 @@ class OcgcoreProbe:
         if relative.is_absolute() or ".." in relative.parts:
             self.errors.append(f"unsafe script path: {relative}")
             return 0
-        if (self.mode == "mr1_startup" and relative.name.startswith("c")
+        if (self.mode != "goat" and relative.name.startswith("c")
                 and relative.suffix == ".lua" and relative.stem[1:].isdigit()):
             # Core requests a script for each card, even when a normal monster
             # needs none. The deck was checked before any cards were inserted.
@@ -495,7 +495,7 @@ class OcgcoreProbe:
                 self.errors.append(f"missing script: {relative}")
             return 0
         relative_path = path.relative_to(self.scripts).as_posix()
-        if (self.mode == "mr1_startup" and path.parent != self.scripts
+        if (self.mode != "goat" and path.parent != self.scripts
                 and not (relative == Path("proc_unofficial.lua")
                          and path.parent == self.scripts / "unofficial")):
             self.errors.append(f"MR1 startup probe cannot load {relative}")
@@ -638,7 +638,7 @@ class OcgcoreProbe:
             raise ValueError("probe deck requires at least six cards")
         if len(deck) < 40 or (opponent_deck is not None and len(opponent_deck) < 40):
             raise ValueError("native duel requires at least 40 main-deck cards per player")
-        if self.mode == "mr1_startup":
+        if self.mode != "goat":
             if extra or opponent_extra:
                 raise ValueError("MR1 startup probe requires empty Extra Decks")
             for code in (*deck, *(opponent_deck if opponent_deck is not None else deck)):
@@ -1009,7 +1009,7 @@ class OcgcoreProbe:
 
     def observation(self, viewer: int, *, terminal: bool = False) -> Observation:
         """Build a redacted view; only audited fields are requested or returned."""
-        if getattr(self, "mode", "goat") != "goat":
+        if getattr(self, "mode", "goat") == "mr1_startup":
             raise RuntimeError("MR1 startup probe does not expose gameplay observations")
         if (self._pending_message is None and not terminal) or viewer not in (0, 1):
             raise RuntimeError("observation requires a pending decision and valid viewer")
@@ -1179,7 +1179,7 @@ class OcgcoreProbe:
 
     def respond(self, response_value: int | bytes) -> NativeTransition:
         """Send one native response and process until another decision or terminal."""
-        if getattr(self, "mode", "goat") != "goat":
+        if getattr(self, "mode", "goat") == "mr1_startup":
             raise RuntimeError("MR1 startup probe does not resolve gameplay")
         if self._pending_message is None:
             raise RuntimeError("no pending native decision")
