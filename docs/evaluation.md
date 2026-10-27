@@ -5899,3 +5899,37 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/benchmark_inference_mode.py \
   .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
   --games 4 --rounds 2 --seed 12000
 ```
+
+### Player-visible disagreement review queue (27 October 2026)
+
+`scripts/shortlist_policy_disagreements.py` now turns existing greedy policy
+replays into a bounded human-review queue. It requires the matching checkpoint
+hash, replays each complete duel against pinned native assets, audits the
+recorded visibility boundary, and reproduces the complete greedy agent's
+choices, including its cancel/selection safeguards. It then asks Tactical-v14
+what it would choose from each *recorded player-visible legal set*. Different
+choices are ranked by the model's probability margin and limited by response
+pattern and replay. Each counterfactual teacher choice starts with fresh
+agent memory, so a teacher-proposed attack that the policy never executed
+cannot influence a later label. This ranking is a review priority only:
+Tactical may be wrong, probability is not a value estimate, and neither
+choice becomes a training label without a separate human preference annotation.
+
+The four seeds 12100–12103 across both sourced Jesse/Warrior and DingoSig
+Return/Flip matchups and both policy seats supplied **16 complete,
+replay-verified duels**, **7,071 verified decisions**, and **291
+disagreements** among 3,505 policy-seat choices. The bounded queue selected
+20 different review prompts from 14 replay viewers. The generated
+`review_queue_12100_12103.html` index presents card names and direct frame
+links; all 20 local links resolve. Queue entries expose selected legal-action
+summaries and omit raw observations and outcomes. The ignored queue is
+`.cache/goat-ai/review_queue_12100_12103.json` (SHA-256
+`a15bc87e72dc19f0b75990e55417821feabb52749c3f4a02966790baf2c27b1b`).
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  .cache/goat-ai/policy_vs_tactical_12100_12115/matchup_*_seed_1210[0-3]_seat_*.json \
+  --limit 20 --per-replay 2 \
+  --output .cache/goat-ai/review_queue_12100_12103.json --render-viewers
+```

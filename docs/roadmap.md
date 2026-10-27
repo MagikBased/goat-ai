@@ -1054,6 +1054,13 @@ demonstrate a direct parent gain, broad competitive strength, or self-play
 gain. Keep the v23 parent as reference; [the pilot log](evaluation.md#on-policy-teacher-diversity-pilot-27-october-2026)
 records the decks, pins, and report hashes.
 
+A player-visible review queue now ranks diverse policy/Tactical disagreements
+from native-verified, checkpoint-attributed greedy replays. Its first 16-duel
+pass selected 20 of 291 disagreements for human inspection. These are not
+ground-truth labels; reviewed preferences and fresh held-out outcome gains
+remain necessary before using them to support an M4 strength claim. See
+[the queue protocol](evaluation.md#player-visible-disagreement-review-queue-27-october-2026).
+
 Four-duel PPO rollout batching and equal-duel loss weighting were tested
 from that same parent on the same 32-game training schedule. The unweighted
 rollout child lost 20–44 to single-duel PPO on 64 held-out games; the
