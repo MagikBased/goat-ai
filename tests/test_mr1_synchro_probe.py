@@ -23,6 +23,10 @@ from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from scripts.record_mr1_black_rose_probe import GEMINI_ELF, record_probe
 from scripts.record_mr1_stardust_probe import record_probe as record_stardust_probe
+from scripts.record_mr1_stardust_black_rose_probe import (
+    SURVIVING_NORMAL,
+    record_probe as record_stardust_black_rose_probe,
+)
 from scripts.record_mr1_synchro_probe import record_attack_probe, select_setup_action
 from scripts.render_replay import render_replay
 
@@ -226,6 +230,52 @@ def test_mr1_stardust_negates_mirror_force_and_returns_at_end_phase(
                        if record.observation.turn == 5
                        for card in record.observation.field)
     path = tmp_path / "stardust.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, Mr1SynchroProbeEngine(native_root)) == decisions
+    assert audit_trajectory_visibility(loaded)["decisions"] == decisions
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("negate,decisions,resolved,revived", (
+    (True, 1621, 79, 88), (False, 1230, 78, None)))
+def test_mr1_stardust_response_to_black_rose_wipe_completes_and_replays(
+        tmp_path, negate, decisions, resolved, revived):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    trajectory, (choice, resolution, returned) = record_stardust_black_rose_probe(
+        native_root, negate=negate)
+    assert choice == ("chain" if negate else "pass", 77)
+    assert (resolution, returned) == (resolved, revived)
+    assert len(trajectory.decisions) == decisions
+    assert trajectory.winner == 1
+    assert trajectory.ruleset == "mr1-synchro-protocol"
+    for code in (BLACK_ROSE_DRAGON, STARDUST_DRAGON, JUNK_SYNCHRON):
+        assert f"scripts/official/c{code}.lua" in trajectory.asset_sha256
+    response = trajectory.decisions[choice[1] - 1]
+    assert [(link.card_code, link.controller) for link in response.observation.chain] == [
+        (BLACK_ROSE_DRAGON, 1)]
+    assert {(card.code, card.controller) for card in response.observation.field} >= {
+        (BLACK_ROSE_DRAGON, 1), (STARDUST_DRAGON, 0), (SURVIVING_NORMAL, 1)}
+    assert response.selected_action.kind == choice[0]
+    after = trajectory.decisions[resolution].observation
+    assert BLACK_ROSE_DRAGON in {card.code for card in after.graveyards[1]}
+    assert STARDUST_DRAGON in {card.code for card in after.graveyards[0]}
+    assert ((SURVIVING_NORMAL, 1) in {
+        (card.code, card.controller) for card in after.field}) == negate
+    if negate:
+        returned_view = trajectory.decisions[revived].observation
+        assert returned_view.turn == 6 and returned_view.phase == "end"
+        assert (STARDUST_DRAGON, 0) in {
+            (card.code, card.controller) for card in returned_view.field}
+        assert STARDUST_DRAGON not in {
+            card.code for card in returned_view.graveyards[0]}
+    else:
+        assert not any(card.code == STARDUST_DRAGON
+                       for record in trajectory.decisions[resolution:]
+                       if record.observation.turn == 6
+                       for card in record.observation.field)
+    path = tmp_path / "stardust_black_rose.json"
     write_trajectory(path, trajectory)
     loaded = read_trajectory(path)
     assert loaded == trajectory

@@ -1056,6 +1056,13 @@ Stardust at End Phase; the pass branch loses Stardust. Both complete duels
 replay-verify and pass the visibility audit. This remains a narrow protocol
 case, not an Edison historical-correctness or card-pool claim; see
 [the Edison audit](edison_research.md).
+An additional paired MR1 fixture puts Stardust Dragon opposite a newly
+Synchro Summoned Black Rose Dragon. The optional Black Rose wipe offers
+Stardust as a chain response: chaining preserves a separate monster and
+returns Stardust at End Phase, while passing lets the wipe destroy all three
+field monsters. Both terminal duels replay-verify and pass visibility checks.
+This validates one interaction between two 2008 Synchro effects without
+establishing a complete Edison rules profile; see [the Edison audit](edison_research.md#stardust-dragon-versus-black-rose-dragon).
 The existing Exiled Force/Torrential Tribute summon-priority fixture now also
 runs in the MR1 protocol, with both chain and pass branches replay-verified and
 visibility-audited. It checks one rulebook-backed priority interaction while

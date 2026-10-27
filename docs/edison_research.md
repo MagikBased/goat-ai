@@ -284,6 +284,38 @@ This establishes one destruction-response protocol path. It does not validate
 all historical Stardust timings, battle rulings, Synchro materials, or the
 complete Edison release pool and rules profile.
 
+## Stardust Dragon versus Black Rose Dragon
+
+The official [Black Rose Dragon record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7898&ope=2&request_locale=en)
+describes its optional Synchro Summon effect that destroys all cards on the
+field. The official [Stardust Dragon record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7734&ope=2&request_locale=en)
+describes Tributing itself to negate a card or effect that would destroy field
+cards, and its possible End Phase return. These current primary card records
+motivate a narrow MR1 interaction test; they do not independently establish
+every 2010 ruling or printed-text detail.
+
+In paired seed-955 fixtures, player 0 Synchro Summons Stardust from Junk
+Synchron and Curse of Dragon. Player 1 retains a second Normal Monster,
+then Synchro Summons Black Rose from Junk Synchron and Gemini Elf and chooses
+its wipe. At decision 77, the Black Rose effect is the public Chain Link 1 and
+Stardust's controller can either chain Stardust or pass. Chaining Tributes
+Stardust, negates and destroys Black Rose, preserves the extra Normal Monster,
+and returns Stardust at turn 6 End Phase. Passing lets the wipe destroy all
+three field monsters, with no Stardust return. The terminal duels contained
+**1,621** and **1,230** decisions respectively; both serialized, replay-verified
+against the pinned native core, and passed the player-visibility audit. The
+fixture exercises two interacting Synchro effects and their chain/return
+windows, not an Edison deck or full historical rules profile.
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_stardust_black_rose_probe.py \
+  --output replays/mr1_stardust_black_rose_chain_seed955.json
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_stardust_black_rose_probe.py \
+  --decline --output replays/mr1_stardust_black_rose_pass_seed955.json
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_synchro_probe.py
+```
+
 ## Summon priority and Torrential Tribute
 
 The [contemporary 5D's official rulebook](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
