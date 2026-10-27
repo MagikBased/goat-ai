@@ -91,6 +91,30 @@ cache two directory levels above them. The 22 full-queue label views and 22
 reviewer views were regenerated locally with 96 cached card image files;
 art and reviewer sidecars remain outside Git.
 
+For reviews that save as you go, start the local server from the repository
+root:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/serve_review_queue.py \
+  replays/review_fixed_policy_44000_full/queue.json
+```
+
+Open the `http://127.0.0.1:8765/.../queue.html` address printed by the
+command. Choose a legal action in **Open label view**; the sidebar confirms
+**Saved on this computer**. Choices are restored when the page is reopened,
+and **Clear frame label** removes one. The server prints the ignored
+`.cache/goat-ai/review_labels/...` folder where it saves standard label JSON
+files. No name, signature, download, or file move is needed. The saved
+`local-reviewer` value is a provenance alias, not identity verification; use
+`--reviewer-alias` and a separate `--output-dir` if multiple people review the
+same queue. The server binds to localhost. Stop it with Ctrl+C.
+
+Before using those choices for training, run
+`scripts/validate_review_queue_labels.py` on the saved JSON files. That
+command performs the full native replay and visibility checks; saving in the
+browser alone does not establish that a selected move is optimal. Opening
+`queue.html` directly as a file still offers the older manual download path.
+
 To refresh a saved queue after viewer changes, run
 `PYTHONPATH=src:. .venv/bin/python scripts/refresh_review_queue.py
 path/to/queue.json`. Use `--index-only` when its duel pages already use the

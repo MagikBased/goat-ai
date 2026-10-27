@@ -201,16 +201,18 @@
         </div>
         <div class="panel" id="review-panel">
           <h2>Review a decision</h2>
-          <p class="muted">Choose an action from the legal list above to label this frame. Labels are retrospective and stay on this device until downloaded.</p>
+          <p class="muted" id="review-instructions">Choose an action from the legal list above to label this frame. Labels are retrospective and stay on this device until downloaded.</p>
           <p id="annotation-status" class="muted"></p>
           <div class="annotation-actions">
             <button id="label-recorded" type="button">Use recorded action</button>
             <button id="clear-label" type="button">Clear frame label</button>
           </div>
-          <label for="reviewer">Reviewer name</label>
-          <input id="reviewer" type="text" autocomplete="name" placeholder="Your name or alias">
-          <p><label><input id="annotation-consent" type="checkbox"> I created these labels and authorize their use for GOAT AI research.</label></p>
-          <button id="download-labels" type="button">Download labels</button>
+          <div id="manual-review-export">
+            <label for="reviewer">Reviewer alias</label>
+            <input id="reviewer" type="text" placeholder="Alias for offline export">
+            <p><label><input id="annotation-consent" type="checkbox"> I created these labels and authorize their use for GOAT AI research.</label></p>
+            <button id="download-labels" type="button">Download labels</button>
+          </div>
         </div>
         <div class="panel">
           <h2>Known opponent hand</h2>
@@ -261,6 +263,11 @@
     let sourceSha256 = "";
     let annotations = new Map();
     let labelsExported = false;
+    let localReviewMode = false;
+    let localReviewLoading = false;
+    let saveRevision = 0;
+    let saveQueue = Promise.resolve();
+    let saveError = false;
     function notifyLabelState() {
       if (window.parent !== window) window.parent.postMessage(
         {type: "goat-ai-review-label-state", pending: annotations.size > 0 && !labelsExported}, "*");
@@ -283,7 +290,7 @@
     }
     function canAnnotateFrame(observation) {
       const authorization = annotationAuthorization();
-      return !reviewerData && authorization && observation &&
+      return !reviewerData && !localReviewLoading && authorization && observation &&
         (authorization === "policy_review"
           ? observation.acting_player === replay.skill_metadata.demonstrator_seat
           : authorization === "self_play_review"
@@ -1020,7 +1027,7 @@
           button.type = "button";
           button.disabled = !canAnnotateFrame(observation);
           button.addEventListener("click", () => {
-            if (canAnnotateFrame(observation)) { annotations.set(index, actionIndex); labelsExported = false; notifyLabelState(); render(); }
+            if (canAnnotateFrame(observation)) setAnnotation(index, actionIndex);
           });
           item.append(button);
           return item;
@@ -1031,7 +1038,9 @@
       const frameLabel = annotations.get(index);
       byId("annotation-status").textContent = `${annotations.size} labeled frame${annotations.size === 1 ? "" : "s"}`
         + (terminal ? " · Final state" : frameLabel == null ? " · This frame is unlabeled"
-          : ` · This frame: option ${frameLabel + 1}`);
+          : ` · This frame: option ${frameLabel + 1}`)
+        + (localReviewMode ? saveError ? " · Save failed; use Download labels"
+          : labelsExported ? " · Saved on this computer" : " · Saving…" : "");
       byId("label-recorded").disabled = terminal || !canAnnotateFrame(observation);
       byId("clear-label").disabled = terminal || frameLabel == null;
       const knownHand = observation.known_opponent_hand_cards || [];
@@ -1092,9 +1101,56 @@
       stop(); index = candidate; render();
     }
     function stop() { if (timer) clearInterval(timer); timer = null; byId("play").textContent = "Play"; }
+    function setAnnotation(frame, actionIndex) {
+      if (actionIndex == null) annotations.delete(frame);
+      else annotations.set(frame, actionIndex);
+      labelsExported = false; notifyLabelState(); render();
+      if (!localReviewMode) return;
+      const revision = ++saveRevision;
+      const digest = sourceSha256;
+      saveQueue = saveQueue.catch(() => {}).then(async () => {
+        const response = await fetch("/api/review/choice", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({source: digest, decision_index: frame,
+                                action_index: actionIndex}),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.saved) throw new Error(data.error || "Local save failed");
+        if (digest === sourceSha256 && revision === saveRevision) {
+          labelsExported = true; saveError = false; notifyLabelState(); render();
+        }
+      }).catch(error => {
+        if (digest !== sourceSha256) return;
+        saveError = true; labelsExported = false;
+        byId("manual-review-export").hidden = false;
+        byId("review-instructions").textContent = `Local save failed: ${error.message}. Download labels as a backup.`;
+        notifyLabelState(); render();
+      });
+    }
+    async function loadLocalReview(hash) {
+      try {
+        const response = await fetch(`/api/review/state?source=${encodeURIComponent(hash)}`);
+        if (!response.ok) throw new Error("local review endpoint unavailable");
+        const data = await response.json();
+        if (sourceSha256 !== hash) return;
+        annotations = new Map(data.choices.map(choice => [choice.decision_index,
+                                                            choice.action_index]));
+        localReviewMode = true; labelsExported = true; saveError = false;
+        byId("manual-review-export").hidden = true;
+        byId("review-instructions").textContent = "Choose a legal action. Your review saves automatically on this computer; no name or download is needed.";
+      } catch (_) { /* File viewers and ordinary static servers use offline export. */ }
+      finally {
+        if (sourceSha256 === hash) { localReviewLoading = false; notifyLabelState(); render(); }
+      }
+    }
     function setReplay(data, label, hash) {
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
-      stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map(); labelsExported = false; notifyLabelState();
+      stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map(); labelsExported = false;
+      localReviewMode = false; saveError = false;
+      localReviewLoading = location.protocol === "http:" &&
+        ["127.0.0.1", "localhost"].includes(location.hostname) && /^[a-f0-9]{64}$/.test(hash);
+      byId("manual-review-export").hidden = false;
+      notifyLabelState();
       reviewerData = embeddedReviewer?.source_trajectory_sha256 === hash ? embeddedReviewer : null;
       const seat = data.skill_metadata?.learner_seat ?? data.skill_metadata?.demonstrator_seat;
       boardBottomPlayer = seat === 0 || seat === 1 ? seat : data.decisions[0].observation.viewer;
@@ -1104,6 +1160,7 @@
       const requested = Number(location.hash.match(/^#decision=(\d+)$/)?.[1] || 1);
       index = Math.max(0, Math.min(data.decisions.length - 1 + Number(Boolean(data.terminal_observation)), requested - 1));
       byId("file-name").textContent = label; render();
+      if (localReviewLoading) loadLocalReview(hash);
     }
     byId("file").addEventListener("change", async event => {
       const file = event.target.files[0];
@@ -1167,11 +1224,9 @@
       const record = replay.decisions[index];
       const selected = record.legal_actions.findIndex(action => action.id === record.selected_action.id);
       if (selected < 0) return;
-      annotations.set(index, selected);
-      labelsExported = false; notifyLabelState();
-      render();
+      setAnnotation(index, selected);
     });
-    byId("clear-label").addEventListener("click", () => { annotations.delete(index); labelsExported = false; notifyLabelState(); render(); });
+    byId("clear-label").addEventListener("click", () => setAnnotation(index, null));
     byId("download-labels").addEventListener("click", () => {
       if (reviewerData) return;
       const authorization = annotationAuthorization();
@@ -1188,7 +1243,7 @@
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2) + "\n"],
                                             {type: "application/json"}));
       const link = document.createElement("a");
-      link.href = url; link.download = `goat_ai_labels_seed_${replay.seed}.json`; link.click();
+      link.href = url; link.download = `goat_ai_labels_seed_${replay.seed}_${sourceSha256.slice(0, 12)}.json`; link.click();
       labelsExported = true; notifyLabelState();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });

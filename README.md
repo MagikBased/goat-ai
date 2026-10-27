@@ -113,6 +113,18 @@ If the original JSON is missing, `python scripts/extract_embedded_replay.py REPL
 
 The sidebar identifies agents when the trajectory records their provenance. See the [early replay decision audit](docs/replay_audit.md) for frame-specific findings and the experimental `--tactical-guard` option for learned-policy match recording and evaluation.
 
+To review queued policy decisions without downloading or moving label files,
+start the [local review server](docs/replay_audit.md) from the repository root:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/serve_review_queue.py \
+  replays/review_fixed_policy_44000_full/queue.json
+```
+
+Open the localhost address it prints. Choosing a legal action saves it to an
+ignored local folder and restores it when you return; no reviewer name is
+needed. Validate the saved choices before training on them.
+
 The renderer also reads card-effect choice text from the local databases, so prompts such as Enemy Controller's two modes have distinct labels. Position and monster-Type choices use names. If a database has no text for a particular option, the viewer labels it by choice number.
 
 The duel board keeps both fields and hands on one screen at desktop sizes; replay loading, playback controls, legal actions, and other details scroll in the right sidebar. Hands show the upper half of each card to leave room for the field. Hover or focus any card to see a larger preview; use the mouse wheel over it to resize the preview from a small card up to the largest card that fits the screen. Banished and Extra Deck stacks flank each centered hand, and the phases run vertically at the right edge of the field. Field Spell Zones sit left of the Monster Zones, while Graveyards sit right of the Spell/Trap Zones. Monsters rotate to show attack and defense position. The viewing player is always at the bottom. Use its slider, arrow keys, or Play button to step through decisions; `#decision=11` opens a particular decision. **Prev common** and **Next common** jump to decisions with at least two legal actions involving a card found in five or more of the six sourced tournament Main Decks. This small sample guides review; it does not measure GOAT metagame play rates. Staged card choices show the required selection count and already selected cards. The legal-action list shows 100 entries at a time, with a button for more. New schema-v18 recordings also include a final frame with the terminal field and Life Points; older recordings end on the last decision. Public Deck-top reveals, cards shown only to the acting player, known opponent hand identities, active disabled field zones, and the acting player's starting Deck composition appear on new recordings. Known hand cards are listed in the sidebar without assigning them to hidden hand slots.
