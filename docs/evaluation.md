@@ -7156,3 +7156,55 @@ candidate code was discarded and the baseline/teacher version remains 14.
 The ignored local reports have SHA-256 values
 `3aa82048e2b5ee8633dc8f9ce6e85d3d6bba25bc3ec44a26296513223779a82d`
 and `6900d91dcee93a168dabf62d5a2a4f63059f80cb84b51ce1dfc57297a0f102b1`.
+
+### Preserving cloning batches while omitting forced forwards (27 October 2026)
+
+`train_behavioral_clone.py --omit-forced-forward` keeps every replay label in
+the original epoch shuffle or weighted sample, minibatch, loss denominator,
+and Adam update. It omits one-legal-action examples from *mixed* batched
+network forwards. An entirely forced minibatch still runs the ordinary
+forward so that its optimizer step is preserved. The flag requires
+`--batched-forward` and cannot be combined with `--skip-forced-training` or
+parent-KL fitting. Full native replay verification and visibility auditing
+still precede fitting. This changes batched floating-point order, so it does
+not promise byte-identical weights.
+
+On the same 32 Tactical-v14 replays and settings as the previous section,
+the original and optimized paths both consumed **23,566 labels** in the same
+optimizer schedule. The separate full-command runs measured **35.66 versus
+24.84 seconds** fitting (**1.44×**) and **72.99 versus 62.43 seconds** total
+(**1.17×**). Epoch losses differed by at most `1.9e-8`, and the largest
+absolute final parameter difference was `0.00227`. These are CPU
+measurements with one Torch thread, not a general throughput guarantee.
+
+On fresh unseen Phoenix/Dimension Fusion pairings, both deck assignments and
+seats, seeds 19132–19139, the optimized child scored **32–32** directly
+against the original; the paired score interval was exactly **50%–50%**
+on that schedule. On matched seeds 19140–19147 versus Tactical-v14, **both
+children scored 20–43–1**. The report comparator found a paired score
+difference of zero with a zero-width interval on this schedule. The evidence
+supports a training-speed setting with no observed outcome difference here;
+it does not establish a stronger policy or equivalence on other decks.
+The original broader checkpoint remains the neural reference.
+
+The optimized checkpoint SHA-256 is
+`fd9016ef0f51f82a16172c946271d896411cdc1fbbe68edaafcc1091e8883bf0`.
+The ignored training summary SHA-256 is
+`0d04de37c3655a8e26ec8d87e91b069e84cab08bfce711c05eaf931f35bd307b`.
+The direct, optimized-versus-Tactical, and original-versus-Tactical report
+hashes are `1e601a57863fbfd43bc49e7e0d9e06e90e40759a964444e98f242cec9a51b29e`,
+`2473cd621abbe936ed7293f9cee92287f0975437fcb9f1554d7eaa5e8d352aa6`,
+and `b5625d8229a86a6e41c207d12e5f20a760c618711f4c7739829901ab81ca52f1`.
+
+Reproduce the optimized training after native setup with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/tactical_v14_chaos_bazoo_18500_18515/seed_*.json \
+  .cache/goat-ai/tactical_v14_lolmarcus_michael_18516_18531/seed_*.json \
+  --engine experimental --feature-version 23 --width 32 --epochs 2 \
+  --batch-size 16 --batched-forward --omit-forced-forward \
+  --verification-workers 4 --learning-rate 0.0002 --seed 55 \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/fv23_tactical_v14_broader_omit_forward_18500_18531.pt
+```

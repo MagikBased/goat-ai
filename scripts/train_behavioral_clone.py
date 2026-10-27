@@ -232,6 +232,10 @@ def main() -> None:
     parser.add_argument("--skip-forced-training", action="store_true",
                         help="exclude one-legal-action records from cloning updates; "
                              "they have zero choice loss but still remain in replay provenance")
+    parser.add_argument("--omit-forced-forward", action="store_true",
+                        help="keep original cloning batches and optimizer steps but omit "
+                             "one-legal-action choices from mixed neural forwards; "
+                             "requires --batched-forward")
     parser.add_argument("--verification-workers", type=int, default=1,
                         help="native replay verification processes (default: serial)")
     parser.add_argument("--width", type=int, default=64)
@@ -311,6 +315,11 @@ def main() -> None:
         parser.error("batched forward is currently supported only for behavioral cloning")
     if args.skip_forced_training and args.parent_kl_steps:
         parser.error("skipping forced choices is currently supported only for behavioral cloning")
+    if args.omit_forced_forward and (not args.batched_forward
+                                    or args.skip_forced_training
+                                    or args.parent_kl_steps):
+        parser.error("--omit-forced-forward requires behavioral cloning with "
+                     "--batched-forward and without --skip-forced-training")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     teacher = (TacticalHeuristicAgent(
@@ -505,7 +514,8 @@ def main() -> None:
                                       batch_size=args.batch_size,
                                       batched_forward=args.batched_forward,
                                       sampling_weights=sampling_weights,
-                                      skip_forced=args.skip_forced_training)
+                                      skip_forced=args.skip_forced_training,
+                                      omit_forced_forward=args.omit_forced_forward)
     fitting_seconds = perf_counter() - fitting_started
     args.output.parent.mkdir(parents=True, exist_ok=True)
     inherited_sources = Counter(parent.get("source_decisions", {})) if parent else Counter()
@@ -531,6 +541,7 @@ def main() -> None:
         "batch_size": args.batch_size,
         "batched_forward": args.batched_forward,
         "skip_forced_training": args.skip_forced_training,
+        "omit_forced_forward": args.omit_forced_forward,
         "fit_decisions": (sum(len(record.legal_actions) > 1 for record in records)
                           if args.skip_forced_training and not preservation_metadata
                           else len(records)),

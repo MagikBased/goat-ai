@@ -1174,6 +1174,60 @@ def test_behavioral_clone_can_skip_forced_choices_without_changing_choice_update
         fit_behavioral_clone(filtered, vocabulary, (forced,), skip_forced=True)
 
 
+def test_behavioral_clone_omits_forced_forward_preserving_update_schedule(monkeypatch):
+    vocabulary = CardVocabulary((10, 20), ((10, 0x21, 300), (20, 0x21, 1000)))
+    choices = actions()
+    forced = DecisionRecord(view(), choices[:1], choices[0])
+    selected = DecisionRecord(view(), choices, choices[1])
+    records = (forced, selected, forced, forced, selected, forced)
+    torch.manual_seed(87)
+    reference = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    torch.manual_seed(87)
+    optimized = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    settings = {"epochs": 3, "learning_rate": 0.01, "seed": 87,
+                "batch_size": 3, "batched_forward": True}
+    adam = torch.optim.Adam
+    updates = []
+
+    class CountingAdam(adam):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            updates.append(0)
+
+        def step(self, *args, **kwargs):
+            updates[-1] += 1
+            return super().step(*args, **kwargs)
+
+    monkeypatch.setattr(torch.optim, "Adam", CountingAdam)
+    reference_losses = fit_behavioral_clone(reference, vocabulary, records, **settings)
+    optimized_losses = fit_behavioral_clone(
+        optimized, vocabulary, records, omit_forced_forward=True, **settings)
+    assert updates == [6, 6]
+    assert optimized_losses == pytest.approx(reference_losses, abs=1e-6)
+    # Batched floating-point order changes when forced rows leave the forward,
+    # so equal updates and losses do not imply bit-identical Adam parameters.
+    assert any(not torch.equal(left, right) for left, right in zip(
+        reference.parameters(), optimized.parameters(), strict=True))
+    with pytest.raises(ValueError, match="requires batched forward"):
+        fit_behavioral_clone(optimized, vocabulary, records,
+                             omit_forced_forward=True)
+    with pytest.raises(ValueError, match="requires batched forward"):
+        fit_behavioral_clone(optimized, vocabulary, records,
+                             batched_forward=True, skip_forced=True,
+                             omit_forced_forward=True)
+    torch.manual_seed(88)
+    forced_reference = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    torch.manual_seed(88)
+    forced_optimized = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    assert fit_behavioral_clone(forced_reference, vocabulary, (forced,) * 3,
+                                batch_size=3, batched_forward=True) == (0.0,)
+    assert fit_behavioral_clone(forced_optimized, vocabulary, (forced,) * 3,
+                                batch_size=3, batched_forward=True,
+                                omit_forced_forward=True) == (0.0,)
+    assert all(torch.equal(left, right) for left, right in zip(
+        forced_reference.parameters(), forced_optimized.parameters(), strict=True))
+
+
 @pytest.mark.parametrize("version", (10, 13, 23, 25))
 def test_padded_forward_matches_variable_length_single_decisions(version):
     vocabulary = CardVocabulary((10, 20), ((10, 0x21, 300), (20, 0x21, 1000)))

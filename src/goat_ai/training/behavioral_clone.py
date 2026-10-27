@@ -17,7 +17,8 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
                          batch_size: int = 1,
                          batched_forward: bool = False,
                          sampling_weights: Sequence[float] | None = None,
-                         skip_forced: bool = False) -> tuple[float, ...]:
+                         skip_forced: bool = False,
+                         omit_forced_forward: bool = False) -> tuple[float, ...]:
     """Return mean per-decision cross-entropy for each epoch.
 
     This function trains on its input as supplied. Callers must verify source,
@@ -33,6 +34,8 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
     if batched_forward and (model.feature_version < 10
                             or model.feature_version in (14, 15)):
         raise ValueError("batched forward requires a supported v10+ feature version")
+    if omit_forced_forward and (not batched_forward or skip_forced):
+        raise ValueError("omit forced forward requires batched forward without skipping records")
     if skip_forced:
         selectable = [index for index, record in enumerate(records)
                       if len(record.legal_actions) > 1]
@@ -44,9 +47,12 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
     device = next(model.parameters()).device
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     losses = []
-    examples = [(encode_decision(record.observation, record.legal_actions, vocabulary,
-                                 model.feature_version),
-                 record.legal_actions.index(record.selected_action)) for record in records]
+    examples = [
+        None if omit_forced_forward and len(record.legal_actions) == 1 else
+        (encode_decision(record.observation, record.legal_actions, vocabulary,
+                         model.feature_version),
+         record.legal_actions.index(record.selected_action))
+        for record in records]
     for epoch in range(epochs):
         rng = random.Random(seed + epoch)
         if sampling_weights is None:
@@ -63,14 +69,28 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
             batch = order[start:start + batch_size]
             optimizer.zero_grad()
             if batched_forward:
-                logits, _ = model.forward_batch([examples[index][0].to(device)
-                                                 for index in batch])
-                targets = torch.tensor([examples[index][1] for index in batch],
+                scored = ([index for index in batch if examples[index] is not None]
+                          if omit_forced_forward else batch)
+                if not scored:
+                    # Preserve the Adam step and its zero gradients for a
+                    # batch made entirely of forced choices.
+                    scored = batch
+                    batch_examples = [
+                        (encode_decision(records[index].observation,
+                                         records[index].legal_actions, vocabulary,
+                                         model.feature_version), 0)
+                        for index in scored]
+                else:
+                    batch_examples = [examples[index] for index in scored]
+                logits, _ = model.forward_batch([item[0].to(device)
+                                                 for item in batch_examples])
+                targets = torch.tensor([item[1] for item in batch_examples],
                                        dtype=torch.long, device=device)
-                batch_losses = nn.functional.cross_entropy(
-                    logits, targets, reduction="none")
+                batch_losses = nn.functional.cross_entropy(logits, targets,
+                                                           reduction="none")
                 total += float(batch_losses.detach().sum())
-                batch_losses.mean().backward()
+                (batch_losses.sum() / len(batch) if omit_forced_forward
+                 else batch_losses.mean()).backward()
             else:
                 batch_losses = []
                 for index in batch:

@@ -1376,3 +1376,11 @@ also failed two held-out Tactical comparisons and was discarded. Future M4
 work should improve decision quality and credit assignment, then verify a
 neural gain across independent deck families and a subsequent self-play gain;
 see [the evaluation](evaluation.md#filtered-cloning-continuation-and-held-out-strength-27-october-2026).
+
+A separate opt-in `--omit-forced-forward` now keeps the original cloning
+minibatches and optimizer steps while avoiding neural work on forced rows in
+mixed batches. On the same 23,566-label workload, fitting was 1.44× faster
+and full training 1.17× faster than the original path. Its child went 32–32
+directly against the original and both scored 20–43–1 versus Tactical on
+matched unseen-deck seeds. The original checkpoint remains the M4 reference;
+see [the measured comparison](evaluation.md#preserving-cloning-batches-while-omitting-forced-forwards-27-october-2026).
