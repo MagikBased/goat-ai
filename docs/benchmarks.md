@@ -1097,3 +1097,33 @@ host. It does not establish speedup on other machines, deck families, or
 larger policies, nor any increase in playing strength. The measured wall time
 includes CLI training, replay writing, and checkpoint saving after Python
 startup; it is not a separate process-launch measurement.
+
+## Four-worker PPO parent-process profile (2026-10-27)
+
+The same 16-game, four-worker schedule above was rerun under `cProfile` with
+output `.cache/goat-ai/ppo_parent_profile_28000.prof`. The trainer reported
+8.623 seconds and completed the same 7,046 decisions. All 16 trajectory files
+were byte-identical to the earlier four-worker arm, and all 38 saved model
+tensors were exactly equal. Profiling raised wall time, so its timings should
+be used to locate work, not as an unprofiled throughput measurement.
+
+In the parent profile, `ppo_clipped_update` accounted for 4.918 seconds of
+cumulative time across four updates. Its 228 batched policy forwards accounted
+for 3.605 seconds of cumulative time; 1,196 decision encodes accounted for
+0.629 seconds. The process-pool wait and shutdown entries include time spent
+waiting for child processes and overlap with other activity; their cumulative
+times cannot be added to the PPO times to make a wall-time budget. The profile
+does **not** include a per-function breakdown inside the rollout workers.
+
+To check whether worker result transfer was a likely bottleneck, one direct
+seed-28000 native episode produced 356 decisions and 52 learner decisions.
+Its `EpisodeResult` occupied 250,062 bytes when pickled with the highest
+protocol; serialization and deserialization took 0.0034 and 0.0036 seconds
+on this host. Omitting its trajectory reduced the pickle to 46,737 bytes but
+saved only about 0.0027 seconds of serialization time. Constructing a v23
+policy took about 0.00146 seconds per model over 100 constructions, and
+loading its state took about 0.00035 seconds per load. These are narrow
+single-process timings, not worker IPC or end-to-end speedups. They make
+model-instance caching and trajectory-free worker returns lower priorities
+than improving the parent PPO batched forward path. Any change there must
+preserve replay bytes and be evaluated on held-out strength as well as speed.
