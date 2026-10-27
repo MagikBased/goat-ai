@@ -1,5 +1,47 @@
 # Early replay decision audit
 
+## Fixed-policy resource and timing review (27 October 2026)
+
+The unchanged current-core feature-v23 checkpoint played Tactical-v14 on
+Jesse Goat Control versus Warrior and Roberto Martinez Phoenix Control versus
+WikiFormat Dimension Fusion, with both policy seats on seeds 44000–44003.
+These 16 games are the review subset of a separately recorded 64-duel
+fixed-policy corpus. Collection and shortlisting independently native-replayed
+and visibility-audited all **7,830 decisions** in this subset; the shortlister
+also reproduced every policy-seat choice from the saved checkpoint. The
+[offline review index](../replays/review_fixed_policy_44000/queue.html) selects
+**20 frames** from 410 candidates and links to 11 complete duel viewers.
+All linked viewer files exist. None of these prompts has been used as a
+training label.
+
+Four selected decisions have conservative visible-state flags: passing an
+activatable Thunder Dragon at End Phase, activating Nobleman of Crossout with
+only a friendly Set monster available, moving an unobstructed attacker to
+weaker Defense Position, and activating Heavy Storm with a negative visible
+backrow trade. The last case is especially useful for review: Tactical-v14
+also suggests Heavy Storm there. A baseline disagreement is neither required
+for a flag nor evidence that an alternative is correct. Open the linked frame,
+inspect the legal actions, and apply your own judgment before authorizing a
+label. If these games enter training, reserve different Main Decks for the
+child's future unseen-deck evaluation.
+
+The ignored 64-game collection manifest SHA-256 is
+`93c2f2f5f768b912b76d9033408f833a1eef972a6d1371021f6a3287b72fffa6`;
+the 16-game review queue JSON SHA-256 is
+`5815ef1b6677d9f8ec14ef07641ac59613e50a0368e9c42ea3c233c6ed45aef5`.
+The review index is an ignored local artifact. Reproduce the queue after the
+[fixed-policy collection](evaluation.md#fixed-policy-visible-state-critic-check-27-october-2026)
+with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/fixed_policy_value_44000_44015/matchup_*_seed_4400[0-3]_seat_*.json \
+  --limit 20 --per-replay 2 --render-viewers \
+  --output replays/review_fixed_policy_44000/queue.json
+```
+
 ## Current-core Jesse versus Warrior review (27 October 2026)
 
 The current-core feature-v23 Tactical-imitation checkpoint played Jesse
