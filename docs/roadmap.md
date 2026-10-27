@@ -270,6 +270,13 @@ Rush variant chains to Ring and boosts its target first. All three complete
 native duels replay-verify and pass the player-visible trajectory audit; see
 [GOAT rules](goat_rules.md).
 
+A paired Dimension Fusion / pre-errata Dark Magician of Chaos fixture now
+checks the optional immediate Spell recovery after Bazoo banishes DMoC. The
+spent Dimension Fusion is a selectable Graveyard target, and the opponent
+learns its identity in hand only when recovery is accepted. Both full duels
+replay-verify and pass the visibility audit; the [ruling log](goat_rules.md)
+records the source and untested middle-of-chain timing case.
+
 ## M3 — Evaluation and data
 
 An eight-duel two-worker native pilot now reports per-process Linux peak RSS,
