@@ -463,7 +463,7 @@ Jar before resolution remains untested for this pair.
 
 **Compulsory Evacuation Device:** [Official card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5914&ope=2&request_locale=en) targets one field monster and returns it to hand. [Historical rulings](https://www.goatformat.com/rulings1.html) allow it in the Battle Step but not the Damage Step, and distinguish bouncing the attacker (no replay) from bouncing the attack target (replay). Two seeded native fixtures Set Compulsory, target an opposing face-up monster, and resolve the effect. An ordinary Main Deck monster leaves the field and increases its owner's private hand count by one. In a Scapegoat/Metamorphosis line, Thousand-Eyes Restrict instead returns to its owner's Extra Deck; its hand count does not change. Neither target enters the Graveyard. Two more seeded Battle Step branches let the defender bounce the attacker or its own defending monster. Both return to their owners' private hands without battle damage; after the defending monster is bounced, the surviving attacker receives another attack choice. The bounced attacker cannot attack. A further fixture offers Compulsory in the Battle Step but removes it from legal responses after the attacked Dekoichi flips in the Damage Step, while the Trap remains set. Facedown targets, target removal in a chain, and control-changed targets remain untested.
 
-**Thunder Dragon:** [Historical Netrep rulings](https://www.goatformat.com/rulings7.html) allow discarding Thunder Dragon to search for zero copies, even when copies remain, and [the historical mechanics guide](https://www.goatformat.com/basics.html) gives the no-copy case as a Deck verification example. The pinned official script requires at least one copy in Deck, so GOAT AI uses the pinned GOAT variant `504700054`. A seeded native fixture offers a zero-card selection alongside one- and two-card choices while two copies remain; both the explicit empty selection and the native cancel response leave the Deck unchanged and reveal nothing to the opponent. A second fixture takes both copies and checks the opponent-only reveal, then discards another Thunder Dragon with no copies in Deck. The opponent still remembers the remaining searched Thunder Dragon in hand after the other copy’s public discard. That effect remains legal and reveals the remaining 32-card Deck to the opponent for verification. This checks the historical search behavior and information boundary; banish replacement remains untested.
+**Thunder Dragon:** [Historical Netrep rulings](https://www.goatformat.com/rulings7.html) allow discarding Thunder Dragon to search for zero copies, even when copies remain, and [the historical mechanics guide](https://www.goatformat.com/basics.html) gives the no-copy case as a Deck verification example. The pinned official script requires at least one copy in Deck, so GOAT AI uses the pinned GOAT variant `504700054`. A seeded native fixture offers a zero-card selection alongside one- and two-card choices while two copies remain; both the explicit empty selection and the native cancel response leave the Deck unchanged and reveal nothing to the opponent. A second fixture takes both copies and checks the opponent-only reveal, then discards another Thunder Dragon with no copies in Deck. The opponent still remembers the remaining searched Thunder Dragon in hand after the other copy’s public discard. That effect remains legal and reveals the remaining 32-card Deck to the opponent for verification. This checks the historical search behavior and information boundary; other replacement effects remain untested.
 
 The same [period Thunder Dragon FAQ](https://www.goatformat.com/rulings7.html)
 explicitly permits discarding an opponent-owned copy obtained with Exchange
@@ -474,7 +474,17 @@ player 1's Deck stays at 35, and the discarded card reaches its owner,
 player 1's Graveyard. Only player 1 receives the two-card search reveal and
 retains both copies as known opponent-hand cards. The full duel reaches
 terminal, serializes, replay-verifies, and passes the visibility audit.
-Other Exchange targets and banish replacement remain untested.
+Other Exchange targets and replacement effects remain untested.
+
+The [period Thunder Dragon FAQ](https://www.goatformat.com/rulings7.html)
+also allows its discard cost while Banisher of the Light sends discarded
+cards to banishment instead of the Graveyard. A seed-3 native fixture
+Normal Summons Banisher, activates the GOAT Thunder Dragon in hand, and
+selects two copies from its controller's Deck. The discarded copy is
+face-up banished, none reaches that player's Graveyard, the Deck falls
+from 34 to 32, and the opponent alone receives the two-copy reveal. The
+complete duel terminates, serializes, replay-verifies, and passes the
+visibility audit. Other replacement effects remain untested.
 
 The OCG ruling shown in the user's seed-6803 review instead says to take one
 or two copies. That is a different regional/ruleset ruling. GOAT AI follows

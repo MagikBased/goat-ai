@@ -5,11 +5,15 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 THUNDER_DRAGON = 504700054  # GOAT variant permits searching for zero copies.
+BANISHER_OF_THE_LIGHT = 61528025
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -106,3 +110,74 @@ def test_thunder_dragon_two_then_zero_and_opponent_verification(tmp_path):
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Thunder Dragon two-copy and zero-copy searches did not resolve")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_banisher_replaces_thunder_dragon_discard_without_stopping_search(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    deck = tmp_path / "banisher_thunder.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        BANISHER_OF_THE_LIGHT, *([THUNDER_DRAGON] * 3),
+        *VANILLA_DECK[4:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        assert sum(card.code == THUNDER_DRAGON for card in observation.hand) == 1
+        summoned = activated = searched = False
+        fallback = RandomAgent(3)
+        for _ in range(30):
+            actions = env.legal_actions()
+            action = None
+            if observation.acting_player == 0 and not summoned:
+                action = next((item for item in actions
+                               if item.kind == "normal_summon" and item.parameters.get(
+                                   "code") == BANISHER_OF_THE_LIGHT), None)
+                summoned |= action is not None
+            if action is None and observation.acting_player == 0 \
+                    and summoned and not activated:
+                action = next((item for item in actions if item.kind == "activate"
+                               and item.parameters.get("code") == THUNDER_DRAGON), None)
+                activated |= action is not None
+            if action is None and activated and any(item.kind == "select_cards"
+                                                    for item in actions):
+                action = next(item for item in actions if item.kind == "select_cards"
+                              and len(item.parameters.get("cards", ())) == 2)
+                searched = True
+            if action is None:
+                action = next((item for item in actions if item.kind == "pass"), None)
+                if action is None:
+                    action = next((item for item in actions if item.kind == "place"), None)
+            observation = env.step(action or fallback.select_action(observation, actions))
+            if searched and env.engine.probe.observation(0).deck_counts[0] == 32:
+                own = env.engine.probe.observation(0)
+                other = env.engine.probe.observation(1)
+                assert any(card.code == BANISHER_OF_THE_LIGHT and card.zone == "monster"
+                           and card.position == "faceup" for card in own.field)
+                assert [card.code for card in own.banished[0]] == [THUNDER_DRAGON]
+                assert not own.graveyards[0]
+                assert sum(card.code == THUNDER_DRAGON for card in own.hand) == 2
+                assert other.known_opponent_hand_cards == (
+                    THUNDER_DRAGON, THUNDER_DRAGON)
+                assert [card.code for card in other.private_reveals[-1].cards] == [
+                    THUNDER_DRAGON, THUNDER_DRAGON]
+                assert not own.private_reveals
+                assert f"goat/c{THUNDER_DRAGON}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                break
+        else:
+            pytest.fail("Banisher / Thunder Dragon search was not reached")
+
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            observation = env.step(fallback.select_action(
+                observation, env.legal_actions()))
+        assert env.is_terminal(), "Banisher / Thunder Dragon duel did not finish"
+        trajectory = env.trajectory()
+    path = tmp_path / "banisher_thunder.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, ExperimentalOcgcoreEngine(root)) == len(
+        trajectory.decisions)
+    assert audit_trajectory_visibility(loaded)["decisions"] == len(trajectory.decisions)

@@ -239,6 +239,11 @@ owner's Graveyard, opponent-only search reveal, a complete replay, and the
 visibility audit. This is one high-play card interaction, not full M2
 coverage; see [GOAT rules](goat_rules.md#thunder-dragon).
 
+A second Thunder Dragon fixture checks its period banish-replacement ruling:
+Banisher of the Light sends the discarded copy face-up to banishment while
+the controller still searches two copies. The complete duel replay-verifies
+and passes the visibility audit; see [GOAT rules](goat_rules.md#thunder-dragon).
+
 A native-enabled local regression run on 2026-10-27 passed **1,003 tests**
 in 13 minutes 43 seconds after correction of a schema-v6 test projection
 carrying newer owner and pending-summon fields. The ignored full-run log is

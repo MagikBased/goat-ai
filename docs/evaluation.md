@@ -8308,3 +8308,24 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_historical_thunder_dragon.py \
   tests/test_historical_exchange.py
 ```
+
+### Thunder Dragon under Banisher of the Light (27 October 2026)
+
+The [period Thunder Dragon FAQ](https://www.goatformat.com/rulings7.html)
+permits activating its effect even when Banisher of the Light redirects the
+discard away from the Graveyard. A seed-3 native fixture Normal Summons
+Banisher, discards GOAT Thunder Dragon, and selects two copies from its own
+Deck. The discarded copy is face-up banished; none enters its controller's
+Graveyard. Its Deck falls from 34 to 32, and only the opponent receives the
+two-card search reveal and remembers both copies in hand. The scripted line
+continues with random legal choices to a terminal result; the complete
+trajectory serializes, replay-verifies, and passes the visibility audit.
+The focused Thunder Dragon/Exchange native suite passed **5/5 tests**.
+This validates the pinned engine's behavior for one replacement effect, not
+all banishment or Exchange interactions.
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_historical_thunder_dragon.py \
+  tests/test_historical_thunder_exchange.py
+```
