@@ -5419,6 +5419,32 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/probe_random_decks.py \
   --verify-replays --distinct-opponents --count-card-actions
 ```
 
+### Further independent whitelist probe (27 October 2026)
+
+Fresh seeds 10324–10355 used independently generated legal 40-card decks
+against distinct opponents, RandomAgent decisions, a 3,000-decision cap,
+full native replay verification, the player-visible trajectory audit, and
+source-card action counts. All **32/32** games reached terminal; all
+**33,664** decisions replay-verified and passed the visibility audit. The
+longest duel took 1,607 decisions. The run loaded 1,037 distinct native
+assets, including 10 assets absent from the earlier 10148–10247 sweep, and
+observed 3,167 source-card/action-kind pairs. There were no protocol errors.
+This measures coverage of the sampled native paths, not historical ruling
+correctness or agent strength.
+
+The ignored report is
+`.cache/goat-ai/whitelist_distinct_10324_10355/report.json` (SHA-256
+`555399d95530dcfcb5060b6d0cdfb36b7deadffd52ce6f9c6acfee20ed5ae816`).
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_distinct_10324_10355 \
+  --seed 10324 --seeds 32 --max-decisions 3000 \
+  --verify-replays --distinct-opponents --count-card-actions
+```
+
 ### Incremental native sum choices
 
 `MSG_SELECT_SUM` previously failed explicitly when the number of possible

@@ -140,6 +140,11 @@ Both were produced at project commit `f2c209d` with
 This is broad protocol and information-boundary evidence, not a ruling audit
 for all cards loaded or a proof of GOAT-correct outcomes.
 
+A later fresh sweep on seeds 10324–10355 reached **32/32 terminal duels**;
+all 33,664 decisions replay-verified and passed visibility auditing. It loaded
+10 native assets absent from the 10148–10247 sweep. See the
+[evaluation record](evaluation.md#further-independent-whitelist-probe-27-october-2026).
+
 The next 100 independent whitelist-deck pairs on seeds 10024–10123 initially
 yielded 93 terminal, replay-verified duels. A SHA-guarded in-memory correction
 fixed three pinned Firebird battle callback crashes. Bounded native
