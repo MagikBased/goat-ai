@@ -6531,3 +6531,40 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/benchmark_trajectory_serializa
   .cache/goat-ai/selfplay_profile_14701_replays/episode_00000_seed_14701.json \
   --rounds 4
 ```
+
+### Resource trade head on new deck families (27 October 2026)
+
+The experimental v25 resource trade head was evaluated on four Main Deck
+compositions absent from both its training lineage and the v23 parent's:
+WikiFormat Dimension Fusion Turbo, Roberto Martinez Phoenix Control,
+WeirdChamp Bazoo Return, and Michael Fukuyama Goat Control. Two pairings
+(Dimension Fusion/Phoenix and Bazoo/Michael) used both deck assignments and
+both seats. Against its unchanged v23 parent, v25 won **34 of 64** duels on
+seeds 17000–17007; its paired 95% bootstrap score interval was **43.8%–60.9%**.
+The ignored report is
+`.cache/goat-ai/fv25_vs_parent_df_phoenix_bazoo_michael_17000_17007.json`
+(SHA-256 `aea4b728590129569acf8a58edb4f07412b0c19b0d0a930f46f22d2fdb11c734`).
+
+On a separate matched schedule against unguarded Tactical v14, seeds
+17008–17015, v25 won **16 of 64** and v23 won **15 of 64**. The paired
+score difference was **+1.6 percentage points**, with a 95% matchup-seed
+bootstrap interval of **−7.8 to +10.9 points**. The reports are
+`.cache/goat-ai/fv25_vs_tactical_df_phoenix_bazoo_michael_17008_17015.json`
+(SHA-256 `077393ed1a3e028ce2709f9562307dcb4db2cd38a1a190973b04b1b09d26c8c2`)
+and `.cache/goat-ai/fv23_parent_vs_tactical_df_phoenix_bazoo_michael_17008_17015.json`
+(SHA-256 `a531605205073265ef172dd7f675d9f82847f74a92c00662ca2f1f54eabe019b`).
+`compare_tournament_reports.py --verify-local-decks` accepted matching engine,
+source, assets, card scripts, deck hashes, seeds, opponent, and assignments.
+The new deck families did not establish a competitive gain, and both neural
+policies remain far below Tactical on this schedule. v25 stays experimental.
+
+One v25-versus-Tactical Dimension Fusion/Phoenix duel at seed 17008 ended in
+a v25 loss. Its **482** decisions passed native replay verification and its
+**227** policy choices reproduced from the saved checkpoint; the visibility
+audit passed. The existing candidate detector returned no flagged decisions
+for this duel, which is not evidence that every play was sound. The ignored
+trajectory is `.cache/goat-ai/fv25_df_vs_phoenix_tactical_17008.json`
+(SHA-256 `a52f48b2aec065e0c8cd2231c928bd33088ba526c5e5a52bdd2a3567dc49a12c`).
+The next policy experiment should address the wider action-value errors
+visible in losses, and require improvement against Tactical across multiple
+unseen deck families before replacing v23.
