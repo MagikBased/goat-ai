@@ -88,8 +88,12 @@ attacker-slot hint. Altered or incomplete responses fail. The reader retains
 custom rule-card IDs internally so this path can reject them; its public
 summary reports only their count. This is **synthetic format coverage**, not
 established compatibility with a real EDOPro replay, whose original core and
-scripts may differ. Ambiguous responses and staged multi-card selections
-still fail explicitly. No human demonstration import is claimed. Legacy
+scripts may differ. Synthetic GOAT Thunder Dragon searches for zero, one,
+and two copies and a Puppet Magic sum choice now replay under forced staged
+action enumeration: one saved native response can become several public
+decision records before its exact response is committed. Ambiguous or
+invalid responses still fail explicitly. No human demonstration import is
+claimed. Legacy
 headers without four recorded RNG words also need a separately validated
 RNG path.
 

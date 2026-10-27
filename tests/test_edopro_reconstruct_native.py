@@ -1,14 +1,21 @@
 """Synthetic legacy-response playback; no real human replay compatibility claim."""
 
 import os
+import random
 import struct
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
+from goat_ai.engine import native_messages
+from goat_ai.engine.decks import read_ydk
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.ocgcore_probe import GOAT_FLAGS, OcgcoreProbe
 from goat_ai.engine.probe_deck import VANILLA_DECK
+from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_decision_visibility
 from goat_ai.replay.edopro_container import (
     DUEL_FLAG_64BIT,
     EXTENDED_HEADER,
@@ -21,15 +28,19 @@ from goat_ai.replay.edopro_reconstruct import (
     ReplayReconstructionError,
     reconstruct_legacy_responses,
 )
+from scripts.probe_random_decks import generate_deck, write_deck
+
+THUNDER_DRAGON = 504700054
 
 
 def _legacy_replay(responses: list[bytes], *, settings=(8000, 5, 1),
-                   rule_cards=(), extended=True):
+                   rule_cards=(), extended=True,
+                   decks=(VANILLA_DECK, VANILLA_DECK), seed_words=(43, 44, 45, 46)):
     names = (struct.pack("<I", 1) + b"\x00" * 40) * 2
     payload = names + struct.pack("<IIIQ", *settings, GOAT_FLAGS)
-    for _ in range(2):
-        payload += struct.pack("<I", len(VANILLA_DECK))
-        payload += struct.pack(f"<{len(VANILLA_DECK)}I", *VANILLA_DECK)
+    for deck in decks:
+        payload += struct.pack("<I", len(deck))
+        payload += struct.pack(f"<{len(deck)}I", *deck)
         payload += struct.pack("<I", 0)
     payload += struct.pack("<I", len(rule_cards))
     payload += struct.pack(f"<{len(rule_cards)}I", *rule_cards)
@@ -38,7 +49,7 @@ def _legacy_replay(responses: list[bytes], *, settings=(8000, 5, 1),
     flags = NEW_REPLAY | DUEL_FLAG_64BIT | (EXTENDED_HEADER if extended else 0)
     header = HEADER.pack(YRP1, 1, flags, 12345, len(payload), 0, b"\x00" * 8)
     if extended:
-        header += struct.pack("<5Q", 1, 43, 44, 45, 46)
+        header += struct.pack("<5Q", 1, *seed_words)
     return parse_edopro_container(header + payload)
 
 
@@ -70,12 +81,15 @@ def test_reconstructs_complete_native_legacy_response_trace(native_legacy_respon
     replay = _legacy_replay(responses)
     trace = reconstruct_legacy_responses(replay, root)
     assert len(trace.decisions) == len(responses) == len(views)
+    assert trace.saved_response_count == len(responses)
     # The public adapter adds an attacker-slot hint to the raw native view
     # during attack-target responses; all other visible fields must match.
     assert tuple(replace(record.observation, pending_attack=None)
                  for record in trace.decisions) == tuple(views)
     assert all(record.selected_action in record.legal_actions
                for record in trace.decisions)
+    for record in trace.decisions:
+        audit_decision_visibility(record)
     assert all(card.code is None
                for record in trace.decisions
                for card in record.observation.field
@@ -96,6 +110,118 @@ def test_reconstruction_rejects_divergent_and_incomplete_responses(native_legacy
         reconstruct_legacy_responses(_legacy_replay(changed), root)
     with pytest.raises(ReplayReconstructionError, match="before native terminal"):
         reconstruct_legacy_responses(_legacy_replay(responses[:-1]), root)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("copy_count", (0, 1, 2))
+def test_reconstructs_saved_thunder_search_as_staged_visible_actions(monkeypatch,
+                                                                     copy_count):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/goat/c{THUNDER_DRAGON}.lua").is_file():
+        pytest.skip("GOAT Thunder Dragon script not installed")
+    seed = 4
+    main = (THUNDER_DRAGON,) * 3 + VANILLA_DECK[3:]
+    ordered = []
+    for team, deck in enumerate((main, VANILLA_DECK)):
+        cards = list(deck)
+        random.Random(seed * 2 + team).shuffle(cards)
+        ordered.append(tuple(cards))
+    responses = []
+    activated = searched = False
+    with OcgcoreProbe(root / "build/libocgcore.so", root / "database/cards.cdb",
+                      root / "scripts") as probe:
+        probe.first_replay_decision((5, 6, 7, 8), *ordered)
+        for _ in range(3000):
+            prompt = probe.decode_pending()
+            action = prompt.choices[0]
+            if not activated:
+                activation = next((choice for choice in prompt.choices
+                                   if choice.kind == "activate"
+                                   and choice.code == THUNDER_DRAGON), None)
+                if activation is not None:
+                    action = activation
+                    activated = True
+            elif not searched:
+                search = next((choice for choice in prompt.choices
+                               if (choice.kind == "select_cards"
+                                   and len(choice.cards) == copy_count
+                                   and all(card[0] == THUNDER_DRAGON
+                                           for card in choice.cards))
+                               or (copy_count == 1 and choice.kind == "select_card"
+                                   and choice.code == THUNDER_DRAGON
+                                   and choice.location == 1)), None)
+                if search is not None:
+                    action = search
+                    searched = True
+            value = action.response
+            responses.append(struct.pack("<I", value & 0xffffffff)
+                             if isinstance(value, int) else value)
+            if probe.respond(value).terminal:
+                break
+        else:
+            pytest.fail("Thunder Dragon source duel did not reach terminal")
+    assert activated and searched
+    replay = _legacy_replay(responses, decks=tuple(ordered),
+                            seed_words=(5, 6, 7, 8))
+    monkeypatch.setattr(native_messages, "MAX_CARD_SELECTION_COMBINATIONS", 1)
+    trace = reconstruct_legacy_responses(replay, root)
+    assert trace.saved_response_count == len(responses)
+    assert len(trace.decisions) == len(responses) + (1 if copy_count else 0)
+    for record in trace.decisions:
+        audit_decision_visibility(record)
+    if copy_count:
+        assert any(record.selected_action.kind == "select_card"
+                   and record.selected_action.parameters.get("code") == THUNDER_DRAGON
+                   for record in trace.decisions)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_reconstructs_saved_sum_choice_as_staged_visible_actions(tmp_path, monkeypatch):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    seed = 10097
+    paths = (tmp_path / "sum_first.ydk", tmp_path / "sum_second.ydk")
+    write_deck(paths[0], generate_deck(root, seed))
+    write_deck(paths[1], generate_deck(root, seed + 1_000_000))
+    responses = []
+    saw_sum = False
+    with GoatEnvironment(*(str(path) for path in paths), seed=seed,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        agent = RandomAgent(seed)
+        for _ in range(3000):
+            actions = env.legal_actions()
+            if env.engine.probe._pending_message[0] == 23 and not saw_sum:
+                action = actions[0]
+                saw_sum = True
+            else:
+                action = agent.select_action(observation, actions)
+            assert not env.engine.recorded_selection_in_progress()
+            choice = env.engine._choices[actions.index(action)]
+            value = choice.response
+            responses.append(struct.pack("<I", value & 0xffffffff)
+                             if isinstance(value, int) else value)
+            observation = env.step(action)
+            if env.is_terminal():
+                break
+        else:
+            pytest.fail("sum source duel did not reach terminal")
+    assert saw_sum
+    ordered = []
+    for team, path in enumerate(paths):
+        cards = list(read_ydk(path).main)
+        random.Random(seed * 2 + team).shuffle(cards)
+        ordered.append(tuple(cards))
+    replay = _legacy_replay(responses, decks=tuple(ordered),
+                            seed_words=tuple(seed + i + 1 for i in range(4)))
+    monkeypatch.setattr(native_messages, "MAX_SUM_SELECTION_COMBINATIONS", 1)
+    trace = reconstruct_legacy_responses(replay, root)
+    assert trace.saved_response_count == len(responses)
+    assert len(trace.decisions) > len(responses)
+    for record in trace.decisions:
+        audit_decision_visibility(record)
+    assert any(record.selected_action.kind == "finish_selection"
+               and "selection_sum_target" in record.selected_action.parameters
+               for record in trace.decisions)
 
 
 def test_reconstruction_rejects_non_goat_or_unreproducible_startup():

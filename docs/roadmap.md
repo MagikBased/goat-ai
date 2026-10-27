@@ -374,7 +374,10 @@ identical inputs. A synthetic extended-header `yrp1` with every response from
 one vanilla duel now reconstructs a complete sequence of public observations,
 legal actions, selected actions, and terminal outcome on the pinned adapter;
 altered and missing responses fail. Custom rule cards are rejected, and
-ambiguous or staged selection responses still fail explicitly. This does not
+ambiguous or invalid responses still fail explicitly. Synthetic GOAT Thunder
+Dragon zero-, one-, and two-copy searches and a Puppet Magic sum choice now
+replay through staged public actions when the adapter's action bound forces
+them; the saved native response is committed only once. This does not
 prove that a real EDOPro recording replays on our core or that its original
 asset versions match. A permitted real GOAT fixture and independent
 player-knowledge audit remain open.

@@ -55,3 +55,14 @@ class ExperimentalOcgcoreEngine(RestrictedOcgcoreEngine):
         if len(matches) != 1:
             raise ValueError("recorded response has no unique public action")
         return matches[0]
+
+    def action_for_selection_index(self, index: int) -> Action:
+        """Find one staged public pick by the native candidate index."""
+        matches = [action for choice, action in zip(self._choices, self._actions, strict=True)
+                   if choice.kind == "select_card" and choice.response == index]
+        if len(matches) != 1:
+            raise ValueError("recorded selection index has no unique public action")
+        return matches[0]
+
+    def recorded_selection_in_progress(self) -> bool:
+        return self._selection_indices is not None

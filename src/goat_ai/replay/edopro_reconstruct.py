@@ -5,6 +5,7 @@ from this module is evidence that its responses replay on *our* assets, not
 proof of historical fidelity or permission to train on its decisions.
 """
 
+import struct
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,6 +30,7 @@ class ReplayReconstructionError(ValueError):
 class ReconstructedLegacyDuel:
     replay_sha256: str
     decisions: tuple[DecisionRecord, ...]
+    saved_response_count: int
     winner: int | None
     terminal_observation: Observation
     asset_sha256: dict[str, str]
@@ -40,9 +42,9 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                                  ) -> ReconstructedLegacyDuel:
     """Map each legacy native response to one player-visible legal action.
 
-    Only unambiguous, direct response prompts are supported here. Staged
-    multi-card selections fail explicitly until their response mapping is
-    implemented. Returned records are not admitted to the training pipeline.
+    Staged selections produce multiple public DecisionRecords for one saved
+    native response, following the normal environment's action contract.
+    Returned records are not admitted to the training pipeline.
     """
     if max_responses < 1:
         raise ValueError("max_responses must be positive")
@@ -74,8 +76,36 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
             try:
                 action = engine.action_for_recorded_response(response)
             except ValueError as exc:
-                raise ReplayReconstructionError(
-                    f"response {index}: saved bytes do not map to one legal action") from exc
+                native = engine.probe.decode_pending()
+                selection = native.card_selection or native.sum_selection
+                if selection is None or not selection.accepts(response):
+                    raise ReplayReconstructionError(
+                        f"response {index}: saved bytes do not map to one legal action") from exc
+                if len(response) < 8:
+                    raise ReplayReconstructionError(f"response {index}: truncated selection")
+                size = struct.unpack_from("<I", response, 4)[0]
+                indices = struct.unpack_from(f"<{size}I", response, 8)
+                for candidate in indices:
+                    try:
+                        action = engine.action_for_selection_index(candidate)
+                        records.append(DecisionRecord(decision.observation,
+                                                      decision.legal_actions, action))
+                        decision = engine.step(action)
+                    except (ValueError, RuntimeError) as stage_exc:
+                        raise ReplayReconstructionError(
+                            f"response {index}: staged selection diverged: {stage_exc}") from stage_exc
+                if engine.recorded_selection_in_progress():
+                    try:
+                        action = engine.action_for_recorded_response(response)
+                        if action.kind != "finish_selection":
+                            raise ValueError("selection did not reach a finish action")
+                        records.append(DecisionRecord(decision.observation,
+                                                      decision.legal_actions, action))
+                        decision = engine.step(action)
+                    except (ValueError, RuntimeError) as stage_exc:
+                        raise ReplayReconstructionError(
+                            f"response {index}: selection finish diverged: {stage_exc}") from stage_exc
+                continue
             records.append(DecisionRecord(decision.observation,
                                           decision.legal_actions, action))
             try:
@@ -85,7 +115,7 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                     f"response {index}: native transition failed: {exc}") from exc
         if not decision.terminal:
             raise ReplayReconstructionError("saved responses ended before native terminal state")
-        return ReconstructedLegacyDuel(replay.sha256, tuple(records),
+        return ReconstructedLegacyDuel(replay.sha256, tuple(records), len(replay.responses),
                                        decision.winner, decision.observation,
                                        engine.replay_manifest())
     finally:
