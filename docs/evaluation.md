@@ -5567,3 +5567,27 @@ control/Chaos probe decks at seed 441. It reached terminal in 1,347 decisions
 and 2.085 seconds of episode wall time; all 1,347 decisions replay-verified
 and passed the legal-choice visibility audit. This was one optimized run, with
 no matched pre-change whole-duel timing.
+
+The reproducible `scripts/benchmark_forced_inference.py` ablation ran four
+complete, matched duels (seeds 12000–12003, 4,322 decisions per schedule)
+twice, reversing the order of the reference and shortcut paths. The reference
+still skips RNG consumption on forced choices, isolating only the redundant
+encode/forward work. All eight reference/shortcut trajectory pairs were
+identical. On an Intel Core i7-10700K, Linux 6.8.0 x86_64, PyTorch 2.5.1 CPU,
+and one Torch thread, the reference and shortcut times were respectively
+**8.816 vs 7.123 seconds** (1.238×) and **8.768 vs 6.910 seconds** (1.269×).
+These are two matched schedules on the control/Chaos probe decks; other decks,
+hardware, and training updates may differ. The checkpoint SHA-256 was
+`93ca70795e2c5316ab349a4e5c61ebd553915e49abdbe469d0976d3bebe3d9b2`.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/benchmark_forced_inference.py \
+  .cache/goat-ai/fv23_tactical_v6_current_assets.pt --games 4 --rounds 2
+```
+
+One `cProfile` pass over the optimized first duel attributed about 1.16 of
+2.23 profiler-accounted seconds to building native observations, including
+0.79 seconds in native location queries. Policy sampling took 0.54 seconds.
+These overlapping cumulative times identify observation construction as the
+next performance candidate, but the Python profiler does not establish how
+much can be saved without changing the information contract.
