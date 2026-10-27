@@ -6116,3 +6116,76 @@ PYTHONPATH=src:. python scripts/compare_tournament_reports.py \
   .cache/goat-ai/fv23_self_banish_parent_vs_tactical_14116_14123.json \
   --verify-local-decks
 ```
+
+### Broader Tactical continuation and batched fitting (27 October 2026)
+
+To test whether more deck variety helps the feature-v23 policy, the unchanged
+parent (SHA-256 `9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`)
+was continued on 16 new native Tactical-v14 versus Combat-v3 duels. The
+training pairs were Insids Chaos Control/Weirdchamp Bazoo Return (seeds
+14400–14403) and Lolmarcus/Fukuyama Goat Control (14410–14413), each with
+both teacher seats. All 16 duels reached terminal, were replay-verified and
+visibility-audited by the training command, and supplied 4,464 Tactical-seat
+decisions. The teacher won 14/16. The resulting checkpoint contains 96
+training games across 12 distinct Main Deck compositions. These are
+synthetic teacher labels, not human demonstrations.
+
+With width 32, feature v23, two epochs, minibatch 16, learning rate 0.0002,
+seed 45, and four replay-verification processes, the batched-forward run took
+**14.22 seconds** overall, including **4.32 seconds** of verification and
+**6.72 seconds** of fitting. Epoch loss was **0.18939**, then **0.16347**.
+The same input and settings through the scalar-forward reference took
+**32.97 seconds** overall, including **4.28 seconds** of verification and
+**25.46 seconds** of fitting. Batched forward was **3.79× faster for fitting**
+and **2.32× faster end to end** in this one matched run. Losses agreed to
+within `8e-10`, although final parameters differed by as much as `0.00375`;
+the two numerical paths are not bit-identical. The batched child checkpoint
+is ignored at
+`.cache/goat-ai/fv23_tactical_v14_sixdeck_continuation_14400_14413.pt`
+(SHA-256 `5941c66ec1ee68babf2f359c9e6dab807b3e50021761fe0ce8214aac873abab0`).
+
+The reserved GoatFormat Guide and WikiFormat Dimension Fusion Turbo Main
+Decks were absent from both the parent and child training compositions.
+Across both deck assignments and seats on seeds 14500–14515, the batched
+child scored **36–27–1** against its parent over 64 games: **57.03%** score,
+with matchup/seed paired 95% bootstrap interval **48.44–65.63%**. On seeds
+14516–14523 against Tactical-v14, the child scored **8–24** and the parent
+**6–26** on the same 32-game schedule. The paired score difference was
+**6.25 points**, interval **−12.5 to 25 points**. Neither comparison
+establishes a competitive gain, and Tactical remains substantially stronger
+on these decks. Keep the parent as the reference. All reports record the
+current native script-tree and project-source fingerprints.
+
+The four ignored tournament reports, in order, are
+`fv23_sixdeck_vs_parent_dimension_14500_14507.json` (SHA-256
+`bf27c6517ddbfdba06a7c49d6414a6e05a0f3b29ee44c234bd1420ee9250cc92`),
+`fv23_sixdeck_vs_parent_dimension_14508_14515.json`
+(`39c422c5ecedb6fcc62e0cf4fb9484692744a59025ea867fa31285d3e215d7c5`),
+`fv23_sixdeck_vs_tactical_dimension_14516_14523.json`
+(`b0dfbc0dd55cf4be0f772a387254b9f38d66dd67f287a1701c8f2ed3a4f06a53`),
+and `fv23_parent_vs_tactical_dimension_14516_14523.json`
+(`82c17b8a0f0e538404e3be42d6f9eafb50357e4bcbf44bb623c595ba24278eed`).
+Reproduce collection and fitting with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher tactical --opponent combat_heuristic \
+  --deck-a examples/decks/chaos_control_insids_worlds_2022.ydk \
+  --deck-b examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --seed 14400 --seeds 4 \
+  --output-dir .cache/goat-ai/tactical_v14_insids_bazoo_14400_14403
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher tactical --opponent combat_heuristic \
+  --deck-a examples/decks/goat_control_lolmarcus_2020.ydk \
+  --deck-b examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --seed 14410 --seeds 4 \
+  --output-dir .cache/goat-ai/tactical_v14_lolmarcus_fukuyama_14410_14413
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/tactical_v14_insids_bazoo_14400_14403/seed_*.json \
+  .cache/goat-ai/tactical_v14_lolmarcus_fukuyama_14410_14413/seed_*.json \
+  --engine experimental --feature-version 23 --width 32 --epochs 2 \
+  --batch-size 16 --batched-forward --verification-workers 4 \
+  --learning-rate 0.0002 --seed 45 \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/fv23_tactical_v14_sixdeck_continuation_14400_14413.pt
+```
