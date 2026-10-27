@@ -781,7 +781,7 @@
       const code = visibleCode(observation, parameters, known);
       if (code != null) parts.push(nameOf(code));
       if (parameters.controller != null && parameters.sequence != null) {
-        const owner = parameters.controller === observation.viewer ? "Your" : "Opponent's";
+        const owner = `P${parameters.controller + 1}`;
         const place = locationName(parameters.location);
         const slot = [4, 8].includes(parameters.location) ? ` ${parameters.sequence + 1}` : "";
         parts.push(`${owner} ${place}${slot}`);
@@ -792,7 +792,7 @@
           ? `Already selected: ${cards}` : cards);
       }
       if (parameters.zones) parts.push(parameters.zones.map(zone =>
-        `${zone.controller === observation.viewer ? "Your" : "Opponent's"} ${locationName(zone.location)} ${zone.sequence + 1}`).join(", "));
+        `P${zone.controller + 1} ${locationName(zone.location)} ${zone.sequence + 1}`).join(", "));
       if (parameters.position != null) parts.push(positionName(parameters.position));
       if (parameters.race != null) parts.push(raceName(parameters.race));
       if (parameters.attribute != null) parts.push(attributeName(parameters.attribute));
@@ -1053,21 +1053,24 @@
       let candidate = index + direction;
       const skip = byId("skip").checked;
       const lastIndex = replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation));
-      const visibleTransition = frame => {
-        if (frame === 0) return true;
-        const previous = replay.decisions[frame - 1].observation;
-        const current = replay.decisions[frame].observation;
-        // A response often has a selected "pass" while newly activated Traps
-        // are face-up in the chain. Keep that frame even with skipping enabled.
-        return JSON.stringify(current.chain || []) !== JSON.stringify(previous.chain || [])
-          || JSON.stringify(current.life_points) !== JSON.stringify(previous.life_points)
-          || JSON.stringify(current.field) !== JSON.stringify(previous.field)
-          || JSON.stringify(current.graveyards) !== JSON.stringify(previous.graveyards)
-          || JSON.stringify(current.banished) !== JSON.stringify(previous.banished);
+      const quietAction = frame => ["pass", "place", "shuffle_hand"].includes(
+        replay.decisions[frame].selected_action.kind);
+      const chainKey = frame => JSON.stringify(replay.decisions[frame].observation.chain || []);
+      const preservePass = frame => {
+        if (frame === 0 || frame === replay.decisions.length - 1 && !replay.terminal_observation)
+          return true;
+        const chain = chainKey(frame);
+        if (chain === "[]" || chain === chainKey(frame - 1)) return false;
+        // A newly built chain can resolve before the next actual choice. Keep
+        // one frame showing its face-up cards, but never stop at every pass.
+        let next = frame + 1;
+        while (next < replay.decisions.length && quietAction(next)) next++;
+        return next === replay.decisions.length || chainKey(next) !== chain;
       };
       while (candidate >= 0 && candidate < replay.decisions.length && skip
-          && ["pass", "place", "shuffle_hand"].includes(replay.decisions[candidate].selected_action.kind)
-          && !visibleTransition(candidate)) candidate += direction;
+          && quietAction(candidate)
+          && (replay.decisions[candidate].selected_action.kind !== "pass"
+            || !preservePass(candidate))) candidate += direction;
       if (candidate < 0 || candidate > lastIndex) { stop(); return; }
       index = candidate;
       animateNext = direction > 0;

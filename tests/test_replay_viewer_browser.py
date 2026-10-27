@@ -158,3 +158,54 @@ def test_board_seat_stays_fixed_when_decision_viewer_changes(tmp_path):
     match = re.search(r'data-seat-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
     assert match.group(1) == "1,0|1,0|true|0,1|P2 at bottom · Switch sides"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_skip_passes_does_not_stop_at_each_changed_board_view(tmp_path):
+    first = _observation()
+    other = deepcopy(first)
+    other.update(viewer=1, acting_player=1, hand=[], opponent_hand_count=0)
+    changed = deepcopy(first)
+    changed["field"].append({"controller": 0, "zone": "spell_trap", "sequence": 0,
+                             "code": 3, "position": "facedown"})
+    other_changed = deepcopy(other)
+    other_changed["field"] = deepcopy(changed["field"])
+    other_changed["field"][-1]["code"] = None
+    passed0 = {"id": "pass0", "kind": "pass", "actor": 0, "parameters": {}}
+    passed1 = {"id": "pass1", "kind": "pass", "actor": 1, "parameters": {}}
+    played0 = {"id": "play0", "kind": "activate", "actor": 0,
+               "parameters": {"code": 1, "location": 4, "controller": 0, "sequence": 0}}
+    played1 = {"id": "play1", "kind": "activate", "actor": 1,
+               "parameters": {"code": 2, "location": 4, "controller": 1, "sequence": 0}}
+    replay = {"seed": 4, "source": "test", "winner": 0, "decisions": [
+        {"observation": first, "selected_action": played0, "legal_actions": [played0]},
+        {"observation": other, "selected_action": passed1, "legal_actions": [passed1]},
+        {"observation": changed, "selected_action": passed0, "legal_actions": [passed0]},
+        {"observation": other_changed, "selected_action": passed1,
+         "legal_actions": [passed1]},
+        {"observation": changed, "selected_action": played0, "legal_actions": [played0]},
+        {"observation": other_changed, "selected_action": played1,
+         "legal_actions": [played1]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {1: "First", 2: "Second", 3: "Set"}, {}, {})
+    probe = """<script>
+      const seats = () => [...document.querySelectorAll('.duel-side')]
+        .map(side => side.dataset.player).join(',');
+      move(1);
+      const first = [index, seats(), byId('action').textContent].join(':');
+      move(1);
+      document.body.dataset.passProbe = [first, index, seats(),
+        byId('action').textContent].join('|');
+    </script></body>"""
+    path = tmp_path / "skip_pass_perspective.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-pass-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == (
+        "4:1,0:activate · First · P1 Monster 1|5|1,0|"
+        "activate · Second · P2 Monster 1")
