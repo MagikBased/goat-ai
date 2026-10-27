@@ -51,11 +51,21 @@ def test_sampled_self_play_provenance_cannot_be_mistaken_for_greedy_choices():
     assert provenance["selection_temperature"] == 2.0
     assert provenance["choice_verification"] == "not_reproduced_exploratory_sampling"
     assert provenance["verified_policy_choices"] is None
+    masked = replace(sampled, skill_metadata={**sampled.skill_metadata,
+                                              "selection_progress_mask": 1})
+    masked_provenance = sampled_self_play_provenance(masked, "a" * 64)
+    assert masked_provenance["selection_mode"] == "sampled_softmax_progress_mask_v1"
+    undo = Action("undo", "unselect_card", 0, {"code": 10})
+    add = Action("add", "select_card", 0, {"code": 20})
+    impossible = replace(masked, decisions=(DecisionRecord(view(), (undo, add), undo),))
+    with pytest.raises(ValueError, match="selection progress mask violated"):
+        sampled_self_play_provenance(impossible, "a" * 64)
     with pytest.raises(ValueError, match="parent checkpoint"):
         sampled_self_play_provenance(sampled, "b" * 64)
     for key, bad_value in (("learner_seat", True),
                            ("parent_checkpoint_sha256", "unknown"),
                            ("learner_action_selection", "greedy"),
+                           ("selection_progress_mask", 2),
                            ("learner_temperature", 0),
                            ("learner_temperature", float("nan"))):
         corrupted = replace(sampled, skill_metadata={**sampled.skill_metadata,

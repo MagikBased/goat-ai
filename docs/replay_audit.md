@@ -1304,3 +1304,39 @@ replay still ranks both rejected actions first; the preferred-minus-rejected
 logit margins are −1.119 and −1.229. Previous two-preference fitting corrected
 these exact frames but suppressed useful activations elsewhere, so this file
 is a durable evaluation/training case, not evidence for promoting that child.
+
+## Frozen-parent check after selection-progress masking
+
+The 32 complete lower-temperature PPO training replays from seeds 21200–21231
+were native replay-verified and visibility-audited before comparing their
+62 conservative mistake flags with the unchanged imitation parent's greedy
+choice on each exact player-visible state. The parent chose the same flagged
+action in **49/62** cases. This includes **14/14** end-turn choices with an
+activatable Thunder Dragon, **11/11** own-only Nobleman activations, **7/10**
+weak Flip Normal Summons, and **3/4** Ring self-targets. Other categories
+include three empty Thunder searches, three premature weak-Flip Metamorphoses,
+and one self-banish each with Black Luster Soldier and Chaos Sorcerer. In
+contrast, the parent avoided both negative visible Heavy Storm trades and
+the single own-target Raigeki Break and MST cases seen in this sample.
+The ignored report is
+`.cache/goat-ai/fv23_ppo_temp05_masked_parent_diagnostic_21200_21231.json`
+(SHA-256 `21e85919ba9ade40b4576a92d38c50f77952b73d2a062e3f08e4593dcafb9587`).
+These flags are conservative review prompts, not proof of optimal alternatives
+or human labels. The comparison does not reproduce the changing PPO policy's
+sampled action distribution; it shows that many bad candidates already rank
+first under the frozen parent on those visible states.
+
+New self-play trajectories explicitly mark `selection_progress_mask: 1`.
+The replay provenance audit rejects an `unselect_card` choice while a legal
+`select_card` or `finish_selection` exists under that marker, and preserves
+legacy unmarked trajectories as the earlier sampling mode. An eight-duel
+rerun of seeds 21200–21207 recorded the marker; all **5,918** decisions
+replay-verified and passed the visibility audit. Its decisions exactly match
+the previously recorded masked run's eight corresponding duels. The ignored
+audit is `.cache/goat-ai/fv23_ppo_masked_provenance_21200_21207_audit.json`
+(SHA-256 `ef8365d11a409d6f8649fb52c2b1abb38c12f97187ea6d7574ccd2f688c687d4`).
+The earlier 32-duel experiment predates this per-trajectory marker; its
+checkpoint configuration and pinned source identify the mask, but its replay
+files should not be silently relabeled. Future collections use the explicit
+marker. The persistent Thunder and Nobleman cases are priorities for
+independent player review and broader action-value learning.

@@ -957,6 +957,10 @@ The complete 32-game masked continuation also terminated and replay-verified,
 but scored 26–35–3 directly against its parent and 14–50 against Tactical-v14
 on unseen Main Decks (parent 18–46 on matched Tactical games). Keep the
 checkpoint experimental and prioritize action valuation or credit assignment.
+A frozen-parent audit of that run found the same flagged choice in 49 of 62
+sampled mistake candidates, especially Thunder Dragon timing and own-only
+Nobleman. New sampled trajectories identify the selection mask explicitly and
+the replay audit validates it; see [the replay audit](replay_audit.md#frozen-parent-check-after-selection-progress-masking).
 Labeling 7,538 decisions from the fixed imitation checkpoint's own games
 with Tactical-v14 and upweighting 1,891 disagreements also failed a held-out
 strength check: the child scored 30–34 directly against that checkpoint and

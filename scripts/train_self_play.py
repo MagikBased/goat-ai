@@ -193,6 +193,7 @@ def main() -> None:
                 "self_play_episode_index": index,
                 "learner_temperature": args.learner_temperature,
                 "learner_action_selection": "sampled_softmax",
+                "selection_progress_mask": 1,
             },
         )
         path = record_dir / f"episode_{index:05d}_seed_{episode.seed}.json"

@@ -356,6 +356,7 @@ def sampled_self_play_provenance(trajectory: Trajectory,
     seat = metadata.get("learner_seat")
     parent = metadata.get("parent_checkpoint_sha256")
     temperature = metadata.get("learner_temperature")
+    progress_mask = metadata.get("selection_progress_mask", 0)
     if type(seat) is not int or seat not in (0, 1):
         raise ValueError("self-play replay must identify learner seat")
     if not isinstance(parent, str) or re.fullmatch(r"[0-9a-f]{64}", parent) is None:
@@ -367,7 +368,20 @@ def sampled_self_play_provenance(trajectory: Trajectory,
     if (type(temperature) not in (int, float) or not isfinite(temperature)
             or temperature <= 0):
         raise ValueError("self-play replay must record a positive finite temperature")
+    if type(progress_mask) is not int or progress_mask not in (0, 1):
+        raise ValueError("unsupported self-play selection progress mask")
+    if progress_mask == 1:
+        for index, decision in enumerate(trajectory.decisions):
+            if decision.observation.acting_player != seat:
+                continue
+            if (decision.selected_action.kind == "unselect_card"
+                    and any(action.kind in ("select_card", "finish_selection")
+                            for action in decision.legal_actions)):
+                raise ValueError(f"selection progress mask violated at decision {index}")
     return {"policy_seat": seat, "checkpoint_sha256": parent,
-            "selection_mode": "sampled_softmax", "selection_temperature": temperature,
+            "selection_mode": ("sampled_softmax_progress_mask_v1" if progress_mask
+                               else "sampled_softmax"),
+            "selection_progress_mask": progress_mask,
+            "selection_temperature": temperature,
             "choice_verification": "not_reproduced_exploratory_sampling",
             "verified_policy_choices": None}
