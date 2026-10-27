@@ -1384,3 +1384,15 @@ and full training 1.17× faster than the original path. Its child went 32–32
 directly against the original and both scored 20–43–1 versus Tactical on
 matched unseen-deck seeds. The original checkpoint remains the M4 reference;
 see [the measured comparison](evaluation.md#preserving-cloning-batches-while-omitting-forced-forwards-27-october-2026).
+
+## Historical cross-controller SEGOC blocker
+
+The native Soul Exchange / opponent Sangan / Thestalos regression in
+`tests/test_historical_soul_exchange_trigger_order.py` is a strict expected
+failure: the core builds Thestalos CL1, Sangan CL2, while the GOAT-specific
+guide and archived UDE Netrep ruling require Sangan CL1, Thestalos CL2.
+Investigate a GOAT-only native trigger-order correction, preserving player
+choice for genuinely simultaneous effects in the same SEGOC group. Re-run
+both same-controller and cross-controller regressions, plus full duel replay
+verification, before removing the expected-failure marker. See
+`docs/goat_rules.md` for source links and the conflicting Edison summary.
