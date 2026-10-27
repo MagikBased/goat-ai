@@ -83,6 +83,28 @@ flags. Choosing an Edison flag combination requires sourced ruling tests. The
 current native bridge also contains GOAT-specific card and script corrections.
 It must be separated or revalidated before Edison play is enabled.
 
+### Cross-controller trigger-order boundary
+
+The [contemporary official rulebook, page 43](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
+says simultaneous Spell Speed 1 effects enter a chain with the turn player's
+effects first, followed by the opponent's. The community
+[Time Wizard Edison ruling summary](https://timewizardrulings.com/) applies
+that order specifically to Soul Exchange Tributing an opponent's Sangan for
+Caius: Caius Link 1, opposing Sangan Link 2. The [GOAT source-backed
+example](goat_rules.md) instead places Sangan before its
+Monarch. These sources establish a concrete format-specific regression target;
+the rulebook's general wording alone does not adjudicate every different-time
+trigger case.
+
+The `mr1-synchro-protocol` allowlist now includes Soul Exchange, the pinned
+official Sangan, and Caius for a narrow native test. On seed 15, the unmodified
+MR1 mode produces Caius Link 1 and opponent Sangan Link 2; the complete
+1,334-decision duel replay-verifies and passes the player-visibility audit.
+The corresponding GOAT-only patched fixture still expects Sangan Link 1 and
+Thestalos Link 2. This confirms separation of this specific chain order, not
+historical correctness of all 2010 effects, the current Sangan script, or
+the complete Edison card pool.
+
 An isolated `mr1_startup` probe now starts the pinned core with its exact
 `DUEL_MODE_MR1` bit mask (`853760`) and the unmodified upstream `utility.lua`.
 It accepts only 40-card-or-larger Normal Monster Main Decks and empty Extra

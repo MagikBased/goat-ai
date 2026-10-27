@@ -44,6 +44,9 @@ MR1_SYNCHRO_CARDS = frozenset({
     87621407,  # Dekoichi the Battlechanted Locomotive
     24317029,  # Gravekeeper's Spy
     93747864,  # Desert Sunlight
+    68005187,  # Soul Exchange
+    26202165,  # Sangan
+    9748752,   # Caius the Shadow Monarch
 })
 MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094})
 UPSTREAM_UTILITY_SHA256 = "59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a"

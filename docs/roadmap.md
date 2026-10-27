@@ -1028,6 +1028,11 @@ An MR1 Desert Sunlight fixture now checks both owner-selected chain orders for
 simultaneous Dekoichi and Gravekeeper's Spy Flip Effects. Both full duels
 replay-verify and pass visibility checks under the pinned MR1 mode, advancing
 one contemporary rulebook timing case without validating the full format.
+A separate MR1 Soul Exchange fixture Tributes the opponent's official Sangan
+for Caius and observes Caius Link 1, Sangan Link 2. Its complete native duel
+replay-verifies and passes visibility checks. The paired GOAT fixture retains
+the opposite format-specific order; this validates a narrow rules boundary,
+not Edison as a whole. See [the Edison audit](edison_research.md).
 An independent 2009 deck-construction validator now accepts an explicitly
 audited eligible-card set and checks Main, Extra, and Side sizes, Fusion/Synchro
 placement, and shared canonical copy caps. It deliberately does not infer
