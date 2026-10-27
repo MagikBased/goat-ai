@@ -1444,6 +1444,9 @@ replay-verified. A separate four-versus-eight worker scaling check found only
 about 1–4% shorter trainer time with eight workers on two 16-duel schedules.
 Prioritize a measured reduction in policy-inference overhead before adding
 more rollout workers; see [the longer profile and scaling check](benchmarks.md#longer-single-process-ppo-profile).
+Skipping the chain GRU on empty-chain CPU decisions preserved outputs but did
+not shorten an eight-duel complete-training run; the trial was reverted. See
+[the pilot](benchmarks.md#empty-chain-gru-skip-pilot-27-october-2026).
 An opt-in feature-v23 TorchScript trace now reuses frozen scorer operations
 across each single-process multi-duel PPO rollout. Two matched 16-duel runs
 saved about 4–6% of complete trainer time, with byte-identical replays and

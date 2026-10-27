@@ -1,5 +1,28 @@
 # Native benchmark log
 
+## Empty-chain GRU skip pilot (27 October 2026)
+
+An experimental CPU inference branch skipped the chain GRU when the encoded
+chain was the single all-zero sentinel row. It kept the ordinary GRU path
+during gradient-enabled fitting and TorchScript tracing. In eight recorded
+Jesse Goat Control versus Warrior duels, 167 of 1,644 multi-option decisions
+had a nonempty chain, so this looked like a frequent opportunity. A focused
+test found equal logits between the skipped inference path and the ordinary
+gradient-enabled GRU path, including a later nonempty chain through the
+traced scorer.
+
+On seeds 26000–26007, the unchanged feature-v23 parent, one Torch CPU thread,
+two four-duel PPO rollouts, two update epochs, and batch size 16, the ordinary
+trainer reported **7.202 seconds** in its last measured arm. Two experimental
+arms reported **7.229 and 7.284 seconds**. All three wrote byte-identical
+replays across **4,848 decisions** and equal final policy tensors. Those same
+replay bytes in a matched ordinary-GRU arm passed native verification and the
+player-visibility audit. The experiment did not show a complete-training
+speed gain, so the branch was reverted. Its ignored reports and outputs have the
+`reuse_bench_off_b_26000` and `empty_chain_fast_{a,b}_26000` prefixes under
+`.cache/goat-ai/`. These measurements do not support changing the policy
+inference path.
+
 ## Cached viewer-specific card projections (27 October 2026)
 
 Observation construction previously rebuilt every immutable `CardView` from
