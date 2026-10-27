@@ -737,12 +737,12 @@ def train_against_snapshot_pool(
             or ppo_batch_size < 1 or ppo_rollout_games < 1
             or rollout_workers < 0
             or ppo_rollout_weighting not in ("per_decision", "per_episode")
-            or ppo_baseline_timing not in ("online", "frozen_rollout")
+            or ppo_baseline_timing not in ("online", "frozen_rollout", "leave_one_out")
             or not 0 < ppo_clip_epsilon < 1):
         raise ValueError("invalid self-play policy update")
-    if ppo_baseline_timing == "frozen_rollout" and (
+    if ppo_baseline_timing in ("frozen_rollout", "leave_one_out") and (
             policy_update != "clipped_ppo" or ppo_rollout_games < 2):
-        raise ValueError("frozen rollout baseline requires multi-duel PPO")
+        raise ValueError("rollout baseline requires multi-duel PPO")
     if ppo_rollout_games > 1 and (policy_update != "clipped_ppo"
                                   or baseline_scope == "state_value"
                                   or skip_capped_games or skip_unsupported_games
@@ -791,6 +791,10 @@ def train_against_snapshot_pool(
     rollout_advantages: list[float] = []
     rollout_record_counts: list[int] = []
     rollout_report_indices: list[int] = []
+    rollout_rewards: list[float] = []
+    rollout_keys: list[str] = []
+    rollout_all_report_indices: list[int] = []
+    rollout_record_episode_indices: list[int] = []
     schedule = episode_schedule(matchups, seeds, mode=schedule_mode)
     pool = (ProcessPoolExecutor(max_workers=min(rollout_workers, ppo_rollout_games),
                                 mp_context=get_context("spawn"))
@@ -803,7 +807,8 @@ def train_against_snapshot_pool(
                     and index % ppo_rollout_games == 0):
                 model.eval()
                 rollout_scorer = TracedRolloutScorer(model)
-            if ppo_baseline_timing == "frozen_rollout" and index % ppo_rollout_games == 0:
+            if (ppo_baseline_timing in ("frozen_rollout", "leave_one_out")
+                    and index % ppo_rollout_games == 0):
                 rollout_baselines = baselines.copy()
             if (rollout_workers or rollout_batch_inference) and index % ppo_rollout_games == 0:
                 model_state = (None if rollout_batch_inference
@@ -906,7 +911,8 @@ def train_against_snapshot_pool(
                 if value_model is not None and episode.learner_records else None)
             baseline = (sum(state_baselines) / len(state_baselines)
                         if state_baselines else
-                        (rollout_baselines if ppo_baseline_timing == "frozen_rollout"
+                        (rollout_baselines if ppo_baseline_timing in
+                         ("frozen_rollout", "leave_one_out")
                          else baselines).get(baseline_key, 0.0))
             loss = None
             if episode.learner_records:
@@ -931,6 +937,9 @@ def train_against_snapshot_pool(
                             rollout_features.extend(episode.learner_features)
                         rollout_advantages.extend(
                             [episode.reward - baseline] * len(episode.learner_records))
+                        if ppo_baseline_timing == "leave_one_out":
+                            rollout_record_episode_indices.extend(
+                                [len(rollout_rewards)] * len(episode.learner_records))
                         rollout_record_counts.append(len(episode.learner_records))
                         rollout_report_indices.append(len(reports))
                 else:
@@ -963,30 +972,56 @@ def train_against_snapshot_pool(
                             "decisions": episode.decisions,
                             "learner_decisions": len(episode.learner_records),
                             "policy_loss": loss, "value_loss": value_loss})
-            if (ppo_rollout_games > 1 and rollout_records
+            if ppo_baseline_timing == "leave_one_out":
+                rollout_rewards.append(episode.reward)
+                rollout_keys.append(baseline_key)
+                rollout_all_report_indices.append(len(reports) - 1)
+            if (ppo_rollout_games > 1
                     and ((index + 1) % ppo_rollout_games == 0 or index + 1 == len(seeds))):
-                weights = None
-                if ppo_rollout_weighting == "per_episode":
-                    weights = [len(rollout_records) / (len(rollout_record_counts) * count)
-                               for count in rollout_record_counts for _ in range(count)]
-                rollout_loss = ppo_clipped_update(
-                    model, vocabulary, rollout_records, 0.0, 0.0, optimizer,
-                    epochs=ppo_epochs, batch_size=ppo_batch_size,
-                    clip_epsilon=ppo_clip_epsilon,
-                    entropy_coefficient=entropy_coefficient,
-                    temperature=learner_temperature,
-                    parent_model=parent_model,
-                    parent_kl_weight=parent_kl_weight,
-                    random_seed=random_seed + seed,
-                    advantages=rollout_advantages, sample_weights=weights,
-                    encoded_features=(rollout_features if reuse_rollout_features else None))
-                for report_index in rollout_report_indices:
-                    reports[report_index]["policy_loss"] = rollout_loss
+                if ppo_baseline_timing == "leave_one_out":
+                    totals: dict[str, tuple[float, int]] = {}
+                    for key, reward in zip(rollout_keys, rollout_rewards, strict=True):
+                        total, count = totals.get(key, (0.0, 0))
+                        totals[key] = (total + reward, count + 1)
+                    episode_baselines = []
+                    for key, reward, report_index in zip(
+                            rollout_keys, rollout_rewards,
+                            rollout_all_report_indices, strict=True):
+                        total, count = totals[key]
+                        estimate = ((total - reward) / (count - 1) if count > 1
+                                    else rollout_baselines.get(key, 0.0))
+                        episode_baselines.append(estimate)
+                        reports[report_index]["baseline"] = estimate
+                    rollout_advantages = [
+                        rollout_rewards[episode_index] - episode_baselines[episode_index]
+                        for episode_index in rollout_record_episode_indices]
+                if rollout_records:
+                    weights = None
+                    if ppo_rollout_weighting == "per_episode":
+                        weights = [len(rollout_records) / (len(rollout_record_counts) * count)
+                                   for count in rollout_record_counts for _ in range(count)]
+                    rollout_loss = ppo_clipped_update(
+                        model, vocabulary, rollout_records, 0.0, 0.0, optimizer,
+                        epochs=ppo_epochs, batch_size=ppo_batch_size,
+                        clip_epsilon=ppo_clip_epsilon,
+                        entropy_coefficient=entropy_coefficient,
+                        temperature=learner_temperature,
+                        parent_model=parent_model,
+                        parent_kl_weight=parent_kl_weight,
+                        random_seed=random_seed + seed,
+                        advantages=rollout_advantages, sample_weights=weights,
+                        encoded_features=(rollout_features if reuse_rollout_features else None))
+                    for report_index in rollout_report_indices:
+                        reports[report_index]["policy_loss"] = rollout_loss
                 rollout_records.clear()
                 rollout_features.clear()
                 rollout_advantages.clear()
                 rollout_record_counts.clear()
                 rollout_report_indices.clear()
+                rollout_rewards.clear()
+                rollout_keys.clear()
+                rollout_all_report_indices.clear()
+                rollout_record_episode_indices.clear()
             if (index + 1) % snapshot_every == 0:
                 snapshots.append(copy.deepcopy(model.state_dict()))
                 if len(snapshots) > max_snapshots:

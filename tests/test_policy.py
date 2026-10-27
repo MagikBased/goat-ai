@@ -2222,6 +2222,7 @@ def test_self_play_uses_named_opt_in_baseline_opponent(monkeypatch):
 @pytest.mark.parametrize("baseline_timing, first_advantages", [
     ("online", (1.0, -1.05, -1.05)),
     ("frozen_rollout", (1.0, -1.0, -1.0)),
+    ("leave_one_out", (2.0, -2.0, -2.0)),
 ])
 def test_multi_duel_ppo_freezes_policy_until_rollout_boundary(
         monkeypatch, baseline_timing, first_advantages):
@@ -2266,9 +2267,47 @@ def test_multi_duel_ppo_freezes_policy_until_rollout_boundary(
     if baseline_timing == "frozen_rollout":
         assert [report["baseline"] for report in reports] == pytest.approx(
             [0.0, 0.0, -0.0025, -0.0025, -0.00475625])
+    if baseline_timing == "leave_one_out":
+        assert [report["baseline"] for report in reports] == pytest.approx(
+            [-1.0, 1.0, -1.0, 1.0, -0.00475625])
+        assert batches[2][1] == pytest.approx((1.00475625,))
     with pytest.raises(ValueError, match="multi-duel PPO"):
         train_against_snapshot_pool(model, vocabulary, (("a", "b"),), (100,),
                                     lambda: None, ppo_rollout_games=2)
+
+
+def test_leave_one_out_uses_other_same_deck_games_even_without_policy_choices(
+        monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    seen = []
+
+    def run_episode(_policy, _vocabulary, _opponent, _decks, seed, *_args):
+        records = () if seed == 101 else (DecisionRecord(
+            view(), actions(), actions()[0]),)
+        return SimpleNamespace(
+            seed=seed, winner=0, reward=1.0 if seed % 2 == 0 else -1.0,
+            decisions=2, learner_records=records,
+            trajectory=SimpleNamespace(deck_sha256=("a", "b"),
+                                       asset_sha256={"core": "hash"},
+                                       rules_profile="goat"))
+
+    def update(_policy, _vocabulary, records, _reward, _baseline, _optimizer,
+               **kwargs):
+        seen.append((len(records), tuple(kwargs["advantages"])))
+        return 7.0
+
+    monkeypatch.setattr("goat_ai.training.self_play.run_learning_episode", run_episode)
+    monkeypatch.setattr("goat_ai.training.self_play.ppo_clipped_update", update)
+    reports = train_against_snapshot_pool(
+        model, vocabulary, (("a", "b"),), (100, 101, 102, 103),
+        lambda: None, policy_update="clipped_ppo", ppo_rollout_games=4,
+        schedule_mode="four_roles", baseline_scope="learner_deck",
+        ppo_baseline_timing="leave_one_out", snapshot_every=4)
+    assert seen == [(3, pytest.approx((2.0, 2.0, -2.0)))]
+    assert [report["baseline"] for report in reports] == pytest.approx(
+        [-1.0, 1.0, -1.0, 1.0])
+    assert [report["policy_loss"] for report in reports] == [7.0, None, 7.0, 7.0]
 
 
 def test_self_play_can_censor_over_cap_game_without_learning_from_it(monkeypatch):

@@ -1730,6 +1730,14 @@ reviewed action values and better credit assignment, rather than treating
 training-game win rate as progress. See
 [evaluation](evaluation.md#longer-lower-kl-ppo-continuation-27-october-2026).
 
+An opt-in leave-one-out PPO baseline now uses other terminal duels from the
+same rollout and learner deck to reduce return variance without consulting
+the acting agent's hidden state. A matched 32-game ablation replay-verified
+all training duels but tied the corrected frozen-baseline child against
+Tactical v14 and did not establish a gain over the selected parent. It
+remains experimental; see
+[evaluation](evaluation.md#leave-one-out-ppo-rollout-baseline-27-october-2026).
+
 The visible-resource v3 experiment adds replay-verified counterfactual
 comparisons for own-only Nobleman and negative visible Heavy Storm trades,
 including decisions where the recorded policy avoided the loss. A child fit

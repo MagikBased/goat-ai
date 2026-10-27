@@ -7946,6 +7946,63 @@ Evaluate with `scripts/evaluate_policy.py --engine experimental
 Phoenix/Dimension, and either `--opponent-checkpoint` for direct comparison
 or `--opponent tactical` for the two matched Tactical arms.
 
+### Leave-one-out PPO rollout baseline (27 October 2026)
+
+An opt-in `--ppo-baseline-timing leave_one_out` now centers each completed
+duel's terminal reward against the *other* games in the same frozen-policy
+rollout and learner-deck group. Its baseline cannot depend on that duel's
+sampled actions or outcome. A singleton group uses the pre-rollout moving
+estimate. Games with no learner policy choice still contribute their outcome
+to other games' baselines. The moving estimates continue to accumulate every
+terminal result for later singleton fallbacks. This changes training updates,
+not agent-visible observations or the simulator. Unit tests cover paired
+rewards, separate deck groups, empty learner records, and a final singleton;
+native tests confirm serial, process-worker, and batched-inference modes
+produce equal trajectories, reports, and model tensors.
+
+A matched four-role, 32-game ablation used the same selected parent, training
+decks, seeds 46000–46031, four workers, four-game PPO rollouts, per-episode
+weighting, learner-deck scope, three epochs, batch size 16, learning rate
+0.0001, and parent KL weight 0.5 as the corrected frozen-baseline check above.
+Only `--ppo-baseline-timing leave_one_out` changed. All 32 games terminated:
+17 learner wins, 15 losses, 4,064 learner decisions, 23,487 total decisions,
+and measured training wall time 25.36 s with one Torch thread. All 32 saved
+trajectories independently replay-verified and passed the visibility audit;
+38 possible mistakes were shortlisted. The ignored checkpoint is
+`.cache/goat-ai/fv23_loo_ppo_46000_46031.pt` (SHA-256
+`054c40ee0a1d85cebbc7a53026c833f6bbbfd816f6db990dfb5b226147a82de0`),
+and the ignored audit is
+`.cache/goat-ai/fv23_loo_ppo_46000_46031_audit.json` (SHA-256
+`52516cb28265fb377af51cb15c4ed96b5f429cb5922ad43a932fbd8d29719127`).
+
+On unseen Rhymus Goat Control versus Charlotte Zombie, both deck assignments
+and seats, seeds 46100–46107, the child scored **16–15–1** directly against
+the matched frozen-baseline child (paired-bootstrap 95% score interval
+39.1–64.1%) and **17–15** against the selected parent (31.3–68.8%). Against
+Tactical v14, the leave-one-out and frozen-baseline children each scored
+**15–17**, while the parent scored **16–16**. The verified paired child-minus-
+parent Tactical score difference was **−3.1 points** (95% interval −15.6 to
++9.4); leave-one-out minus frozen baseline was **0 points** (−12.5 to +12.5).
+The report comparator checked matched native/source fingerprints, current
+local deck hashes, and absence of evaluation Main Deck compositions from
+training provenance. Ignored evaluation report SHA-256 values are
+`d96dbd7f3b8a84df6c80a1e7c4ec774140a748eba6510e3e5ff78b0de57d1352`
+(direct versus frozen), `1a25ad64cd0de083880cf458fe01257df18d529899224c52e89091a3605e144a`
+(direct versus parent), `2dc158a2e310339e5785e3e377fde331a5cbe602171e35781bb24d84c1be16c9`
+(leave-one-out versus Tactical),
+`f5814f252a5e72d6bec3fa17459fdbb6d28622c15f2734d658227a1a84bbd5e9`
+(frozen versus Tactical), and
+`0d4be5ae1e129ac3d1030d476159898b61fd1331003e3af92f8264e88db06c97`
+(parent versus Tactical). This small held-out sample gives no basis to promote
+the child; leave-one-out remains an opt-in research setting.
+
+Reproduce training with the corrected frozen-baseline command above, changing
+only `--ppo-baseline-timing leave_one_out` and the distinct output path to
+`.cache/goat-ai/fv23_loo_ppo_46000_46031.pt`. Replay-audit all
+`episode_*.json` files in its adjacent replay directory. Evaluate with
+`scripts/evaluate_policy.py` and the Rhymus/Zombie matchup on seed 46100,
+eight seeds, both deck assignments, both seats, and an unseen-Main-Deck gate.
+
 ### Visible-rule v2 preference ablation (27 October 2026)
 
 The `visible_audit_v2` automated-label experiment adds two narrow categories

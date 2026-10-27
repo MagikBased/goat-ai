@@ -20,7 +20,8 @@ REVERSE = ROOT / "examples/decks/vanilla_reverse.ydk"
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("baseline_timing", ["online", "frozen_rollout"])
+@pytest.mark.parametrize("baseline_timing", [
+    "online", "frozen_rollout", "leave_one_out"])
 def test_worker_count_preserves_rollout_trajectories_and_update(baseline_timing):
     native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     vocabulary = CardVocabulary.from_goat_whitelist(

@@ -102,9 +102,11 @@ def main() -> None:
     parser.add_argument("--ppo-rollout-weighting", choices=("per_decision", "per_episode"),
                         default="per_decision",
                         help="per_episode equalizes total decision weight across rollout duels")
-    parser.add_argument("--ppo-baseline-timing", choices=("online", "frozen_rollout"),
+    parser.add_argument("--ppo-baseline-timing",
+                        choices=("online", "frozen_rollout", "leave_one_out"),
                         default="online",
-                        help="frozen_rollout uses the same pre-rollout return baseline for every duel in a PPO batch")
+                        help="frozen_rollout uses a pre-rollout estimate; leave_one_out "
+                             "uses other terminal duels of the same learner deck in that rollout")
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
     parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value"),
