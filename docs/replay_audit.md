@@ -1140,3 +1140,26 @@ an additional card destroyed by its effect. These are player-visible review
 prompts, not claims about hidden opponent cards or about optimal play after
 possible chain responses. The opt-in Tactical resource guard and neural
 feature experiments are measured in [evaluation](evaluation.md).
+
+The two explicit user corrections are now versioned in
+[`neural_v14_return_flip_9901_resource.preference.json`](../examples/preferences/neural_v14_return_flip_9901_resource.preference.json).
+The source JSON can be restored from the committed standalone viewer without
+changing its SHA-256:
+
+```bash
+PYTHONPATH=src python scripts/extract_embedded_replay.py \
+  replays/neural_v14_vs_tactical_return_flip_seed9901.html \
+  .cache/goat-ai/neural_v14_return_flip_9901.json
+```
+
+With the pinned native assets, all 329 restored decisions replay-verify and
+pass the player-visibility audit. At decision 10, setting a Spell/Trap or
+ending the turn is marked preferable to activating Nobleman on the only Set
+monster, its own Spy. At decision 25, ending the turn is marked preferable to
+activating Heavy Storm against only its own two other Set cards. The exact
+alternative indices are engineering interpretations of the user's rejection,
+not additional human demonstrations. The same v23 policy that generated the
+replay still ranks both rejected actions first; the preferred-minus-rejected
+logit margins are −1.119 and −1.229. Previous two-preference fitting corrected
+these exact frames but suppressed useful activations elsewhere, so this file
+is a durable evaluation/training case, not evidence for promoting that child.

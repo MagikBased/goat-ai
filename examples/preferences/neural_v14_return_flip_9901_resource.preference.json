@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "source_trajectory_sha256": "a8158006692a3f7e68aaff18a5c910cc1bb1344ebebf6aec50f90f398f4df3a6",
+  "reviewer": "player_replay_feedback_2026_10_26",
+  "authorization": "policy_review",
+  "reviewed_seat": 0,
+  "preferences": [
+    {
+      "decision_index": 10,
+      "preferred_action_indices": [0, 4],
+      "disfavored_action_indices": [3]
+    },
+    {
+      "decision_index": 25,
+      "preferred_action_indices": [1],
+      "disfavored_action_indices": [0]
+    }
+  ]
+}
