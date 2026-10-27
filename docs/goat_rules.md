@@ -695,6 +695,27 @@ Unresolved: exact script revisions for 2005 TCG card text, card-specific rulings
 
 **Firebird battle callback:** [The official Firebird text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6261&ope=2) grants 500 ATK when a friendly Winged Beast is destroyed. The [historical FAQ](https://www.goatformat.com/rulings3.html) places the battle trigger at the end of the Damage Step and counts multiple Winged Beasts destroyed together only once. The pinned GOAT Lua script passed an omitted callback `tp` to `IsControler`, crashing three independently generated full-duel seeds. A SHA-guarded in-memory patch uses the effect handler's player for that battle condition. Seeds 10030, 10062, and 10122 reach terminal and replay-verify. A new paired native fixture follows the effect itself: Firebird and a friendly Harpie Lady face a 1900-ATK Gemini Elf. Harpie attacks and is destroyed in battle; Firebird rises from 1000 to 1500 ATK after the Damage Step, while its controller takes 600 battle damage. In the control branch, friendly non-Winged Beast Mystical Elf is destroyed by the same Gemini Elf; Firebird stays at 1000 ATK and its controller takes 1100 damage. Both complete duels replay-verify and pass the visibility audit. This covers one battle destruction and one type-negative branch; simultaneous destruction, face-down monsters, and effect destruction remain untested.
 
+**Sangan paid for Metamorphosis, with or without Solemn Judgment:** The
+[historical Metamorphosis FAQ](https://www.goatformat.com/rulings5.html)
+says Tributing the monster is an activation cost. The
+[historical Sangan FAQ](https://www.goatformat.com/rulings7.html) says its
+effect activates when sent from the field to the Graveyard, and the
+[contemporary Last Will timing discussion](https://www.goatformat.com/home/ruling-notice-last-will)
+explicitly describes Sangan's cost-triggered search waiting until the
+current chain finishes. A paired seed-52 fixture Normal Summons the GOAT
+Sangan, activates Metamorphosis, and Tributes Sangan for a Level 3 Fusion.
+Before the response, Sangan is already in the Graveyard but neither the
+Fusion nor a Sangan Deck reveal has appeared. With Solemn passed,
+Dragoness the Wicked Knight is Summoned; with Solemn chained to negate the
+Spell activation, the Fusion stays in the Extra Deck and the opponent pays
+half of 8000 LP. In **both** branches, Sangan then searches Mystical Elf in
+a new chain, the Deck count falls by one, and only the opponent receives
+the one-card hand-reveal event. The combination of the cited cost and
+trigger-timing rules is an inference checked against the pinned engine.
+Both complete duels serialize, replay-verify, and pass the visibility audit.
+Other responses to Metamorphosis and alternate Sangan search targets remain
+untested.
+
 **Hand-choice protocol through other cards:** [Double Spell's official text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5629&ope=2&request_locale=en) can copy a Spell from the opponent's Graveyard. When it copies [The Inexperienced Spy](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4848&ope=2), the choice is still blind: native seed 10093 offers opponent-hand choices without card codes or native hand indices, then reveals only the selected card to the chooser. [Dragged Down into the Grave](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5352&ope=2&request_locale=en) reveals both hands before its choice; seed 10107 retains only the addressed reveal for the choosing player's legal actions. Both complete duels replay-verify and pass the visibility audit. These are protocol and privacy regressions for the pinned scripts, not a complete ruling audit of either card.
 
 **Puppet Magic sum selection:** [The Puppet Magic of Dark Ruler's official text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5313&ope=2) banishes face-up monsters whose Levels total the revived Fiend's Level. Native seeds 10097 and 10102 exercise the pinned core's `MSG_SELECT_SUM` choice and complete with replay verification after bounded exact/exceed combination decoding. The adapter parses mandatory-card sum prompts and checks them in parser tests, but these native seeds offered no mandatory cards; an end-to-end native case remains unobserved. The two native tests establish response encoding and completion for their offered choices, not every historical summoning or targeting interaction.
