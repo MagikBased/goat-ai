@@ -1492,6 +1492,45 @@ def test_ppo_update_uses_visible_variable_action_sets_and_terminal_reward():
     with pytest.raises(ValueError, match="state baselines"):
         ppo_clipped_update(policy, vocabulary, records, 1.0, 0.0,
                            optimizer, state_baselines=(0.0,))
+    with pytest.raises(ValueError, match="advantages"):
+        ppo_clipped_update(policy, vocabulary, records, 0.0, 0.0,
+                           optimizer, advantages=(1.0,))
+    with pytest.raises(ValueError, match="sample weights"):
+        ppo_clipped_update(policy, vocabulary, records, 0.0, 0.0,
+                           optimizer, sample_weights=(1.0, 0.0))
+
+
+def test_ppo_update_accepts_mixed_rollout_advantages():
+    vocabulary = CardVocabulary((10, 20))
+    choices = actions()
+    records = (DecisionRecord(view(), choices, choices[1]),
+               DecisionRecord(view(), choices, choices[0]))
+    torch.manual_seed(31)
+    policy = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    features = encode_decision(view(), choices, vocabulary, 10)
+    before = torch.softmax(policy(features), 0)[1].item()
+    optimizer = torch.optim.SGD(policy.parameters(), lr=0.01)
+    ppo_clipped_update(policy, vocabulary, records, 0.0, 0.0, optimizer,
+                       epochs=2, batch_size=2, advantages=(1.0, -1.0))
+    assert torch.softmax(policy(features), 0)[1].item() > before
+
+
+def test_ppo_decision_weights_change_conflicting_updates():
+    vocabulary = CardVocabulary((10, 20))
+    choices = actions()
+    records = (DecisionRecord(view(), choices, choices[1]),
+               DecisionRecord(view(), choices, choices[0]))
+    torch.manual_seed(36)
+    initial = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    probabilities = []
+    for weights in ((3.0, 1.0), (1.0, 3.0)):
+        policy = copy.deepcopy(initial)
+        optimizer = torch.optim.SGD(policy.parameters(), lr=0.01)
+        ppo_clipped_update(policy, vocabulary, records, 1.0, 0.0, optimizer,
+                           epochs=1, batch_size=2, sample_weights=weights)
+        features = encode_decision(view(), choices, vocabulary, 10)
+        probabilities.append(torch.softmax(policy(features), 0)[1].item())
+    assert probabilities[0] > probabilities[1]
 
 
 def test_policy_gradient_uses_sampling_temperature_in_log_probability():
@@ -1679,6 +1718,49 @@ def test_self_play_can_track_terminal_baseline_by_learner_deck(monkeypatch):
     with pytest.raises(ValueError, match="hyperparameters"):
         train_against_snapshot_pool(model, vocabulary, matchups, seeds,
                                     lambda: None, baseline_scope="unknown")
+
+
+def test_multi_duel_ppo_freezes_policy_until_rollout_boundary(monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    weights_seen = []
+    batches = []
+
+    def run_episode(policy, _vocabulary, _opponent, _decks, seed, *_args):
+        weights_seen.append(float(next(policy.parameters()).flatten()[0]))
+        decisions = (DecisionRecord(view(), actions(), actions()[0]),)
+        return SimpleNamespace(
+            seed=seed, winner=0, reward=1.0 if seed % 2 == 0 else -1.0,
+            decisions=2, learner_records=decisions if seed % 2 == 0 else decisions * 2,
+            trajectory=SimpleNamespace(deck_sha256=("a", "b"),
+                                       asset_sha256={"core": "hash"},
+                                       rules_profile="goat"))
+
+    def update(policy, _vocabulary, records, _reward, _baseline, _optimizer, **kwargs):
+        batches.append((len(records), tuple(kwargs["advantages"]),
+                        tuple(kwargs["sample_weights"])))
+        with torch.no_grad():
+            next(policy.parameters()).add_(0.1)
+        return float(len(batches))
+
+    monkeypatch.setattr("goat_ai.training.self_play.run_learning_episode", run_episode)
+    monkeypatch.setattr("goat_ai.training.self_play.ppo_clipped_update", update)
+    reports = train_against_snapshot_pool(
+        model, vocabulary, (("a", "b"),), (100, 101, 102, 103, 104),
+        lambda: None, policy_update="clipped_ppo", ppo_rollout_games=2,
+        ppo_rollout_weighting="per_episode", snapshot_every=2)
+    assert weights_seen[0] == weights_seen[1]
+    assert weights_seen[2] == weights_seen[3]
+    assert weights_seen[0] != weights_seen[2]
+    assert batches[0][0] == 3
+    assert batches[0][1] == pytest.approx((1.0, -1.05, -1.05))
+    assert batches[0][2] == pytest.approx((1.5, 0.75, 0.75))
+    assert batches[1][0] == 3
+    assert batches[2][0] == 1  # flush the final partial rollout
+    assert [report["policy_loss"] for report in reports] == [1.0, 1.0, 2.0, 2.0, 3.0]
+    with pytest.raises(ValueError, match="multi-duel PPO"):
+        train_against_snapshot_pool(model, vocabulary, (("a", "b"),), (100,),
+                                    lambda: None, ppo_rollout_games=2)
 
 
 def test_self_play_can_censor_over_cap_game_without_learning_from_it(monkeypatch):

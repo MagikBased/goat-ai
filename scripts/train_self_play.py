@@ -53,6 +53,11 @@ def main() -> None:
     parser.add_argument("--ppo-epochs", type=int, default=2)
     parser.add_argument("--ppo-batch-size", type=int, default=16)
     parser.add_argument("--ppo-clip-epsilon", type=float, default=0.2)
+    parser.add_argument("--ppo-rollout-games", type=int, default=1,
+                        help="collect this many terminal duels under one frozen policy before PPO updates")
+    parser.add_argument("--ppo-rollout-weighting", choices=("per_decision", "per_episode"),
+                        default="per_decision",
+                        help="per_episode equalizes total decision weight across rollout duels")
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
     parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value"),
@@ -76,6 +81,7 @@ def main() -> None:
             or args.learner_temperature <= 0
             or args.value_width < 1 or args.value_learning_rate <= 0
             or args.ppo_epochs < 1 or args.ppo_batch_size < 1
+            or args.ppo_rollout_games < 1
             or not 0 < args.ppo_clip_epsilon < 1
             or not 0 <= args.historical_probability <= 1):
         parser.error("invalid training schedule or hyperparameters")
@@ -141,6 +147,8 @@ def main() -> None:
         ppo_epochs=args.ppo_epochs,
         ppo_batch_size=args.ppo_batch_size,
         ppo_clip_epsilon=args.ppo_clip_epsilon,
+        ppo_rollout_games=args.ppo_rollout_games,
+        ppo_rollout_weighting=args.ppo_rollout_weighting,
         schedule_mode=args.schedule_mode,
         value_model=value_model,
         value_learning_rate=args.value_learning_rate,
@@ -178,6 +186,10 @@ def main() -> None:
                                  if args.policy_update == "clipped_ppo" else None),
               "ppo_clip_epsilon": (args.ppo_clip_epsilon
                                    if args.policy_update == "clipped_ppo" else None),
+              "ppo_rollout_games": (args.ppo_rollout_games
+                                    if args.policy_update == "clipped_ppo" else None),
+              "ppo_rollout_weighting": (args.ppo_rollout_weighting
+                                        if args.policy_update == "clipped_ppo" else None),
               "value_width": args.value_width if value_model is not None else None,
               "value_learning_rate": (args.value_learning_rate
                                       if value_model is not None else None),

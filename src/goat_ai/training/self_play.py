@@ -223,12 +223,13 @@ def ppo_clipped_update(
     parent_model: LegalActionPolicy | None = None,
     parent_kl_weight: float = 0.0,
     random_seed: int = 0,
+    advantages: Sequence[float] | None = None,
+    sample_weights: Sequence[float] | None = None,
 ) -> float:
-    """Reuse one on-policy duel with a clipped objective and visible actions.
+    """Reuse on-policy visible decisions with a clipped objective.
 
-    The pre-update policy supplies fixed action log probabilities. Advantages
-    are terminal returns minus the supplied baseline; there is no GAE or
-    multi-episode rollout batch in this first PPO experiment.
+    The pre-update policy supplies fixed action log probabilities. Callers
+    may supply per-decision advantages from several frozen-policy duels.
     """
     if (not records or epochs < 1 or batch_size < 1 or temperature <= 0
             or entropy_coefficient < 0 or max_gradient_norm <= 0
@@ -242,6 +243,15 @@ def ppo_clipped_update(
             and (len(state_baselines) != len(records)
                  or any(not isfinite(value) for value in state_baselines))):
         raise ValueError("state baselines must be finite and match decisions")
+    if (advantages is not None
+            and (len(advantages) != len(records)
+                 or any(not isfinite(value) for value in advantages))):
+        raise ValueError("advantages must be finite and match decisions")
+    if (sample_weights is not None
+            and (len(sample_weights) != len(records)
+                 or any(not isfinite(weight) or weight <= 0
+                        for weight in sample_weights))):
+        raise ValueError("sample weights must be positive, finite, and match decisions")
     if not 0 < clip_epsilon < 1:
         raise ValueError("PPO clip epsilon must be between zero and one")
     device = next(model.parameters()).device
@@ -277,13 +287,18 @@ def ppo_clipped_update(
             previous = torch.tensor([old_log_probs[index] for index in indices],
                                     dtype=chosen_log_probs.dtype, device=device)
             advantage = torch.tensor([
-                reward - (state_baselines[index] if state_baselines is not None
-                          else baseline) for index in indices],
+                advantages[index] if advantages is not None else reward - (
+                    state_baselines[index] if state_baselines is not None else baseline)
+                for index in indices],
                 dtype=chosen_log_probs.dtype, device=device)
+            weights = (torch.tensor([sample_weights[index] for index in indices],
+                                    dtype=chosen_log_probs.dtype, device=device)
+                       if sample_weights is not None else torch.ones_like(advantage))
             ratio = (chosen_log_probs - previous).exp()
             entropy = -(probabilities * log_probs).sum(1)
-            loss = (-clipped_surrogate(ratio, advantage, clip_epsilon).mean()
-                    - entropy_coefficient * entropy.mean())
+            loss = (-(weights * clipped_surrogate(
+                ratio, advantage, clip_epsilon)).mean()
+                    - entropy_coefficient * (weights * entropy).mean())
             if parent_kl_weight:
                 with torch.no_grad():
                     parent_logits, _ = parent_model.forward_batch(
@@ -291,7 +306,8 @@ def ppo_clipped_update(
                     parent_log_probs = torch.log_softmax(parent_logits / temperature, 1)
                     parent_probs = parent_log_probs.exp()
                 loss = loss + parent_kl_weight * (
-                    parent_probs * (parent_log_probs - log_probs)).sum(1).mean()
+                    weights * (parent_probs * (
+                        parent_log_probs - log_probs)).sum(1)).mean()
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_gradient_norm)
@@ -357,6 +373,8 @@ def train_against_snapshot_pool(
     ppo_epochs: int = 2,
     ppo_batch_size: int = 16,
     ppo_clip_epsilon: float = 0.2,
+    ppo_rollout_games: int = 1,
+    ppo_rollout_weighting: str = "per_decision",
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
@@ -364,8 +382,8 @@ def train_against_snapshot_pool(
     """Train one learner seat per duel against random or frozen past policies.
 
     Frozen snapshots prevent the opponent from changing within an episode.
-    PPO is an opt-in, single-episode clipped update. Neither branch is league
-    training or an established competitive policy.
+    PPO can update from one or several duels sampled under the same policy.
+    Neither branch is league training or an established competitive policy.
     """
     if (not matchups or not seeds or learning_rate <= 0 or snapshot_every < 1
             or max_snapshots < 1 or learner_temperature <= 0
@@ -378,8 +396,16 @@ def train_against_snapshot_pool(
             or schedule_mode not in ("paired_seats", "four_roles")):
         raise ValueError("invalid self-play schedule or hyperparameters")
     if (policy_update not in ("reinforce", "clipped_ppo") or ppo_epochs < 1
-            or ppo_batch_size < 1 or not 0 < ppo_clip_epsilon < 1):
+            or ppo_batch_size < 1 or ppo_rollout_games < 1
+            or ppo_rollout_weighting not in ("per_decision", "per_episode")
+            or not 0 < ppo_clip_epsilon < 1):
         raise ValueError("invalid self-play policy update")
+    if ppo_rollout_games > 1 and (policy_update != "clipped_ppo"
+                                  or baseline_scope == "state_value"
+                                  or skip_capped_games or skip_unsupported_games
+                                  or snapshot_every % ppo_rollout_games):
+        raise ValueError("multi-duel PPO requires terminal duels, a moving baseline, "
+                         "and snapshot intervals divisible by rollout size")
     if (policy_update == "clipped_ppo" and
             (model.feature_version < 10 or model.feature_version in (14, 15))):
         raise ValueError("clipped PPO requires a supported batched policy version")
@@ -394,6 +420,10 @@ def train_against_snapshot_pool(
     snapshots = [copy.deepcopy(model.state_dict())]
     baselines: dict[str, float] = {}
     reports = []
+    rollout_records: list[DecisionRecord] = []
+    rollout_advantages: list[float] = []
+    rollout_record_counts: list[int] = []
+    rollout_report_indices: list[int] = []
     for index, (seed, decks, learner_seat) in enumerate(episode_schedule(
             matchups, seeds, mode=schedule_mode)):
         if rng.random() < historical_probability:
@@ -441,17 +471,24 @@ def train_against_snapshot_pool(
         loss = None
         if episode.learner_records:
             if policy_update == "clipped_ppo":
-                loss = ppo_clipped_update(
-                    model, vocabulary, episode.learner_records,
-                    episode.reward, baseline, optimizer,
-                    epochs=ppo_epochs, batch_size=ppo_batch_size,
-                    clip_epsilon=ppo_clip_epsilon,
-                    entropy_coefficient=entropy_coefficient,
-                    temperature=learner_temperature,
-                    state_baselines=state_baselines,
-                    parent_model=parent_model,
-                    parent_kl_weight=parent_kl_weight,
-                    random_seed=random_seed + seed)
+                if ppo_rollout_games == 1:
+                    loss = ppo_clipped_update(
+                        model, vocabulary, episode.learner_records,
+                        episode.reward, baseline, optimizer,
+                        epochs=ppo_epochs, batch_size=ppo_batch_size,
+                        clip_epsilon=ppo_clip_epsilon,
+                        entropy_coefficient=entropy_coefficient,
+                        temperature=learner_temperature,
+                        state_baselines=state_baselines,
+                        parent_model=parent_model,
+                        parent_kl_weight=parent_kl_weight,
+                        random_seed=random_seed + seed)
+                else:
+                    rollout_records.extend(episode.learner_records)
+                    rollout_advantages.extend(
+                        [episode.reward - baseline] * len(episode.learner_records))
+                    rollout_record_counts.append(len(episode.learner_records))
+                    rollout_report_indices.append(len(reports))
             else:
                 loss = policy_gradient_update(
                     model, vocabulary, episode.learner_records,
@@ -479,6 +516,28 @@ def train_against_snapshot_pool(
                         "decisions": episode.decisions,
                         "learner_decisions": len(episode.learner_records),
                         "policy_loss": loss, "value_loss": value_loss})
+        if (ppo_rollout_games > 1 and rollout_records
+                and ((index + 1) % ppo_rollout_games == 0 or index + 1 == len(seeds))):
+            weights = None
+            if ppo_rollout_weighting == "per_episode":
+                weights = [len(rollout_records) / (len(rollout_record_counts) * count)
+                           for count in rollout_record_counts for _ in range(count)]
+            rollout_loss = ppo_clipped_update(
+                model, vocabulary, rollout_records, 0.0, 0.0, optimizer,
+                epochs=ppo_epochs, batch_size=ppo_batch_size,
+                clip_epsilon=ppo_clip_epsilon,
+                entropy_coefficient=entropy_coefficient,
+                temperature=learner_temperature,
+                parent_model=parent_model,
+                parent_kl_weight=parent_kl_weight,
+                random_seed=random_seed + seed,
+                advantages=rollout_advantages, sample_weights=weights)
+            for report_index in rollout_report_indices:
+                reports[report_index]["policy_loss"] = rollout_loss
+            rollout_records.clear()
+            rollout_advantages.clear()
+            rollout_record_counts.clear()
+            rollout_report_indices.clear()
         if (index + 1) % snapshot_every == 0:
             snapshots.append(copy.deepcopy(model.state_dict()))
             if len(snapshots) > max_snapshots:

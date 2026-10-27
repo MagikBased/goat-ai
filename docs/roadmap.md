@@ -954,3 +954,13 @@ algorithm gain does not satisfy M4's absolute strength gate. Keep the parent
 as the neural reference and require a measured gain against the parent and
 Tactical across deck families before promoting an RL update; see
 [the evaluation](evaluation.md).
+
+Four-duel PPO rollout batching and equal-duel loss weighting were tested
+from that same parent on the same 32-game training schedule. The unweighted
+rollout child lost 20–44 to single-duel PPO on 64 held-out games; the
+equal-weight child scored 29–33 with two draws against it. The latter also
+scored 29–35 versus its unchanged parent and 17–47 versus Tactical on a
+separate held-out schedule. Neither variant meets the M4 gate or shows a
+measured speed gain. Keep single-duel updates as the default and pursue a
+better learning signal before scaling rollout volume; see
+[the evaluation](evaluation.md).

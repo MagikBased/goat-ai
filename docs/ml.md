@@ -342,13 +342,19 @@ self-play algorithm.
 `--policy-update clipped_ppo` is an opt-in implementation of the clipped
 probability-ratio objective from [Schulman et al., 2017](https://arxiv.org/abs/1707.06347).
 It freezes the pre-update action probabilities for each sampled duel, then
-reuses that duel's player-visible decisions for `--ppo-epochs` minibatch
-passes with `--ppo-batch-size` and `--ppo-clip-epsilon`. It supports policy
-feature versions 10–13 and 16–25. The advantage is still terminal outcome
-minus the chosen baseline. This initial experiment lacks generalized
-advantage estimation and multi-episode rollout batches; it is not evidence
-of superhuman play. The original REINFORCE path remains the default.
-The controlled native comparison and held-out results are in
+reuses player-visible decisions for `--ppo-epochs` minibatch passes with
+`--ppo-batch-size` and `--ppo-clip-epsilon`. `--ppo-rollout-games N` can
+collect N complete duels before updating the policy; all N duels use the
+same policy weights. `--ppo-rollout-weighting per_episode` scales decision
+losses so each duel contributes equal total weight, while the default
+`per_decision` gives longer duels more weight. Multi-duel rollouts require
+terminal games, a moving return baseline, and a snapshot interval divisible
+by N; the experimental state-value baseline is not supported in this mode.
+The policy supports feature versions 10–13 and 16–25. Advantage remains
+terminal outcome minus the baseline; there is no generalized advantage
+estimation. Rollout batching is not a measured speedup or strength gain, and
+neither PPO mode is evidence of superhuman play. The original REINFORCE path
+remains the default. The controlled native comparisons are in
 [evaluation](evaluation.md).
 
 ## Ordered-chain feature check

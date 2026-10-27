@@ -5308,6 +5308,78 @@ PPO improved relative to this REINFORCE child, but did not demonstrate an
 absolute playing-strength gain. The parent remains the neural reference;
 PPO remains opt-in and M4's self-play strength gate remains open.
 
+### Four-duel PPO rollout and weighting check
+
+The PPO trainer can now collect multiple complete duels with the same
+unchanged learner policy before a clipped update. The first comparison used
+four duels per update with per-decision loss weighting. A controlled variant
+gave every duel equal total loss weight to test whether longer duels were
+dominating the update. Both started from the same v23 parent and used the
+same 32-game four-role training schedule, seeds 11820–11851, opponent-pool settings,
+learning rate, three PPO epochs, minibatch size 16, clip epsilon 0.2, and
+parent KL weight 0.1 as the single-duel PPO pilot above. Policy updates
+changed later trajectories, so the sampled games are not identical after
+the first rollout.
+
+The unweighted four-duel run completed 32/32 games (17–15, 3,022 learner
+decisions) in 75.77 seconds. Its 32 recordings passed native replay
+verification and the visibility audit (16,988 total decisions). The
+equal-duel-weight run completed 32/32 (18–13 with one draw, 3,196 learner
+decisions) in 72.26 seconds; all 16,510 decisions likewise verified and
+passed the visibility audit. The single-duel PPO control took 73.65 seconds
+for 32 games with different trajectories, so these small runs do not
+establish a speed gain from rollout batching. Ignored checkpoints:
+`.cache/goat-ai/ppo_rollout4_11820_11851.pt` (SHA-256
+`b2e6421def1630b1f3a371904183ea314bd272b7d1254b36efb03ceb1a4dbcda`)
+and `.cache/goat-ai/ppo_rollout4_equal_11820_11851.pt` (SHA-256
+`86004ba01c8cb5d46e95b79f054fd213eb61945b4030039e50138d7a7b671d57`).
+
+On the same unseen-Main-Deck, two-pairing, both-assignment and both-seat
+schedule as the earlier PPO pilot, with fresh seeds 11940–11947, the
+unweighted rollout child scored **20–44** against single-duel PPO (paired
+95% score interval 21.9%–42.2%). The equal-duel-weight child scored
+**29–33 with two draws** against single-duel PPO (35.9%–58.6%) and
+**30–33 with one draw** directly against the unweighted rollout child
+(35.2%–61.7%). On separate seeds 11948–11955, the equal-weight child scored
+**29–35** against its unchanged parent (37.5%–53.1%) and **17–47**
+against Tactical (15.6%–37.5%). The unweighted child scored **31–33**
+against the parent (37.5%–59.4%). None establishes an absolute gain. Keep
+single-duel updates as the default; neither rollout variant is promoted.
+
+The ignored reports, in the order above, are
+`.cache/goat-ai/ppo_rollout4_vs_single_11940_11947.json` (SHA-256
+`8bd4540629952dc0b6e5766f04517484ff0cf90400c1b12f283e4d0db1de370d`),
+`.cache/goat-ai/ppo_rollout4_equal_vs_single_11940_11947.json` (SHA-256
+`9d549cf2cef1cd720d9e0a9950c14ddeba8ef40f864fcfbc3243eaf1971dd516`),
+`.cache/goat-ai/ppo_rollout4_equal_vs_unweighted_11940_11947.json` (SHA-256
+`8af967acbc9b94268e81f5a8b280dce319b10bd366b276648682f308d0331dc1`),
+`.cache/goat-ai/ppo_rollout4_equal_vs_parent_11948_11955.json` (SHA-256
+`28ff3bfaed4fcb6856ee63ede2d56791211ba182ddf6e4baeacc692a4ad4e64c`),
+`.cache/goat-ai/ppo_rollout4_equal_vs_tactical_11948_11955.json` (SHA-256
+`fa84bdfe03acef9af924a70bb4c2a44d187d9432d7ef0f2f7810d89b6407235b`),
+and `.cache/goat-ai/ppo_rollout4_vs_parent_11948_11955.json` (SHA-256
+`551db2179b0ce6e52112e7d21b711ecc4399c7e5564bd63da9f8d9f7ae029ae0`).
+
+With the pinned native assets and parent checkpoint present, reproduce the
+equal-duel-weight training run using:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk examples/decks/warrior_montague_clash.ydk \
+  --matchup examples/decks/chaos_return_dingosig_worlds_2022.ydk examples/decks/flip_control_goatformat_guide.ydk \
+  --schedule-mode four_roles --seed 11820 --games 32 \
+  --learning-rate 0.0003 --historical-probability 0.75 \
+  --snapshot-every 8 --baseline-scope learner_deck \
+  --policy-update clipped_ppo --ppo-epochs 3 --ppo-batch-size 16 \
+  --ppo-clip-epsilon 0.2 --ppo-rollout-games 4 \
+  --ppo-rollout-weighting per_episode --parent-kl-weight 0.1 \
+  --max-decisions 3000 \
+  --record-dir .cache/goat-ai/ppo_rollout4_equal_11820_11851_replays \
+  --output .cache/goat-ai/ppo_rollout4_equal_11820_11851.pt
+```
+
 ### Batch policy replay collection
 
 `scripts/collect_policy_matches.py` now records a deterministic schedule of
