@@ -205,6 +205,12 @@ A paired Creature Swap / Scapegoat fixture now tests a common Goat Control Token
 
 A pre-errata Sinister Serpent fixture now checks two returns within one Standby Phase, separated by Raigeki Break discarding Serpent as its cost. The hidden Trap target and opponent's known-hand update are checked in a full replay-verified duel. See [GOAT rules](goat_rules.md).
 
+Paired Raigeki Break/Mystical Space Typhoon fixtures now test the response
+when Typhoon targets a Set Break. Chaining Break pays its discard and destroys
+an opposing monster before Typhoon removes Break; passing preserves the
+monster. Both complete duels replay-verify and pass the visibility audit; see
+[GOAT rules](goat_rules.md).
+
 A paired Metamorphosis fixture now confirms that Raigeki Break can discard a
 card and destroy the activated Normal Spell without stopping its Fusion
 Summon, matching the previously tested Mystical Space Typhoon response. Both
