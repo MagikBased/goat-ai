@@ -1189,3 +1189,10 @@ training-speed experiment should therefore target work that occurs on most
 decisions, such as batched policy inference across concurrent duels, and
 measure full training throughput and held-out strength before adoption; see
 [the benchmark](benchmarks.md#staged-selection-observation-reuse).
+
+The existing opt-in REINFORCE batch-16 update now also has a matched complete
+one-duel training measurement: 1.19× faster than scalar updates in both AB/BA
+orders, with an identical recorded 924-decision rollout. This is a useful CPU
+experiment setting, but one training game does not justify changing the
+reproducibility default or establish strength; see
+[the training benchmark](benchmarks.md#complete-one-duel-reinforce-training-scalar-versus-batch-16).

@@ -459,3 +459,35 @@ for this fixture. It is not a training-throughput result. The ignored raw
 report is `.cache/goat-ai/staged_observation_benchmark_18.json`. This run used
 an Intel Core i7-10700K on Linux 6.8.0 with native core SHA-256
 `b2ce880275e07ae2cd5e6f8735e61e651dedaa6b752de471e6c0cf9d66db00eb`.
+
+## Complete one-duel REINFORCE training: scalar versus batch 16
+
+On 27 October 2026, the existing opt-in batch update was measured through the
+complete `train_self_play.py` command, including native rollout, replay writing,
+update, and checkpoint save. The fv23 checkpoint
+`93ca70795e2c5316ab349a4e5c61ebd553915e49abdbe469d0976d3bebe3d9b2`
+played the control/Chaos probe decks, seed 16000, with one Torch CPU thread on
+an Intel Core i7-10700K. Run each command from the repository root, changing
+`MODE` and `BATCH` to `scalar`/`1` or `batch16`/`16`:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v6_current_assets.pt \
+  --output .cache/goat-ai/speed_MODE_16000.pt \
+  --record-dir .cache/goat-ai/speed_MODE_16000_replays \
+  --engine experimental \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk \
+  --seed 16000 --games 1 --max-decisions 3000 --reinforce-batch-size BATCH
+```
+
+AB/BA training wall times were **2.520/2.111 s** and **2.466/2.076 s** for
+scalar/batch 16, respectively: **1.19× and 1.19×** speedups. All four runs
+played the same 924 decisions (158 learner decisions), winner seat 0, and
+wrote byte-identical trajectories (SHA-256
+`b8e09b8272b77d8be913c28eb4037df0b1419468c7be2041eae47780192f7dc7`).
+The batched trajectory passed exact native verification and the visibility
+audit. Policy losses differed only at floating-point precision (0.5590956630
+versus 0.5590956422). These are one-duel training measurements, not a
+multi-game throughput or competitive-strength result. Keep batch size 1 as
+the reproducibility default; use `--reinforce-batch-size 16` for opt-in CPU
+experiments and evaluate resulting checkpoints separately.
