@@ -1,9 +1,9 @@
 """Candidate ranking and queue navigation stay deterministic."""
 
+import json
 import re
 import shutil
 import subprocess
-import json
 
 import pytest
 
@@ -66,6 +66,21 @@ def test_review_index_separates_player_label_and_hidden_reveal_views(tmp_path):
     assert 'id="previous-item"' in html
     assert 'id="next-item"' in html
     assert 'id="queue-search"' in html
+
+
+def test_review_index_distinguishes_shared_flagged_play_from_disagreement(tmp_path):
+    queue = tmp_path / "queue.json"
+    viewer = tmp_path / "game.html"
+    viewer.write_text("player view")
+    action = {"kind": "activate", "parameters": {"code": 19613556}}
+    selected = [{"viewer": f"{viewer}#decision=3", "turn": 1,
+                 "phase": "main1", "viewer_frame": 3,
+                 "policy_action": action, "teacher_action": action,
+                 "audit_flags": ["heavy_storm_negative_visible_trade"]}]
+    html = write_review_index(selected, queue, tmp_path / "native").read_text()
+    assert "Both agents played:" in html
+    assert "Tactical suggests:" not in html
+    assert "A flagged play can be one both agents made." in html
 
 
 def test_refresh_rejects_changed_trajectory(tmp_path):

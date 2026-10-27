@@ -106,6 +106,12 @@ def write_review_index(selected: list[dict], output: Path,
                   if reveal_path.is_file() else "")
         reason = (", ".join(flag.replace("_", " ") for flag in item["audit_flags"])
                   if item["audit_flags"] else "Tactical agent suggests another play")
+        teacher_agrees = item["policy_action"] == item["teacher_action"]
+        choices = (f'<p><strong>Both agents played:</strong> '
+                   f'{action_label(item["policy_action"])}</p>'
+                   if teacher_agrees else
+                   f'<p><strong>AI played:</strong> {action_label(item["policy_action"])}<br>'
+                   f'<strong>Tactical suggests:</strong> {action_label(item["teacher_action"])}</p>')
         card = (
             f'<article class="review-card" id="item-{number}" data-queue-index="{number - 1}">'
             f'<div class="card-top"><span class="badge">#{number} · '
@@ -113,8 +119,7 @@ def write_review_index(selected: list[dict], output: Path,
             f'<span>Turn {item["turn"]} · {escape(item["phase"].replace("_", " "))}'
             f' · decision {item["viewer_frame"]}</span></div>'
             f'<h3>{escape(reason)}</h3>'
-            f'<p><strong>AI played:</strong> {action_label(item["policy_action"])}<br>'
-            f'<strong>Tactical suggests:</strong> {action_label(item["teacher_action"])}</p>'
+            f'{choices}'
             f'<div class="links"><a class="primary" href="{escape(label_href, quote=True)}">Open label view</a>'
             f'{reveal}</div></article>')
         queue_items.append({"visible": label_href, "reveal": reveal_href,
@@ -152,7 +157,8 @@ def write_review_index(selected: list[dict], output: Path,
             "white-space:nowrap}#stage-frame{width:100%;height:100%;border:0}"
             "</style><section class=\"intro\"><h1>GOAT AI review queue</h1>"
             "<p>Each card opens a complete duel at one decision worth examining."
-            " Flags and Tactical suggestions are prompts, not confirmed mistakes.</p>"
+            " Flags and Tactical suggestions are prompts, not confirmed mistakes."
+            " A flagged play can be one both agents made.</p>"
             "<ol><li>Choose <strong>Open label view</strong> to see exactly what the"
             " acting AI player could see. The sidebar shows its selected action"
             " and all legal alternatives.</li><li>Use the queue bar to move between"

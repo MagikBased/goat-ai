@@ -74,7 +74,10 @@ distinct flagged categories. It is an ignored local review artifact; no
 suggestion is a training label until a person authorizes and validates it.
 
 The queue index groups flagged decisions and other model/Tactical comparisons
-into searchable cards. Open `queue.html` and choose **Open label view** to see
+into searchable cards. A flagged card can show **Both agents played** when the
+policy and Tactical agent made the same choice; the flag still asks for human
+review, but it is not a model/Tactical disagreement. Open `queue.html` and
+choose **Open label view** to see
 the acting player's visible state at that decision. The bar above the duel has
 **Previous item**, **Next item**, **Reveal all cards**, and **← Queue**. The
 replay's own Previous/Next controls move between decisions *within that duel*.
