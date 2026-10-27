@@ -25,7 +25,7 @@ Required regression cases: first-turn draw; summon response and Ignition priorit
 
 ## Replay and demonstration data
 
-[Project Ignis FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html) says old `.yrp` replays re-enact decisions against a matching core and scripts, whereas `.yrpX` stores resulting actions and remains viewable across engine updates. Neither statement guarantees the complete legal action set or each player's knowledge at every choice. The [EDOPro replay header and flags](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.h) and [container reader](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp) define `yrp1` as saved Decks plus engine responses and `yrpX` as a packet stream, with optional LZMA compression and an extended four-word seed. GOAT AI has a bounded structural reader for these two EDOPro containers. It returns raw records only for future reconstruction and prints a privacy-preserving summary by default. A public YGOPro `yrp2` sample from [ygopro-yrp-encode](https://github.com/purerosefallen/ygopro-yrp-encode) is a distinct format and is rejected explicitly. Decision reconstruction, legal action recovery, and player-knowledge validation are **not implemented**. No EDOPro replay is yet admitted as a training trajectory. DuelingBook data and video-derived trajectories require rights and a separate extraction pipeline.
+[Project Ignis FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html) says old `.yrp` replays re-enact decisions against a matching core and scripts, whereas `.yrpX` stores resulting actions and remains viewable across engine updates. Neither statement guarantees the complete legal action set or each player's knowledge at every choice. The [EDOPro replay header and flags](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.h) and [container reader](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp) define `yrp1` as saved Decks plus engine responses and `yrpX` as a packet stream, with optional LZMA compression and an extended four-word seed. GOAT AI has a bounded structural reader for these two EDOPro containers and conditional native response reconstruction tested on synthetic GOAT duels. The reader prints a privacy-preserving summary by default. A public YGOPro `yrp2` sample from [ygopro-yrp-encode](https://github.com/purerosefallen/ygopro-yrp-encode) is a distinct format and is rejected explicitly. Real EDOPro replay compatibility and player-knowledge validation are **not established**. No EDOPro replay is yet admitted as a training trajectory. DuelingBook data and video-derived trajectories require rights and a separate extraction pipeline.
 
 The reader was also checked against five actual `.yrpX` files from the
 [MIT-licensed Project Echelon repository at commit `cc969ba`](https://github.com/COTFK/project-echelon/tree/cc969ba7ebfa48fbe149287d14aee096e4dfe422/replays),
@@ -93,9 +93,14 @@ and two copies and a Puppet Magic sum choice now replay under forced staged
 action enumeration: one saved native response can become several public
 decision records before its exact response is committed. Ambiguous or
 invalid responses still fail explicitly. No human demonstration import is
-claimed. Legacy
-headers without four recorded RNG words also need a separately validated
-RNG path.
+claimed. The reconstructor now accepts either a standalone legacy replay
+or one embedded in `.yrpX`; it rejects disagreement in player count, rules
+flags, or recorded RNG words between the wrapper and embedded replay, and
+retains both file hashes. The optional `--reconstruct-native` inspection
+mode reports only a match/fail status, decision and response counts, and a
+hash of the loaded-asset manifest. It never exports card IDs or marks a
+replay as training ready. Legacy headers without four recorded RNG words
+also need a separately validated RNG path.
 
 An optional `--goat-whitelist .cache/goat-ai/banlist/GOAT.lflist.conf` screen
 reads the embedded Decks and reports only the number of Main/Extra cards

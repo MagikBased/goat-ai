@@ -133,8 +133,11 @@ Pass several replay paths to cache their combined card set, for example `replays
 
 To inspect an EDOPro replay container's format and record counts, run
 `python scripts/inspect_edopro_replay.py path/to/replay.yrpX`. The summary
-omits player names and card IDs. This inspection does not reconstruct legal
-decisions or convert the replay for training or the visual viewer.
+omits player names and card IDs. To test whether its saved responses reconstruct
+on your pinned native assets, add `--reconstruct-native .cache/goat-ai`.
+That optional check reports counts and provenance hashes only. A native match
+does not certify the replay's original core/scripts, historical rulings,
+training permission, or compatibility with the visual viewer.
 
 To review a decision, expand **All legal actions** in the sidebar and click a
 choice. Enter your name or alias, confirm that you created the labels and

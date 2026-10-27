@@ -18,6 +18,7 @@ from goat_ai.replay.edopro_container import (
     SINGLE_MODE,
     TAG,
     EdoReplayContainer,
+    ReplayContainerError,
 )
 from goat_ai.replay.trajectory import DecisionRecord
 
@@ -29,6 +30,7 @@ class ReplayReconstructionError(ValueError):
 @dataclass(frozen=True)
 class ReconstructedLegacyDuel:
     replay_sha256: str
+    embedded_replay_sha256: str | None
     decisions: tuple[DecisionRecord, ...]
     saved_response_count: int
     winner: int | None
@@ -48,6 +50,22 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
     """
     if max_responses < 1:
         raise ValueError("max_responses must be positive")
+    source_sha256 = replay.sha256
+    embedded_sha256 = None
+    if replay.header.format == "yrpX":
+        try:
+            embedded = replay.embedded_legacy_replay()
+        except ReplayContainerError as exc:
+            raise ReplayReconstructionError(f"invalid embedded replay: {exc}") from exc
+        if embedded is None:
+            raise ReplayReconstructionError("yrpX has no embedded legacy responses")
+        if (replay.duel_flags != embedded.duel_flags
+                or replay.player_count != embedded.player_count
+                or (replay.header.seed_words is not None
+                    and replay.header.seed_words != embedded.header.seed_words)):
+            raise ReplayReconstructionError("yrpX wrapper disagrees with embedded replay")
+        embedded_sha256 = embedded.sha256
+        replay = embedded
     settings = replay.settings
     if (replay.header.format != "yrp" or replay.header.flags & (TAG | SINGLE_MODE | HAND_TEST)
             or replay.player_count != 2 or len(replay.decks) != 2
@@ -115,7 +133,8 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                     f"response {index}: native transition failed: {exc}") from exc
         if not decision.terminal:
             raise ReplayReconstructionError("saved responses ended before native terminal state")
-        return ReconstructedLegacyDuel(replay.sha256, tuple(records), len(replay.responses),
+        return ReconstructedLegacyDuel(source_sha256, embedded_sha256,
+                                       tuple(records), len(replay.responses),
                                        decision.winner, decision.observation,
                                        engine.replay_manifest())
     finally:

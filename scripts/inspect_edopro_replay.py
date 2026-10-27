@@ -1,12 +1,17 @@
 """Inspect EDOPro replay containers without exporting private card data."""
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
 from goat_ai.engine.decks import read_goat_whitelist
 from goat_ai.engine.ocgcore_probe import GOAT_FLAGS
 from goat_ai.replay import ReplayContainerError, read_edopro_container
+from goat_ai.replay.edopro_reconstruct import (
+    ReplayReconstructionError,
+    reconstruct_legacy_responses,
+)
 
 
 def goat_rules_screen(replay) -> dict:
@@ -59,6 +64,9 @@ def main() -> None:
     parser.add_argument("--goat-whitelist", type=Path,
                         help="screen Deck membership and minimum Main Deck size; "
                              "a passing screen does not validate GOAT rules")
+    parser.add_argument("--reconstruct-native", type=Path,
+                        help="conditionally replay saved responses on these pinned native assets; "
+                             "never admits replay data to training")
     args = parser.parse_args()
     try:
         whitelist = (read_goat_whitelist(args.goat_whitelist)
@@ -66,6 +74,7 @@ def main() -> None:
     except (OSError, ValueError) as exc:
         parser.error(f"GOAT whitelist: {exc}")
     summaries = []
+    reconstruction_failed = False
     for path in args.replays:
         try:
             replay = read_edopro_container(path)
@@ -73,10 +82,29 @@ def main() -> None:
                       **goat_rules_screen(replay)}
             if whitelist is not None:
                 report.update(goat_pool_screen(replay, whitelist))
+            if args.reconstruct_native is not None:
+                try:
+                    trace = reconstruct_legacy_responses(replay, args.reconstruct_native)
+                    manifest = json.dumps(trace.asset_sha256, sort_keys=True,
+                                          separators=(",", ":")).encode("ascii")
+                    report.update({
+                        "conditional_native_reconstruction": "matched",
+                        "reconstructed_decisions": len(trace.decisions),
+                        "saved_response_count": trace.saved_response_count,
+                        "embedded_yrp_sha256": trace.embedded_replay_sha256,
+                        "native_asset_manifest_sha256": hashlib.sha256(manifest).hexdigest(),
+                        "training_ready": False,
+                    })
+                except (ReplayReconstructionError, OSError, RuntimeError):
+                    reconstruction_failed = True
+                    report.update({"conditional_native_reconstruction": "failed",
+                                   "training_ready": False})
             summaries.append(report)
         except (OSError, ReplayContainerError) as exc:
             parser.error(f"{path}: {exc}")
     print(json.dumps(summaries, indent=2))
+    if reconstruction_failed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

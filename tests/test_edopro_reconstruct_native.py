@@ -1,8 +1,11 @@
 """Synthetic legacy-response playback; no real human replay compatibility claim."""
 
+import hashlib
+import json
 import os
 import random
 import struct
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -22,6 +25,7 @@ from goat_ai.replay.edopro_container import (
     HEADER,
     NEW_REPLAY,
     YRP1,
+    YRPX,
     parse_edopro_container,
 )
 from goat_ai.replay.edopro_reconstruct import (
@@ -35,7 +39,8 @@ THUNDER_DRAGON = 504700054
 
 def _legacy_replay(responses: list[bytes], *, settings=(8000, 5, 1),
                    rule_cards=(), extended=True,
-                   decks=(VANILLA_DECK, VANILLA_DECK), seed_words=(43, 44, 45, 46)):
+                   decks=(VANILLA_DECK, VANILLA_DECK), seed_words=(43, 44, 45, 46),
+                   raw=False):
     names = (struct.pack("<I", 1) + b"\x00" * 40) * 2
     payload = names + struct.pack("<IIIQ", *settings, GOAT_FLAGS)
     for deck in decks:
@@ -50,7 +55,20 @@ def _legacy_replay(responses: list[bytes], *, settings=(8000, 5, 1),
     header = HEADER.pack(YRP1, 1, flags, 12345, len(payload), 0, b"\x00" * 8)
     if extended:
         header += struct.pack("<5Q", 1, *seed_words)
-    return parse_edopro_container(header + payload)
+    data = header + payload
+    return data if raw else parse_edopro_container(data)
+
+
+def _wrapped_replay(legacy: bytes, *, duel_flags=GOAT_FLAGS,
+                    seed_words=(43, 44, 45, 46), raw=False):
+    names = (struct.pack("<I", 1) + b"\x00" * 40) * 2
+    packet = bytes((231,)) + struct.pack("<I", len(legacy)) + legacy
+    payload = names + struct.pack("<Q", duel_flags) + packet
+    flags = NEW_REPLAY | DUEL_FLAG_64BIT | EXTENDED_HEADER
+    header = HEADER.pack(YRPX, 1, flags, 12345, len(payload), 0, b"\x00" * 8)
+    header += struct.pack("<5Q", 1, *seed_words)
+    data = header + payload
+    return data if raw else parse_edopro_container(data)
 
 
 @pytest.fixture
@@ -98,6 +116,7 @@ def test_reconstructs_complete_native_legacy_response_trace(native_legacy_respon
     assert trace.winner in (0, 1)
     assert trace.terminal_observation.life_points[trace.winner] > 0
     assert trace.replay_sha256 == replay.sha256
+    assert trace.embedded_replay_sha256 is None
     assert "build/libocgcore.so" in trace.asset_sha256
 
 
@@ -110,6 +129,67 @@ def test_reconstruction_rejects_divergent_and_incomplete_responses(native_legacy
         reconstruct_legacy_responses(_legacy_replay(changed), root)
     with pytest.raises(ReplayReconstructionError, match="before native terminal"):
         reconstruct_legacy_responses(_legacy_replay(responses[:-1]), root)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_reconstructs_embedded_yrpx_with_both_file_hashes(native_legacy_responses):
+    root, responses, _ = native_legacy_responses
+    legacy = _legacy_replay(responses, raw=True)
+    wrapper = _wrapped_replay(legacy)
+    trace = reconstruct_legacy_responses(wrapper, root)
+    assert trace.replay_sha256 == wrapper.sha256
+    assert trace.embedded_replay_sha256 == hashlib.sha256(legacy).hexdigest()
+    assert trace.saved_response_count == len(responses)
+    assert trace.winner in (0, 1)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_native_inspection_reports_only_conditional_counts_and_hashes(
+        native_legacy_responses, tmp_path, monkeypatch, capsys):
+    from scripts.inspect_edopro_replay import main
+
+    root, responses, _ = native_legacy_responses
+    legacy = _legacy_replay(responses, raw=True)
+    path = tmp_path / "source.yrpX"
+    path.write_bytes(_wrapped_replay(legacy, raw=True))
+    monkeypatch.setattr(sys, "argv", ["inspect_edopro_replay.py", str(path),
+                                       "--reconstruct-native", str(root)])
+    main()
+    report = json.loads(capsys.readouterr().out)[0]
+    assert report["conditional_native_reconstruction"] == "matched"
+    assert report["reconstructed_decisions"] == len(responses)
+    assert report["saved_response_count"] == len(responses)
+    assert report["training_ready"] is False
+    assert len(report["native_asset_manifest_sha256"]) == 64
+    assert all(str(code) not in str(report) for code in VANILLA_DECK)
+
+
+def test_reconstruction_rejects_mismatched_yrpx_wrapper():
+    legacy = _legacy_replay([b"\xff" * 4], raw=True)
+    wrapper = _wrapped_replay(legacy, duel_flags=0)
+    with pytest.raises(ReplayReconstructionError, match="wrapper disagrees"):
+        reconstruct_legacy_responses(wrapper, ".cache/goat-ai")
+    wrapper = _wrapped_replay(legacy, seed_words=(1, 2, 3, 4))
+    with pytest.raises(ReplayReconstructionError, match="wrapper disagrees"):
+        reconstruct_legacy_responses(wrapper, ".cache/goat-ai")
+
+
+def test_native_inspection_fails_closed_without_exposing_replay_values(
+        tmp_path, monkeypatch, capsys):
+    from scripts.inspect_edopro_replay import main
+
+    path = tmp_path / "mismatched.yrpX"
+    legacy = _legacy_replay([b"\xff" * 4], raw=True)
+    path.write_bytes(_wrapped_replay(legacy, duel_flags=0, raw=True))
+    monkeypatch.setattr(sys, "argv", ["inspect_edopro_replay.py", str(path),
+                                       "--reconstruct-native", ".cache/goat-ai"])
+    with pytest.raises(SystemExit) as exited:
+        main()
+    assert exited.value.code == 1
+    report = json.loads(capsys.readouterr().out)[0]
+    assert report["conditional_native_reconstruction"] == "failed"
+    assert report["training_ready"] is False
+    assert all(str(code) not in str(report) for code in VANILLA_DECK)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

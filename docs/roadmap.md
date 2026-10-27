@@ -377,7 +377,10 @@ altered and missing responses fail. Custom rule cards are rejected, and
 ambiguous or invalid responses still fail explicitly. Synthetic GOAT Thunder
 Dragon zero-, one-, and two-copy searches and a Puppet Magic sum choice now
 replay through staged public actions when the adapter's action bound forces
-them; the saved native response is committed only once. This does not
+them; the saved native response is committed only once. The optional native
+inspection command also unwraps `.yrpX`, checks its player count, rules flags,
+and RNG words against the embedded legacy replay, and reports only counts and
+provenance hashes. This does not
 prove that a real EDOPro recording replays on our core or that its original
 asset versions match. A permitted real GOAT fixture and independent
 player-knowledge audit remain open.
