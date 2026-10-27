@@ -130,7 +130,8 @@ effect cards, Synchro Summoning, 2010 rulings, or Edison deck legality. The
 lists Junk Synchron and Junk Warrior; the [official Junk Warrior card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7696&ope=2&request_locale=en)
 dates its first TCG printing to 5 August 2008 and specifies Junk Synchron
 plus non-Tuner material. The separate `Mr1SynchroProbeEngine` admits only
-the old vanilla fixture cards, Bokoichi, and this named pair. It checks Main,
+the old vanilla fixture cards, Bokoichi, this named pair, and the separately
+tested Black Rose Dragon below. It checks Main,
 Extra, and copy limits using the March 2010 restriction table, but its tiny
 eligible-ID set is a **probe subset**, not the full Edison release pool.
 
@@ -161,6 +162,39 @@ entire trajectory before exporting hidden reviewer cards. It rejects unknown
 rulesets. Reviewer reveals stay in the generated HTML and SHA-bound sidecar,
 outside the player-visible training trajectory.
 
+## Black Rose Dragon optional trigger
+
+[Konami's Black Rose Dragon card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7898&ope=2&request_locale=en)
+dates its first TCG printing to 3 November 2008 and gives a Level 7 Synchro
+Summon an optional effect that destroys all cards on the field. The
+[March 2010 TCG list](https://www.yugioh-card.com/en/downloads/alt_format/2010-03-01.pdf)
+limits Black Rose Dragon to one copy. The MR1 probe now allows that one Extra
+Deck card alongside its earlier Junk Warrior case, while still rejecting
+unsourced Synchros and applying the restriction table.
+
+Paired seed-3 native fixtures Normal Summon Level 4 Kabazauls, keep an opposing
+Gemini Elf on the field, then Normal Summon Level 3 Junk Synchron. Both are
+offered as material for Black Rose Dragon. At decision 36 the controller can
+accept or decline its optional trigger. Accepting moves Black Rose Dragon and
+Gemini Elf to their owners' Graveyards; declining leaves both face-up on the
+field. The respective duels terminate in 1,258 and 1,376 decisions. Their
+complete trajectories replay-verify and pass the player-visibility audit.
+The positive and negative branches use the pinned official Black Rose script
+and unmodified upstream MR1 `utility.lua`. Reproduce them after native setup:
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_black_rose_probe.py \
+  --output replays/mr1_black_rose_yes_seed3.json
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_black_rose_probe.py \
+  --decline --output replays/mr1_black_rose_no_seed3.json
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_synchro_probe.py
+```
+
+This adds a distinct Synchro trigger and choice to the protocol evidence. It
+does not independently validate every 2010 Black Rose ruling, the script's
+other effect, the full Edison card pool, or an Edison rules profile.
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including
@@ -175,7 +209,8 @@ outside the player-visible training trajectory.
    should settle individual cases.
 4. Audit player-visible observations and legal actions in Edison fixtures, then
    complete seeded duels and replay verification before benchmarking throughput.
-   MR1 vanilla and one Junk Warrior fixture check protocol paths only.
+   MR1 vanilla, Junk Warrior, and Black Rose Dragon fixtures check protocol
+   paths only.
 
 No Edison simulator, deck-legality claim, or Edison training data is available
 yet. Keep GOAT and Edison trajectory ruleset versions distinct.

@@ -32,7 +32,12 @@ from goat_ai.observations import (
 CORE_API_VERSION = (11, 0)
 GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
 MR1_FLAGS = 853760  # DUEL_MODE_MR1 in pinned ocgapi_constants.h
-MR1_SYNCHRO_CARDS = frozenset({63977008, 60800381})  # Junk Synchron / Junk Warrior
+MR1_SYNCHRO_CARDS = frozenset({
+    63977008,  # Junk Synchron
+    60800381,  # Junk Warrior
+    73580471,  # Black Rose Dragon
+})
+MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471})
 UPSTREAM_UTILITY_SHA256 = "59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a"
 GOAT_DECK_CONFIRM_OLD = b"Duel.ConfirmCards(tp,dg)"
 GOAT_DECK_CONFIRM_HISTORICAL = b"Duel.ConfirmCards(1-tp,dg)"
@@ -650,8 +655,9 @@ class OcgcoreProbe:
             if self.mode != "mr1_synchro_probe" and (extra or opponent_extra):
                 raise ValueError("MR1 startup probe requires empty Extra Decks")
             if self.mode == "mr1_synchro_probe" and any(
-                    code != 60800381 for code in (*extra, *opponent_extra)):
-                raise ValueError("MR1 Synchro probe permits Junk Warrior only in Extra Deck")
+                    code not in MR1_SYNCHRO_EXTRA for code in (*extra, *opponent_extra)):
+                raise ValueError("MR1 Synchro probe permits only sourced Synchros "
+                                 "in Extra Deck")
             for code in (*deck, *(opponent_deck if opponent_deck is not None else deck)):
                 row = self._card_row(code, "type")
                 if row is None or (row[0] != 17 and not (

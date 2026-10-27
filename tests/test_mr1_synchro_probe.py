@@ -1,4 +1,4 @@
-"""A sourced 2008 Synchro pair in MR1; not a complete Edison rules test."""
+"""Sourced 2008 Synchro interactions in MR1; not complete Edison rules."""
 
 import hashlib
 import json
@@ -9,6 +9,7 @@ import pytest
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.mr1_synchro_probe import (
+    BLACK_ROSE_DRAGON,
     BOKOICHI,
     JUNK_SYNCHRON,
     JUNK_WARRIOR,
@@ -18,6 +19,7 @@ from goat_ai.engine.ocgcore_probe import MR1_FLAGS
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
+from scripts.record_mr1_black_rose_probe import GEMINI_ELF, record_probe
 from scripts.record_mr1_synchro_probe import select_setup_action
 from scripts.render_replay import render_replay
 
@@ -81,4 +83,50 @@ def test_mr1_synchro_probe_rejects_unsourced_extra_card(tmp_path):
     with (GoatEnvironment(str(deck), str(OPPONENT), seed=3,
                           engine=Mr1SynchroProbeEngine(native_root)) as env,
           pytest.raises(ValueError, match="Junk Warrior")):
+        env.reset()
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("activate,decisions", ((True, 1258), (False, 1376)))
+def test_mr1_black_rose_optional_wipe_completes_and_replays(
+        tmp_path, activate, decisions):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    trajectory, choice = record_probe(native_root, 3, activate=activate)
+    assert choice == ("yes" if activate else "no", 36)
+    assert len(trajectory.decisions) == decisions
+    assert trajectory.winner == 1
+    assert trajectory.ruleset == "mr1-synchro-protocol"
+    assert trajectory.asset_sha256["scripts/utility.lua"] == hashlib.sha256(
+        (native_root / "scripts/utility.lua").read_bytes()).hexdigest()
+    assert "scripts/official/c73580471.lua" in trajectory.asset_sha256
+    assert "scripts/official/c63977008.lua" in trajectory.asset_sha256
+    after_choice = [record.observation for record in trajectory.decisions[choice[1]:]
+                    if record.observation.turn == 3]
+    if activate:
+        assert any(not {BLACK_ROSE_DRAGON, GEMINI_ELF} & {
+            card.code for card in view.field} and
+            BLACK_ROSE_DRAGON in {card.code for card in view.graveyards[0]} and
+            GEMINI_ELF in {card.code for card in view.graveyards[1]}
+            for view in after_choice)
+    else:
+        assert any({BLACK_ROSE_DRAGON, GEMINI_ELF} <= {
+            card.code for card in view.field}
+            for view in after_choice)
+    path = tmp_path / "black_rose.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, Mr1SynchroProbeEngine(native_root)) == decisions
+    assert audit_trajectory_visibility(loaded)["decisions"] == decisions
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_mr1_black_rose_obeys_march_2010_one_copy_limit(tmp_path):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    deck = tmp_path / "two_black_rose.ydk"
+    source = (ROOT / "examples/decks/mr1_black_rose_probe.ydk").read_text()
+    deck.write_text(source.replace("#extra\n73580471\n", "#extra\n73580471\n73580471\n"))
+    with (GoatEnvironment(str(deck), str(OPPONENT), seed=3,
+                          engine=Mr1SynchroProbeEngine(native_root)) as env,
+          pytest.raises(ValueError, match="exceeds Edison copy limit 1")):
         env.reset()
