@@ -17,7 +17,7 @@ from goat_ai.engine.native_messages import NativeChoice
 from goat_ai.engine.ocgcore_probe import OcgcoreProbe
 from goat_ai.engine.protocol import Decision, RulesProfile, SimulatorUnavailable
 from goat_ai.observations import TargetSlotView
-from goat_ai.replay.fingerprint import sha256_file
+from goat_ai.replay.fingerprint import sha256_unchanged_file
 
 
 class RestrictedOcgcoreEngine:
@@ -331,7 +331,7 @@ class RestrictedOcgcoreEngine:
             "database/goat-entries.cdb", "database/cards-unofficial.cdb",
             "banlist/GOAT.lflist.conf",
         )
-        result = {name: sha256_file(self.root / name) for name in required}
+        result = {name: sha256_unchanged_file(self.root / name) for name in required}
         result.update({f"scripts/{name}": digest
                        for name, digest in self.probe.loaded_script_sha256.items()})
         return result

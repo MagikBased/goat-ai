@@ -270,3 +270,45 @@ After merging the opt-in trainer path, the Python suite passed 294 tests
 (694 native-gated skips), and the focused policy/native-query suite passed 95
 tests with native assets. The 985-test full native run above preceded this
 trainer commit; the native CLI smoke and focused tests exercise its new path.
+
+## Native replay-manifest hash cache
+
+On 27 October 2026, profiling one 846-decision feature-v23 policy duel showed
+about 0.20 seconds in `replay_manifest()` hashing the same native library and
+databases at duel completion. The library alone is about 90 MiB. The adapter
+now reuses each required asset's SHA-256 while its resolved path, device,
+inode, size, modification time, and change time match. Loaded scripts retain
+their per-duel hashes. Deck files and trajectories still use direct content
+hashing. A file edit, including a same-size edit with restored modification
+time, invalidates the cache through the change time.
+
+Four complete policy-versus-random native duels (seeds 13000–13003,
+control/Chaos probe decks, 3,816 total decisions) were run with direct and
+cached hashing on an Intel Core i7-10700K, one PyTorch CPU thread. Two rounds
+reversed run order. All corresponding complete trajectories, including asset
+hashes, were equal.
+
+| Order | Direct hashes | Cached hashes | Whole-duel speedup |
+| :--- | ---: | ---: | ---: |
+| Direct, cached | 4.161 s | 3.650 s | 1.14× |
+| Cached, direct | 4.214 s | 3.470 s | 1.21× |
+
+This measures short, single-process policy rollouts with repeated pinned
+assets; it does not measure a parallel training run or competitive strength.
+The checkpoint SHA-256 was
+`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`.
+The deck SHA-256 values were
+`04352ceadbf53684fe7d6bc4dc18b7e5bed756e01c5914649dda93073dcefc8b`
+and `51ca430a9ec9dc3e8b9ce400bcec469d3de39d2152add2a8feb5db814c38a48e`.
+The comparison used Linux 6.8, PyTorch 2.5.1+cpu, and commit `c0980cf` plus
+this cache change. Reproduce it with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/benchmark_native_manifest_cache.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --games 4 --rounds 2
+```
+
+The targeted fingerprint/native environment test run passed 5 tests. The
+Python suite passed 295 tests with 694 native-gated skips. The full native
+suite has not been rerun after this change.
