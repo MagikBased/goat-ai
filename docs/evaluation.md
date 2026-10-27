@@ -7598,3 +7598,75 @@ comparisons passed for both Tactical deck pairs. The ignored reports are
 `--engine experimental --both-deck-assignments --require-unseen-main-decks
 --max-decisions 3000`. The new timing has no established strength gain, and
 neither PPO child is promoted.
+
+### Visible-rule v2 preference ablation (27 October 2026)
+
+The `visible_audit_v2` automated-label experiment adds two narrow categories
+to v1: activating Nobleman of Crossout while only one's own set monsters are
+visible, and choosing one's own card for Raigeki Break when a legal opposing
+field target exists. For the first category the alternative is an offered
+Battle Phase transition from Main Phase 1 (or End Phase from Main Phase 2);
+for the second it is an offered opposing field target. These are synthetic
+pairwise hypotheses, not human-reviewed optimal-play labels. The v1 rule set
+remains unchanged and old v1 label files continue to validate against v1.
+
+The old 21200–21231 replays failed current-asset verification because they
+recorded the pre-correction Dark Balter script. A fresh 32-duel frozen-policy
+rollout from the unchanged feature-v23 reference used control/Chaos probe
+decks, seeds 24000–24031, one PPO rollout with four workers, and the current
+experimental native core. All duels terminated after **24,509 decisions**,
+including **4,034 learner decisions**. Full native replay verification and
+visibility auditing of these source games produced **12 preferences from
+eight replays**: four Chaos Sorcerer self-banish, four new Nobleman cases,
+three weak Flip summons, and one BLS self-banish. No Raigeki Break case was
+present in this sample. The label manifest SHA-256 is
+`8bfbcc86ab6acc212cab5a1fe0a998e7fabdd3234426096a308f15881c9a3d39`.
+
+A parent-KL fit used those 12 labels, 64 distinct current-asset preservation
+states from seeds 23000–23003, 100 steps, learning rate 0.0001, and KL weight
+1.0. Preference loss fell from 1.8301 to 0.2247; final preservation KL was
+0.0454. The ignored child checkpoint
+`.cache/goat-ai/fv23_visible_rule_v2_24000_24031.pt` has SHA-256
+`ac23fd824a439769e0c1945aa36e404514abf56f64afa1018259e72cd01336a3`.
+Learning those comparisons is not a competitive-strength result.
+
+On unseen Phoenix Control versus the GoatFormat and WikiFormat Dimension
+Fusion Main Decks, both deck assignments and seats, seeds 25000–25007 gave
+the child **34–30** directly against the unchanged parent over 64 duels;
+its paired-bootstrap score interval was **45.3%–62.5%**. On matched seeds
+25008–25015 against Tactical-v14, the child scored **13–49–2** and the
+parent **18–46** over 64 duels each. The report comparator checked identical
+opponent, deck hashes, native assets, source code, and schedule, and estimated
+a child-minus-parent score difference of **−6.25 percentage points** with a
+95% interval of **−17.19 to +6.25 points**. The visible-rule v2 fit did not
+establish a gain and is not promoted. The ignored reports have the
+`v2_pref_*_25000_25007.json` and `v2_pref_*_25008_25015.json` names under
+`.cache/goat-ai/`. This experiment also shows that a small batch of obvious
+mistake labels can improve its own comparison loss without improving held-out
+play; the next strength experiment needs broader, independently validated
+decision feedback and outcome-sensitive evaluation.
+
+Reproduce the source and label steps after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --engine experimental \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk \
+  --seed 24000 --games 32 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 32 --rollout-workers 4 \
+  --ppo-epochs 1 --ppo-batch-size 16 --snapshot-every 32 \
+  --output .cache/goat-ai/v2_pref_source_24000_24031.pt
+PYTHONPATH=src:. .venv/bin/python scripts/derive_visible_rule_preferences.py \
+  .cache/goat-ai/v2_pref_source_24000_24031_replays/episode_*.json \
+  --native-root .cache/goat-ai --rule-set visible_audit_v2 \
+  --output-dir .cache/goat-ai/v2_pref_labels_24000_24031
+```
+
+The `train_review_preferences.py` command takes each of the eight matching
+replay/label pairs with `--case`, four seed-23000–23003 current-asset replays
+with `--preserve-current-trajectory`, then the fit hyperparameters above.
+The held-out tournaments use `scripts/evaluate_policy.py` with
+`--both-deck-assignments --require-unseen-main-decks --workers 4
+--max-decisions 3000`, and either the unchanged parent checkpoint or
+`--opponent tactical` as the opponent.

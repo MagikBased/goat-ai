@@ -20,9 +20,9 @@ from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_decision_preferences, read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 
-
 RULE_SET_ID = "visible_audit_v1"
-SUPPORTED_CATEGORIES = frozenset({
+RULE_SET_V2 = "visible_audit_v2"
+SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
     "thunder_empty_search_with_copies_available",
@@ -30,6 +30,10 @@ SUPPORTED_CATEGORIES = frozenset({
     "pot_before_available_thunder_dragon",
     "ring_targets_own_with_safe_enemy_option",
 })
+SUPPORTED_CATEGORIES_V2 = SUPPORTED_CATEGORIES_V1 | {
+    "nobleman_only_own_set_monster",
+    "raigeki_break_targets_own_card_with_enemy_option",
+}
 
 
 def preferred_indices(record, category: str) -> list[int]:
@@ -66,16 +70,30 @@ def preferred_indices(record, category: str) -> list[int]:
                 and (card := enemy.get(action.parameters.get("sequence"))) is not None
                 and card.attack is not None
                 and card.attack < record.observation.life_points[seat]]
+    if category == "nobleman_only_own_set_monster":
+        phase_action = "battle_phase" if record.observation.phase == "main1" \
+            else "end_phase"
+        return [i for i, action in enumerate(actions) if action.kind == phase_action]
+    if category == "raigeki_break_targets_own_card_with_enemy_option":
+        return [i for i, action in enumerate(actions)
+                if action.kind == "select_card"
+                and action.parameters.get("controller") == 1 - seat
+                and action.parameters.get("location") in (4, 8)]
     return []
 
 
-def derive(trajectory, candidates) -> tuple[list[dict], Counter]:
+def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID
+           ) -> tuple[list[dict], Counter]:
     """Keep one unambiguous automated comparison per recorded decision."""
+    categories = {RULE_SET_ID: SUPPORTED_CATEGORIES_V1,
+                  RULE_SET_V2: SUPPORTED_CATEGORIES_V2}.get(rule_set_id)
+    if categories is None:
+        raise ValueError("unsupported visible audit rule set")
     result = []
     counts = Counter()
     seen = set()
     for candidate in candidates:
-        if candidate.category not in SUPPORTED_CATEGORIES \
+        if candidate.category not in categories \
                 or candidate.decision_index in seen:
             continue
         record = trajectory.decisions[candidate.decision_index]
@@ -93,14 +111,15 @@ def derive(trajectory, candidates) -> tuple[list[dict], Counter]:
 
 def validate_automated_preferences(trajectory, preferences, weak_flip_attacks) -> None:
     """Reject edits that no longer match the declared visible-rule output."""
+    rule_set_id = getattr(preferences, "rule_set_id", None) or RULE_SET_ID
     expected, _ = derive(trajectory, review_candidates(
-        trajectory, weak_flip_attacks=weak_flip_attacks))
+        trajectory, weak_flip_attacks=weak_flip_attacks), rule_set_id=rule_set_id)
     actual = [{"decision_index": item.decision_index,
                "preferred_action_indices": list(item.preferred_action_indices),
                "disfavored_action_indices": list(item.disfavored_action_indices)}
               for item in preferences.preferences]
     if actual != expected:
-        raise ValueError("automated preferences do not match visible_audit_v1")
+        raise ValueError(f"automated preferences do not match {rule_set_id}")
 
 
 def main() -> None:
@@ -108,6 +127,8 @@ def main() -> None:
     parser.add_argument("replays", nargs="+", type=Path)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--rule-set", choices=(RULE_SET_ID, RULE_SET_V2),
+                        default=RULE_SET_ID)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
         parser.error("output directory must be empty")
@@ -121,7 +142,8 @@ def main() -> None:
         verified = verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
         candidates = review_candidates(trajectory, weak_flip_attacks=weak_flip_attacks)
-        preferences, categories = derive(trajectory, candidates)
+        preferences, categories = derive(trajectory, candidates,
+                                         rule_set_id=args.rule_set)
         if not preferences:
             continue
         seat = trajectory.skill_metadata.get("learner_seat" if trajectory.source
@@ -130,7 +152,7 @@ def main() -> None:
             "schema_version": 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",
-            "rule_set_id": RULE_SET_ID,
+            "rule_set_id": args.rule_set,
             "reviewer": "GOAT AI automated visible-audit rules",
             "reviewed_seat": seat,
             "preferences": preferences,
@@ -145,7 +167,7 @@ def main() -> None:
                        "verified_decisions": verified, "output": str(output),
                        "output_sha256": sha256_file(output),
                        "preferences": len(preferences), "categories": dict(categories)})
-    manifest = {"schema_version": 1, "rule_set_id": RULE_SET_ID,
+    manifest = {"schema_version": 1, "rule_set_id": args.rule_set,
                 "labels_are_human_reviewed": False, "replays": report}
     manifest_path = args.output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n",

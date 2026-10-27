@@ -67,8 +67,8 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
                  and metadata["opponent_version"] > 0)
     elif authorization == "automated_rule":
         rule_set_id = raw.get("rule_set_id")
-        if rule_set_id != "visible_audit_v1":
-            raise ValueError("automated preferences require visible_audit_v1 rule set")
+        if rule_set_id not in ("visible_audit_v1", "visible_audit_v2"):
+            raise ValueError("automated preferences require a supported visible audit rule set")
         seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
                             else "demonstrator_seat")
         checkpoint = metadata.get("policy_checkpoint_sha256")

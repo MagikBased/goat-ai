@@ -134,10 +134,14 @@ def test_automated_rule_preferences_have_distinct_provenance(tmp_path):
     labels = read_decision_preferences(path, "a" * 64, base)
     assert labels.authorization == "automated_rule"
     assert labels.rule_set_id == "visible_audit_v1"
+    v2 = preference_file(tmp_path, authorization="automated_rule",
+                         rule_set_id="visible_audit_v2", reviewed_seat=0)
+    assert read_decision_preferences(v2, "a" * 64, base).rule_set_id == (
+        "visible_audit_v2")
     for rule_set in (None, "unreviewed_v2"):
         invalid = preference_file(tmp_path, authorization="automated_rule",
                                   rule_set_id=rule_set)
-        with pytest.raises(ValueError, match="visible_audit_v1"):
+        with pytest.raises(ValueError, match="supported visible audit rule set"):
             read_decision_preferences(invalid, "a" * 64, base)
     path = preference_file(tmp_path, authorization="automated_rule",
                            rule_set_id="visible_audit_v1", reviewed_seat=0)

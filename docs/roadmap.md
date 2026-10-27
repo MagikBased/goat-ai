@@ -1459,6 +1459,15 @@ close M4. The label source is recorded distinctly from human review, and
 training recomputes each rule before fitting; see
 [evaluation](evaluation.md#automated-visible-rule-preference-experiment-27-october-2026).
 
+A second automated preference ablation added visible-state Nobleman and
+Raigeki Break comparisons while preserving the v1 label contract. Fresh
+current-asset replays yielded 12 labels, including four Nobleman cases and no
+Raigeki Break case. The child scored 34–30 directly against its parent, but
+13–49–2 versus Tactical-v14 against the parent's 18–46 on matched unseen-deck
+seeds. The comparison does not establish a strength gain; keep the unchanged
+reference and pursue broader, independently validated decision feedback.
+See [the v2 experiment](evaluation.md#visible-rule-v2-preference-ablation-27-october-2026).
+
 An opt-in frozen-rollout PPO baseline was also tested on the same post-patch
 training schedule. Its child scored 28–36 against the online-baseline PPO
 child and 31–33 against the unchanged reference on separate held-out direct
