@@ -1,5 +1,58 @@
 # Baseline evaluation log
 
+## Fixed-policy visible-state critic check (27 October 2026)
+
+To remove the policy-change confound in the earlier v1/v2 critic comparison,
+the unchanged current-core feature-v23 checkpoint
+`.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt` (SHA-256
+`975d06284b3035bc8bf8dbafa041a8a25a80195574d1ff695f2fbd25d1c7ff45`)
+played Tactical-v14 on two deck pairings: Jesse Goat Control versus Warrior,
+and 2005 Phoenix Control versus WikiFormat Dimension Fusion. Seeds
+44000–44015 covered both policy seats for each pairing, producing **64
+complete duels and 31,729 native replay-verified, visibility-audited
+decisions**. The critic comparison independently verified every trajectory
+and reproduced **15,704 recorded policy choices** against the unchanged
+checkpoint. The collector manifest SHA-256 is
+`93c2f2f5f768b912b76d9033408f833a1eef972a6d1371021f6a3287b72fffa6`.
+
+The first 12 whole seeds supplied 48 training duels with 768 evenly spaced
+multi-option policy-seat decisions; the final four whole seeds supplied 16
+holdout duels with 256 such decisions. Each split has both pairings and seats.
+The critics each used width 32, two epochs, learning rate 0.001, and the same
+initial seed 171. Targets were the learner's terminal win/loss outcome; a
+constant predictor used the training games' mean return. On the holdout,
+per-game mean squared error was **0.866** for the constant, **1.151** for v1,
+and **1.169** for v2. The v2-minus-v1 paired bootstrap 95% interval was
+**−0.005 to +0.055**, so this sample does not distinguish their errors. The
+first pairing had 2/8 policy wins on holdout; the second had 3/8. This is a
+value-prediction diagnostic, not a policy-strength result. These critics do
+not justify changing the default PPO baseline on this fixed-policy evidence.
+Training on more diverse fixed-policy games or a different value objective
+remains open; repeated tuning against these 16 holdout games would invalidate
+their use as an untouched check.
+
+The ignored report is
+`.cache/goat-ai/fixed_policy_value_comparison_44000_44015.json` (SHA-256
+`44ad61ed9ce5ecb3b97d3483ecbdf08a6d56fdccc91859c4e283dd602604c2d7`).
+Reproduce from pinned native assets with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --matchup examples/decks/phoenix_control_roberto_martinez_new_jersey_2005.ydk \
+            examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk \
+  --opponent tactical --seed 44000 --seeds 16 --workers 4 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/fixed_policy_value_44000_44015
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/compare_fixed_policy_values.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/fixed_policy_value_44000_44015/manifest.json \
+  --holdout-seeds 4 --max-records-per-game 16 --epochs 2 --width 32 \
+  --learning-rate 0.001 --seed 171 \
+  --output .cache/goat-ai/fixed_policy_value_comparison_44000_44015.json
+```
+
 ## Visible-state critic architecture transfer check (27 October 2026)
 
 The original opt-in Monte Carlo critic (v1) averages all visible card
