@@ -1401,3 +1401,11 @@ historical SEGOC combinations remain to be independently checked. Re-record
 old training trajectories before replay verification because the native core
 binary hash and potentially the resulting games have changed. See
 `docs/goat_rules.md` for source links and the conflicting Edison summary.
+
+Fresh post-patch Tactical-v14 demonstrations now cover 16 complete duels and
+4,761 teacher-seat decisions. A feature-v23 continuation replay-verified those
+duels but scored 32–31–1 directly against its parent on 64 held-out duels.
+On a separate matched 64-duel Tactical-v14 schedule, the child scored 18–46
+and the parent 17–47; the paired interval includes zero. Keep the parent as
+the neural reference. A new post-patch self-play policy gain and broader
+historical trigger-order checks remain open; see [evaluation](evaluation.md#re-recording-and-retraining-after-the-goat-segoc-core-patch-27-october-2026).

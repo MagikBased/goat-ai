@@ -7208,3 +7208,85 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clo
   --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
   --output .cache/goat-ai/fv23_tactical_v14_broader_omit_forward_18500_18531.pt
 ```
+
+### Re-recording and retraining after the GOAT SEGOC core patch (27 October 2026)
+
+The [GOAT-only native trigger-order patch](native_setup.md) changes the
+`libocgcore.so` SHA-256 to
+`df1774ae5d2f23e52ec2290bcd23e20713d908404539dfffc8f34e1c853e9a00`.
+An older Tactical-v14 trajectory failed exact verification with `ReplayMismatch:
+native assets differ from recorded trajectory: build/libocgcore.so`. This is
+the expected provenance gate; old observations and actions were not silently
+relabeled as if produced by the patched core.
+
+Fresh Tactical-v14 demonstrations used Chaos Control versus Bazoo Return,
+seeds 21000–21003, with Tactical on both seats; and Lolmarcus versus Michael
+Goat Control, seeds 21004–21007, with Tactical against Combat v3. The
+collector wrote **16 complete seat-swapped duels and 9,327 source decisions**.
+Training replay-verified and visibility-audited all 16, then fit the 4,761
+Tactical-seat decisions for two epochs from the unchanged feature-v23
+reference. The `--omit-forced-forward` option kept the full optimizer schedule.
+Measured wall time was **13.20 s**, including 4.18 s replay verification and
+5.20 s fitting with four verification workers and one Torch thread. The
+checkpoint is
+`.cache/goat-ai/fv23_patched_core_continuation_21000_21007.pt` (SHA-256
+`55831b93ed2c3599629708b2f24edd276557ced913dfd174f2a7e4d236177c20`).
+The SHA-256 of the sorted `relative_path + space + file_sha256 + newline`
+manifest for the 16 ignored trajectories is
+`215dbb127285235bc1b71e53fea2eabc1313f1f975ff63f9e3144fc2c6f47404`.
+All source decks are tracked under `examples/decks/`; no replay or checkpoint
+was added to Git.
+
+On **64 direct held-out duels** across both assignments and policy seats for
+Roberto Martinez Phoenix Control versus the GoatFormat and WikiFormat
+Dimension Fusion decks, seeds 21100–21107, the child scored **32–31–1**
+against its parent. Its 50.8% score had a paired-bootstrap 95% interval of
+39.1%–62.5%. The GoatFormat pair was 17–15; the WikiFormat pair was 15–16–1.
+On separate matched seeds 21108–21115 versus Tactical-v14, the child scored
+**18–46** and the parent **17–47** over 64 duels each. The paired score
+difference was +1.6 percentage points with a 95% interval of **−10.9 to
++12.5 points**. The report comparator verified both pairs' native asset,
+script, source-code, seed, opponent, and local deck controls. This sample does
+not establish a policy-strength improvement; the unchanged parent remains the
+neural reference, and the M4 self-play gain gate remains open. The child also
+inherits pre-patch weights, so its full training lineage is not wholly
+patched-core data.
+
+The ignored direct reports are
+`patched_core_child_vs_parent_phoenix_{goat,wiki}_df_21100_21107.json`, and
+the four Tactical reports are
+`patched_core_{child,parent}_vs_tactical_phoenix_{goat,wiki}_df_21108_21115.json`,
+all under `.cache/goat-ai/`. Their checkpoint, replay-manifest, and report
+hashes are recorded above or in the files. Reproduce the source and fit with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher tactical --opponent tactical \
+  --deck-a examples/decks/chaos_control_insids_worlds_2022.ydk \
+  --deck-b examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --seed 21000 --seeds 4 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/patched_core_tactical_chaos_bazoo_21000_21003
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher tactical --opponent combat_heuristic \
+  --deck-a examples/decks/goat_control_lolmarcus_2020.ydk \
+  --deck-b examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --seed 21004 --seeds 4 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/patched_core_tactical_lolmarcus_michael_21004_21007
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/patched_core_tactical_chaos_bazoo_21000_21003/seed_*.json \
+  .cache/goat-ai/patched_core_tactical_lolmarcus_michael_21004_21007/seed_*.json \
+  --engine experimental --feature-version 23 --width 32 --epochs 2 \
+  --batch-size 16 --batched-forward --omit-forced-forward \
+  --verification-workers 4 --learning-rate 0.0002 --seed 55 \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/fv23_patched_core_continuation_21000_21007.pt
+```
+
+For the direct evaluations, use `scripts/evaluate_policy.py` with
+`--opponent-checkpoint` pointing to the parent; for both Tactical controls,
+use `--opponent tactical`. In each arm use `--engine experimental
+--both-deck-assignments --require-unseen-main-decks --workers 4
+--max-decisions 3000 --seeds 8`, the named Phoenix/Dimension Fusion `--matchup`,
+and the seed ranges above. Save each report under a distinct path. Run
+`scripts/compare_tournament_reports.py --verify-local-decks` on each matched
+child/parent Tactical pair before computing a combined paired difference.
