@@ -91,20 +91,23 @@ def write_review_index(selected: list[dict], output: Path,
 
     def frame_link(path: Path, fragment: str) -> str:
         relative = path.relative_to(output.parent.resolve())
-        return escape(quote(str(relative), safe="/") + "#" + fragment, quote=True)
+        return quote(str(relative), safe="/") + "#" + fragment
 
     flagged = []
     disagreements = []
+    queue_items = []
     for number, item in enumerate(selected, 1):
         viewer, fragment = item["viewer"].split("#", 1)
         label_href = frame_link(Path(viewer), fragment)
         reveal_path = Path(viewer).with_suffix(".review.html")
-        reveal = (f'<a href="{frame_link(reveal_path, fragment)}">Reveal all cards</a>'
+        reveal_href = (frame_link(reveal_path, fragment)
+                       if reveal_path.is_file() else None)
+        reveal = (f'<a href="{escape(reveal_href, quote=True)}">Reveal all cards</a>'
                   if reveal_path.is_file() else "")
         reason = (", ".join(flag.replace("_", " ") for flag in item["audit_flags"])
                   if item["audit_flags"] else "Tactical agent suggests another play")
         card = (
-            f'<article class="review-card" id="item-{number}">'
+            f'<article class="review-card" id="item-{number}" data-queue-index="{number - 1}">'
             f'<div class="card-top"><span class="badge">#{number} · '
             f'{"Flagged play" if item["audit_flags"] else "Alternative"}</span>'
             f'<span>Turn {item["turn"]} · {escape(item["phase"].replace("_", " "))}'
@@ -112,9 +115,12 @@ def write_review_index(selected: list[dict], output: Path,
             f'<h3>{escape(reason)}</h3>'
             f'<p><strong>AI played:</strong> {action_label(item["policy_action"])}<br>'
             f'<strong>Tactical suggests:</strong> {action_label(item["teacher_action"])}</p>'
-            f'<div class="links"><a class="primary" href="{label_href}">Open label view</a>'
+            f'<div class="links"><a class="primary" href="{escape(label_href, quote=True)}">Open label view</a>'
             f'{reveal}</div></article>')
+        queue_items.append({"visible": label_href, "reveal": reveal_href,
+                            "title": f"#{number} · {reason}"})
         (flagged if item["audit_flags"] else disagreements).append(card)
+    queue_json = json.dumps(queue_items, ensure_ascii=True).replace("<", "\\u003c")
     html = ("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             "<title>GOAT AI review queue</title><style>"
@@ -132,20 +138,85 @@ def write_review_index(selected: list[dict], output: Path,
             ".links a{display:inline-block;border:1px solid #4f7980;border-radius:7px;"
             "padding:8px 10px;text-decoration:none}.links a:hover{background:#306575}"
             ".links .primary{background:#234854;color:#fff}"
+            "button,input{font:inherit}button{cursor:pointer;background:#234854;color:#fff;"
+            "border:1px solid #4f7980;border-radius:7px;padding:7px 10px}"
+            "button:disabled{opacity:.45;cursor:default}#queue-search{width:100%;max-width:480px;"
+            "padding:9px;background:#0b2430;color:#fff;border:1px solid #4f7980;"
+            "border-radius:7px;margin:12px 0}"
+            ".review-card[hidden]{display:none}.stage[hidden]{display:none}"
+            ".stage{position:fixed;inset:0;z-index:10;background:#071925;"
+            "display:grid;grid-template-rows:auto minmax(0,1fr)}"
+            ".stage-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;"
+            "padding:7px 12px;background:#172731;border-bottom:1px solid #36535e}"
+            ".stage-title{flex:1;min-width:180px;overflow:hidden;text-overflow:ellipsis;"
+            "white-space:nowrap}#stage-frame{width:100%;height:100%;border:0}"
             "</style><section class=\"intro\"><h1>GOAT AI review queue</h1>"
             "<p>Each card opens a complete duel at one decision worth examining."
             " Flags and Tactical suggestions are prompts, not confirmed mistakes.</p>"
             "<ol><li>Choose <strong>Open label view</strong> to see exactly what the"
             " acting AI player could see. The sidebar shows its selected action"
-            " and all legal alternatives.</li><li>Use Previous and Next or the"
-            " arrow keys for context. Your browser Back button returns here.</li>"
+            " and all legal alternatives.</li><li>Use the queue bar to move between"
+            " review items. Inside the replay, Previous and Next move between"
+            " decisions in that duel.</li>"
             "<li>If you know a better legal action, choose it under All legal"
             " actions, enter a reviewer name, authorize research use, and download"
             " labels. <strong>Reveal all cards</strong> opens a separate inspection"
             " view with hidden cards shown; labeling is disabled there.</li></ol>"
-            "</section><h2>Flagged decisions</h2><div class=\"grid\">"
+            "</section><label for=\"queue-search\">Find a review item</label><br>"
+            "<input id=\"queue-search\" type=\"search\" placeholder=\"Search card, action, or flag\">"
+            "<h2>Flagged decisions</h2><div class=\"grid\">"
             + "".join(flagged) + "</div><h2>Other choices to compare</h2>"
-            "<div class=\"grid\">" + "".join(disagreements) + "</div></html>\n")
+            "<div class=\"grid\">" + "".join(disagreements) + "</div>"
+            "<section class=\"stage\" id=\"stage\" hidden aria-label=\"Review replay\">"
+            "<nav class=\"stage-bar\" aria-label=\"Review queue navigation\">"
+            "<button id=\"back-to-queue\" type=\"button\">← Queue</button>"
+            "<button id=\"previous-item\" type=\"button\">Previous item</button>"
+            "<span id=\"item-position\"></span>"
+            "<button id=\"next-item\" type=\"button\">Next item</button>"
+            "<button id=\"toggle-reveal\" type=\"button\">Reveal all cards</button>"
+            "<span class=\"stage-title\" id=\"stage-title\"></span>"
+            "<a id=\"open-tab\" target=\"_blank\" rel=\"noopener\">Open in new tab</a>"
+            "</nav><iframe id=\"stage-frame\" title=\"GOAT AI replay viewer\"></iframe>"
+            "</section><script>\"use strict\";const items=" + queue_json + ";"
+            "const stage=document.getElementById('stage'),frame=document.getElementById('stage-frame');"
+            "let current=-1,mode='visible',pendingLabels=false;"
+            "window.addEventListener('message',event=>{if(event.source===frame.contentWindow&&"
+            "event.data?.type==='goat-ai-review-label-state')"
+            "pendingLabels=Boolean(event.data.pending);});"
+            "function mayLeave(){return !pendingLabels||confirm('You have labels that have not been downloaded. Leave this duel and discard them?');}"
+            "function openItem(i,wanted='visible'){if(i<0||i>=items.length)return;"
+            "if(current>=0&&!mayLeave())return;pendingLabels=false;"
+            "current=i;mode=wanted==='reveal'&&items[i].reveal?'reveal':'visible';"
+            "const url=items[i][mode];frame.src=url;stage.hidden=false;"
+            "document.getElementById('item-position').textContent=`${i+1} / ${items.length}`;"
+            "document.getElementById('stage-title').textContent=items[i].title;"
+            "document.getElementById('open-tab').href=url;"
+            "document.getElementById('previous-item').disabled=i===0;"
+            "document.getElementById('next-item').disabled=i===items.length-1;"
+            "const toggle=document.getElementById('toggle-reveal');"
+            "toggle.disabled=!items[i].reveal;toggle.textContent=mode==='reveal'"
+            "?'Return to label view':'Reveal all cards';"
+            "history.replaceState(null,'',`#item=${i+1}&mode=${mode}`);"
+            "}"
+            "document.querySelectorAll('.review-card').forEach(card=>{"
+            "card.querySelectorAll('.links a').forEach(link=>link.addEventListener('click',e=>{"
+            "if(e.ctrlKey||e.metaKey||e.shiftKey||e.button!==0)return;"
+            "e.preventDefault();openItem(Number(card.dataset.queueIndex),"
+            "link.classList.contains('primary')?'visible':'reveal');}));});"
+            "document.getElementById('back-to-queue').onclick=()=>{if(!mayLeave())return;"
+            "pendingLabels=false;stage.hidden=true;"
+            "frame.removeAttribute('src');history.replaceState(null,'',location.pathname);"
+            "document.getElementById(`item-${current+1}`)?.scrollIntoView({block:'center'});};"
+            "document.getElementById('previous-item').onclick=()=>openItem(current-1,mode);"
+            "document.getElementById('next-item').onclick=()=>openItem(current+1,mode);"
+            "document.getElementById('toggle-reveal').onclick=()=>openItem(current,"
+            "mode==='reveal'?'visible':'reveal');"
+            "document.getElementById('queue-search').oninput=e=>{const term=e.target.value.toLowerCase();"
+            "document.querySelectorAll('.review-card').forEach(card=>{"
+            "card.hidden=!card.textContent.toLowerCase().includes(term);});};"
+            "const match=location.hash.match(/^#item=(\\d+)&mode=(visible|reveal)$/);"
+            "if(match)openItem(Number(match[1])-1,match[2]);"
+            "</script></html>\n")
     index = output.with_suffix(".html")
     index.write_text(html, encoding="utf-8")
     return index

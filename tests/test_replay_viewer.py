@@ -42,6 +42,17 @@ def test_nested_review_viewer_uses_parent_card_art_cache(tmp_path):
         10: "../../card_images/10.jpg", "back": "../../card_images/cover.png"}
 
 
+def test_cached_review_viewer_uses_shared_replay_art(tmp_path, monkeypatch):
+    art = tmp_path / "replays/card_images"
+    art.mkdir(parents=True)
+    (art / "10.jpg").write_bytes(b"card")
+    monkeypatch.setattr("scripts.render_replay.TEMPLATE",
+                        tmp_path / "examples/replay_viewer.html")
+    viewer = tmp_path / ".cache/goat-ai/review/queue_viewers/game.html"
+    assert _local_card_images(viewer, {10}) == {
+        10: "../../../../replays/card_images/10.jpg"}
+
+
 def test_reviewer_reveal_rejects_unknown_ruleset_before_native_access(tmp_path):
     with pytest.raises(ValueError, match="do not support ruleset"):
         _review_engine("unknown-format", tmp_path)

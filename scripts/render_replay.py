@@ -93,10 +93,13 @@ def _catalog_codes(native_root: Path) -> set[int]:
 
 
 def _local_card_images(output: Path, codes: set[int]) -> dict[int | str, str]:
-    """Reference the nearest local art cache, including a parent replay folder."""
+    """Reference local art for replay and cache-based review queues."""
+    shared_cache = TEMPLATE.parent.parent / "replays/card_images"
     folder = next((parent / "card_images" for parent in
                    (output.parent, *list(output.parent.parents)[:2])
                    if (parent / "card_images").is_dir()), None)
+    if folder is None and shared_cache.is_dir():
+        folder = shared_cache
     if folder is None:
         return {}
     relative = Path(os.path.relpath(folder, output.parent)).as_posix()

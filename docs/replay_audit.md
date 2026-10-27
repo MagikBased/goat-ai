@@ -73,17 +73,26 @@ links 32 varied frames from 22 complete duel viewers, including eight
 distinct flagged categories. It is an ignored local review artifact; no
 suggestion is a training label until a person authorizes and validates it.
 
-The queue index now groups flagged decisions and other model/Tactical
-comparisons into readable cards. **Open label view** opens the player-visible
-duel at that decision, with legal actions and retrospective labeling in the
-sidebar. **Reveal all cards** opens a separate, native-verified reviewer view
-of the same duel; labeling is disabled there because hidden-card knowledge
-must not enter a player-visible training label. Previous/Next or the arrow
-keys move through the duel, and the browser Back button returns to the queue.
+The queue index groups flagged decisions and other model/Tactical comparisons
+into searchable cards. Open `queue.html` and choose **Open label view** to see
+the acting player's visible state at that decision. The bar above the duel has
+**Previous item**, **Next item**, **Reveal all cards**, and **← Queue**. The
+replay's own Previous/Next controls move between decisions *within that duel*.
+The reveal view shows both hands but disables labeling because hidden-card
+knowledge must not enter a player-visible training label. Use **Open in new
+tab** if you want a separate full-size duel page. Older local queues under
+`.cache/goat-ai` were refreshed with the current viewer layout; their original
+queues did not include reviewer reveals.
 Generated queue viewers now find the shared ignored `replays/card_images/`
 cache two directory levels above them. The 22 full-queue label views and 22
 reviewer views were regenerated locally with 96 cached card image files;
 art and reviewer sidecars remain outside Git.
+
+To refresh a saved queue after viewer changes, run
+`PYTHONPATH=src:. .venv/bin/python scripts/refresh_review_queue.py
+path/to/queue.json`. Use `--index-only` when its duel pages already use the
+current layout. The script checks the recorded trajectory hashes before
+rewriting local viewer pages and leaves queue selections unchanged.
 
 The ignored audit JSON SHA-256 is
 `3f5a9f6104d5bd9ecd73a1ee9fe8f301da78c71a010430edfa964849db235163`;

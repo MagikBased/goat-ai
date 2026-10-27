@@ -1,7 +1,13 @@
-"""Candidate ranking keeps replay review diverse and deterministic."""
+"""Candidate ranking and queue navigation stay deterministic."""
+
+import re
+import shutil
+import subprocess
+import json
 
 import pytest
 
+from scripts.refresh_review_queue import refresh_review_queue
 from scripts.shortlist_policy_disagreements import (
     select_diverse_candidates,
     write_review_index,
@@ -57,3 +63,64 @@ def test_review_index_separates_player_label_and_hidden_reveal_views(tmp_path):
     assert 'href="queue_viewers/game.review.html#decision=7"' in html
     assert "labeling is disabled there" in html
     assert "weak flip summon" in html
+    assert 'id="previous-item"' in html
+    assert 'id="next-item"' in html
+    assert 'id="queue-search"' in html
+
+
+def test_refresh_rejects_changed_trajectory(tmp_path):
+    queue = tmp_path / "queue.json"
+    replay = tmp_path / "replay.json"
+    replay.write_text("changed")
+    queue.write_text(json.dumps({"selected": [{
+        "trajectory": str(replay), "trajectory_sha256": "0" * 64,
+        "viewer": str(tmp_path / "viewer.html") + "#decision=1",
+    }]}))
+    with pytest.raises(ValueError, match="trajectory hash differs"):
+        refresh_review_queue(queue, tmp_path, index_only=True)
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_review_queue_navigation_stays_in_one_page(tmp_path):
+    queue = tmp_path / "review/queue.json"
+    queue.parent.mkdir()
+    viewers = queue.parent / "queue_viewers"
+    viewers.mkdir()
+    selected = []
+    for number in (1, 2):
+        viewer = viewers / f"game{number}.html"
+        viewer.write_text(f"<html><body>Game {number}</body></html>")
+        viewer.with_suffix(".review.html").write_text("<html><body>Reveal</body></html>")
+        selected.append({"viewer": f"{viewer}#decision={number}",
+                         "turn": number, "phase": "main1", "viewer_frame": number,
+                         "policy_action": {"kind": "pass", "parameters": {}},
+                         "teacher_action": {"kind": "end_phase", "parameters": {}},
+                         "audit_flags": []})
+    index = write_review_index(selected, queue, tmp_path / "native")
+    probe = """<script>
+      document.querySelector('.review-card .primary').click();
+      const first = document.getElementById('item-position').textContent;
+      const replayFrameProbe = document.getElementById('stage-frame');
+      window.dispatchEvent(new MessageEvent('message', {source: replayFrameProbe.contentWindow,
+        data: {type: 'goat-ai-review-label-state', pending: true}}));
+      window.confirm = () => false;
+      document.getElementById('next-item').click();
+      const protectedItem = document.getElementById('item-position').textContent;
+      window.confirm = () => true;
+      document.getElementById('next-item').click();
+      const second = document.getElementById('item-position').textContent;
+      document.getElementById('toggle-reveal').click();
+      const reveal = document.getElementById('stage-frame').src.includes('.review.html');
+      document.getElementById('back-to-queue').click();
+      document.body.dataset.queueProbe = [first, protectedItem, second, reveal,
+        document.getElementById('stage').hidden].join('|');
+    </script>"""
+    index.write_text(index.read_text().replace("</html>", probe + "</html>"))
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=400", "--dump-dom",
+        index.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-queue-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "1 / 2|1 / 2|2 / 2|true|true"

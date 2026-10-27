@@ -260,6 +260,11 @@
     let legalShown = 100;
     let sourceSha256 = "";
     let annotations = new Map();
+    let labelsExported = false;
+    function notifyLabelState() {
+      if (window.parent !== window) window.parent.postMessage(
+        {type: "goat-ai-review-label-state", pending: annotations.size > 0 && !labelsExported}, "*");
+    }
     function annotationAuthorization() {
       if (!replay) return null;
       if (replay.source === "self_play_rl") {
@@ -1015,7 +1020,7 @@
           button.type = "button";
           button.disabled = !canAnnotateFrame(observation);
           button.addEventListener("click", () => {
-            if (canAnnotateFrame(observation)) { annotations.set(index, actionIndex); render(); }
+            if (canAnnotateFrame(observation)) { annotations.set(index, actionIndex); labelsExported = false; notifyLabelState(); render(); }
           });
           item.append(button);
           return item;
@@ -1089,7 +1094,7 @@
     function stop() { if (timer) clearInterval(timer); timer = null; byId("play").textContent = "Play"; }
     function setReplay(data, label, hash) {
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
-      stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map();
+      stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map(); labelsExported = false; notifyLabelState();
       reviewerData = embeddedReviewer?.source_trajectory_sha256 === hash ? embeddedReviewer : null;
       const seat = data.skill_metadata?.learner_seat ?? data.skill_metadata?.demonstrator_seat;
       boardBottomPlayer = seat === 0 || seat === 1 ? seat : data.decisions[0].observation.viewer;
@@ -1126,7 +1131,7 @@
             data.frames.length !== replay.decisions.length + Number(Boolean(replay.terminal_observation)))
           throw new Error("Reviewer data does not match this trajectory.");
         reviewerData = data;
-        annotations.clear();
+        annotations.clear(); labelsExported = false; notifyLabelState();
         render();
       } catch (error) {
         byId("notice").hidden = false;
@@ -1163,9 +1168,10 @@
       const selected = record.legal_actions.findIndex(action => action.id === record.selected_action.id);
       if (selected < 0) return;
       annotations.set(index, selected);
+      labelsExported = false; notifyLabelState();
       render();
     });
-    byId("clear-label").addEventListener("click", () => { annotations.delete(index); render(); });
+    byId("clear-label").addEventListener("click", () => { annotations.delete(index); labelsExported = false; notifyLabelState(); render(); });
     byId("download-labels").addEventListener("click", () => {
       if (reviewerData) return;
       const authorization = annotationAuthorization();
@@ -1183,6 +1189,7 @@
                                             {type: "application/json"}));
       const link = document.createElement("a");
       link.href = url; link.download = `goat_ai_labels_seed_${replay.seed}.json`; link.click();
+      labelsExported = true; notifyLabelState();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
     byId("slider").addEventListener("input", event => { index = Number(event.target.value); render(); });
