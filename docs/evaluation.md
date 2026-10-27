@@ -1,5 +1,55 @@
 # Baseline evaluation log
 
+## New Jersey 2005 Phoenix Control holdout (27 October 2026)
+
+[Roberto Martinez's SJC New Jersey 2005 Top 8 list](https://www.goatformat.com/home/top-8-decklists)
+is transcribed as [Phoenix Control](../examples/decks/phoenix_control_roberto_martinez_new_jersey_2005.ydk)
+(YDK SHA-256 `b0356d0177bc864b81c41f1b1a31d1fde87b967cbdaa92b59717a3e950efd71a`).
+Its published 40-card Main and 18-card Fusion Deck use pinned GOAT/pre-errata
+IDs. The published Side Deck is omitted for single-duel fixtures. The
+name-by-name source transcription and whitelist validation passed on pinned
+native assets; Phoenix played complete duels in both seats against Matt
+Peddle's Indianapolis 2005 list. Both trajectories replay-verified and passed
+the player-visible audit. This checks protocol coverage, not every Phoenix
+ruling.
+
+The four-deck feature-v23 parent (`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`)
+and six-deck continuation (`5941c66ec1ee68babf2f359c9e6dab807b3e50021761fe0ce8214aac873abab0`)
+were compared on Phoenix Control and the independently sourced WikiFormat
+Dimension Fusion Turbo list. Both Main Deck compositions passed the unseen
+training-composition gate for both checkpoints. Seeds 16250–16273, both deck
+assignments and both agent seats, produced 96 direct games. The child won
+**56–40**; paired-bootstrap score interval **51.0–65.6%**. The split was
+**35–13** with Phoenix and **21–27** with Dimension Fusion. This direct match
+favors the child on the aggregate schedule, but its gain is concentrated in one
+deck assignment.
+
+On a separate same-seed 64-game schedule (16274–16289, both deck assignments
+and seats) against Tactical v14, the parent scored **23–41** (paired-bootstrap
+score interval **25.0–46.9%**) and the child **15–49** (**14.1–34.4%**). The
+parent's Phoenix/Dimension Fusion splits were 16–16/7–25; the child's were
+12–20/3–29. These are separate games against a deterministic baseline, not a
+direct paired estimate of the difference in score. They show no absolute
+playing-strength improvement over the parent. Keep the child experimental;
+next training work needs deck-balanced held-out promotion criteria and a better
+Dimension Fusion policy before adopting it as the reference.
+
+The ignored JSON reports are
+`.cache/goat-ai/phoenix_sixdeck_vs_fourdeck_16250_16273.json` (SHA-256
+`a1e4b3dd42fbe6512bc35de8964104ba4bfa32fb55e9ee808aec4e4e9ac152be`),
+`.cache/goat-ai/phoenix_fourdeck_vs_tactical_16274_16289.json`
+(`833d12e40acbbc0da2d2ac737a7e924c6a345209bc187fe76c009dcb1b2f2542`),
+and `.cache/goat-ai/phoenix_sixdeck_vs_tactical_16274_16289.json`
+(`a28bd4a5073951fd5a59d37d8bf2ef1075fde0ce6be67a663ce8200a2bbcefd3`).
+Reproduce with `scripts/evaluate_policy.py`, `--engine experimental`,
+`--both-deck-assignments`, `--require-unseen-main-decks`, `--workers 4`,
+the two `--matchup` paths above, and the indicated seed ranges. Set
+`--opponent-checkpoint` to the parent for the direct comparison or
+`--opponent tactical` for the two baseline checks. The direct 96-game run took
+23.83 s on this machine (4.03 duels/s, 2,471 decisions/s); these timings
+include Python policy inference and tournament overhead and are not native
+simulator-only throughput.
+
 ## Independent Dimension Fusion reference list (27 October 2026)
 
 [WikiFormat's published Dimension Fusion Turbo reference list](https://www.wikiformat.com/en/mazzi/dimension-fusion-turbo/)
