@@ -241,6 +241,36 @@ def test_dark_balter_swords_remains_on_field_but_only_blocks_if_not_negated(
                         [(c.code, c.controller, c.orientation, c.position) for c in obs.field],
                         [(a.kind, a.parameters) for a in actions])
                     assert scripts <= env.engine.probe.loaded_script_sha256.keys()
+                    later_battle_checked = False
+                    for _ in range(180):
+                        assert not env.is_terminal()
+                        if obs.turn == 10:
+                            assert later_battle_checked
+                            assert SWORDS not in {c.code for c in obs.field}
+                            assert SWORDS in {c.code for c in obs.graveyards[1]}
+                            break
+                        if obs.turn <= 8:
+                            assert any(c.code == SWORDS and c.position == "faceup"
+                                       for c in obs.field)
+                        later_actions = env.legal_actions()
+                        if obs.turn == 7 and obs.acting_player == 0 \
+                                and obs.phase == "battle_start" and any(
+                                    a.kind == "main2" for a in later_actions):
+                            assert bool([a for a in later_actions
+                                         if a.kind == "attack"]) == negate_swords
+                            later_battle_checked = True
+                        later_action = (next((a for a in later_actions
+                                              if a.kind == "battle_phase"), None)
+                                        if obs.turn == 7 and obs.acting_player == 0
+                                        and obs.phase == "main1" and not later_battle_checked
+                                        else None)
+                        if later_action is None:
+                            later_action = next((a for a in later_actions if a.kind in (
+                                "main2", "pass", "end_phase", "select_card", "place")),
+                                later_actions[0])
+                        obs = env.step(later_action)
+                    else:
+                        pytest.fail("negated Swords did not expire after three opposing turns")
                     agents = (RandomAgent(184), RandomAgent(185))
                     for _ in range(3000):
                         obs = env.step(agents[obs.acting_player].select_action(
