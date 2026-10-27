@@ -1131,3 +1131,9 @@ binds their SHA-256 hashes to new checkpoint training-game entries. A native
 1,072-decision replay verified after a one-game smoke, including a visibility
 audit. This closes a reproducibility gap; M4's held-out competitive strength
 gate remains open. See [the provenance check](evaluation.md#exact-self-play-replay-provenance-27-october-2026).
+
+Replay writing now avoids a recursive dataclass copy while preserving the
+same current-schema JSON bytes. Four-round serialization benchmarks on two
+native self-play replays showed 1.36–1.78× faster in-memory encoding, with
+no measured whole-training speedup yet. See
+[the serialization benchmark](evaluation.md#replay-serialization-cost-27-october-2026).

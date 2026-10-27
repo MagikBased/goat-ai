@@ -6276,3 +6276,38 @@ its replay is in the adjacent `_replays` directory (SHA-256
 `3ef7714b8eb8e3ca3a72d24c448dc68e1915acfaab42c90f91e8f0821c1eaec2`).
 This is a provenance and reproducibility check, not a strength result or a
 throughput benchmark.
+
+### Replay serialization cost (27 October 2026)
+
+Profiling one 437-decision, single-game self-play run at seed 14701 attributed
+about **0.36 profiler-accounted seconds** to writing its replay. The writer
+now lets JSON traverse dataclass fields directly instead of building a
+recursive `dataclasses.asdict` copy. Its schema validation and on-disk format
+are unchanged. The 437-decision replay then passed full native verification
+and the player-visible trajectory audit.
+
+An AB/BA in-memory serialization benchmark, excluding replay loading and
+file I/O, compared both encoders on two current schema-v25 replays. Each
+round produced **byte-identical output**, also identical to the original
+replay file. On the 437-decision, 4.34 MB replay, legacy conversion/encoding
+took **0.114–0.141 s** and shallow encoding **0.082–0.086 s** across four
+rounds. On a 1,072-decision, 13.38 MB replay, the ranges were **0.347–0.444
+s** and **0.239–0.255 s**. Two rounds each on schema-v17 and schema-v3
+replays also matched between encoders. Those older loaded objects normalize
+legacy fields, so neither encoder reproduces the original old-file bytes.
+This isolates a serialization speedup, not a measured full-training gain.
+
+The ignored benchmark reports are
+`.cache/goat-ai/trajectory_serializer_14701.json` (SHA-256
+`812023f97404abc80fcd5bccdf44cfba35496733db592959fab9fa52aa6e164e`),
+`.cache/goat-ai/trajectory_serializer_14700.json` (SHA-256
+`ff1a0a8e506c994b94565eaa07ce97fac6bb864cb9f6412008e3b2517806a74d`),
+`.cache/goat-ai/trajectory_serializer_v17.json`, and
+`.cache/goat-ai/trajectory_serializer_v3.json`. Reproduce the current-schema
+measurements with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/benchmark_trajectory_serialization.py \
+  .cache/goat-ai/selfplay_profile_14701_replays/episode_00000_seed_14701.json \
+  --rounds 4
+```

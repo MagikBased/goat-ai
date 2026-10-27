@@ -1,5 +1,5 @@
 import json
-from dataclasses import replace
+from dataclasses import asdict, replace
 
 import pytest
 
@@ -121,6 +121,28 @@ def test_schema_twelve_round_trips_visible_stats_and_legacy_reader_strips_them(t
         replace(view(), field=(CardView(1, "monster", "facedown", 999),))
     with pytest.raises(ValueError, match="Extra Deck"):
         replace(view(), own_extra_deck=(CardView(1, "extra", "facedown", 999),))
+
+
+def test_trajectory_writer_preserves_existing_json_bytes(tmp_path):
+    observation = replace(
+        view(), turn_player=0,
+        chain=(ChainLinkView(1, 123, 0, 0x08, 0,
+                             (TargetSlotView(1, "monster", 0),)),),
+        private_reveals=(PrivateRevealView(
+            1, 0, (RevealedCardView(456, 1, 0x02),)),),
+        public_reveals=(PublicRevealView(1, 1, "deck_top", (789,)),),
+    )
+    action = Action("0", "select_card", 0, {"targets": [1, 2], "choice": 1})
+    trajectory = Trajectory(
+        "goat", ("a", "b"), 7,
+        (DecisionRecord(observation, (action,), action),), 0,
+        schema_version=25, terminal_observation=observation,
+    )
+    path = tmp_path / "unchanged.json"
+    write_trajectory(path, trajectory)
+    assert path.read_text() == json.dumps(
+        asdict(trajectory), separators=(",", ":")) + "\n"
+    assert read_trajectory(path) == trajectory
     with pytest.raises(ValueError, match="face-down field slot"):
         replace(view(), known_opponent_field_cards=(KnownCardView(1, "monster", 2, 999),))
 

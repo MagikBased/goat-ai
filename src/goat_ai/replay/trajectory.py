@@ -1,7 +1,7 @@
 """JSON trajectories; only visible observations are admitted by the schema."""
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path
 
 from goat_ai.actions import Action
@@ -46,6 +46,13 @@ class Trajectory:
     deck_sha256: tuple[str, str] | None = None
     asset_sha256: dict[str, str] | None = None
     terminal_observation: Observation | None = None
+
+
+def _json_dataclass(value):
+    """Let JSON traverse nested dataclasses without recursively copying them."""
+    if is_dataclass(value) and not isinstance(value, type):
+        return {field.name: getattr(value, field.name) for field in fields(value)}
+    raise TypeError(f"object of type {type(value).__name__} is not JSON serializable")
 
 
 def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
@@ -97,7 +104,8 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
         if version >= 25 and any(card.zone == "monster" and card.position == "faceup"
                                  and card.owner is None for card in view.field):
             raise ValueError("schema v25 requires owner for face-up monsters")
-    Path(path).write_text(json.dumps(asdict(trajectory), separators=(",", ":")) + "\n", encoding="utf-8")
+    Path(path).write_text(json.dumps(trajectory, default=_json_dataclass,
+                                     separators=(",", ":")) + "\n", encoding="utf-8")
 
 
 def read_trajectory(path: str | Path) -> Trajectory:
