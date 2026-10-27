@@ -31,8 +31,12 @@ def review_files(tmp_path):
     queue.write_text(json.dumps({
         "schema_version": 1,
         "purpose": "human_review_candidates_not_training_labels",
+        "checkpoint_sha256": "b" * 64,
         "selected": [{"trajectory": replay.name, "trajectory_sha256": digest,
-                      "decision_index": 0}],
+                      "decision_index": 0, "viewer_frame": 1, "seat": 0,
+                      "turn": 1, "phase": "main1", "legal_action_count": 2,
+                      "policy_action": {"kind": "battle_phase", "parameters": {}},
+                      "teacher_action": {"kind": "end_phase", "parameters": {}}}],
     }))
     labels = tmp_path / "labels.json"
     labels.write_text(json.dumps({
@@ -49,6 +53,7 @@ def test_queue_label_validation_binds_replay_and_shortlisted_choice(tmp_path, mo
     monkeypatch.setattr(validator, "audit_trajectory_visibility", lambda *_: None)
     result = validator.validate_labels(queue, [labels], tmp_path)
     assert result["authorization"] == "policy_review"
+    assert result["policy_checkpoint_sha256"] == "b" * 64
     assert result["verified_decisions"] == 2
     assert result["reviewed_decisions"] == 1
     assert result["cases"][0]["changed_choices"] == 1
@@ -73,4 +78,29 @@ def test_queue_label_validation_rejects_wrong_replay_or_duplicate_export(tmp_pat
     data["source_trajectory_sha256"] = "c" * 64
     labels.write_text(json.dumps(data))
     with pytest.raises(ValueError, match="absent from review queue"):
+        validator.validate_labels(queue, [labels], tmp_path)
+
+
+@pytest.mark.parametrize("field,value,message", [
+    ("checkpoint_sha256", "c" * 64, "declared policy checkpoint"),
+    ("seat", 1, "metadata differs"),
+    ("turn", 2, "metadata differs"),
+    ("phase", "battle_start", "metadata differs"),
+    ("legal_action_count", 3, "metadata differs"),
+    ("policy_action", {"kind": "end_phase", "parameters": {}}, "metadata differs"),
+    ("teacher_action", {"kind": "attack", "parameters": {}}, "metadata differs"),
+])
+def test_queue_label_validation_rejects_stale_display_metadata(
+    tmp_path, monkeypatch, field, value, message,
+):
+    queue, labels, _ = review_files(tmp_path)
+    monkeypatch.setattr(validator, "verify_trajectory", lambda *_: 2)
+    monkeypatch.setattr(validator, "audit_trajectory_visibility", lambda *_: None)
+    data = json.loads(queue.read_text())
+    if field == "checkpoint_sha256":
+        data[field] = value
+    else:
+        data["selected"][0][field] = value
+    queue.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match=message):
         validator.validate_labels(queue, [labels], tmp_path)

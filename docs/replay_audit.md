@@ -211,7 +211,9 @@ PYTHONPATH=src:. .venv/bin/python scripts/validate_review_queue_labels.py \
 ```
 
 The validator checks the exact replay SHA-256, native replay, player-visible
-audit, policy-seat authorization, legal action index, and shortlist membership.
+audit, policy-seat authorization, legal action index, shortlist membership,
+checkpoint identity, and each shortlisted frame's displayed action and decision
+metadata against the replay. Its report records the policy checkpoint SHA-256.
 It reports the changed-choice count and the replay/label pairs needed by
 `train_behavioral_clone.py --annotation-for`. It does not infer that the
 reviewer's action is strategically optimal. A synthetic recorded-action
