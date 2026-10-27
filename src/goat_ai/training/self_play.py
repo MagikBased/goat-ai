@@ -168,11 +168,16 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
                            state_baselines: Sequence[float] | None = None,
                            reduction: str = "sum",
                            parent_model: LegalActionPolicy | None = None,
-                           parent_kl_weight: float = 0.0) -> float:
+                           parent_kl_weight: float = 0.0,
+                           batch_size: int = 1) -> float:
     """Apply one terminal-return score-function update; return mean loss."""
     if (not records or entropy_coefficient < 0 or max_gradient_norm <= 0
+            or batch_size < 1
             or temperature <= 0 or reduction not in ("sum", "mean")):
         raise ValueError("update needs decisions, positive temperature, and valid regularization")
+    if batch_size > 1 and (model.feature_version < 10
+                           or model.feature_version in (14, 15)):
+        raise ValueError("batched REINFORCE requires a supported v10+ feature version")
     if (not isfinite(parent_kl_weight) or parent_kl_weight < 0
             or parent_kl_weight > 0 and parent_model is None):
         raise ValueError("parent KL needs a frozen parent and nonnegative weight")
@@ -183,6 +188,39 @@ def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
     optimizer.zero_grad()
     device = next(model.parameters()).device
     total = 0.0
+    if batch_size > 1:
+        for start in range(0, len(records), batch_size):
+            batch = records[start:start + batch_size]
+            features = [encode_decision(record.observation, record.legal_actions,
+                                        vocabulary, model.feature_version).to(device)
+                        for record in batch]
+            logits, _ = model.forward_batch(features)
+            log_probs = torch.log_softmax(logits / temperature, dim=1)
+            probabilities = log_probs.exp()
+            choices = torch.tensor([
+                record.legal_actions.index(record.selected_action) for record in batch],
+                dtype=torch.long, device=device)
+            chosen = log_probs.gather(1, choices[:, None]).squeeze(1)
+            advantages = torch.tensor([
+                reward - (state_baselines[start + index]
+                          if state_baselines is not None else baseline)
+                for index in range(len(batch))], dtype=chosen.dtype, device=device)
+            entropy = -(probabilities * log_probs).sum(1)
+            losses = -advantages * chosen - entropy_coefficient * entropy
+            if parent_kl_weight:
+                with torch.no_grad():
+                    parent_logits, _ = parent_model.forward_batch(features)
+                    parent_log_probs = torch.log_softmax(
+                        parent_logits / temperature, dim=1)
+                    parent_probs = parent_log_probs.exp()
+                losses = losses + parent_kl_weight * (
+                    parent_probs * (parent_log_probs - log_probs)).sum(1)
+            (losses.sum() / len(records) if reduction == "mean"
+             else losses.sum()).backward()
+            total += float(losses.detach().sum())
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_gradient_norm)
+        optimizer.step()
+        return total / len(records)
     for index, record in enumerate(records):
         advantage = reward - (state_baselines[index]
                               if state_baselines is not None else baseline)
@@ -374,6 +412,7 @@ def train_against_snapshot_pool(
     policy_gradient_reduction: str = "sum",
     parent_kl_weight: float = 0.0,
     policy_update: str = "reinforce",
+    reinforce_batch_size: int = 1,
     ppo_epochs: int = 2,
     ppo_batch_size: int = 16,
     ppo_clip_epsilon: float = 0.2,
@@ -399,7 +438,8 @@ def train_against_snapshot_pool(
             or (baseline_scope == "state_value") != (value_model is not None)
             or schedule_mode not in ("paired_seats", "four_roles")):
         raise ValueError("invalid self-play schedule or hyperparameters")
-    if (policy_update not in ("reinforce", "clipped_ppo") or ppo_epochs < 1
+    if (policy_update not in ("reinforce", "clipped_ppo")
+            or reinforce_batch_size < 1 or ppo_epochs < 1
             or ppo_batch_size < 1 or ppo_rollout_games < 1
             or ppo_rollout_weighting not in ("per_decision", "per_episode")
             or not 0 < ppo_clip_epsilon < 1):
@@ -413,6 +453,10 @@ def train_against_snapshot_pool(
     if (policy_update == "clipped_ppo" and
             (model.feature_version < 10 or model.feature_version in (14, 15))):
         raise ValueError("clipped PPO requires a supported batched policy version")
+    if reinforce_batch_size > 1 and (policy_update != "reinforce"
+                                     or model.feature_version < 10
+                                     or model.feature_version in (14, 15)):
+        raise ValueError("batched REINFORCE requires REINFORCE and a supported v10+ policy")
     rng = random.Random(random_seed)
     generator = torch.Generator(device="cpu").manual_seed(random_seed)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -502,7 +546,8 @@ def train_against_snapshot_pool(
                     state_baselines=state_baselines,
                     reduction=policy_gradient_reduction,
                     parent_model=parent_model,
-                    parent_kl_weight=parent_kl_weight)
+                    parent_kl_weight=parent_kl_weight,
+                    batch_size=reinforce_batch_size)
         value_loss = (state_value_update(
             value_model, vocabulary, episode.learner_records, episode.reward,
             model.feature_version, value_optimizer)

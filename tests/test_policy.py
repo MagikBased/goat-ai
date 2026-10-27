@@ -1606,6 +1606,54 @@ def test_mean_policy_gradient_is_invariant_to_duplicate_decisions():
                                0.0, optimizer, reduction="unknown")
 
 
+@pytest.mark.parametrize("reduction", ("sum", "mean"))
+def test_batched_reinforce_matches_scalar_variable_action_update(reduction):
+    vocabulary = CardVocabulary((10, 20))
+    choices = actions()
+    records = (DecisionRecord(view(), choices, choices[1]),
+               DecisionRecord(view(), choices[:2], choices[0]),
+               DecisionRecord(view(), choices, choices[2]),
+               DecisionRecord(view(), choices[:1], choices[0]))
+    torch.manual_seed(71)
+    initial = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    parent = copy.deepcopy(initial).eval().requires_grad_(False)
+    with torch.no_grad():
+        next(parent.parameters()).add_(0.1)
+    results = []
+    for batch_size in (1, 3):
+        model = copy.deepcopy(initial)
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
+        loss = policy_gradient_update(
+            model, vocabulary, records, 1.0, 0.0, optimizer,
+            entropy_coefficient=0.02, max_gradient_norm=100,
+            temperature=1.3, state_baselines=(0.1, 0.2, -0.1, 0.0),
+            reduction=reduction, parent_model=parent,
+            parent_kl_weight=0.1, batch_size=batch_size)
+        results.append((loss, tuple(p.detach().clone() for p in model.parameters())))
+    assert results[0][0] == pytest.approx(results[1][0], abs=1e-5)
+    assert all(torch.allclose(left, right, atol=1e-5, rtol=1e-5)
+               for left, right in zip(results[0][1], results[1][1]))
+
+
+def test_batched_reinforce_rejects_unsupported_feature_version():
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=1)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
+    record = DecisionRecord(view(), actions(), actions()[0])
+    with pytest.raises(ValueError, match="batched REINFORCE"):
+        policy_gradient_update(model, vocabulary, (record,), 1.0, 0.0,
+                               optimizer, batch_size=2)
+
+    with pytest.raises(ValueError, match="batched REINFORCE"):
+        train_against_snapshot_pool(model, vocabulary, (("a", "b"),), (1,),
+                                    lambda: None, reinforce_batch_size=2)
+    supported = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    with pytest.raises(ValueError, match="batched REINFORCE"):
+        train_against_snapshot_pool(supported, vocabulary, (("a", "b"),), (1,),
+                                    lambda: None, policy_update="clipped_ppo",
+                                    reinforce_batch_size=2)
+
+
 def test_self_play_parent_kl_pulls_policy_toward_frozen_visible_teacher():
     class TwoLogitPolicy(torch.nn.Module):
         feature_version = 1

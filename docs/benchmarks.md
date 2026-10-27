@@ -196,3 +196,62 @@ Reproduce after [native setup](native_setup.md):
 PYTHONPATH=src:. .venv/bin/python scripts/benchmark_native_query_cache.py \
   --games 4 --rounds 2
 ```
+
+## Batched REINFORCE update
+
+The self-play trainer now accepts opt-in `--reinforce-batch-size 16` for
+supported feature versions (v10+, excluding the chain-target v14/v15
+variants). Its default of one keeps earlier scalar-update experiments
+reproducible. The batched path pads variable-length legal-action sets, masks
+padding, and accumulates the same per-decision REINFORCE objective before one
+optimizer step. It supports entropy regularization, state baselines, and the
+frozen-parent KL term. It does not alter policy sampling or the PPO path.
+
+On 27 October 2026, one replay-verified recording supplied **211**
+multi-option, player-visible decisions for one seat. A feature-v23 width-32
+checkpoint, Adam at `1e-4`, mean gradient reduction, and one CPU thread gave:
+
+| Order | Scalar update | Batch of 16 | Update speedup |
+| :--- | ---: | ---: | ---: |
+| Scalar, batched | 0.692 s | 0.183 s | 3.78× |
+| Batched, scalar | 0.699 s | 0.188 s | 3.72× |
+
+The loss differed by `1.30e-8`; the largest absolute parameter difference
+after the Adam step was `7.98e-6`. These are small numerical differences from
+batched floating-point operations, not bit-identical updates. One exploratory
+single-duel training comparison produced identical 1,196-decision native
+trajectories and measured 1.18×–1.70× CPU speedup across reversed run orders;
+that range is too small and variable to generalize to other training schedules.
+No playing-strength gain is claimed. The checkpoint SHA-256 was
+`93ca70795e2c5316ab349a4e5c61ebd553915e49abdbe469d0976d3bebe3d9b2`;
+the recording SHA-256 was
+`e5ce07fa2e62f2dcfe6b7613260207a416dc636e291baec26b0a2e0748863fe9`.
+A CLI smoke trained one batch-of-16 native duel at seed 14000 on the
+control/Chaos probe decks. It reached terminal after 721 decisions, recorded
+140 learner choices, saved the batch setting in checkpoint provenance, and
+replay-verified and visibility-audited all 721 decisions.
+
+Reproduce the update-only comparison with the ignored recording from the
+on-policy teacher collection:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/benchmark_reinforce_update.py \
+  .cache/goat-ai/fv23_tactical_v6_current_assets.pt \
+  .cache/goat-ai/on_policy_teacher_10400_10407/jesse_warrior_10400_seat0.json \
+  --seat 0 --batch-size 16 --rounds 2
+```
+
+The native CLI smoke used:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v6_current_assets.pt \
+  --output .cache/goat-ai/batched_reinforce_smoke_child.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk \
+  --games 1 --seed 14000 --historical-probability 0 \
+  --learning-rate 0.00001 --policy-gradient-reduction mean \
+  --reinforce-batch-size 16 \
+  --record-dir .cache/goat-ai/batched_reinforce_smoke_records
+```

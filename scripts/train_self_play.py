@@ -45,6 +45,8 @@ def main() -> None:
     parser.add_argument("--entropy-coefficient", type=float, default=0.001)
     parser.add_argument("--policy-gradient-reduction", choices=("sum", "mean"),
                         default="sum", help="REINFORCE only: sum preserves earlier runs; mean normalizes by learner decisions")
+    parser.add_argument("--reinforce-batch-size", type=int, default=1,
+                        help="REINFORCE only: batch visible decisions for fewer forward/backward calls")
     parser.add_argument("--parent-kl-weight", type=float, default=0.0,
                         help="penalize divergence from the frozen starting policy on learner decisions")
     parser.add_argument("--policy-update", choices=("reinforce", "clipped_ppo"),
@@ -80,6 +82,7 @@ def main() -> None:
             or not 0 <= args.parent_kl_weight < float("inf")
             or args.learner_temperature <= 0
             or args.value_width < 1 or args.value_learning_rate <= 0
+            or args.reinforce_batch_size < 1
             or args.ppo_epochs < 1 or args.ppo_batch_size < 1
             or args.ppo_rollout_games < 1
             or not 0 < args.ppo_clip_epsilon < 1
@@ -142,6 +145,7 @@ def main() -> None:
         learner_temperature=args.learner_temperature,
         baseline_scope=args.baseline_scope,
         policy_gradient_reduction=args.policy_gradient_reduction,
+        reinforce_batch_size=args.reinforce_batch_size,
         parent_kl_weight=args.parent_kl_weight,
         policy_update=args.policy_update,
         ppo_epochs=args.ppo_epochs,
@@ -179,6 +183,8 @@ def main() -> None:
               "learner_temperature": args.learner_temperature,
               "baseline_scope": args.baseline_scope,
               "policy_gradient_reduction": args.policy_gradient_reduction,
+              "reinforce_batch_size": (args.reinforce_batch_size
+                                       if args.policy_update == "reinforce" else None),
               "parent_kl_weight": args.parent_kl_weight,
               "policy_update": args.policy_update,
               "ppo_epochs": args.ppo_epochs if args.policy_update == "clipped_ppo" else None,
