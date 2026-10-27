@@ -1393,6 +1393,12 @@ matched an unprofiled reference exactly; the observed profile overhead is
 reported separately. The next speed experiment should target the frequent
 observation path and preserve exact visible decisions; see
 [the profile](benchmarks.md#four-duel-ppo-training-profile-27-october-2026).
+The first observation-path experiment caches immutable, viewer-specific card
+projections. A four-duel complete-training AB/BA comparison kept all replay
+bytes and model tensors equal and ran faster in both orders (1.37× and 1.09×
+uncached/cached); the reversed order gives the more cautious estimate. Native
+verification and the visibility audit passed. See
+[the measured comparison](benchmarks.md#cached-viewer-specific-card-projections-27-october-2026).
 
 Clipped PPO with frozen-parent KL now caches parent action probabilities once
 per recorded decision instead of recomputing them in each epoch. One matched

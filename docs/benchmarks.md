@@ -1,5 +1,42 @@
 # Native benchmark log
 
+## Cached viewer-specific card projections (27 October 2026)
+
+Observation construction previously rebuilt every immutable `CardView` from
+the same decoded native card record at every decision. The engine now caches
+this pure projection by **viewer, controller, location, sequence, and complete
+queried card**. The cache is bounded to 8,192 entries, includes the viewer in
+its key, and does not change the player-visible observation contract. It does
+not skip native queries or hide new card, position, stat, or counter changes.
+
+A complete-training AB/BA comparison used the feature-v23 parent checkpoint
+`fv23_tactical_v14_unseen_fourdeck_continuation.pt` (SHA-256
+`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`),
+Jesse Goat Control versus Warrior, seeds 23500–23503, one Torch CPU thread,
+four-game PPO rollouts, two epochs, and batch size 16. Both modes played the
+same **2,060 decisions** in every arm. All four replay files were byte-identical
+between modes in each order, and all **38 model tensors** were exactly equal.
+The cached arm's four replays passed exact native verification and the
+player-visibility audit. The cache had 73,998 hits and 688 misses per arm.
+
+| Run order | Uncached complete training | Cached complete training | Ratio |
+| :--- | ---: | ---: | ---: |
+| Uncached, cached | 3.781 s | 2.756 s | 1.37× |
+| Cached, uncached | 2.967 s | 2.728 s | 1.09× |
+
+The arms ran in one process, so startup and warm-cache effects can differ by
+order. The reversed order supports a smaller local gain; these timings do not
+establish performance across other decks, hardware, or long training runs.
+Memory overhead was not isolated because both modes shared one process. The
+ignored comparison and replay audit are under `.cache/goat-ai/` with
+`card_view_*_23500` prefixes. The reference arm assigns
+`ocgcore_probe._view_card = ocgcore_probe._view_card.__wrapped__` before running
+the same trainer arguments; the cached arm uses the decorated function.
+
+The pure projection has a unit regression that changes viewer, zone sequence,
+position, and attack while checking both redaction and cache separation. The
+native observation, environment, and visibility test group passed **23 tests**.
+
 ## Four-duel PPO training profile (27 October 2026)
 
 One complete feature-v23 PPO rollout was profiled to choose a measured next

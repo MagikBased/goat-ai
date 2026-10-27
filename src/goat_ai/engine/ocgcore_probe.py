@@ -13,6 +13,7 @@ import sqlite3
 import struct
 from collections import Counter
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -179,6 +180,38 @@ LOCATION_SZONE = 0x08
 LOCATION_GRAVE = 0x10
 LOCATION_REMOVED = 0x20
 LOCATION_EXTRA = 0x40
+
+
+@lru_cache(maxsize=8192)
+def _view_card(viewer: int, player: int, location: int, sequence: int,
+               card) -> CardView:
+    """Project one immutable native card query into a viewer-specific card."""
+    faceup = bool(card.position & 0x5)
+    visible_code = card.code if player == viewer or faceup else None
+    position = "faceup" if faceup else "facedown"
+    zone = {LOCATION_MZONE: "monster", LOCATION_SZONE: "spell_trap",
+            LOCATION_GRAVE: "graveyard", LOCATION_REMOVED: "banished",
+            LOCATION_EXTRA: "extra"}[location]
+    orientation = None
+    if location == LOCATION_MZONE:
+        if card.position in (0x1, 0x2):
+            orientation = "attack"
+        elif card.position in (0x4, 0x8):
+            orientation = "defense"
+        else:
+            raise ValueError(f"unexpected monster position {card.position:#x}")
+    return CardView(player, zone, position, visible_code, sequence, orientation,
+                    card.attack if location == LOCATION_MZONE and faceup else None,
+                    card.defense if location == LOCATION_MZONE and faceup else None,
+                    card.counters if location == LOCATION_MZONE and faceup else (),
+                    (card.equip_target[0], card.equip_target[2])
+                    if location == LOCATION_SZONE and card.equip_target
+                    and card.equip_target[1] == LOCATION_MZONE else None,
+                    # Magical Hats can occupy a Monster Zone with zero Type.
+                    (card.race or None) if location == LOCATION_MZONE and faceup else None,
+                    card.owner if location == LOCATION_MZONE and faceup else None)
+
+
 POSITION_FACEDOWN_DEFENSE = 0x08
 MSG_SELECT_IDLECMD = 11
 MSG_SELECT_CHAIN = 16
@@ -1113,43 +1146,14 @@ class OcgcoreProbe:
             lp = tuple(max(0, value if value < (1 << 31) else value - (1 << 32))
                        for value in lp)
 
-        def view_card(player: int, location: int, sequence: int, card) -> CardView:
-            faceup = bool(card.position & 0x5)
-            visible_code = card.code if player == viewer or faceup else None
-            position = "faceup" if faceup else "facedown"
-            zone = {LOCATION_MZONE: "monster", LOCATION_SZONE: "spell_trap",
-                    LOCATION_GRAVE: "graveyard", LOCATION_REMOVED: "banished",
-                    LOCATION_EXTRA: "extra"}[location]
-            orientation = None
-            if location == LOCATION_MZONE:
-                if card.position in (0x1, 0x2):
-                    orientation = "attack"
-                elif card.position in (0x4, 0x8):
-                    orientation = "defense"
-                else:
-                    raise ValueError(f"unexpected monster position {card.position:#x}")
-            return CardView(player, zone, position, visible_code, sequence, orientation,
-                            card.attack if location == LOCATION_MZONE and faceup else None,
-                            card.defense if location == LOCATION_MZONE and faceup else None,
-                            card.counters if location == LOCATION_MZONE and faceup else (),
-                            (card.equip_target[0], card.equip_target[2])
-                            if location == LOCATION_SZONE and card.equip_target
-                            and card.equip_target[1] == LOCATION_MZONE else None,
-                            # Magical Hats can put a Spell/Trap in a Monster
-                            # Zone. Its native QUERY_RACE is zero: no current
-                            # monster Type, rather than an invalid Type mask.
-                            (card.race or None) if location == LOCATION_MZONE and faceup
-                            else None,
-                            card.owner if location == LOCATION_MZONE and faceup else None)
-
-        field = tuple(view_card(player, location, sequence, card)
+        field = tuple(_view_card(viewer, player, location, sequence, card)
                       for player in (0, 1) for location in (LOCATION_MZONE, LOCATION_SZONE)
                       for sequence, card in enumerate(locations[player, location]) if card is not None)
-        graveyards = tuple(tuple(view_card(player, LOCATION_GRAVE, sequence, card)
+        graveyards = tuple(tuple(_view_card(viewer, player, LOCATION_GRAVE, sequence, card)
                                  for sequence, card in enumerate(locations[player, LOCATION_GRAVE])
                                  if card is not None)
                            for player in (0, 1))
-        banished = tuple(tuple(view_card(player, LOCATION_REMOVED, sequence, card)
+        banished = tuple(tuple(_view_card(viewer, player, LOCATION_REMOVED, sequence, card)
                                for sequence, card in enumerate(locations[player, LOCATION_REMOVED])
                                if card is not None)
                          for player in (0, 1))
@@ -1164,7 +1168,7 @@ class OcgcoreProbe:
             opponent_hand_count=opponent_hand_count,
             deck_counts=deck_counts,
             extra_deck_counts=extra_deck_counts,
-            own_extra_deck=tuple(view_card(viewer, LOCATION_EXTRA, sequence, card)
+            own_extra_deck=tuple(_view_card(viewer, viewer, LOCATION_EXTRA, sequence, card)
                                  for sequence, card in enumerate(own_extra)
                                  if card is not None),
             chain=tuple(self._chain),

@@ -1,5 +1,6 @@
 import os
 import struct
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -12,10 +13,11 @@ from goat_ai.engine.native_queries import (
     QUERY_OWNER,
     QUERY_POSITION,
     QUERY_RACE,
+    QueriedCard,
     decode_field_summary,
     decode_location,
 )
-from goat_ai.engine.ocgcore_probe import OcgcoreProbe
+from goat_ai.engine.ocgcore_probe import LOCATION_MZONE, OcgcoreProbe, _view_card
 from goat_ai.engine.probe_deck import VANILLA_DECK
 
 
@@ -65,6 +67,24 @@ def test_query_location_distinguishes_same_size_hidden_card_buffers():
     assert decode_location(first)[0].code == 31560081
     assert decode_location(second)[0].code == 87621407
     assert decode_location(first)[0].code == 31560081
+
+
+def test_cached_card_projection_is_viewer_scoped_and_tracks_native_changes():
+    _view_card.cache_clear()
+    hidden = QueriedCard(31560081, 8, False, attack=300, defense=400)
+    owner = _view_card(0, 0, LOCATION_MZONE, 2, hidden)
+    opponent = _view_card(1, 0, LOCATION_MZONE, 2, hidden)
+    assert owner.code == 31560081
+    assert opponent.code is None
+    assert opponent.attack is None and opponent.defense is None
+    assert _view_card(1, 0, LOCATION_MZONE, 2, hidden) is opponent
+    assert _view_card(1, 0, LOCATION_MZONE, 3, hidden).sequence == 3
+
+    faceup = replace(hidden, position=1)
+    changed = _view_card(1, 0, LOCATION_MZONE, 2, faceup)
+    assert changed.code == 31560081 and changed.attack == 300
+    assert _view_card(1, 0, LOCATION_MZONE, 2,
+                      replace(faceup, attack=500)).attack == 500
 
 
 def test_query_location_decodes_public_equip_target():
