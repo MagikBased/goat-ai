@@ -1127,3 +1127,25 @@ single-process timings, not worker IPC or end-to-end speedups. They make
 model-instance caching and trajectory-free worker returns lower priorities
 than improving the parent PPO batched forward path. Any change there must
 preserve replay bytes and be evaluated on held-out strength as well as speed.
+
+## PPO minibatch 16 versus 32 (2026-10-27)
+
+With the same v23 parent, Jesse Goat Control/Warrior pairing, seeds
+28000–28015, four rollout workers, two PPO epochs, and one CPU Torch thread,
+the existing `--ppo-batch-size 16` setting took 7.474, 7.631, and 7.609
+seconds in three complete runs. `--ppo-batch-size 32` took 6.727 and 6.517
+seconds in two complete runs. Each repeat of a given setting saved identical
+model tensors. Batch 32 changed the policy updates and subsequent duels: it
+produced 1,119 learner decisions versus 1,196 for batch 16. Thus the full-run
+times are evidence for this schedule, but do not isolate computation saved
+per PPO update.
+
+For a fixed-update comparison, the first four batch-16 replay files supplied
+304 player-visible learner decisions. Two CPU-time rounds in reversed order
+ran the same two-epoch clipped PPO update from a fresh copy of the same parent
+with batch 16 and batch 32. Batch 16 took 0.5454 and 0.5289 seconds; batch 32
+took 0.3947 and 0.3895 seconds. The different losses reflect different
+minibatch updates, not an equivalence claim. Batch 32 is a useful opt-in speed
+setting, pending stronger held-out playing-strength evidence. The generated
+checkpoints, replays, and JSON reports use `ppo_batch{16,32}_28000_*` names
+under ignored `.cache/goat-ai/`.

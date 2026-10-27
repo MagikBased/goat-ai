@@ -7801,3 +7801,27 @@ The held-out tournaments use `scripts/evaluate_policy.py` with
 `--both-deck-assignments --require-unseen-main-decks --workers 4
 --max-decisions 3000`, and either the unchanged parent checkpoint or
 `--opponent tactical` as the opponent.
+
+### PPO minibatch-32 speed pilot (27 October 2026)
+
+The same 16-game, four-worker self-play schedule was trained with PPO
+minibatches of 16 and 32. [The speed measurements](benchmarks.md#ppo-minibatch-16-versus-32-2026-10-27)
+favor batch 32 on this schedule. Both settings were then evaluated on held-out
+Main Deck compositions: Chaos Control/Bazoo Return and Dimension Fusion
+Turbo/Phoenix Control, with both deck assignments and both seats on seeds
+28100–28103. Batch 32 scored **17–15** directly against batch 16 over 32
+duels (53.1%, paired 95% interval 43.8%–62.5%). Against Tactical on matched
+seeds 28104–28107, batch 32 scored **7–25** and batch 16 scored **6–25–1**.
+The paired Tactical score difference was +1.6 percentage points, with a 95%
+interval of −4.7 to +9.4 points. The report comparator checked matching
+source, native assets, seeds, and local deck hashes. Batch 32 is faster in
+this pilot, but these outcomes do not establish a playing-strength gain or
+close M4's competitive gate. It remains opt-in.
+
+The ignored reports are `.cache/goat-ai/ppo_batch32_vs_16_28100.json`,
+`ppo_batch16_vs_tactical_28104.json`, and
+`ppo_batch32_vs_tactical_28104.json`; the Tactical report SHA-256 values are
+`3a18742b77480dc767e477f704d2b6ffecd9367c9a3cb8dd7f9de9ae4e371b7a`
+and `826f7354b8d80d256c22a6549145ad6822fc80a6c4fc3893f76d5d345369cf16`.
+The direct report SHA-256 is
+`4f42dac27427dd5eee4fd07f81d9fc333f3154fe56d2535313244a61d57dc53d`.
