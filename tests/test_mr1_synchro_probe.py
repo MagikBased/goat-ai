@@ -1,6 +1,7 @@
 """A sourced 2008 Synchro pair in MR1; not a complete Edison rules test."""
 
 import hashlib
+import json
 import os
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from scripts.record_mr1_synchro_probe import select_setup_action
+from scripts.render_replay import render_replay
 
 ROOT = Path(__file__).resolve().parents[1]
 DECK = ROOT / "examples/decks/mr1_junk_warrior_probe.ydk"
@@ -63,6 +65,12 @@ def test_mr1_junk_warrior_synchro_complete_duel(tmp_path):
     assert loaded == trajectory
     assert verify_trajectory(loaded, Mr1SynchroProbeEngine(native_root)) == 1439
     assert audit_trajectory_visibility(loaded)["decisions"] == 1439
+    output = tmp_path / "mr1_synchro.html"
+    assert render_replay(path, output, native_root, reviewer_reveal=True)[0] == 1439
+    review = json.loads(output.with_suffix(".review.json").read_text())
+    assert review["source_trajectory_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert len(review["frames"]) == 1440
+    assert any(JUNK_WARRIOR in frame["extra"][0] for frame in review["frames"])
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

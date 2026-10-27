@@ -45,7 +45,9 @@ can change its JSON bytes and invalidate those sidecar hashes.
 `goat_ai.replay.verify_trajectory` reconstructs a duel from its seed and
 decklists, compares each player-visible observation and complete legal-action
 set with the recording, applies the selected action, and checks the result.
-The optional replay-viewer reviewer export runs that verifier first, then
+The optional replay-viewer reviewer export selects the engine by the recorded
+GOAT or narrow MR1 protocol ruleset, rejects unknown rulesets, runs that
+engine's verifier first, then
 reconstructs the same duel and combines the two player-scoped native views
 at each decision. It stores hand, Set field, banished, and Extra Deck identities
 in a SHA-256-bound `.review.json` sidecar and generated HTML, not in trajectory

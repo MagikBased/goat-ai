@@ -145,18 +145,34 @@ def _reviewer_frame(engine, *, terminal: bool = False) -> dict:
     }
 
 
+def _review_engine(ruleset: str, native_root: Path):
+    """Select only a native engine whose replay contract matches the ruleset."""
+    if ruleset == "tcg-goat-2005-08-17":
+        from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+
+        return ExperimentalOcgcoreEngine(native_root)
+    if ruleset == "mr1-vanilla-protocol":
+        from goat_ai.engine.mr1_vanilla_adapter import Mr1VanillaEngine
+
+        return Mr1VanillaEngine(native_root)
+    if ruleset == "mr1-synchro-protocol":
+        from goat_ai.engine.mr1_synchro_probe import Mr1SynchroProbeEngine
+
+        return Mr1SynchroProbeEngine(native_root)
+    raise ValueError(f"reviewer reveals do not support ruleset {ruleset!r}")
+
+
 def _reviewer_data(trajectory, native_root: Path, source_sha256: str,
                    deck_paths: tuple[str | Path, str | Path] | None = None) -> dict:
-    from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
     from goat_ai.environments import GoatEnvironment
 
     paths = deck_paths or trajectory.decks
     # Verification checks the complete recorded observations, actions, decks,
     # result and native asset hashes before any hidden information is exported.
-    verify_trajectory(trajectory, ExperimentalOcgcoreEngine(native_root), paths)
+    verify_trajectory(trajectory, _review_engine(trajectory.ruleset, native_root), paths)
     frames = []
     with GoatEnvironment(str(paths[0]), str(paths[1]), trajectory.seed,
-                         ExperimentalOcgcoreEngine(native_root)) as env:
+                         _review_engine(trajectory.ruleset, native_root)) as env:
         env.reset()
         for index, record in enumerate(trajectory.decisions):
             frame = _reviewer_frame(env.engine)

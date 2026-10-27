@@ -147,7 +147,7 @@ fixture and open the resulting trajectory in the existing replay viewer:
 PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_synchro_probe.py \
   --output replays/mr1_synchro_seed3.json
 PYTHONPATH=src:. .venv/bin/python scripts/render_replay.py \
-  replays/mr1_synchro_seed3.json
+  replays/mr1_synchro_seed3.json --reviewer-reveal
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_synchro_probe.py
 ```
@@ -156,8 +156,10 @@ The current script text, Junk Synchron's effect details, historical priority,
 and Synchro timing have **not** been compared against 2010 source rulings.
 This fixture proves the native decision protocol can represent one Synchro
 line; it does not establish an Edison simulator or justify Edison training.
-The replay viewer can show its player-visible trajectory, but its GOAT-only
-reviewer-reveal verifier does not support this MR1 ruleset.
+The replay viewer now chooses the matching MR1 protocol engine to verify the
+entire trajectory before exporting hidden reviewer cards. It rejects unknown
+rulesets. Reviewer reveals stay in the generated HTML and SHA-bound sidecar,
+outside the player-visible training trajectory.
 
 ## Validation gates before an Edison duel can be claimed
 

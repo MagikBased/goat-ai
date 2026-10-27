@@ -22,8 +22,18 @@ from goat_ai.observations import (
     RevealedCardView,
 )
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
-from scripts.render_replay import _reviewer_frame, render_catalog_viewer, render_replay
+from scripts.render_replay import (
+    _review_engine,
+    _reviewer_frame,
+    render_catalog_viewer,
+    render_replay,
+)
 from scripts.setup_card_images import setup_card_backs, setup_card_images
+
+
+def test_reviewer_reveal_rejects_unknown_ruleset_before_native_access(tmp_path):
+    with pytest.raises(ValueError, match="do not support ruleset"):
+        _review_engine("unknown-format", tmp_path)
 
 
 def test_common_card_navigation_matches_sourced_main_decks():

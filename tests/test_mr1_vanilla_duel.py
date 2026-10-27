@@ -13,6 +13,7 @@ from goat_ai.engine.ocgcore_probe import MR1_FLAGS
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
+from scripts.render_replay import render_replay
 
 ROOT = Path(__file__).resolve().parents[1]
 DECKS = (ROOT / "examples/decks/vanilla_probe.ydk",
@@ -50,6 +51,8 @@ def test_mr1_vanilla_complete_duel_replay_and_visibility(tmp_path):
     assert loaded == trajectory
     assert verify_trajectory(loaded, Mr1VanillaEngine(native_root)) == 1368
     assert audit_trajectory_visibility(loaded)["decisions"] == 1368
+    assert render_replay(path, tmp_path / "mr1_vanilla.html", native_root,
+                         reviewer_reveal=True)[0] == 1368
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
