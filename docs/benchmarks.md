@@ -181,6 +181,15 @@ choices; it is not a policy-training benchmark or a historical-rules audit.
 Deck SHA-256 values were `04352ceadbf53684fe7d6bc4dc18b7e5bed756e01c5914649dda93073dcefc8b`
 and `51ca430a9ec9dc3e8b9ce400bcec469d3de39d2152add2a8feb5db814c38a48e`.
 
+A matched policy-rollout check used the v23 checkpoint with SHA-256
+`93ca70795e2c5316ab349a4e5c61ebd553915e49abdbe469d0976d3bebe3d9b2`
+as the learner against `RandomAgent` on the same deck pair and seeds. Each
+four-duel schedule made **4,322 decisions**; complete trajectories matched
+between cached and uncached runs. With one Torch thread, uncached versus
+cached CPU time was **7.085 vs 6.148 seconds** (1.15×), then **7.036 vs 6.028
+seconds** (1.17×) in reverse order. This measures rollout time only; it does
+not include optimizer updates or imply a playing-strength gain.
+
 Reproduce after [native setup](native_setup.md):
 
 ```bash
