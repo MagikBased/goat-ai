@@ -5995,3 +5995,57 @@ monster target in that player's recorded view. The ignored output is
 `a1284f5f163e07cc477ba9a34b39b6a94194bd757dd24ccaf4f6cfb9681e40e7`);
 its adjacent HTML index links to the review frames. This changes review
 coverage, not trained weights or competitive strength.
+
+### Self-banish preference pilot (27 October 2026)
+
+The player had repeatedly identified Black Luster Soldier and Chaos Sorcerer
+banishing themselves as a serious error when an opposing monster is available.
+Two **rule-derived** pairwise annotations apply that general guidance to
+specific native-verified policy decisions; the player did not review these
+exact frames. They are tracked as
+`examples/preferences/fv23_chaos_sorcerer_self_banish_12105_p0.preference.json`
+and `examples/preferences/fv23_bls_self_banish_12115_p1.preference.json`.
+At decision 111 of the first replay, Sorcerer chose itself over one opposing
+monster. At decision 727 of the second, Black Luster Soldier chose itself
+over four opposing Sheep Tokens. All legal non-self targets are acceptable
+for this *target-choice* comparison; it does not establish that activating
+the banish effect was better than an earlier attack or pass. The annotations
+bind to their source replay hashes and acting seats. The preference reader
+now rejects a supplied `reviewed_seat` if it disagrees with the replay's
+agent seat. This does not turn the derived labels into direct human reviews.
+
+`scripts/train_review_preferences.py` replay-verified and visibility-audited
+both policy sources and four preservation replays from the parent checkpoint.
+Three older potential preservation replays were rejected because their
+recorded hash for `scripts/pre-errata/c511000818.lua` differs from the
+current native asset; the pilot used four currently verifiable Return/Flip
+replays instead. Starting from the frozen feature-v23 parent, 120 preference
+steps used 64 sampled preservation states, batch 16, parent KL weight 1.0,
+learning rate 0.0001, and seed 27. Preference loss fell from **1.5357** to
+**0.0490**; final sampled preservation KL was **0.0010**. The child selected
+a non-self target at both *training* decisions, versus 0/2 for the parent.
+Its ignored checkpoint is
+`.cache/goat-ai/fv23_self_banish_pairwise_12105_12115.pt` (SHA-256
+`513b765b5d3265ab89d680f5595f496bb94c6739c8ab085b38e56fdc90b00770`).
+
+Held-out Main Deck composition checks passed for Insids Chaos Control versus
+Weirdchamp Bazoo Return and Lolmarcus Goat Control versus Fukuyama Goat
+Control, with both deck assignments and seats. Against its parent, the child
+scored **35–29** on seeds 14100–14107 and **31–32–1** on fresh seeds
+14108–14115. Pooled over 128 games, it scored **66–61–1** (51.95%, paired
+95% interval **44.92–58.98%**). On seeds 14116–14123 against Tactical-v14,
+the child scored **15–49** and the unchanged parent **12–52**; their paired
+score difference was 4.69 percentage points (95% interval **−4.69 to
+14.06 points**). These small, same-family schedules show target-choice fit
+but no established competitive gain. Keep the parent as the reference and
+the child experimental.
+
+The ignored evaluation reports are
+`.cache/goat-ai/fv23_self_banish_vs_parent_14100_14107.json` (SHA-256
+`999ac95860d81f98b8106c2ea6235b37c2e6b90433b6187d2d339b9f7876c477`),
+`.cache/goat-ai/fv23_self_banish_vs_parent_14108_14115.json`
+(`e57f52bd6276f344cc3775294a2a0a7bcee710940577ef6fe1f1ba40960cdd30`),
+`.cache/goat-ai/fv23_self_banish_vs_tactical_14116_14123.json`
+(`43f6f6fa784e7e399be4d5569d3ffdb7054235e5ff1e8a3c3b215448fdcca60d`),
+and `.cache/goat-ai/fv23_self_banish_parent_vs_tactical_14116_14123.json`
+(`a52e688fbaaff749a7142aee358c86b9fb21583d8a12d527de490fa82c09a40b`).

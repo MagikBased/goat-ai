@@ -94,6 +94,19 @@ def test_preference_restricts_source_and_learner_seat(tmp_path):
         read_decision_preferences(preference_file(tmp_path), "a" * 64, wrong_seat)
 
 
+def test_optional_reviewed_seat_must_match_replay_policy_seat(tmp_path):
+    base = replace(trajectory(), source="policy_evaluation",
+                   skill_metadata={"demonstrator_seat": 0,
+                                   "policy_checkpoint_sha256": "b" * 64})
+    correct = preference_file(tmp_path, authorization="policy_review", reviewed_seat=0)
+    assert read_decision_preferences(correct, "a" * 64, base).reviewed_seat == 0
+    for wrong in (1, True):
+        path = preference_file(tmp_path, authorization="policy_review",
+                               reviewed_seat=wrong)
+        with pytest.raises(ValueError, match="reviewed seat"):
+            read_decision_preferences(path, "a" * 64, base)
+
+
 def test_baseline_review_binds_either_recorded_agent_seat(tmp_path):
     base = trajectory()
     metadata = {"demonstrator_seat": 1, "teacher": "TacticalHeuristicAgent",

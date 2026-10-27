@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "source_trajectory_sha256": "75faafb36b0e6493d61000670c58a72651ccda1fed90fc2bf5f920cfd3cc1764",
+  "authorization": "policy_review",
+  "reviewer": "GOAT AI replay audit applying player-reported self-banish guidance",
+  "reviewed_seat": 0,
+  "preferences": [
+    {
+      "decision_index": 111,
+      "preferred_action_indices": [1],
+      "disfavored_action_indices": [0]
+    }
+  ]
+}

@@ -68,6 +68,9 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
         raise ValueError("preferences require agent-review authorization")
     if not valid:
         raise ValueError("preference source and agent seat do not match authorization")
+    if "reviewed_seat" in raw and (type(raw["reviewed_seat"]) is not int
+                                   or raw["reviewed_seat"] != seat):
+        raise ValueError("preference reviewed seat does not match source agent seat")
     reviewer = raw.get("reviewer")
     if not isinstance(reviewer, str) or not reviewer.strip():
         raise ValueError("preferences require a reviewer name")

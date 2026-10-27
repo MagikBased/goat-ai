@@ -1074,6 +1074,11 @@ An AB/BA eight-game REINFORCE pilot measured about 1.38–1.40× shorter
 training wall time with the existing opt-in batch size 16 versus scalar
 updates. Its matching summaries are not a held-out strength result; see
 [evaluation](evaluation.md#batched-reinforce-update-microbenchmark-27-october-2026).
+Two rule-derived self-banish preferences fit their exact Chaos Sorcerer and
+Black Luster Soldier target states, but their feature-v23 child scored
+66–61–1 against its parent across 128 held-out-deck games, with a paired
+interval including 50%, and remained well behind Tactical-v14. Keep it
+experimental; see [the preference pilot](evaluation.md#self-banish-preference-pilot-27-october-2026).
 
 Four-duel PPO rollout batching and equal-duel loss weighting were tested
 from that same parent on the same 32-game training schedule. The unweighted
