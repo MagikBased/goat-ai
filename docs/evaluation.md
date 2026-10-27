@@ -5540,3 +5540,30 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/evaluate_policy.py \
   --seed 11300 --seeds 8 --workers 4 \
   --output .cache/goat-ai/fv25_resource_trade_head_vs_parent_11300_11307.json
 ```
+
+### Forced-choice inference shortcut (27 October 2026)
+
+Self-play sampling now returns the only legal action without encoding an
+observation, running a policy forward pass, or consuming the policy's sampling
+generator. This applies equally to the learner and frozen-policy opponents;
+multi-option decisions still use the same sampling path. The changed generator
+consumption means new seed-matched runs need not reproduce action sequences
+from earlier code revisions. Trajectory replay remains based on recorded
+actions.
+
+On Linux x86_64 with PyTorch CPU and `OMP_NUM_THREADS=1`, a single ignored
+trajectory (`.cache/goat-ai/on_policy_teacher_10400_10407/jesse_warrior_10400_seat0.json`,
+SHA-256 `e5ce07fa2e62f2dcfe6b7613260207a416dc636e291baec26b0a2e0748863fe9`)
+contained **716 forced choices among 1,122 decisions**. Scoring those 716
+recorded forced choices once with the previous encode/forward/sample path took
+**0.956638 seconds**; the shortcut took **0.000534 seconds**. Both returned the
+recorded action every time. This measures only forced-choice policy work in one
+process, not complete duel throughput or training-wall-time speedup. The
+corresponding focused policy and native information-boundary tests passed:
+`86 passed` in 2.67 seconds.
+
+A separate native smoke ran the v23 checkpoint against `RandomAgent` on the
+control/Chaos probe decks at seed 441. It reached terminal in 1,347 decisions
+and 2.085 seconds of episode wall time; all 1,347 decisions replay-verified
+and passed the legal-choice visibility audit. This was one optimized run, with
+no matched pre-change whole-duel timing.

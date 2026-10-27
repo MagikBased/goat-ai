@@ -1469,6 +1469,23 @@ def test_terminal_reward_moves_selected_action_probability():
     assert sample_legal_action(model, vocabulary, view(), actions(), generator) in actions()
 
 
+def test_forced_self_play_action_skips_inference_and_sampling(monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=16)
+    forced = actions()[:1]
+    generator = torch.Generator().manual_seed(9)
+    before = generator.get_state().clone()
+
+    def unexpected_forward(*_args, **_kwargs):
+        pytest.fail("forced action should not run the policy")
+
+    monkeypatch.setattr(model, "forward", unexpected_forward)
+    assert sample_legal_action(model, vocabulary, view(), forced, generator) == forced[0]
+    assert torch.equal(generator.get_state(), before)
+    with pytest.raises(ValueError, match="temperature"):
+        sample_legal_action(model, vocabulary, view(), forced, generator, temperature=0)
+
+
 def test_ppo_clipped_surrogate_handles_both_advantage_signs():
     ratio = torch.tensor([1.5, 0.5])
     advantage = torch.tensor([1.0, -1.0])

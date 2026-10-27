@@ -103,6 +103,10 @@ def sample_legal_action(model: LegalActionPolicy, vocabulary: CardVocabulary,
     """Sample from visible legal options, with no native-state access."""
     if temperature <= 0:
         raise ValueError("temperature must be positive")
+    if len(legal_actions) == 1:
+        # A forced choice needs neither feature encoding nor a neural forward
+        # pass. It also need not consume the policy's sampling generator.
+        return legal_actions[0]
     features = encode_decision(observation, legal_actions, vocabulary, model.feature_version)
     device = next(model.parameters()).device
     with torch.no_grad():
