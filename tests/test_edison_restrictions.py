@@ -16,6 +16,7 @@ def test_official_march_2010_restrictions_are_complete_and_distinct() -> None:
     assert limits[32646477] == 0  # Dark Strike Fighter
     assert limits[73580471] == 1  # Black Rose Dragon
     assert limits[70095154] == 2  # Cyber Dragon
+    assert limits[70583986] == 2  # Dewloren: listed, but released after Edison
     assert 44508094 not in limits  # Stardust Dragon: unrestricted by this list
 
 

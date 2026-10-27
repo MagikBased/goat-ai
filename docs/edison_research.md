@@ -24,6 +24,30 @@ validation, **not** a complete Edison whitelist or playable engine profile.
 For example, Stardust Dragon is absent from the restriction list, which says
 nothing by itself about release eligibility or simulator correctness.
 
+One explicit trap in the official restriction list is Dewloren, Tiger King of
+the Ice Barrier (`70583986`): it is Semi-Limited there, but [Konami's Hidden
+Arsenal 2 product page](https://www.yugioh-card.com/en/products/past_products/ha02/)
+says that set contained Dewloren and became tournament legal July 20, 2010,
+after the Edison cutoff. Its list entry must **not** make it Edison-legal.
+
+As a candidate-pool cross-check, `scripts/audit_edison_pool.py` compared the
+unbundled [edisonrul.ing card-pool CSV at commit `1c43eb1`](https://github.com/vivaria/edisonrul.ing/blob/1c43eb150db4043ecf80456f2e3d46d87707de44/edison_cardpool.csv)
+against the pinned database and official restrictions. The cached CSV SHA-256
+was `be47a612299dcdd683561979d5b8bc31d302887a24ca1f146e6a23fe79b55ee3`.
+Of its 3,631 candidate IDs, nine lacked pinned metadata; no represented
+card's stated copy cap disagreed with the official list after alias resolution;
+and Dewloren was the sole non-Forbidden restriction absent from the candidate.
+This is **not** an independent audit of every release date or proof that all
+eligible cards appear in the candidate. The external CSV has no identified
+redistribution license, so it remains in ignored cache and is not vendored.
+Reproduce the comparison after placing that CSV locally:
+
+```sh
+PYTHONPATH=. .venv/bin/python scripts/audit_edison_pool.py \
+  path/to/edison_cardpool.csv .cache/goat-ai/database/cards.cdb \
+  configs/historical/edison_2010_03_01_advanced_limits.tsv
+```
+
 ## Native engine assessment
 
 The pinned Project Ignis database has metadata for representative Edison
