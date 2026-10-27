@@ -256,9 +256,13 @@ Traps could respond. Mirror Force is legal only in the former branch. A third
 branch activates Royal Decree after both Skill Drain and Jinzo are face-up;
 Mirror Force becomes unavailable again, matching the archived ruling's
 observable consequence. All three complete duels replay-verify and pass the
-visibility audit. Other continuous-effect permutations and Jinzo's
-Summon-negation window remain open. See
+visibility audit. Other continuous-effect permutations remain open. See
 [GOAT rules](goat_rules.md).
+
+A paired Jinzo/Solemn Judgment fixture now checks the Tribute Summon window:
+Solemn is legal before Jinzo's continuous Trap suppression applies, but is
+unavailable after a successful Summon. Both full duels replay-verify and pass
+visibility checks; see [the ruling note](goat_rules.md#solemn-judgment-against-jinzos-tribute-summon).
 
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
 
