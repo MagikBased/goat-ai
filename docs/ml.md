@@ -444,3 +444,26 @@ the action-kind weights and sampling mode. This changes the training
 distribution, not the engine's legal actions or what the acting player can
 observe. A matched experiment must check both held-out choices and competitive
 results before using an oversampled checkpoint by default.
+
+### Automated visible-rule preference experiment
+
+`scripts/derive_visible_rule_preferences.py` can turn six conservative replay
+audit flags into pairwise legal-action preferences. It verifies each complete
+native replay and audits hidden-information isolation first. The output uses
+`authorization=automated_rule` and `rule_set_id=visible_audit_v1`; it is
+explicitly **synthetic feedback**, not a human annotation. The rules cover
+self-banish with an opposing target, empty Thunder Dragon searches, weak Flip
+monsters Summoned face up when a Set is available, Pot of Greed before an
+available Thunder Dragon activation, and Ring of Destruction on an own monster
+with a safe opposing target. The generator selects only alternatives present
+in that decision's recorded legal-action set. It does not claim those
+alternatives are always optimal.
+
+`scripts/train_review_preferences.py` accepts these files alongside its
+existing human-review formats, records their distinct provenance, and
+recomputes the rule output from the verified source replay before fitting.
+An edited or forged automated preference that does not match the rule is
+rejected. Reviewer-only hidden-card sidecars never enter this path. Training
+still needs held-out, matched competitive checks before any child checkpoint
+becomes the reference. The first post-patch experiment did **not** meet that
+gate; see [evaluation](evaluation.md#automated-visible-rule-preference-experiment-27-october-2026).

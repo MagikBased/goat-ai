@@ -7354,3 +7354,42 @@ checkpoint. All used `--engine experimental --both-deck-assignments
 the Phoenix/Dimension Fusion pair named above. Set `--seed 21300` for the
 direct arm and `--seed 21308` for the Tactical arms. Run
 `scripts/audit_selfplay_replays.py` on the 32 recorded `episode_*.json` files.
+
+### Automated visible-rule preference experiment (27 October 2026)
+
+The 32 replay-verified patched-core PPO self-play duels above supplied
+decision-level error candidates. `scripts/derive_visible_rule_preferences.py`
+re-verified every duel and its visibility audit, then wrote **26 synthetic
+preferences across 19 replays** under rule set `visible_audit_v1`: 7 Chaos
+Sorcerer self-banish, 7 empty Thunder Dragon searches, 5 weak Flip Normal
+Summons, 3 own-target Rings with a safe enemy option, 3 Black Luster Soldier
+self-banish, and 1 Pot-before-Thunder choice. The ignored label manifest is
+`.cache/goat-ai/patched_core_ppo_visible_rule_v1_21200_21231/manifest.json`,
+SHA-256 `fee3f15bfe164859ec200b2b4e1bd5957f370a27ffb521c150c42f7a581636b4`.
+These labels are automated, not human reviewed, and each preference only
+asserts that a recorded visible legal alternative is worth trying.
+
+A parent-KL preference fit started from the unchanged feature-v23 reference
+`.cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt`. It used
+100 updates at learning rate 0.0001, parent-KL weight 1.0, 26 preferences,
+and 64 fresh preservation states from seeds 21000 and 21004. Preference loss
+fell from 2.43848 to 0.422737; last preservation KL was 0.0275732. The
+ignored child checkpoint is
+`.cache/goat-ai/fv23_patched_core_visible_rule_pref_21200_21231.pt`, SHA-256
+`3a7dc2955efb30ac5b9d7ff0668b22dce3b47c2cfb05a58ae3852848019f6f90`.
+This fit proves only that the child learned the selected comparisons.
+
+On untouched Phoenix Control versus GoatFormat and WikiFormat Dimension
+Fusion decks, with both deck assignments and both seats, fresh seeds
+21400–21415 gave the child **70–58** directly against its parent over 128
+duels. Its 54.7% score had a paired-bootstrap 95% interval of **47.7%–61.7%**.
+The four 32-game blocks were 18–14, 20–12, 17–15, and 15–17. Separate matched
+seeds 21416–21423 against Tactical-v14 gave the child **14–50** and parent
+**13–51** over 64 duels each. The paired score difference was **+1.6
+percentage points**, 95% interval **−12.5 to +14.1 points**. The report
+comparator verified native assets, scripts, source and local deck hashes for
+both Tactical pairs. Reports are the eight ignored
+`.cache/goat-ai/visible_rule_pref_*214*.json` files. All tournament arms used
+`--engine experimental --both-deck-assignments --require-unseen-main-decks
+--workers 4 --max-decisions 3000`. These results do not establish a
+competitive improvement. The unchanged parent remains the reference.

@@ -22,6 +22,7 @@ class DecisionPreferences:
     authorization: str
     reviewed_seat: int
     preferences: tuple[ReviewedPreference, ...]
+    rule_set_id: str | None = None
 
 
 def read_decision_preferences(path: str | Path, trajectory_sha256: str,
@@ -64,6 +65,22 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
                  and isinstance(metadata.get("opponent"), str)
                  and type(metadata.get("opponent_version")) is int
                  and metadata["opponent_version"] > 0)
+    elif authorization == "automated_rule":
+        rule_set_id = raw.get("rule_set_id")
+        if rule_set_id != "visible_audit_v1":
+            raise ValueError("automated preferences require visible_audit_v1 rule set")
+        seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
+                            else "demonstrator_seat")
+        checkpoint = metadata.get("policy_checkpoint_sha256")
+        valid = ((trajectory.source == "self_play_rl"
+                  and type(seat) is int and seat in (0, 1)
+                  and (metadata.get("demonstrator_seat") is None
+                       or (type(metadata["demonstrator_seat"]) is int
+                           and metadata["demonstrator_seat"] == seat)))
+                 or (trajectory.source == "policy_evaluation"
+                     and type(seat) is int and seat in (0, 1)
+                     and isinstance(checkpoint, str)
+                     and re.fullmatch(r"[0-9a-f]{64}", checkpoint) is not None))
     else:
         raise ValueError("preferences require agent-review authorization")
     if not valid:
@@ -109,4 +126,5 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
             raise ValueError("disfavored actions must include the recorded choice")
         parsed.append(ReviewedPreference(index, preferred, disfavored))
     return DecisionPreferences(trajectory_sha256, reviewer.strip(), authorization,
-                               seat, tuple(parsed))
+                               seat, tuple(parsed),
+                               raw.get("rule_set_id") if authorization == "automated_rule" else None)

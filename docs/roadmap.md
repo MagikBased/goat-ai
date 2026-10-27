@@ -1423,3 +1423,12 @@ split **33–31** against its parent on 64 held-out direct games and scored
 baseline schedule. Neither comparison establishes a self-play gain. Keep the
 parent as reference and investigate stronger decision-level feedback before
 another large PPO run; see [evaluation](evaluation.md#patched-core-ppo-continuation-and-held-out-check-27-october-2026).
+
+A separate six-rule visible-state feedback experiment generated 26 synthetic
+preferences from 19 of those verified PPO replays. The trained child scored
+70–58 directly against its parent on 128 fresh held-out duels, with a paired
+interval including 50%, and 14–50 versus Tactical-v14 against the parent's
+13–51 on a matched 64-duel schedule. This remains experimental and does not
+close M4. The label source is recorded distinctly from human review, and
+training recomputes each rule before fitting; see
+[evaluation](evaluation.md#automated-visible-rule-preference-experiment-27-october-2026).

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import torch
 
+from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
@@ -20,6 +21,7 @@ from goat_ai.replay import (
 )
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import fit_preferences_with_parent_kl, load_policy_agent
+from scripts.derive_visible_rule_preferences import validate_automated_preferences
 
 
 def validate_preservation_reference(path: Path, digest: str, seed: int, *,
@@ -78,6 +80,7 @@ def main() -> None:
     new_hashes = {}
     training_games = []
     preference_hashes = {}
+    weak_flip_attacks = None
     for replay_path, preferences_path in args.case:
         replay_path = Path(replay_path)
         preferences_path = Path(preferences_path)
@@ -90,6 +93,10 @@ def main() -> None:
         verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
         preferences = read_decision_preferences(preferences_path, replay_hash, trajectory)
+        if preferences.authorization == "automated_rule":
+            if weak_flip_attacks is None:
+                weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
+            validate_automated_preferences(trajectory, preferences, weak_flip_attacks)
         reviewed.extend((trajectory.decisions[item.decision_index], item)
                         for item in preferences.preferences)
         new_hashes[str(replay_path)] = replay_hash
@@ -104,10 +111,12 @@ def main() -> None:
             "deck_sha256": trajectory.deck_sha256,
             "main_deck_composition_sha256": tuple(
                 main_deck_composition_sha256(read_ydk(deck)) for deck in trajectory.decks),
-            "source": {"self_play_review": "self_play_preference",
+            "source": {"automated_rule": "automated_rule_preference",
+                       "self_play_review": "self_play_preference",
                        "policy_review": "policy_preference",
                        "baseline_review": "baseline_preference"}[preferences.authorization],
             "authorization": preferences.authorization,
+            "rule_set_id": preferences.rule_set_id,
             "reviewer": preferences.reviewer,
             "reviewed_seat": preferences.reviewed_seat,
             "reviewed_agent": reviewed_agent,

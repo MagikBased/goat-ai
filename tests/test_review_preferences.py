@@ -127,6 +127,29 @@ def test_baseline_review_binds_either_recorded_agent_seat(tmp_path):
                                                                 "teacher_version": True}))
 
 
+def test_automated_rule_preferences_have_distinct_provenance(tmp_path):
+    base = trajectory()
+    path = preference_file(tmp_path, authorization="automated_rule",
+                           rule_set_id="visible_audit_v1", reviewed_seat=0)
+    labels = read_decision_preferences(path, "a" * 64, base)
+    assert labels.authorization == "automated_rule"
+    assert labels.rule_set_id == "visible_audit_v1"
+    for rule_set in (None, "unreviewed_v2"):
+        invalid = preference_file(tmp_path, authorization="automated_rule",
+                                  rule_set_id=rule_set)
+        with pytest.raises(ValueError, match="visible_audit_v1"):
+            read_decision_preferences(invalid, "a" * 64, base)
+    path = preference_file(tmp_path, authorization="automated_rule",
+                           rule_set_id="visible_audit_v1", reviewed_seat=0)
+    with pytest.raises(ValueError, match="agent seat"):
+        read_decision_preferences(path, "a" * 64,
+                                  replace(base, source="tactical"))
+    with pytest.raises(ValueError, match="reviewed seat"):
+        read_decision_preferences(preference_file(
+            tmp_path, authorization="automated_rule", rule_set_id="visible_audit_v1",
+            reviewed_seat=1), "a" * 64, base)
+
+
 def test_score_prefers_either_good_target_without_set_size_bonus():
     torch = pytest.importorskip("torch")
     from goat_ai.training.policy import CardVocabulary
