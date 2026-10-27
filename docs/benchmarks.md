@@ -630,9 +630,11 @@ that trajectory. The profile and sample are ignored local artifacts at
 `.cache/goat-ai/train_profile_18000.prof` and
 `.cache/goat-ai/train_profile_18000_replays/`.
 
-An opt-in `--fast-trajectory-json` path now uses `orjson`'s native dataclass
-writer. Install the optional dependency with `pip install '.[speed]'`; the
-standard writer remains the default. The complete one-game training comparison
+The `--fast-trajectory-json` path uses `orjson`'s native dataclass writer.
+Install the optional dependency with `pip install '.[speed]'`; the trainer now
+uses it automatically when installed and otherwise uses standard JSON.
+`--standard-trajectory-json` forces the standard writer. The initial complete
+one-game training comparison
 used the same fv23 checkpoint, seed 18100, experimental native engine,
 control/Chaos probe decks, batch size 16, and one Torch CPU thread. Each arm
 recorded 1,115 decisions in a byte-identical 13,218,971-byte trajectory
@@ -645,8 +647,9 @@ which include Python/Torch startup, were 3.841/3.619 s and 3.800/3.582 s.
 These are one-game CPU measurements, not multi-game scaling or a strength gain.
 The ignored comparison is `.cache/goat-ai/fast_json_benchmark_18100/report.json`.
 
-Reproduce one arm from the repository root, changing `MODE` and optionally
-adding `--fast-trajectory-json` for the fast arm:
+Reproduce one arm from the repository root, changing `MODE` and adding
+`--standard-trajectory-json` for the standard arm, or
+`--fast-trajectory-json` for the fast arm:
 
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
@@ -655,3 +658,16 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
   --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk \
   --seed 18100 --games 1 --max-decisions 3000 --reinforce-batch-size 16
 ```
+
+After making the fast writer automatic, a second AB/BA comparison used the
+same feature-v23 checkpoint and decks with seed 18102. Each arm finished
+1,556 decisions and produced a byte-identical 21,399,927-byte replay (SHA-256
+`0a497d54fe680104bc68dda0d6db517bf8f536e0a63f470bf65f5cd16b4ac091`).
+The saved model's 38 tensors were exactly equal across writers. The automatic
+writer's replay passed native verification of all 1,556 decisions and the
+player-visibility audit. Standard/automatic reported training wall times were
+3.948/3.458 s and 3.879/3.472 s in reversed orders, or **1.142×** and
+**1.117×** ratios. These are two runs of one CPU duel, not a multi-game
+throughput estimate or evidence of improved playing strength. The ignored
+checkpoints and replays are under `.cache/goat-ai/` with
+`standard_json_18102` and `auto_json_18102` prefixes.

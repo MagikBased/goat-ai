@@ -107,9 +107,23 @@ def main() -> None:
                         help="record native protocol gaps; exclude those games from updates and provenance")
     parser.add_argument("--record-dir", type=Path,
                         help="directory for exact self-play trajectories; defaults beside the checkpoint")
-    parser.add_argument("--fast-trajectory-json", action="store_true",
-                        help="use optional orjson for replay writing; install .[speed]")
+    trajectory_json = parser.add_mutually_exclusive_group()
+    trajectory_json.add_argument("--fast-trajectory-json", action="store_true",
+                                 help="require optional orjson for replay writing; install .[speed]")
+    trajectory_json.add_argument("--standard-trajectory-json", action="store_true",
+                                 help="force the standard JSON writer for comparisons")
     args = parser.parse_args()
+    if args.standard_trajectory_json:
+        fast_trajectory_json = False
+    elif args.fast_trajectory_json:
+        fast_trajectory_json = True
+    else:
+        try:
+            import orjson  # noqa: F401
+        except ImportError:
+            fast_trajectory_json = False
+        else:
+            fast_trajectory_json = True
     if (args.games < 1 or args.learning_rate <= 0 or args.snapshot_every < 1
             or args.max_snapshots < 1 or args.max_decisions < 1
             or args.entropy_coefficient < 0
@@ -175,7 +189,7 @@ def main() -> None:
             },
         )
         path = record_dir / f"episode_{index:05d}_seed_{episode.seed}.json"
-        write_trajectory(path, trajectory, fast_json=args.fast_trajectory_json)
+        write_trajectory(path, trajectory, fast_json=fast_trajectory_json)
         recorded_games[episode.seed] = (str(path), sha256_file(path))
 
     reports = train_against_snapshot_pool(
