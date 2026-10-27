@@ -107,6 +107,65 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python -m cProfile \
   --ppo-epochs 2 --ppo-batch-size 16 --snapshot-every 4
 ```
 
+### Longer single-process PPO profile
+
+A follow-up used the same feature-v23 parent, sourced Goat Control/Warrior
+matchup, one Torch CPU thread, four-game PPO rollouts, two epochs, and
+batch size 16 on an Intel Core i7-10700K. Seeds 23700–23715 produced 16
+terminal duels, **8,151 total decisions**, and **1,740 learner decisions**.
+The profiled run reported 18.557 seconds of trainer time; the otherwise
+identical unprofiled run reported 13.026 seconds. Profiling overhead and
+ordinary timing variation are included in that difference.
+
+All 16 replay JSON files were byte-identical between runs, and all 38 policy
+tensors were exactly equal. Native replay verification checked all 8,151
+decisions in the profiled arm, and the player-visibility audit passed.
+
+| Repeated function | Calls | Profile cumulative time |
+| :--- | ---: | ---: |
+| Policy forward (internal) | 3,204 | 4.320 s |
+| Native observation construction | 8,167 | 3.221 s |
+| Visible decision encoding | 4,611 | 2.634 s |
+| Native response processing | 8,151 | 1.623 s |
+| Native location query, included in observation time | 57,080 | 1.092 s |
+
+The cumulative times overlap callers and cannot be added to estimate a total.
+This longer sample changes the next experiment's priority: reduce the many
+small PyTorch operations in policy inference or avoid redundant inference
+work, then measure **complete training time** against the unchanged rollout
+and model tensors. The existing four-worker rollout measurement remains a
+better tested CPU setting than single-process batched inference. This profile
+alone establishes no speedup and no playing-strength change. It covers one
+deck pairing and the single-process rollout path.
+
+The ignored artifacts are `.cache/goat-ai/ppo_profile_23700_16.prof`,
+`ppo_profile_23700_16.pt`, `ppo_reference_23700_16.pt`, their replay folders,
+and `ppo_reference_23700_16_report.json`. To reproduce the profiled arm, use
+the command above with seed 23700, 16 games, and fresh output and profile
+paths; run the same command without `-m cProfile -o <profile>` for the
+reference arm.
+
+### Four versus eight PPO rollout workers
+
+A separate scaling check used 16 games per schedule, eight-game PPO rollouts,
+two epochs, batch size 16, and the same sourced Goat Control/Warrior pairing.
+Both worker counts used independent native processes and one Torch CPU thread
+per process on the same i7-10700K. Run order was reversed between seed groups.
+
+| Seeds; order | Decisions | Four workers | Eight workers |
+| :--- | ---: | ---: | ---: |
+| 23800–23815; four then eight | 7,557 | 7.706 s | 7.396 s |
+| 23820–23835; eight then four | 7,327 | 7.774 s | 7.695 s |
+
+Within each seed group, all 16 replay files and all 38 policy tensors were
+exactly equal between worker counts. The first eight-worker group's 7,557
+decisions replay-verified against the pinned native engine and passed the
+visibility audit. Eight workers saved about 1–4% of the reported trainer time
+in these two short runs; worker memory and larger schedules were not measured.
+This is too small a local gain to establish eight workers as the default.
+The ignored reports, checkpoints, and replay folders have `worker4_23800_16`,
+`worker8_23800_16`, `worker4_23820_16`, and `worker8_23820_16` prefixes.
+
 ## Reusing visible PPO features from rollout (27 October 2026)
 
 The opt-in `--reuse-rollout-features` path retains the learner's already

@@ -1403,6 +1403,13 @@ bytes and model tensors equal and ran faster in both orders (1.37× and 1.09×
 uncached/cached); the reversed order gives the more cautious estimate. Native
 verification and the visibility audit passed. See
 [the measured comparison](benchmarks.md#cached-viewer-specific-card-projections-27-october-2026).
+After the card-projection cache, a 16-duel single-process profile found policy
+forward calls ahead of observation construction in cumulative Python time.
+Matched replays and model tensors were identical and all 8,151 decisions
+replay-verified. A separate four-versus-eight worker scaling check found only
+about 1–4% shorter trainer time with eight workers on two 16-duel schedules.
+Prioritize a measured reduction in policy-inference overhead before adding
+more rollout workers; see [the longer profile and scaling check](benchmarks.md#longer-single-process-ppo-profile).
 
 Clipped PPO with frozen-parent KL now caches parent action probabilities once
 per recorded decision instead of recomputing them in each epoch. One matched
