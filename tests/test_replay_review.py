@@ -237,6 +237,31 @@ def test_opponent_review_keeps_bls_and_solemn_findings_separate():
         review_candidates(saved, review_seat=True)
 
 
+@pytest.mark.parametrize("source,category", [
+    (9596126, "chaos_sorcerer_targets_itself_with_enemy_option"),
+    (4178474, "raigeki_break_targets_own_card_with_enemy_option"),
+])
+def test_shortlist_flags_self_removal_only_with_visible_enemy_option(source, category):
+    own = CardView(0, "monster", "faceup", 9596126, 0,
+                   "attack", 2300, 2000)
+    enemy = CardView(1, "monster", "faceup", 69140098, 1,
+                     "attack", 1900, 900)
+    target = Action("own", "select_card", 0,
+                    {"code": own.code, "controller": 0,
+                     "location": 4, "sequence": 0})
+    other = Action("enemy", "select_card", 0,
+                   {"code": enemy.code, "controller": 1,
+                    "location": 4, "sequence": 1})
+    obs = replace(view(own, enemy),
+                  chain=(ChainLinkView(1, source, 0, 4, 0),))
+    found = review_candidates(policy(record(obs, target, other)))
+    assert [(item.category, item.evidence) for item in found] == [
+        (category, {"source_card_code": source})]
+    assert review_candidates(policy(record(obs, other, target))) == ()
+    assert review_candidates(policy(record(
+        replace(obs, field=(own,)), target))) == ()
+
+
 def test_shortlist_flags_zero_attack_defender_changed_to_attack():
     sheep = CardView(0, "monster", "faceup", 73915053, 2,
                      "defense", 0, 0)

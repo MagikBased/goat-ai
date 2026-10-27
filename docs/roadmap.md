@@ -1065,6 +1065,11 @@ checkpoint-attributed greedy replays. Its first 16-duel pass selected 20 of
 ground-truth labels; reviewed preferences and fresh held-out outcome gains
 remain necessary before using them to support an M4 strength claim. See
 [the queue protocol](evaluation.md#player-visible-disagreement-review-queue-27-october-2026).
+An extended 18-duel pass adds self-banish findings for Chaos Sorcerer and
+Black Luster Soldier with legal opposing targets, selecting 24 of 335
+candidates after 8,578 native-verified decisions. The audit also recognizes
+Raigeki Break targeting a friendly card while an opposing target is legal;
+no such case occurred in this measured set.
 
 Four-duel PPO rollout batching and equal-duel loss weighting were tested
 from that same parent on the same 32-game training schedule. The unweighted

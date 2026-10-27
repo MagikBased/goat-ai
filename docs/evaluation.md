@@ -5937,3 +5937,20 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/shortlist_policy_disagreements
   --limit 20 --per-replay 2 \
   --output .cache/goat-ai/review_queue_12100_12103.json --render-viewers
 ```
+
+The visible-state audit now also flags Chaos Sorcerer or Black Luster Soldier
+banishing itself when a legal opposing target exists, and Raigeki Break
+targeting a friendly card with an opposing target available. These remain
+human review prompts; the latter can have situational uses. An extended
+18-duel queue added policy replays `matchup_01_seed_12105_seat_0.json` and
+`matchup_00_seed_12115_seat_1.json` to the original schedule. It verified
+**8,578 decisions**, including **4,273 policy-seat choices**, and found
+**334 Tactical disagreements** plus one audit-only choice, for **335
+candidates**. The 24 selected prompts include six audit findings across
+16 replay viewers. The new Chaos Sorcerer self-banish at decision 111 and
+Black Luster Soldier self-banish at decision 727 each had a legal opposing
+monster target in that player's recorded view. The ignored output is
+`.cache/goat-ai/review_queue_extended_20261027.json` (SHA-256
+`a1284f5f163e07cc477ba9a34b39b6a94194bd757dd24ccaf4f6cfb9681e40e7`);
+its adjacent HTML index links to the review frames. This changes review
+coverage, not trained weights or competitive strength.

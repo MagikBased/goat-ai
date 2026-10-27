@@ -22,7 +22,9 @@ ROYAL_DECREE = 51452091
 SAKURETSU_ARMOR = 56120475
 TRIBE_INFECTING_VIRUS = 33184167
 BLACK_LUSTER_SOLDIER = 504700118
+CHAOS_SORCERER = 9596126
 MYSTICAL_SPACE_TYPHOON = 5318639
+RAIGEKI_BREAK = 4178474
 BREAKER_THE_MAGICAL_WARRIOR = 71413901
 POT_OF_GREED = 55144522
 THUNDER_DRAGON = 504700054
@@ -233,14 +235,20 @@ def review_candidates(trajectory: Trajectory,
                         and a.parameters.get("controller") != seat
                         for a in record.legal_actions)):
             source = obs.chain[-1].card_code
-            if (source == BLACK_LUSTER_SOLDIER
+            if (source in (BLACK_LUSTER_SOLDIER, CHAOS_SORCERER)
                     and selected.parameters.get("code") == source
                     and selected.parameters.get("location") == obs.chain[-1].location
                     and selected.parameters.get("sequence") == obs.chain[-1].sequence):
-                found.append(("bls_targets_itself_with_enemy_option",
+                category = ("bls_targets_itself_with_enemy_option"
+                            if source == BLACK_LUSTER_SOLDIER else
+                            "chaos_sorcerer_targets_itself_with_enemy_option")
+                found.append((category,
                               {"source_card_code": source}))
             elif source == MYSTICAL_SPACE_TYPHOON:
                 found.append(("mst_targets_own_card_with_enemy_option",
+                              {"source_card_code": source}))
+            elif source == RAIGEKI_BREAK:
+                found.append(("raigeki_break_targets_own_card_with_enemy_option",
                               {"source_card_code": source}))
             elif source == BREAKER_THE_MAGICAL_WARRIOR:
                 found.append(("breaker_targets_own_card_with_enemy_option",
