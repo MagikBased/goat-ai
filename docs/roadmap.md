@@ -525,6 +525,14 @@ tested matchups, while the child remains weaker than Tactical overall and has
 no human-play or self-play improvement evidence. Keep it experimental; see
 [evaluation](evaluation.md#fresh-64-duel-current-core-tactical-continuation-27-october-2026).
 
+A 64-duel PPO continuation from that fresh imitation child replay-verified
+34,755 decisions and passed the visibility audit. On held-out Phoenix and
+Dimension Fusion pairings, it split 31–31–2 directly against its parent and
+scored 17–46–1 against Tactical-v14 versus the parent's 21–42–1 on matched
+seeds. The paired Tactical difference interval includes zero. Retain the
+imitation child as the experimental comparison; M4 still needs a measured
+self-play strength gain. See [evaluation](evaluation.md#self-play-from-the-fresh-current-core-imitation-child-27-october-2026).
+
 The new sourced 2005 Phoenix Control holdout passed native deck and replay
 checks. On Phoenix versus Dimension Fusion, the six-deck continuation beat its
 four-deck parent 56–40 directly over 96 paired games, but lost more often than

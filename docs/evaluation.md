@@ -7957,3 +7957,55 @@ with `scripts/evaluate_policy.py --engine experimental
 --both-deck-assignments --require-unseen-main-decks --workers 4 --seeds 8`
 and the matchups, seeds, and opponents above. Use distinct ignored output
 paths for each run.
+
+### Self-play from the fresh current-core imitation child (27 October 2026)
+
+To test whether the stronger Tactical-imitation starting point helps PPO, a
+64-duel continuation began from the fresh current-core child above. It used
+Jesse Goat Control versus Warrior in all four deck/seat roles, seeds
+34000–34063, four process workers, four-game frozen rollouts, two PPO epochs,
+minibatch 32, per-episode weighting, a learner-deck moving baseline, parent
+KL weight 0.5, and 0.75 frozen-opponent probability. All **64 duels reached a
+terminal result** with no decision-cap or unsupported-game exclusions. The
+learner's 37–26–1 training record measures its sampled training opponents,
+not improvement. The trainer reported 28.41 seconds and 5,623 learner
+decisions. Independently replay-verifying every output and auditing
+player-visible observations covered **34,755 decisions**. The 64-replay
+manifest SHA-256 is
+`258c72ec2e1608df86ea5c2169410e262ad910a72d142e559f3de1c567fc978a`.
+
+On held-out Phoenix Control versus both Dimension Fusion Turbo lists, both
+deck assignments and policy seats, the PPO child split **31–31–2** directly
+against its imitation parent on seeds 34100–34107 (50.0% score; paired 95%
+interval 42.2%–59.4%). On separate matched seeds 34108–34115 against
+Tactical-v14, the PPO child scored **17–46–1** and the imitation parent
+**21–42–1**. Their paired score difference was **−6.25 percentage points**
+(95% interval **−13.3 to +1.6**). The report comparator confirmed matched
+native assets, card scripts, source, local deck hashes, opponent, and seeds.
+This run does not establish a self-play gain; retain the imitation child as an
+experimental comparison and keep M4's self-play exit open.
+
+The ignored PPO checkpoint
+`.cache/goat-ai/current_broader_ppo_34000_34063.pt` has SHA-256
+`d552bd5f5e7ff5a26cf5750e25da60039ed74c303d0da60323c7711029975007`.
+Its training summary SHA-256 is
+`5e222e19693d157f8cb67a52350aeb2a08c097cdba2e3841d1c4974266af093c`.
+The direct, child-versus-Tactical, and parent-versus-Tactical report hashes
+are `bec26169c9505ab2e6d66e17ffe74572f627b0d5a8dd0c21611c64644da9d1a8`,
+`594179099eacc8cb279e661a3b1cfeef30df56e0858cac3eba6d4765d3ad112f`,
+and `0e13a83aa5986b6edd04a50ac9a2ee4f43fbacb0888f61e4158eb458243f3232`.
+Reproduce the training with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --schedule-mode four_roles --seed 34000 --games 64 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 --ppo-epochs 2 \
+  --ppo-batch-size 32 --ppo-rollout-weighting per_episode \
+  --baseline-scope learner_deck --snapshot-every 4 --parent-kl-weight 0.5 \
+  --historical-probability 0.75 --rollout-workers 4 \
+  --output .cache/goat-ai/current_broader_ppo_reproduction.pt
+```
