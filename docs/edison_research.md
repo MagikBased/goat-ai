@@ -148,7 +148,28 @@ The raw HTML is not redistributed. This is a bounded source check of 28
 cards, not proof that the entire Edison release pool is complete or that a
 current card record cannot omit an old regional printing. The other six
 named API-only discrepancies and the two community-only promotional cards
-still need separate adjudication.
+need separate adjudication.
+
+The [six-card non-DT01 discrepancy ledger](../configs/historical/edison_non_dt01_candidate_discrepancies_2010_04_20.tsv)
+now records the independent North American evidence and the remaining
+questions. Two more API-only cards can be excluded from the April 2010 North
+American pool: [Konami's *Legendary Collection 2* product page](https://www.yugioh-card.com/en/products/past_products/legendary_coll2/)
+says Darkness Destroyer first released in North America on 4 October 2011,
+despite its [2008 English TCG game-bundle printing elsewhere](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7983&ope=2&request_locale=en).
+[Konami's *Gold Series 3* page](https://www.yugioh-card.com/en/products/past_products/gs2010/)
+calls it the first product to offer Vice Dragon and gives 23 June 2010 as its
+tournament-legal date. The current [official card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7991&ope=2&request_locale=en)
+also starts with that print. A third card, Restructer Revolution, has a
+[dated 2005 ordinary booster printing](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4871&ope=2&request_locale=en)
+and is an inclusion *candidate*, not a finalized whitelist entry. The
+[Wicked Dreadroot](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6405&ope=2&request_locale=en),
+[Wicked Eraser](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7092&ope=2&request_locale=en),
+and [Yu-Jo Friendship](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5754&ope=2&request_locale=en)
+have older promotional records, but their period North American legal dates
+have not been proved. Thus 30 of the 34 named API-only discrepancies have a
+source-backed exclusion, one is an inclusion candidate, and three await a
+promotional-card check. The two community-only promotions and the wider
+release pool remain open.
 
 The ignored report is
 `.cache/goat-ai/edison_pool_candidate_comparison_20261027.json` (SHA-256
