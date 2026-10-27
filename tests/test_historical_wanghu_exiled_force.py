@@ -15,6 +15,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 WANGHU = 504700143  # GOAT variant
 EXILED_FORCE = 74131780
 ARCHFIEND_SOLDIER = 49881766
+BOOK = 14087893
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -101,3 +102,103 @@ def test_wanghu_preempts_exiled_force_ignition_effect(tmp_path, wanghu_present):
                     env.engine.probe.loaded_script_sha256
                 checked = True
     pytest.fail("Wanghu / Exiled Force duel did not finish")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("book_response", [False, True])
+def test_book_chained_to_wanghu_restores_exiled_force_ignition(tmp_path, book_response):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    scripts = {f"goat/c{WANGHU}.lua", f"official/c{EXILED_FORCE}.lua",
+               f"official/c{BOOK}.lua"}
+    if any(not (root / "scripts" / script).is_file() for script in scripts):
+        pytest.skip("required card script not installed")
+    wanghu_deck = tmp_path / "wanghu_book.ydk"
+    wanghu_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([WANGHU] * 3), *([BOOK] * 3), *VANILLA_DECK[6:])))
+        + "\n#extra\n!side\n")
+    exiled_deck = tmp_path / "exiled.ydk"
+    exiled_deck.write_text("#main\n" + "\n".join(map(str, (
+        EXILED_FORCE, *VANILLA_DECK[1:])))
+        + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(wanghu_deck), str(exiled_deck), seed=15,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {WANGHU, BOOK} <= {card.code for card in obs.hand}
+        assert EXILED_FORCE in {card.code for card in env.engine.probe.observation(1).hand}
+        summoned = book_set = exiled_summoned = response_made = book_targeted = False
+        exiled_used = exiled_targeted = checked = False
+        agents = (RandomAgent(15), RandomAgent(16))
+        for _ in range(5000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / f"wanghu_exiled_book_{book_response}.json"
+                write_trajectory(path, env.trajectory())
+                trajectory = read_trajectory(path)
+                assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) \
+                    == len(trajectory.decisions)
+                assert audit_trajectory_visibility(trajectory)["decisions"] == len(
+                    trajectory.decisions)
+                return
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == WANGHU), None)
+                    summoned |= action is not None
+                if summoned and not book_set and action is None:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == BOOK), None)
+                    book_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not exiled_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == EXILED_FORCE), None)
+                exiled_summoned |= action is not None
+            if exiled_summoned and not response_made and obs.acting_player == 0 \
+                    and any(link.card_code == WANGHU for link in obs.chain):
+                assert not any(a.kind == "activate" and
+                               a.parameters.get("code") == EXILED_FORCE for a in actions)
+                book = next((a for a in actions if a.kind == "chain"
+                             and a.parameters.get("code") == BOOK), None)
+                if book is not None:
+                    action = book if book_response else next(a for a in actions
+                                                             if a.kind == "pass")
+                    response_made = True
+            if book_response and response_made and not book_targeted \
+                    and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code") == WANGHU
+                               and a.parameters.get("controller") == 0), None)
+                book_targeted |= action is not None
+            if book_response and book_targeted and not exiled_used \
+                    and obs.acting_player == 1 and not obs.chain:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == EXILED_FORCE), action)
+                exiled_used |= action is not None and action.kind == "activate"
+            if exiled_used and not exiled_targeted and actions[0].kind == "select_card":
+                assert EXILED_FORCE in {card.code for card in obs.graveyards[1]}
+                action = next((a for a in actions if a.parameters.get("controller") == 0
+                               and a.parameters.get("location") == 4), None)
+                exiled_targeted |= action is not None
+            if action is None and not checked:
+                action = next((a for a in actions if a.kind in (
+                    "select_card", "place", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+            if exiled_summoned and response_made and not checked and not obs.chain \
+                    and EXILED_FORCE in {card.code for card in obs.graveyards[1]}:
+                if book_response:
+                    if not exiled_targeted or WANGHU not in {
+                            card.code for card in obs.graveyards[0]}:
+                        continue
+                    assert exiled_used
+                    assert not any(card.code == WANGHU for card in obs.field)
+                    assert scripts <= env.engine.probe.loaded_script_sha256.keys()
+                else:
+                    assert not exiled_used
+                    assert WANGHU in {card.code for card in obs.field}
+                    assert BOOK not in {card.code for card in obs.graveyards[0]}
+                assert obs.life_points == (8000, 8000)
+                checked = True
+    pytest.fail("Book / Wanghu / Exiled Force duel did not finish")
