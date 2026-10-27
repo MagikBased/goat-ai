@@ -6,7 +6,7 @@ import pytest
 
 from goat_ai.actions import Action
 from goat_ai.evaluation.replay_review import review_candidates, sampled_self_play_provenance
-from goat_ai.observations import CardView, ChainLinkView, Observation
+from goat_ai.observations import CardView, ChainLinkView, Observation, PendingSummonView
 from goat_ai.replay import DecisionRecord, Trajectory
 
 
@@ -251,6 +251,29 @@ def test_opponent_review_keeps_bls_and_solemn_findings_separate():
         (2, "solemn_on_opponent_scapegoat")]
     with pytest.raises(ValueError, match="review seat"):
         review_candidates(saved, review_seat=True)
+
+
+def test_summon_negation_review_uses_only_public_sinister_serpent_identity():
+    serpent = 511000818
+    summoned = CardView(1, "monster", "faceup", serpent, 0,
+                        "attack", 300, 250)
+    response = replace(view(summoned, phase="main1", turn_player=1),
+                       pending_summon=PendingSummonView("normal", 1, 0, serpent))
+    solemn = Action("solemn", "chain", 0, {"code": 41420027})
+    decline = Action("decline", "pass", 0)
+    found = review_candidates(policy(record(response, solemn, decline)))
+    assert [(item.category, item.evidence) for item in found] == [
+        ("solemn_on_opponent_sinister_serpent_summon",
+         {"own_life_points": 8000, "summoned_card_code": serpent})]
+    assert review_candidates(policy(record(response, decline, solemn))) == ()
+    other = replace(response, pending_summon=PendingSummonView("normal", 1, 0,
+                                                                69140098),
+                    field=(replace(summoned, code=69140098),))
+    assert review_candidates(policy(record(other, solemn, decline))) == ()
+    assert review_candidates(policy(record(
+        replace(response, pending_summon=PendingSummonView("normal", 0, 0,
+                                                            serpent),
+                field=(replace(summoned, controller=0),)), solemn, decline))) == ()
 
 
 @pytest.mark.parametrize("source,category", [

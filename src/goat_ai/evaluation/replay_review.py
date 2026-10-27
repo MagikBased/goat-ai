@@ -30,6 +30,7 @@ POT_OF_GREED = 55144522
 THUNDER_DRAGON = 504700054
 METAMORPHOSIS = 46411259
 SOLEMN_JUDGMENT = 41420027
+SINISTER_SERPENT = 511000818
 
 
 @dataclass(frozen=True)
@@ -196,6 +197,13 @@ def review_candidates(trajectory: Trajectory,
                 and obs.chain[-1].controller != seat):
             found.append(("solemn_on_opponent_scapegoat",
                           {"own_life_points": obs.life_points[seat]}))
+        if (_is_action(selected, "chain", SOLEMN_JUDGMENT) and can_pass
+                and obs.pending_summon is not None
+                and obs.pending_summon.controller != seat
+                and obs.pending_summon.code == SINISTER_SERPENT):
+            found.append(("solemn_on_opponent_sinister_serpent_summon",
+                          {"own_life_points": obs.life_points[seat],
+                           "summoned_card_code": SINISTER_SERPENT}))
         if (selected.kind == "normal_summon"
                 and (code := selected.parameters.get("code")) in weak_flip_attacks
                 and any(a.kind == "set_monster"

@@ -1172,6 +1172,14 @@ card-value and timing signal that improves independent match outcomes while
 preserving profitable resource use, followed by a separately demonstrated
 self-play gain; see [the evaluation](evaluation.md).
 
+An expanded v25 resource head trained on 207 verified opportunities across
+four deck pairings corrected nine of 10 later flagged own-only Nobleman
+choices and all four negative Heavy Storm choices on recorded states. Across
+96 new held-out direct duels it scored 51–43–2 against its v23 parent, with a
+paired interval crossing 50%; against Tactical-v14 it scored 21–75 versus
+the parent's 20–76. The narrow card-trade signal still does not establish the
+M4 strength gate; see [the expanded outcome check](evaluation.md#diverse-resource-trade-head-and-held-out-outcome-check-27-october-2026).
+
 A focused 71-decision Thunder Dragon imitation fit improved fixed-state
 teacher agreement on separate recorded duels, but scored 26–38 directly
 against its parent on unseen deck families and 7–57 against Tactical versus

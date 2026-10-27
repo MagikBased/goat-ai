@@ -6709,3 +6709,79 @@ PYTHONPATH=src:. .venv/bin/python scripts/audit_visible_value_signals.py \
 The report SHA-256 values are
 `ce5fb3f58da74e8c75026a3566dabe99d87117f787a8da5ca0c463735f8ef7e0` and `64baf655633de5aa942388333adde697333d3c5b4c8592c22af7b616a6b6612e`, respectively; each report binds the
 individual source replay hashes and sampled snapshot turns.
+
+### Diverse resource-trade head and held-out outcome check (27 October 2026)
+
+The unchanged feature-v23 parent still selected obvious visible resource
+losses in its 64 saved policy-versus-Tactical games from seeds 12100–12115.
+The player-visible replay audit flagged 10 Nobleman activations with only a
+friendly Set monster, four negative Heavy Storm activations, four Sakuretsu
+Armor activations under face-up Royal Decree, and six other isolated cases.
+The original feature-v25 resource head would choose a different action on
+eight of the 10 Nobleman and all four Storm snapshots. These are fixed-state,
+off-policy choices, not corrected duel outcomes. A new audit category now
+flags Solemn Judgment on a publicly pending opposing Sinister Serpent Summon;
+among 62 such response prompts in this batch, Solemn was selected zero times.
+The flag remains a human-review prompt, never an automatic play label.
+
+A second v25 head used 48 complete parent-policy replays: the original 32
+Jesse/Warrior and Return/Flip games plus eight WikiFormat Dimension Fusion
+mirror games and eight Chaos Turbo/Matt Peddle games. All **20,786** source
+decisions replay-verified and passed the visibility audit. The corrected
+Tactical synthetic teacher supplied **207** Heavy Storm/Nobleman activation
+labels, including 140 disagreements. Only the zero-initialized two-weight
+trade head was trained; every other parent parameter stayed frozen. The head
+weights became 2.491 and 2.898, versus 2.057 and 2.486 in the original v25
+fit. On the same 64 saved parent states it changed nine of 10 flagged
+Nobleman choices and all four negative Storm choices. The ignored checkpoint
+is `.cache/goat-ai/fv25_trade_diverse_10400_13100_13300.pt` (SHA-256
+`e5b6705673853ec1ced872b135fb4c5fa5e14e2a76c7e6398d570b6da170502c`).
+
+Three Main Deck pairings excluded from both the parent and new head's
+training compositions—Chaos Control/Bazoo Return, Lolmarcus/Michael Goat
+Control, and GoatFormat Dimension Fusion/Phoenix Control—were evaluated with
+both deck assignments and both policy seats on seeds 18300–18307. Over **96
+direct held-out duels**, the new head scored **51–43–2** against its unchanged
+v23 parent (54.2%, paired 95% interval 47.4%–60.4%) and **52–44** against
+the original v25 head (54.2%, interval 50.0%–59.4%). Against Tactical-v14 it
+scored **21–75**, while the v23 parent scored **20–76** on the matched schedule.
+The paired Tactical score difference was +1.0 percentage point, interval
+−4.2 to +6.2 points. More diverse resource examples improved one additional
+recorded Nobleman choice, but did not establish a held-out competitive gain.
+Keep v23 as the neural reference and both v25 heads experimental. A stronger
+signal must address the other visible mistakes as well as win outcomes.
+
+The direct and Tactical report SHA-256 values are, respectively,
+`78c8088dbd0cb2fcd0ec54bbfa987bc3c96490345c70fe0b986335ccafa6d6da`,
+`c688b15145367a7853f498e8f4251a111330203a651bd60c0e40fdb41ccbad5b`,
+`b8765661982a7885d5d483ab2df7058e44fa82a4255b4f39c349f54bd358a206`,
+and `8e1228f0c2a8e7a5d1d45fdab9dfff1bc6a15e9e142037604e823ff37dd21374`
+under `.cache/goat-ai/` with the `fv25_trade_diverse_vs_parent`,
+`fv25_trade_diverse_vs_v25_original`, `fv25_trade_diverse_vs_tactical`, and
+`fv23_parent_vs_tactical` prefixes. The comparison tool verified matching
+native, source, deck, and seed controls and unchanged local deck hashes.
+
+Reproduce training from the three ignored source-replay directories:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/on_policy_teacher_10400_10407/*.json \
+  .cache/goat-ai/on_policy_wikiformat_df_13100_13103/matchup_*.json \
+  .cache/goat-ai/on_policy_chaos_turbo_matt_13300_13303/matchup_*.json \
+  --engine experimental --on-policy-teacher tactical_card_advantage \
+  --on-policy-teacher-activation-focus-only \
+  --focus-card 504700116 --focus-card 19613556 \
+  --feature-version 25 --width 32 --epochs 30 --batch-size 16 \
+  --learning-rate 0.01 --seed 47 --trainable-module trade_head \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --upgrade-feature-23-to-25 --verification-workers 4 \
+  --output .cache/goat-ai/fv25_trade_diverse_10400_13100_13300.pt
+```
+
+For a matched evaluation, use `scripts/evaluate_policy.py` with the three
+pairings named above, `--engine experimental --both-deck-assignments
+--seed 18300 --seeds 8 --max-decisions 3000 --require-unseen-main-decks
+--workers 4`. Set the candidate checkpoint to the new v25 file and use
+either `--opponent-checkpoint` for the v23 or original v25 file, or
+`--opponent tactical`; then repeat the Tactical arm with the unchanged v23
+candidate. Give each run its own ignored `--output` path.
