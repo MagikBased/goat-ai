@@ -1125,3 +1125,9 @@ separate held-out schedule. Neither variant meets the M4 gate or shows a
 measured speed gain. Keep single-duel updates as the default and pursue a
 better learning signal before scaling rollout volume; see
 [the evaluation](evaluation.md).
+
+Self-play training now saves exact terminal-duel trajectories by default and
+binds their SHA-256 hashes to new checkpoint training-game entries. A native
+1,072-decision replay verified after a one-game smoke, including a visibility
+audit. This closes a reproducibility gap; M4's held-out competitive strength
+gate remains open. See [the provenance check](evaluation.md#exact-self-play-replay-provenance-27-october-2026).

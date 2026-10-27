@@ -6252,3 +6252,27 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_review_preferences.py \
   --parent-kl-weight 1 --learning-rate 0.0001 --seed 27 \
   --output .cache/goat-ai/fv23_self_banish_current_preservation_14400_14410.pt
 ```
+
+### Exact self-play replay provenance (27 October 2026)
+
+`train_self_play.py` now records every terminal training duel by default in
+`<checkpoint-stem>_replays/` beside its output checkpoint. An explicit
+`--record-dir` can select another empty directory. Each new training-game
+entry names its replay and SHA-256; the checkpoint's `trajectory_sha256` map
+contains those hashes along with the parent's. The trainer rejects missing,
+changed, duplicated, or overlapping replay paths before saving the child.
+Censored games have no training-game entry. Existing checkpoints are not
+retroactively given replay provenance.
+
+A one-game experimental-engine smoke from the unchanged four-deck v23 parent
+used control/Chaos probe decks at seed 14700. It completed **1,072 native
+decisions**, including **216 learner decisions**, and reported **2.519 s**
+run wall time. The saved trajectory hash matched both the new training-game
+entry and the checkpoint hash map. Full native replay verification returned
+1,072 decisions, and the visibility audit passed. The ignored checkpoint is
+`.cache/goat-ai/selfplay_provenance_smoke_14700.pt` (SHA-256
+`6dcfdd6358c8f93e7657fe3b462b22a71aedb7e013d5ce983d25fb5b132bab00`);
+its replay is in the adjacent `_replays` directory (SHA-256
+`3ef7714b8eb8e3ca3a72d24c448dc68e1915acfaab42c90f91e8f0821c1eaec2`).
+This is a provenance and reproducibility check, not a strength result or a
+throughput benchmark.

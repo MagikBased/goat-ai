@@ -13,6 +13,7 @@ from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.replay import write_trajectory
+from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
 from goat_ai.training.self_play import VisibleStateValue, train_against_snapshot_pool
 
@@ -23,6 +24,30 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def replay_directory(output: Path, requested: Path | None) -> Path:
+    """Give every checkpoint a separate, initially empty replay directory."""
+    directory = requested or output.with_name(output.stem + "_replays")
+    if (directory.resolve() == output.resolve()
+            or directory.exists() and (not directory.is_dir()
+                                           or any(directory.iterdir()))):
+        raise ValueError("self-play replay directory must be empty and distinct from output")
+    return directory
+
+
+def checked_replay_hashes(terminal_reports: list[dict],
+                          recorded_games: dict[int, tuple[str, str]],
+                          previous_hashes: dict[str, str]) -> dict[str, str]:
+    """Bind each completed training game to unchanged, unique replay bytes."""
+    if set(recorded_games) != {report["seed"] for report in terminal_reports}:
+        raise ValueError("recorded self-play games differ from terminal training games")
+    if any(sha256_file(path) != digest for path, digest in recorded_games.values()):
+        raise ValueError("recorded self-play trajectory changed during training")
+    new_hashes = dict(recorded_games.values())
+    if len(new_hashes) != len(recorded_games) or set(new_hashes) & set(previous_hashes):
+        raise ValueError("self-play replay path overlaps training provenance")
+    return new_hashes
 
 
 def main() -> None:
@@ -74,7 +99,7 @@ def main() -> None:
     parser.add_argument("--skip-unsupported-games", action="store_true",
                         help="record native protocol gaps; exclude those games from updates and provenance")
     parser.add_argument("--record-dir", type=Path,
-                        help="optional ignored directory for exact self-play trajectories")
+                        help="directory for exact self-play trajectories; defaults beside the checkpoint")
     args = parser.parse_args()
     if (args.games < 1 or args.learning_rate <= 0 or args.snapshot_every < 1
             or args.max_snapshots < 1 or args.max_decisions < 1
@@ -98,6 +123,10 @@ def main() -> None:
     overlap = {game["seed"] for game in previous}.intersection(seeds)
     if overlap:
         parser.error(f"self-play seeds overlap existing training seeds: {sorted(overlap)}")
+    try:
+        record_dir = replay_directory(args.output, args.record_dir)
+    except ValueError as exc:
+        parser.error(str(exc))
     agent = load_policy_agent(args.checkpoint)
     value_model = None
     if args.baseline_scope == "state_value":
@@ -118,22 +147,23 @@ def main() -> None:
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     parent_checkpoint_sha256 = sha256(args.checkpoint)
+    recorded_games: dict[int, tuple[str, str]] = {}
 
     def record(index, episode):
-        if args.record_dir is not None:
-            args.record_dir.mkdir(parents=True, exist_ok=True)
-            trajectory = replace(
-                episode.trajectory,
-                skill_metadata={
-                    **(episode.trajectory.skill_metadata or {}),
-                    "parent_checkpoint_sha256": parent_checkpoint_sha256,
-                    "self_play_episode_index": index,
-                    "learner_temperature": args.learner_temperature,
-                    "learner_action_selection": "sampled_softmax",
-                },
-            )
-            write_trajectory(args.record_dir / f"episode_{index:05d}_seed_{episode.seed}.json",
-                             trajectory)
+        record_dir.mkdir(parents=True, exist_ok=True)
+        trajectory = replace(
+            episode.trajectory,
+            skill_metadata={
+                **(episode.trajectory.skill_metadata or {}),
+                "parent_checkpoint_sha256": parent_checkpoint_sha256,
+                "self_play_episode_index": index,
+                "learner_temperature": args.learner_temperature,
+                "learner_action_selection": "sampled_softmax",
+            },
+        )
+        path = record_dir / f"episode_{index:05d}_seed_{episode.seed}.json"
+        write_trajectory(path, trajectory)
+        recorded_games[episode.seed] = (str(path), sha256_file(path))
 
     reports = train_against_snapshot_pool(
         agent.model, agent.vocabulary, matchups, seeds,
@@ -164,8 +194,14 @@ def main() -> None:
     terminal_reports = [report for report in reports if report["status"] == "terminal"]
     if not terminal_reports:
         parser.error("no terminal self-play games; checkpoint was not written")
+    previous_hashes = parent.get("trajectory_sha256", {})
+    if not isinstance(previous_hashes, dict):
+        parser.error("parent checkpoint has invalid trajectory hashes")
+    new_hashes = checked_replay_hashes(terminal_reports, recorded_games,
+                                      previous_hashes)
     training_games = list(previous)
     for report in terminal_reports:
+        trajectory_path, trajectory_digest = recorded_games[report["seed"]]
         training_games.append({
             "seed": report["seed"],
             "deck_sha256": report["deck_sha256"],
@@ -175,6 +211,8 @@ def main() -> None:
             "asset_sha256": report["asset_sha256"],
             "rules_profile": report["rules_profile"],
             "source": "self_play_rl", "opponent": report["opponent"],
+            "trajectory": trajectory_path,
+            "trajectory_sha256": trajectory_digest,
         })
     config = {"engine": args.engine, "learning_rate": args.learning_rate,
               "historical_probability": args.historical_probability,
@@ -200,6 +238,7 @@ def main() -> None:
               "value_learning_rate": (args.value_learning_rate
                                       if value_model is not None else None),
               "schedule_mode": args.schedule_mode,
+              "record_dir": str(record_dir),
               "max_decisions": args.max_decisions, "seed": args.seed,
               "skip_capped_games": args.skip_capped_games}
     config["skip_unsupported_games"] = args.skip_unsupported_games
@@ -214,7 +253,7 @@ def main() -> None:
         "feature_version": agent.model.feature_version,
         "parent_checkpoint_sha256": parent_checkpoint_sha256,
         "training_games": training_games,
-        "trajectory_sha256": parent.get("trajectory_sha256", {}),
+        "trajectory_sha256": previous_hashes | new_hashes,
         "source_decisions": source_decisions,
         "self_play_config": config, "self_play_reports": reports,
         "torch_version": str(torch.__version__),
