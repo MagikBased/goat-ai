@@ -542,3 +542,37 @@ versus 0.5590956422). These are one-duel training measurements, not a
 multi-game throughput or competitive-strength result. Keep batch size 1 as
 the reproducibility default; use `--reinforce-batch-size 16` for opt-in CPU
 experiments and evaluate resulting checkpoints separately.
+
+## Cached race-mask encoding
+
+On 27 October 2026, the opt-in policy feature versions 20–25 repeatedly
+expanded the same public announced race mask into 64 float bits for every
+legal action. A bounded 256-entry cache now reuses the exact tuple for each
+race value. The cache stores only the integer action parameter and its pure
+encoding; it contains no duel state or hidden card information.
+
+On 182 multi-action decisions (799 legal actions) from a recorded v25
+Dimension Fusion/Phoenix duel, eight encoder passes took a median **59.3 ms**
+without the cache and **49.4 ms** with it, excluding the first pass. Every
+encoded tensor matched byte for byte (combined SHA-256
+`894436ae77c3cd5115e6e71af081a28f4f0fda7ff75ec38aa8e221292f575610`).
+These measurements isolate feature encoding; they are not full training times.
+Ignored measurement reports are `.cache/goat-ai/encode_race_baseline_17008.json`
+and `.cache/goat-ai/encode_race_cached_17008.json`.
+
+The matched complete-duel check is reproducible from the repository root:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/benchmark_race_feature_cache.py \
+  .cache/goat-ai/fv25_resource_trade_head_10400_10407.pt \
+  --output .cache/goat-ai/race_cache_complete_script_17100_17103.json
+```
+
+Four seeded control/Chaos probe duels completed **2,723 decisions** in each
+arm. Both AB/BA rounds had identical full trajectories and learner records.
+Uncached/cached wall times were **2.539/2.390 s** and **2.366/2.320 s**,
+respectively. The second round's difference is small relative to timing
+variation; this confirms correctness and a modest local CPU saving, not a
+reliable estimate of large-scale self-play speedup. The ignored raw report is
+`.cache/goat-ai/race_cache_complete_script_17100_17103.json`.

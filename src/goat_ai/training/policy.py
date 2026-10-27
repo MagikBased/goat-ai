@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from functools import cached_property
+from functools import cached_property, lru_cache
 from math import cos, log1p, sin
 from pathlib import Path
 
@@ -60,6 +60,12 @@ CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 SPELL_TYPE = 0x2  # TYPE_SPELL in pinned ocgcore constant.lua
 HEAVY_STORM = 19613556
 NOBLEMAN_OF_CROSSOUT = 504700116
+
+
+@lru_cache(maxsize=256)
+def _race_mask_bits(race: int) -> tuple[float, ...]:
+    """Reuse the exact float features for repeated public race choices."""
+    return tuple(float(bool(race & (1 << bit))) for bit in range(64))
 
 
 @dataclass(frozen=True)
@@ -303,8 +309,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         ])
         prompt_id = int(params.get("prompt_id", 0))
         race = int(params.get("race", 0))
-        race_numbers = (tuple(float(bool(race & (1 << bit))) for bit in range(64))
-                        if feature_version >= 20 else
+        race_numbers = (_race_mask_bits(race) if feature_version >= 20 else
                         ((race & 0xFFFFFFFF) / 0xFFFFFFFF,
                          (race >> 32) / 0xFFFFFFFF))
         numeric = (
