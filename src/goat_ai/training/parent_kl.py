@@ -95,6 +95,7 @@ def fit_preferences_with_parent_kl(
     preservation_weight: float,
     learning_rate: float,
     rng: random.Random,
+    recorded_bad_weight: float = 1.0,
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """Raise preferred legal actions above disfavored ones with parent KL.
 
@@ -106,6 +107,8 @@ def fit_preferences_with_parent_kl(
             or learning_rate <= 0
             or not isfinite(preservation_weight) or preservation_weight <= 0):
         raise ValueError("preference KL needs records and positive finite settings")
+    if not isfinite(recorded_bad_weight) or recorded_bad_weight <= 0:
+        raise ValueError("recorded bad-choice weight must be finite and positive")
     if parent is model or parent.feature_version != model.feature_version:
         raise ValueError("preference KL needs a separate compatible reference policy")
     device = next(model.parameters()).device
@@ -121,8 +124,10 @@ def fit_preferences_with_parent_kl(
                        for index in (*good, *bad))
                 or legal.index(record.selected_action) not in (*good, *bad)):
             raise ValueError("preference must compare disjoint legal sets including recorded")
+        weight = recorded_bad_weight if legal.index(record.selected_action) in bad else 1.0
         examples.append((encode_decision(record.observation, legal, vocabulary,
-                                         model.feature_version), good, bad))
+                                         model.feature_version), good, bad, weight))
+    total_preference_weight = sum(item[3] for item in examples)
     preserve_features = [encode_decision(record.observation, record.legal_actions,
                                          vocabulary, model.feature_version)
                          for record in preservation]
@@ -144,8 +149,9 @@ def fit_preferences_with_parent_kl(
     for _ in range(steps):
         model.train()
         optimizer.zero_grad()
-        preference_loss = sum(preference_term(features, good, bad)
-                              for features, good, bad in examples) / len(examples)
+        preference_loss = sum(weight * preference_term(features, good, bad)
+                              for features, good, bad, weight in examples
+                              ) / total_preference_weight
         picks = rng.sample(range(len(preserve_features)), preservation_batch)
         preservation_loss = sum(
             nn.functional.kl_div(

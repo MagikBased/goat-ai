@@ -1653,3 +1653,9 @@ Zombie family but regressed on a separate Phoenix family and retained an
 own-only Nobleman activation. It remains experimental; M4 needs independently
 reviewed resource decisions, broader outcome gains, and a separate self-play
 improvement. See [the measured experiment](evaluation.md#visible-resource-v3-counterfactual-preference-experiment-27-october-2026).
+
+An eightfold weight for the nine recorded-bad v3 comparisons did not fix the
+held-out own-only Nobleman choice or establish a gain over the unweighted
+child on two independent 64-duel families. Keep the weight experimental and
+the reference unchanged; more synthetic weight alone has not closed M4.
+See [the matched ablation](evaluation.md#recorded-bad-preference-weight-ablation-27-october-2026).

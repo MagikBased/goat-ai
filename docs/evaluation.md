@@ -8207,3 +8207,43 @@ files, `--engine experimental --init-checkpoint
 --verification-workers 4 --width 32 --feature-version 23
 --learning-rate 0.0002 --seed 58`; add `--fast-trajectory-json` for the
 fast arm and use a distinct ignored output path.
+
+### Recorded-bad preference weight ablation (27 October 2026)
+
+Schema-v2 resource feedback had 128 comparisons where the recorded policy
+avoided a flagged loss and nine where it chose one. An opt-in
+`--recorded-bad-weight 8` fit increased the latter comparisons' relative
+pairwise-loss contribution while keeping the same 137 source preferences,
+parent, 30 steps, 64 preservation states, seed 57, learning rate 0.0001,
+and KL settings as the unweighted child. The preservation files were the
+exact same four seed-33016–33019 seat-0 Tactical replays. The final weighted
+preference loss was **0.2492** and final preservation KL **0.00496**; these
+values use a different loss weighting and are not comparable to the
+unweighted loss as a strength metric. The ignored checkpoint is
+`.cache/goat-ai/fv23_visible_resource_v3_bad8_matched_34000_34063.pt`
+(SHA-256 `7f0c1ba5c1fd31b8aaf08bceeb4c5af065ed5efdf550a984f670da49b8922a20`).
+
+On fresh held-out seeds 36800–36807, both assignments and policy seats,
+the weighted child scored **29–34–1** directly against the unweighted v3
+child across Charlotte Zombie versus Phoenix and WikiFormat Dimension
+Fusion (paired 95% score interval **39.8–51.6%**). On independent Phoenix
+versus WikiFormat and GoatFormat Dimension Fusion pairings, seeds
+36900–36907, it scored **34–30** (paired interval **50.0–57.8%**).
+All 128 duels reached terminal before the 3000-decision cap. Neither family
+shows a convincing gain; the inspected own-only Nobleman choice persists,
+while the inspected Heavy Storm activation remains corrected to a Set. The
+unweighted and weighted children both remain experimental. The direct
+reports are `.cache/goat-ai/resource_v3_bad8_matched_vs_v3_zombie_36800_36807.json`
+(SHA-256 `1101f2976556acff08371b4e7b3f9a57bd2cc1e5fe5c1b99c3bb06fce2f1a2a1`)
+and `.cache/goat-ai/resource_v3_bad8_matched_vs_v3_phoenix_36900_36907.json`
+(`4b5f8bdcebbb3cbd02deeaf057a31a7d92a04a9066796901ae29432e0a43aede`).
+
+An earlier trial selected seat-1 preservation replays for two seeds and is
+excluded from this ablation because preservation differed. Reproduce the
+matched fit from the v3 manifest's 25 replay/preference path pairs, plus
+`current_tactical_goat_mirror_33016_33031/seed_3301{6,7,8,9}_seat_0.json`,
+with the parameters above and the new weight flag. Reproduce the direct
+checks using `scripts/evaluate_policy.py --engine experimental
+--opponent-checkpoint .cache/goat-ai/fv23_visible_resource_v3_34000_34063.pt
+--both-deck-assignments --require-unseen-main-decks --workers 4 --seeds 8
+--max-decisions 3000`, the named deck pairs, and the two seed blocks.

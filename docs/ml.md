@@ -506,6 +506,15 @@ player's own cards, never opponent Set-card identities. The measured
 experiment and its uneven cross-deck results are in
 [evaluation](evaluation.md#visible-resource-v3-counterfactual-preference-experiment-27-october-2026).
 
+`train_review_preferences.py --recorded-bad-weight N` is an opt-in ablation
+for schema-v2 sets that contain both recorded safe and recorded bad choices.
+It increases the pairwise-loss weight of comparisons where the replay chose
+the disfavored action, normalizing by total comparison weight and recording
+the setting in the checkpoint. Schema-v1 files always record a disfavored
+choice, so a common weight does not rebalance them. An eightfold setting did
+not establish a held-out gain or fix the inspected Nobleman decision; see
+[evaluation](evaluation.md#recorded-bad-preference-weight-ablation-27-october-2026).
+
 ### Frozen moving baseline within a PPO rollout
 
 Multi-duel PPO already collects several games under one frozen policy.

@@ -53,6 +53,8 @@ def main() -> None:
     parser.add_argument("--preserve-per-trajectory", type=int, default=16)
     parser.add_argument("--preserve-batch", type=int, default=16)
     parser.add_argument("--parent-kl-weight", type=float, default=1.0)
+    parser.add_argument("--recorded-bad-weight", type=float, default=1.0,
+                        help="relative loss weight when the replay chose a disfavored action")
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", type=Path, required=True)
@@ -62,6 +64,8 @@ def main() -> None:
     if (args.steps < 1 or args.preserve_per_trajectory < 1
             or args.preserve_batch < 1 or not isfinite(args.parent_kl_weight)
             or args.parent_kl_weight <= 0 or not isfinite(args.learning_rate)
+            or not isfinite(args.recorded_bad_weight)
+            or args.recorded_bad_weight <= 0
             or args.learning_rate <= 0 or args.output.resolve() == args.checkpoint.resolve()):
         parser.error("invalid optimization settings or output overlaps parent")
     metadata = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
@@ -166,7 +170,8 @@ def main() -> None:
         model, parent, agent.vocabulary, reviewed, preservation,
         steps=args.steps, preservation_batch=args.preserve_batch,
         preservation_weight=args.parent_kl_weight,
-        learning_rate=args.learning_rate, rng=rng)
+        learning_rate=args.learning_rate, rng=rng,
+        recorded_bad_weight=args.recorded_bad_weight)
     sources = dict(metadata.get("source_decisions", {}))
     for game in training_games:
         source = game["source"]
@@ -193,6 +198,7 @@ def main() -> None:
             "steps": args.steps, "preserve_per_trajectory": args.preserve_per_trajectory,
             "preserve_batch": args.preserve_batch,
             "parent_kl_weight": args.parent_kl_weight,
+            "recorded_bad_weight": args.recorded_bad_weight,
             "learning_rate": args.learning_rate, "seed": args.seed,
         },
         "preference_loss_first": preference_losses[0],

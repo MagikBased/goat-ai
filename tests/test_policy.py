@@ -453,6 +453,40 @@ def test_counterfactual_preference_can_rank_recorded_safe_action_above_bad_optio
     assert after > before
 
 
+def test_recorded_bad_weight_changes_conflicting_preference_update():
+    torch.manual_seed(72)
+    vocabulary = CardVocabulary((10, 20))
+    initial = LegalActionPolicy(vocabulary.size, width=8, feature_version=19)
+    legal = actions()[:2]
+    observation = replace(view(), turn_player=0)
+    recorded_bad = DecisionRecord(observation, legal, legal[0])
+    recorded_safe = DecisionRecord(observation, legal, legal[0])
+    comparisons = (
+        (recorded_bad, ReviewedPreference(0, (1,), (0,))),
+        (recorded_safe, ReviewedPreference(0, (0,), (1,))),
+    )
+    preservation = (recorded_safe,)
+    margins = []
+    for weight in (1.0, 8.0):
+        child = copy.deepcopy(initial)
+        fit_preferences_with_parent_kl(
+            child, copy.deepcopy(initial), vocabulary, comparisons,
+            preservation, steps=2, preservation_batch=1,
+            preservation_weight=1.0, learning_rate=0.001,
+            rng=random.Random(72), recorded_bad_weight=weight)
+        features = encode_decision(observation, legal, vocabulary, 19)
+        with torch.no_grad():
+            logits = child(features)
+            margins.append(float(logits[1] - logits[0]))
+    assert margins[1] > margins[0]
+    with pytest.raises(ValueError, match="bad-choice weight"):
+        fit_preferences_with_parent_kl(
+            copy.deepcopy(initial), copy.deepcopy(initial), vocabulary,
+            comparisons, preservation, steps=1, preservation_batch=1,
+            preservation_weight=1.0, learning_rate=0.001,
+            rng=random.Random(72), recorded_bad_weight=0)
+
+
 def test_policy_audit_fingerprint_identifies_visible_decision_and_choice():
     observation = view()
     legal = actions()
