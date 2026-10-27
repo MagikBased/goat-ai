@@ -1,5 +1,27 @@
 # Baseline evaluation log
 
+## Phoenix Control historical effect line (27 October 2026)
+
+The pinned GOAT scripts completed a sourced Hand of Nephthys / Scapegoat /
+Sacred Phoenix of Nephthys line. Hand Tributed itself and a Sheep Token as a
+cost to Summon Phoenix from the Deck. Torrential Tribute destroyed Phoenix,
+which returned during its controller's next Standby Phase and then destroyed
+an opposing Set Book of Moon. The native duel continued to a terminal result;
+its trajectory replay-verified and passed the player-visible audit. Historical
+sources and explicit remaining edge cases are in [GOAT rules](goat_rules.md).
+This is a card-interaction correctness fixture, not a playing-strength result.
+
+For M4 triage, the unchanged feature-v23 parent played a 391-decision
+Dimension Fusion mirror against Tactical v14 at seed 16295 and lost. The
+trajectory replay-verified. The existing teacher-disagreement queue selected
+11 frames, including an early Card Destruction-versus-Thunder Dragon choice
+and two Book of Moon response disagreements. These are review candidates,
+not human correctness labels, and no policy was trained from them. Ignored
+artifacts: `.cache/goat-ai/dimension_v23_vs_tactical_16295.json` (SHA-256
+`8fc3ccd3489c989c1a1821f92cdc7b37c3e50c6600f0406195330077ca8a1a3e`)
+and `.cache/goat-ai/dimension_v23_review_16295.json`
+(`4b42f850767269fb4eb812a166928179897131c16b5395d9f5c0d485ac938a99`).
+
 ## Parallel frozen-policy PPO rollouts (27 October 2026)
 
 The multi-duel PPO path now has an opt-in `--rollout-workers` setting. A frozen
