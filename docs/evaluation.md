@@ -1,5 +1,49 @@
 # Baseline evaluation log
 
+## Fixed-policy visible-margin outcome diagnostic (27 October 2026)
+
+The same 64 frozen-checkpoint, native-verified policy-versus-Tactical duels
+used for the [critic check](#fixed-policy-visible-state-critic-check-27-october-2026)
+also test the user's card-advantage hypothesis without a policy-change
+confound. At the first policy-seat Main Phase 1 of turn 4 in each duel, one
+player-visible snapshot counted hand and field cards, excluding Sheep Tokens,
+and compared that margin with the eventual binary outcome. It also recorded
+the visible Life Point margin. Each duel contributes one sample, including
+both deck pairings and policy seats; the policy won 18/64 games. The saved
+summary checks all snapshot hashes against the collector manifest. The
+separate critic comparison had already independently replay-verified the
+same 31,729 decisions and reproduced the checkpoint's 15,704 choices.
+
+Overall win-versus-loss ranking AUC was **0.561** for visible card count and
+**0.671** for Life Point margin. Resampling whole four-game seeds 10,000
+times gave 95% intervals **0.370–0.759** for card count and **0.505–0.830**
+for Life Points. The paired LP-minus-card AUC interval was **−0.203 to
++0.402**; this small corpus does not establish that either margin is better.
+By pairing, card-count AUC was **0.514** for Jesse Goat Control/Warrior and
+**0.628** for Phoenix/Dimension Fusion; LP AUC was **0.668** and **0.742**.
+Card count alone is a weak and uncertain early predictor here. Later-turn
+snapshots are conditional on duels lasting that long and can reflect the
+consequence of winning, so this retrospective audit does not identify an
+action's causal value or justify a shaped reward. It also omits card quality,
+hidden holdings, and future draws.
+
+The ignored raw audit SHA-256 is
+`cdc560e583c1cfb6fcd5ad210bd220c591a4554677ca033d624104854866b92b`;
+the ignored summary SHA-256 is
+`5af727ea547662c7a2af809361d0052ea8ea7409bb10e7999aac6127cf6e068d`.
+Reproduce after the fixed-policy collection above with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_visible_value_signals.py \
+  .cache/goat-ai/fixed_policy_value_44000_44015 --turn 4 \
+  --output .cache/goat-ai/fixed_policy_value_signals_44000_44015.json
+PYTHONPATH=src:. .venv/bin/python scripts/summarize_fixed_policy_value_signals.py \
+  .cache/goat-ai/fixed_policy_value_signals_44000_44015.json \
+  .cache/goat-ai/fixed_policy_value_44000_44015/manifest.json \
+  --seed 171 --replicates 10000 \
+  --output .cache/goat-ai/fixed_policy_value_signals_summary_44000_44015.json
+```
+
 ## Fixed-policy visible-state critic check (27 October 2026)
 
 To remove the policy-change confound in the earlier v1/v2 critic comparison,

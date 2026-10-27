@@ -625,6 +625,12 @@ the v2-minus-v1 interval crossed zero. Keep both critics experimental and
 prioritize stronger decision feedback or a different value objective before
 using a critic as a PPO strength claim; see the [fixed-policy check](evaluation.md#fixed-policy-visible-state-critic-check-27-october-2026).
 
+On those same 64 fixed-policy games, a single player-visible turn-4 card-count
+margin only weakly ranked eventual wins (AUC 0.561, seed-group 95% interval
+0.370–0.759). Life Point margin was 0.671 with overlapping uncertainty.
+Neither retrospective margin establishes causal action value or supports a
+shaped reward; see the [visible-margin diagnostic](evaluation.md#fixed-policy-visible-margin-outcome-diagnostic-27-october-2026).
+
 A feature-version-10 checkpoint trained on the same 4,630 sourced teacher decisions as version 9 won 20–11 with one draw in 32 paired duels on separate Chaos Return and Warrior deck files. Its held-out chain-decision teacher agreement was 116/135 versus version 9's 114/135, while its overall agreement was two choices lower. Feature version 11 now supplies an equal-capacity unordered-chain GRU control. Ordered version 10 scored 16–15 with one draw against it on a fresh 32-duel schedule, and matched one more of 135 held-out multi-option chain decisions. This does not establish a chain-order strength gain; repeat the comparison across deck families and training seeds. See [the evaluation log](evaluation.md) for protocols and intervals. M4 remains open.
 
 On another sourced Chaos Control/Warrior schedule, ordered version 10 split 16–16 against the unordered control and won 17–15 versus version 9. A same-seed HeuristicAgent control favored Warrior 24–8, revealing a large deck effect. The [evaluation log](evaluation.md) has the deck and seat splits. M4 still needs improved held-out play across decks, with audited full-deck rules.
