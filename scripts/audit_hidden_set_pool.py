@@ -1,4 +1,4 @@
-"""Compare next-turn player views after each legal GOAT Spell/Trap is Set.
+"""Compare next-turn player views after a GOAT card is Set.
 
 The native engine still owns both Decks. Only its player-visible observation
 and legal actions are compared; a private query verifies the Set identity.
@@ -23,7 +23,11 @@ class CardCannotBeSet(ValueError):
 
 
 def reach_next_main_phase(own_deck: Path, opponent_deck: Path, root: Path,
-                          seed: int, hidden_code: int):
+                          seed: int, hidden_code: int, zone: str = "spell_trap"):
+    if zone not in ("spell_trap", "monster"):
+        raise ValueError("zone must be spell_trap or monster")
+    set_kind = "set_spell_trap" if zone == "spell_trap" else "set_monster"
+    location = 8 if zone == "spell_trap" else 4
     with GoatEnvironment(str(own_deck), str(opponent_deck), seed=seed,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
@@ -37,7 +41,7 @@ def reach_next_main_phase(own_deck: Path, opponent_deck: Path, root: Path,
             if observation.turn == 2 and observation.acting_player == 1 \
                     and not set_done:
                 action = next((option for option in actions
-                               if option.kind == "set_spell_trap"
+                               if option.kind == set_kind
                                and option.parameters.get("code") == hidden_code), None)
                 set_done |= action is not None
                 if observation.phase == "main1" and action is None:
@@ -47,11 +51,11 @@ def reach_next_main_phase(own_deck: Path, opponent_deck: Path, root: Path,
                 if not set_done:
                     raise AssertionError("opponent card was not Set")
                 hidden = [card for card in observation.field
-                          if card.controller == 1 and card.zone == "spell_trap"]
+                          if card.controller == 1 and card.zone == zone]
                 if len(hidden) != 1 or hidden[0].position != "facedown" \
                         or hidden[0].code is not None:
                     raise AssertionError("opponent Set card was not hidden")
-                if env.engine.probe._query_location(1, 8)[hidden[0].sequence].code \
+                if env.engine.probe._query_location(1, location)[hidden[0].sequence].code \
                         != hidden_code:
                     raise AssertionError("private Set identity differs from candidate")
                 if len(actions) < 2:
@@ -73,7 +77,9 @@ def main() -> None:
     parser.add_argument("--own-deck", type=Path,
                         default=Path("examples/decks/nobleman_probe.ydk"))
     parser.add_argument("--seed", type=int, default=52)
-    parser.add_argument("--limit", type=int, help="audit only this many Spell/Trap IDs")
+    parser.add_argument("--zone", choices=("spell_trap", "monster"),
+                        default="spell_trap", help="type of card the opponent Sets")
+    parser.add_argument("--limit", type=int, help="audit only this many eligible IDs")
     parser.add_argument("--output", type=Path, help="write the complete JSON report")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
@@ -85,8 +91,10 @@ def main() -> None:
     limits = read_goat_whitelist(whitelist)
     with sqlite3.connect(database) as connection:
         card_types = dict(connection.execute("SELECT id, type FROM datas"))
+    type_mask = (0x2 | 0x4) if args.zone == "spell_trap" else 0x1
     eligible = sorted(code for code, cap in limits.items()
-                      if cap > 0 and card_types.get(code, 0) & (0x2 | 0x4))
+                      if cap > 0 and card_types.get(code, 0) & type_mask
+                      and not card_types[code] & 0x40)
     codes = eligible[:args.limit] if args.limit is not None else eligible
     started = perf_counter()
     opening_baseline = None
@@ -103,7 +111,8 @@ def main() -> None:
                                 + "\n#extra\n!side\n", encoding="utf-8")
             try:
                 opening, slot, next_main = reach_next_main_phase(
-                    args.own_deck, opponent, args.native_root, args.seed, code)
+                    args.own_deck, opponent, args.native_root, args.seed, code,
+                    args.zone)
                 if opening_baseline is None:
                     opening_baseline = opening
                 elif opening != opening_baseline:
@@ -121,14 +130,15 @@ def main() -> None:
                 errors.append({"code": code, "error": f"{type(exc).__name__}: {exc}"})
 
     report = {
-        "scope": "opening and next own Main Phase after opponent Sets one Spell/Trap",
+        "scope": "opening and next own Main Phase after opponent Sets one card",
+        "zone": args.zone,
         "seed": args.seed,
         "own_deck": str(args.own_deck),
         "own_deck_sha256": sha256_file(args.own_deck),
         "whitelist_sha256": sha256_file(whitelist),
         "database_sha256": sha256_file(database),
         "core_sha256": sha256_file(core),
-        "eligible_spell_trap_ids": len(eligible),
+        "eligible_ids": len(eligible),
         "attempted": len(codes),
         "checked": checked,
         "not_settable": not_settable,

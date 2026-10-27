@@ -74,6 +74,23 @@ action. The full run recorded zero mismatches and zero errors in 25.55 seconds
 on this host. This checks one passive route to the following Main Phase; it
 does not validate chain responses, later reveals, or all possible field states.
 
+The same command accepts `--zone monster` to audit face-down monsters:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_hidden_set_pool.py \
+  --zone monster --output .cache/goat-ai/hidden_set_monster_audit_52.json
+```
+
+At seed 52, the native engine offered a Set action for 644 of 873 eligible
+Main Deck monster IDs in the empty-field fixture. All 644 produced identical
+player-zero observations and legal actions at the next Main Phase, with zero
+runtime errors or differences; the measured run took 39.12 seconds on this
+host. The other 229 lacked a Set action **in this setup**. Many monsters need
+Tributes or have Summon restrictions, so this number is not a claim that they
+can never be Set or are illegal in a deck. The audit checks one field slot
+and passive turn path; a separate Nobleman fixture checks a later target
+prompt for six common hidden monster identities.
+
 Keep older replay files byte-for-byte when they back SHA-256-bound reviews:
 reading and verifying v23 is supported, but rewriting it with a newer writer
 can change its JSON bytes and invalidate those sidecar hashes.

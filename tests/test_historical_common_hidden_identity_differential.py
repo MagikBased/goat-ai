@@ -8,6 +8,8 @@ import pytest
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from scripts.audit_hidden_opening_pool import candidate_deck
+from scripts.audit_hidden_set_pool import CardCannotBeSet, reach_next_main_phase
 
 NOBLEMAN = 504700116
 HIDDEN_MONSTERS = (
@@ -18,6 +20,36 @@ HIDDEN_MONSTERS = (
     88240808,  # Kycoo
     16226796,  # Night Assailant (GOAT)
 )
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
+                    reason="native assets not installed")
+def test_common_set_monsters_have_identical_next_main_phase_choices(tmp_path):
+    snapshots = []
+    for code in HIDDEN_MONSTERS:
+        opponent = tmp_path / f"set_monster_{code}.ydk"
+        opponent.write_text("#main\n" + "\n".join(map(str, candidate_deck(code)))
+                            + "\n#extra\n!side\n")
+        opening, slot, next_main = reach_next_main_phase(
+            Path("examples/decks/nobleman_probe.ydk"), opponent,
+            Path(os.environ["GOAT_AI_NATIVE_ROOT"]), 52, code, "monster")
+        assert slot == ("monster", 0)
+        assert len(next_main[1]) > 1
+        snapshots.append((opening, next_main))
+    assert all(snapshot == snapshots[0] for snapshot in snapshots[1:])
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
+                    reason="native assets not installed")
+@pytest.mark.parametrize("code", (504700118, 504700054))
+def test_boss_or_tribute_monster_has_no_empty_field_set_action(tmp_path, code):
+    opponent = tmp_path / f"no_set_{code}.ydk"
+    opponent.write_text("#main\n" + "\n".join(map(str, candidate_deck(code)))
+                        + "\n#extra\n!side\n")
+    with pytest.raises(CardCannotBeSet, match=str(code)):
+        reach_next_main_phase(Path("examples/decks/nobleman_probe.ydk"), opponent,
+                              Path(os.environ["GOAT_AI_NATIVE_ROOT"]), 52, code,
+                              "monster")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
