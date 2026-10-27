@@ -5900,6 +5900,47 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/benchmark_inference_mode.py \
   --games 4 --rounds 2 --seed 12000
 ```
 
+### Batched REINFORCE update microbenchmark (27 October 2026)
+
+The supported `--reinforce-batch-size 16` path was compared against scalar
+updates on the same 136 learner decisions from a recorded feature-v23 native
+duel. Four AB/BA rounds each started from the same parent weights and Adam
+optimizer settings. Scalar CPU update time was **0.423–0.450 seconds**;
+batched time was **0.110–0.116 seconds** (**3.73–3.93×** for this update).
+Mean reported loss differed by about `1.58e-8`, and the largest post-update
+parameter difference was `1.82e-5`. This measures one update, not whole
+self-play training or playing strength. The ignored
+report is `.cache/goat-ai/reinforce_batch_microbench_20261027.json`
+(SHA-256 `915404428ea2bbd1e9ece9e4553b4b79975147b0cbbe9c022e8168fe08dbfac0`).
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/benchmark_reinforce_update.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  .cache/goat-ai/fv23_parentkl_timer_smoke/episode_00000_seed_7600.json \
+  --seat 0 --batch-size 16 --rounds 4
+```
+
+An AB/BA full-training pilot used the same feature-v23 parent, two sourced
+Jesse/Warrior and DingoSig Return/Flip pairings, four-role seats, seeds
+14000–14007, a 3,000-decision cap, REINFORCE mean reduction, learner-deck
+baseline, and frozen-parent KL weight 0.1. With one Torch thread, the scalar
+eight-game runs took **9.595 and 9.485 seconds**, versus **6.861 and 6.855
+seconds** with batch size 16 (about **1.40× and 1.38×**). Each mode repeated
+bit-identical weights across order, and all runs reported the same eight
+winners and game lengths (4–4, 819 learner decisions). Scalar and batched
+final weights differed by at most `2.05e-4`; identical summaries do not
+prove identical action sequences or held-out strength. This establishes a
+small-schedule training wall-time gain, not a competitive gain. Batch size 16
+remains opt-in for supported feature versions until broader outcome checks.
+The four ignored run reports are
+`reinforce_batch_ab_scalar_14000.json` (SHA-256
+`2070b5d331486a33092511722dea9ac10c7e94bed8ce75831688e989b8288e29`),
+`reinforce_batch_ab_batched_14000.json` (`5be005fc2850c0857a37151d708e981685023e8a9b396ec7befeca14f61b13bb`),
+`reinforce_batch_ba_batched_14000.json` (`1939b59e24c4cddc5c6097d408f7857ea194f83bfb91b26fd4a7d22a19b8bee8`),
+and `reinforce_batch_ba_scalar_14000.json`
+(`1f3e6811fa5c30d1eb44d882fe72c7c35a9aaccee59ff7005f41afd82e2bf724`)
+under `.cache/goat-ai/`.
+
 ### Player-visible disagreement review queue (27 October 2026)
 
 `scripts/shortlist_policy_disagreements.py` now turns existing greedy policy

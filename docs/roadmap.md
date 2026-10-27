@@ -1070,6 +1070,10 @@ Black Luster Soldier with legal opposing targets, selecting 24 of 335
 candidates after 8,578 native-verified decisions. The audit also recognizes
 Raigeki Break targeting a friendly card while an opposing target is legal;
 no such case occurred in this measured set.
+An AB/BA eight-game REINFORCE pilot measured about 1.38–1.40× shorter
+training wall time with the existing opt-in batch size 16 versus scalar
+updates. Its matching summaries are not a held-out strength result; see
+[evaluation](evaluation.md#batched-reinforce-update-microbenchmark-27-october-2026).
 
 Four-duel PPO rollout batching and equal-duel loss weighting were tested
 from that same parent on the same 32-game training schedule. The unweighted
