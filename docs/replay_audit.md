@@ -1,5 +1,55 @@
 # Early replay decision audit
 
+## Current-core imitation review queue (27 October 2026)
+
+The fresh current-core feature-v23 Tactical imitation child played
+Tactical-v14 on Phoenix Control versus each of the WikiFormat and GoatFormat
+Dimension Fusion Main Decks. All three Main Deck compositions are absent
+from the child's training provenance. Seeds 35000–35001 with both policy seats
+produced **eight terminal duels and 5,332 decisions**. The collector and
+shortlister independently native-replayed the games and audited player
+visibility. The saved checkpoint's greedy actions reproduced at each frame.
+
+The [local review queue](../.cache/goat-ai/current_clone_review_35000_35001/queue.html)
+has **24 linked frames** from 247 candidates, exactly three per replay, 12
+per matchup, and 12 per policy seat. Every viewer link exists. All 24 are
+policy/Tactical disagreements. Three also have conservative visible-state
+flags: ending a turn with an activatable Thunder Dragon, Normal Summoning a
+weak Flip monster when Set is legal, and using Ring of Destruction on an own
+monster while a safe opposing target is offered. These flags are review
+prompts, not proofs of the best play. Tactical suggestions are not human
+labels; no frame in this queue has been used for training.
+
+The ignored collection manifest SHA-256 is
+`e61cc5e3364cc27ff4820e08a540c7168c1236d7087c28ea1aadb4397785944e`;
+the queue JSON SHA-256 is
+`9143599e18d879ae2836f628063d3544f82eb6faf06f0120cc18f987b4ded199`.
+To label a frame, open its linked replay in player-visible mode, choose a
+legal action, enter a reviewer name, authorize research use, and download
+the label file. Validate downloaded labels with
+`scripts/validate_review_queue_labels.py` against this queue before fitting.
+If labels from these Phoenix or Dimension Fusion games are used for training,
+those Main Decks must be excluded from future held-out strength evaluations.
+
+Reproduce after [native setup](native_setup.md) with a new output directory:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --matchup examples/decks/phoenix_control_roberto_martinez_new_jersey_2005.ydk \
+            examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk \
+  --matchup examples/decks/phoenix_control_roberto_martinez_new_jersey_2005.ydk \
+            examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+  --opponent tactical --seed 35000 --seeds 2 --workers 4 \
+  --max-decisions 3000 --output-dir .cache/goat-ai/current_clone_review_reproduction
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/current_clone_review_reproduction/matchup_*.json \
+  --limit 24 --per-replay 3 --render-viewers \
+  --output .cache/goat-ai/current_clone_review_reproduction/queue.json
+```
+
 ## Broader-clone unseen-deck review queue (27 October 2026)
 
 The feature-v23 broader Tactical imitation checkpoint played Tactical-v14 on

@@ -1007,6 +1007,14 @@ but none is an expert label yet. This prepares independent decision feedback
 without claiming a self-play strength gain; see
 [the review queue](replay_audit.md#broader-clone-unseen-deck-review-queue-27-october-2026).
 
+The fresh current-core imitation child now has its own balanced 24-frame
+review queue from eight newly native-verified Phoenix/Dimension Fusion duels.
+It includes Thunder Dragon timing, weak Flip Summoning, and own-monster Ring
+target prompts. The policy and Tactical choices disagree at every frame;
+none is a human label yet. Use the linked [current review queue](replay_audit.md#current-core-imitation-review-queue-27-october-2026) for independent
+feedback, then reserve different Main Decks for evaluation if its labels
+enter training.
+
 ## M5 — Search and other formats
 
 
