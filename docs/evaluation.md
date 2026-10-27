@@ -8282,3 +8282,29 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
   --seed 30150 --seeds 100 --max-decisions 3000 \
   --verify-replays --distinct-opponents --count-card-actions
 ```
+
+### Exchanged Thunder Dragon native ruling fixture (27 October 2026)
+
+The [period Thunder Dragon FAQ](https://www.goatformat.com/rulings7.html)
+allows the controller of an opponent-owned copy obtained through Exchange to
+discard it and search that controller's own Deck. The new seed-28 fixture
+starts with Exchange in player 0's hand and two Thunder Dragons in player
+1's hand. Exchange transfers one Dragon to player 0, who discards it and
+selects two copies from their own Deck. Player 0's Deck falls from 34 to 32,
+player 1's remains at 35, and the discarded card reaches player 1's
+Graveyard. The opponent receives the two-card search reveal and remembers
+both copies in the opponent-hand multiset. The scripted line is followed by
+random legal play until terminal; the complete trajectory serializes,
+replay-verifies, and passes the visibility audit. The focused Exchange and
+Thunder Dragon native suite passed **5/5 tests**. This establishes the
+specific pinned-core behavior, not every Exchange or banish-replacement
+interaction.
+
+Reproduce with pinned native assets:
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_historical_thunder_exchange.py \
+  tests/test_historical_thunder_dragon.py \
+  tests/test_historical_exchange.py
+```

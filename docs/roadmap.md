@@ -232,6 +232,13 @@ arbitrary-card completeness or M2 rulings. See
 
 ## M2 — Historical correctness gate
 
+A seed-28 Exchange/Thunder Dragon fixture now checks the period ruling that
+an opponent-owned Thunder Dragon taken with Exchange can be discarded to
+search the new controller's own Deck. It verifies both Deck counts, the
+owner's Graveyard, opponent-only search reveal, a complete replay, and the
+visibility audit. This is one high-play card interaction, not full M2
+coverage; see [GOAT rules](goat_rules.md#thunder-dragon).
+
 A native-enabled local regression run on 2026-10-27 passed **1,003 tests**
 in 13 minutes 43 seconds after correction of a schema-v6 test projection
 carrying newer owner and pending-summon fields. The ignored full-run log is
