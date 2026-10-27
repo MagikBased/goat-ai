@@ -8045,3 +8045,72 @@ The evaluator required unseen Main Decks and bound the same native assets,
 card scripts, source, local deck hashes, opponent, and seeds in the paired
 Tactical comparison. All 192 tournament duels reached terminal; the fixture
 tests, rather than the tournaments, recorded full replay-verified trajectories.
+
+### Additional Tactical imitation and cross-family holdout (27 October 2026)
+
+The current-core imitation child above was continued on **32 newly recorded
+Tactical-v14 versus Tactical-v14 duels**: Daryl Gessler Gravekeepers versus
+Cas Stomphorst Flip Control on seeds 36300–36307, and Matt Peddle Goat Control
+versus Montague Warrior on seeds 36308–36315, with the demonstrator in both
+seats. These are distinct from the Charlotte/Phoenix/Dimension Fusion
+evaluation compositions. The 32 source trajectories contain **15,689 native
+decisions** and **7,845 demonstrator decisions**. The clone trainer replay-
+verified and visibility-audited every source duel before fitting. Two epochs,
+width 32, minibatch 16, batched forward, omitted forced forwards, learning
+rate `0.0002`, seed 56, and four verification workers reduced imitation loss
+from 0.113257 to 0.100014. Reported total time was **20.37 seconds**, including
+5.70 seconds of verification and 8.24 seconds of fitting. The ignored
+checkpoint `.cache/goat-ai/fv23_current_diversity_36300_36315.pt` has SHA-256
+`3afb14c8e11c3ed23fdf20b7e8d7b976309932dce7512e97071bae7b1304936f`.
+The sorted `relative_path + space + SHA-256 + newline` manifest over all 32
+source files hashes to
+`f4361fd0de0ccda48e3c7285ccd3abc32a04afdc30a722bbcefaa022a880d303`.
+
+On unseen Charlotte Zombie versus Phoenix and WikiFormat Dimension Fusion,
+both deck assignments and policy seats, seeds 36400–36407, the child scored
+**41–23** directly against its parent (paired 95% score interval
+**57.8–71.9%**). By assigned deck it scored Zombie 21–11, Phoenix 12–4, and
+Dimension Fusion 8–8. On matched seeds 36408–36415 against Tactical-v14, the
+child scored **18–44–2** and its parent **20–44**. Their paired score
+difference was **−1.6 points** (95% interval **−14.8 to +11.7**).
+
+An independent unseen family, Phoenix versus both the WikiFormat and
+GoatFormat Dimension Fusion lists, reversed the direct result: on seeds
+36500–36507 the child scored **27–37** against its parent (paired interval
+**34.4–51.6%**). On matched Tactical seeds 36508–36515, it scored **18–46**
+versus the parent's **21–43**, a **−4.7-point** paired difference (95% interval
+**−15.6 to +6.3**). Each Tactical comparator confirmed matching opponent,
+seeds, native assets, card scripts, source, and local deck hashes. All **384
+evaluation duels** reached terminal; these tournaments did not save full
+trajectories. The child also retained the two own-resource activations in the
+[Charlotte review](replay_audit.md#charlotte-zombie-holdout-review-27-october-2026).
+It is an experimental matchup-dependent child, not a promoted reference or
+evidence of broad competitive improvement. More synthetic Tactical labels
+alone remain lower priority than independently reviewed decisions and a
+stronger outcome signal.
+
+The ignored direct reports are
+`current_diversity_zombie_vs_parent_36400_36407.json` (SHA-256
+`02853ed408fc90178602ff76b17bf984dc4cf35392a35a8717322b939bf365e8`)
+and `current_diversity_phoenix_vs_parent_36500_36507.json`
+(`4c928e8f1867df05af83c189f9ff24debdcbfde914beee64c02d7b6a100b4c56`).
+The matched child/parent Tactical reports for Zombie are
+`current_diversity_zombie_vs_tactical_36408_36415.json`
+(`82ad9b547916c64759e78ec5a4fa9841264efb12bcaf9360ea3e9661646a6a9f`)
+and `current_parent_zombie_vs_tactical_36408_36415.json`
+(`fd757950ec17ec1fe3a9797748a9975b542b3445b3c5272fbd01dd952553a267`).
+For Phoenix they are `current_diversity_phoenix_vs_tactical_36508_36515.json`
+(`9a0c173234bc56ab59d980882e0b9b49dc2ff70255e909f144a01e27bee9edd4`)
+and `current_parent_phoenix_vs_tactical_36508_36515.json`
+(`6a54de27a0e82862cb5bc8a9ec7cb227a91e108cf78889e5aeaf5920060aad0c`),
+all under `.cache/goat-ai/`. Reproduce the source duels with
+`scripts/collect_heuristic_demos.py --engine experimental --teacher tactical
+--opponent tactical --seeds 8` on each pairing and seed block above. Continue
+the parent with `scripts/train_behavioral_clone.py --engine experimental
+--feature-version 23 --width 32 --epochs 2 --batch-size 16 --batched-forward
+--omit-forced-forward --verification-workers 4 --learning-rate 0.0002
+--seed 56 --init-checkpoint
+.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt` and all 32
+source replay paths. Evaluate with `scripts/evaluate_policy.py --engine
+experimental --both-deck-assignments --require-unseen-main-decks --workers 4
+--seeds 8 --max-decisions 3000` on the pairs and seed blocks above.

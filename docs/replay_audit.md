@@ -1,5 +1,34 @@
 # Early replay decision audit
 
+## Charlotte Zombie holdout review (27 October 2026)
+
+The current-core feature-v23 imitation child played Tactical-v14 on Jae Kim's
+2005 Charlotte Zombie Main Deck versus 2005 Phoenix Control, with both deck
+assignments and policy seats on seed 36200. The collector recorded **four
+terminal duels and 1,371 decisions**; both collection and shortlisting
+independently native-replayed the trajectories and audited player visibility.
+The saved checkpoint's greedy actions reproduced at each policy decision.
+
+The [local review queue](../.cache/goat-ai/current_clone_zombie_review_36200/queue.html)
+selected **15 frames** from 60 candidates. At decision 6 in
+`matchup_00_seed_36200_seat_0.json`, the policy activates Nobleman of
+Crossout while only its own Set monster is available. At decision 17 in the
+same duel, it activates Heavy Storm with other own backrow and no opposing
+backrow. The optional Tactical baseline avoids both activations. The source
+positions support the user's earlier resource-loss reports, but Tactical's
+other suggestions are review candidates rather than expert labels.
+
+A later 32-duel Tactical imitation continuation on different Main Decks
+still chose **both flagged activations** when rescored on these exact visible
+positions. Neither Charlotte duel nor any queue frame trained that child;
+Charlotte remains a holdout. The collection manifest SHA-256 is
+`270972b9da9feee13397ce3cbdbd8aa608e86b09f4319dc38ea07ab9291b80c7`;
+the queue JSON SHA-256 is
+`f2b1fa9fb72d9a677834202a6b39ffcfbd2ca00fdf26febd3b37801dafb311a8`.
+See [evaluation](evaluation.md#additional-tactical-imitation-and-cross-family-holdout-27-october-2026)
+for the outcome check. Labeling frames from this queue would move Charlotte
+out of future unseen-deck evaluations.
+
 ## Current-core imitation review queue (27 October 2026)
 
 The fresh current-core feature-v23 Tactical imitation child played

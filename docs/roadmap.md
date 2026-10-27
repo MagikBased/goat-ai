@@ -1022,6 +1022,15 @@ none is a human label yet. Use the linked [current review queue](replay_audit.md
 feedback, then reserve different Main Decks for evaluation if its labels
 enter training.
 
+A further 32-duel current-core Tactical imitation continuation trained on
+Gravekeepers/Flip Control and Matt Goat Control/Warrior. It beat its parent
+41–23 directly on an unseen Charlotte Zombie pairing, but lost 27–37 on a
+second unseen Phoenix/Dimension Fusion family and did not improve against
+Tactical-v14 on either family. Two own-resource mistakes in a verified Zombie
+review queue also persisted. Keep the child experimental and prioritize
+independently reviewed decision feedback and outcome learning; see
+[evaluation](evaluation.md#additional-tactical-imitation-and-cross-family-holdout-27-october-2026).
+
 ## M5 — Search and other formats
 
 
