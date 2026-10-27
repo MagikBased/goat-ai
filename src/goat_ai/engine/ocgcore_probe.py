@@ -962,7 +962,11 @@ class OcgcoreProbe:
                             (card.equip_target[0], card.equip_target[2])
                             if location == LOCATION_SZONE and card.equip_target
                             and card.equip_target[1] == LOCATION_MZONE else None,
-                            card.race if location == LOCATION_MZONE and faceup else None,
+                            # Magical Hats can put a Spell/Trap in a Monster
+                            # Zone. Its native QUERY_RACE is zero: no current
+                            # monster Type, rather than an invalid Type mask.
+                            (card.race or None) if location == LOCATION_MZONE and faceup
+                            else None,
                             card.owner if location == LOCATION_MZONE and faceup else None)
 
         field = tuple(view_card(player, location, sequence, card)

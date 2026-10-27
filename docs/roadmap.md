@@ -149,6 +149,15 @@ visibility audit. These are broader protocol and selection-boundary checks,
 not a full observation or historical ruling certificate; see
 [the action-coverage report](competitive_action_coverage.md).
 
+A further 50-pair distinct whitelist sweep (seeds 10224–10273) exposed two
+new native-path cases. A Magical Hats Spell/Trap flipped face-up in a Monster
+Zone has no Type; the observation and trajectory schema now preserve an
+explicit null Type and the exact seed 10247 reaches terminal with full replay
+and visibility verification. Seed 10227 still fails on a recursive native
+event when GOAT Rivalry of Warlords requests a Type choice while two face-up
+Types are present. Keep M1 open until this native interaction is fixed and
+verified; see [the protocol log](evaluation.md).
+
 ## M2 — Historical correctness gate
 
 A native-enabled local regression run on 2026-10-27 finished with 981 passed

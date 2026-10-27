@@ -540,7 +540,9 @@ def test_current_monster_type_requires_schema_twenty_four_and_stays_public(tmp_p
     action = Action("0", "pass", 0)
     visible = CardView(1, "monster", "faceup", 49003308, 0, "attack",
                        1850, 1000, race=524288)
-    current_view = replace(view(), turn_player=0, field=(visible,))
+    hats_trap = CardView(0, "monster", "faceup", 504700090, 1, "defense",
+                         0, 0, race=None)
+    current_view = replace(view(), turn_player=0, field=(visible, hats_trap))
     current = Trajectory("goat", ("a", "b"), 7,
                          (DecisionRecord(current_view, (action,), action),), 0,
                          schema_version=24, terminal_observation=current_view)

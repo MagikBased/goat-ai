@@ -91,9 +91,6 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
             raise ValueError("schema v23 requires the public turn player")
         if version < 24 and any(card.race is not None for card in cards):
             raise ValueError("current monster Type requires schema v24")
-        if version >= 24 and any(card.zone == "monster" and card.position == "faceup"
-                                 and card.race is None for card in view.field):
-            raise ValueError("schema v24 requires current Type for face-up monsters")
         if version < 25 and (view.pending_summon is not None
                              or any(card.owner is not None for card in cards)):
             raise ValueError("summon context and original owner require schema v25")
@@ -132,10 +129,11 @@ def read_trajectory(path: str | Path) -> Trajectory:
         view["hand"] = cards(view["hand"])
         if "own_extra_deck" in view:
             view["own_extra_deck"] = cards(view["own_extra_deck"])
+        if version >= 24 and any(card.get("zone") == "monster"
+                                 and card.get("position") == "faceup"
+                                 and "race" not in card for card in view["field"]):
+            raise ValueError("schema v24 requires a Type field for face-up monsters")
         view["field"] = cards(view["field"])
-        if version >= 24 and any(card.zone == "monster" and card.position == "faceup"
-                                 and card.race is None for card in view["field"]):
-            raise ValueError("schema v24 requires current Type for face-up monsters")
         if version >= 25 and any(card.zone == "monster" and card.position == "faceup"
                                  and card.owner is None for card in view["field"]):
             raise ValueError("schema v25 requires owner for face-up monsters")

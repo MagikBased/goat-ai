@@ -4821,6 +4821,43 @@ gain. Neither is evidence for M4's trained-policy or self-play gate.
 
 ### Distinct whitelist-deck protocol probe
 
+#### Magical Hats Type encoding and unresolved Rivalry event (27 October 2026)
+
+A new 50-pair sweep of independently generated 40-card GOAT-whitelist decks,
+seeds 10224–10273 with distinct opponent seed offset 1,000,000, initially
+produced 48 terminal, replay-verified duels. Seed 10247 failed when Magical
+Hats placed GOAT Energy Drain (`504700090`, a Trap) in a Monster Zone and an
+attack flipped it face-up. Native `QUERY_RACE=0` is expected for a card with
+no monster Type; the observation validator had incorrectly rejected it. The
+adapter now emits `race=None`, and schema-v24+ trajectories require the
+explicit `race` field while allowing its null value. A new regression covers
+that exact 915-decision duel, serialization, full native replay, and the
+visibility audit. [Historical Rivalry rulings](https://www.goatformat.com/rulings6.html)
+explicitly state that the Spell/Trap cards summoned by Magical Hats have no
+Type.
+
+On the corrected sweep, **49/50 duels reached terminal** and all **51,250
+decisions in those 49 duels** replay-verified and passed the legal-choice
+visibility audit. Seed 10227 still stops at decision 369 when GOAT Rivalry of
+Warlords (`504700158`) asks its controller to retain one of two face-up
+Types. Both legal Type choices reproduce the native `recursive event trigger
+detected` error. Removing the pinned script's explicit `Duel.Readjust()` in a
+temporary local experiment did not clear the error, so no script change was
+retained. This is a known protocol gap; no outcome was fabricated for that
+duel, and the 49 successes do not establish arbitrary-deck correctness.
+The ignored report is
+`.cache/goat-ai/random-probe-distinct-10224-10273-fixed/report.json`
+(SHA-256 `393a2d30218fcbcf549691999373527553db1407718089789a7223da3db21507`).
+Reproduce after [native setup](native_setup.md) with:
+
+```bash
+PYTHONPATH=src:. python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/random-probe-distinct-10224-10273-fixed \
+  --seed 10224 --seeds 50 --max-decisions 3000 \
+  --distinct-opponents --verify-replays
+```
+
 `scripts/probe_random_decks.py --seed 10000 --seeds 24 --max-decisions 3000
 --distinct-opponents --verify-replays` generated 48 different whitelist-legal
 40-card decks and played 24 seeded random-agent duels. Before the adapter
