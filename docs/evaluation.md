@@ -7393,3 +7393,29 @@ both Tactical pairs. Reports are the eight ignored
 `--engine experimental --both-deck-assignments --require-unseen-main-decks
 --workers 4 --max-decisions 3000`. These results do not establish a
 competitive improvement. The unchanged parent remains the reference.
+
+### Distinct-opponent whitelist protocol sweep (27 October 2026)
+
+The experimental GOAT adapter completed **20/20** newly seeded duels between
+independently generated, whitelist-legal 40-card Main Decks. The 40 deck files
+contained **1,036 distinct Main Deck IDs**; every opponent deck hash differed
+from its paired deck hash. Seeds 30000–30019 used RandomAgent, a 3,000-decision
+limit, and full native replay and player-visibility verification. All **21,078
+decisions** replay-verified; game lengths ranged from 436 to 1,566 decisions.
+The visibility audit counted 217 hidden-field, 1,174 opponent-field, and 18
+opponent-hand choice references. There were no reported native-message errors
+or censored games. The ignored report is
+`.cache/goat-ai/whitelist_distinct_30000_30019/report.json`, SHA-256
+`8208baa7f409fdad3141d21082e97eca567d1adaaf73339a8c6e27dccb347368`.
+Reproduce it after native setup with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --seed 30000 --seeds 20 --max-decisions 3000 \
+  --card-pool whitelist --distinct-opponents --verify-replays \
+  --output .cache/goat-ai/whitelist_distinct_30000_30019
+```
+
+This is protocol coverage, not a historical correctness test for all 1,036
+cards. Each generated deck has 40 distinct canonical Main Deck cards and no
+Extra or Side Deck; such random lists are not competitive deck samples.

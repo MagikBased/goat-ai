@@ -88,6 +88,14 @@ A tournament-pool random-deck mode now mixes only Main Deck cards from the
 six sourced tournament lists within pinned copy limits, with a sourced Extra
 Deck. Seeds 18600–18649 produced 50 distinct legal decks and 50 terminal
 duels; all 46,875 decisions replay-verified against fresh pinned engines.
+
+A separate broad-whitelist sweep on seeds 30000–30019 paired each generated
+40-card deck with an independently generated opponent. All 20 duels reached
+terminal within 3,000 decisions; all 21,078 decisions replay-verified and
+passed the visibility audit. The 40 decks covered 1,036 distinct Main Deck
+IDs. This extends M1 protocol evidence beyond tournament-list mixtures, but
+does not certify the effects or 2005 rulings of every sampled card; see
+[evaluation](evaluation.md#distinct-opponent-whitelist-protocol-sweep-27-october-2026).
 The report fingerprints source decks and 103 loaded native assets. This
 expands common-card protocol coverage while leaving broader whitelist and
 individual historical-ruling coverage open; see
