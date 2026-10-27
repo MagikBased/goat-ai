@@ -40,8 +40,7 @@ allocates only the declared output size. Our reader accepts at most eight
 extra zero bytes and still rejects nonzero or excessive output; that eight-byte
 bound is a defensive parser limit, not an EDOPro format guarantee. These are
 modern packet-stream samples, not GOAT duels or demonstrations of recoverable
-player decisions. A standalone real `yrp1` file and a permitted GOAT replay
-remain unvalidated.
+player decisions. A permitted real GOAT replay remains unvalidated.
 
 Packet inspection narrows the reconstruction path. All five sampled
 `.yrpX` streams had **zero** `MSG_SELECT_*`/selection prompt packets, but each
@@ -57,6 +56,32 @@ may permit response reconstruction if the original engine/scripts can be
 matched. A response byte sequence still does not identify the corresponding
 player-visible observation or all legal actions. Do not train on it without
 re-running and validating the duel.
+
+A separate, actual standalone `.yrp` file from the public
+[BOSS-3000 replay repository at commit `7b56a7b`](https://github.com/BOSS-3000/ygopro-replays-by-BOSS/blob/7b56a7b9c344b5ae020ca8d714ff863f30443c6c/FROGZ%20OTK%20ROCK%20STUN.yrp)
+was checked read-only in ignored local cache. Its SHA-256 is
+`3f3c2ffcdbe836387739355b4aecd76f28a8117cff5b119c59145d3dc79dfaae`.
+The structural reader found two 40-card Main Decks, two 15-card Extra Decks,
+and 248 saved responses. Its duel flags differ from the supported GOAT
+profile; 65 Main and all 30 Extra Deck entries fall outside the pinned GOAT
+whitelist, and both Decks fail the native GOAT validator. This confirms that
+the reader can parse one real standalone legacy container, **not** that the
+saved responses reconstruct on the pinned core or that the game is GOAT.
+Its old header also records no four-word RNG state for the current native
+reconstruction path. That is a separate compatibility limit after the GOAT
+setup failure.
+The source repository does not identify a redistribution or training license,
+so this file is not committed or admitted as a demonstration. Reproduce the
+read-only screen with the pinned source revision:
+
+```bash
+curl -L --fail \
+  'https://raw.githubusercontent.com/BOSS-3000/ygopro-replays-by-BOSS/7b56a7b9c344b5ae020ca8d714ff863f30443c6c/FROGZ%20OTK%20ROCK%20STUN.yrp' \
+  -o .cache/goat-ai/replay_samples/boss_frogz_rock_stun.yrp
+PYTHONPATH=src:. .venv/bin/python scripts/inspect_edopro_replay.py \
+  .cache/goat-ai/replay_samples/boss_frogz_rock_stun.yrp \
+  --native-deck-screen .cache/goat-ai
+```
 
 The reader now retains the three `yrp1` duel settings that the pinned upstream
 `Replay::ParseParams` reads: starting LP, opening hand size, and cards drawn

@@ -414,6 +414,10 @@ Main and Extra Decks. A native test confirms that it catches an alias pair
 over the shared limited-card count and a non-Fusion in the Extra Deck that the
 whitelist-only screen cannot catch. The replay container has no Side Deck
 record; deck screening alone cannot admit a replay for training.
+A public standalone 2012 `.yrp` with 248 saved responses now also passes
+structural intake, closing the real-file check for that container form. Its
+rules flags and Decks fail GOAT screens, and its repository identifies no
+training license, so it remains an ignored read-only sample. See [research](research.md).
 The structural reader now retains the three legacy duel settings required
 to recreate startup. A separate private-safe setup screen compares the
 embedded legacy replay, when present, with this project's two-player,
