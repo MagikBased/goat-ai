@@ -935,6 +935,12 @@ decisions through the common environment, then replay-verifies and passes the
 visibility audit. This is an MR1 protocol result, not an Edison duel: the
 2010 release pool, restrictions, effect scripts, Synchro actions, and historical
 rulings remain open.
+An isolated Junk Synchron/Junk Warrior fixture now also exercises one Level 5
+Synchro line under MR1. The native core offers the Extra Deck action and moves
+both selected materials to the Graveyard; the complete 1,439-decision duel
+replay-verifies and passes the visibility audit. The fixture uses a tiny sourced
+card subset and modern pinned scripts. It does not validate all 2010 Synchro
+rulings, effect text, or Edison legality; see [the Edison audit](edison_research.md).
 An independent 2009 deck-construction validator now accepts an explicitly
 audited eligible-card set and checks Main, Extra, and Side sizes, Fusion/Synchro
 placement, and shared canonical copy caps. It deliberately does not infer

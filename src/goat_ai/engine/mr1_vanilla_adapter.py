@@ -18,6 +18,7 @@ class Mr1VanillaEngine(RestrictedOcgcoreEngine):
     database, with no Extra or Side Deck. This is only a decision/replay probe:
     it does not check the 2010 release pool or establish Edison correctness.
     """
+    probe_mode = "mr1_vanilla"
 
     def __init__(self, native_root: str | Path) -> None:
         self.root = Path(native_root)
@@ -54,9 +55,10 @@ class Mr1VanillaEngine(RestrictedOcgcoreEngine):
         cards2 = self._load_deck(deck2)
         self.probe = OcgcoreProbe(self.root / "build/libocgcore.so",
                                   self.root / "database/cards.cdb",
-                                  self.root / "scripts", mode="mr1_vanilla")
+                                  self.root / "scripts", mode=self.probe_mode)
         try:
-            self.probe.first_decision(seed, cards1.main, cards2.main)
+            self.probe.first_decision(seed, cards1.main, cards2.main,
+                                      cards1.extra, cards2.extra)
             return self._decision()
         except Exception:
             self.close()

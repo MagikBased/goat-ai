@@ -124,6 +124,41 @@ not apply the March 2010 restriction list or release cutoff and does not test
 effect cards, Synchro Summoning, 2010 rulings, or Edison deck legality. The
 `mr1_startup` mode remains read-only and refuses gameplay responses.
 
+## First Synchro protocol fixture
+
+[Konami's 5D's Starter Deck 2008 catalog](https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=1&pid=13306000&request_locale=en&rp=99999)
+lists Junk Synchron and Junk Warrior; the [official Junk Warrior card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7696&ope=2&request_locale=en)
+dates its first TCG printing to 5 August 2008 and specifies Junk Synchron
+plus non-Tuner material. The separate `Mr1SynchroProbeEngine` admits only
+the old vanilla fixture cards, Bokoichi, and this named pair. It checks Main,
+Extra, and copy limits using the March 2010 restriction table, but its tiny
+eligible-ID set is a **probe subset**, not the full Edison release pool.
+
+In a seeded native duel, one player Sets Level 2 Bokoichi, the opponent
+destroys it by battle, and Junk Synchron later revives it. The engine offers
+Level 5 Junk Warrior from the Extra Deck, accepts Junk Synchron and Bokoichi
+as materials, and moves both to the Graveyard. The duel then terminates after
+1,439 decisions. The complete trajectory replay-verifies and passes the
+player-visibility audit. MR1 uses unmodified upstream `utility.lua` and the
+pinned official scripts for the two named effect cards. Reproduce the
+fixture and open the resulting trajectory in the existing replay viewer:
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_synchro_probe.py \
+  --output replays/mr1_synchro_seed3.json
+PYTHONPATH=src:. .venv/bin/python scripts/render_replay.py \
+  replays/mr1_synchro_seed3.json
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_synchro_probe.py
+```
+
+The current script text, Junk Synchron's effect details, historical priority,
+and Synchro timing have **not** been compared against 2010 source rulings.
+This fixture proves the native decision protocol can represent one Synchro
+line; it does not establish an Edison simulator or justify Edison training.
+The replay viewer can show its player-visible trajectory, but its GOAT-only
+reviewer-reveal verifier does not support this MR1 ruleset.
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including
@@ -138,7 +173,7 @@ effect cards, Synchro Summoning, 2010 rulings, or Edison deck legality. The
    should settle individual cases.
 4. Audit player-visible observations and legal actions in Edison fixtures, then
    complete seeded duels and replay verification before benchmarking throughput.
-   The MR1 vanilla fixture checks this protocol for Normal Monsters only.
+   MR1 vanilla and one Junk Warrior fixture check protocol paths only.
 
 No Edison simulator, deck-legality claim, or Edison training data is available
 yet. Keep GOAT and Edison trajectory ruleset versions distinct.

@@ -32,6 +32,7 @@ from goat_ai.observations import (
 CORE_API_VERSION = (11, 0)
 GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
 MR1_FLAGS = 853760  # DUEL_MODE_MR1 in pinned ocgapi_constants.h
+MR1_SYNCHRO_CARDS = frozenset({63977008, 60800381})  # Junk Synchron / Junk Warrior
 UPSTREAM_UTILITY_SHA256 = "59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a"
 GOAT_DECK_CONFIRM_OLD = b"Duel.ConfirmCards(tp,dg)"
 GOAT_DECK_CONFIRM_HISTORICAL = b"Duel.ConfirmCards(1-tp,dg)"
@@ -283,8 +284,9 @@ class OcgcoreProbe:
     """Owns one native duel; MR1 gameplay remains restricted to vanilla cards."""
 
     def __init__(self, library: Path, database: Path, scripts: Path, *,
-                 mode: Literal["goat", "mr1_startup", "mr1_vanilla"] = "goat") -> None:
-        if mode not in ("goat", "mr1_startup", "mr1_vanilla"):
+                 mode: Literal["goat", "mr1_startup", "mr1_vanilla",
+                               "mr1_synchro_probe"] = "goat") -> None:
+        if mode not in ("goat", "mr1_startup", "mr1_vanilla", "mr1_synchro_probe"):
             raise ValueError("unsupported native startup mode")
         self.mode = mode
         self.flags = GOAT_FLAGS if mode == "goat" else MR1_FLAGS
@@ -466,8 +468,11 @@ class OcgcoreProbe:
         if relative.is_absolute() or ".." in relative.parts:
             self.errors.append(f"unsafe script path: {relative}")
             return 0
-        if (self.mode != "goat" and relative.name.startswith("c")
-                and relative.suffix == ".lua" and relative.stem[1:].isdigit()):
+        card_script = (relative.name.startswith("c") and relative.suffix == ".lua"
+                       and relative.stem[1:].isdigit())
+        if (self.mode != "goat" and card_script
+                and (self.mode != "mr1_synchro_probe"
+                     or int(relative.stem[1:]) not in MR1_SYNCHRO_CARDS)):
             # Core requests a script for each card, even when a normal monster
             # needs none. The deck was checked before any cards were inserted.
             return 0
@@ -497,7 +502,10 @@ class OcgcoreProbe:
         relative_path = path.relative_to(self.scripts).as_posix()
         if (self.mode != "goat" and path.parent != self.scripts
                 and not (relative == Path("proc_unofficial.lua")
-                         and path.parent == self.scripts / "unofficial")):
+                         and path.parent == self.scripts / "unofficial")
+                and not (self.mode == "mr1_synchro_probe" and card_script
+                         and int(relative.stem[1:]) in MR1_SYNCHRO_CARDS
+                         and path.parent == self.scripts / "official")):
             self.errors.append(f"MR1 startup probe cannot load {relative}")
             return 0
         contents = path.read_bytes()
@@ -639,11 +647,15 @@ class OcgcoreProbe:
         if len(deck) < 40 or (opponent_deck is not None and len(opponent_deck) < 40):
             raise ValueError("native duel requires at least 40 main-deck cards per player")
         if self.mode != "goat":
-            if extra or opponent_extra:
+            if self.mode != "mr1_synchro_probe" and (extra or opponent_extra):
                 raise ValueError("MR1 startup probe requires empty Extra Decks")
+            if self.mode == "mr1_synchro_probe" and any(
+                    code != 60800381 for code in (*extra, *opponent_extra)):
+                raise ValueError("MR1 Synchro probe permits Junk Warrior only in Extra Deck")
             for code in (*deck, *(opponent_deck if opponent_deck is not None else deck)):
                 row = self._card_row(code, "type")
-                if row is None or row[0] != 17:
+                if row is None or (row[0] != 17 and not (
+                        self.mode == "mr1_synchro_probe" and code == 63977008)):
                     raise ValueError("MR1 startup probe requires normal monsters only")
         self._initial_main_decks = (tuple(sorted(deck)),
                                     tuple(sorted(opponent_deck if opponent_deck is not None
