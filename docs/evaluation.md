@@ -7873,6 +7873,79 @@ from both checkpoints' training provenance. Ignored report SHA-256 values are
 (parent versus Tactical). This schedule does not show a self-play gain; the
 selected parent remains unchanged.
 
+### Longer lower-KL PPO continuation (27 October 2026)
+
+To test whether the earlier short rollouts were undertraining the policy, a
+predeclared continuation used **128** four-role self-play games on seeds
+47000–47127 from the selected feature-v23 parent. It kept the two 2022
+training matchups, four process workers, four-game PPO rollouts, per-episode
+weighting, learner-deck moving baselines, three epochs, batch size 16, and
+learning rate 0.0001. It reduced the frozen-parent KL weight from 0.5 to 0.1.
+The snapshot-pool probability was 0.75; the remaining games used RandomAgent.
+All 128 games terminated within 3,000 decisions: 77 learner wins, 50 losses,
+one draw, and 16,988 learner decisions. Measured training wall time was
+108.34 s with `OMP_NUM_THREADS=1`. These training outcomes are not a strength
+estimate. All 128 saved trajectories independently replay-verified against
+the pinned native assets and passed the visibility audit, covering **96,181
+decisions**. The audit shortlisted 222 possible mistakes, including 47
+end-turn choices with an activatable Thunder Dragon and 38 own-only Nobleman
+activations; the flags are review prompts, not expert labels.
+
+The ignored checkpoint is
+`.cache/goat-ai/fv23_ppo_128_kl01_47000_47127.pt` (SHA-256
+`5f0eae50832978cfb576b138f569a4e3d33f1fa7f881abe3d47fcf4330818175`),
+and its ignored replay audit is
+`.cache/goat-ai/fv23_ppo_128_kl01_47000_47127_audit.json` (SHA-256
+`1fccc399d90f7faeadd4837c6ca87bb3207eb383e6ba98433adab266755e4f7a`).
+
+Two independently held-out families used both deck assignments, both policy
+seats, and 16 new seeds each. Against the unchanged parent directly, the child
+scored **35–29** on 2005 Rhymus Goat Control versus Charlotte Zombie and
+**34–30** on Phoenix Control versus Dimension Fusion Turbo. Their paired
+bootstrap 95% score intervals were **42.2–68.8%** and **42.2–64.1%**.
+Against Tactical v14 on the same schedules, the child scored **22–40–2** and
+**20–44**; the parent scored **23–40–1** and **26–38**. The verified paired
+child-minus-parent score differences were **−0.8 points** (95% interval
+−14.1 to +12.5) and **−9.4 points** (−26.6 to +6.3). The comparator checked
+native and source fingerprints, unchanged local decks, and absence of both
+evaluation Main Deck compositions from both checkpoints' training records.
+The six ignored evaluation reports have SHA-256 values, in direct-child,
+child-Tactical, parent-Tactical order: Rhymus/Zombie
+`b5f53838e3c7488a2cff62ecfb88f3570f81f035126ff0951d7829a96e5e3d08`,
+`7f983d999d5f7e39b3db5dbb13707940fe8168e0af5c57777f76347e62193ae7`,
+`ee143774359e12b9378deaaad92e09df3d849e4ec574321298eb2d0337a9e62b`;
+Phoenix/Dimension
+`eba108a8b279f23a7a9626e5636dfc90b60ae74f7d268e9e19448fa39731e318`,
+`95c6c06dc887e98d4973b67b6b19ed8e3f5462c8efada46b6fe30c564b18b38a`,
+`cd5db5ab32105c57e1d1bfcfb154ac74ee9320ef37f4ab87ddab5c85d28878f2`.
+This is not a demonstrated competitive gain; the parent remains selected.
+
+Reproduce training with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --engine experimental \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+            examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --schedule-mode four_roles --seed 47000 --games 128 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 --rollout-workers 4 \
+  --ppo-rollout-weighting per_episode --ppo-baseline-timing online \
+  --ppo-epochs 3 --ppo-batch-size 16 --ppo-clip-epsilon 0.2 \
+  --learning-rate 0.0001 --parent-kl-weight 0.1 --baseline-scope learner_deck \
+  --snapshot-every 4 --max-snapshots 8 \
+  --output .cache/goat-ai/fv23_ppo_128_kl01_47000_47127.pt
+```
+
+Use `scripts/audit_selfplay_replays.py` on all 128 `episode_*.json` files.
+Evaluate with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --seeds 16 --workers 4
+--max-decisions 3000`: seed 47200 for Rhymus/Zombie, seed 47300 for
+Phoenix/Dimension, and either `--opponent-checkpoint` for direct comparison
+or `--opponent tactical` for the two matched Tactical arms.
+
 ### Visible-rule v2 preference ablation (27 October 2026)
 
 The `visible_audit_v2` automated-label experiment adds two narrow categories

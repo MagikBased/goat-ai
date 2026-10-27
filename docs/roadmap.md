@@ -1720,6 +1720,16 @@ Goat Control versus Charlotte Zombie decks, compared with the parent's
 the parent remains selected. See
 [evaluation](evaluation.md#corrected-frozen-rollout-baseline-check-27-october-2026).
 
+A 128-game PPO continuation with a lighter parent-KL penalty also failed the
+held-out promotion gate. It scored 35–29 and 34–30 directly against its parent
+on two unseen deck families, with both intervals crossing 50%; its Tactical
+v14 results were no better than the matched parent's results. All 128 source
+games replay-verified and passed the visibility audit. The recurring Thunder
+Dragon and own-only Nobleman flags suggest focusing next on independently
+reviewed action values and better credit assignment, rather than treating
+training-game win rate as progress. See
+[evaluation](evaluation.md#longer-lower-kl-ppo-continuation-27-october-2026).
+
 The visible-resource v3 experiment adds replay-verified counterfactual
 comparisons for own-only Nobleman and negative visible Heavy Storm trades,
 including decisions where the recorded policy avoided the loss. A child fit
