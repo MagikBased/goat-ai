@@ -5863,3 +5863,39 @@ One `cProfile` pass over the optimized first duel attributed about 1.16 of
 These overlapping cumulative times identify observation construction as the
 next performance candidate, but the Python profiler does not establish how
 much can be saved without changing the information contract.
+
+### Greedy forced-choice and inference-mode ablations (27 October 2026)
+
+Greedy `PolicyAgent` now returns its sole legal action without feature encoding
+or a network forward. The self-play sampler and greedy agent also use PyTorch
+inference mode for multi-option decisions. Neither change alters model weights,
+legal choices, or the agent's information boundary. A focused test makes the
+greedy policy forward fail if it is called on a forced decision.
+
+On the same Intel Core i7-10700K, PyTorch 2.5.1 CPU, and one Torch thread, an
+AB/BA benchmark of four native control/Chaos probe duels (seeds 12000–12003)
+found 1,020 forced **greedy-policy** decisions per schedule. Each comparison
+produced exactly the same four native trajectories, with 3,284 total decisions.
+The reference path still scored forced choices and took **4.888 versus 3.398
+seconds** in the first order (1.438×); the reversed order took **4.676 versus
+3.370 seconds** (1.387×). This is a measured speedup for these complete
+greedy-policy duels against `RandomAgent`, not a training update or a playing
+strength gain.
+
+An independent AB/BA benchmark isolated inference mode in sampled self-play on
+the same four seeds. All trajectories matched. No-grad versus inference-mode
+times were **3.835 versus 3.542 seconds** (1.083×) and **3.518 versus 3.582
+seconds** (0.982×); the full-duel result is inconclusive at this scale. A
+single fixed-decision, 3,000-forward microbenchmark measured approximately
+3.00 versus 2.67 seconds, but does not establish an overall duel speedup.
+Both benchmarks used v23 checkpoint SHA-256
+`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/benchmark_greedy_forced.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --games 4 --rounds 2 --seed 12000
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/benchmark_inference_mode.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --games 4 --rounds 2 --seed 12000
+```

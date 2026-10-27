@@ -109,7 +109,7 @@ def sample_legal_action(model: LegalActionPolicy, vocabulary: CardVocabulary,
         return legal_actions[0]
     features = encode_decision(observation, legal_actions, vocabulary, model.feature_version)
     device = next(model.parameters()).device
-    with torch.no_grad():
+    with torch.inference_mode():
         logits = model(features.to(device)) / temperature
         probabilities = torch.softmax(logits, dim=0).cpu()
         index = int(torch.multinomial(probabilities, 1, generator=generator).item())

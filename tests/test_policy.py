@@ -1486,6 +1486,18 @@ def test_forced_self_play_action_skips_inference_and_sampling(monkeypatch):
         sample_legal_action(model, vocabulary, view(), forced, generator, temperature=0)
 
 
+def test_forced_greedy_action_skips_inference(monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=16)
+    forced = actions()[:1]
+
+    def unexpected_forward(*_args, **_kwargs):
+        pytest.fail("forced action should not run the policy")
+
+    monkeypatch.setattr(model, "forward", unexpected_forward)
+    assert PolicyAgent(model, vocabulary).select_action(view(), forced) == forced[0]
+
+
 def test_ppo_clipped_surrogate_handles_both_advantage_signs():
     ratio = torch.tensor([1.5, 0.5])
     advantage = torch.tensor([1.0, -1.0])
