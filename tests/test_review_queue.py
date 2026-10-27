@@ -2,7 +2,10 @@
 
 import pytest
 
-from scripts.shortlist_policy_disagreements import select_diverse_candidates
+from scripts.shortlist_policy_disagreements import (
+    select_diverse_candidates,
+    write_review_index,
+)
 
 
 def test_review_queue_prioritizes_margin_and_caps_prompt_and_replay():
@@ -33,3 +36,24 @@ def test_review_queue_puts_visible_audit_before_confidence_margin():
     ]
     chosen = select_diverse_candidates(candidates, 1, 1)
     assert chosen[0]["decision_index"] == 2
+
+
+def test_review_index_separates_player_label_and_hidden_reveal_views(tmp_path):
+    queue = tmp_path / "review/queue.json"
+    queue.parent.mkdir()
+    viewer = queue.parent / "queue_viewers/game.html"
+    viewer.parent.mkdir()
+    viewer.write_text("player view")
+    viewer.with_suffix(".review.html").write_text("reviewer view")
+    selected = [{"viewer": f"{viewer}#decision=7", "turn": 2,
+                 "phase": "main1", "viewer_frame": 7,
+                 "policy_action": {"kind": "normal_summon", "parameters": {}},
+                 "teacher_action": {"kind": "set_monster", "parameters": {}},
+                 "audit_flags": ["weak_flip_summon"],
+                 "probability_margin": 0.5}]
+    index = write_review_index(selected, queue, tmp_path / "native")
+    html = index.read_text()
+    assert 'href="queue_viewers/game.html#decision=7"' in html
+    assert 'href="queue_viewers/game.review.html#decision=7"' in html
+    assert "labeling is disabled there" in html
+    assert "weak flip summon" in html

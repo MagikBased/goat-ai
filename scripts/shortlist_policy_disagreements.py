@@ -77,7 +77,7 @@ def disagreement_fingerprint(record, teacher_action) -> tuple:
 
 def write_review_index(selected: list[dict], output: Path,
                        native_root: Path) -> Path:
-    """Link selected frames without loading private reviewer reveals."""
+    """Link player-visible label frames and separate full-information review."""
     codes = {action["parameters"].get("code")
              for item in selected for action in (
                  item["policy_action"], item["teacher_action"])}
@@ -87,39 +87,65 @@ def write_review_index(selected: list[dict], output: Path,
     def action_label(action: dict) -> str:
         code = action["parameters"].get("code")
         name = names.get(code, f"Card {code}") if code else ""
-        return escape(f"{action['kind']} {name}".strip())
+        return escape(f"{action['kind'].replace('_', ' ')} {name}".strip())
 
-    rows = []
-    for item in selected:
+    def frame_link(path: Path, fragment: str) -> str:
+        relative = path.relative_to(output.parent.resolve())
+        return escape(quote(str(relative), safe="/") + "#" + fragment, quote=True)
+
+    flagged = []
+    disagreements = []
+    for number, item in enumerate(selected, 1):
         viewer, fragment = item["viewer"].split("#", 1)
-        relative = Path(viewer).relative_to(output.parent.resolve())
-        href = quote(str(relative), safe="/") + "#" + fragment
-        reasons = ", ".join(item["audit_flags"]) or "Tactical disagreement"
-        rows.append(
-            f'<tr><td><a href="{escape(href, quote=True)}">'
-            f'{item["turn"]} · {escape(item["phase"])} · frame {item["viewer_frame"]}'
-            f'</a></td><td>{action_label(item["policy_action"])}</td>'
-            f'<td>{action_label(item["teacher_action"])}</td>'
-            f'<td>{escape(reasons)}</td>'
-            f'<td>{item["probability_margin"]:.3f}</td></tr>')
+        label_href = frame_link(Path(viewer), fragment)
+        reveal_path = Path(viewer).with_suffix(".review.html")
+        reveal = (f'<a href="{frame_link(reveal_path, fragment)}">Reveal all cards</a>'
+                  if reveal_path.is_file() else "")
+        reason = (", ".join(flag.replace("_", " ") for flag in item["audit_flags"])
+                  if item["audit_flags"] else "Tactical agent suggests another play")
+        card = (
+            f'<article class="review-card" id="item-{number}">'
+            f'<div class="card-top"><span class="badge">#{number} · '
+            f'{"Flagged play" if item["audit_flags"] else "Alternative"}</span>'
+            f'<span>Turn {item["turn"]} · {escape(item["phase"].replace("_", " "))}'
+            f' · decision {item["viewer_frame"]}</span></div>'
+            f'<h3>{escape(reason)}</h3>'
+            f'<p><strong>AI played:</strong> {action_label(item["policy_action"])}<br>'
+            f'<strong>Tactical suggests:</strong> {action_label(item["teacher_action"])}</p>'
+            f'<div class="links"><a class="primary" href="{label_href}">Open label view</a>'
+            f'{reveal}</div></article>')
+        (flagged if item["audit_flags"] else disagreements).append(card)
     html = ("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             "<title>GOAT AI review queue</title><style>"
-            "body{font:16px system-ui;background:#071925;color:#f1f6f8;"
-            "max-width:1100px;margin:2rem auto;padding:0 1rem}"
-            "table{border-collapse:collapse;width:100%}th,td{padding:.7rem;"
-            "border-bottom:1px solid #42606b;text-align:left}a{color:#8bd9ee}"
-            "</style><h1>GOAT AI review queue</h1>"
-            "<p>Visible-state audit flags come first, followed by diverse"
-            " policy and Tactical-v14 disagreements. These are review prompts,"
-            " not correct-play labels. Open a frame to inspect the complete duel."
-            " The viewer preserves each player's information boundary."
-            " If you know a better legal action, select it in the viewer, enter"
-            " your name, authorize its research use, and download the labels."
-            " Validate each downloaded file against this queue before training.</p>"
-            "<table><thead><tr><th>Replay frame</th><th>Policy played</th>"
-            "<th>Tactical suggested</th><th>Review reason</th>"
-            "<th>Model margin</th></tr></thead><tbody>"
-            + "".join(rows) + "</tbody></table></html>\n")
+            "*{box-sizing:border-box}body{font:16px system-ui;background:#071925;"
+            "color:#f1f6f8;max-width:1180px;margin:0 auto;padding:20px}"
+            "h1{margin:0 0 8px}h2{margin:28px 0 12px}h3{margin:8px 0;font-size:1.05rem}"
+            "p{line-height:1.45}a{color:#8bd9ee}ol{padding-left:24px;line-height:1.55}"
+            ".intro{background:#172731;border:1px solid #36535e;border-radius:12px;"
+            "padding:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,"
+            "minmax(min(100%,350px),1fr));gap:12px}.review-card{background:#172731;"
+            "border:1px solid #36535e;border-radius:12px;padding:16px;min-width:0}"
+            ".card-top{display:flex;justify-content:space-between;gap:12px;"
+            "flex-wrap:wrap;color:#a7c5ca;font-size:.85rem}.badge{color:#ffe2a3}"
+            ".links{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}"
+            ".links a{display:inline-block;border:1px solid #4f7980;border-radius:7px;"
+            "padding:8px 10px;text-decoration:none}.links a:hover{background:#306575}"
+            ".links .primary{background:#234854;color:#fff}"
+            "</style><section class=\"intro\"><h1>GOAT AI review queue</h1>"
+            "<p>Each card opens a complete duel at one decision worth examining."
+            " Flags and Tactical suggestions are prompts, not confirmed mistakes.</p>"
+            "<ol><li>Choose <strong>Open label view</strong> to see exactly what the"
+            " acting AI player could see. The sidebar shows its selected action"
+            " and all legal alternatives.</li><li>Use Previous and Next or the"
+            " arrow keys for context. Your browser Back button returns here.</li>"
+            "<li>If you know a better legal action, choose it under All legal"
+            " actions, enter a reviewer name, authorize research use, and download"
+            " labels. <strong>Reveal all cards</strong> opens a separate inspection"
+            " view with hidden cards shown; labeling is disabled there.</li></ol>"
+            "</section><h2>Flagged decisions</h2><div class=\"grid\">"
+            + "".join(flagged) + "</div><h2>Other choices to compare</h2>"
+            "<div class=\"grid\">" + "".join(disagreements) + "</div></html>\n")
     index = output.with_suffix(".html")
     index.write_text(html, encoding="utf-8")
     return index
@@ -245,6 +271,8 @@ def main() -> None:
                 raise ValueError(f"{path}: replay changed before rendering")
             output = viewer_dir / f"{source.stem}_{digest[:12]}.html"
             render_replay(source, output, args.native_root)
+            render_replay(source, output.with_suffix(".review.html"),
+                          args.native_root, reviewer_reveal=True)
             for item in selected:
                 if item["trajectory"] == path:
                     item["viewer"] = str(output.resolve()) + f"#decision={item['viewer_frame']}"

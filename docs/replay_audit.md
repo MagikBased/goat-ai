@@ -73,6 +73,18 @@ links 32 varied frames from 22 complete duel viewers, including eight
 distinct flagged categories. It is an ignored local review artifact; no
 suggestion is a training label until a person authorizes and validates it.
 
+The queue index now groups flagged decisions and other model/Tactical
+comparisons into readable cards. **Open label view** opens the player-visible
+duel at that decision, with legal actions and retrospective labeling in the
+sidebar. **Reveal all cards** opens a separate, native-verified reviewer view
+of the same duel; labeling is disabled there because hidden-card knowledge
+must not enter a player-visible training label. Previous/Next or the arrow
+keys move through the duel, and the browser Back button returns to the queue.
+Generated queue viewers now find the shared ignored `replays/card_images/`
+cache two directory levels above them. The 22 full-queue label views and 22
+reviewer views were regenerated locally with 96 cached card image files;
+art and reviewer sidecars remain outside Git.
+
 The ignored audit JSON SHA-256 is
 `3f5a9f6104d5bd9ecd73a1ee9fe8f301da78c71a010430edfa964849db235163`;
 the full-corpus queue JSON SHA-256 is

@@ -23,12 +23,23 @@ from goat_ai.observations import (
 )
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
 from scripts.render_replay import (
+    _local_card_images,
     _review_engine,
     _reviewer_frame,
     render_catalog_viewer,
     render_replay,
 )
 from scripts.setup_card_images import setup_card_backs, setup_card_images
+
+
+def test_nested_review_viewer_uses_parent_card_art_cache(tmp_path):
+    art = tmp_path / "replays/card_images"
+    art.mkdir(parents=True)
+    (art / "10.jpg").write_bytes(b"card")
+    (art / "cover.png").write_bytes(b"back")
+    viewer = tmp_path / "replays/review/queue_viewers/game.html"
+    assert _local_card_images(viewer, {10, 11}) == {
+        10: "../../card_images/10.jpg", "back": "../../card_images/cover.png"}
 
 
 def test_reviewer_reveal_rejects_unknown_ruleset_before_native_access(tmp_path):

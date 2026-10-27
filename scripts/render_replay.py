@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 import sqlite3
 from pathlib import Path
 
@@ -92,17 +93,22 @@ def _catalog_codes(native_root: Path) -> set[int]:
 
 
 def _local_card_images(output: Path, codes: set[int]) -> dict[int | str, str]:
-    """Reference only locally cached art beside the generated HTML."""
-    folder = output.parent / "card_images"
+    """Reference the nearest local art cache, including a parent replay folder."""
+    folder = next((parent / "card_images" for parent in
+                   (output.parent, *list(output.parent.parents)[:2])
+                   if (parent / "card_images").is_dir()), None)
+    if folder is None:
+        return {}
+    relative = Path(os.path.relpath(folder, output.parent)).as_posix()
     images = {}
     for code in codes:
         for suffix in ("jpg", "jpeg", "png", "webp"):
             if (folder / f"{code}.{suffix}").is_file():
-                images[code] = f"card_images/{code}.{suffix}"
+                images[code] = f"{relative}/{code}.{suffix}"
                 break
     for key, filename in (("back", "cover.png"), ("backOpponent", "cover2.png")):
         if (folder / filename).is_file():
-            images[key] = f"card_images/{filename}"
+            images[key] = f"{relative}/{filename}"
     return images
 
 
