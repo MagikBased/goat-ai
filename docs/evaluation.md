@@ -6568,3 +6568,75 @@ trajectory is `.cache/goat-ai/fv25_df_vs_phoenix_tactical_17008.json`
 The next policy experiment should address the wider action-value errors
 visible in losses, and require improvement against Tactical across multiple
 unseen deck families before replacing v23.
+
+### Focused Thunder Dragon imitation pilot (27 October 2026)
+
+The held-out loss audit exposed repeated missed Thunder Dragon activation
+opportunities. A new **32-duel** policy-versus-Tactical collection used
+WikiFormat Dimension Fusion/Michael Goat Control and WeirdChamp Bazoo
+Return/Roberto Martinez Phoenix, seeds 17200–17207, both policy seats. All
+**14,715** decisions replay-verified. Among the policy seat's multi-option
+states, **71** offered a Thunder Dragon activation; Tactical v14 chose that
+activation in **58**, and disagreed with the recorded policy in **53**. These
+are synthetic baseline labels, not human demonstrations. The ignored
+collection manifest is
+`.cache/goat-ai/fv23_td_opportunity_train_17200_17207/manifest.json`
+(SHA-256 `b06d6c2ff12aa8818a9b00ec1ba8199572828bdbcbcf74d26b9593aad655d8bf`).
+
+A child of the unchanged feature-v23 reference trained **only its scorer**
+on those 71 labels for 12 epochs, batch 16, learning rate 0.0003, seed 53.
+Training took **13.45 s**, including **6.16 s** for source replay
+verification and **0.89 s** for fitting. The ignored checkpoint is
+`.cache/goat-ai/fv23_td_score_head_17200_17207.pt` (SHA-256
+`bce9bacc9449e8973dfcb2837f2a316ec01ff06862deef057fd47524383db973`).
+On the earlier eight replay-verified loss-audit duels, excluded from this
+fit, the child chose Thunder Dragon activation in **9/13** offered states
+versus the parent's **1/13**; exact Tactical agreement on those states was
+**6/13 versus 1/13**. Overall agreement on the 534 multi-option policy
+states was **428/534 versus 408/534**. These are counterfactual decisions
+on recorded states, not wins.
+
+For competitive evaluation, Dimension Fusion Turbo from GoatFormat Guide,
+Insids Chaos Control, and Lolmarcus Goat Control Main Deck compositions were
+absent from both the parent and child training lineages. On two pairings of
+the first two decks versus Lolmarcus, both assignments and seats, seeds
+17300–17307, the child scored **26–38** directly against its parent over 64
+duels (paired 95% interval **28.1%–53.1%**). When piloting the two Thunder
+Dragon decks it won only **8/32**. The ignored report is
+`.cache/goat-ai/fv23_td_score_head_vs_parent_17300_17307.json` (SHA-256
+`6dad0fe093c507e6d797cc671539ee5494c88b95b0948ee5a5d54468fe39ae50`).
+On a separate matched schedule versus Tactical, seeds 17308–17315, the child
+won **7/64** and the unchanged parent **6/64**. The paired score difference
+was **+1.6 percentage points** with a 95% matchup-seed interval of
+**−6.3 to +9.4 points**. Both policies went **0/16** when piloting Insids
+Chaos Control. The ignored child and parent reports are
+`.cache/goat-ai/fv23_td_score_head_vs_tactical_17308_17315.json` (SHA-256
+`08fcdd8d0ad60e6552fd6380a289cd5afb6809717112d62aeae7e6229431390a`)
+and `.cache/goat-ai/fv23_parent_vs_tactical_17308_17315.json` (SHA-256
+`dc61c9baec389469c4db17f7d2e69bc29da59e6e45e3c2d2f6aa44aa05f5235b`).
+The saved-report comparator accepted matching assets, code, card scripts,
+decks, seeds, and opponent for the Tactical pair. The focused fit corrected
+some isolated decisions but did not improve held-out match strength; the v23
+reference remains unchanged. Broader card-value and timing feedback, with
+separate competitive checks, is needed before another promotion attempt.
+
+Reproduce the fit after collecting the 32 source duels with
+`scripts/collect_policy_matches.py` on the named training pairings and seeds:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/fv23_td_opportunity_train_17200_17207/matchup_*.json \
+  --engine experimental --on-policy-teacher tactical_v14 \
+  --on-policy-teacher-activation-focus-only --focus-card 504700054 \
+  --feature-version 23 --width 32 --trainable-module score \
+  --epochs 12 --batch-size 16 --batched-forward --verification-workers 4 \
+  --learning-rate 0.0003 --seed 53 \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/fv23_td_score_head_17200_17207.pt
+```
+
+Use `scripts/evaluate_policy.py` with the two held-out pairings above,
+`--both-deck-assignments --require-unseen-main-decks --seeds 8 --workers 4`.
+For the direct comparison use `--seed 17300` and `--opponent-checkpoint`
+pointing to the unchanged v23 parent. For the matched Tactical reports use
+`--seed 17308 --opponent tactical` with each checkpoint in turn.

@@ -1157,6 +1157,14 @@ card-value and timing signal that improves independent match outcomes while
 preserving profitable resource use, followed by a separately demonstrated
 self-play gain; see [the evaluation](evaluation.md).
 
+A focused 71-decision Thunder Dragon imitation fit improved fixed-state
+teacher agreement on separate recorded duels, but scored 26–38 directly
+against its parent on unseen deck families and 7–57 against Tactical versus
+the parent's 6–58. A local activation correction alone did not close M4's
+competitive gap; keep the unchanged v23 reference and measure match strength
+before promoting future decision-specific fits. See
+[the evaluation](evaluation.md#focused-thunder-dragon-imitation-pilot-27-october-2026).
+
 An opt-in clipped PPO update now reuses each native self-play duel for
 minibatch policy updates. In matched 32-duel training runs from the v23
 parent, PPO scored 122–69 with one draw against the REINFORCE child over
