@@ -38,6 +38,7 @@ MR1_SYNCHRO_CARDS = frozenset({
     60800381,  # Junk Warrior
     73580471,  # Black Rose Dragon
     44508094,  # Stardust Dragon
+    7391448,   # Goyo Guardian (2010 unrestricted Tuner requirement below)
     44095762,  # Mirror Force
     74131780,  # Exiled Force
     53582587,  # Torrential Tribute
@@ -48,7 +49,15 @@ MR1_SYNCHRO_CARDS = frozenset({
     26202165,  # Sangan
     9748752,   # Caius the Shadow Monarch
 })
-MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094})
+MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094, 7391448})
+UPSTREAM_GOYO_SHA256 = "b1f8f68c428302b537a1bf4b660ef33ae800afd4a1716cd962f3908b2f24302b"
+GOYO_TUNER_REQUIREMENT_CURRENT = (
+    b"Synchro.AddProcedure(c,aux.FilterBoolFunctionEx(Card.IsAttribute,"
+    b"ATTRIBUTE_EARTH),1,1,Synchro.NonTuner(nil),1,99)"
+)
+GOYO_TUNER_REQUIREMENT_2010 = (
+    b"Synchro.AddProcedure(c,nil,1,1,Synchro.NonTuner(nil),1,99)"
+)
 UPSTREAM_UTILITY_SHA256 = "59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a"
 GOAT_DECK_CONFIRM_OLD = b"Duel.ConfirmCards(tp,dg)"
 GOAT_DECK_CONFIRM_HISTORICAL = b"Duel.ConfirmCards(1-tp,dg)"
@@ -669,6 +678,13 @@ class OcgcoreProbe:
                 return 0
             contents = contents.replace(BALTER_NEGATE_OLD,
                                         BALTER_NEGATE_SWORDS_HISTORICAL)
+        if relative_path == "official/c7391448.lua" and self.mode == "mr1_synchro_probe":
+            if (hashlib.sha256(contents).hexdigest() != UPSTREAM_GOYO_SHA256
+                    or contents.count(GOYO_TUNER_REQUIREMENT_CURRENT) != 1):
+                self.errors.append("pinned Goyo script changed; 2010 Tuner correction not applied")
+                return 0
+            contents = contents.replace(GOYO_TUNER_REQUIREMENT_CURRENT,
+                                        GOYO_TUNER_REQUIREMENT_2010)
         self.loaded_script_sha256[relative_path] = (
             hashlib.sha256(contents).hexdigest()
         )

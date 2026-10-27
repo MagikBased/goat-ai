@@ -365,6 +365,44 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_historical_same_time_trigger_choice.py
 ```
 
+## Goyo Guardian historical material correction
+
+The [March 2010 official list](https://www.yugioh-card.com/en/downloads/alt_format/2010-03-01.pdf)
+limits Goyo Guardian to one. Its [official card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7736&ope=2&request_locale=en)
+dates its TCG debut to September 2008, but displays the later requirement
+for an EARTH Tuner. The [Edison historical errata record](https://www.edisonformat.com/rulings/relevant-errata)
+preserves the period material text permitting any Tuner; a [September 2008
+card review](https://www.pojo.com/yu-gi-oh/COTD/2008/Sept/25.shtml) independently
+prints that earlier material line. This is a concrete example of why a modern
+card script cannot be used unchanged for historical play.
+
+The pinned official `c7391448.lua` has SHA-256
+`b1f8f68c428302b537a1bf4b660ef33ae800afd4a1716cd962f3908b2f24302b`
+and requires an EARTH Tuner. In `mr1-synchro-protocol` only, the script reader
+checks that exact hash and replaces the material predicate in memory; the
+resulting loaded script has SHA-256
+`4c2dc55206a96699a270b1ad1ef74ae2760795b9e402026b9b22869704769f27`.
+The upstream file remains untouched, and replay manifests bind the loaded
+script hash. The MR1 probe applies the official one-copy restriction.
+
+In a seed-5 native fixture, DARK Junk Synchron and EARTH Giant Soldier of Stone
+become the Level 6 materials. Goyo destroys the opponent's Dark Blade in
+battle. Accepting its optional effect brings Dark Blade to the controller's
+field face-up in Defense Position; declining leaves it in its owner's
+Graveyard. Both complete duels replay-verify and pass the player-visibility
+audit, with 1,281 and 1,389 decisions respectively. This validates the
+material and battle-trigger paths in this narrow probe, not a general Edison
+engine or all Goyo rulings. Reproduce after native setup:
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_goyo_probe.py \
+  --output replays/mr1_goyo_yes_seed5.json
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_goyo_probe.py \
+  --decline --output replays/mr1_goyo_no_seed5.json
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_synchro_probe.py -k goyo
+```
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including

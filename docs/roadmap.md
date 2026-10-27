@@ -1091,6 +1091,12 @@ The [Edison feasibility audit](edison_research.md) records the official March
 2010 Advanced Format restrictions as a checked data asset and lists the
 remaining card-pool, native-rule, and observation validation gates. This is
 M5 preparation; Edison duels are not yet supported.
+The MR1 Synchro probe now applies a checksum-guarded in-memory correction for
+Goyo Guardian's period generic-Tuner material text. Paired seed-5 duels use a
+non-EARTH Tuner, accept or decline its battle recruitment effect, reach
+terminal, replay-verify, and pass the visibility audit. This is one validated
+historical card path, not a complete Edison profile; see the
+[Edison audit](edison_research.md#goyo-guardian-historical-material-correction).
 The pinned core's MR1 mode now has a separate vanilla-only startup probe and
 complete-duel adapter. The seed-42 Normal Monster fixture completes 1,368
 decisions through the common environment, then replay-verifies and passes the
