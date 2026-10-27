@@ -8750,3 +8750,26 @@ examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk
 examples/decks/zombie_jae_kim_charlotte_2005.ydk --both-deck-assignments
 --require-unseen-main-decks --seed 37200 --seeds 8 --workers 4
 --max-decisions 3000` and the v26 checkpoint as the positional argument.
+
+### Tournament-card private-draw differential (27 October 2026)
+
+A native regression varies only one card at the seeded draw slot of player
+1's 40-card Main Deck. The 59 candidates are distinct Main Deck IDs from the
+project's sourced tournament-deck corpus absent from the shared Normal Monster
+fixture. Seed 52 leaves that slot out of player 1's opening hand and draws it
+privately on turn two. The test confirms the same opening hand in every
+variant, the changed private hand after the draw, and equality of **every
+player-0 observation and legal-action set** from the opening through player
+0's turn-three Main Phase while both players take the same passive public
+actions. All 59 variants passed on the pinned experimental adapter; the
+measured pytest run took 2.84 s on this host.
+
+This is a differential information-flow check across 59 competitive card IDs,
+including GOAT-specific variants. It does not test those cards' effects,
+choices after the public game diverges, or the opponent's own legal actions.
+Reproduce it after native setup with:
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_historical_private_draw_pool.py
+```

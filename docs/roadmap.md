@@ -145,6 +145,15 @@ The current six-tournament-deck corpus, now including Bazoo Return in place of t
 
 A seeded Thunder Dragon / Morphing Jar fixture now checks the player-visible hand-memory boundary: a revealed search creates known opponent cards, a later hidden Set reduces the guaranteed count conservatively, and Jar's hand replacement clears current knowledge while retaining the historical reveal event. The full duel replay-verifies; see [GOAT rules](goat_rules.md).
 
+A native multi-turn differential now replaces only the opponent's turn-two
+private draw with each of 59 distinct cards from the sourced tournament Main
+Deck corpus. All opening opponent hands remain identical, the private drawn
+hands differ, and every first-player observation and legal-action set remains
+identical through the turn-three Main Phase under the same passive public
+actions. This extends the hidden-information check past startup; it does not
+cover divergent public plays or all card effects. See
+[evaluation](evaluation.md#tournament-card-private-draw-differential-27-october-2026).
+
 A new **24-duel** whitelist-random, distinct-opponent probe on seeds
 10000–10023 found five native protocol failures: four unsupported card-name
 expression prompts (Prohibition, Mind Crush, Dark Designator) and one blind
