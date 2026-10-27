@@ -1392,9 +1392,11 @@ Exchange, while the GOAT-specific guide and archived UDE Netrep ruling require
 Sangan CL1, Thestalos CL2. A checksum-verified GOAT-only native patch now
 selects mandatory triggers by trigger time and gives the turn player priority
 when triggers share a time. Same-controller, cross-controller, and paired
-simultaneous-Sangan native regressions pass. The patch preserves player choice
-within a same-time group but that branch still needs a dedicated fixture.
-Optional cross-controller triggers, effects recognized mid-chain, and wider
+simultaneous-Sangan native regressions pass. A paired Desert Sunlight fixture
+now confirms that one player may choose either order for their simultaneous
+Dekoichi and Gravekeeper's Spy Flip Effects; both branches reach terminal,
+replay-verify, and pass the visibility audit. Optional cross-controller
+triggers, effects recognized mid-chain, and wider
 historical SEGOC combinations remain to be independently checked. Re-record
 old training trajectories before replay verification because the native core
 binary hash and potentially the resulting games have changed. See
