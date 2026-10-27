@@ -32,6 +32,7 @@ from goat_ai.replay import (
     Trajectory,
     demonstrator_records,
     demonstrator_seat,
+    training_demonstrator_records,
 )
 from goat_ai.training import (
     CardVocabulary,
@@ -2308,6 +2309,34 @@ def test_demonstration_seat_filters_verified_duel_labels():
         demonstrator_records(replace(trajectory, skill_metadata=None))
     with pytest.raises(ValueError, match="demonstrator_seat"):
         demonstrator_records(replace(trajectory, skill_metadata={"demonstrator_seat": True}))
+
+
+def test_raw_training_source_admission_keeps_unauthorized_replays_out():
+    first = DecisionRecord(view(), actions(), actions()[0])
+    base = Trajectory("goat", ("a", "b"), 1, (first,), 0)
+    assert training_demonstrator_records(base) == (first,)
+    teacher = replace(base, source="tactical",
+                      skill_metadata={"demonstrator_seat": 0})
+    assert training_demonstrator_records(teacher) == (first,)
+    assert training_demonstrator_records(replace(
+        base, source="combat_flip", skill_metadata={"demonstrator_seat": 0})) == (first,)
+    human = replace(base, source="human_cli", skill_metadata={
+        "demonstrator_seat": 0, "authorization": "self_recorded"})
+    assert training_demonstrator_records(human) == (first,)
+    for source in ("policy_evaluation", "edopro_conditional", "unknown"):
+        with pytest.raises(ValueError, match="not an admitted raw training source"):
+            training_demonstrator_records(replace(base, source=source))
+    with pytest.raises(ValueError, match="scripted replay requires explicit annotations"):
+        training_demonstrator_records(replace(base, source="scripted_probe"))
+    with pytest.raises(ValueError, match="self_recorded authorization"):
+        training_demonstrator_records(replace(
+            human, skill_metadata={"demonstrator_seat": 0}))
+    with pytest.raises(ValueError, match="demonstrator_seat"):
+        training_demonstrator_records(replace(
+            teacher, skill_metadata=None))
+    with pytest.raises(ValueError, match="demonstrator_seat"):
+        training_demonstrator_records(replace(
+            human, skill_metadata={"authorization": "self_recorded"}))
 
 
 def test_policy_agent_progresses_multi_card_selection():

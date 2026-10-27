@@ -33,3 +33,26 @@ def demonstrator_records(trajectory: Trajectory) -> tuple[DecisionRecord, ...]:
     if not selected:
         raise ValueError("trajectory contains no decisions by demonstrator_seat")
     return selected
+
+
+def training_demonstrator_records(trajectory: Trajectory) -> tuple[DecisionRecord, ...]:
+    """Admit raw cloning labels only from known local recording paths.
+
+    Replay verification proves native reproducibility, not recording permission.
+    Imported or reviewed material must use an explicit, separately validated
+    annotation path until its own admission requirements are implemented.
+    """
+    source = trajectory.source
+    if source.startswith("scripted_"):
+        raise ValueError("scripted replay requires explicit annotations")
+    teachers = {"heuristic", "combat_heuristic", "combat_flip", "tactical"}
+    if source == "human_cli":
+        if (trajectory.skill_metadata or {}).get("authorization") != "self_recorded":
+            raise ValueError("human_cli training requires self_recorded authorization")
+    elif source not in teachers | {"self_play", "self_play_rl"}:
+        raise ValueError(f"{source} is not an admitted raw training source")
+    if source in teachers | {"human_cli"}:
+        seat = (trajectory.skill_metadata or {}).get("demonstrator_seat")
+        if type(seat) is not int or seat not in (0, 1):
+            raise ValueError(f"{source} training requires demonstrator_seat 0 or 1")
+    return demonstrator_records(trajectory)

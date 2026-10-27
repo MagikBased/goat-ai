@@ -67,3 +67,6 @@ Before using a real replay as imitation data, we need all of the following:
 
 Until these gates pass, the file remains a compatibility fixture and its
 decisions are excluded from policy training and strength claims.
+The behavioral-clone command rejects EDOPro-derived sources even when native
+response reconstruction succeeds; a future admission path must verify the
+recording's original engine and script provenance and its permissions first.

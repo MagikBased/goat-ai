@@ -29,6 +29,7 @@ from goat_ai.replay import (
     demonstrator_seat,
     read_decision_annotations,
     read_trajectory,
+    training_demonstrator_records,
     verify_trajectory,
 )
 from goat_ai.training import (
@@ -379,6 +380,8 @@ def main() -> None:
         annotation = None
         label_path = labels_by_path.get(path.resolve())
         disagreements = None
+        if trajectory.source.startswith("edopro_"):
+            raise ValueError(f"{path}: EDOPro reconstruction is not admitted for training")
         if teacher is not None:
             selected, disagreements = label_policy_trajectory(
                 trajectory, teacher, teacher_parent_hash)
@@ -391,9 +394,7 @@ def main() -> None:
             annotation, selected = read_decision_annotations(
                 label_path, hashlib.sha256(raw).hexdigest(), trajectory)
         else:
-            if trajectory.source.startswith("scripted_"):
-                raise ValueError(f"{path}: scripted replay requires explicit annotations")
-            selected = demonstrator_records(trajectory)
+            selected = training_demonstrator_records(trajectory)
         if teacher is not None:
             source = f"automated_teacher_{args.on_policy_teacher}"
         elif annotation is not None:

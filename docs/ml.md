@@ -115,6 +115,17 @@ The training CLI accepts `--feature-version` for controlled encoder comparisons.
 
 A full-duel trajectory can name `skill_metadata.demonstrator_seat` as 0 or 1. Behavioral cloning verifies the **entire** native replay, then uses only that seat's selected actions as labels. This prevents an opponent's random decisions from contaminating a heuristic or human demonstration. The CLI human player in `examples/play_vanilla.py --human-seat 0` records `source=human_cli`, `authorization=self_recorded`, and the selected seat when a trajectory path is supplied. This is a local interactive recording path; it does not parse tournament videos or third-party replays.
 
+Raw behavioral-clone labels are admitted only from known local sources:
+`self_play`, `self_play_rl`, `heuristic`, `combat_heuristic`, `combat_flip`,
+`tactical`, and `human_cli`. Teacher and CLI recordings require a valid
+demonstrator seat; CLI recordings also require the `self_recorded` authorization
+declaration. Checkpoint policy replays need explicit review labels or an
+automated teacher. Scripted scenarios need matching scripted annotations.
+Unknown sources cannot silently become raw demonstrations, and EDOPro
+reconstruction is excluded from this trainer pending its separate admission
+gates. These metadata checks do not authenticate a person's declaration of
+rights; contributors must still provide permission for external recordings.
+
 For `source=self_play_rl`, the learner is the only demonstrator. New recordings
 store both `learner_seat` and matching `demonstrator_seat`; older recordings
 with only `learner_seat` are filtered by that seat when reused for cloning or
