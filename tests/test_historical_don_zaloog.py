@@ -5,12 +5,16 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 DON_ZALOOG = 76922029
 MYSTICAL_ELF = 15025844
+WABOKU = 12607053
 SETTABLE_BACKROW = (12607053, 14087893, 4178474, 56120475, 60082869)
 
 
@@ -296,3 +300,87 @@ def test_don_choice_is_identical_when_opponent_private_hand_changes(tmp_path):
     assert observation == changed_observation
     assert actions == changed_actions
     assert observation.opponent_hand_count == len(hidden_hand)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_don_does_not_trigger_when_waboku_prevents_direct_battle_damage(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (DON_ZALOOG, WABOKU):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    don_deck = tmp_path / "don.ydk"
+    don_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([DON_ZALOOG] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    waboku_deck = tmp_path / "waboku.ydk"
+    waboku_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([WABOKU] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(don_deck), str(waboku_deck), seed=11,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        assert DON_ZALOOG in {card.code for card in observation.hand}
+        assert WABOKU in {card.code for card in env.engine.probe.observation(1).hand}
+        don_summoned = waboku_set = don_attacked = waboku_used = checked = False
+        damage_step_seen = False
+        defender_hand = defender_deck = None
+        agents = (RandomAgent(11), RandomAgent(12))
+        for _ in range(5000):
+            if env.is_terminal():
+                assert checked
+                assert {f"official/c{code}.lua" for code in (DON_ZALOOG, WABOKU)} <= (
+                    env.engine.probe.loaded_script_sha256.keys())
+                path = tmp_path / "don_waboku.json"
+                write_trajectory(path, env.trajectory())
+                replay = read_trajectory(path)
+                assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) == len(
+                    replay.decisions)
+                audit_trajectory_visibility(replay)
+                return
+            actions = env.legal_actions()
+            if waboku_used and observation.turn == 3:
+                damage_step_seen |= observation.phase == "damage_step"
+                assert not any(a.kind == "yes"
+                               and a.parameters.get("code") == DON_ZALOOG
+                               for a in actions)
+            action = None
+            if observation.turn == 1 and observation.acting_player == 0 \
+                    and not don_summoned:
+                action = next((a for a in actions if a.kind == "normal_summon"
+                               and a.parameters.get("code") == DON_ZALOOG), None)
+                don_summoned |= action is not None
+            if observation.turn == 2 and observation.acting_player == 1 \
+                    and not waboku_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == WABOKU), None)
+                waboku_set |= action is not None
+            if observation.turn == 3 and observation.acting_player == 0 \
+                    and observation.phase == "main1":
+                action = next((a for a in actions if a.kind == "battle_phase"), action)
+            if observation.turn == 3 and observation.acting_player == 0 \
+                    and observation.phase == "battle_start" and not don_attacked:
+                defender_hand = observation.opponent_hand_count
+                defender_deck = observation.deck_counts[1]
+                action = next((a for a in actions if a.kind == "attack"
+                               and a.parameters.get("code") == DON_ZALOOG), None)
+                don_attacked |= action is not None
+            if don_attacked and observation.turn == 3 and observation.phase == "battle_step" \
+                    and observation.acting_player == 1 and not waboku_used:
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == WABOKU), None)
+                waboku_used |= action is not None
+            if waboku_used and damage_step_seen and not checked and observation.turn == 3 \
+                    and observation.phase == "battle_step" \
+                    and observation.acting_player == 0 \
+                    and WABOKU in {c.code for c in observation.graveyards[1]}:
+                assert observation.life_points == (8000, 8000)
+                assert observation.opponent_hand_count == defender_hand
+                assert observation.deck_counts[1] == defender_deck
+                assert damage_step_seen
+                checked = True
+            if action is None and not checked:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase", "main2")), actions[0])
+            if action is None:
+                action = agents[observation.acting_player].select_action(observation, actions)
+            observation = env.step(action)
+    pytest.fail("Don Zaloog / Waboku duel did not terminate")
