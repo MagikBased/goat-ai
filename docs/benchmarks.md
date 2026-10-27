@@ -1,5 +1,39 @@
 # Native benchmark log
 
+## PPO minibatch operation profile and equal-shape stacking trial (27 October 2026)
+
+Two 16-decision feature-v23 minibatches were taken from the recorded
+`worker_bench_4a_28000` trajectories: the first 16 multi-option decisions,
+and the first 16 multi-option decisions with a nonempty public chain. Each
+batch used the saved parent policy, one CPU Torch thread, three warm-up
+forward/backward passes, then ten passes under `torch.profiler` with shape
+recording. Both batches' encoded chain length was one: either a sentinel or
+one active link. The 16-game replay set has 2,012 multi-option decisions with
+no active chain, 240 with one link, and nine with two links. This sample cannot
+characterize longer-chain cost.
+
+The first profiled batch accumulated **88.2 ms** of self CPU time over ten
+forward/backward passes. Its largest individual operations were `aten::select`
+(8.1 ms), `aten::mm` (6.5 ms), `aten::slice` (6.0 ms), and `aten::copy_`
+(5.8 ms). The active-chain batch accumulated **100.1 ms**; its leading
+operations were `aten::mm` (9.8 ms), `aten::select` (7.6 ms), `aten::add`
+(6.9 ms), `aten::copy_` (6.5 ms), and `aten::slice` (6.1 ms). These totals
+include profiler overhead and are *not* complete-training timings. The
+operation counts suggest many small tensor operations rather than one dominant
+GRU setup call, but do not isolate feature padding from the scorer's other
+indexing.
+
+A follow-up candidate used `torch.stack` instead of individual slice copies
+when every decision had the same shape for a feature field. The six focused
+policy/PPO tests passed. On the same 16-game, four-worker PPO schedule used
+below, the changed trainer reported **7.384 seconds** versus **7.365 seconds**
+for the immediately preceding unchanged run. All 16 replay files and all 38
+final model tensors matched exactly. This single comparison shows no speed
+gain, so the change was reverted. Its ignored report, checkpoint, and replays
+use the `.cache/goat-ai/stack_fixed_28000` prefix. A future speed experiment
+should measure a larger change to the scorer's tensor work on several deck and
+batch-size schedules before adopting it.
+
 ## Padded versus packed chain GRU in PPO batches (27 October 2026)
 
 The four-worker PPO profile identified batched policy scoring as a parent-process
