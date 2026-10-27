@@ -119,3 +119,42 @@ def test_skip_passes_keeps_newly_chained_trap_face_up(tmp_path):
     match = re.search(r'data-chain-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
     assert match.group(1) == "2|false|Second Trap|1"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_board_seat_stays_fixed_when_decision_viewer_changes(tmp_path):
+    first = _observation()
+    second = deepcopy(first)
+    second.update(viewer=1, acting_player=1, hand=[{"controller": 1,
+                  "zone": "hand", "position": "hidden", "code": 3, "sequence": 0}],
+                  opponent_hand_count=2)
+    passed = {"id": "pass", "kind": "pass", "actor": 0, "parameters": {}}
+    other_pass = {**passed, "actor": 1}
+    replay = {"seed": 3, "source": "self_play_rl", "winner": 0,
+              "skill_metadata": {"learner_seat": 0}, "decisions": [
+        {"observation": first, "selected_action": passed, "legal_actions": [passed]},
+        {"observation": second, "selected_action": other_pass,
+         "legal_actions": [other_pass]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {1: "Attacker", 2: "Target", 3: "Hand"}, {}, {})
+    probe = """<script>
+      const seats = () => [...document.querySelectorAll('.duel-side')]
+        .map(side => side.dataset.player).join(',');
+      const first = seats();
+      index = 1; render();
+      const afterPass = seats();
+      const bottomHandHidden = document.querySelector('.duel-side:last-child .hand-back') !== null;
+      byId('board-seat').click();
+      document.body.dataset.seatProbe = [first, afterPass, bottomHandHidden,
+        seats(), byId('board-seat').textContent].join('|');
+    </script></body>"""
+    path = tmp_path / "fixed_seat.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-seat-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "1,0|1,0|true|0,1|P2 at bottom · Switch sides"

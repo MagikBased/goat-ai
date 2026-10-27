@@ -138,7 +138,7 @@
     .sidebar { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding: calc(var(--load-height) + 6px) 3px 0 0; }
     .controls { position: sticky; top: calc(var(--load-height) + 6px); z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; background: #203744; }
     .controls button { padding: 7px 3px; }
-    .controls #slider, .controls .decision-jump, .controls .skip-label { grid-column: 1 / -1; }
+    .controls #slider, .controls .decision-jump, .controls .skip-label, .controls #board-seat { grid-column: 1 / -1; }
     .controls .decision-jump { justify-content: space-between; }
     .details-grid { display: block; }
     .detail-box { padding: 10px; background: #11232b; border-radius: 8px; }
@@ -185,6 +185,7 @@
           <input id="slider" type="range" min="0" value="0" aria-label="Decision position">
           <label class="decision-jump">Frame <input id="jump" type="number" min="1" value="1"> <span id="total"></span></label>
           <label class="skip-label"><input id="skip" type="checkbox" checked> Skip passes and placement</label>
+          <button id="board-seat" type="button" title="Keep one player at the bottom while decisions change">P1 at bottom · Switch sides</button>
         </div>
         <div class="panel summary">
           <div><strong id="turn"></strong><p id="viewpoint" class="muted"></p></div>
@@ -299,6 +300,7 @@
     let currentObservation = null;
     let embeddedReviewer = null;
     let reviewerData = null;
+    let boardBottomPlayer = 0;
     let previewSource = null;
     let previewHeight = 250;
     // Card IDs in >=5 of the six sourced tournament Main Decks; tests pin this list.
@@ -434,7 +436,7 @@
       const observation = currentObservation;
       const reveal = reviewerData?.frames[index];
       const own = player === observation.viewer;
-      const label = `${own ? "Your" : "Opponent"} ${zone === "deck" ? "Deck" : zone === "extra" ? "Extra Deck" : zone === "graveyard" ? "Graveyard" : "Banished cards"}`;
+      const label = `Player ${player + 1} ${zone === "deck" ? "Deck" : zone === "extra" ? "Extra Deck" : zone === "graveyard" ? "Graveyard" : "Banished cards"}`;
       byId("pile-title").textContent = label;
       const scroll = byId("pile-scroll");
       const grid = node("div", "pile-grid");
@@ -468,7 +470,7 @@
         note = `${cards.length} ${cards.length === 1 ? "card" : "cards"}. ${zone === "graveyard" ? "Graveyard cards are public." : reveal ? "Reviewer view includes concealed banished cards." : "Concealed banished cards remain hidden."}`;
         for (const [cardIndex, card] of cards.entries()) grid.append(pileCard(
           zone === "banished" ? (reveal?.banished[player]?.[cardIndex] ?? card.code) : card.code,
-          1, !own));
+          1, player !== boardBottomPlayer));
       }
       byId("pile-note").textContent = note;
       if (!grid.childElementCount) scroll.replaceChildren(node("p", "muted", "No cards to display."));
@@ -532,7 +534,7 @@
       element.title = reviewerCode != null ? nameOf(reviewerCode) : cardLabel(observation, card, known);
       element.dataset.fieldKey = fieldKey(card);
       addCardVisual(element, card.code, card.position === "facedown",
-                    card.controller !== observation.viewer);
+                    card.controller !== boardBottomPlayer);
       if (animateNext && previousFrame >= 0 && index > previousFrame) {
         const before = previousField.get(fieldKey(card));
         if (!before) element.classList.add("card-arrive");
@@ -592,7 +594,7 @@
         if (pile.length) {
           const top = node("div", "card monster");
           const last = pile[pile.length - 1];
-          addCardVisual(top, last.code, last.code == null, player !== observation.viewer);
+          addCardVisual(top, last.code, last.code == null, player !== boardBottomPlayer);
           if (last.code != null) top.dataset.previewCode = String(last.code);
           pileButton.append(top);
         }
@@ -604,7 +606,7 @@
         auxiliary.setAttribute("aria-label", `View Player ${player + 1} Deck`);
         auxiliary.title = "Deck";
         auxiliary.addEventListener("click", () => showPile(player, "deck"));
-        auxiliary.append(cardBack(player !== observation.viewer));
+        auxiliary.append(cardBack(player !== boardBottomPlayer));
         auxiliary.append(node("strong", "", observation.deck_counts[player]));
         line.append(auxiliary);
       }
@@ -692,16 +694,18 @@
       extraButton.setAttribute("aria-label", `View Player ${player + 1} Extra Deck`);
       extraButton.title = "Extra Deck";
       extraButton.addEventListener("click", () => showPile(player, "extra"));
-      extraButton.append(cardBack(player !== observation.viewer),
+      extraButton.append(cardBack(player !== boardBottomPlayer),
                          node("strong", "", observation.extra_deck_counts[player]));
       row.append(extraButton);
       return row;
     }
     function playerBoard(observation, player, known) {
       const own = player === observation.viewer;
-      const section = node("section", `duel-side ${own ? "viewer-side" : "opponent"}`);
+      const bottom = player === boardBottomPlayer;
+      const section = node("section", `duel-side ${bottom ? "viewer-side" : "opponent"}`);
+      section.dataset.player = String(player);
       const playerHeader = node("div", "player-header");
-      playerHeader.append(node("strong", "", `Player ${player + 1}${own ? " · your view" : " · opponent"}`));
+      playerHeader.append(node("strong", "", `Player ${player + 1}${observation.acting_player === player ? " · acting" : ""}`));
       const handCount = own ? observation.hand.length : observation.opponent_hand_count;
       const counts = node("span", "zone-counts");
       counts.append(node("span", "", `Hand ${handCount}`));
@@ -727,19 +731,19 @@
           const back = node("div", "hand-back");
           back.tabIndex = 0;
           back.setAttribute("aria-label", "Hidden opponent hand card");
-          back.append(cardBack(true));
+          back.append(cardBack(player !== boardBottomPlayer));
           hand.append(back);
         }
       }
-      if (!own) section.append(handRow(observation, player, hand));
-      if (own) {
+      if (!bottom) section.append(handRow(observation, player, hand));
+      if (bottom) {
         section.append(zoneLine(observation, player, "monster", known));
         section.append(zoneLine(observation, player, "spell_trap", known));
       } else {
         section.append(zoneLine(observation, player, "spell_trap", known));
         section.append(zoneLine(observation, player, "monster", known));
       }
-      if (own) section.append(handRow(observation, player, hand));
+      if (bottom) section.append(handRow(observation, player, hand));
       return section;
     }
     function phaseRail(observation, terminal) {
@@ -941,9 +945,10 @@
       byId("view-mode").textContent = reviewerData ? "Reviewer view · both players' cards revealed" : "Player-visible decision snapshots";
       byId("review-panel").hidden = Boolean(reviewerData);
       const field = node("div", "field-stack");
-      field.append(playerBoard(observation, 1 - observation.viewer, known),
-                   playerBoard(observation, observation.viewer, known));
+      field.append(playerBoard(observation, 1 - boardBottomPlayer, known),
+                   playerBoard(observation, boardBottomPlayer, known));
       board.replaceChildren(field, phaseRail(observation, terminal));
+      byId("board-seat").textContent = `P${boardBottomPlayer + 1} at bottom · Switch sides`;
       const selected = record?.selected_action;
       if (selected?.kind === "attack") {
         const targetKey = `${selected.actor}:monster:${selected.parameters?.sequence}`;
@@ -977,12 +982,12 @@
       previousObservation = observation;
       animateNext = false;
       byId("piles").replaceChildren(node("h2", "", "Graveyards and banished cards"),
-        listZone("Opponent Graveyard", observation.graveyards[1 - observation.viewer], 1 - observation.viewer, "graveyard"),
-        listZone("Opponent Banished", observation.banished[1 - observation.viewer].map((card, i) =>
-          ({...card, code: reviewerData?.frames[index]?.banished[1 - observation.viewer]?.[i] ?? card.code})), 1 - observation.viewer, "banished"),
-        listZone("Your Graveyard", observation.graveyards[observation.viewer], observation.viewer, "graveyard"),
-        listZone("Your Banished", observation.banished[observation.viewer].map((card, i) =>
-          ({...card, code: reviewerData?.frames[index]?.banished[observation.viewer]?.[i] ?? card.code})), observation.viewer, "banished"));
+        listZone(`Player ${2 - boardBottomPlayer} Graveyard`, observation.graveyards[1 - boardBottomPlayer], 1 - boardBottomPlayer, "graveyard"),
+        listZone(`Player ${2 - boardBottomPlayer} Banished`, observation.banished[1 - boardBottomPlayer].map((card, i) =>
+          ({...card, code: reviewerData?.frames[index]?.banished[1 - boardBottomPlayer]?.[i] ?? card.code})), 1 - boardBottomPlayer, "banished"),
+        listZone(`Player ${boardBottomPlayer + 1} Graveyard`, observation.graveyards[boardBottomPlayer], boardBottomPlayer, "graveyard"),
+        listZone(`Player ${boardBottomPlayer + 1} Banished`, observation.banished[boardBottomPlayer].map((card, i) =>
+          ({...card, code: reviewerData?.frames[index]?.banished[boardBottomPlayer]?.[i] ?? card.code})), boardBottomPlayer, "banished"));
       byId("action").textContent = terminal ? "Duel ended" : actionLabel(
         observation, record.selected_action, known,
         record.legal_actions.findIndex(action => action.id === record.selected_action.id));
@@ -1079,6 +1084,8 @@
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
       stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map();
       reviewerData = embeddedReviewer?.source_trajectory_sha256 === hash ? embeddedReviewer : null;
+      const seat = data.skill_metadata?.learner_seat ?? data.skill_metadata?.demonstrator_seat;
+      boardBottomPlayer = seat === 0 || seat === 1 ? seat : data.decisions[0].observation.viewer;
       previousFrame = -1; previousField = new Map(); previousHand = null;
       previousObservation = null; animateNext = false;
       commonFrames = data.decisions.flatMap((record, frame) => commonDecision(record) ? [frame] : []);
@@ -1172,6 +1179,11 @@
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
     byId("slider").addEventListener("input", event => { index = Number(event.target.value); render(); });
+    byId("board-seat").addEventListener("click", () => {
+      boardBottomPlayer = 1 - boardBottomPlayer;
+      animateNext = false;
+      render();
+    });
     byId("jump").addEventListener("change", event => { index = Math.max(0, Math.min(replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation)), Number(event.target.value) - 1)); render(); });
     byId("play").addEventListener("click", () => {
       if (timer) { stop(); return; }

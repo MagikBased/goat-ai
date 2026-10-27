@@ -106,6 +106,8 @@ Choose each replay **JSON** with **Open trajectory**. Open a generated replay **
 
 The viewer keeps chain additions, card flips, life-point changes, and field-to-pile movement visible even when **Skip passes and placement** is enabled. Previously generated HTML embeds its own copy of the viewer; regenerate it with `scripts/render_replay.py` to pick up viewer fixes.
 
+The replay field keeps the same player at the bottom as decisions pass between players. It starts with the recorded learner or demonstrator seat when available; use **Switch sides** in the sidebar to change it. The decision details still identify whose player-visible snapshot is being shown. Load a verified reviewer reveal if you want both hands visible throughout the replay.
+
 If the original JSON is missing, `python scripts/extract_embedded_replay.py REPLAY.html OUTPUT.json` restores it from a generated standalone viewer and checks the embedded SHA-256. Catalog-only viewers have no trajectory to restore.
 
 The sidebar identifies agents when the trajectory records their provenance. See the [early replay decision audit](docs/replay_audit.md) for frame-specific findings and the experimental `--tactical-guard` option for learned-policy match recording and evaluation.
