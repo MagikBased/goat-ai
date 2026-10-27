@@ -1,5 +1,58 @@
 # Early replay decision audit
 
+## Broader-clone unseen-deck review queue (27 October 2026)
+
+The feature-v23 broader Tactical imitation checkpoint played Tactical-v14 on
+Roberto Martinez Phoenix Control versus each of the WikiFormat and GoatFormat
+Dimension Fusion Main Decks. All three exact Main Deck compositions are absent
+from that checkpoint's training provenance. Seeds 27002–27003 with both policy
+seats produced **eight terminal duels and 4,728 decisions**. The collection
+and shortlister each native-replayed the games and audited player visibility.
+The saved checkpoint's greedy actions reproduced on the visible decisions.
+
+The reviewer queue selected **24 frames** from 241 candidates, with three or
+fewer per replay, 12 per matchup, and 12 per policy seat. It contains **23
+policy/Tactical disagreements** and four conservative audit flags: ending a
+turn with an activatable Thunder Dragon, activating Nobleman with only an own
+Set monster visible, Normal Summoning a weak Flip monster when Set is legal,
+and a negative visible Heavy Storm trade. Tactical made the same Heavy Storm
+choice in that last flagged frame. Thus neither the audit flag nor Tactical's
+choice is an expert label. No queue item has been used for training.
+
+Open the ignored local [review index](../.cache/goat-ai/broader_unseen_review_27002_27003/queue.html)
+to inspect the 24 exact viewer frames. All index links resolve to locally
+rendered replay HTML with a decision anchor. The collection manifest SHA-256
+is `5c07bb7b0fde7620d918c742bdb43549968173312aeff4e127f18037b821fa1a`;
+the queue JSON SHA-256 is
+`d4772e1e5256df15810c63fb390fba4eb7043c6f874fc7140009ca4a4e68eb8f`.
+The output is a development review set, not a held-out strength result.
+Any reviewed labels trained from these decks require separate evaluation
+decks and seeds.
+
+Reproduce after [native setup](native_setup.md) with a new output directory:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_tactical_v14_broader_18500_18531.pt \
+  --matchup examples/decks/phoenix_control_roberto_martinez_new_jersey_2005.ydk \
+            examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk \
+  --matchup examples/decks/phoenix_control_roberto_martinez_new_jersey_2005.ydk \
+            examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+  --opponent tactical --seed 27002 --seeds 2 --workers 4 \
+  --max-decisions 3000 --output-dir .cache/goat-ai/broader_unseen_review_27002_27003
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_tactical_v14_broader_18500_18531.pt \
+  .cache/goat-ai/broader_unseen_review_27002_27003/matchup_*.json \
+  --limit 24 --per-replay 3 --render-viewers \
+  --output .cache/goat-ai/broader_unseen_review_27002_27003/queue.json
+```
+
+An earlier exploratory eight-duel batch at seeds 27000–27001 included Daryl
+Gravekeepers and Cas Flip Control, both present in the checkpoint's training
+provenance. It remains local exploratory data and is excluded from this
+unseen-deck queue.
+
 ## Four-matchup development review queue (27 October 2026)
 
 The unchanged feature-v23 reference played Tactical-v14 across four distinct

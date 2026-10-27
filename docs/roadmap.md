@@ -968,6 +968,13 @@ strength check: the child scored 30–34 directly against that checkpoint and
 teacher agreement alone is insufficient; prioritize independently reviewed
 action value and outcome-sensitive learning signals.
 
+A fresh broader-clone review queue now covers eight replay-verified duels on
+three Main Deck compositions absent from that checkpoint's training history.
+Its 24 linked frames include four conservative resource or Flip-monster flags,
+but none is an expert label yet. This prepares independent decision feedback
+without claiming a self-play strength gain; see
+[the review queue](replay_audit.md#broader-clone-unseen-deck-review-queue-27-october-2026).
+
 ## M5 — Search and other formats
 
 
