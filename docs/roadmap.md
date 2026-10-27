@@ -1409,3 +1409,10 @@ On a separate matched 64-duel Tactical-v14 schedule, the child scored 18–46
 and the parent 17–47; the paired interval includes zero. Keep the parent as
 the neural reference. A new post-patch self-play policy gain and broader
 historical trigger-order checks remain open; see [evaluation](evaluation.md#re-recording-and-retraining-after-the-goat-segoc-core-patch-27-october-2026).
+
+A post-patch 32-duel PPO continuation replay-verified all training games but
+split **33–31** against its parent on 64 held-out direct games and scored
+**12–52** against Tactical-v14, versus the parent's **18–46** on the matched
+baseline schedule. Neither comparison establishes a self-play gain. Keep the
+parent as reference and investigate stronger decision-level feedback before
+another large PPO run; see [evaluation](evaluation.md#patched-core-ppo-continuation-and-held-out-check-27-october-2026).

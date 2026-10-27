@@ -7290,3 +7290,67 @@ use `--opponent tactical`. In each arm use `--engine experimental
 and the seed ranges above. Save each report under a distinct path. Run
 `scripts/compare_tournament_reports.py --verify-local-decks` on each matched
 child/parent Tactical pair before computing a combined paired difference.
+
+### Patched-core PPO continuation and held-out check (27 October 2026)
+
+The unchanged feature-v23 neural reference was continued on the patched GOAT
+core with four-role, four-worker PPO self-play across Chaos Control/Bazoo
+Return and the two Goat Control training decks. Seeds 21200–21231 produced
+**32/32 terminal duels**, with **5,425 learner decisions**, no censored or
+unsupported games, and a measured training wall time of **36.66 s** with one
+Torch thread. The saved replay audit verified all 32 full trajectories and
+listed 69 review candidates. The ignored checkpoint
+`.cache/goat-ai/fv23_patched_core_ppo_21200_21231.pt` has SHA-256
+`506d87a478fe17dc936d3cb3acd393be183a19587e2272b8c491adb08d40ba78`;
+its replay-audit report has SHA-256
+`4fb133fc3c0f8788e19b750948e4fdd27167ddb0660469f060f65005f1a42b6b`.
+
+On fresh Phoenix Control versus GoatFormat and WikiFormat Dimension Fusion
+decks, seeds 21300–21307 with both deck assignments and policy seats, the PPO
+child scored **33–31** directly against its unchanged parent over 64 duels.
+The paired-bootstrap 95% interval for its 51.6% score was **40.6%–64.1%**.
+The split was **13–19** on the GoatFormat pair and **20–12** on the WikiFormat
+pair. The direct report SHA-256 values were
+`62c14d2835e2af71eb92dff870599a1a91a806d11cf810c1ae51fa37c1e886c2`
+and `0674011f809b3d72b44c71f9897db60ffb5a33cb0ceb336a1539653d979e6953`.
+
+Against Tactical-v14 on the matched but separate 21308–21315 schedule, the
+child scored **12–52** and the parent **18–46** over 64 duels each. The paired
+score difference was **−9.4 percentage points**, 95% interval **−21.9 to
++3.1 points**. The report comparator verified native assets, script and
+source fingerprints, seed/opponent settings, and current local deck hashes for
+each pair. The four ignored Tactical report SHA-256 values, in child Goat,
+parent Goat, child Wiki, parent Wiki order, were
+`c4736470bd25f57c4101f4dfc3a462caa3588611feae4391a0dc5dedca583caf`,
+`00698ce1b7842b7960d5f16164dc957f1744aaae4372f5b29aff3ae0d3d16ad3`,
+`ca2790704fa6c8625c8efd705247f3fda8cb10bd1f8b6522f637ff6854afe6a6`,
+and `a13be52808deabbcac8edde181821cb176d6a62314197ad59e77e4ef50c8ecbf`.
+This run does not establish a self-play strength gain. The unchanged parent
+remains the reference; the child is an ignored experimental checkpoint.
+
+Reproduce the self-play with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --engine experimental \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+            examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --schedule-mode four_roles --seed 21200 --games 32 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 --rollout-workers 4 \
+  --ppo-rollout-weighting per_episode --ppo-epochs 3 --ppo-batch-size 16 \
+  --ppo-clip-epsilon 0.2 --learning-rate 0.0001 --parent-kl-weight 0.5 \
+  --baseline-scope learner_deck --snapshot-every 4 --max-snapshots 8 \
+  --record-dir .cache/goat-ai/fv23_patched_core_ppo_21200_21231_replays \
+  --output .cache/goat-ai/fv23_patched_core_ppo_21200_21231.pt
+```
+
+The direct arm used `scripts/evaluate_policy.py --opponent-checkpoint` with
+the unchanged parent; the Tactical arms used `--opponent tactical` for each
+checkpoint. All used `--engine experimental --both-deck-assignments
+--require-unseen-main-decks --seeds 8 --max-decisions 3000 --workers 4` and
+the Phoenix/Dimension Fusion pair named above. Set `--seed 21300` for the
+direct arm and `--seed 21308` for the Tactical arms. Run
+`scripts/audit_selfplay_replays.py` on the 32 recorded `episode_*.json` files.
