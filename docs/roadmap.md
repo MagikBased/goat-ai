@@ -378,7 +378,7 @@ reset overhead, and throughput on sourced decks; see the
 [evaluation log](evaluation.md). Memory scaling to larger worker counts remains
 unmeasured.
 
-**Status: in progress.** Seeded tournament runners swap seats for each deck matchup, record individual outcomes, report seat and matchup splits, and give paired score and Wilson intervals. A spawned-process runner reproduces the sequential results on a native fixture and has a measured two-worker throughput example. A restricted-fixture baseline report is in [the evaluation log](evaluation.md). Schema v18 trajectories add a final player-visible terminal observation to the v17 decision records, which record face-up monster ATK, DEF, and counters alongside bounded public events, field-slot known-card memory, conservative opponent-hand knowledge from public returns and addressed hand reveals, a public Scapegoat restriction, public Deck-top reveals, active disabled zones, recipient-scoped private reveals, and the player's initial Main Deck composition; they can be replayed against the native engine with exact observation, legal-action, result, deck-content, rules-profile, and loaded-asset comparisons. An offline browser viewer renders these player-visible decisions with optional locally cached card art and snapshot animations. It does not reconstruct movements between native decision snapshots. Earlier fingerprinted recordings without affected Deck-search choices, addressed face-down field reveals, or face-down control returns, or transferred set cards remain verifiable; affected recordings need re-recording for exact comparison. Broader deck families, held-out opponents, authorized human replay reconstruction, training/evaluation separation, and memory scaling across more workers remain outstanding.
+**Status: in progress.** Seeded tournament runners swap seats for each deck matchup, record individual outcomes, report seat and matchup splits, and give paired score and Wilson intervals. A spawned-process runner reproduces the sequential results on a native fixture and has a measured two-worker throughput example. A restricted-fixture baseline report is in [the evaluation log](evaluation.md). Schema v18 trajectories add a final player-visible terminal observation to the v17 decision records, which record face-up monster ATK, DEF, and counters alongside bounded public events, field-slot known-card memory, conservative opponent-hand knowledge from public returns and addressed hand reveals, a public Scapegoat restriction, public Deck-top reveals, active disabled zones, recipient-scoped private reveals, and the player's initial Main Deck composition; they can be replayed against the native engine with exact observation, legal-action, result, deck-content, rules-profile, and loaded-asset comparisons. An offline browser viewer renders these player-visible decisions with optional locally cached card art. It interpolates attack arrows, target markers, Life Point fill and numbers, and field-to-Graveyard or banished-pile movement between recorded decision snapshots; it does not reconstruct every native event. The new GOAT-only native core patch changes the binary fingerprint, so older recordings require re-recording for exact verification on the current setup. Broader deck families, held-out opponents, authorized human replay reconstruction, training/evaluation separation, and memory scaling across more workers remain outstanding.
 
 A first sourced-deck baseline now evaluates HeuristicAgent versus RandomAgent on both Goat Control/Chaos Turbo deck assignments with seat swaps. The 32-game seeds-7000–7007 report and its limitations are in [the evaluation log](evaluation.md). This does not satisfy the held-out competitive-policy exit gate.
 
@@ -1385,14 +1385,17 @@ directly against the original and both scored 20–43–1 versus Tactical on
 matched unseen-deck seeds. The original checkpoint remains the M4 reference;
 see [the measured comparison](evaluation.md#preserving-cloning-batches-while-omitting-forced-forwards-27-october-2026).
 
-## Historical cross-controller SEGOC blocker
+## Historical cross-controller SEGOC
 
-The native Soul Exchange / opponent Sangan / Thestalos regression in
-`tests/test_historical_soul_exchange_trigger_order.py` is a strict expected
-failure: the core builds Thestalos CL1, Sangan CL2, while the GOAT-specific
-guide and archived UDE Netrep ruling require Sangan CL1, Thestalos CL2.
-Investigate a GOAT-only native trigger-order correction, preserving player
-choice for genuinely simultaneous effects in the same SEGOC group. Re-run
-both same-controller and cross-controller regressions, plus full duel replay
-verification, before removing the expected-failure marker. See
+The pinned upstream core builds Thestalos CL1, opponent Sangan CL2 after Soul
+Exchange, while the GOAT-specific guide and archived UDE Netrep ruling require
+Sangan CL1, Thestalos CL2. A checksum-verified GOAT-only native patch now
+selects mandatory triggers by trigger time and gives the turn player priority
+when triggers share a time. Same-controller, cross-controller, and paired
+simultaneous-Sangan native regressions pass. The patch preserves player choice
+within a same-time group but that branch still needs a dedicated fixture.
+Optional cross-controller triggers, effects recognized mid-chain, and wider
+historical SEGOC combinations remain to be independently checked. Re-record
+old training trajectories before replay verification because the native core
+binary hash and potentially the resulting games have changed. See
 `docs/goat_rules.md` for source links and the conflicting Edison summary.

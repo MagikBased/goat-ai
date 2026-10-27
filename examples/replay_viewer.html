@@ -32,17 +32,28 @@
     label { display: inline-flex; align-items: center; gap: 5px; }
     .panel { background: #172731; border: 1px solid #36535e; border-radius: 10px; padding: 12px; margin: 0 0 10px; }
     .summary { justify-content: space-between; }
-    .board { margin: 0; min-width: 0; min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 50px; gap: 6px; padding: 10px; background: radial-gradient(circle at 50% 50%, #17424eaa 0%, transparent 55%), repeating-linear-gradient(24deg, transparent 0 54px, #3477773a 55px 57px, transparent 58px 108px), repeating-linear-gradient(-24deg, transparent 0 66px, #33767629 67px 68px, transparent 69px 132px), #071520; border-color: #537884; }
+    .board { position: relative; margin: 0; min-width: 0; min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 50px; gap: 6px; padding: 10px; background: radial-gradient(circle at 50% 50%, #17424eaa 0%, transparent 55%), repeating-linear-gradient(24deg, transparent 0 54px, #3477773a 55px 57px, transparent 58px 108px), repeating-linear-gradient(-24deg, transparent 0 66px, #33767629 67px 68px, transparent 69px 132px), #071520; border-color: #537884; }
     .field-stack { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
     .duel-side { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
     .player-header { flex: 0 0 auto; justify-content: space-between; padding: 2px 5px; background: #071924b8; border-radius: 8px; }
     .player-header strong { font-size: 1rem; }
     .player-header .zone-counts { font-size: .78rem; }
-    .life { min-width: 92px; padding: 3px 9px; border: 2px solid #e4ca70; border-radius: 20px; background: linear-gradient(90deg, #b43843, #d6a233); text-align: center; font-size: 1.1rem; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000; }
-    .opponent .life { background: linear-gradient(90deg, #006c65, #3179d9); }
+    .life { position: relative; min-width: 110px; padding: 3px 9px; border: 2px solid #e4ca70; border-radius: 20px; background: #101d27; text-align: center; font-size: 1.1rem; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000; isolation: isolate; }
+    .life-fill { position: absolute; z-index: 0; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, #b43843, #d6a233); transition: width .52s ease-in-out; }
+    .life-value { position: relative; z-index: 1; }
+    .opponent .life-fill { background: linear-gradient(90deg, #006c65, #3179d9); }
+    .life-delta { position: absolute; z-index: 5; right: 3px; bottom: 100%; color: #ff8888; font-size: .85rem; animation: life-delta .75s ease-out both; white-space: nowrap; }
+    .life-delta.gain { color: #91e6b6; }
     .zone-line { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(60px, 10%) minmax(0, 1fr) minmax(60px, 10%); gap: 6px; }
     .zones { min-height: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-    .slot { min-height: 0; min-width: 0; border: 2px solid #638677; border-radius: 6px; padding: 3px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; background: #081b2459; box-shadow: inset 0 0 12px #091f2299, 0 0 7px #2b9d8a33; }
+    .slot { position: relative; min-height: 0; min-width: 0; border: 2px solid #638677; border-radius: 6px; padding: 3px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; background: #081b2459; box-shadow: inset 0 0 12px #091f2299, 0 0 7px #2b9d8a33; }
+    .target-marker { position: absolute; z-index: 6; inset: 3px; pointer-events: none; background: linear-gradient(#ff4655,#ff4655) top left / 17px 3px no-repeat, linear-gradient(#ff4655,#ff4655) top left / 3px 17px no-repeat, linear-gradient(#ff4655,#ff4655) top right / 17px 3px no-repeat, linear-gradient(#ff4655,#ff4655) top right / 3px 17px no-repeat, linear-gradient(#ff4655,#ff4655) bottom left / 17px 3px no-repeat, linear-gradient(#ff4655,#ff4655) bottom left / 3px 17px no-repeat, linear-gradient(#ff4655,#ff4655) bottom right / 17px 3px no-repeat, linear-gradient(#ff4655,#ff4655) bottom right / 3px 17px no-repeat; filter: drop-shadow(0 0 5px #ff4655); animation: target-pulse .7s ease-in-out infinite alternate; }
+    .effect-layer { position: absolute; z-index: 7; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+    .attack-line { stroke: #ffcc61; stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 0 6px #ff6b29); stroke-dasharray: 1; animation: attack-line .5s ease-out both; }
+    .travel-card { position: fixed; z-index: 30; pointer-events: none; transform-origin: top left; filter: drop-shadow(0 0 9px #f4c774); }
+    .travel-card .card { width: 100%; height: 100%; }
+    .travel-card .card.defense { rotate: 90deg; }
+    .incoming-pile .card, .incoming-pile .mini-art { visibility: hidden; }
     .opponent .slot { border-color: #6ebf23; box-shadow: inset 0 0 12px #10330066, 0 0 6px #6ebf235e; }
     .viewer-side .slot { border-color: #e3248e; box-shadow: inset 0 0 12px #33001b66, 0 0 6px #e3248e5e; }
     .opponent .zones .slot:nth-child(4), .opponent .zones .slot:nth-child(5) { border-color: #d69b18; }
@@ -119,8 +130,11 @@
     @keyframes card-flip { from { transform: rotateY(85deg); opacity: .5; } to { transform: rotateY(0); opacity: 1; } }
     @keyframes card-draw { from { opacity: .4; transform: translateX(45px) rotate(12deg) scale(.75); } to { opacity: 1; transform: none; } }
     @keyframes card-attack { 50% { transform: translateY(-8px) scale(1.07); filter: drop-shadow(0 0 13px #ffca54); } }
+    @keyframes attack-line { from { stroke-dashoffset: 1; opacity: .3; } to { stroke-dashoffset: 0; opacity: 1; } }
+    @keyframes target-pulse { to { opacity: .55; } }
+    @keyframes life-delta { from { opacity: 0; transform: translateY(10px); } 25% { opacity: 1; } to { opacity: 0; transform: translateY(-14px); } }
     @keyframes phase-glow { to { box-shadow: 0 0 6px #fb2c77; } }
-    @media (prefers-reduced-motion: reduce) { .card-arrive, .card-flip, .card-draw, .card-attack, .phase-chip.active, .hand-preview { animation: none; } }
+    @media (prefers-reduced-motion: reduce) { .card-arrive, .card-flip, .card-draw, .card-attack, .phase-chip.active, .hand-preview, .target-marker, .attack-line, .life-delta { animation: none; } .life-fill { transition: none; } .travel-card { display: none; } }
     .sidebar { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding: calc(var(--load-height) + 6px) 3px 0 0; }
     .controls { position: sticky; top: calc(var(--load-height) + 6px); z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; background: #203744; }
     .controls button { padding: 7px 3px; }
@@ -276,7 +290,12 @@
     let previousFrame = -1;
     let previousField = new Map();
     let previousHand = null;
+    let previousObservation = null;
     let animateNext = false;
+    let lifeFrames = [];
+    let lifeTimers = [];
+    let travelCards = [];
+    let travelTimers = [];
     let currentObservation = null;
     let embeddedReviewer = null;
     let reviewerData = null;
@@ -324,6 +343,45 @@
     };
     const fieldKey = card => `${card.controller}:${card.zone}:${card.sequence}`;
     const fieldSignature = card => `${card.code ?? "hidden"}:${card.position}:${card.orientation}`;
+    const lifeFraction = points => Math.max(0, Math.min(1, points / 8000));
+    function lifePill(observation, player) {
+      const points = observation.life_points[player];
+      const before = animateNext && previousObservation?.life_points?.[player];
+      const changing = Number.isFinite(before) && before !== points;
+      const pill = node("span", "life");
+      pill.dataset.player = String(player);
+      pill.setAttribute("aria-label", `Player ${player + 1}: ${points} life points`);
+      const fill = node("span", "life-fill");
+      fill.style.width = `${100 * lifeFraction(changing ? before : points)}%`;
+      pill.append(fill, node("span", "life-value", `${changing ? before : points} LP`));
+      if (changing && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const delta = points - before;
+        pill.append(node("span", `life-delta ${delta > 0 ? "gain" : ""}`,
+                         `${delta > 0 ? "+" : ""}${delta}`));
+        const start = performance.now();
+        const value = pill.querySelector(".life-value");
+        const tick = now => {
+          if (!pill.isConnected) return;
+          const ratio = Math.min(1, (now - start) / 520);
+          value.textContent = `${Math.round(before + (points - before) * ratio)} LP`;
+          if (ratio < 1) lifeFrames.push(requestAnimationFrame(tick));
+        };
+        lifeFrames.push(requestAnimationFrame(() => {
+          fill.style.width = `${100 * lifeFraction(points)}%`;
+          lifeFrames.push(requestAnimationFrame(tick));
+        }));
+        lifeTimers.push(setTimeout(() => {
+          if (pill.isConnected) {
+            value.textContent = `${points} LP`;
+            fill.style.width = `${100 * lifeFraction(points)}%`;
+          }
+        }, 550));
+      } else {
+        fill.style.width = `${100 * lifeFraction(points)}%`;
+        pill.querySelector(".life-value").textContent = `${points} LP`;
+      }
+      return pill;
+    }
     function imageSource(code) {
       if (code == null) return null;
       const key = String(code);
@@ -528,6 +586,7 @@
         const pileButton = node("button", "slot pile-slot");
         pileButton.type = "button";
         pileButton.setAttribute("aria-label", `View Player ${player + 1} Graveyard`);
+        pileButton.dataset.graveyardPlayer = String(player);
         pileButton.title = "Graveyard";
         pileButton.addEventListener("click", () => showPile(player, "graveyard"));
         if (pile.length) {
@@ -611,6 +670,7 @@
       const banishButton = node("button", "slot hand-zone");
       banishButton.type = "button";
       banishButton.setAttribute("aria-label", `View Player ${player + 1} Banished cards`);
+      banishButton.dataset.banishedPlayer = String(player);
       banishButton.title = "Banished cards";
       banishButton.addEventListener("click", () => showPile(player, "banished"));
       const last = banished.at(-1);
@@ -646,7 +706,7 @@
       const counts = node("span", "zone-counts");
       counts.append(node("span", "", `Hand ${handCount}`));
       playerHeader.append(counts);
-      playerHeader.append(node("span", "life", `${observation.life_points[player]} LP`));
+      playerHeader.append(lifePill(observation, player));
       section.append(playerHeader);
       const hand = node("div", "hand");
       const revealedHand = reviewerData?.frames[index]?.hands[player];
@@ -735,6 +795,100 @@
       if (parameters.number != null) parts.push(String(parameters.number));
       return parts.join(" · ");
     }
+    function findFieldCard(board, card) {
+      return [...board.querySelectorAll("[data-field-key]")].find(
+        element => element.dataset.fieldKey === fieldKey(card));
+    }
+    function markTarget(board, target) {
+      const card = findFieldCard(board, target);
+      const slot = card?.closest(".slot");
+      if (slot && !slot.querySelector(".target-marker")) {
+        const marker = node("span", "target-marker");
+        marker.setAttribute("aria-hidden", "true");
+        slot.append(marker);
+      }
+      return card;
+    }
+    function drawAttackArrow(board, source, destination) {
+      if (!source || !destination) return;
+      const box = board.getBoundingClientRect();
+      const from = source.getBoundingClientRect();
+      const to = destination.getBoundingClientRect();
+      if (!box.width || !box.height || !from.width || !to.width) return;
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.classList.add("effect-layer");
+      svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+      svg.setAttribute("aria-hidden", "true");
+      const defs = document.createElementNS(svg.namespaceURI, "defs");
+      const marker = document.createElementNS(svg.namespaceURI, "marker");
+      marker.setAttribute("id", "attack-arrow-head");
+      marker.setAttribute("markerWidth", "12");
+      marker.setAttribute("markerHeight", "12");
+      marker.setAttribute("refX", "10");
+      marker.setAttribute("refY", "6");
+      marker.setAttribute("orient", "auto");
+      const head = document.createElementNS(svg.namespaceURI, "path");
+      head.setAttribute("d", "M 1 1 L 11 6 L 1 11 z");
+      head.setAttribute("fill", "#ffcc61");
+      marker.append(head); defs.append(marker); svg.append(defs);
+      const line = document.createElementNS(svg.namespaceURI, "line");
+      line.classList.add("attack-line");
+      line.setAttribute("pathLength", "1");
+      line.setAttribute("x1", String(from.left + from.width / 2 - box.left));
+      line.setAttribute("y1", String(from.top + from.height / 2 - box.top));
+      line.setAttribute("x2", String(to.left + to.width / 2 - box.left));
+      line.setAttribute("y2", String(to.top + to.height / 2 - box.top));
+      line.setAttribute("marker-end", "url(#attack-arrow-head)");
+      svg.append(line); board.append(svg);
+    }
+    function animateCardMoves(before, after, oldVisuals, board) {
+      if (!before || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const added = ["graveyards", "banished"].flatMap(zone => [0, 1].flatMap(player =>
+        after[zone][player].slice(before[zone][player].length)
+          .map(card => ({zone, player, code: card.code}))));
+      if (!added.length) return;
+      const remainingField = new Map(after.field.map(card => [fieldKey(card), card]));
+      for (const oldCard of before.field) {
+        const current = remainingField.get(fieldKey(oldCard));
+        if (current && (oldCard.code == null || current.code === oldCard.code)) continue;
+        const visual = oldVisuals.get(fieldKey(oldCard));
+        if (!visual) continue;
+        const matching = added.filter(item => oldCard.code == null || item.code === oldCard.code);
+        if (matching.length !== 1) continue;
+        const candidate = matching[0];
+        added.splice(added.indexOf(candidate), 1);
+        const destination = board.querySelector(candidate.zone === "graveyards"
+          ? `[data-graveyard-player="${candidate.player}"]`
+          : `[data-banished-player="${candidate.player}"]`);
+        if (!destination) continue;
+        const target = destination.getBoundingClientRect();
+        const origin = visual.rect;
+        if (!origin.width || !origin.height || !target.width) continue;
+        const moving = node("div", "travel-card");
+        moving.style.left = `${origin.left}px`;
+        moving.style.top = `${origin.top}px`;
+        moving.style.width = `${origin.width}px`;
+        moving.style.height = `${origin.height}px`;
+        visual.card.classList.remove("card-arrive", "card-flip", "card-attack");
+        moving.append(visual.card);
+        document.body.append(moving);
+        destination.classList.add("incoming-pile");
+        travelCards.push(moving);
+        const scale = .35;
+        const dx = target.left + target.width / 2 - origin.left - origin.width * scale / 2;
+        const dy = target.top + target.height / 2 - origin.top - origin.height * scale / 2;
+        const animation = moving.animate([
+          {transform: "translate(0, 0) scale(1)", opacity: 1},
+          {transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: .2}
+        ], {duration: 520, easing: "ease-in", fill: "forwards"});
+        const finish = () => {
+          moving.remove();
+          destination.classList.remove("incoming-pile");
+        };
+        animation.addEventListener("finish", finish, {once: true});
+        travelTimers.push(setTimeout(finish, 550));
+      }
+    }
     function render() {
       if (!replay) return;
       missingNames = new Set();
@@ -772,6 +926,17 @@
         ? `Seed ${replay.seed} · ${replay.winner == null ? "Draw" : `Winner: Player ${replay.winner}`}`
         : `Seed ${replay.seed} · Outcome hidden`;
       const board = byId("board");
+      for (const frame of lifeFrames) cancelAnimationFrame(frame);
+      lifeFrames = [];
+      for (const timeout of lifeTimers) clearTimeout(timeout);
+      lifeTimers = [];
+      for (const card of travelCards) card.remove();
+      travelCards = [];
+      for (const timeout of travelTimers) clearTimeout(timeout);
+      travelTimers = [];
+      const beforeObservation = previousObservation;
+      const oldVisuals = new Map([...board.querySelectorAll("[data-field-key]")].map(element => [
+        element.dataset.fieldKey, {card: element.cloneNode(true), rect: element.getBoundingClientRect()}]));
       hidePreview();
       byId("view-mode").textContent = reviewerData ? "Reviewer view · both players' cards revealed" : "Player-visible decision snapshots";
       byId("review-panel").hidden = Boolean(reviewerData);
@@ -785,10 +950,31 @@
         const attacker = [...board.querySelectorAll("[data-field-key]")].find(
           element => element.dataset.fieldKey === targetKey);
         attacker?.classList.add("card-attack");
+        if (!observation.field.some(card => card.controller !== selected.actor && card.zone === "monster")) {
+          const life = board.querySelector(`.life[data-player="${1 - selected.actor}"]`);
+          drawAttackArrow(board, attacker, life);
+        }
       }
+      for (const link of observation.chain || [])
+        for (const target of link.targets || []) markTarget(board, target);
+      if (selected?.kind === "select_card" && [4, 8].includes(selected.parameters?.location)
+          && (observation.pending_attack || observation.chain?.length)) {
+        const target = {controller: selected.parameters.controller,
+                        zone: selected.parameters.location === 4 ? "monster" : "spell_trap",
+                        sequence: selected.parameters.sequence};
+        const targetCard = markTarget(board, target);
+        if (observation.pending_attack && targetCard) {
+          const attacker = findFieldCard(board, observation.pending_attack);
+          attacker?.classList.add("card-attack");
+          drawAttackArrow(board, attacker, targetCard);
+        }
+      }
+      if (animateNext && previousFrame >= 0)
+        animateCardMoves(beforeObservation, observation, oldVisuals, board);
       previousFrame = index;
       previousField = new Map(observation.field.map(card => [fieldKey(card), fieldSignature(card)]));
       previousHand = {viewer: observation.viewer, count: observation.hand.length};
+      previousObservation = observation;
       animateNext = false;
       byId("piles").replaceChildren(node("h2", "", "Graveyards and banished cards"),
         listZone("Opponent Graveyard", observation.graveyards[1 - observation.viewer], 1 - observation.viewer, "graveyard"),
@@ -879,7 +1065,8 @@
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
       stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map();
       reviewerData = embeddedReviewer?.source_trajectory_sha256 === hash ? embeddedReviewer : null;
-      previousFrame = -1; previousField = new Map(); previousHand = null; animateNext = false;
+      previousFrame = -1; previousField = new Map(); previousHand = null;
+      previousObservation = null; animateNext = false;
       commonFrames = data.decisions.flatMap((record, frame) => commonDecision(record) ? [frame] : []);
       const requested = Number(location.hash.match(/^#decision=(\d+)$/)?.[1] || 1);
       index = Math.max(0, Math.min(data.decisions.length - 1 + Number(Boolean(data.terminal_observation)), requested - 1));
