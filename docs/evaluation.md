@@ -7825,3 +7825,65 @@ The ignored reports are `.cache/goat-ai/ppo_batch32_vs_16_28100.json`,
 and `826f7354b8d80d256c22a6549145ad6822fc80a6c4fc3893f76d5d345369cf16`.
 The direct report SHA-256 is
 `4f42dac27427dd5eee4fd07f81d9fc333f3154fe56d2535313244a61d57dc53d`.
+
+### Frozen-opponent frequency in PPO self-play (27 October 2026)
+
+Two 64-duel continuations started from the unchanged feature-v23 reference
+checkpoint. Both used the sourced Jesse Goat Control/Warrior pairing in all
+four deck/seat roles, seeds 32000–32063, four rollout workers, four-game PPO
+rollouts, two update epochs, minibatch 32, per-episode weighting, a per-deck
+moving return baseline, parent KL weight 0.5, and the same native assets. The
+sole planned difference was `--historical-probability`: **0.75** sampled a
+frozen past policy in 48 games and RandomAgent in 16; **1.0** sampled a frozen
+policy in all 64. The first run recorded 38–26 and
+5,846 learner decisions in 27.281 seconds; the second recorded 29–35 and
+5,633 learner decisions in 26.916 seconds. Training wins are against different
+opponent mixtures and do not compare playing strength.
+
+All 128 terminal training trajectories independently replay-verified against
+the pinned experimental native engine and passed the visibility audit:
+34,025 decisions for the 0.75 arm and 34,053 for the 1.0 arm. The checks used
+four isolated processes and the existing `verify_training_trajectory` gate.
+No game hit the 3,000-decision cap or an unsupported native request.
+
+On held-out Chaos Control/Bazoo Return and Dimension Fusion Turbo/Phoenix
+Control Main Decks, both assignments and seats, seeds 32100–32107, the 1.0
+child scored **33–30–1** directly against the 0.75 child over 64 duels
+(52.3%, paired 95% interval 46.9%–57.8%). On separate seeds 32108–32115,
+the 0.75 child scored **30–34** and the 1.0 child **31–33** against the
+unchanged parent. On matched seeds 32116–32123 against Tactical-v14, the
+0.75 child scored **9–55**, the 1.0 child **7–56–1**, and the parent
+**9–55**. The paired Tactical score differences versus the parent were
+0.0 points (interval −9.4 to +9.4) and −2.3 points (interval −10.2 to +6.3),
+respectively. The tournament report comparator confirmed matching source,
+native assets, local deck hashes, opponent, and schedules for the matched
+baseline arms. Neither child meets M4's held-out self-play gain gate; retain
+the unchanged reference and prioritize better decision feedback or value
+estimation over simply changing the opponent mixture.
+
+The ignored checkpoints are `.cache/goat-ai/historical75_32000_32063.pt`
+(SHA-256 `4eb9d85fffba7b6ad0be96cea4d3879dabeb5de033b0a43206e28c3f174b5a90`)
+and `historical100_32000_32063.pt` (SHA-256
+`7e54ac09f93c681c249b45cb9986e643a171488a304ae2f4d9835b634d5c66eb`).
+Their replay directories share those stems. The direct child-vs-child report
+is `historical100_vs_75_32100.json` (SHA-256
+`62be4acf273dcab0530b84c99b00145ce5f1d68af3867fca9ac5ad277d7d4585`);
+the parent and Tactical reports use `historical{75,100,parent}_vs_*_321*.json`
+names in the same ignored cache.
+
+Reproduce one training arm after [native setup](native_setup.md), changing
+`PROBABILITY` between `0.75` and `1.0` and using a fresh output path:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --schedule-mode four_roles --seed 32000 --games 64 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 --ppo-epochs 2 \
+  --ppo-batch-size 32 --ppo-rollout-weighting per_episode \
+  --baseline-scope learner_deck --snapshot-every 4 --parent-kl-weight 0.5 \
+  --historical-probability PROBABILITY --rollout-workers 4 \
+  --output .cache/goat-ai/historical_PROBABILITY_reproduction.pt
+```

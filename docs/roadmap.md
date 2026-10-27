@@ -530,6 +530,14 @@ both orders, with byte-identical trajectories and model tensors. One full arm
 replay-verified and passed the visibility audit; see
 [benchmarks](benchmarks.md#sixteen-game-ppo-rollout-workers).
 
+A controlled 64-duel PPO continuation compared the usual 0.75 frozen-policy
+opponent probability with 1.0, keeping the four-role training schedule fixed.
+All 128 training duels replay-verified and passed visibility checks, but the
+children split 33–30–1 directly on held-out Main Decks, scored 30–34 and
+31–33 against their unchanged parent, and neither improved on the parent's
+9–55 Tactical result. Opponent-mixture tuning alone did not close M4; see
+[evaluation](evaluation.md#frozen-opponent-frequency-in-ppo-self-play-27-october-2026).
+
 A 64-duel, four-role continuation with parallel PPO, per-deck baselines,
 per-episode weighting, and parent KL produced 33,341 replay-verified native
 decisions. On unseen Phoenix/Dimension Fusion decks, it scored 44–50–2
