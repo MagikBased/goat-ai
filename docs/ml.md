@@ -246,7 +246,16 @@ checkpoint; the trainer replay-verifies and visibility-audits them, then
 checks their exact byte hashes against parent provenance. The sampled states,
 KL weight, batch size, step count, and parent hash are saved with the child.
 This is policy distillation on visible states, not simulator access to hidden
-cards. Example:
+cards.
+
+Cloning can use `--fast-trajectory-json` with the optional `.[speed]` extra to
+decode source replays with `orjson` in both the main process and verification
+workers. It changes only JSON decoding; native replay verification, visibility
+auditing, source hashes, and feature encoding remain required. A matched
+eight-replay check produced identical model tensors and a small wall-time
+reduction; see [evaluation](evaluation.md#optional-fast-trajectory-reading-for-cloning-27-october-2026).
+
+Parent-KL example:
 
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \

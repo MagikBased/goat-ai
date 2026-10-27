@@ -50,13 +50,13 @@ SOURCE_KINDS = frozenset((
 ))
 
 
-def verify_training_trajectory(task: tuple[Path, Path, str]) -> tuple[int, str]:
+def verify_training_trajectory(task: tuple[Path, Path, str, bool]) -> tuple[int, str]:
     """Verify one recorded duel in an isolated native-engine process."""
-    path, native_root, engine = task
+    path, native_root, engine, fast_json = task
     engine_type = (RestrictedOcgcoreEngine if engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    trajectory = read_trajectory(path)
+    trajectory = read_trajectory(path, fast_json=fast_json)
     if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
         raise ValueError(f"{path}: trajectory changed during verification")
     count = verify_trajectory(trajectory, engine_type(native_root))
@@ -238,6 +238,9 @@ def main() -> None:
                              "requires --batched-forward")
     parser.add_argument("--verification-workers", type=int, default=1,
                         help="native replay verification processes (default: serial)")
+    parser.add_argument("--fast-trajectory-json", action="store_true",
+                        help="use optional orjson to decode input trajectories in the main "
+                             "process and replay-verification workers")
     parser.add_argument("--width", type=int, default=64)
     parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 26)),
                         default=POLICY_FEATURE_VERSION)
@@ -340,14 +343,15 @@ def main() -> None:
     verified_results = None
     if args.verification_workers > 1:
         verification_started = perf_counter()
-        tasks = [(path, args.native_root, args.engine) for path in args.trajectories]
+        tasks = [(path, args.native_root, args.engine, args.fast_trajectory_json)
+                 for path in args.trajectories]
         with ProcessPoolExecutor(max_workers=args.verification_workers,
                                  mp_context=multiprocessing.get_context("spawn")) as pool:
             verified_results = list(pool.map(verify_training_trajectory, tasks))
         verification_seconds = perf_counter() - verification_started
     for trajectory_index, path in enumerate(args.trajectories):
         raw = path.read_bytes()
-        trajectory = read_trajectory(path)
+        trajectory = read_trajectory(path, fast_json=args.fast_trajectory_json)
         if hashlib.sha256(path.read_bytes()).digest() != hashlib.sha256(raw).digest():
             raise ValueError(f"{path}: trajectory changed while loading")
         if trajectory.schema_version not in range(3, 26) or not trajectory.deck_sha256 or not (
@@ -479,7 +483,7 @@ def main() -> None:
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             if parent["trajectory_sha256"].get(str(path)) != digest:
                 raise ValueError(f"{path}: preservation replay is absent from parent provenance")
-            trajectory = read_trajectory(path)
+            trajectory = read_trajectory(path, fast_json=args.fast_trajectory_json)
             verify_trajectory(trajectory, engine_type(args.native_root))
             audit_trajectory_visibility(trajectory)
             candidates = [record for record in demonstrator_records(trajectory)
@@ -540,6 +544,7 @@ def main() -> None:
         "seed": args.seed, "torch_version": str(torch.__version__),
         "batch_size": args.batch_size,
         "batched_forward": args.batched_forward,
+        "fast_trajectory_json": args.fast_trajectory_json,
         "skip_forced_training": args.skip_forced_training,
         "omit_forced_forward": args.omit_forced_forward,
         "fit_decisions": (sum(len(record.legal_actions) > 1 for record in records)
@@ -576,6 +581,7 @@ def main() -> None:
     summary["fitting_seconds"] = fitting_seconds
     summary["verification_workers"] = args.verification_workers
     summary["batched_forward"] = args.batched_forward
+    summary["fast_trajectory_json"] = args.fast_trajectory_json
     print(json.dumps(summary, indent=2))
 
 

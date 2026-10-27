@@ -117,8 +117,17 @@ def write_trajectory(path: str | Path, trajectory: Trajectory, *,
                                          separators=(",", ":")) + "\n", encoding="utf-8")
 
 
-def read_trajectory(path: str | Path) -> Trajectory:
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+def read_trajectory(path: str | Path, *, fast_json: bool = False) -> Trajectory:
+    data = Path(path).read_bytes()
+    if fast_json:
+        try:
+            import orjson
+        except ImportError as error:
+            raise RuntimeError("fast trajectory JSON requires the speed extra: "
+                               "pip install '.[speed]'") from error
+        raw = orjson.loads(data)
+    else:
+        raw = json.loads(data)
     version = raw.get("schema_version")
     if version not in range(1, 26):
         raise ValueError("unsupported trajectory schema")

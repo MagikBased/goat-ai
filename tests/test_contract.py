@@ -60,6 +60,8 @@ def test_fast_trajectory_json_roundtrip_matches_standard_path(tmp_path):
     write_trajectory(fast, trajectory, fast_json=True)
     assert fast.read_bytes() == standard.read_bytes()
     assert read_trajectory(fast) == trajectory
+    assert read_trajectory(standard, fast_json=True) == trajectory
+    assert read_trajectory(fast, fast_json=True) == trajectory
 
 
 class ContractEngine:

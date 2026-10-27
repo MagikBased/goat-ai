@@ -8173,3 +8173,37 @@ for Zombie and
 `17e5cef77f500f57c596c8e89d0b92abfe1615e92953fa17c1c25e5b77794461`
 for Phoenix. The reports are under `.cache/goat-ai/` with the
 `resource_v3_` prefix and seed ranges above.
+
+### Optional fast trajectory reading for cloning (27 October 2026)
+
+`read_trajectory(..., fast_json=True)` and the cloning CLI's
+`--fast-trajectory-json` use optional `orjson` for source replay decoding.
+The command still verifies every complete replay and audits player visibility.
+On 16 PPO source replay files totaling 61.0 MB, four in-memory decode runs
+had median times of **0.766 s** with standard `json` and **0.477 s** with
+`orjson`; this measures JSON decoding only. A separate proposed split of
+16-decision neural batches by legal-action count was discarded: on 512
+recorded learner decisions it took **0.174 s** per pass versus **0.114 s**
+for the existing batch despite reducing action padding. The maximum valid
+logit difference in that diagnostic was `2.4e-7`.
+
+For a full-command check, eight self-play replays on seeds 34000–34007
+supplied **2,023 training decisions**. Each arm used the unchanged v23
+current-core parent, one cloning epoch, width 32, minibatch 16, batched
+forward, omitted forced forwards, seed 58, four native verification workers,
+and one Torch thread. Runs were ordered standard, fast, fast, standard.
+CLI-reported wall times were **5.777 / 5.651 s** for standard and
+**5.670 / 5.527 s** for fast; the matched reductions were **0.107 / 0.124 s**.
+All four runs had exactly the same loss (`0.1490818825`), source hashes,
+and model tensors. The small speed difference is specific to this machine
+and workload; it does not establish a general training-throughput gain.
+
+The ignored checkpoints are `.cache/goat-ai/fast_read_{off_a,on_a,on_b,off_b}_34000_34007.pt`.
+Reproduce one arm with `scripts/train_behavioral_clone.py` on the eight
+`current_broader_ppo_34000_34063_replays/episode_0000[0-7]_seed_*.json`
+files, `--engine experimental --init-checkpoint
+.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt --epochs 1
+--batch-size 16 --batched-forward --omit-forced-forward
+--verification-workers 4 --width 32 --feature-version 23
+--learning-rate 0.0002 --seed 58`; add `--fast-trajectory-json` for the
+fast arm and use a distinct ignored output path.
