@@ -1,5 +1,46 @@
 # Native benchmark log
 
+## Torch CPU thread count in a complete self-play game (27 October 2026)
+
+The trainer does not override PyTorch's CPU thread count. On this host its
+default was eight. A matched AB/BA test compared `OMP_NUM_THREADS=8` and
+`OMP_NUM_THREADS=1` using the feature-v23
+`fv23_tactical_v6_current_assets.pt` checkpoint, the control/Chaos probe
+decks, seed 18200, experimental native engine, one REINFORCE game, and update
+batch size 16. Each arm completed 1,527 decisions, recorded the same replay
+bytes (SHA-256 `f040020863571a0b54a0989cdbd55e8d7091da77bdbb2e0c7f6c7152213d93fe`),
+and reported the same policy loss. The one-thread replay verified against all
+1,527 native decisions. Whole-process times in run order were **4.454 s**
+(eight), **4.452 s** (one), **4.400 s** (one), and **4.363 s** (eight).
+The trainer's own reported times were 3.111, 3.104, 3.065, and 3.022 s.
+These tiny differences do not support changing the thread default.
+
+Saved weights were bit-identical between runs with the same thread count.
+Across thread counts, seven tensors differed by at most `3.24e-6`, despite
+identical sampled decisions. Pin the thread count when exact checkpoint
+reproduction matters. The ignored raw report and outputs are under
+`.cache/goat-ai/thread_benchmark_18200/`. To reproduce an arm, use a fresh
+output path and change `OMP_NUM_THREADS` between one and eight:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v6_current_assets.pt \
+  --output .cache/goat-ai/thread_example_18200.pt --engine experimental \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk \
+  --seed 18200 --games 1 --max-decisions 3000 --reinforce-batch-size 16
+```
+
+A separate `cProfile` sample with the automatic fast replay writer used
+seed 18201 and 1,215 native decisions. It attributed cumulative Python time
+of 0.742 s to observation construction, 0.553 s to 714 policy feature
+encodings, and 0.505 s to 380 policy forward calls. These cumulative times
+overlap their callers and include profiling overhead. They identify the next
+places to test with complete matched duels: reduce redundant observation
+work, then consider reuse of already encoded learner decisions during policy
+updates. Preserve player-visible observations and byte-identical trajectories
+as correctness gates. The ignored profile is
+`.cache/goat-ai/train_profile_fast_18201.prof`.
+
 ## Cached frozen-parent scores for PPO (27 October 2026)
 
 With `--parent-kl-weight`, clipped PPO previously re-ran the unchanged
