@@ -8,7 +8,6 @@ from pathlib import Path
 
 import torch
 from torch import Tensor, nn
-from torch.nn import functional as F
 from torch.nn.utils.rnn import pack_padded_sequence
 
 from goat_ai.actions import Action
@@ -663,10 +662,10 @@ class LegalActionPolicy(nn.Module):
             values = [getattr(item, name) for item in decisions]
             shape = tuple(max(value.shape[axis] for value in values)
                           for axis in range(values[0].ndim))
-            stacked.append(torch.stack([
-                F.pad(value, tuple(component for axis in reversed(range(value.ndim))
-                                   for component in (0, shape[axis] - value.shape[axis])))
-                for value in values]))
+            padded_values = values[0].new_zeros((len(values), *shape))
+            for index, value in enumerate(values):
+                padded_values[(index, *(slice(0, size) for size in value.shape))] = value
+            stacked.append(padded_values)
         padded = DecisionFeatures(*stacked)
         chain_lengths = [len(item.chain_cards) for item in decisions]
         chain = padded.chain_cards

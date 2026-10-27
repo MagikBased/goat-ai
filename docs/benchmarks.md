@@ -1,5 +1,31 @@
 # Native benchmark log
 
+## Preallocated PPO feature padding (27 October 2026)
+
+The policy's batched forward pass used to call `torch.nn.functional.pad` for
+every feature tensor in every decision, then stack the padded tensors. It now
+allocates one zero-filled tensor per feature field and copies each decision
+into its slice. Padding values and the legal-action mask are unchanged.
+
+An AB/BA complete-training comparison used the feature-v23 reference
+checkpoint, Jesse Goat Control versus Warrior, seeds 28000–28015, four
+rollout workers, two PPO epochs, minibatch 32, and one Torch CPU thread per
+process on an Intel Core i7-10700K. The unmodified arm ran from detached
+commit `9a3e21d`; the changed arm ran from this patch. Each arm finished 16
+terminal duels with 1,119 learner decisions. The 16 replay files were
+byte-for-byte equal and all saved model tensors were exactly equal in every arm.
+
+| Run order | Original trainer | Preallocated padding |
+| :--- | ---: | ---: |
+| Original, changed | 6.861 s | 6.643 s |
+| Changed, original | 6.668 s | 6.496 s |
+
+This was a **2.6–3.2% complete-training saving** on this one schedule. One
+changed replay independently verified all 356 native decisions; the focused
+policy suite passed 104 tests. The small gain does not establish a speedup on
+other models, hardware, or deck pairings. Ignored reports and replays use
+`.cache/goat-ai/pad_bench_{control,new,control_b,new_b}_28000` prefixes.
+
 ## Empty-chain GRU skip pilot (27 October 2026)
 
 An experimental CPU inference branch skipped the chain GRU when the encoded
