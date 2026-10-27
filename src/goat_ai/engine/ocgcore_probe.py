@@ -48,6 +48,8 @@ MR1_SYNCHRO_CARDS = frozenset({
     68005187,  # Soul Exchange
     26202165,  # Sangan
     9748752,   # Caius the Shadow Monarch
+    59197169,  # Yami; period Field Spell replacement probe
+    22702055,  # Umi; period Field Spell replacement probe
 })
 MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094, 7391448})
 UPSTREAM_GOYO_SHA256 = "b1f8f68c428302b537a1bf4b660ef33ae800afd4a1716cd962f3908b2f24302b"

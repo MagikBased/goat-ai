@@ -403,6 +403,26 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_synchro_probe.py -k goyo
 ```
 
+## One-active-Field-Spell MR1 check
+
+The [2009 official rulebook, pages 8 and 24](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
+states that only one Field Spell may be active across both players and that
+activating a new one destroys the previous active Field Spell. [Yami](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4341&ope=2&request_locale=en)
+and [Umi](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4340&ope=2&request_locale=en)
+both predate the Edison cutoff. The narrow `mr1-synchro-protocol` allowlist
+now includes their pinned official IDs and scripts. In a seed-52 fixture,
+player 0 activates Yami and player 1 later activates Umi; Umi alone remains
+in the Field Spell zone and Yami is in its owner's Graveyard. The duel then
+reaches terminal, serializes, replay-verifies, and passes the visibility
+audit. This confirms the pinned MR1 mode's field-replacement path for these
+two cards. It does not certify every 2010 Field Spell interaction or an Edison
+environment.
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_field_spells.py
+```
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including

@@ -1104,6 +1104,10 @@ non-EARTH Tuner, accept or decline its battle recruitment effect, reach
 terminal, replay-verify, and pass the visibility audit. This is one validated
 historical card path, not a complete Edison profile; see the
 [Edison audit](edison_research.md#goyo-guardian-historical-material-correction).
+The separate MR1 protocol also checks the 2009 one-active-Field-Spell rule:
+player 1's Umi replaces player 0's Yami in a complete, replay-verified,
+visibility-audited duel. This narrows one historical mechanics gap without
+certifying an Edison simulator; see the [Edison audit](edison_research.md#one-active-field-spell-mr1-check).
 The pinned core's MR1 mode now has a separate vanilla-only startup probe and
 complete-duel adapter. The seed-42 Normal Monster fixture completes 1,368
 decisions through the common environment, then replay-verifies and passes the
