@@ -24,6 +24,8 @@ from goat_ai.observations import Observation
 
 ZONES = ("hand", "monster", "spell_trap", "graveyard", "banished", "extra", "chain")
 POSITIONS = ("hidden", "facedown", "faceup")
+ZONE_IDS = {zone: index + 1 for index, zone in enumerate(ZONES)}
+POSITION_IDS = {position: index + 1 for index, position in enumerate(POSITIONS)}
 PHASES = ("draw", "standby", "main1", "battle_start", "battle_step", "damage_step",
           "damage_calculation", "battle", "main2", "end")
 ACTION_KINDS = (
@@ -180,13 +182,13 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
             raise ValueError("unknown visible card zone or position")
         code = visible_code(card.code, card.controller, zone_locations.get(card.zone),
                             card.sequence)
-        cards.append((vocabulary.index(code), ZONES.index(card.zone) + 1,
+        cards.append((vocabulary.index(code), ZONE_IDS[card.zone],
                       int(card.controller != observation.viewer) + 1,
-                      POSITIONS.index(card.position) + 1))
+                      POSITION_IDS[card.position]))
         card_sequences.append(card.sequence if card.zone in ("monster", "spell_trap")
                               and card.sequence is not None else -1)
         equip_slots.append((int(card.equipped_to[0] != observation.viewer) + 1,
-                            ZONES.index("monster") + 1, card.equipped_to[1])
+                            ZONE_IDS["monster"], card.equipped_to[1])
                            if feature_version in EQUIP_FEATURE_VERSIONS
                            and card.equipped_to is not None
                            else (0, 0, -1))
@@ -198,7 +200,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                              float(card.attack is not None))
                             if feature_version >= 8 else (0.0,) * 5)
     for link in observation.chain:
-        cards.append((vocabulary.index(link.card_code), ZONES.index("chain") + 1,
+        cards.append((vocabulary.index(link.card_code), ZONE_IDS["chain"],
                       int(link.controller != observation.viewer) + 1, 3))
         card_numbers.append((0.0,) * 5)
         card_sequences.append(-1)
@@ -280,7 +282,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         if (zone is None or not isinstance(sequence, int)
                 or controller not in (0, 1)):
             return (0, 0, -1)
-        return (int(controller != own) + 1, ZONES.index(zone) + 1, sequence)
+        return (int(controller != own) + 1, ZONE_IDS[zone], sequence)
 
     for action in legal_actions:
         params = action.parameters
@@ -438,7 +440,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         chain_links.sort()
     chain_targets = (
         [[(int(target.controller != observation.viewer) + 1,
-           ZONES.index(target.zone) + 1, target.sequence)
+           ZONE_IDS[target.zone], target.sequence)
           for target in link.targets]
          for link in observation.chain]
         if feature_version in CHAIN_TARGET_FEATURE_VERSIONS else []

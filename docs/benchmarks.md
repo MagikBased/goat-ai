@@ -1,5 +1,27 @@
 # Native benchmark log
 
+## Fixed zone and position lookup in policy encoding (27 October 2026)
+
+Policy feature encoding now looks up the seven fixed zones and three fixed
+positions through prebuilt integer maps. A recorded feature-v23 replay from
+seed 18200 supplied 615 multi-action decisions. Six passes over those
+decisions gave a median warm encoding time of **171.3 ms** with tuple searches
+and **166.8 ms** with maps. The combined feature-tensor SHA-256 was identical
+in both modes:
+`b6dfed5b4f8da6dab29d0f26ccd5bfd50d6c580caf9476f0b03d9a63c228b83e`.
+
+A complete native AB/BA comparison used the same feature-v23 checkpoint,
+control/Chaos probe decks, seeds 18210–18213, a frozen random opponent,
+one Torch CPU thread, and a 3,000-decision cap. Each mode completed
+**4,956 decisions** and produced exactly equal trajectories and learner
+records. Linear/mapped wall times were **5.119/5.032 s** and
+**4.913/4.871 s** in reversed order. This is a small gain on one CPU and
+deck pair; it does not establish a broader training speedup or any strength
+change. The ignored measurements are
+`.cache/goat-ai/zone_lookup_baseline_18200.json`,
+`.cache/goat-ai/zone_lookup_candidate_18200.json`, and
+`.cache/goat-ai/zone_lookup_full_18210.json`.
+
 ## Torch CPU thread count in a complete self-play game (27 October 2026)
 
 The trainer does not override PyTorch's CPU thread count. On this host its
