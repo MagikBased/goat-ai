@@ -23,6 +23,7 @@ class DecisionPreferences:
     reviewed_seat: int
     preferences: tuple[ReviewedPreference, ...]
     rule_set_id: str | None = None
+    schema_version: int = 1
 
 
 def read_decision_preferences(path: str | Path, trajectory_sha256: str,
@@ -33,8 +34,10 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
     before scoring or training on these retrospective preferences.
     """
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+    if (not isinstance(raw, dict) or type(raw.get("schema_version")) is not int
+            or raw["schema_version"] not in (1, 2)):
         raise ValueError("unsupported decision-preference schema")
+    schema_version = raw["schema_version"]
     if raw.get("source_trajectory_sha256") != trajectory_sha256:
         raise ValueError("preference source trajectory SHA-256 mismatch")
     authorization = raw.get("authorization")
@@ -67,7 +70,9 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
                  and metadata["opponent_version"] > 0)
     elif authorization == "automated_rule":
         rule_set_id = raw.get("rule_set_id")
-        if rule_set_id not in ("visible_audit_v1", "visible_audit_v2"):
+        if ((schema_version == 1 and rule_set_id not in (
+                "visible_audit_v1", "visible_audit_v2"))
+                or (schema_version == 2 and rule_set_id != "visible_resource_v3")):
             raise ValueError("automated preferences require a supported visible audit rule set")
         seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
                             else "demonstrator_seat")
@@ -83,6 +88,8 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
                      and re.fullmatch(r"[0-9a-f]{64}", checkpoint) is not None))
     else:
         raise ValueError("preferences require agent-review authorization")
+    if schema_version == 2 and authorization != "automated_rule":
+        raise ValueError("counterfactual preference schema requires automated-rule provenance")
     if not valid:
         raise ValueError("preference source and agent seat do not match authorization")
     if "reviewed_seat" in raw and (type(raw["reviewed_seat"]) is not int
@@ -122,9 +129,13 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
         preferred, disfavored = groups
         if set(preferred) & set(disfavored):
             raise ValueError("preferred and disfavored actions overlap")
-        if record.legal_actions.index(record.selected_action) not in disfavored:
+        selected_index = record.legal_actions.index(record.selected_action)
+        if schema_version == 1 and selected_index not in disfavored:
             raise ValueError("disfavored actions must include the recorded choice")
+        if schema_version == 2 and selected_index not in (*preferred, *disfavored):
+            raise ValueError("counterfactual comparison must include the recorded choice")
         parsed.append(ReviewedPreference(index, preferred, disfavored))
     return DecisionPreferences(trajectory_sha256, reviewer.strip(), authorization,
                                seat, tuple(parsed),
-                               raw.get("rule_set_id") if authorization == "automated_rule" else None)
+                               raw.get("rule_set_id") if authorization == "automated_rule" else None,
+                               schema_version)

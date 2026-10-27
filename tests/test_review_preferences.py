@@ -154,6 +154,32 @@ def test_automated_rule_preferences_have_distinct_provenance(tmp_path):
             reviewed_seat=1), "a" * 64, base)
 
 
+def test_counterfactual_schema_accepts_recorded_safe_action_only_for_v3(tmp_path):
+    base = trajectory()
+    pair = [{"decision_index": 0, "preferred_action_indices": [0],
+             "disfavored_action_indices": [1]}]
+    path = preference_file(tmp_path, schema_version=2,
+                           authorization="automated_rule",
+                           rule_set_id="visible_resource_v3",
+                           reviewed_seat=0, preferences=pair)
+    labels = read_decision_preferences(path, "a" * 64, base)
+    assert labels.schema_version == 2
+    assert labels.preferences[0].preferred_action_indices == (0,)
+    with pytest.raises(ValueError, match="supported visible audit rule set"):
+        read_decision_preferences(preference_file(
+            tmp_path, schema_version=1, authorization="automated_rule",
+            rule_set_id="visible_resource_v3", preferences=pair), "a" * 64, base)
+    with pytest.raises(ValueError, match="counterfactual preference schema"):
+        read_decision_preferences(preference_file(
+            tmp_path, schema_version=2, preferences=pair), "a" * 64, base)
+    with pytest.raises(ValueError, match="recorded choice"):
+        read_decision_preferences(preference_file(
+            tmp_path, schema_version=2, authorization="automated_rule",
+            rule_set_id="visible_resource_v3", preferences=[{
+                "decision_index": 0, "preferred_action_indices": [1],
+                "disfavored_action_indices": [2]}]), "a" * 64, base)
+
+
 def test_score_prefers_either_good_target_without_set_size_bonus():
     torch = pytest.importorskip("torch")
     from goat_ai.training.policy import CardVocabulary

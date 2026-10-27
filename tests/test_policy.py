@@ -431,6 +431,28 @@ def test_preference_kl_raises_a_reviewed_set_without_forcing_one_target():
             learning_rate=0.001, rng=random.Random(19))
 
 
+def test_counterfactual_preference_can_rank_recorded_safe_action_above_bad_option():
+    torch.manual_seed(71)
+    vocabulary = CardVocabulary((10, 20))
+    student = LegalActionPolicy(vocabulary.size, width=8, feature_version=19)
+    parent = copy.deepcopy(student)
+    legal = actions()
+    record = DecisionRecord(replace(view(), turn_player=0), legal, legal[0])
+    preference = ReviewedPreference(0, (0,), (1,))
+    preservation = DecisionRecord(replace(view(), turn_player=1), legal, legal[0])
+    features = encode_decision(record.observation, legal, vocabulary, 19)
+    with torch.no_grad():
+        before = float(student(features)[0] - student(features)[1])
+    losses, _ = fit_preferences_with_parent_kl(
+        student, parent, vocabulary, ((record, preference),), (preservation,),
+        steps=4, preservation_batch=1, preservation_weight=1.0,
+        learning_rate=0.001, rng=random.Random(71))
+    with torch.no_grad():
+        after = float(student(features)[0] - student(features)[1])
+    assert losses[-1] < losses[0]
+    assert after > before
+
+
 def test_policy_audit_fingerprint_identifies_visible_decision_and_choice():
     observation = view()
     legal = actions()

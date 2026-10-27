@@ -1644,3 +1644,12 @@ checks. The matched Tactical comparison was 13–51 versus 10–54 for the
 reference, with a paired interval crossing zero. Neither PPO timing meets
 M4's self-play gain gate; see
 [evaluation](evaluation.md#frozen-rollout-baseline-ablation-27-october-2026).
+
+The visible-resource v3 experiment adds replay-verified counterfactual
+comparisons for own-only Nobleman and negative visible Heavy Storm trades,
+including decisions where the recorded policy avoided the loss. A child fit
+to 137 synthetic comparisons improved against Tactical-v14 on one held-out
+Zombie family but regressed on a separate Phoenix family and retained an
+own-only Nobleman activation. It remains experimental; M4 needs independently
+reviewed resource decisions, broader outcome gains, and a separate self-play
+improvement. See [the measured experiment](evaluation.md#visible-resource-v3-counterfactual-preference-experiment-27-october-2026).

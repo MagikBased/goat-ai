@@ -1,4 +1,4 @@
-"""Turn a narrow set of verified visible-state audit flags into synthetic preferences.
+"""Derive replay-verified synthetic preferences from player-visible decisions.
 
 These labels are automated hypotheses, not human reviews or winning-move
 claims. Keep the output separate from human annotations and evaluate a trained
@@ -13,6 +13,8 @@ from pathlib import Path
 from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import (
+    HEAVY_STORM,
+    NOBLEMAN_OF_CROSSOUT,
     THUNDER_DRAGON,
     review_candidates,
 )
@@ -22,6 +24,7 @@ from goat_ai.replay.fingerprint import sha256_file
 
 RULE_SET_ID = "visible_audit_v1"
 RULE_SET_V2 = "visible_audit_v2"
+RULE_SET_V3 = "visible_resource_v3"
 SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -85,6 +88,8 @@ def preferred_indices(record, category: str) -> list[int]:
 def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID
            ) -> tuple[list[dict], Counter]:
     """Keep one unambiguous automated comparison per recorded decision."""
+    if rule_set_id == RULE_SET_V3:
+        return derive_resource_counterfactuals(trajectory)
     categories = {RULE_SET_ID: SUPPORTED_CATEGORIES_V1,
                   RULE_SET_V2: SUPPORTED_CATEGORIES_V2}.get(rule_set_id)
     if categories is None:
@@ -109,11 +114,84 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID
     return result, counts
 
 
+def derive_resource_counterfactuals(trajectory) -> tuple[list[dict], Counter]:
+    """Compare a visited safe choice or phase transition with visible resource loss.
+
+    The chosen action can be on either side of the comparison. The opponent's
+    Set-card identity and the simulator's private state are never inspected.
+    """
+    metadata = trajectory.skill_metadata or {}
+    seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
+                        else "demonstrator_seat")
+    if type(seat) is not int or seat not in (0, 1):
+        raise ValueError("resource comparisons require a recorded policy seat")
+    result = []
+    counts = Counter()
+    seen_contexts = set()
+    for index, record in enumerate(trajectory.decisions):
+        obs = record.observation
+        if (obs.acting_player != seat or obs.turn_player != seat
+                or obs.phase not in ("main1", "main2")):
+            continue
+        own_sets = any(card.controller == seat and card.zone == "monster"
+                       and card.position == "facedown" for card in obs.field)
+        enemy_sets = any(card.controller != seat and card.zone == "monster"
+                         and card.position == "facedown" for card in obs.field)
+        own_backrow = [card for card in obs.field
+                       if card.controller == seat and card.zone == "spell_trap"]
+        enemy_backrow_count = sum(card.controller != seat
+                                  and card.zone == "spell_trap" for card in obs.field)
+        bad = []
+        categories = set()
+        for action_index, action in enumerate(record.legal_actions):
+            if action.kind != "activate":
+                continue
+            code = action.parameters.get("code")
+            if code == NOBLEMAN_OF_CROSSOUT and own_sets and not enemy_sets:
+                bad.append(action_index)
+                categories.add("nobleman_only_own_set_monster")
+            elif code == HEAVY_STORM:
+                source_is_set = action.parameters.get("location") == 8 and any(
+                    card.sequence == action.parameters.get("sequence")
+                    and card.code == HEAVY_STORM for card in own_backrow)
+                own_other_backrow = len(own_backrow) - int(source_is_set)
+                if enemy_backrow_count <= own_other_backrow:
+                    bad.append(action_index)
+                    categories.add("heavy_storm_negative_visible_trade")
+        if not bad:
+            continue
+        selected = record.legal_actions.index(record.selected_action)
+        if selected not in bad:
+            preferred = [selected]
+        else:
+            phase_kind = "battle_phase" if obs.phase == "main1" else "end_phase"
+            preferred = [i for i, action in enumerate(record.legal_actions)
+                         if action.kind == phase_kind]
+        if not preferred:
+            continue
+        # Priority passes can revisit a near-identical resource choice many
+        # times in one turn. Count each visible trade and chosen side once.
+        context = (obs.turn, obs.phase, tuple(sorted(categories)),
+                   len(own_backrow), enemy_backrow_count, own_sets, enemy_sets,
+                   tuple(sorted((record.legal_actions[i].parameters.get("code"),
+                                 record.legal_actions[i].parameters.get("location") == 8)
+                                for i in bad)), selected in bad)
+        if context in seen_contexts:
+            continue
+        seen_contexts.add(context)
+        result.append({"decision_index": index,
+                       "preferred_action_indices": preferred,
+                       "disfavored_action_indices": bad})
+        counts.update(categories)
+    return result, counts
+
+
 def validate_automated_preferences(trajectory, preferences, weak_flip_attacks) -> None:
     """Reject edits that no longer match the declared visible-rule output."""
     rule_set_id = getattr(preferences, "rule_set_id", None) or RULE_SET_ID
-    expected, _ = derive(trajectory, review_candidates(
-        trajectory, weak_flip_attacks=weak_flip_attacks), rule_set_id=rule_set_id)
+    candidates = (() if rule_set_id == RULE_SET_V3 else review_candidates(
+        trajectory, weak_flip_attacks=weak_flip_attacks))
+    expected, _ = derive(trajectory, candidates, rule_set_id=rule_set_id)
     actual = [{"decision_index": item.decision_index,
                "preferred_action_indices": list(item.preferred_action_indices),
                "disfavored_action_indices": list(item.disfavored_action_indices)}
@@ -127,7 +205,7 @@ def main() -> None:
     parser.add_argument("replays", nargs="+", type=Path)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--rule-set", choices=(RULE_SET_ID, RULE_SET_V2),
+    parser.add_argument("--rule-set", choices=(RULE_SET_ID, RULE_SET_V2, RULE_SET_V3),
                         default=RULE_SET_ID)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
@@ -141,7 +219,8 @@ def main() -> None:
             raise ValueError(f"{path}: expected a policy or self-play replay")
         verified = verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
-        candidates = review_candidates(trajectory, weak_flip_attacks=weak_flip_attacks)
+        candidates = (() if args.rule_set == RULE_SET_V3 else review_candidates(
+            trajectory, weak_flip_attacks=weak_flip_attacks))
         preferences, categories = derive(trajectory, candidates,
                                          rule_set_id=args.rule_set)
         if not preferences:
@@ -149,7 +228,7 @@ def main() -> None:
         seat = trajectory.skill_metadata.get("learner_seat" if trajectory.source
                                              == "self_play_rl" else "demonstrator_seat")
         payload = {
-            "schema_version": 1,
+            "schema_version": 2 if args.rule_set == RULE_SET_V3 else 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",
             "rule_set_id": args.rule_set,

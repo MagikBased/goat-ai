@@ -119,7 +119,7 @@ def fit_preferences_with_parent_kl(
         if (not good or not bad or set(good) & set(bad)
                 or any(type(index) is not int or not 0 <= index < len(legal)
                        for index in (*good, *bad))
-                or legal.index(record.selected_action) not in bad):
+                or legal.index(record.selected_action) not in (*good, *bad)):
             raise ValueError("preference must compare disjoint legal sets including recorded")
         examples.append((encode_decision(record.observation, legal, vocabulary,
                                          model.feature_version), good, bad))

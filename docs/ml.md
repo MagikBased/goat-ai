@@ -221,6 +221,13 @@ self-play; they are retrospective play hypotheses, not expert human data.
 Their fixed-state margins alone do not establish playing strength. See the
 held-out child-versus-parent result in [evaluation](evaluation.md).
 
+Preference schema v2 is reserved for `authorization=automated_rule` with
+`rule_set_id=visible_resource_v3`. It permits the recorded action in either
+the preferred or disfavored set, provided both sets are disjoint, legal, and
+one contains the recorded choice. Schema v1 keeps its original contract:
+the recorded choice must be disfavored. The trainer independently recomputes
+all automated comparisons from the verified source replay.
+
 For rehearsal, pass `--annotation-for TRAJECTORY=LABELS` for the scripted
 replay and leave ordinary teacher trajectories unannotated. A scripted
 trajectory without labels is rejected, so its random filler decisions cannot
@@ -475,6 +482,20 @@ rejected. Reviewer-only hidden-card sidecars never enter this path. Training
 still needs held-out, matched competitive checks before any child checkpoint
 becomes the reference. The first post-patch experiment did **not** meet that
 gate; see [evaluation](evaluation.md#automated-visible-rule-preference-experiment-27-october-2026).
+
+`--rule-set visible_resource_v3` scans each recorded acting-player main-phase
+legal set for two visible resource losses: Nobleman of Crossout when only the
+acting player has a Set monster, and Heavy Storm when the opponent's visible
+backrow count is no greater than the acting player's other backrow count.
+The Set Heavy Storm source is excluded from its own collateral count. If the
+recorded choice avoids the loss, that choice is preferred to the flagged
+activations. If the recorded choice is flagged, an offered phase transition
+is preferred. Near-identical contexts within a replay are deduplicated.
+These labels compare a narrow card trade; they do not certify the preferred
+action as strategically optimal. They use public counts and the acting
+player's own cards, never opponent Set-card identities. The measured
+experiment and its uneven cross-deck results are in
+[evaluation](evaluation.md#visible-resource-v3-counterfactual-preference-experiment-27-october-2026).
 
 ### Frozen moving baseline within a PPO rollout
 

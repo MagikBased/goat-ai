@@ -8114,3 +8114,62 @@ the parent with `scripts/train_behavioral_clone.py --engine experimental
 source replay paths. Evaluate with `scripts/evaluate_policy.py --engine
 experimental --both-deck-assignments --require-unseen-main-decks --workers 4
 --seeds 8 --max-decisions 3000` on the pairs and seed blocks above.
+
+### Visible resource v3 counterfactual preference experiment (27 October 2026)
+
+The source was 64 current-core PPO self-play replays on seeds 34000–34063.
+`scripts/derive_visible_rule_preferences.py --rule-set visible_resource_v3`
+replay-verified and visibility-audited every duel before emitting **137
+synthetic preferences from 25 replays**. Of these, 128 compared a recorded
+safe choice with an offered resource loss; nine compared a recorded loss with
+an offered phase transition. There were 44 Nobleman and 100 Heavy Storm
+category occurrences; a decision can carry both categories. Repeated
+near-identical resource contexts in one replay were deduplicated, though one
+replay still contributed 38 preferences. The ignored manifest is
+`.cache/goat-ai/visible_resource_v3_dedup_34000_34063/manifest.json`
+(SHA-256 `ff7a0f0ddf8a025cd781219c2e55467294922b3864e216fde137ff35ffdb241c`).
+These are narrow visible-card-trade hypotheses, not expert decisions.
+
+Starting from the unchanged current-core parent, a 30-step parent-KL fit
+used all 137 preferences plus 64 preservation states from four
+parent-provenance Tactical replays on seeds 33016–33019. The fit used
+preservation batch 8, KL weight 1, learning rate 0.0001, and seed 57.
+Preference loss went from **0.1893 to 0.0969**; final preservation KL was
+**0.00482**. These are fit diagnostics, not a playing-strength measure. The
+ignored child checkpoint is `.cache/goat-ai/fv23_visible_resource_v3_34000_34063.pt`
+(SHA-256 `2636e05b7b3c8df8c6f0e661c6a8f23735460ac8553e5f9ea8b8e64dca7fe1dd`).
+On two previously flagged Zombie replay states, the child changed an
+immediate Heavy Storm activation into a Set but still activated an own-only
+Nobleman.
+
+Fresh held-out evaluation used the experimental native engine, eight seeds
+per block, both deck assignments and policy seats, unseen Main Decks, four
+workers, and a 3000-decision cap. All **384 duels** reached terminal. On
+Charlotte Zombie versus Phoenix and WikiFormat Dimension Fusion, the child
+split **32–32** directly with its parent on seeds 36600–36607 (paired 95%
+score interval 39.1–60.9%). Against Tactical-v14 on matched seeds
+36608–36615, the child split **32–32** while the parent scored **23–41**:
+paired child-minus-parent **+14.06 percentage points**, 95% interval
+**+3.125 to +23.4375**. This is a deck-family-specific signal.
+
+On independent Phoenix versus WikiFormat and GoatFormat Dimension Fusion
+pairings, the child scored **36–28** directly against its parent on seeds
+36700–36707 (paired 95% interval 43.75–68.75%). Against Tactical-v14 on
+matched seeds 36708–36715, it scored **22–41–1** versus the parent's
+**25–38–1**: paired difference **−4.69 points**, interval **−17.97 to
++9.38**. Both Tactical comparisons matched opponent, seeds, native assets,
+card scripts, source, and local deck hashes. The child is not promoted: the
+cross-family result is uneven and the Nobleman mistake persists. M4 remains
+open.
+
+The ignored direct report hashes for Zombie and Phoenix are respectively
+`38a81b54a273a4b497048067d0afbd9adacdebf5bed8a9e993318812c8eeb283`
+and `f05c5d61461573a5a690f2651439ba594c3677fcb89525f06aed73103771897b`.
+Matched child/parent Tactical report hashes are respectively
+`25d3da9f1a0d215b3e92339ed191f84a590e59cd5e38316345833edbf5cf0e11` /
+`f72ce06ca6417f5188e2165f9456bf0d4797c63b89ea0eb47064dc56eaffdcc9`
+for Zombie and
+`42aa90084a0fc2daf4e53eca45acf3708d443a7c964d3e0396062b0b6af79bda` /
+`17e5cef77f500f57c596c8e89d0b92abfe1615e92953fa17c1c25e5b77794461`
+for Phoenix. The reports are under `.cache/goat-ai/` with the
+`resource_v3_` prefix and seed ranges above.
