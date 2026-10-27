@@ -6785,3 +6785,34 @@ pairings named above, `--engine experimental --both-deck-assignments
 either `--opponent-checkpoint` for the v23 or original v25 file, or
 `--opponent tactical`; then repeat the Tactical arm with the unchanged v23
 candidate. Give each run its own ignored `--output` path.
+
+### Batched visible-state critic fitting (27 October 2026)
+
+The optional self-play `state_value` baseline previously encoded, forwarded,
+and backpropagated each learner decision separately. The v1 and v2 critics now
+pad visible card and Deck sequences, compute a batch of values, and fit in
+minibatches of 32. A regression test compares batched and scalar predictions,
+losses, and parameter updates for both architectures on variable-length
+player-visible states. The critic still receives only encoded observations;
+the objective remains terminal duel outcome.
+
+On 75 learner decisions from saved self-play seed 6000, four AB/BA CPU-process
+time rounds measured scalar fitting at **0.142–0.151 seconds** and batched
+fitting at **0.036–0.038 seconds** (3.83–4.03× faster for this critic update).
+The maximum absolute parameter difference was `1.20e-7`; the loss difference
+was `4.49e-8`. This is a critic-update microbenchmark, not a whole-duel or
+end-to-end training speedup. It does not establish stronger play. Reproduce:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/benchmark_critic_batch.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  .cache/goat-ai/fv23_selfplay_mean_6000_6007_replays/episode_00000_seed_6000.json \
+  --limit 128 --rounds 4
+```
+
+The input checkpoint and trajectory SHA-256 values were
+`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`
+and `c3d4bfcf8ad7a994e3edcc3cb38b29823c70c10e61a3a1e0ed511e9ed4bc5c71`.
+The run used PyTorch 2.5.1+cpu with one thread and the feature-v23 policy;
+the reported project commit was the pre-change parent `08841fc` because this
+measurement preceded the implementation commit.

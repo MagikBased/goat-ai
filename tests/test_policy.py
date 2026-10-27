@@ -1786,6 +1786,48 @@ def test_value_v2_uses_visible_stats_and_own_deck_without_action_order():
                           architecture="unsupported")
 
 
+@pytest.mark.parametrize("architecture,feature_version", [("v1", 1), ("v2", 23)])
+def test_critic_batch_matches_scalar_predictions_and_update(architecture, feature_version):
+    vocabulary = CardVocabulary((10, 20), ((10, 0, 1000), (20, 0, 2000)))
+    base = view()
+    observations = (
+        replace(base, own_main_deck=(10,)),
+        replace(base, own_main_deck=(10, 20, 20),
+                field=(CardView(0, "monster", "faceup", 10, 0, "attack",
+                                attack=1000, defense=1000),)),
+        replace(base, own_main_deck=(10, 20),
+                hand=(*base.hand, CardView(0, "hand", "hidden", 20, 1))),
+    )
+    records = tuple(DecisionRecord(observation, actions(), actions()[0])
+                    for observation in observations)
+    features = [encode_decision(observation, actions(), vocabulary, feature_version)
+                for observation in observations]
+    torch.manual_seed(173)
+    scalar = VisibleStateValue(vocabulary.size, features[0].state_numbers.numel(),
+                               width=16, architecture=architecture)
+    batched = copy.deepcopy(scalar)
+    with torch.no_grad():
+        expected = torch.stack([scalar(item) for item in features])
+        actual = batched.forward_batch(features)
+    assert torch.allclose(actual, expected, atol=1e-6)
+    assert predict_state_values(batched, vocabulary, records, feature_version,
+                                batch_size=2) == pytest.approx(expected.tolist(), abs=1e-6)
+    scalar_optimizer = torch.optim.SGD(scalar.parameters(), lr=0.01)
+    batched_optimizer = torch.optim.SGD(batched.parameters(), lr=0.01)
+    scalar_optimizer.zero_grad()
+    scalar_losses = torch.stack([(scalar(item) - 1.0).square() for item in features])
+    scalar_losses.mean().backward()
+    torch.nn.utils.clip_grad_norm_(scalar.parameters(), 1.0)
+    scalar_optimizer.step()
+    batch_loss = state_value_update(batched, vocabulary, records, 1.0,
+                                    feature_version, batched_optimizer, batch_size=2)
+    assert batch_loss == pytest.approx(float(scalar_losses.detach().mean()), abs=1e-6)
+    for left, right in zip(scalar.parameters(), batched.parameters(), strict=True):
+        assert torch.allclose(left, right, atol=1e-6)
+    with pytest.raises(ValueError, match="batch size"):
+        predict_state_values(batched, vocabulary, records, feature_version, batch_size=0)
+
+
 def test_critic_corpus_selects_only_learner_visible_decisions():
     learner = DecisionRecord(view(), actions(), actions()[0])
     opponent_view = replace(view(), viewer=1, acting_player=1,

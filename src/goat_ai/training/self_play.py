@@ -81,6 +81,40 @@ class VisibleStateValue(nn.Module):
         return self.value(pooled + self.phase(features.phase)
                           + self.numbers(features.state_numbers)).squeeze()
 
+    def forward_batch(self, decisions: Sequence[DecisionFeatures]) -> torch.Tensor:
+        """Score visible states together, padding only card and Deck sequences."""
+        if not decisions:
+            raise ValueError("critic batch requires decisions")
+        pad = torch.nn.utils.rnn.pad_sequence
+        cards = pad([item.state_cards for item in decisions], batch_first=True)
+        card_numbers = pad([item.state_card_numbers for item in decisions],
+                           batch_first=True)
+        numbers = torch.stack([item.state_numbers for item in decisions])
+        phases = torch.stack([item.phase for item in decisions])
+        visible = (self.card(cards[:, :, 0]) + self.zone(cards[:, :, 1])
+                   + self.owner(cards[:, :, 2]) + self.position(cards[:, :, 3]))
+        context = self.phase(phases) + self.numbers(numbers)
+        if self.architecture == "v2":
+            visible = visible + self.card_numbers(card_numbers)
+            own_mask = ((cards[:, :, 1] != 0) & (cards[:, :, 2] == 1)).unsqueeze(2)
+            opposing_mask = ((cards[:, :, 1] != 0) & (cards[:, :, 2] == 2)).unsqueeze(2)
+            own = (visible * own_mask).sum(1) / own_mask.sum(1).clamp(min=1)
+            opposing = ((visible * opposing_mask).sum(1)
+                        / opposing_mask.sum(1).clamp(min=1))
+            counts = torch.stack([
+                ((cards[:, :, 2] == owner) & (cards[:, :, 1] == zone)).sum(1) / 10
+                for owner in (1, 2) for zone in range(1, 8)
+            ], dim=1).to(visible.dtype)
+            decks = pad([item.deck_cards for item in decisions], batch_first=True)
+            deck_mask = (decks != 0).unsqueeze(2)
+            deck = (self.card(decks) * deck_mask).sum(1) / deck_mask.sum(1).clamp(min=1)
+            context = context + self.resource_counts(counts)
+            return self.value(torch.cat((own, opposing, context,
+                                         self.deck_projection(deck)), dim=1)).squeeze(1)
+        mask = (cards[:, :, 1] != 0).unsqueeze(2)
+        pooled = (visible * mask).sum(1) / mask.sum(1).clamp(min=1)
+        return self.value(pooled + context).squeeze(1)
+
 
 @dataclass(frozen=True)
 class EpisodeResult:
@@ -515,14 +549,21 @@ def ppo_clipped_update(
 def predict_state_values(value_model: VisibleStateValue,
                          vocabulary: CardVocabulary,
                          records: Sequence[DecisionRecord],
-                         feature_version: int) -> tuple[float, ...]:
+                         feature_version: int,
+                         batch_size: int = 32) -> tuple[float, ...]:
     """Freeze critic predictions before updating either model on an episode."""
+    if batch_size < 1:
+        raise ValueError("critic batch size must be positive")
     device = next(value_model.parameters()).device
     value_model.eval()
     with torch.no_grad():
-        return tuple(float(value_model(encode_decision(
-            record.observation, record.legal_actions, vocabulary,
-            feature_version).to(device))) for record in records)
+        values = []
+        for start in range(0, len(records), batch_size):
+            features = [encode_decision(record.observation, record.legal_actions,
+                                        vocabulary, feature_version).to(device)
+                        for record in records[start:start + batch_size]]
+            values.extend(value_model.forward_batch(features).tolist())
+        return tuple(values)
 
 
 def state_value_update(value_model: VisibleStateValue,
@@ -530,21 +571,22 @@ def state_value_update(value_model: VisibleStateValue,
                        records: Sequence[DecisionRecord], reward: float,
                        feature_version: int,
                        optimizer: torch.optim.Optimizer,
-                       max_gradient_norm: float = 1.0) -> float:
+                       max_gradient_norm: float = 1.0,
+                       batch_size: int = 32) -> float:
     """Fit visible-state outcome estimates to the completed duel's return."""
-    if not records or max_gradient_norm <= 0 or not isfinite(reward):
+    if not records or max_gradient_norm <= 0 or not isfinite(reward) or batch_size < 1:
         raise ValueError("value update needs decisions and finite terminal reward")
     device = next(value_model.parameters()).device
     value_model.train()
     optimizer.zero_grad()
     total = 0.0
-    for record in records:
-        features = encode_decision(record.observation, record.legal_actions,
-                                   vocabulary, feature_version).to(device)
-        prediction = value_model(features)
-        loss = (prediction - reward).square()
-        (loss / len(records)).backward()
-        total += float(loss.detach())
+    for start in range(0, len(records), batch_size):
+        features = [encode_decision(record.observation, record.legal_actions,
+                                    vocabulary, feature_version).to(device)
+                    for record in records[start:start + batch_size]]
+        losses = (value_model.forward_batch(features) - reward).square()
+        (losses.sum() / len(records)).backward()
+        total += float(losses.detach().sum())
     torch.nn.utils.clip_grad_norm_(value_model.parameters(), max_gradient_norm)
     optimizer.step()
     return total / len(records)
