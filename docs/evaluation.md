@@ -5162,6 +5162,43 @@ ignored report is
 This adds protocol coverage after the sum-choice decoder changes. It does
 not validate the historical rulings of those randomly selected cards.
 
+### Fresh distinct-deck protocol sweeps (27 October 2026)
+
+With the current pinned native assets, a third 50-pair sweep drew two
+independent whitelist-legal 40-card Main Decks per seed, 10274–10323. All
+**50/50** games reached terminal under 3,000 decisions, with **54,273**
+decisions fully replay-verified and visibility-audited; the longest game
+took 1,616 decisions. The process loaded 1,213 distinct native assets and
+recorded 4,146 source-card/action-kind pairs. The ignored report is
+`.cache/goat-ai/whitelist_distinct_10274_10323/report.json` (SHA-256
+`a7f8fdcb0c6738db66f65f8087838becd47c530bcb0ec78d9e320690ad4000f1`).
+A separate repeat of seeds 10274–10275 matched their original deck hashes,
+opponent hashes, winners, decision counts, action-kind sets, replay-verified
+counts, and pinned asset hashes.
+
+A separate 50-pair sweep drew legal 40-card Main Decks from copies in six
+sourced tournament lists, again with independently generated opponents,
+seeds 30000–30049. All **50/50** games reached terminal, and **46,227**
+decisions fully replay-verified and visibility-audited; the longest took
+1,440 decisions. This run observed 200 opponent-hand choices and 596
+hidden-field choices in the visibility audit, and 86 distinct selected
+chain-response/source pairs. Its ignored report is
+`.cache/goat-ai/tournament_mix_distinct_30000_30049/report.json` (SHA-256
+`c394a381ec6fb6fedde03a9b7e8d764a3a0ea469e1af6c51ee849c7cb3c8fbf4`).
+These are random-agent protocol and information-boundary checks, not
+historical ruling audits or claims about competitive deck construction.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai --output .cache/goat-ai/whitelist_distinct_10274_10323 \
+  --seed 10274 --seeds 50 --max-decisions 3000 \
+  --verify-replays --distinct-opponents --count-card-actions
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai --output .cache/goat-ai/tournament_mix_distinct_30000_30049 \
+  --seed 30000 --seeds 50 --max-decisions 3000 --card-pool tournament \
+  --verify-replays --distinct-opponents --count-card-actions
+```
+
 ### Incremental native sum choices
 
 `MSG_SELECT_SUM` previously failed explicitly when the number of possible

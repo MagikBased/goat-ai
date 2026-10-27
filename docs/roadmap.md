@@ -165,6 +165,13 @@ choices now reach terminal with full replay and visibility checks. The
 corrected 50-pair sweep reached **50/50 terminal** with **52,275** decisions
 replay-verified and visibility-audited. Keep M1 open for broader arbitrary-deck
 coverage; see [the protocol log](evaluation.md).
+A fresh distinct-whitelist 50-pair run reached **50/50 terminal** with
+**54,273** replay-verified and visibility-audited decisions. A separate
+50-pair run mixing cards from six sourced tournament decks also reached
+**50/50 terminal**, with **46,227** verified decisions. Both used distinct
+legal opponent decks and found no adapter error; neither proves complete
+arbitrary-deck or historical-ruling coverage. See
+[the sweep reports](evaluation.md#fresh-distinct-deck-protocol-sweeps-27-october-2026).
 
 ## M2 — Historical correctness gate
 
