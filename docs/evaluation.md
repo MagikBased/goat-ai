@@ -97,6 +97,61 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/compare_fixed_policy
   --output .cache/goat-ai/fixed_policy_value_comparison_44000_44015.json
 ```
 
+## Fixed-policy critic architecture transfer check (27 October 2026)
+
+The v1/v2 critic comparison now accepts `policy_evaluation` trajectories and
+selects only the frozen policy's `demonstrator_seat` decisions. On the 64-game
+fixed-policy corpus above, seeds 44000–44011 supplied 48 training duels and
+44012–44015 supplied 16 held-out duels, with both deck pairings and policy
+seats in each split. An independently collected 16-game corpus used 2005
+Rhymus Lizo Goat Control and Jae Kim Charlotte Zombie in both deck assignments
+and policy seats, seeds 47400–47403. The frozen checkpoint is the same in all
+80 duels. All **39,552 decisions** were native replay-verified and visibility
+audited for this comparison; 768, 256, and 256 multi-option policy-seat
+decisions were sampled from training, holdout, and independent games.
+
+With width 32, two epochs, learning rate `0.001`, and seed 171, per-game
+outcome MSE was:
+
+| Predictor | Held-out seeds | Independent decks |
+| --- | ---: | ---: |
+| Constant training-return mean | 0.866 | 0.866 |
+| v1 visible-state critic | 1.151 | 1.150 |
+| v2 visible-state critic | 1.169 | 1.187 |
+
+The v2-minus-v1 paired bootstrap 95% interval was **−0.005 to +0.055** on
+held-out seeds and **+0.001 to +0.078** on independent decks. Both fitted
+critics underperform the constant baseline on these data. The independent
+deck result supports v1 over v2 for this specific fit, but neither critic
+has earned use as a PPO baseline. This experiment used one training seed and
+only 16 independent games; it is a prediction diagnostic, not a measured
+policy-strength change.
+
+The ignored independent collection manifest SHA-256 is
+`716444777065171464b17a84c9a663c8f785151fa9570181ad173067e98cc0f4`;
+the ignored comparison report SHA-256 is
+`4d240379f2c9fb1a57465b4081071ed9f603edbc964d41e4aac449c0cded5320`.
+Reproduce after the 64-game collection above with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --matchup examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk \
+            examples/decks/zombie_jae_kim_charlotte_2005.ydk \
+  --matchup examples/decks/zombie_jae_kim_charlotte_2005.ydk \
+            examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk \
+  --seed 47400 --seeds 4 --workers 4 \
+  --output-dir .cache/goat-ai/fixed_policy_value_rhymus_zombie_47400_47403
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/compare_value_architectures.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/fixed_policy_value_44000_44015 \
+  --corpus-source policy_evaluation \
+  --independent-replay-dir .cache/goat-ai/fixed_policy_value_rhymus_zombie_47400_47403 \
+  --train-games 48 --max-records-per-game 16 --epochs 2 --width 32 \
+  --learning-rate 0.001 --seed 171 \
+  --output .cache/goat-ai/fixed_policy_value_transfer_44000_47403.json
+```
+
 ## Visible-state critic architecture transfer check (27 October 2026)
 
 The original opt-in Monte Carlo critic (v1) averages all visible card

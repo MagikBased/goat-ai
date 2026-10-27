@@ -20,16 +20,17 @@ from goat_ai.training.self_play import (
 )
 
 
-def selected_records(trajectory, limit: int):
-    seat = (trajectory.skill_metadata or {}).get("learner_seat")
-    if (trajectory.source != "self_play_rl" or type(seat) is not int
+def selected_records(trajectory, limit: int, source: str = "self_play_rl"):
+    seat_key = "learner_seat" if source == "self_play_rl" else "demonstrator_seat"
+    seat = (trajectory.skill_metadata or {}).get(seat_key)
+    if (trajectory.source != source or type(seat) is not int
             or seat not in (0, 1)):
-        raise ValueError("critic comparison needs learner-seat self-play replays")
+        raise ValueError(f"critic comparison needs {source} replays with {seat_key}")
     records = [record for record in trajectory.decisions
                if record.observation.acting_player == seat
                and len(record.legal_actions) > 1]
     if not records:
-        raise ValueError("duel has no learner decisions with alternatives")
+        raise ValueError("duel has no selected-seat decisions with alternatives")
     if len(records) > limit:
         indices = ([len(records) // 2] if limit == 1 else
                    [index * (len(records) - 1) // (limit - 1)
@@ -66,8 +67,10 @@ def main() -> None:
     parser.add_argument("checkpoint", type=Path,
                         help="policy checkpoint supplies the pinned vocabulary and feature version")
     parser.add_argument("replay_dir", type=Path)
+    parser.add_argument("--corpus-source", choices=("self_play_rl", "policy_evaluation"),
+                        default="self_play_rl")
     parser.add_argument("--independent-replay-dir", type=Path,
-                        help="separate same-parent self-play corpus for transfer validation")
+                        help="separate same-policy corpus for transfer validation")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--train-games", type=int, default=48)
     parser.add_argument("--max-records-per-game", type=int, default=16)
@@ -80,8 +83,17 @@ def main() -> None:
     if (args.train_games < 1 or args.max_records_per_game < 1 or args.epochs < 1
             or args.width < 1 or args.learning_rate <= 0):
         parser.error("invalid critic comparison settings")
-    primary_paths = sorted(args.replay_dir.glob("episode_*.json"))
-    independent_paths = (sorted(args.independent_replay_dir.glob("episode_*.json"))
+    pattern = ("episode_*.json" if args.corpus_source == "self_play_rl"
+               else "matchup_*.json")
+
+    def replay_order(path: Path):
+        if args.corpus_source == "policy_evaluation":
+            parts = path.stem.split("_")
+            return (int(parts[3]), int(parts[1]), int(parts[5]))
+        return path.name
+
+    primary_paths = sorted(args.replay_dir.glob(pattern), key=replay_order)
+    independent_paths = (sorted(args.independent_replay_dir.glob(pattern), key=replay_order)
                          if args.independent_replay_dir else [])
     paths = [*primary_paths, *independent_paths]
     if len(primary_paths) <= args.train_games:
@@ -89,25 +101,33 @@ def main() -> None:
     agent = load_policy_agent(args.checkpoint)
     games = []
     seeds = []
+    game_keys = []
     fingerprints = {}
     verified = 0
     parent_digest = sha256_file(args.checkpoint)
+    parent_key = ("parent_checkpoint_sha256" if args.corpus_source == "self_play_rl"
+                  else "policy_checkpoint_sha256")
     started = perf_counter()
     for path in paths:
         digest = sha256_file(path)
         trajectory = read_trajectory(path)
-        if (trajectory.skill_metadata or {}).get("parent_checkpoint_sha256") != parent_digest:
+        if (trajectory.skill_metadata or {}).get(parent_key) != parent_digest:
             raise ValueError(f"replay does not descend from selected parent: {path}")
         verified += verify_trajectory(
             trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
         if sha256_file(path) != digest:
             raise ValueError(f"replay changed during verification: {path}")
-        games.append(selected_records(trajectory, args.max_records_per_game))
+        games.append(selected_records(trajectory, args.max_records_per_game,
+                                      args.corpus_source))
         seeds.append(trajectory.seed)
+        game_keys.append((trajectory.seed, trajectory.deck_sha256,
+                          (trajectory.skill_metadata or {}).get(
+                              "learner_seat" if args.corpus_source == "self_play_rl"
+                              else "demonstrator_seat")))
         fingerprints[str(path)] = digest
-    if len(set(seeds)) != len(seeds):
-        raise ValueError("duplicate replay seed")
+    if len(set(game_keys)) != len(game_keys):
+        raise ValueError("duplicate replay deck/seed/seat")
     train = games[:args.train_games]
     holdout = games[args.train_games:len(primary_paths)]
     independent = games[len(primary_paths):]
@@ -148,6 +168,7 @@ def main() -> None:
                                          if transfer_losses else None),
         }
     result = {
+        "corpus_source": args.corpus_source,
         "policy_checkpoint_sha256": parent_digest,
         "replay_sha256": fingerprints,
         "train_games": len(train), "holdout_games": len(holdout),
