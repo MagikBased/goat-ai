@@ -245,6 +245,12 @@ Phoenix cases are recorded in [GOAT rules](goat_rules.md).
 
 A paired native Ring of Destruction and Book of Moon fixture now checks target validity at resolution, the no-damage outcome when Book sets the target, and the opponent's hidden field view. Its historical interpretation is identified as an inference in [GOAT rules](goat_rules.md).
 
+An attacked Morphing Jar / Skill Drain pair now checks a sourced Damage Step
+boundary: an aged Set Drain cannot be chained to Jar's battle-triggered Flip
+Effect, whereas activating Drain before the attack negates that effect while
+Jar remains face-up. Both full duels replay-verify and pass the visibility
+audit; see [GOAT rules](goat_rules.md).
+
 A paired Creature Swap / Scapegoat fixture now tests a common Goat Control Token exchange: Scapegoat chained to Swap adds four legal Token choices at resolution, while passing leaves only the original monster available. A Ring of Destruction response fixture removes the defender's only monster before Swap resolves and confirms the exchange fails. All three full duels replay-verify; other interruption types remain open. See [GOAT rules](goat_rules.md).
 
 A pre-errata Sinister Serpent fixture now checks two returns within one Standby Phase, separated by Raigeki Break discarding Serpent as its cost. The hidden Trap target and opponent's known-hand update are checked in a full replay-verified duel. See [GOAT rules](goat_rules.md).
