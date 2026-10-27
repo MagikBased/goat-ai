@@ -8117,6 +8117,22 @@ experimental --both-deck-assignments --require-unseen-main-decks --workers 4
 
 ### Visible resource v3 counterfactual preference experiment (27 October 2026)
 
+The saved-report comparator now has `--require-unseen-main-decks` for M4
+comparisons. It verifies both local YDK files against their report hashes,
+recomputes each Main Deck composition hash, and rejects a composition present
+in either checkpoint's recorded training games. It fails closed for older
+reports without composition provenance. On the existing 64-game Zombie
+child/parent Tactical reports below, the gate passed and reproduced the
+paired +14.06-point difference (95% interval +3.125 to +23.4375 points).
+This verifies the exact Main Deck multisets, not archetype independence.
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/compare_tournament_reports.py \
+  .cache/goat-ai/resource_v3_zombie_child_vs_tactical_36608_36615.json \
+  .cache/goat-ai/resource_v3_zombie_parent_vs_tactical_36608_36615.json \
+  --require-unseen-main-decks
+```
+
 The source was 64 current-core PPO self-play replays on seeds 34000–34063.
 `scripts/derive_visible_rule_preferences.py --rule-set visible_resource_v3`
 replay-verified and visibility-audited every duel before emitting **137

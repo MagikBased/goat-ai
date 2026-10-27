@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.evaluation.tournament import (
     GameResult,
     TournamentReport,
@@ -21,7 +22,8 @@ CONTROL_FIELDS = (
 EXTENDED_FINGERPRINTS = ("card_scripts_sha256", "source_code_sha256")
 
 
-def load_report(path: Path, *, verify_local_decks: bool = False) -> tuple[dict, tuple[GameResult, ...]]:
+def load_report(path: Path, *, verify_local_decks: bool = False,
+                require_unseen_main_decks: bool = False) -> tuple[dict, tuple[GameResult, ...]]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise TypeError(f"{path}: tournament report must be an object")
@@ -67,19 +69,45 @@ def load_report(path: Path, *, verify_local_decks: bool = False) -> tuple[dict, 
             or set(deck_hashes) != {deck for game in games
                                     for deck in (game.deck_a, game.deck_b)}):
         raise ValueError(f"{path}: deck hashes do not cover the schedule")
-    if verify_local_decks:
+    if verify_local_decks or require_unseen_main_decks:
         for deck, expected in deck_hashes.items():
             if sha256_file(Path(deck)) != expected:
                 raise ValueError(f"{path}: local deck differs from report: {deck}")
+    if require_unseen_main_decks:
+        compositions = raw.get("main_deck_composition_sha256")
+        if (not isinstance(compositions, dict)
+                or set(compositions) != set(deck_hashes)):
+            raise ValueError(f"{path}: Main Deck composition hashes do not cover the schedule")
+        for deck, expected in compositions.items():
+            if main_deck_composition_sha256(read_ydk(deck)) != expected:
+                raise ValueError(f"{path}: local Main Deck differs from report: {deck}")
+        training = raw.get("training_games")
+        if not isinstance(training, list) or not training or any(
+                not isinstance(game, dict)
+                or not isinstance(game.get("main_deck_composition_sha256"), (list, tuple))
+                or len(game["main_deck_composition_sha256"]) != 2
+                or any(not isinstance(digest, str) for digest in
+                       game["main_deck_composition_sha256"])
+                for game in training):
+            raise ValueError(f"{path}: checkpoint lacks Main Deck training provenance")
+        used = {digest for game in training
+                for digest in game["main_deck_composition_sha256"]}
+        overlap = used.intersection(compositions.values())
+        if overlap:
+            raise ValueError(f"{path}: evaluation Main Deck overlaps training: "
+                             f"{sorted(overlap)}")
     return raw, games
 
 
 def compare_reports(candidate_path: Path, control_path: Path, *,
-                    verify_local_decks: bool = False) -> dict:
+                    verify_local_decks: bool = False,
+                    require_unseen_main_decks: bool = False) -> dict:
     candidate, left = load_report(candidate_path,
-                                  verify_local_decks=verify_local_decks)
+                                  verify_local_decks=verify_local_decks,
+                                  require_unseen_main_decks=require_unseen_main_decks)
     control, right = load_report(control_path,
-                                 verify_local_decks=verify_local_decks)
+                                 verify_local_decks=verify_local_decks,
+                                 require_unseen_main_decks=require_unseen_main_decks)
     for key in CONTROL_FIELDS:
         if key not in candidate or key not in control or candidate[key] != control[key]:
             raise ValueError(f"tournament controls differ: {key}")
@@ -94,6 +122,7 @@ def compare_reports(candidate_path: Path, control_path: Path, *,
         "control_report": str(control_path),
         "control_report_sha256": sha256_file(control_path),
         "games_per_report": len(left),
+        "unseen_main_decks_verified": require_unseen_main_decks,
         "opponent": candidate["opponent"],
         "card_scripts_sha256": candidate.get("card_scripts_sha256"),
         "source_code_sha256": candidate.get("source_code_sha256"),
@@ -109,9 +138,13 @@ def main() -> None:
     parser.add_argument("candidate_report", type=Path)
     parser.add_argument("control_report", type=Path)
     parser.add_argument("--verify-local-decks", action="store_true")
+    parser.add_argument("--require-unseen-main-decks", action="store_true",
+                        help="verify local Main Decks are absent from both checkpoints' training games")
     args = parser.parse_args()
     print(json.dumps(compare_reports(args.candidate_report, args.control_report,
-                                     verify_local_decks=args.verify_local_decks), indent=2))
+                                     verify_local_decks=args.verify_local_decks,
+                                     require_unseen_main_decks=args.require_unseen_main_decks),
+                     indent=2))
 
 
 if __name__ == "__main__":

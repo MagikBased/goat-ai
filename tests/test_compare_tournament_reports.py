@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import pytest
 
+from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.evaluation.tournament import GameResult, TournamentReport
 from goat_ai.replay.fingerprint import sha256_file
 from scripts.compare_tournament_reports import compare_reports
@@ -106,3 +107,35 @@ def test_comparison_requires_matching_extended_fingerprints_when_recorded(tmp_pa
     right["card_scripts_sha256"] = "a" * 64
     b.write_text(json.dumps(right))
     assert compare_reports(a, b)["card_scripts_sha256"] == "a" * 64
+
+
+def test_unseen_main_deck_comparison_checks_both_training_histories(tmp_path):
+    a, b, left, right, _ = saved_pair(tmp_path)
+    compositions = {deck: main_deck_composition_sha256(read_ydk(deck))
+                    for deck in left["deck_sha256"]}
+    for report in (left, right):
+        report["main_deck_composition_sha256"] = compositions
+        report["training_games"][0]["main_deck_composition_sha256"] = ["c" * 64,
+                                                                         "d" * 64]
+    a.write_text(json.dumps(left))
+    b.write_text(json.dumps(right))
+    assert compare_reports(a, b, require_unseen_main_decks=True)[
+        "unseen_main_decks_verified"] is True
+
+    right["training_games"][0]["main_deck_composition_sha256"][0] = next(
+        iter(compositions.values()))
+    b.write_text(json.dumps(right))
+    with pytest.raises(ValueError, match="overlaps training"):
+        compare_reports(a, b, require_unseen_main_decks=True)
+
+    right["training_games"][0].pop("main_deck_composition_sha256")
+    b.write_text(json.dumps(right))
+    with pytest.raises(ValueError, match="lacks Main Deck training provenance"):
+        compare_reports(a, b, require_unseen_main_decks=True)
+
+    right["training_games"][0]["main_deck_composition_sha256"] = ["c" * 64,
+                                                                    "d" * 64]
+    right["main_deck_composition_sha256"] = {deck: "e" * 64 for deck in compositions}
+    b.write_text(json.dumps(right))
+    with pytest.raises(ValueError, match="local Main Deck differs"):
+        compare_reports(a, b, require_unseen_main_decks=True)
