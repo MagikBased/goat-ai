@@ -20,6 +20,33 @@ from goat_ai.training.self_play import (
 )
 
 
+class VisibleResourceValue(torch.nn.Module):
+    """Small visible-only outcome baseline: LP, hand, and field counts."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.value = torch.nn.Sequential(torch.nn.Linear(6, 1), torch.nn.Tanh())
+
+    @staticmethod
+    def _resources(features):
+        numbers = features.state_numbers
+        cards = features.state_cards
+        own_monsters = ((cards[:, 1] == 2) & (cards[:, 2] == 1)).sum() / 5
+        other_monsters = ((cards[:, 1] == 2) & (cards[:, 2] == 2)).sum() / 5
+        own_backrow = ((cards[:, 1] == 3) & (cards[:, 2] == 1)).sum() / 5
+        other_backrow = ((cards[:, 1] == 3) & (cards[:, 2] == 2)).sum() / 5
+        return torch.stack((numbers[0] - numbers[1],
+                            numbers[6] - numbers[7],
+                            own_monsters - other_monsters,
+                            own_backrow - other_backrow,
+                            numbers[2] - numbers[3],
+                            numbers[8]))
+
+    def forward_batch(self, decisions):
+        return self.value(torch.stack([self._resources(item) for item in decisions])
+                          ).squeeze(1)
+
+
 def selected_records(trajectory, limit: int, source: str = "self_play_rl"):
     seat_key = "learner_seat" if source == "self_play_rl" else "demonstrator_seat"
     seat = (trajectory.skill_metadata or {}).get(seat_key)
@@ -140,10 +167,11 @@ def main() -> None:
     scores = {}
     heldout_losses = {}
     independent_losses = {}
-    for architecture in ("v1", "v2"):
+    for architecture in ("v1", "v2", "resource"):
         torch.manual_seed(args.seed)
-        model = VisibleStateValue(agent.vocabulary.size, number_width,
-                                  width=args.width, architecture=architecture)
+        model = (VisibleResourceValue() if architecture == "resource" else
+                 VisibleStateValue(agent.vocabulary.size, number_width,
+                                   width=args.width, architecture=architecture))
         optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
         training_losses = []
         for _ in range(args.epochs):

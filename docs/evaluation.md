@@ -129,8 +129,16 @@ policy-strength change.
 
 The ignored independent collection manifest SHA-256 is
 `716444777065171464b17a84c9a663c8f785151fa9570181ad173067e98cc0f4`;
-the ignored comparison report SHA-256 is
+the original two-critic comparison report SHA-256 is
 `4d240379f2c9fb1a57465b4081071ed9f603edbc964d41e4aac449c0cded5320`.
+An additional six-input visible-resource control used
+acting-player-minus-opponent Life Points, hand size, monster count, backrow
+count, Deck count, and turn. Under the same two-epoch Adam schedule it scored
+**1.309** MSE on held-out seeds and **1.233** on independent decks, also worse
+than the constant. This small model may be underfit at the shared learning
+rate; the result only rules out this fit. Its updated ignored report SHA-256 is
+`6103d38a9241a2fc180a27929e905b1af3e66762ebd54689f1ec55ac991a6424`
+at `.cache/goat-ai/fixed_policy_resource_transfer_44000_47403.json`.
 Reproduce after the 64-game collection above with:
 
 ```bash
@@ -149,7 +157,7 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/compare_value_archit
   --independent-replay-dir .cache/goat-ai/fixed_policy_value_rhymus_zombie_47400_47403 \
   --train-games 48 --max-records-per-game 16 --epochs 2 --width 32 \
   --learning-rate 0.001 --seed 171 \
-  --output .cache/goat-ai/fixed_policy_value_transfer_44000_47403.json
+  --output .cache/goat-ai/fixed_policy_resource_transfer_44000_47403.json
 ```
 
 ## Visible-state critic architecture transfer check (27 October 2026)
