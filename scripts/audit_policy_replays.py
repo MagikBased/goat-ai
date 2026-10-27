@@ -14,6 +14,7 @@ from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import (
     category_counts,
+    compare_parent_greedy_candidates,
     review_candidates,
     sampled_self_play_provenance,
 )
@@ -30,18 +31,26 @@ def main() -> None:
                         help="complete policy_evaluation, sampled self_play_rl, or tactical trajectories")
     parser.add_argument("--checkpoint", type=Path,
                         help="required for greedy policy replays; optionally checks a sampled replay's parent hash")
+    parser.add_argument("--compare-parent-greedy", action="store_true",
+                        help="for sampled self-play, test flagged states with the frozen parent checkpoint")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--include-opponent", action="store_true",
                         help="also shortlist the evaluation opponent's visible decisions; "
                              "native replay verified, but agent choices are not reproduced")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    if args.compare_parent_greedy and args.checkpoint is None:
+        parser.error("--compare-parent-greedy requires --checkpoint")
     checkpoint_sha256 = sha256_file(args.checkpoint) if args.checkpoint else None
     card_races = load_card_races(args.native_root)
     weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
+    parent_policy = (load_policy_agent(args.checkpoint)
+                     if args.compare_parent_greedy else None)
     reports = []
     for path in args.replays:
         trajectory = read_trajectory(path)
+        if args.compare_parent_greedy and trajectory.source != "self_play_rl":
+            raise ValueError("--compare-parent-greedy requires sampled self-play replays")
         verified = verify_trajectory(
             trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
@@ -126,6 +135,9 @@ def main() -> None:
         else:
             raise ValueError(f"{path}: unsupported trajectory source {trajectory.source!r}")
         candidates = review_candidates(trajectory, card_races, weak_flip_attacks)
+        parent_greedy_review = (compare_parent_greedy_candidates(
+            trajectory, candidates, parent_policy, card_races, weak_flip_attacks)
+            if parent_policy is not None else None)
         opponent_review = None
         if args.include_opponent:
             if trajectory.source != "policy_evaluation":
@@ -151,6 +163,8 @@ def main() -> None:
             "verified_decisions": verified,
             "category_counts": category_counts(candidates),
             "candidates": [candidate.to_dict() for candidate in candidates],
+            **({"parent_greedy_review": parent_greedy_review}
+               if parent_policy is not None else {}),
             "opponent_review": opponent_review,
         })
     result = {"schema_version": 1, "replays": reports}

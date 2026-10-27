@@ -1,5 +1,48 @@
 # Early replay decision audit
 
+## Frozen-parent check of sampled self-play flags (27 October 2026)
+
+Sixteen fresh PPO training replays from two Jesse Goat Control versus Warrior
+seed groups (23600–23607 and 23610–23617) completed and replay-verified all
+**8,972 decisions**. The player-visibility audit passed. Their sampled learner
+choices triggered eight conservative review flags. The new
+`audit_policy_replays.py --compare-parent-greedy` mode loads the exact frozen
+parent checkpoint identified by each replay's SHA-256 and asks what that
+checkpoint would choose greedily at each flagged **player-visible** decision.
+It checks that the choice belongs to the recorded legal set. It does not
+recreate the policy weights after subsequent PPO updates or simulate the
+alternative game's outcome.
+
+The parent made the same flagged choice in **five of eight** cases: two
+own-only Nobleman activations, one MST target on its own card despite an
+opposing option, one Heavy Storm with a negative visible backrow trade, and
+one Metamorphosis material choice spending a weak Flip monster against an
+empty opposing field. It selected a different, unflagged action on one
+additional Nobleman prompt, one Breaker target prompt, and one 0-ATK
+position-change prompt. Thus several resource flags persist under greedy
+reference inference; sampled self-play alone does not explain them. The
+shortlist is a diagnostic, not certified expert labels or proof that every
+flagged move loses the duel.
+
+The ignored report is
+`.cache/goat-ai/card_view_parent_greedy_23600_23610.json` (SHA-256
+`0f8c2042c7c46733a454a0d274eed3298aad28508e2389ba70aef6dfa112c58`).
+Reproduce after native setup with the unchanged reference checkpoint:
+
+```bash
+PYTHONPATH=src:. OMP_NUM_THREADS=1 .venv/bin/python scripts/audit_policy_replays.py \
+  .cache/goat-ai/card_view_cached_23600_replays/*.json \
+  .cache/goat-ai/card_view_cached_23610_replays/*.json \
+  --checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --compare-parent-greedy \
+  --output .cache/goat-ai/card_view_parent_greedy_23600_23610.json
+```
+
+The next feedback experiment should prioritize confirmed greedy resource
+errors across independent Deck families and hold out separate seeds and
+Decks for match outcomes. These five examples are too few to establish a
+general training signal by themselves.
+
 ## Held-out neural losses: unused Thunder Dragon (27 October 2026)
 
 The feature-v25 resource-trade head lost a Dimension Fusion/Phoenix duel to

@@ -6,7 +6,7 @@ These are candidates, not automatic play labels or evidence of a rules error.
 import re
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from math import isfinite
 
 from goat_ai.actions import Action
@@ -307,6 +307,40 @@ def review_candidates(trajectory: Trajectory,
 
 def category_counts(candidates: tuple[ReviewCandidate, ...]) -> dict[str, int]:
     return dict(sorted(Counter(c.category for c in candidates).items()))
+
+
+def compare_parent_greedy_candidates(
+    trajectory: Trajectory, candidates: tuple[ReviewCandidate, ...], agent,
+    card_races: Mapping[int, int] | None = None,
+    weak_flip_attacks: Mapping[int, int] | None = None,
+) -> tuple[dict, ...]:
+    """Diagnose sampled flags using a frozen parent's greedy choice at that view.
+
+    A self-play policy may change after each rollout. This checks the supplied
+    parent checkpoint on recorded visible states, not the exact sampling policy
+    that generated every action or a counterfactual game outcome.
+    """
+    if trajectory.source != "self_play_rl":
+        raise ValueError("frozen-parent comparison requires sampled self-play")
+    result = []
+    for candidate in candidates:
+        record = trajectory.decisions[candidate.decision_index]
+        greedy = agent.select_action(record.observation, record.legal_actions)
+        if greedy not in record.legal_actions:
+            raise ValueError("parent selected an action outside the visible legal set")
+        one_decision = replace(
+            trajectory, decisions=(replace(record, selected_action=greedy),))
+        flags = review_candidates(one_decision, card_races, weak_flip_attacks)
+        categories = sorted({flag.category for flag in flags})
+        result.append({
+            "decision_index": candidate.decision_index,
+            "sampled_category": candidate.category,
+            "parent_greedy_same_action": greedy == record.selected_action,
+            "parent_greedy_action_kind": greedy.kind,
+            "parent_greedy_flagged_categories": categories,
+            "parent_greedy_same_category_flagged": candidate.category in categories,
+        })
+    return tuple(result)
 
 
 def sampled_self_play_provenance(trajectory: Trajectory,

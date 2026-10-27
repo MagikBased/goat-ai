@@ -1488,6 +1488,14 @@ seeds. The comparison does not establish a strength gain; keep the unchanged
 reference and pursue broader, independently validated decision feedback.
 See [the v2 experiment](evaluation.md#visible-rule-v2-preference-ablation-27-october-2026).
 
+A frozen-parent diagnostic now re-scores conservative flags from sampled
+self-play using the unchanged reference's greedy action on exactly the
+recorded player-visible state and legal set. Across 16 new native-verified
+training duels, five of eight sampled flags also appeared under greedy parent
+inference, including own-only Nobleman and negative backrow trades. This
+separates persistent model choices from pure sampling noise but supplies no
+expert labels or demonstrated strength gain; see [the replay audit](replay_audit.md#frozen-parent-check-of-sampled-self-play-flags-27-october-2026).
+
 An opt-in frozen-rollout PPO baseline was also tested on the same post-patch
 training schedule. Its child scored 28–36 against the online-baseline PPO
 child and 31–33 against the unchanged reference on separate held-out direct

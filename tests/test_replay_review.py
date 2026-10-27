@@ -5,7 +5,11 @@ from dataclasses import replace
 import pytest
 
 from goat_ai.actions import Action
-from goat_ai.evaluation.replay_review import review_candidates, sampled_self_play_provenance
+from goat_ai.evaluation.replay_review import (
+    compare_parent_greedy_candidates,
+    review_candidates,
+    sampled_self_play_provenance,
+)
 from goat_ai.observations import CardView, ChainLinkView, Observation, PendingSummonView
 from goat_ai.replay import DecisionRecord, Trajectory
 
@@ -140,6 +144,37 @@ def test_shortlist_flags_negative_heavy_trade_and_self_nobleman():
     ]
     assert found[0].evidence == {"own_other_backrow": 1, "enemy_backrow": 1}
     assert found[1].evidence == {"own_set_monsters": 1, "enemy_set_monsters": 0}
+
+
+def test_sampled_review_separates_frozen_parent_greedy_choice():
+    spy = CardView(0, "monster", "facedown", 504700044, 0)
+    nobleman = Action("nobleman", "activate", 0, {"code": 504700116})
+    end = Action("end", "end_phase", 0)
+    sampled = replace(policy(record(view(spy), nobleman, end)),
+                      source="self_play_rl", skill_metadata={"learner_seat": 0})
+    candidates = review_candidates(sampled)
+    assert len(candidates) == 1
+
+    class FixedAgent:
+        def __init__(self, choice):
+            self.choice = choice
+
+        def select_action(self, _observation, _legal_actions):
+            return self.choice
+
+    safe = compare_parent_greedy_candidates(sampled, candidates, FixedAgent(end))
+    assert safe[0]["sampled_category"] == "nobleman_only_own_set_monster"
+    assert safe[0]["parent_greedy_same_action"] is False
+    assert safe[0]["parent_greedy_same_category_flagged"] is False
+    assert safe[0]["parent_greedy_flagged_categories"] == []
+
+    flagged = compare_parent_greedy_candidates(sampled, candidates,
+                                                FixedAgent(nobleman))
+    assert flagged[0]["parent_greedy_same_action"] is True
+    assert flagged[0]["parent_greedy_same_category_flagged"] is True
+    with pytest.raises(ValueError, match="outside the visible legal set"):
+        compare_parent_greedy_candidates(
+            sampled, candidates, FixedAgent(Action("invalid", "pass", 0)))
 
 
 def test_shortlist_rejects_non_policy_source_or_missing_seat():
