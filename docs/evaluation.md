@@ -6816,3 +6816,148 @@ and `c3d4bfcf8ad7a994e3edcc3cb38b29823c70c10e61a3a1e0ed511e9ed4bc5c71`.
 The run used PyTorch 2.5.1+cpu with one thread and the feature-v23 policy;
 the reported project commit was the pre-change parent `08841fc` because this
 measurement preceded the implementation commit.
+
+### Broader Tactical-v14 imitation continuation (27 October 2026)
+
+Starting from the unchanged feature-v23 neural reference
+(`fv23_tactical_v14_unseen_fourdeck_continuation.pt`), two fresh native
+matchups supplied **64 complete Tactical-v14 demonstrations**: Chaos Control
+versus Bazoo Return with Tactical on both seats (seeds 18500–18515), and
+Lolmarcus versus Michael Goat Control with Tactical against Combat v3 (seeds
+18516–18531). The teacher occupied each seat 32 times. All **46,154 source
+decisions** replay-verified and passed the player-visible audit during fitting;
+the teacher supplied **23,566** selected decisions. The four new Main Deck
+compositions were absent from the parent training set. A two-epoch,
+batched-forward continuation with width 32, minibatch 16, learning rate
+`0.0002`, seed 55, and four verification workers reduced source imitation
+loss from `0.156409` to `0.131609`. The reported run took 71.87 wall seconds,
+including 15.90 seconds of verification and 35.13 seconds of fitting. The
+ignored child checkpoint is
+`.cache/goat-ai/fv23_tactical_v14_broader_18500_18531.pt` (SHA-256
+`1f42d70451521afa210d97f322d53d37eb139c62f6269dafc34c7794f971994f`).
+
+Two held-out matchups paired Roberto Martinez Phoenix Control with either the
+WikiFormat or GoatFormat Guide Dimension Fusion Main Deck. None of these
+three compositions appeared in either checkpoint's training provenance. On
+seeds 18600–18607, both deck assignments and both policy seats, the child
+beat the unchanged parent **43–21** over 64 duels (67.2% score; paired
+bootstrap 95% interval **56.2%–78.1%**). By assigned Main Deck its record was
+21–11 Phoenix, 14–2 GoatFormat Dimension Fusion, and 8–8 WikiFormat
+Dimension Fusion. This establishes an improvement over this neural parent on
+the tested held-out schedule, with uneven deck results.
+
+Against Tactical-v14 on matched seeds 18608–18615, the child scored **25–39**
+and the parent **13–51**, each over 64 duels. The paired score difference was
+**+18.75 percentage points** (95% interval **+7.8 to +31.3 points**). The child
+still loses to Tactical-v14 overall. Its assigned-deck results were 14–18
+Phoenix, 4–12 GoatFormat Dimension Fusion, and 7–9 WikiFormat Dimension
+Fusion. This is a measured imitation gain, not a self-play improvement or a
+superhuman-strength claim. M4 remains open.
+
+The direct, child-versus-Tactical, and parent-versus-Tactical reports are in
+`.cache/goat-ai/` with prefixes
+`fv23_tactical_v14_broader_vs_parent_18600_18607`,
+`fv23_tactical_v14_broader_vs_tactical_18608_18615`, and
+`fv23_parent_vs_tactical_18608_18615`; their SHA-256 values are
+`d88771821f2c9173d92a6216c15fa42a842c70741b190733a95d3d3776634682`,
+`51956e035b4e13bf822bc2ac254ace776b967041140a8de192c30a31862b0bab`,
+and `c385146cceb3202852c78d754bab208c3e7b6032cbee6f5535527c8a7d0cb255`.
+`scripts/compare_tournament_reports.py --verify-local-decks` confirmed the
+matched Tactical controls and the paired difference. The source and training
+commands are:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher tactical --opponent tactical \
+  --deck-a examples/decks/chaos_control_insids_worlds_2022.ydk \
+  --deck-b examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --seed 18500 --seeds 16 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/tactical_v14_chaos_bazoo_18500_18515
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher tactical --opponent combat_heuristic \
+  --deck-a examples/decks/goat_control_lolmarcus_2020.ydk \
+  --deck-b examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --seed 18516 --seeds 16 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/tactical_v14_lolmarcus_michael_18516_18531
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/tactical_v14_chaos_bazoo_18500_18515/seed_*.json \
+  .cache/goat-ai/tactical_v14_lolmarcus_michael_18516_18531/seed_*.json \
+  --engine experimental --feature-version 23 --width 32 --epochs 2 \
+  --batch-size 16 --batched-forward --verification-workers 4 \
+  --learning-rate 0.0002 --seed 55 \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/fv23_tactical_v14_broader_18500_18531.pt
+```
+
+Use `scripts/evaluate_policy.py` with the two held-out `--matchup` pairs above,
+`--engine experimental --both-deck-assignments --require-unseen-main-decks
+--seeds 8 --max-decisions 3000 --workers 4`. Use `--seed 18600` with
+`--opponent-checkpoint` pointing to the unchanged parent for the direct arm;
+use `--seed 18608 --opponent tactical` once per checkpoint for the matched
+baseline arms. Give each run a distinct ignored `--output` path.
+
+### Self-play continuation of the broader imitation child
+
+The stronger imitation child above was continued through **64 terminal native
+self-play duels**, seeds 18700–18763, on its two training pairings. The
+four-role schedule gave the learner each Main Deck in both seats. Four frozen
+policy duels were collected per PPO update with four CPU workers, three PPO
+epochs, minibatch 16, clip epsilon 0.2, per-episode weighting, learning rate
+`0.0001`, parent KL weight 0.5, and a learner-deck moving baseline. The run
+recorded **7,912 multi-option learner decisions** in 61.16 wall seconds,
+with 40 wins, 23 losses, and one draw against its changing training-opponent
+mixture. Those training wins do not establish improvement.
+
+All **64 saved trajectories and 43,820 decisions** subsequently passed fresh
+native replay verification and the player-visible audit. The conservative
+review shortlist found 101 candidate mistakes across sampled actions,
+including 23 Nobleman activations with only a friendly Set monster, 14
+negative or own-only Heavy Storm activations, and 10 weak Flip-monster Normal
+Summons with Set available. These are review prompts, not automatically
+validated tactical labels; stochastic training choices are not the greedy
+checkpoint's choices.
+
+On fresh seeds 18800–18807 across the same two held-out Phoenix/Dimension
+Fusion pairings as above, both deck assignments and both seats, the PPO child
+scored **27–37** directly against its unchanged imitation parent (42.2%;
+paired bootstrap 95% interval 32.8%–53.1%). By assigned Main Deck it scored
+16–16 Phoenix, 6–10 GoatFormat Dimension Fusion, and 5–11 WikiFormat
+Dimension Fusion. This continuation fails the M4 self-play improvement gate;
+keep the imitation checkpoint as the neural reference. A future update needs
+better action-level credit assignment or stronger sampled-action quality,
+measured on fresh decks and seeds rather than training wins.
+
+The ignored PPO checkpoint is
+`.cache/goat-ai/fv23_broader_ppo_18700_18763.pt` (SHA-256
+`58cef491e6f1e508498b186c13d5ac61354fe057a7207787e2f50cb9eb31e3b8`).
+The training, held-out tournament, and replay-audit report SHA-256 values
+are respectively
+`e60bd85e8b8023e2a45d593fdf3db7ea9e8a1e8a4e38a0f645f141eb17cba9e2`,
+`e99c7dfe8b6479e77813488ddd59fcdd5e4a7735fbc18e2de4b283f6596de71f`,
+and `82eb98fab722c59fd003ee00d55787151cb6d54e126cd0667c5d4247c5dd7ca6`.
+Reproduce the training with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_broader_18500_18531.pt \
+  --engine experimental \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+            examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --schedule-mode four_roles --seed 18700 --games 64 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 --rollout-workers 4 \
+  --ppo-rollout-weighting per_episode --ppo-epochs 3 --ppo-batch-size 16 \
+  --ppo-clip-epsilon 0.2 --learning-rate 0.0001 --parent-kl-weight 0.5 \
+  --baseline-scope learner_deck --snapshot-every 4 --max-snapshots 8 \
+  --record-dir .cache/goat-ai/fv23_broader_ppo_18700_18763_replays \
+  --output .cache/goat-ai/fv23_broader_ppo_18700_18763.pt
+```
+
+The held-out comparison used `scripts/evaluate_policy.py` with the two
+Phoenix/Dimension Fusion `--matchup` pairs above,
+`--engine experimental --both-deck-assignments --require-unseen-main-decks
+--seed 18800 --seeds 8 --max-decisions 3000 --workers 4`, and
+`--opponent-checkpoint` pointing to the unchanged imitation parent. The
+replay audit used `scripts/audit_selfplay_replays.py` on all
+`episode_*.json` files in the recorded directory.

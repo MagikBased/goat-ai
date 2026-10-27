@@ -893,6 +893,19 @@ chain/pass agreement on recorded states yet split 32–32 with the unweighted
 clone on fresh complete duels. See [evaluation](evaluation.md). M4 remains
 open; future training changes must improve held-out game outcomes.
 
+A separate 64-duel Tactical-v14 demonstration continuation on four previously
+unseen training decks did improve held-out outcomes: **43–21** directly against
+the unchanged neural parent, and **25–39** against Tactical-v14 versus the
+parent's **13–51** on a matched 64-duel schedule. One Dimension Fusion list
+split 8–8 against the parent, and the child still loses to Tactical overall.
+Keep the checkpoint experimental until independent deck families and self-play
+improvement are demonstrated; see [evaluation](evaluation.md).
+One 64-duel PPO continuation from that checkpoint scored 27–37 against its
+unchanged imitation parent on fresh held-out seeds. All training duels replay-
+verified and passed the visibility audit, but sampled actions still included
+many visible resource-loss candidates. Keep the self-play gate open and test
+credit assignment or better sampled-action quality before promotion.
+
 ## M5 — Search and other formats
 
 
