@@ -2263,6 +2263,9 @@ def test_multi_duel_ppo_freezes_policy_until_rollout_boundary(
     assert batches[1][0] == 3
     assert batches[2][0] == 1  # flush the final partial rollout
     assert [report["policy_loss"] for report in reports] == [1.0, 1.0, 2.0, 2.0, 3.0]
+    if baseline_timing == "frozen_rollout":
+        assert [report["baseline"] for report in reports] == pytest.approx(
+            [0.0, 0.0, -0.0025, -0.0025, -0.00475625])
     with pytest.raises(ValueError, match="multi-duel PPO"):
         train_against_snapshot_pool(model, vocabulary, (("a", "b"),), (100,),
                                     lambda: None, ppo_rollout_games=2)

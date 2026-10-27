@@ -298,6 +298,7 @@ def main() -> None:
                                         if args.policy_update == "clipped_ppo" else None),
               "ppo_baseline_timing": (args.ppo_baseline_timing
                                       if args.policy_update == "clipped_ppo" else None),
+              "baseline_accumulation": "all_terminal_rewards_v2",
               "value_width": args.value_width if value_model is not None else None,
               "value_architecture": (args.value_architecture
                                      if value_model is not None else None),

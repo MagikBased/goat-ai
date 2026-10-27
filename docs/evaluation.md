@@ -7793,10 +7793,17 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
 The existing four-duel PPO rollout freezes policy weights but, in its default
 `online` mode, updates the moving return baseline after each duel. An opt-in
 `--ppo-baseline-timing frozen_rollout` uses the pre-rollout baseline for all
-four advantage calculations and updates the moving estimate for later
-rollouts as before. The learner and opponent still receive only their own
+four advantage calculations. The learner and opponent still receive only their own
 player-visible observations. Tests cover both timings and confirm identical
 native results across serial, process-worker, and batched-inference rollouts.
+
+The original frozen-rollout run below used a flawed moving-baseline update:
+each game replaced the estimate using the same frozen pre-rollout value, so
+only the last game's reward affected the estimate carried to the next rollout.
+The implementation now accumulates every terminal reward while retaining the
+frozen pre-rollout value for that rollout's advantages. The checkpoint and
+measurements below remain reproducible historical results of the old update
+rule; they are not evidence for the corrected update rule's strength.
 
 Starting from the same unchanged feature-v23 reference and using the same
 32-game post-patch PPO schedule and settings as the online run above, the
@@ -7826,6 +7833,45 @@ comparisons passed for both Tactical deck pairs. The ignored reports are
 `--engine experimental --both-deck-assignments --require-unseen-main-decks
 --max-decisions 3000`. The new timing has no established strength gain, and
 neither PPO child is promoted.
+
+### Corrected frozen-rollout baseline check (27 October 2026)
+
+The frozen-rollout baseline now accumulates every terminal reward for future
+rollouts while using a single pre-rollout value for the current four games.
+The checkpoint records `baseline_accumulation=all_terminal_rewards_v2` to
+distinguish it from the earlier experiment above. Starting from the selected
+feature-v23 parent (`975d06284b3035bc8bf8dbafa041a8a25a80195574d1ff695f2fbd25d1c7ff45`),
+32 four-role PPO games on seeds 46000–46031 used the two World Championship
+2022 deck pairings documented in the post-patch PPO command above, four
+process workers, four-game rollouts, per-episode weighting, learner-deck
+baselines, three epochs, batch size 16, learning rate 0.0001, and parent KL
+weight 0.5. All 32 games reached terminal; the learner had 4,268 decisions.
+Measured training wall time was 26.67 s on this host with one Torch thread.
+All 32 trajectories replay-verified against the pinned native assets and
+passed the visibility audit, covering 24,014 total decisions. The audit
+shortlisted 42 review candidates; these are not proven mistakes.
+
+The ignored checkpoint is `.cache/goat-ai/fv23_fixed_frozen_ppo_46000_46031.pt`
+(SHA-256 `373b99f92915cb1684d0bb2d8b3d3fa08032ac04da35eb9deae2bd014ac26814`);
+the ignored audit is `.cache/goat-ai/fv23_fixed_frozen_ppo_46000_46031_audit.json`
+(SHA-256 `c07d528798ff93cdc98572458a262d0b7ff2e1c7f2c6a2ece4bcd45a13b32b88`).
+The checkpoint and its 32 source trajectories remain outside Git.
+
+On unseen 2005 Rhymus Goat Control versus Charlotte Zombie Main Decks, both
+deck assignments and seats, seeds 46100–46107, the child scored **14–18**
+directly against the parent over 32 duels (paired-bootstrap 95% score interval
+25.0–59.4%). Against Tactical v14 on the identical 32-game schedule, the
+child scored **15–17**, the parent **16–16**, and their paired score
+difference was **−3.1 percentage points** (95% interval −21.9 to +12.5).
+The report comparator verified identical native assets and source hashes,
+current local deck files, and that both Main Deck compositions are absent
+from both checkpoints' training provenance. Ignored report SHA-256 values are
+`9e2420b78a2b7a2921d14dc70f3c2e7428a5ed253dc8e0acf279f3485ac219f3`
+(direct), `614e348e29f5c467dd771decdd737b54f158e52bd9785672862558ff09719441`
+(child versus Tactical), and
+`2d99852515a53eab9b079d8441426d93c6d39ce4ecc429909c8d99224f74bca0`
+(parent versus Tactical). This schedule does not show a self-play gain; the
+selected parent remains unchanged.
 
 ### Visible-rule v2 preference ablation (27 October 2026)
 

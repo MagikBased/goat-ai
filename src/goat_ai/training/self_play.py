@@ -949,7 +949,9 @@ def train_against_snapshot_pool(
                 model.feature_version, value_optimizer)
                 if value_model is not None and episode.learner_records else None)
             if value_model is None:
-                baselines[baseline_key] = 0.95 * baseline + 0.05 * episode.reward
+                baselines[baseline_key] = (
+                    0.95 * baselines.get(baseline_key, 0.0)
+                    + 0.05 * episode.reward)
             reports.append({"seed": seed, "learner_seat": learner_seat,
                             "decks": decks, "opponent": opponent_name,
                             "status": "terminal",

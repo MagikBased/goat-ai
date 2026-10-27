@@ -1712,6 +1712,13 @@ checks. The matched Tactical comparison was 13–51 versus 10–54 for the
 reference, with a paired interval crossing zero. Neither PPO timing meets
 M4's self-play gain gate; see
 [evaluation](evaluation.md#frozen-rollout-baseline-ablation-27-october-2026).
+Those frozen-rollout results used the earlier baseline accumulation bug; the
+corrected update was evaluated separately: its 32-game child scored 14–18
+against the selected parent and 15–17 versus Tactical v14 on unseen Rhymus
+Goat Control versus Charlotte Zombie decks, compared with the parent's
+16–16 Tactical result on the same seeds. The paired interval crosses zero;
+the parent remains selected. See
+[evaluation](evaluation.md#corrected-frozen-rollout-baseline-check-27-october-2026).
 
 The visible-resource v3 experiment adds replay-verified counterfactual
 comparisons for own-only Nobleman and negative visible Heavy Storm trades,
