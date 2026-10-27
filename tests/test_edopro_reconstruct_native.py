@@ -18,7 +18,7 @@ from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.ocgcore_probe import GOAT_FLAGS, OcgcoreProbe
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
-from goat_ai.evaluation.visibility import audit_decision_visibility
+from goat_ai.evaluation.visibility import VisibilityViolation, audit_decision_visibility
 from goat_ai.replay.edopro_container import (
     DUEL_FLAG_64BIT,
     EXTENDED_HEADER,
@@ -118,6 +118,36 @@ def test_reconstructs_complete_native_legacy_response_trace(native_legacy_respon
     assert trace.replay_sha256 == replay.sha256
     assert trace.embedded_replay_sha256 is None
     assert "build/libocgcore.so" in trace.asset_sha256
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_reconstruction_fails_closed_when_visible_action_audit_fails(
+        native_legacy_responses, monkeypatch, tmp_path, capsys):
+    from goat_ai.replay import edopro_reconstruct
+    from scripts.inspect_edopro_replay import main
+
+    root, responses, _ = native_legacy_responses
+
+    def reject_hidden_choice(_record):
+        raise VisibilityViolation("opponent hand choice reveals unknown identity")
+
+    monkeypatch.setattr(edopro_reconstruct, "audit_decision_visibility",
+                        reject_hidden_choice)
+    replay = _legacy_replay(responses)
+    with pytest.raises(ReplayReconstructionError, match="player-visible action audit failed"):
+        reconstruct_legacy_responses(replay, root)
+
+    path = tmp_path / "source.yrp"
+    path.write_bytes(_legacy_replay(responses, raw=True))
+    monkeypatch.setattr(sys, "argv", ["inspect_edopro_replay.py", str(path),
+                                       "--reconstruct-native", str(root)])
+    with pytest.raises(SystemExit) as exited:
+        main()
+    assert exited.value.code == 1
+    report = json.loads(capsys.readouterr().out)[0]
+    assert report["conditional_native_reconstruction"] == "failed"
+    assert report["training_ready"] is False
+    assert "opponent hand choice" not in str(report)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

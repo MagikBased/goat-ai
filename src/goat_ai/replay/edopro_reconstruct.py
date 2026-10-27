@@ -12,6 +12,7 @@ from pathlib import Path
 from goat_ai.engine.decks import Decklist
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.ocgcore_probe import GOAT_FLAGS
+from goat_ai.evaluation.visibility import VisibilityViolation, audit_decision_visibility
 from goat_ai.observations import Observation
 from goat_ai.replay.edopro_container import (
     HAND_TEST,
@@ -133,6 +134,15 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                     f"response {index}: native transition failed: {exc}") from exc
         if not decision.terminal:
             raise ReplayReconstructionError("saved responses ended before native terminal state")
+        for index, record in enumerate(records):
+            if record.selected_action not in record.legal_actions:
+                raise ReplayReconstructionError(
+                    f"decision {index}: saved response is not a legal visible action")
+            try:
+                audit_decision_visibility(record)
+            except VisibilityViolation as exc:
+                raise ReplayReconstructionError(
+                    f"decision {index}: player-visible action audit failed: {exc}") from exc
         return ReconstructedLegacyDuel(source_sha256, embedded_sha256,
                                        tuple(records), len(replay.responses),
                                        decision.winner, decision.observation,

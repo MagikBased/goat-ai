@@ -459,7 +459,9 @@ replay through staged public actions when the adapter's action bound forces
 them; the saved native response is committed only once. The optional native
 inspection command also unwraps `.yrpX`, checks its player count, rules flags,
 and RNG words against the embedded legacy replay, and reports only counts and
-provenance hashes. This does not
+provenance hashes. Reconstruction also rejects any recovered choice outside
+its visible legal set or flagged by the decision visibility audit; a synthetic
+injected leak makes the inspection command fail closed. This does not
 prove that a real EDOPro recording replays on our core or that its original
 asset versions match. A permitted real GOAT fixture and independent
 player-knowledge audit remain open.

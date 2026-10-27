@@ -127,6 +127,13 @@ hash of the loaded-asset manifest. It never exports card IDs or marks a
 replay as training ready. Legacy headers without four recorded RNG words
 also need a separately validated RNG path.
 
+Conditional reconstruction now checks that every recovered choice is in its
+player-visible legal set and runs the existing decision visibility audit before
+reporting a match. An injected visibility failure makes both reconstruction and
+the privacy-preserving CLI fail closed. This audits the reconstructed adapter
+output; it cannot establish what a real player knew in an original EDOPro
+recording made with different core or script versions.
+
 An optional `--goat-whitelist .cache/goat-ai/banlist/GOAT.lflist.conf` screen
 reads the embedded Decks and reports only the number of Main/Extra cards
 absent from or forbidden by the pinned GOAT list, plus whether both Main
