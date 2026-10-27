@@ -50,6 +50,26 @@ PYTHONPATH=. .venv/bin/python scripts/audit_edison_pool.py \
 
 ## Native engine assessment
 
+The [contemporary Yu-Gi-Oh! 5D's official rulebook](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
+sets 40–60 Main Deck cards, at most 15 Extra Deck cards containing only Fusion
+and Synchro Monsters, at most 15 Side Deck cards, and three copies of a card
+across all three zones before Forbidden/Limited restrictions. The new
+`validate_edison_deck` function enforces those construction limits and the
+March 2010 canonical copy caps against pinned card metadata. It requires an
+explicit caller-supplied set of eligible card IDs; the project has not yet
+established the complete dated TCG release pool, so this function cannot by
+itself certify a real deck as Edison-legal. It also rejects later Xyz, Pendulum,
+and Link types even if a bad candidate pool includes them. Synthetic database
+tests cover size, zone, alias, restriction, release-pool, and future-type
+boundaries. The GOAT validator and native adapter are separate and unchanged.
+
+Konami's [current Time Travel FAQ](https://www.yugioh-card.com/en/play/alternate_format_tournaments/time-travel/)
+uses the historical card pool and list but *current mechanics and current card
+text* (with historical first-turn draw and field layout). This differs from
+reconstructing the 2010 tournament's original rulings. The project's Edison
+research target is the latter; a Time Travel profile would need separate
+validation and versioning if added.
+
 The pinned Project Ignis database has metadata for representative Edison
 Synchros including Stardust Dragon, Black Rose Dragon, Brionac, Goyo Guardian,
 and Dark Strike Fighter. Metadata presence does not validate 2010 scripts,

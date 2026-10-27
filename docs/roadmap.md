@@ -902,6 +902,11 @@ The [Edison feasibility audit](edison_research.md) records the official March
 2010 Advanced Format restrictions as a checked data asset and lists the
 remaining card-pool, native-rule, and observation validation gates. This is
 M5 preparation; Edison duels are not yet supported.
+An independent 2009 deck-construction validator now accepts an explicitly
+audited eligible-card set and checks Main, Extra, and Side sizes, Fusion/Synchro
+placement, and shared canonical copy caps. It deliberately does not infer
+release eligibility from the restriction list; the complete dated card pool
+and native 2010 rules profile remain open.
 
 ### Possible Stardust PC-port integration
 
