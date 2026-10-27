@@ -7420,6 +7420,18 @@ This is protocol coverage, not a historical correctness test for all 1,036
 cards. Each generated deck has 40 distinct canonical Main Deck cards and no
 Extra or Side Deck; such random lists are not competitive deck samples.
 
+An opt-in `--repeat-seeds` reran each of those 20 games from a fresh native
+environment and a newly seeded RandomAgent. The repeated trajectories had
+identical player-visible decisions, selected actions, terminal observations,
+and winners across **21,078 decisions**. Deck hashes, decision counts, and
+outcomes also matched the earlier sweep. Replay verification and visibility
+audits again passed for all 20 games. The ignored repeat report is
+`.cache/goat-ai/whitelist_distinct_repeat_30000_30019/report.json`, SHA-256
+`55118a331ea351fe97cf420be94d62eec1eeee49ecf6addfc95dd6c407a5b288`.
+Use the command above with `--repeat-seeds` and a distinct output directory.
+This tests determinism for these seeds, decks, and RandomAgent; it is not a
+proof that every possible GOAT duel is deterministic or historically correct.
+
 ### Frozen-rollout baseline ablation (27 October 2026)
 
 The existing four-duel PPO rollout freezes policy weights but, in its default

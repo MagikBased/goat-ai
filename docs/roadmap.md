@@ -96,6 +96,11 @@ passed the visibility audit. The 40 decks covered 1,036 distinct Main Deck
 IDs. This extends M1 protocol evidence beyond tournament-list mixtures, but
 does not certify the effects or 2005 rulings of every sampled card; see
 [evaluation](evaluation.md#distinct-opponent-whitelist-protocol-sweep-27-october-2026).
+An opt-in fresh-environment repeat of the same 20 games reproduced every
+player-visible decision, selected action, terminal observation, and outcome;
+the earlier sweep's deck hashes and game lengths also matched. This strengthens
+the seeded-determinism part of M1 for the sampled corpus, without proving all
+legal cards or historical interactions correct.
 The report fingerprints source decks and 103 loaded native assets. This
 expands common-card protocol coverage while leaving broader whitelist and
 individual historical-ruling coverage open; see

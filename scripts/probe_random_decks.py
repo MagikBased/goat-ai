@@ -102,7 +102,8 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
           max_decisions: int, card_pool: str = "whitelist",
           verify_replays: bool = False,
           distinct_opponents: bool = False,
-          count_card_actions: bool = False) -> dict:
+          count_card_actions: bool = False,
+          repeat_seeds: bool = False) -> dict:
     if card_pool not in ("whitelist", "tournament"):
         raise ValueError("unknown card pool")
     output.mkdir(parents=True, exist_ok=True)
@@ -112,6 +113,8 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
     responses: Counter[tuple[int, int]] = Counter()
     visibility_counts: Counter[str] = Counter()
     visibility_games = 0
+    repeated_games = 0
+    repeated_decisions = 0
     loaded_assets: dict[str, str] = {}
     rules_profile = None
     for seed in range(first_seed, first_seed + seeds):
@@ -162,6 +165,29 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
                                              record.selected_action, offered, selected)
                         count_chain_response(record.observation,
                                              record.selected_action, responses)
+            if repeat_seeds:
+                if trajectory is None:
+                    raise RuntimeError("cannot repeat a duel that did not reach terminal")
+                with GoatEnvironment(str(path), str(opponent_path), seed,
+                                     ExperimentalOcgcoreEngine(root)) as repeated:
+                    repeated_observation = repeated.reset()
+                    repeated_agent = RandomAgent(seed)
+                    for _ in range(decisions):
+                        if repeated.is_terminal():
+                            raise RuntimeError("seeded repeat ended before the original duel")
+                        repeated_actions = repeated.legal_actions()
+                        repeated_observation = repeated.step(
+                            repeated_agent.select_action(repeated_observation,
+                                                         repeated_actions))
+                    repeated_trajectory = repeated.trajectory() if repeated.is_terminal() else None
+                    if (repeated_trajectory is None
+                            or repeated_trajectory.decisions != trajectory.decisions
+                            or repeated_trajectory.terminal_observation
+                            != trajectory.terminal_observation
+                            or repeated.result() != winner):
+                        raise RuntimeError("seeded repeat changed decisions, state, or outcome")
+                repeated_games += 1
+                repeated_decisions += decisions
             error = None
         except (OSError, RuntimeError, ValueError) as exc:
             terminal, winner = False, None
@@ -174,6 +200,8 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
             game["opponent_deck_sha256"] = sha256_file(opponent_path)
         if verify_replays:
             game["replay_verified_decisions"] = verified if error is None else None
+        if repeat_seeds:
+            game["deterministic_repeat"] = error is None
         games.append(game)
     report = {"max_decisions": max_decisions, "games": games}
     if card_pool != "whitelist":
@@ -211,6 +239,9 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
             "audited_games": visibility_games,
             **dict(sorted(visibility_counts.items())),
         }
+    if repeat_seeds:
+        report["determinism"] = {"repeated_games": repeated_games,
+                                 "identical_decisions": repeated_decisions}
     if count_card_actions:
         report["card_actions"] = [
             {"code": code, "kind": kind, "offered_decisions": offered[code, kind],
@@ -241,18 +272,22 @@ def main() -> None:
                         help="generate an independent legal opponent deck per seed")
     parser.add_argument("--count-card-actions", action="store_true",
                         help="count source-card options and selected chain responses")
+    parser.add_argument("--repeat-seeds", action="store_true",
+                        help="rerun each complete duel and require identical decisions, terminal state, and outcome")
     args = parser.parse_args()
     if args.seeds < 1 or args.max_decisions < 1:
         parser.error("--seeds and --max-decisions must be positive")
     report = probe(args.native_root, args.output, args.seed, args.seeds,
                    args.max_decisions, args.card_pool, args.verify_replays,
-                   args.distinct_opponents, args.count_card_actions)
+                   args.distinct_opponents, args.count_card_actions,
+                   args.repeat_seeds)
     for game in report["games"]:
         status = "error" if game["error"] else "terminal" if game["terminal"] else "limit"
         suffix = f" error={game['error']}" if game["error"] else ""
         print(f"seed={game['seed']} decisions={game['decisions']} status={status}{suffix}")
     print(f"report={args.output / 'report.json'}")
-    if any(game["error"] or (args.verify_replays and not game["terminal"])
+    if any(game["error"] or ((args.verify_replays or args.repeat_seeds)
+                             and not game["terminal"])
            for game in report["games"]):
         raise SystemExit(1)
 
