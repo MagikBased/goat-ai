@@ -1048,7 +1048,21 @@
       let candidate = index + direction;
       const skip = byId("skip").checked;
       const lastIndex = replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation));
-      while (candidate >= 0 && candidate < replay.decisions.length && skip && ["pass", "place", "shuffle_hand"].includes(replay.decisions[candidate].selected_action.kind)) candidate += direction;
+      const visibleTransition = frame => {
+        if (frame === 0) return true;
+        const previous = replay.decisions[frame - 1].observation;
+        const current = replay.decisions[frame].observation;
+        // A response often has a selected "pass" while newly activated Traps
+        // are face-up in the chain. Keep that frame even with skipping enabled.
+        return JSON.stringify(current.chain || []) !== JSON.stringify(previous.chain || [])
+          || JSON.stringify(current.life_points) !== JSON.stringify(previous.life_points)
+          || JSON.stringify(current.field) !== JSON.stringify(previous.field)
+          || JSON.stringify(current.graveyards) !== JSON.stringify(previous.graveyards)
+          || JSON.stringify(current.banished) !== JSON.stringify(previous.banished);
+      };
+      while (candidate >= 0 && candidate < replay.decisions.length && skip
+          && ["pass", "place", "shuffle_hand"].includes(replay.decisions[candidate].selected_action.kind)
+          && !visibleTransition(candidate)) candidate += direction;
       if (candidate < 0 || candidate > lastIndex) { stop(); return; }
       index = candidate;
       animateNext = direction > 0;

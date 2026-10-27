@@ -3,6 +3,7 @@
 import re
 import shutil
 import subprocess
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -74,3 +75,47 @@ def test_attack_target_life_fill_and_field_card_movement(tmp_path, destination):
     match = re.search(r'data-animation-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
     assert match.group(1) == "true|true|true|true|true|true|7000 LP|87.5%"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_skip_passes_keeps_newly_chained_trap_face_up(tmp_path):
+    first = _observation()
+    first["field"] = [
+        {"controller": 0, "zone": "spell_trap", "sequence": 0,
+         "code": 1, "position": "faceup"},
+        {"controller": 1, "zone": "spell_trap", "sequence": 0,
+         "code": None, "position": "facedown"},
+    ]
+    first["chain"] = [{"index": 1, "card_code": 1, "controller": 0,
+                       "location": 8, "sequence": 0, "targets": []}]
+    second = deepcopy(first)
+    third = deepcopy(first)
+    third["field"][1].update(code=2, position="faceup")
+    third["chain"].append({"index": 2, "card_code": 2, "controller": 1,
+                           "location": 8, "sequence": 0, "targets": []})
+    passed = {"id": "pass", "kind": "pass", "actor": 0, "parameters": {}}
+    chained = {"id": "chain", "kind": "chain", "actor": 1,
+               "parameters": {"code": 2, "location": 8, "controller": 1, "sequence": 0}}
+    replay = {"seed": 2, "source": "test", "winner": 0, "decisions": [
+        {"observation": first, "selected_action": passed, "legal_actions": [passed]},
+        {"observation": second, "selected_action": chained, "legal_actions": [chained]},
+        {"observation": third, "selected_action": passed, "legal_actions": [passed]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {1: "First Trap", 2: "Second Trap"}, {}, {})
+    probe = """<script>
+      index = 1; render();
+      move(1);
+      const trap = document.querySelector('[data-field-key="1:spell_trap:0"]');
+      document.body.dataset.chainProbe = [index, trap?.classList.contains('facedown'),
+        trap?.title, document.querySelectorAll('.card-flip').length].join('|');
+    </script></body>"""
+    path = tmp_path / "chained_trap.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-chain-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "2|false|Second Trap|1"
