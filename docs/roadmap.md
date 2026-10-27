@@ -392,7 +392,15 @@ reports its response count without printing private values. It is still
 not replay decision reconstruction or an authorized human-data pipeline.
 An optional private-safe GOAT card-pool screen rejects all five modern
 samples without publishing their Deck card IDs; it is only an intake filter,
-not historical or training validation.
+not historical or training validation. It now also rejects exact card-ID
+copy counts above the whitelist limit across each player's Main and Extra
+Deck. A synthetic 40-card-per-player replay test covers a duplicate limited
+ID across those sections and confirms that the report contains only counts.
+An opt-in native Deck screen now runs the pinned validator on the replay's
+Main and Extra Decks. A native test confirms that it catches an alias pair
+over the shared limited-card count and a non-Fusion in the Extra Deck that the
+whitelist-only screen cannot catch. The replay container has no Side Deck
+record; deck screening alone cannot admit a replay for training.
 The structural reader now retains the three legacy duel settings required
 to recreate startup. A separate private-safe setup screen compares the
 embedded legacy replay, when present, with this project's two-player,

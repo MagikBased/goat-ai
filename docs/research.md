@@ -108,9 +108,18 @@ absent from or forbidden by the pinned GOAT list, plus whether both Main
 Decks have at least 40 cards. All five real samples fail this screen: their
 Main Deck out-of-pool counts are 40, 53, 81, 112, and 12 respectively by
 file date. This independently rules them out as GOAT training fixtures.
-Passing the screen would only make a replay a candidate: it does not check
-copy limits, historical scripts, rules flags, response reconstruction,
-player visibility, or permission to train on that gameplay.
+The screen also counts exact card-ID copies across each player's Main and
+Extra Deck and rejects counts above the pinned whitelist limit. It reports
+only the total excess count. The optional `--native-deck-screen
+.cache/goat-ai` uses the pinned card databases and the same GOAT deck
+validator as native duels. It additionally rejects alias-equivalent cards
+that exceed a shared copy limit and non-Fusion cards in the Extra Deck,
+without printing card IDs or rejection details. A native test checks both
+cases. The parsed legacy Deck record does not contain Side Decks, so this
+still cannot validate a complete tournament Deck submission.
+Passing either screen would only make a replay a candidate: it does not check
+historical scripts, rules flags, response reconstruction, player visibility,
+Side Deck legality, or permission to train on that gameplay.
 
 Reproduce the first real-file intake check without committing the replay:
 

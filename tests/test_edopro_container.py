@@ -2,8 +2,11 @@
 
 import json
 import lzma
+import os
 import struct
 import sys
+from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +19,7 @@ from goat_ai.replay.edopro_container import (
     YRP1,
     YRPX,
     ReplayContainerError,
+    ReplayDeck,
     parse_edopro_container,
 )
 
@@ -194,8 +198,66 @@ def test_goat_pool_screen_reports_counts_without_private_card_ids(tmp_path,
     report = json.loads(capsys.readouterr().out)[0]
     assert report["goat_main_cards_outside_whitelist"] == 2
     assert report["goat_extra_cards_outside_whitelist"] == 0
+    assert report["goat_exact_id_copy_excess"] == 0
     assert report["goat_pool_screen"] == "outside_pool_or_deck_size"
     assert "30" not in str(report)
+
+
+def test_goat_pool_screen_rejects_main_extra_copy_excess_per_player():
+    from scripts.inspect_edopro_replay import goat_pool_screen
+
+    cards = tuple(range(1, 41))
+    replay = SimpleNamespace(
+        decks=(ReplayDeck(cards, (1,)), ReplayDeck(cards, ())),
+        embedded_legacy_replay=lambda: None,
+    )
+    whitelist = {code: 3 for code in cards}
+    whitelist[1] = 1
+    report = goat_pool_screen(replay, whitelist)
+    assert report["goat_pool_screen"] == "exact_id_copy_limit_exceeded"
+    assert report["goat_exact_id_copy_excess"] == 1
+    assert report["goat_main_cards_outside_whitelist"] == 0
+    assert report["goat_extra_cards_outside_whitelist"] == 0
+    assert "(1," not in str(report)
+
+    replay.decks = (ReplayDeck(cards, ()), ReplayDeck(cards, ()))
+    report = goat_pool_screen(replay, whitelist)
+    assert report["goat_pool_screen"] == "candidate_only"
+    assert report["goat_exact_id_copy_excess"] == 0
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_native_deck_screen_catches_alias_copies_and_nonfusion_extra():
+    from goat_ai.engine.decks import read_goat_whitelist
+    from goat_ai.engine.probe_deck import VANILLA_DECK
+    from scripts.inspect_edopro_replay import (
+        goat_native_deck_screen,
+        goat_pool_screen,
+    )
+
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    whitelist = read_goat_whitelist(root / "banlist/GOAT.lflist.conf")
+    replay = SimpleNamespace(
+        decks=(ReplayDeck(VANILLA_DECK, ()), ReplayDeck(VANILLA_DECK, ())),
+        embedded_legacy_replay=lambda: None,
+    )
+    assert goat_native_deck_screen(replay, root, whitelist)[
+        "goat_native_deck_screen"] == "candidate_only"
+
+    # Both permitted IDs point to one canonical limited card in the pinned DB.
+    alias_main = (77585514, 77585513, *VANILLA_DECK[2:])
+    replay.decks = (ReplayDeck(alias_main, ()), ReplayDeck(VANILLA_DECK, ()))
+    assert goat_pool_screen(replay, whitelist)["goat_pool_screen"] == "candidate_only"
+    report = goat_native_deck_screen(replay, root, whitelist)
+    assert report["goat_native_deck_screen"] == "rejected"
+    assert report["goat_native_decks_rejected"] == 1
+    assert "775855" not in str(report)
+
+    replay.decks = (ReplayDeck(VANILLA_DECK, (97923414,)),
+                    ReplayDeck(VANILLA_DECK, ()))
+    assert goat_pool_screen(replay, whitelist)["goat_pool_screen"] == "candidate_only"
+    assert goat_native_deck_screen(replay, root, whitelist)[
+        "goat_native_deck_screen"] == "rejected"
 
 
 def test_goat_rules_screen_rejects_wrong_setup_without_private_values():

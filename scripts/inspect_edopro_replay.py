@@ -3,9 +3,11 @@
 import argparse
 import hashlib
 import json
+import sqlite3
+from collections import Counter
 from pathlib import Path
 
-from goat_ai.engine.decks import read_goat_whitelist
+from goat_ai.engine.decks import Decklist, read_goat_whitelist, validate_goat_deck
 from goat_ai.engine.ocgcore_probe import GOAT_FLAGS
 from goat_ai.replay import ReplayContainerError, read_edopro_container
 from goat_ai.replay.edopro_reconstruct import (
@@ -47,14 +49,49 @@ def goat_pool_screen(replay, whitelist: dict[int, int]) -> dict:
     extra = [code for deck in deck_replay.decks for code in deck.extra]
     main_outside = sum(whitelist.get(code, 0) == 0 for code in main)
     extra_outside = sum(whitelist.get(code, 0) == 0 for code in extra)
+    exact_id_copy_excess = sum(
+        max(0, count - whitelist.get(code, 0))
+        for deck in deck_replay.decks
+        for code, count in Counter((*deck.main, *deck.extra)).items()
+        if whitelist.get(code, 0) > 0
+    )
     has_minimum = all(len(deck.main) >= 40 for deck in deck_replay.decks)
+    if main_outside or extra_outside or not has_minimum:
+        status = "outside_pool_or_deck_size"
+    elif exact_id_copy_excess:
+        status = "exact_id_copy_limit_exceeded"
+    else:
+        status = "candidate_only"
     return {
-        "goat_pool_screen": ("candidate_only" if not main_outside
-                             and not extra_outside and has_minimum
-                             else "outside_pool_or_deck_size"),
+        "goat_pool_screen": status,
         "goat_main_cards_outside_whitelist": main_outside,
         "goat_extra_cards_outside_whitelist": extra_outside,
+        "goat_exact_id_copy_excess": exact_id_copy_excess,
         "goat_all_main_decks_at_least_40": has_minimum,
+    }
+
+
+def goat_native_deck_screen(replay, native_root: Path,
+                            whitelist: dict[int, int]) -> dict:
+    """Use pinned metadata/aliases without publishing replay Deck contents."""
+    deck_replay = replay.embedded_legacy_replay() or replay
+    if not deck_replay.decks:
+        return {"goat_native_deck_screen": "unavailable_no_decks"}
+    rejected = 0
+    for deck in deck_replay.decks:
+        try:
+            validate_goat_deck(
+                Decklist(deck.main, deck.extra), whitelist,
+                native_root / "database/cards.cdb",
+                native_root / "database/goat-entries.cdb",
+                native_root / "database/cards-unofficial.cdb",
+            )
+        except ValueError:
+            rejected += 1
+    return {
+        "goat_native_deck_screen": ("candidate_only" if not rejected else "rejected"),
+        "goat_native_decks_rejected": rejected,
+        "goat_native_side_decks_checked": False,
     }
 
 
@@ -64,15 +101,27 @@ def main() -> None:
     parser.add_argument("--goat-whitelist", type=Path,
                         help="screen Deck membership and minimum Main Deck size; "
                              "a passing screen does not validate GOAT rules")
+    parser.add_argument("--native-deck-screen", type=Path,
+                        help="screen Decks against pinned GOAT metadata and aliases; "
+                             "Side Decks are unavailable in the replay container")
     parser.add_argument("--reconstruct-native", type=Path,
                         help="conditionally replay saved responses on these pinned native assets; "
                              "never admits replay data to training")
     args = parser.parse_args()
+    if args.native_deck_screen is not None and args.goat_whitelist is not None:
+        parser.error("choose either native deck screening or an explicit GOAT whitelist")
     try:
-        whitelist = (read_goat_whitelist(args.goat_whitelist)
-                     if args.goat_whitelist else None)
+        whitelist_path = (args.native_deck_screen / "banlist/GOAT.lflist.conf"
+                          if args.native_deck_screen is not None
+                          else args.goat_whitelist)
+        whitelist = read_goat_whitelist(whitelist_path) if whitelist_path else None
     except (OSError, ValueError) as exc:
         parser.error(f"GOAT whitelist: {exc}")
+    if args.native_deck_screen is not None:
+        required = ("database/cards.cdb", "database/goat-entries.cdb",
+                    "database/cards-unofficial.cdb")
+        if any(not (args.native_deck_screen / name).is_file() for name in required):
+            parser.error("native deck screen needs all pinned card databases")
     summaries = []
     reconstruction_failed = False
     for path in args.replays:
@@ -82,6 +131,12 @@ def main() -> None:
                       **goat_rules_screen(replay)}
             if whitelist is not None:
                 report.update(goat_pool_screen(replay, whitelist))
+            if args.native_deck_screen is not None:
+                try:
+                    report.update(goat_native_deck_screen(
+                        replay, args.native_deck_screen, whitelist))
+                except (OSError, sqlite3.Error):
+                    parser.error("native deck screen could not read pinned card databases")
             if args.reconstruct_native is not None:
                 try:
                     trace = reconstruct_legacy_responses(replay, args.reconstruct_native)
