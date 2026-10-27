@@ -613,6 +613,7 @@ def train_against_snapshot_pool(
     ppo_clip_epsilon: float = 0.2,
     ppo_rollout_games: int = 1,
     ppo_rollout_weighting: str = "per_decision",
+    ppo_baseline_timing: str = "online",
     rollout_workers: int = 0,
     rollout_batch_inference: bool = False,
     skip_capped_games: bool = False,
@@ -640,8 +641,12 @@ def train_against_snapshot_pool(
             or ppo_batch_size < 1 or ppo_rollout_games < 1
             or rollout_workers < 0
             or ppo_rollout_weighting not in ("per_decision", "per_episode")
+            or ppo_baseline_timing not in ("online", "frozen_rollout")
             or not 0 < ppo_clip_epsilon < 1):
         raise ValueError("invalid self-play policy update")
+    if ppo_baseline_timing == "frozen_rollout" and (
+            policy_update != "clipped_ppo" or ppo_rollout_games < 2):
+        raise ValueError("frozen rollout baseline requires multi-duel PPO")
     if ppo_rollout_games > 1 and (policy_update != "clipped_ppo"
                                   or baseline_scope == "state_value"
                                   or skip_capped_games or skip_unsupported_games
@@ -675,6 +680,7 @@ def train_against_snapshot_pool(
                        if value_model is not None else None)
     snapshots = [copy.deepcopy(model.state_dict())]
     baselines: dict[str, float] = {}
+    rollout_baselines: dict[str, float] = {}
     reports = []
     rollout_records: list[DecisionRecord] = []
     rollout_advantages: list[float] = []
@@ -687,6 +693,8 @@ def train_against_snapshot_pool(
     try:
         parallel_batch: dict[int, tuple[EpisodeResult, str]] = {}
         for index, (seed, decks, learner_seat) in enumerate(schedule):
+            if ppo_baseline_timing == "frozen_rollout" and index % ppo_rollout_games == 0:
+                rollout_baselines = baselines.copy()
             if (rollout_workers or rollout_batch_inference) and index % ppo_rollout_games == 0:
                 model_state = (None if rollout_batch_inference
                                else copy.deepcopy(model.state_dict()))
@@ -782,7 +790,9 @@ def train_against_snapshot_pool(
                 value_model, vocabulary, episode.learner_records, model.feature_version)
                 if value_model is not None and episode.learner_records else None)
             baseline = (sum(state_baselines) / len(state_baselines)
-                        if state_baselines else baselines.get(baseline_key, 0.0))
+                        if state_baselines else
+                        (rollout_baselines if ppo_baseline_timing == "frozen_rollout"
+                         else baselines).get(baseline_key, 0.0))
             loss = None
             if episode.learner_records:
                 if policy_update == "clipped_ppo":

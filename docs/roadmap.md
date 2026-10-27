@@ -1440,3 +1440,11 @@ interval including 50%, and 14–50 versus Tactical-v14 against the parent's
 close M4. The label source is recorded distinctly from human review, and
 training recomputes each rule before fitting; see
 [evaluation](evaluation.md#automated-visible-rule-preference-experiment-27-october-2026).
+
+An opt-in frozen-rollout PPO baseline was also tested on the same post-patch
+training schedule. Its child scored 28–36 against the online-baseline PPO
+child and 31–33 against the unchanged reference on separate held-out direct
+checks. The matched Tactical comparison was 13–51 versus 10–54 for the
+reference, with a paired interval crossing zero. Neither PPO timing meets
+M4's self-play gain gate; see
+[evaluation](evaluation.md#frozen-rollout-baseline-ablation-27-october-2026).

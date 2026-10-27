@@ -90,6 +90,9 @@ def main() -> None:
     parser.add_argument("--ppo-rollout-weighting", choices=("per_decision", "per_episode"),
                         default="per_decision",
                         help="per_episode equalizes total decision weight across rollout duels")
+    parser.add_argument("--ppo-baseline-timing", choices=("online", "frozen_rollout"),
+                        default="online",
+                        help="frozen_rollout uses the same pre-rollout return baseline for every duel in a PPO batch")
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
     parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value"),
@@ -212,6 +215,7 @@ def main() -> None:
         rollout_workers=args.rollout_workers,
         rollout_batch_inference=args.rollout_batch_inference,
         ppo_rollout_weighting=args.ppo_rollout_weighting,
+        ppo_baseline_timing=args.ppo_baseline_timing,
         schedule_mode=args.schedule_mode,
         value_model=value_model,
         value_learning_rate=args.value_learning_rate,
@@ -265,6 +269,8 @@ def main() -> None:
               "rollout_batch_inference": args.rollout_batch_inference,
               "ppo_rollout_weighting": (args.ppo_rollout_weighting
                                         if args.policy_update == "clipped_ppo" else None),
+              "ppo_baseline_timing": (args.ppo_baseline_timing
+                                      if args.policy_update == "clipped_ppo" else None),
               "value_width": args.value_width if value_model is not None else None,
               "value_architecture": (args.value_architecture
                                      if value_model is not None else None),

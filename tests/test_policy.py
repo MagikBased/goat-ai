@@ -1996,7 +1996,12 @@ def test_self_play_can_track_terminal_baseline_by_learner_deck(monkeypatch):
                                     lambda: None, baseline_scope="unknown")
 
 
-def test_multi_duel_ppo_freezes_policy_until_rollout_boundary(monkeypatch):
+@pytest.mark.parametrize("baseline_timing, first_advantages", [
+    ("online", (1.0, -1.05, -1.05)),
+    ("frozen_rollout", (1.0, -1.0, -1.0)),
+])
+def test_multi_duel_ppo_freezes_policy_until_rollout_boundary(
+        monkeypatch, baseline_timing, first_advantages):
     vocabulary = CardVocabulary((10, 20))
     model = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
     weights_seen = []
@@ -2024,12 +2029,13 @@ def test_multi_duel_ppo_freezes_policy_until_rollout_boundary(monkeypatch):
     reports = train_against_snapshot_pool(
         model, vocabulary, (("a", "b"),), (100, 101, 102, 103, 104),
         lambda: None, policy_update="clipped_ppo", ppo_rollout_games=2,
-        ppo_rollout_weighting="per_episode", snapshot_every=2)
+        ppo_rollout_weighting="per_episode", snapshot_every=2,
+        ppo_baseline_timing=baseline_timing)
     assert weights_seen[0] == weights_seen[1]
     assert weights_seen[2] == weights_seen[3]
     assert weights_seen[0] != weights_seen[2]
     assert batches[0][0] == 3
-    assert batches[0][1] == pytest.approx((1.0, -1.05, -1.05))
+    assert batches[0][1] == pytest.approx(first_advantages)
     assert batches[0][2] == pytest.approx((1.5, 0.75, 0.75))
     assert batches[1][0] == 3
     assert batches[2][0] == 1  # flush the final partial rollout

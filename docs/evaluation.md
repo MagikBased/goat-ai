@@ -7419,3 +7419,42 @@ PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
 This is protocol coverage, not a historical correctness test for all 1,036
 cards. Each generated deck has 40 distinct canonical Main Deck cards and no
 Extra or Side Deck; such random lists are not competitive deck samples.
+
+### Frozen-rollout baseline ablation (27 October 2026)
+
+The existing four-duel PPO rollout freezes policy weights but, in its default
+`online` mode, updates the moving return baseline after each duel. An opt-in
+`--ppo-baseline-timing frozen_rollout` uses the pre-rollout baseline for all
+four advantage calculations and updates the moving estimate for later
+rollouts as before. The learner and opponent still receive only their own
+player-visible observations. Tests cover both timings and confirm identical
+native results across serial, process-worker, and batched-inference rollouts.
+
+Starting from the same unchanged feature-v23 reference and using the same
+32-game post-patch PPO schedule and settings as the online run above, the
+frozen-baseline child completed **32/32** terminal duels, with **5,542 learner
+decisions** and measured training wall time **38.09 s** with one Torch thread.
+All 32 saved trajectories replay-verified and passed the visibility audit;
+the audit shortlisted 69 review candidates. The ignored checkpoint is
+`.cache/goat-ai/fv23_patched_core_ppo_frozen_baseline_21200_21231.pt`, SHA-256
+`504c32544be81daf831c26b8aeee41685000b986abf5b49cbfe257b7065a41f0`.
+Its replay-audit report SHA-256 is
+`17d23e974377a702296436f5a8fe7158c06b037e9387daa2615d94cd1e138b9f`.
+
+On held-out Phoenix Control versus two separately sourced Dimension Fusion
+decks, with both deck assignments and policy seats, seeds 21500–21507 gave
+the frozen child **28–36** directly against the online-baseline PPO child over
+64 games. Its score interval was **34.4%–51.6%**. A separate direct comparison
+on seeds 21516–21523 gave the frozen child **31–33** against the unchanged
+parent, with score interval **40.6%–56.2%**. On a matched Tactical-v14 schedule
+at seeds 21508–21515, the frozen child scored **13–51**, the online child
+**10–54**, and the unchanged parent **10–54** over 64 games each. The frozen
+minus parent paired score difference was **+4.7 percentage points**, 95%
+interval **−1.6 to +10.9 points**. Local-deck and native-asset report
+comparisons passed for both Tactical deck pairs. The ignored reports are
+`.cache/goat-ai/frozen_vs_online_ppo_phoenix_*.json`,
+`.cache/goat-ai/frozen_ppo_vs_parent_phoenix_*.json`, and the matched
+`*_ppo_vs_tactical_phoenix_*.json` files. All evaluations used
+`--engine experimental --both-deck-assignments --require-unseen-main-decks
+--max-decisions 3000`. The new timing has no established strength gain, and
+neither PPO child is promoted.

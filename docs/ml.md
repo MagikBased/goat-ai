@@ -467,3 +467,16 @@ rejected. Reviewer-only hidden-card sidecars never enter this path. Training
 still needs held-out, matched competitive checks before any child checkpoint
 becomes the reference. The first post-patch experiment did **not** meet that
 gate; see [evaluation](evaluation.md#automated-visible-rule-preference-experiment-27-october-2026).
+
+### Frozen moving baseline within a PPO rollout
+
+Multi-duel PPO already collects several games under one frozen policy.
+`--ppo-baseline-timing frozen_rollout` now optionally snapshots the moving
+global or learner-deck return baseline at the start of that rollout, so all
+games in the batch calculate advantages against the same prior estimate.
+The default `online` mode continues updating the baseline between games.
+The snapshot changes only learning weights; it reads no extra simulator state.
+The checkpoint stores the selected timing. Native tests confirm identical
+trajectories and updates across serial, worker, and batched-inference paths
+for both modes. The first held-out comparison did not establish a playing-
+strength gain; see [evaluation](evaluation.md#frozen-rollout-baseline-ablation-27-october-2026).

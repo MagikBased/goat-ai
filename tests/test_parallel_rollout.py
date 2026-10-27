@@ -18,7 +18,8 @@ REVERSE = ROOT / "examples/decks/vanilla_reverse.ydk"
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_worker_count_preserves_rollout_trajectories_and_update():
+@pytest.mark.parametrize("baseline_timing", ["online", "frozen_rollout"])
+def test_worker_count_preserves_rollout_trajectories_and_update(baseline_timing):
     native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     vocabulary = CardVocabulary.from_goat_whitelist(
         native_root / "banlist/GOAT.lflist.conf")
@@ -32,6 +33,7 @@ def test_worker_count_preserves_rollout_trajectories_and_update():
             model, vocabulary, ((str(VANILLA), str(REVERSE)),),
             (90000, 90001), partial(RestrictedOcgcoreEngine, native_root),
             policy_update="clipped_ppo", ppo_rollout_games=2,
+            ppo_baseline_timing=baseline_timing,
             rollout_workers=workers, rollout_batch_inference=batch_inference,
             snapshot_every=2,
             ppo_epochs=1, ppo_batch_size=8, historical_probability=0.5,
