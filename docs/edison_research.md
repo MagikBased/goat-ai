@@ -243,6 +243,10 @@ Synchros including Stardust Dragon, Black Rose Dragon, Brionac, Goyo Guardian,
 and Dark Strike Fighter. Metadata presence does not validate 2010 scripts,
 errata, release dates, or rulings. The present GOAT deck validator allows only
 Fusion monsters in the Extra Deck and must not be reused for Edison.
+Dark Strike Fighter is explicitly **Forbidden** on the
+[March 2010 Advanced list](https://www.yugioh-card.com/en/downloads/alt_format/2010-03-01.pdf),
+so its original effect is not a playable Edison regression priority even
+though the pinned database contains the card.
 
 The pinned core exposes `DUEL_MODE_MR1`, `DUEL_MODE_MR2`, and `DUEL_MODE_GOAT`
 in `ocgapi_constants.h`, but no Edison mode. `DUEL_MODE_MR1` includes obsolete
