@@ -176,6 +176,7 @@ def _sample_legal_action_with_features(
     model: LegalActionPolicy, vocabulary: CardVocabulary,
     observation, legal_actions, generator: torch.Generator,
     temperature: float = 1.0,
+    scorer: Callable[[DecisionFeatures], torch.Tensor] | None = None,
 ) -> tuple[Action, DecisionFeatures | None]:
     """Sample from visible legal options, with no native-state access."""
     if temperature <= 0:
@@ -187,10 +188,41 @@ def _sample_legal_action_with_features(
     features = encode_decision(observation, legal_actions, vocabulary, model.feature_version)
     device = next(model.parameters()).device
     with torch.inference_mode():
-        logits = model(features.to(device)) / temperature
+        logits = (scorer(features.to(device)) if scorer is not None
+                  else model(features.to(device))) / temperature
         probabilities = torch.softmax(logits, dim=0).cpu()
         index = int(torch.multinomial(probabilities, 1, generator=generator).item())
     return legal_actions[index], features
+
+
+class _FlatPolicy(nn.Module):
+    """Expose the existing scorer's tensor inputs to TorchScript tracing."""
+
+    def __init__(self, model: LegalActionPolicy) -> None:
+        super().__init__()
+        self.model = model
+
+    def forward(self, *inputs: torch.Tensor) -> torch.Tensor:
+        return self.model(DecisionFeatures(*inputs))
+
+
+class TracedRolloutScorer:
+    """Trace a frozen policy once, on its first player-visible decision."""
+
+    def __init__(self, model: LegalActionPolicy) -> None:
+        if model.feature_version != 23 or model.training:
+            raise ValueError("traced rollout inference requires an eval-mode v23 policy")
+        self.model = model
+        self.traced = None
+
+    def __call__(self, features: DecisionFeatures) -> torch.Tensor:
+        inputs = tuple(features.__dict__.values())
+        if self.traced is None:
+            self.traced = torch.jit.trace(_FlatPolicy(self.model), inputs,
+                                          check_trace=False)
+            if not torch.equal(self.model(features), self.traced(*inputs)):
+                raise RuntimeError("traced policy changed initial action scores")
+        return self.traced(*inputs)
 
 
 class SamplingPolicyAgent:
@@ -211,11 +243,14 @@ def run_learning_episode(
     engine_factory: Callable[[], RulesEngine], generator: torch.Generator,
     max_decisions: int = 5000, learner_temperature: float = 1.0,
     collect_features: bool = False,
+    rollout_scorer: TracedRolloutScorer | None = None,
 ) -> EpisodeResult:
     if learner_seat not in (0, 1) or max_decisions < 1 or learner_temperature <= 0:
         raise ValueError("invalid learner seat or decision cap")
     records = []
     learner_features = []
+    if rollout_scorer is not None:
+        model.eval()
     with GoatEnvironment(*decks, seed=seed, engine=engine_factory()) as env:
         observation = env.reset()
         for count in range(1, max_decisions + 1):
@@ -223,7 +258,7 @@ def run_learning_episode(
             if observation.acting_player == learner_seat:
                 action, features = _sample_legal_action_with_features(
                     model, vocabulary, observation, legal_actions, generator,
-                    temperature=learner_temperature)
+                    temperature=learner_temperature, scorer=rollout_scorer)
                 if len(legal_actions) > 1:
                     records.append(DecisionRecord(observation, legal_actions, action))
                     if collect_features:
@@ -644,6 +679,7 @@ def train_against_snapshot_pool(
     ppo_baseline_timing: str = "online",
     rollout_workers: int = 0,
     rollout_batch_inference: bool = False,
+    trace_rollout_inference: bool = False,
     reuse_rollout_features: bool = False,
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
@@ -692,6 +728,12 @@ def train_against_snapshot_pool(
             or ppo_rollout_games < 2 or skip_capped_games
             or skip_unsupported_games or baseline_scope == "state_value"):
         raise ValueError("batched inference needs multi-duel PPO without workers or skips")
+    if trace_rollout_inference and (model.feature_version != 23
+                                    or policy_update != "clipped_ppo"
+                                    or ppo_rollout_games < 2
+                                    or rollout_workers or rollout_batch_inference):
+        raise ValueError("traced rollout inference needs single-process v23 "
+                         "multi-duel PPO")
     if reuse_rollout_features and (policy_update != "clipped_ppo" or rollout_workers):
         raise ValueError("rollout feature reuse needs single-process PPO")
     if (policy_update == "clipped_ppo" and
@@ -722,9 +764,14 @@ def train_against_snapshot_pool(
     pool = (ProcessPoolExecutor(max_workers=min(rollout_workers, ppo_rollout_games),
                                 mp_context=get_context("spawn"))
             if rollout_workers > 1 else None)
+    rollout_scorer = None
     try:
         parallel_batch: dict[int, tuple[EpisodeResult, str]] = {}
         for index, (seed, decks, learner_seat) in enumerate(schedule):
+            if (trace_rollout_inference and not rollout_workers
+                    and index % ppo_rollout_games == 0):
+                model.eval()
+                rollout_scorer = TracedRolloutScorer(model)
             if ppo_baseline_timing == "frozen_rollout" and index % ppo_rollout_games == 0:
                 rollout_baselines = baselines.copy()
             if (rollout_workers or rollout_batch_inference) and index % ppo_rollout_games == 0:
@@ -798,6 +845,8 @@ def train_against_snapshot_pool(
                     episode = run_learning_episode(model, vocabulary, opponent, decks, seed,
                                                    learner_seat, engine_factory, generator,
                                                    max_decisions, learner_temperature,
+                                                   **({"rollout_scorer": rollout_scorer}
+                                                      if trace_rollout_inference else {}),
                                                    **({"collect_features": True}
                                                       if reuse_rollout_features else {}))
                 except EpisodeDecisionLimit:

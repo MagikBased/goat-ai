@@ -1410,6 +1410,13 @@ replay-verified. A separate four-versus-eight worker scaling check found only
 about 1–4% shorter trainer time with eight workers on two 16-duel schedules.
 Prioritize a measured reduction in policy-inference overhead before adding
 more rollout workers; see [the longer profile and scaling check](benchmarks.md#longer-single-process-ppo-profile).
+An opt-in feature-v23 TorchScript trace now reuses frozen scorer operations
+across each single-process multi-duel PPO rollout. Two matched 16-duel runs
+saved about 4–6% of complete trainer time, with byte-identical replays and
+equal model tensors; the traced second group's 7,179 decisions replay-verified
+and passed the visibility audit. Four process workers remain faster on the
+separate measured CPU workload, so tracing is not the default. See the
+[trace benchmark](benchmarks.md#reused-torchscript-trace-for-frozen-ppo-rollout-inference).
 
 Clipped PPO with frozen-parent KL now caches parent action probabilities once
 per recorded decision instead of recomputing them in each epoch. One matched

@@ -166,6 +166,49 @@ This is too small a local gain to establish eight workers as the default.
 The ignored reports, checkpoints, and replay folders have `worker4_23800_16`,
 `worker8_23800_16`, `worker4_23820_16`, and `worker8_23820_16` prefixes.
 
+### Reused TorchScript trace for frozen PPO rollout inference
+
+An opt-in `--trace-rollout-inference` path traces the feature-v23 learner
+scorer on its first visible decision and reuses that trace for every duel in
+the same frozen, single-process multi-duel PPO rollout. The policy update
+still uses the ordinary eager model and original feature tensors. A fresh
+trace is made after the next policy update. It is currently restricted to
+feature version 23, clipped PPO with at least two games per rollout, and no
+process workers or batched rollout inference.
+
+On 400 varied multi-option decisions from recorded sourced-deck duels, traced
+and eager scorers returned exactly equal logits. Two warm CPU passes took
+0.349/0.349 seconds eager and 0.151/0.150 seconds traced; this excludes
+feature encoding, trace construction, simulator work, and updates. Tracing
+once **per duel** made complete 16-duel training slower (13.815 versus
+13.115 seconds eager), so the retained path reuses one trace per frozen PPO
+rollout.
+
+The complete-training comparisons below used the feature-v23 parent, sourced
+Goat Control/Warrior decks, one Torch CPU thread, four-game PPO rollouts, two
+epochs, batch size 16, and an Intel Core i7-10700K. Run order was reversed
+between seed groups.
+
+| Seeds; order | Total / learner decisions | Eager trainer time | Reused trace trainer time |
+| :--- | ---: | ---: | ---: |
+| 23900–23915; eager then trace | 9,080 / 1,633 | 13.115 s | 12.566 s |
+| 23920–23935; trace then eager | 7,179 / 1,351 | 11.018 s | 10.392 s |
+
+Within each group, all 16 replay files were byte-identical and all 38 model
+tensors were exactly equal. The traced second group's 7,179 decisions passed
+native replay verification and the player-visibility audit. The observed
+complete-training saving was about 4–6% on these two schedules. This does not
+establish a gain for other policy versions, worker counts, hardware, or
+playing strength; the faster four-worker CPU rollout setting remains a
+separate option. PyTorch's GRU emits shape-check tracer warnings, so this
+path remains opt-in and has an additional two-duel native equality test.
+
+The ignored reports, checkpoints, and replay folders have `trace_ref_23900_16`,
+`trace_reuse_23900_16`, `trace_ref_23920_16`, and `trace_reuse_23920_16`
+prefixes. Reproduce one arm with the documented 16-game PPO profile command,
+seed 23900 or 23920, a fresh output path, and `--trace-rollout-inference`
+for the traced arm; omit that flag for the eager arm.
+
 ## Reusing visible PPO features from rollout (27 October 2026)
 
 The opt-in `--reuse-rollout-features` path retains the learner's already

@@ -48,6 +48,7 @@ from goat_ai.training.on_policy_teacher import (
 from goat_ai.training.policy import ACTION_KINDS
 from goat_ai.training.self_play import (
     EpisodeDecisionLimit,
+    TracedRolloutScorer,
     VisibleStateValue,
     clipped_surrogate,
     episode_schedule,
@@ -117,6 +118,28 @@ def actions() -> tuple[Action, ...]:
     return (Action("native-0", "normal_summon", 0, {"code": 10, "location": 2}),
             Action("native-1", "set_monster", 0, {"code": 10, "location": 2}),
             Action("native-2", "end_phase", 0))
+
+
+def test_traced_rollout_scores_varying_legal_action_counts_exactly():
+    vocabulary = CardVocabulary((10,), ((10, 1, 300),))
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=23).eval()
+    scorer = TracedRolloutScorer(model)
+    with torch.inference_mode():
+        for legal in (actions(), actions()[:2], actions()[1:]):
+            features = encode_decision(view(), legal, vocabulary, 23)
+            assert torch.equal(scorer(features), model(features))
+    with pytest.raises(ValueError, match="eval-mode v23"):
+        TracedRolloutScorer(LegalActionPolicy(vocabulary.size, width=8,
+                                              feature_version=23))
+
+
+def test_traced_rollout_requires_supported_training_schedule():
+    vocabulary = CardVocabulary((10,), ((10, 1, 300),))
+    policy = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    with pytest.raises(ValueError, match="single-process v23 multi-duel PPO"):
+        train_against_snapshot_pool(
+            policy, vocabulary, (("a", "b"),), (1,), lambda: None,
+            trace_rollout_inference=True)
 
 
 def test_on_policy_teacher_labels_only_checkpoint_policy_seat():

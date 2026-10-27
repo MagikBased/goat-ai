@@ -50,6 +50,34 @@ def test_worker_count_preserves_rollout_trajectories_and_update(baseline_timing)
                    for name in serial[2])
 
 
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_traced_v23_rollout_preserves_native_duels_and_update():
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    vocabulary = CardVocabulary.from_goat_whitelist(
+        native_root / "banlist/GOAT.lflist.conf", native_root=native_root)
+    torch.manual_seed(79)
+    initial = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    results = []
+    for traced in (False, True):
+        model = copy.deepcopy(initial)
+        episodes = []
+        reports = train_against_snapshot_pool(
+            model, vocabulary, ((str(VANILLA), str(REVERSE)),),
+            (90020, 90021), partial(RestrictedOcgcoreEngine, native_root),
+            policy_update="clipped_ppo", ppo_rollout_games=2,
+            trace_rollout_inference=traced, snapshot_every=2,
+            ppo_epochs=1, ppo_batch_size=8, historical_probability=0.5,
+            max_decisions=2000, random_seed=79,
+            record_episode=lambda _, episode, sink=episodes: sink.append(episode),
+        )
+        assert len(episodes) == 2
+        assert all(report["status"] == "terminal" for report in reports)
+        results.append((reports, episodes, model.state_dict()))
+    assert results[0][:2] == results[1][:2]
+    assert all(torch.equal(results[0][2][name], results[1][2][name])
+               for name in results[0][2])
+
+
 def test_parallel_rollout_requires_multi_game_ppo():
     vocabulary = CardVocabulary((1,))
     model = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)

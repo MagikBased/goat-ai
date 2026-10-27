@@ -87,6 +87,8 @@ def main() -> None:
                         help="opt-in independent CPU processes per frozen PPO rollout; 0 preserves prior sampling")
     parser.add_argument("--rollout-batch-inference", action="store_true",
                         help="opt-in single-process native PPO duels with batched learner inference")
+    parser.add_argument("--trace-rollout-inference", action="store_true",
+                        help="opt-in TorchScript tracing of each frozen v23 learner rollout")
     parser.add_argument("--reuse-rollout-features", action="store_true",
                         help="opt-in single-process PPO reuse of learner features during the update")
     parser.add_argument("--ppo-rollout-weighting", choices=("per_decision", "per_episode"),
@@ -216,6 +218,7 @@ def main() -> None:
         ppo_rollout_games=args.ppo_rollout_games,
         rollout_workers=args.rollout_workers,
         rollout_batch_inference=args.rollout_batch_inference,
+        trace_rollout_inference=args.trace_rollout_inference,
         reuse_rollout_features=args.reuse_rollout_features,
         ppo_rollout_weighting=args.ppo_rollout_weighting,
         ppo_baseline_timing=args.ppo_baseline_timing,
@@ -270,6 +273,7 @@ def main() -> None:
                                     if args.policy_update == "clipped_ppo" else None),
               "rollout_workers": args.rollout_workers,
               "rollout_batch_inference": args.rollout_batch_inference,
+              "trace_rollout_inference": args.trace_rollout_inference,
               "reuse_rollout_features": args.reuse_rollout_features,
               "ppo_rollout_weighting": (args.ppo_rollout_weighting
                                         if args.policy_update == "clipped_ppo" else None),

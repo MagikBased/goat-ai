@@ -614,7 +614,7 @@ class LegalActionPolicy(nn.Module):
         if self.feature_version >= 18:
             source = (features.chain_cards[-1, 0] if chain_source is None
                       else chain_source)
-            source_embedding = self.card(source).expand(len(action), -1)
+            source_embedding = self.card(source).expand(action.shape[0], -1)
             target_embedding = self.card(features.action_cards)
             action = action + self.source_target_pair(torch.cat(
                 (source_embedding, target_embedding), dim=1)) * (source != 0)
@@ -637,7 +637,7 @@ class LegalActionPolicy(nn.Module):
             matched = (multi_match.to(visible.dtype) @ visible)
             multi_mask = (multi_slots[:, :, 1] != 0).unsqueeze(-1)
             action = action + (matched * multi_mask).sum(1) / multi_mask.sum(1).clamp(min=1)
-        logits = self.score(torch.cat((state.expand(len(action), -1), action), dim=1)).squeeze(1)
+        logits = self.score(torch.cat((state.expand(action.shape[0], -1), action), dim=1)).squeeze(1)
         if self.feature_version >= 25:
             trade = features.action_numbers[:, -3] * 5
             present = features.action_numbers[:, -1]

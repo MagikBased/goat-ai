@@ -371,6 +371,14 @@ neither PPO mode is evidence of superhuman play. The original REINFORCE path
 remains the default. The controlled native comparisons are in
 [evaluation](evaluation.md).
 
+For a feature-v23 checkpoint on one CPU process, `--trace-rollout-inference`
+can reduce repeated scorer overhead during multi-duel clipped PPO. It needs
+`--ppo-rollout-games` of at least two, keeps one trace only while policy weights
+are frozen, and leaves the optimizer on eager PyTorch. It cannot be combined
+with rollout workers or batched rollout inference. Two matched 16-duel runs
+saved about 4–6% of complete trainer time with identical replays and model
+tensors; see [the measured comparison](benchmarks.md#reused-torchscript-trace-for-frozen-ppo-rollout-inference).
+
 ## Ordered-chain feature check
 
 A feature-version-10 checkpoint trained on the same 4,630 replay-verified teacher decisions as version 9 won 20–11 with one draw in 32 paired, seat-swapped duels on sourced Chaos Return and Warrior lists. On separate held-out teacher decisions with a nonempty chain and multiple legal actions, it matched 116/135 choices versus version 9's 114/135; overall teacher agreement was slightly lower (4,073/4,139 versus 4,075/4,139). The small tournament and mixed agreement result are recorded in [the evaluation log](evaluation.md); they do not establish a general strength gain or isolate chain-order encoding from model-capacity changes.
