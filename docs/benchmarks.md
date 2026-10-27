@@ -33,6 +33,27 @@ ignored comparison and replay audit are under `.cache/goat-ai/` with
 `ocgcore_probe._view_card = ocgcore_probe._view_card.__wrapped__` before running
 the same trainer arguments; the cached arm uses the decorated function.
 
+Two further eight-duel comparisons used separate Python processes and the
+same parent, decks, PPO settings, and one Torch thread. Both arms in the
+second row used the same launcher and differed only in whether it assigned
+the undecorated reference function before loading the trainer. All **16
+cached trajectories** replay-verified and passed the visibility audit. Within
+each seed group, cached and reference trajectories were byte-identical and
+all 38 checkpoint tensors were exactly equal.
+
+| Seeds; run order | Decisions | Reference trainer time | Cached trainer time | Reference peak RSS | Cached peak RSS |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| 23600–23607; cached, reference | 4,910 | 8.132 s | 7.540 s | 352,952 KiB | 338,640 KiB |
+| 23610–23617; reference, cached | 4,062 | 7.008 s | 6.584 s | 347,972 KiB | 337,924 KiB |
+
+The 6–7% trainer-time saving is observed for these two schedules, not a
+general throughput estimate. `/usr/bin/time` measured separate whole-process
+wall times of 9.54/8.88 seconds and 8.39/7.92 seconds
+(reference/cached). Peak RSS was lower for the cached process in both runs,
+but two samples cannot isolate cache memory cost from allocator and process
+variation. Raw reports, time files, and the 16-replay audit are ignored under
+`.cache/goat-ai/` with `card_view_*_23600` and `card_view_*_23610` prefixes.
+
 The pure projection has a unit regression that changes viewer, zone sequence,
 position, and attack while checking both redaction and cache separation. The
 native observation, environment, and visibility test group passed **23 tests**.
