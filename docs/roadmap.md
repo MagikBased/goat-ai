@@ -1114,8 +1114,11 @@ their differences must be adjudicated before a complete release whitelist can
 be used. See [the regional scope audit](edison_research.md#regional-scope-of-the-historical-target).
 An archived March 2010 Konami notice now directly establishes that newly
 introduced Duel Terminal cards required another product release before they
-were tournament legal. Three dated DT01 examples are excluded at the Edison
-cutoff; the other DT01 candidate discrepancies still need individual checks.
+were tournament legal. All 28 API-only DT01 candidates have now been checked
+against their official English TCG card pages: each first listed non-DT01
+printing is after the April 20 cutoff. Their dated source table is a partial
+release exclusion asset, not a complete Edison whitelist; six other API-only
+discrepancies and regional promotional cards remain open.
 The MR1 Synchro probe now applies a checksum-guarded in-memory correction for
 Goyo Guardian's period generic-Tuner material text. Paired seed-5 duels use a
 non-EARTH Tuner, accept or decline its battle recruitment effect, reach

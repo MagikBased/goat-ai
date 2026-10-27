@@ -130,9 +130,25 @@ has its next listed print in the 1 June 2010 Starter Deck; and [Mist Valley
 Watcher](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7815&ope=2&request_locale=en)
 has its next listed print in *Gold Series 3* on 23 June. All three dates are
 after the April 20 cutoff. These three are excluded under the contemporary
-North American tournament policy. The remaining DT01 candidate IDs still
-need first-print and qualifying-reprint checks; presence in DT01 alone does
-not prove exclusion.
+North American tournament policy.
+
+The [28-card DT01 exclusion evidence table](../configs/historical/edison_dt01_new_card_exclusions_2010_04_20.tsv)
+records every identified API-only card with a DT01 printing, its official
+Konami card-page link, that printing's date and code, and its earliest listed
+non-DT01 print. All 28 exact-name card pages loaded successfully in the
+English TCG database; every earliest listed non-DT01 date is **later than
+20 April 2010** (the earliest is 11 May). Under Konami's March 2010 notice,
+these 28 newly introduced cards are excluded from the historical North
+American Edison pool. The table's SHA-256 is
+`ef2b63abe3fcf911e78065202f68b98dc88a6566cbfb96066d7e3ade980d0499`.
+The parsed official-page audit remains in ignored local cache at
+`.cache/goat-ai/edison_dt1_official_cards_20261027.json` (SHA-256
+`b8400272621ddcf9f3340f92cb3f991fef992ef3990a23a2f957a0ee1f0e1fbd`).
+The raw HTML is not redistributed. This is a bounded source check of 28
+cards, not proof that the entire Edison release pool is complete or that a
+current card record cannot omit an old regional printing. The other six
+named API-only discrepancies and the two community-only promotional cards
+still need separate adjudication.
 
 The ignored report is
 `.cache/goat-ai/edison_pool_candidate_comparison_20261027.json` (SHA-256
