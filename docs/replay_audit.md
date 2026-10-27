@@ -1,5 +1,63 @@
 # Early replay decision audit
 
+## Held-out neural losses: unused Thunder Dragon (27 October 2026)
+
+The feature-v25 resource-trade head lost a Dimension Fusion/Phoenix duel to
+Tactical v14 at seed 17008. At viewer frame **11**, it ended turn one while a
+Thunder Dragon activation was legal, one copy was visible in its hand, and
+its initial Main Deck contained three copies. Tactical v14 preferred the
+activation at that same player-visible state. The replay reviewer now flags
+this as `end_turn_with_activatable_thunder_dragon`; it is a candidate for
+review, not a claim that every delayed Thunder Dragon activation is wrong.
+The recorded policy never activated that copy before it left the hand.
+The 482-decision source duel and all 227 policy choices verified against the
+native engine and saved checkpoint. The ignored v25 audit is
+`.cache/goat-ai/fv25_df_vs_phoenix_tactical_17008_audit_v2.json` (SHA-256
+`3966cf9b073c4327e22a7d23c4f92a95941ccb5b343ec543317dd01e04a3df84`).
+
+To check whether this was isolated, the unchanged feature-v23 parent played
+Tactical v14 on previously unseen Dimension Fusion/Phoenix and Bazoo/Michael
+Main Deck pairings, both policy seats, seeds 17110–17111. All **eight** duels
+completed, all **3,495** decisions replay-verified, and visibility and greedy
+choice audits passed. The policy lost all eight; this small selected schedule
+is diagnostic and does not estimate its general win rate. The review shortlist
+returned **nine** candidates: three separate turn endings with an activatable
+Thunder Dragon, two weak Flip monsters Normal Summoned with a Set available,
+and one each for Nobleman targeting only an own Set monster, Chaos Sorcerer
+targeting itself with an enemy option, an empty Thunder Dragon search with
+copies available, and Tribe-Infecting Virus naming a race that hit only its
+own monster. These are observable choices to inspect, not automatic labels
+for neural training. In particular, the current model's omission of Thunder
+Dragon occurred across multiple turns of one game, while the other two
+pairings did not show this exact end-turn pattern.
+
+The ignored collection manifest is
+`.cache/goat-ai/fv23_heldout_loss_audit_17110_17111/manifest.json` (SHA-256
+`0c7f6c13e28adc72f9b69b0721b10354873b75349b0601ba6cfece39ad354ebd`),
+and its audit is in the same directory (SHA-256
+`638c46730cada910d51847f6c7643bb9a43eca52389f39bfa9eb1bec7d2d50d8`).
+Reproduce the source games and audit from the repository root with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --matchup examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk examples/decks/phoenix_control_roberto_martinez_new_jersey_2005.ydk \
+  --matchup examples/decks/bazoo_return_weirdchamp_worlds.ydk examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --seed 17110 --seeds 2 --workers 4 --opponent tactical \
+  --output-dir .cache/goat-ai/fv23_heldout_loss_audit_17110_17111
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_replays.py \
+  .cache/goat-ai/fv23_heldout_loss_audit_17110_17111/matchup_*.json \
+  --checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/fv23_heldout_loss_audit_17110_17111/audit.json
+```
+
+Use a fresh output directory when rerunning; the collector rejects a
+nonempty directory to protect the original trajectories. A useful next
+policy experiment should include
+verified examples from several deck families, separate development from
+held-out decks and seeds, and test whether correcting these choices changes
+actual match outcomes against Tactical.
+
 Review each agent's decisions from its own player-visible observation and legal
 actions. The replay viewer's reviewer reveals are for human diagnosis only; they
 must never feed a policy or a baseline. Viewer frames below are one-based; JSON

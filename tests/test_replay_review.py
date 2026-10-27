@@ -209,6 +209,22 @@ def test_shortlist_flags_thunder_order_empty_search_and_flip_metamorphosis():
     assert found[1].evidence == {"maximum_selectable_copies": 2}
 
 
+def test_shortlist_flags_unused_activatable_thunder_only_at_own_turn_end():
+    thunder = 504700054
+    hand_card = CardView(0, "hand", "hidden", thunder)
+    available = Action("thunder", "activate", 0, {"code": thunder})
+    end = Action("end", "end_phase", 0)
+    battle = Action("battle", "battle_phase", 0)
+    own = replace(view(), hand=(hand_card,), own_main_deck=(thunder,) * 3)
+    found = review_candidates(policy(record(own, end, available)))
+    assert [(candidate.viewer_frame, candidate.category) for candidate in found] == [
+        (1, "end_turn_with_activatable_thunder_dragon")]
+    assert found[0].evidence == {"thunder_in_hand": 1, "initial_thunder_copies": 3}
+    assert review_candidates(policy(record(own, battle, available))) == ()
+    assert review_candidates(policy(record(replace(own, turn_player=1), end,
+                                           available))) == ()
+
+
 def test_opponent_review_keeps_bls_and_solemn_findings_separate():
     bls, goat, solemn = 504700118, 504700123, 41420027
     self_target = Action("self", "select_card", 1,
