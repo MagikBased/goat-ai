@@ -160,6 +160,70 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/compare_value_archit
   --output .cache/goat-ai/fixed_policy_resource_transfer_44000_47403.json
 ```
 
+## Fixed-policy resource regression check (27 October 2026)
+
+The earlier six-input resource network underfit on the shared two-epoch Adam
+schedule. A separate closed-form ridge regression now uses the same six
+player-visible differences: Life Points, hand count, monster count, backrow
+count, Deck count, and turn. Each duel has equal total weight regardless of
+its number of sampled decisions. The six inputs are standardized using only
+training games, the intercept is unpenalized, and the fixed coefficient
+penalty is `0.1` per training game. Predictions are clipped to the legal
+terminal-return range of −1 to +1. No hidden identities, future outcome, or
+opponent Deck order enter a prediction.
+
+The frozen feature-v23 policy supplied 48 training duels (seeds 44000–44011)
+and 16 held-out duels (44012–44015) from the prior corpus. A new
+16-duel transfer check used the Guide Dimension Fusion Turbo and Rhymus Lizo
+Goat Control decks in both assignments and policy seats, seeds 48100–48103.
+Both Main Deck compositions are absent from the policy checkpoint's
+training games. The new collection recorded **7,402 decisions**. The
+comparison independently native replay-verified and visibility-audited all
+**39,131 decisions** across 80 duels, and sampled 768 training, 256 held-out,
+and 256 transfer decisions with multiple legal actions.
+
+| Predictor | Held-out seed MSE | New pairing MSE |
+| --- | ---: | ---: |
+| Constant training-return mean | 0.866 | 0.637 |
+| v1 embedding critic | 1.151 | 0.698 |
+| v2 embedding critic | 1.169 | 0.705 |
+| Two-epoch resource network | 1.309 | 1.412 |
+| Closed-form resource ridge | **0.692** | **0.572** |
+
+The ridge-minus-constant paired bootstrap 95% interval was **−0.424 to
++0.056** on held-out seeds and **−0.292 to +0.099** on the new pairing.
+The point estimates favor the ridge baseline, but both intervals include
+zero. This is a retrospective outcome-prediction diagnostic on only 16 games
+per check, not evidence of a stronger playing policy or of causal value for
+the six features. Keep the current self-play baseline unchanged; an opt-in
+ridge-baseline ablation needs a larger independent schedule and held-out
+competitive matches before promotion.
+
+The ignored new collection manifest SHA-256 is
+`4ab7476326cac52628822f80ecf0a43f6309d63256c25799304e6fd0fdb78c72`;
+the ignored comparison report SHA-256 is
+`e828e8aee472fa4dee656b06ac4b6c628384ee20758212d1f32191a5a6080b95`.
+Reproduce after the 64-game fixed-policy collection above with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --matchup examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+            examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk \
+  --matchup examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk \
+            examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+  --seed 48100 --seeds 4 --workers 4 \
+  --output-dir .cache/goat-ai/fixed_policy_value_dimension_rhymus_48100_48103
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/compare_value_architectures.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/fixed_policy_value_44000_44015 \
+  --corpus-source policy_evaluation \
+  --independent-replay-dir .cache/goat-ai/fixed_policy_value_dimension_rhymus_48100_48103 \
+  --train-games 48 --max-records-per-game 16 --epochs 2 --width 32 \
+  --learning-rate 0.001 --seed 171 \
+  --output .cache/goat-ai/fixed_policy_resource_ridge_44000_48103.json
+```
+
 ## Visible-state critic architecture transfer check (27 October 2026)
 
 The original opt-in Monte Carlo critic (v1) averages all visible card

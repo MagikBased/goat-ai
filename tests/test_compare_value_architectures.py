@@ -3,7 +3,12 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from scripts.compare_value_architectures import VisibleResourceValue, selected_records
+from scripts import compare_value_architectures as critic_comparison
+from scripts.compare_value_architectures import (
+    VisibleResourceValue,
+    fit_resource_ridge,
+    selected_records,
+)
 
 
 def _record(seat: int, options: int = 2):
@@ -58,3 +63,17 @@ def test_resource_value_uses_visible_counts_without_hidden_card_identity() -> No
     model = VisibleResourceValue()
     assert torch.equal(model.forward_batch([features]),
                        model.forward_batch([concealed]))
+
+
+def test_resource_ridge_weights_complete_games_equally(monkeypatch) -> None:
+    monkeypatch.setattr(critic_comparison, "encode_decision",
+                        lambda observation, *_: observation)
+    features = SimpleNamespace(
+        state_numbers=torch.tensor([0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0]),
+        state_cards=torch.tensor([[0, 0, 0, 0]]),
+    )
+    record = SimpleNamespace(observation=features, legal_actions=(1, 2))
+    games = (((record,) * 4, 1.0), ((record,), -1.0))
+    mse, coefficients = fit_resource_ridge(games, None, 23)
+    assert abs(coefficients[-1]) < 1e-12
+    assert mse(games) == (1.0, 1.0)

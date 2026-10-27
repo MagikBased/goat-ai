@@ -1766,6 +1766,12 @@ reviewed action values and better credit assignment, rather than treating
 training-game win rate as progress. See
 [evaluation](evaluation.md#longer-lower-kl-ppo-continuation-27-october-2026).
 
+A closed-form visible-resource ridge baseline now beats a constant
+training-return prediction in point estimate on both held-out seeds and a
+new unseen-Main-Deck pairing, but both 16-game paired intervals cross zero.
+It remains an outcome-prediction diagnostic; no self-play policy gain has
+been shown. See [the fixed-policy check](evaluation.md#fixed-policy-resource-regression-check-27-october-2026).
+
 An opt-in leave-one-out PPO baseline now uses other terminal duels from the
 same rollout and learner deck to reduce return variance without consulting
 the acting agent's hidden state. A matched 32-game ablation replay-verified

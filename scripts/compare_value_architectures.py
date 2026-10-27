@@ -13,6 +13,7 @@ from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
+from goat_ai.training.policy import encode_decision
 from goat_ai.training.self_play import (
     VisibleStateValue,
     predict_state_values,
@@ -45,6 +46,46 @@ class VisibleResourceValue(torch.nn.Module):
     def forward_batch(self, decisions):
         return self.value(torch.stack([self._resources(item) for item in decisions])
                           ).squeeze(1)
+
+
+def fit_resource_ridge(games, vocabulary, feature_version, penalty: float = 0.1):
+    """Fit six visible features with equal game weight and fixed L2 shrinkage."""
+    if not games or penalty <= 0:
+        raise ValueError("resource ridge needs games and positive shrinkage")
+
+    def rows(records):
+        return torch.stack([
+            VisibleResourceValue._resources(encode_decision(
+                record.observation, record.legal_actions, vocabulary,
+                feature_version)).double()
+            for record in records])
+
+    game_rows = [rows(records) for records, _ in games]
+    x = torch.cat(game_rows)
+    y = torch.cat([torch.full((len(records),), target, dtype=torch.float64)
+                   for records, target in games])
+    weight = torch.cat([torch.full((len(records),), 1 / len(records),
+                                   dtype=torch.float64)
+                        for records, _ in games])
+    mean = (x * weight[:, None]).sum(0) / weight.sum()
+    scale = ((x - mean).square() * weight[:, None]).sum(0).div(
+        weight.sum()).sqrt().clamp(min=1e-6)
+    z = torch.cat(((x - mean) / scale, torch.ones((len(x), 1), dtype=x.dtype)), 1)
+    regularizer = torch.diag(torch.tensor([penalty * len(games)] * 6 + [0.0],
+                                          dtype=x.dtype))
+    coefficients = torch.linalg.solve(z.T @ (weight[:, None] * z) + regularizer,
+                                      z.T @ (weight * y))
+
+    def mse(other_games):
+        losses = []
+        for records, target in other_games:
+            inputs = rows(records)
+            predictions = (((inputs - mean) / scale) @ coefficients[:-1]
+                           + coefficients[-1]).clamp(-1, 1)
+            losses.append(float((predictions - target).square().mean()))
+        return tuple(losses)
+
+    return mse, tuple(float(value) for value in coefficients)
 
 
 def selected_records(trajectory, limit: int, source: str = "self_play_rl"):
@@ -159,10 +200,13 @@ def main() -> None:
     holdout = games[args.train_games:len(primary_paths)]
     independent = games[len(primary_paths):]
     baseline = sum(target for _, target in train) / len(train)
-    baseline_mse = sum((target - baseline) ** 2 for _, target in holdout) / len(holdout)
-    independent_baseline_mse = (sum((target - baseline) ** 2
-                                    for _, target in independent) / len(independent)
-                                if independent else None)
+    baseline_losses = tuple((target - baseline) ** 2 for _, target in holdout)
+    independent_baseline_losses = tuple((target - baseline) ** 2
+                                        for _, target in independent)
+    baseline_mse = sum(baseline_losses) / len(baseline_losses)
+    independent_baseline_mse = (sum(independent_baseline_losses)
+                                / len(independent_baseline_losses)
+                                if independent_baseline_losses else None)
     number_width = agent.model.state_numbers[0].in_features
     scores = {}
     heldout_losses = {}
@@ -195,6 +239,19 @@ def main() -> None:
             "independent_mse_per_game": (sum(transfer_losses) / len(transfer_losses)
                                          if transfer_losses else None),
         }
+    ridge_mse, ridge_coefficients = fit_resource_ridge(
+        train, agent.vocabulary, agent.model.feature_version)
+    ridge_train = ridge_mse(train)
+    ridge_holdout = ridge_mse(holdout)
+    ridge_independent = ridge_mse(independent) if independent else ()
+    scores["resource_ridge"] = {
+        "final_training_mse_per_game": sum(ridge_train) / len(ridge_train),
+        "holdout_mse_per_game": sum(ridge_holdout) / len(ridge_holdout),
+        "independent_mse_per_game": (sum(ridge_independent) / len(ridge_independent)
+                                     if ridge_independent else None),
+        "penalty_per_training_game": 0.1,
+        "standardized_coefficients_and_intercept": ridge_coefficients,
+    }
     result = {
         "corpus_source": args.corpus_source,
         "policy_checkpoint_sha256": parent_digest,
@@ -219,6 +276,12 @@ def main() -> None:
         "v2_minus_v1_independent_mse_95pct_paired_bootstrap": (
             paired_difference_interval(independent_losses["v2"],
                                        independent_losses["v1"], args.seed)
+            if independent else None),
+        "ridge_minus_constant_holdout_mse_95pct_paired_bootstrap":
+            paired_difference_interval(ridge_holdout, baseline_losses, args.seed),
+        "ridge_minus_constant_independent_mse_95pct_paired_bootstrap": (
+            paired_difference_interval(ridge_independent,
+                                       independent_baseline_losses, args.seed)
             if independent else None),
         "scores": scores, "wall_seconds": perf_counter() - started,
     }
