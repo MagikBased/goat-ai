@@ -53,6 +53,28 @@ Gravekeepers and Cas Flip Control, both present in the checkpoint's training
 provenance. It remains local exploratory data and is excluded from this
 unseen-deck queue.
 
+The offline viewer lets a reviewer select a legal action at a linked frame,
+enter a name, authorize research use, and download a JSON label file. Validate
+each downloaded file before fitting a policy. Label controls are available
+only in the player-visible viewer mode; reviewer-only hidden-card reveals
+disable them.
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/validate_review_queue_labels.py \
+  .cache/goat-ai/broader_unseen_review_27002_27003/queue.json \
+  /path/to/downloaded_labels.json \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/broader_unseen_review_27002_27003/validated_labels.json
+```
+
+The validator checks the exact replay SHA-256, native replay, player-visible
+audit, policy-seat authorization, legal action index, and shortlist membership.
+It reports the changed-choice count and the replay/label pairs needed by
+`train_behavioral_clone.py --annotation-for`. It does not infer that the
+reviewer's action is strategically optimal. A synthetic recorded-action
+export exercised this path on one 725-decision duel; it passed verification
+and was then deleted without training.
+
 ## Four-matchup development review queue (27 October 2026)
 
 The unchanged feature-v23 reference played Tactical-v14 across four distinct
