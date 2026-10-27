@@ -1,5 +1,23 @@
 # Native benchmark log
 
+## Reusing the PPO vmap wrapper: no measured gain (27 October 2026)
+
+The four-worker PPO profile below identified 228 calls to the batched policy
+forward path in the parent process. A small follow-up tested whether creating
+the `torch.vmap` wrapper once, instead of inside every `forward_batch` call,
+would reduce that cost. It used the saved feature-v23
+`worker_bench_4a_28000.pt` checkpoint, 256 multi-option learner decisions
+from the first four `worker_bench_4a_28000_replays`, 16-decision batches, one
+Torch CPU thread, and three no-gradient passes per timed arm. The checked
+candidate batches returned exactly equal logits and legal-action masks.
+
+In baseline/candidate/candidate/baseline order, measured forward times were
+**0.2037, 0.2057, 0.1983, and 0.2024 seconds**. This short diagnostic shows
+no useful improvement from caching the wrapper; it does not measure a complete
+training run or gradients. The production scorer was left unchanged. Further
+speed work should target operations inside batched scoring and use matched
+complete-training runs before adoption.
+
 ## Preallocated PPO feature padding (27 October 2026)
 
 The policy's batched forward pass used to call `torch.nn.functional.pad` for
