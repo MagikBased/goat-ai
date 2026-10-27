@@ -7487,6 +7487,12 @@ optimization target is the per-decision observation/encoding/inference path,
 with exact trajectory and visibility checks. Replay writing is lower priority
 for this short schedule.
 
+In a separate five-repeat microbenchmark over 370 multi-option decisions
+from the first profiled duel, full feature encoding took **0.581 s** while
+building only the initial Main Deck ID tensor took **0.020 s**. Caching that
+duel-constant tensor has at most a small direct opportunity in this measured
+encoder workload; its actual whole-training benefit was not tested.
+
 The ignored profiler data, CLI report, and matching control report are
 `.cache/goat-ai/full_train_profile_23000.pstats`,
 `.cache/goat-ai/full_train_profile_23000.json`, and
@@ -7509,6 +7515,50 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python -m cProfile \
 
 Use a distinct output and replay directory for each repeat. This profile is
 diagnostic only; the four-game outcomes do not establish policy strength.
+
+### PPO rollout execution comparison (27 October 2026)
+
+The same unchanged feature-v23 parent played Jesse Goat Control versus
+Warrior on seeds 23010–23013, using one frozen four-game PPO rollout, two
+update epochs, minibatch 16, and `OMP_NUM_THREADS=1`. Three supported
+execution modes were compared in two orders: one process worker, one process
+with batched learner inference, and four process workers. Every mode and
+order produced the **same four complete trajectories**, **2,948 decisions**,
+**502 learner decisions**, and bit-identical final model tensors. The four
+one-worker source trajectories replay-verified against the pinned native
+core and passed the player-visibility audit.
+
+| Mode | Worker-first order wall time | Batch-first order wall time |
+| --- | ---: | ---: |
+| One process worker | 5.494 s | 5.282 s |
+| Batched inference | 5.792 s | 5.273 s |
+| Four process workers | 5.566 s | 4.839 s |
+
+The two orders do not establish a stable throughput winner on this four-game
+schedule. Longer multi-rollout jobs may amortize process startup differently;
+the separately measured eight-game persistent-worker comparison above showed
+a 1.23× gain for four workers on another matchup. Keep these execution modes
+opt-in until a representative larger matched training benchmark supports a
+default change. The ignored outputs have prefixes
+`.cache/goat-ai/rollout_{worker1,batch,worker4}_23010` with `_b` for the
+reversed order; the JSON reports contain deck and native asset fingerprints.
+
+Reproduce each arm with the same checkpoint and command settings below,
+changing the execution flag and output path; the first arm used
+`--rollout-workers 1`, the second `--rollout-batch-inference`, and the third
+`--rollout-workers 4`:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --seed 23010 --games 4 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 \
+  --ppo-epochs 2 --ppo-batch-size 16 --snapshot-every 4 \
+  --rollout-workers 1 --output .cache/goat-ai/rollout_worker1_23010.pt
+```
 
 ### Frozen-rollout baseline ablation (27 October 2026)
 
