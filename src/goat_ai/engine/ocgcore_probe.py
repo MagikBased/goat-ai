@@ -60,7 +60,22 @@ METAMORPHOSIS_COST_FILTER_GOAT = (
 )
 UPSTREAM_BOOK_SHA256 = "25848f596f425817a250bef9038343fbbcd482b40a0312d84c143e927b12083d"
 UPSTREAM_FIREBIRD_SHA256 = "76c351a0006682d2a31449084cb821d43e6fc5f9f0b98931cae1859d632c2600"
+UPSTREAM_GOAT_RIVALRY_SHA256 = "5da97ba11bd10b53817b9812076d51e116415fe3a5aee3d09265f08ead0fb693"
 UPSTREAM_SINISTER_SHA256 = "92886fb585816f0e4466b682a0858dd3e514b2965b556e8d72c661b1f1337ed1"
+RIVALRY_ADJUST_OLD = b"\te2:SetOperation(s.adjustop)"
+RIVALRY_ADJUST_GUARDED = b"\te2:SetCondition(s.adjustcon)\n\te2:SetOperation(s.adjustop)"
+RIVALRY_SEND_OLD = (b"\tg1:Merge(g2)\n\tif #g1>0 then\n"
+                    b"\t\tDuel.SendtoGrave(g1,REASON_RULE)\n"
+                    b"\t\tDuel.Readjust()\n\tend")
+RIVALRY_SEND_GUARDED = (b"\tg1:Merge(g2)\n\tif #g1>0 then\n"
+                        b"\t\te:SetLabel(1)\n"
+                        b"\t\tDuel.SendtoGrave(g1,REASON_RULE)\n"
+                        b"\t\tDuel.Readjust()\n"
+                        b"\t\te:SetLabel(0)\n\tend")
+RIVALRY_ADJUST_CONDITION = (
+    b"\nfunction s.adjustcon(e,tp,eg,ep,ev,re,r,rp) "
+    b"return e:GetLabel()==0 end\n"
+)
 SINISTER_STANDBY_CONDITION_OLD = b"return Duel.GetTurnPlayer()==tp and Duel.IsExistingMatchingCard"
 SINISTER_STANDBY_CONDITION_HISTORICAL = (
     b"return not e:GetHandler():IsDisabled() "
@@ -523,6 +538,18 @@ class OcgcoreProbe:
                 return 0
             contents = contents.replace(FIREBIRD_BATTLE_CONDITION_OLD,
                                         FIREBIRD_BATTLE_CONDITION_FIXED)
+        if path.relative_to(self.scripts) == Path("goat/c504700158.lua"):
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RIVALRY_SHA256 \
+                    or contents.count(RIVALRY_ADJUST_OLD) != 1 \
+                    or contents.count(RIVALRY_SEND_OLD) != 1:
+                self.errors.append("pinned GOAT Rivalry script changed; adjust guard not applied")
+                return 0
+            # Sending a mismatched Type during EVENT_ADJUST re-enters this
+            # still-running effect on the pinned core. Suppress that re-entry
+            # for this effect only; the explicit readjust then applies normally.
+            contents = (contents.replace(RIVALRY_ADJUST_OLD, RIVALRY_ADJUST_GUARDED)
+                        .replace(RIVALRY_SEND_OLD, RIVALRY_SEND_GUARDED)
+                        + RIVALRY_ADJUST_CONDITION)
         if path.relative_to(self.scripts) == Path("pre-errata/c511000818.lua"):
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_SINISTER_SHA256 \
                     or contents.count(SINISTER_STANDBY_CONDITION_OLD) != 1:

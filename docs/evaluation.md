@@ -4821,7 +4821,7 @@ gain. Neither is evidence for M4's trained-policy or self-play gate.
 
 ### Distinct whitelist-deck protocol probe
 
-#### Magical Hats Type encoding and unresolved Rivalry event (27 October 2026)
+#### Magical Hats Type encoding and Rivalry event correction (27 October 2026)
 
 A new 50-pair sweep of independently generated 40-card GOAT-whitelist decks,
 seeds 10224–10273 with distinct opponent seed offset 1,000,000, initially
@@ -4836,27 +4836,44 @@ visibility audit. [Historical Rivalry rulings](https://www.goatformat.com/ruling
 explicitly state that the Spell/Trap cards summoned by Magical Hats have no
 Type.
 
-On the corrected sweep, **49/50 duels reached terminal** and all **51,250
-decisions in those 49 duels** replay-verified and passed the legal-choice
-visibility audit. Seed 10227 still stops at decision 369 when GOAT Rivalry of
-Warlords (`504700158`) asks its controller to retain one of two face-up
-Types. Both legal Type choices reproduce the native `recursive event trigger
-detected` error. Removing the pinned script's explicit `Duel.Readjust()` in a
-temporary local experiment did not clear the error, so no script change was
-retained. This is a known protocol gap; no outcome was fabricated for that
-duel, and the 49 successes do not establish arbitrary-deck correctness.
-The ignored report is
+After the Magical Hats correction alone, **49/50 duels reached terminal** and
+all **51,250 decisions in those 49 duels** replay-verified and passed the legal-choice
+visibility audit. Before the Rivalry correction, seed 10227 stopped at
+decision 369 when GOAT Rivalry of Warlords (`504700158`) asked its controller
+to retain one of two face-up Types. Both legal Type choices reproduced the
+native `recursive event trigger detected` error. Removing the pinned script's
+explicit `Duel.Readjust()` in a temporary local experiment did not clear it.
+Suppressing the active adjust effect during its `Duel.SendtoGrave` call did:
+the core had been re-entering
+that still-running effect. The retained correction is applied in memory only
+after the original GOAT script passes an exact SHA-256 and marker check.
+Paired native tests choose either Type, check that the other monster reaches
+the Graveyard, and complete, replay-verify, and visibility-audit both duels.
+The 49 successes before this correction did not establish arbitrary-deck
+correctness. The ignored report is
 `.cache/goat-ai/random-probe-distinct-10224-10273-fixed/report.json`
 (SHA-256 `393a2d30218fcbcf549691999373527553db1407718089789a7223da3db21507`).
-Reproduce after [native setup](native_setup.md) with:
+The pre-correction report requires the earlier code revision. Reproduce the
+corrected sweep after [native setup](native_setup.md) with:
 
 ```bash
 PYTHONPATH=src:. python scripts/probe_random_decks.py \
   --native-root .cache/goat-ai \
-  --output .cache/goat-ai/random-probe-distinct-10224-10273-fixed \
+  --output .cache/goat-ai/random-probe-distinct-10224-10273-rivalry-fixed \
   --seed 10224 --seeds 50 --max-decisions 3000 \
   --distinct-opponents --verify-replays
 ```
+
+Re-running the same 50 pairs with the guarded script produced **50/50 terminal
+duels**, **52,275 replay-verified decisions**, and 50 complete legal-choice
+visibility audits. Seed 10227 finished in 1,025 decisions; the other 49
+results were unchanged. The ignored report is
+`.cache/goat-ai/random-probe-distinct-10224-10273-rivalry-fixed/report.json`
+(SHA-256 `4862fb58501560a63177c6b0598ad48c1110c9eef7544e1dd99f7914d6bb4198`).
+Its loaded patched Rivalry script digest is
+`4de623aa5d43d2ec7bae66b3d4d2db476c6f9efb99a5baca0365025463689702`.
+This finite sweep checks protocol completion and replay consistency; it is
+not an audit of every historical Rivalry interaction or legal GOAT deck.
 
 `scripts/probe_random_decks.py --seed 10000 --seeds 24 --max-decisions 3000
 --distinct-opponents --verify-replays` generated 48 different whitelist-legal
