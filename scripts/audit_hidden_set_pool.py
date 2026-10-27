@@ -1,0 +1,150 @@
+"""Compare next-turn player views after each legal GOAT Spell/Trap is Set.
+
+The native engine still owns both Decks. Only its player-visible observation
+and legal actions are compared; a private query verifies the Set identity.
+"""
+
+import argparse
+import json
+import sqlite3
+import tempfile
+from pathlib import Path
+from time import perf_counter
+
+from goat_ai.engine.decks import read_goat_whitelist
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.environments import GoatEnvironment
+from goat_ai.replay.fingerprint import sha256_file
+from scripts.audit_hidden_opening_pool import candidate_deck
+
+
+class CardCannotBeSet(ValueError):
+    """The native Main Phase offers no Set action for this card."""
+
+
+def reach_next_main_phase(own_deck: Path, opponent_deck: Path, root: Path,
+                          seed: int, hidden_code: int):
+    with GoatEnvironment(str(own_deck), str(opponent_deck), seed=seed,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        observation = env.reset()
+        opening = (observation, env.legal_actions())
+        if hidden_code not in {card.code for card in env.engine.probe.observation(1).hand}:
+            raise AssertionError("replacement card absent from opponent opening hand")
+        set_done = False
+        for _ in range(60):
+            actions = env.legal_actions()
+            action = None
+            if observation.turn == 2 and observation.acting_player == 1 \
+                    and not set_done:
+                action = next((option for option in actions
+                               if option.kind == "set_spell_trap"
+                               and option.parameters.get("code") == hidden_code), None)
+                set_done |= action is not None
+                if observation.phase == "main1" and action is None:
+                    raise CardCannotBeSet(hidden_code)
+            if observation.turn == 3 and observation.acting_player == 0 \
+                    and observation.phase == "main1":
+                if not set_done:
+                    raise AssertionError("opponent card was not Set")
+                hidden = [card for card in observation.field
+                          if card.controller == 1 and card.zone == "spell_trap"]
+                if len(hidden) != 1 or hidden[0].position != "facedown" \
+                        or hidden[0].code is not None:
+                    raise AssertionError("opponent Set card was not hidden")
+                if env.engine.probe._query_location(1, 8)[hidden[0].sequence].code \
+                        != hidden_code:
+                    raise AssertionError("private Set identity differs from candidate")
+                if len(actions) < 2:
+                    raise AssertionError("next Main Phase lacks alternative actions")
+                return opening, (hidden[0].zone, hidden[0].sequence), (
+                    observation, actions)
+            if action is None:
+                action = next((option for option in actions if option.kind in (
+                    "pass", "end_phase", "no", "place")), None)
+            if action is None:
+                raise AssertionError("no passive action before next Main Phase")
+            observation = env.step(action)
+    raise AssertionError("next Main Phase was not reached within 60 decisions")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
+    parser.add_argument("--own-deck", type=Path,
+                        default=Path("examples/decks/nobleman_probe.ydk"))
+    parser.add_argument("--seed", type=int, default=52)
+    parser.add_argument("--limit", type=int, help="audit only this many Spell/Trap IDs")
+    parser.add_argument("--output", type=Path, help="write the complete JSON report")
+    args = parser.parse_args()
+    if args.limit is not None and args.limit < 1:
+        parser.error("--limit must be positive")
+
+    whitelist = args.native_root / "banlist/GOAT.lflist.conf"
+    database = args.native_root / "database/cards.cdb"
+    core = args.native_root / "build/libocgcore.so"
+    limits = read_goat_whitelist(whitelist)
+    with sqlite3.connect(database) as connection:
+        card_types = dict(connection.execute("SELECT id, type FROM datas"))
+    eligible = sorted(code for code, cap in limits.items()
+                      if cap > 0 and card_types.get(code, 0) & (0x2 | 0x4))
+    codes = eligible[:args.limit] if args.limit is not None else eligible
+    started = perf_counter()
+    opening_baseline = None
+    baselines = {}
+    group_counts = {}
+    checked = 0
+    not_settable = []
+    mismatches = []
+    errors = []
+    with tempfile.TemporaryDirectory(prefix="goat-hidden-set-") as directory:
+        opponent = Path(directory) / "candidate.ydk"
+        for code in codes:
+            opponent.write_text("#main\n" + "\n".join(map(str, candidate_deck(code)))
+                                + "\n#extra\n!side\n", encoding="utf-8")
+            try:
+                opening, slot, next_main = reach_next_main_phase(
+                    args.own_deck, opponent, args.native_root, args.seed, code)
+                if opening_baseline is None:
+                    opening_baseline = opening
+                elif opening != opening_baseline:
+                    mismatches.append({"code": code, "stage": "opening"})
+                if slot not in baselines:
+                    baselines[slot] = next_main
+                elif next_main != baselines[slot]:
+                    mismatches.append({"code": code, "stage": "after_set",
+                                       "public_slot": slot})
+                group_counts[slot] = group_counts.get(slot, 0) + 1
+                checked += 1
+            except CardCannotBeSet:
+                not_settable.append(code)
+            except Exception as exc:  # noqa: BLE001 - collect failures, then exit nonzero
+                errors.append({"code": code, "error": f"{type(exc).__name__}: {exc}"})
+
+    report = {
+        "scope": "opening and next own Main Phase after opponent Sets one Spell/Trap",
+        "seed": args.seed,
+        "own_deck": str(args.own_deck),
+        "own_deck_sha256": sha256_file(args.own_deck),
+        "whitelist_sha256": sha256_file(whitelist),
+        "database_sha256": sha256_file(database),
+        "core_sha256": sha256_file(core),
+        "eligible_spell_trap_ids": len(eligible),
+        "attempted": len(codes),
+        "checked": checked,
+        "not_settable": not_settable,
+        "public_slot_groups": {f"{zone}:{sequence}": count
+                               for (zone, sequence), count in group_counts.items()},
+        "mismatches": mismatches,
+        "errors": errors,
+        "elapsed_seconds": perf_counter() - started,
+    }
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(report, indent=2))
+    if mismatches or errors or checked + len(not_settable) != len(codes):
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

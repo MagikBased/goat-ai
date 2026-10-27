@@ -8,6 +8,7 @@ import pytest
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from scripts.audit_hidden_set_pool import CardCannotBeSet, reach_next_main_phase
 
 # Common GOAT Spells, Quick-Play Spells, Normal/Counter Traps, and GOAT variants.
 HIDDEN_BACKROW = (
@@ -21,6 +22,14 @@ HIDDEN_BACKROW = (
     44095762,   # Mirror Force
     4178474,    # Raigeki Break
     511000824,  # Ring of Destruction (GOAT pre-errata ID)
+)
+NATIVE_PLACEMENT_ONLY = (
+    30170981,  # Spirit Message "L"
+    31893528,  # Spirit Message "I"
+    67287533,  # Spirit Message "N"
+    94772232,  # Spirit Message "A"
+    4081094,   # The Second Sarcophagus
+    78697395,  # The Third Sarcophagus
 )
 
 
@@ -73,3 +82,15 @@ def test_common_hidden_backrow_has_identical_opening_and_next_main_phase(tmp_pat
 
     assert len(snapshots) == len(HIDDEN_BACKROW)
     assert all(snapshot == snapshots[0] for snapshot in snapshots[1:])
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
+                    reason="native assets not installed")
+@pytest.mark.parametrize("code", NATIVE_PLACEMENT_ONLY)
+def test_cards_placed_by_other_effects_have_no_manual_set_action(tmp_path, code):
+    opponent = tmp_path / f"placement_only_{code}.ydk"
+    opponent.write_text("#main\n" + "\n".join(map(str, (
+        code, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    with pytest.raises(CardCannotBeSet, match=str(code)):
+        reach_next_main_phase(Path("examples/decks/nobleman_probe.ydk"), opponent,
+                              Path(os.environ["GOAT_AI_NATIVE_ROOT"]), 52, code)

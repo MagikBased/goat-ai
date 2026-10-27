@@ -55,6 +55,25 @@ occurred. The full run took 57.68 seconds on this host. The script reports
 asset hashes and exits nonzero on any difference or failed candidate. It
 checks only the first decision: later effects, private reveals, and hidden
 field states still need separate differential tests.
+
+A second native audit covers the next own Main Phase after the opponent Sets
+one Spell/Trap from the same pinned pool:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_hidden_set_pool.py \
+  --output .cache/goat-ai/hidden_set_pool_audit_52.json
+```
+
+At seed 52, 551 of 557 eligible Spell/Trap IDs could be Set. For all 551,
+the card was verified privately in its Set field slot, while the acting
+player saw no identity. Complete observations and legal-action lists matched
+within the two publicly distinct placement groups: 532 ordinary backrow and
+19 Field Spell slots. The other six IDs are placement-only Spirit Messages
+and Second/Third Sarcophagus cards; the native engine offered no manual Set
+action. The full run recorded zero mismatches and zero errors in 25.55 seconds
+on this host. This checks one passive route to the following Main Phase; it
+does not validate chain responses, later reveals, or all possible field states.
+
 Keep older replay files byte-for-byte when they back SHA-256-bound reviews:
 reading and verifying v23 is supported, but rewriting it with a newer writer
 can change its JSON bytes and invalidate those sidecar hashes.
