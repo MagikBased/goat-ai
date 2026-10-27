@@ -354,6 +354,15 @@ demonstrate an improvement in greedy playing strength; see
 [evaluation](evaluation.md). Keep training opponents separate from evaluation
 opponents when comparing future updates.
 
+`--baseline-opponent tactical` optionally uses the version-14 generic
+TacticalHeuristicAgent instead of RandomAgent on duels where a frozen policy
+snapshot was not sampled. The default remains RandomAgent. The checkpoint
+records this choice and each duel records the actual opponent. Tactical uses
+the same player-visible observation and legal-action interface as the learner.
+A 64-duel matched PPO continuation with this option produced reproducible,
+replay-verified games but was weaker than its unchanged parent against
+Tactical on unseen Main Decks; see [the evaluation](evaluation.md#tactical-baseline-opponent-in-ppo-27-october-2026).
+
 An opt-in `--baseline-scope state_value` now tests a learned Monte Carlo
 baseline. A separate critic embeds the same **player-visible** card, zone,
 owner, position, phase, and numeric observation features as the policy

@@ -8,9 +8,11 @@ from pathlib import Path
 import pytest
 import torch
 
+from goat_ai.agents import load_card_facts, load_card_races, load_flip_monster_codes
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.training.policy import CardVocabulary, LegalActionPolicy
-from goat_ai.training.self_play import train_against_snapshot_pool
+from goat_ai.training.self_play import make_tactical_opponent, train_against_snapshot_pool
 
 ROOT = Path(__file__).resolve().parents[1]
 VANILLA = ROOT / "examples/decks/vanilla_probe.ydk"
@@ -91,3 +93,36 @@ def test_parallel_rollout_requires_multi_game_ppo():
             model, vocabulary, (("a", "b"),), (1,), lambda: None,
             rollout_batch_inference=True,
         )
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_tactical_baseline_reproduces_across_rollout_worker_counts():
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    vocabulary = CardVocabulary.from_goat_whitelist(
+        native_root / "banlist/GOAT.lflist.conf")
+    torch.manual_seed(81)
+    initial = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    factory = partial(make_tactical_opponent,
+                      flip_codes=load_flip_monster_codes(native_root),
+                      card_races=load_card_races(native_root),
+                      card_facts=load_card_facts(native_root))
+    results = []
+    for workers in (1, 2):
+        model = copy.deepcopy(initial)
+        episodes = []
+        reports = train_against_snapshot_pool(
+            model, vocabulary, ((str(VANILLA), str(REVERSE)),),
+            (90040, 90041), partial(ExperimentalOcgcoreEngine, native_root),
+            policy_update="clipped_ppo", ppo_rollout_games=2,
+            rollout_workers=workers, snapshot_every=2,
+            ppo_epochs=1, ppo_batch_size=8, historical_probability=0,
+            baseline_opponent_factory=factory, baseline_opponent_name="tactical_v14",
+            max_decisions=2000, random_seed=81,
+            record_episode=lambda _, episode, sink=episodes: sink.append(episode),
+        )
+        assert len(episodes) == 2
+        assert all(report["opponent"] == "tactical_v14" for report in reports)
+        results.append((reports, episodes, model.state_dict()))
+    assert results[0][:2] == results[1][:2]
+    assert all(torch.equal(results[0][2][name], results[1][2][name])
+               for name in results[0][2])

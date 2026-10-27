@@ -8010,6 +8010,53 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
   --output .cache/goat-ai/current_broader_ppo_reproduction.pt
 ```
 
+### Tactical baseline opponent in PPO (27 October 2026)
+
+The self-play trainer now offers `--baseline-opponent tactical` for the
+non-snapshot branch. A two-game worker smoke on control/Chaos probes completed
+both duels against Tactical-v14. One- and two-worker runs wrote byte-identical
+trajectories and equal model tensors; one 763-decision replay independently
+verified against the pinned native engine and passed the visibility audit.
+
+A matched 64-duel continuation used the same current-core imitation parent,
+Jesse Goat Control/Warrior four-role schedule, seeds 34000–34063, four rollout
+workers, four-game PPO rollouts, two update epochs, batch 32, per-episode
+weighting, learner-deck baselines, parent KL 0.5, and 0.75 snapshot probability
+as the preceding experiment. The only schedule change was replacing the
+RandomAgent branch with Tactical-v14. Seventeen duels sampled Tactical and 47
+sampled frozen snapshots. All 64 terminated below the 3,000-decision cap;
+the sampled learner went 26–38, with 4,697 learner decisions. Reported trainer
+time was **25.84 seconds** on this host. Every trajectory independently
+replay-verified and passed visibility checks, covering **30,362 decisions**.
+The ignored child checkpoint SHA-256 is
+`e2a636bbf57cef01550eb15794061c98b2f1c1fc7f0bd79517473c1f5d1260cf`;
+the 64-replay audit SHA-256 is
+`422faf859070fb3b9ec144b12634cd1b8e122c27871a675c05af2a98de1f9fdf`.
+
+On fresh Phoenix/Dimension Fusion Main Decks, both deck assignments and
+policy seats, the child scored **34–28–2** directly against its parent over
+64 games (54.7% score; paired 95% interval 46.9–62.5%). This does not
+establish a direct strength gain. Against Tactical-v14 on a separate matched
+64-game schedule, the child scored **13–48–3** and the unchanged parent
+**21–42–1**. The report comparator independently checked unseen Main Deck
+compositions and matching decks, seeds, native assets, scripts, source, and
+opponent, then measured a child-minus-parent difference of **−10.9 percentage
+points**, paired 95% interval **−19.5 to −1.6**. Thus Tactical exposure in
+this small mixture worsened held-out Tactical performance. Keep the parent as
+the neural reference; M4's self-play improvement gate remains open.
+
+The ignored child-versus-parent, child-versus-Tactical, and
+parent-versus-Tactical report hashes are respectively
+`5703bced640c6c04d5ff1a94e3f559985f9f95ca687217d871b9444e548463d8`,
+`37bcb0221834cf47c710b3ee4d4c23ff441a286310ae1929e9035c28e55a12fd`,
+and `c2aa5bfff678dd66a21d2e49c62307e97b52fcf742a16a6243a402dfc8181c68`.
+Reproduce the training with the preceding 64-duel PPO command, adding
+`--baseline-opponent tactical`, a new output path, and the same seed block.
+Use `scripts/evaluate_policy.py --both-deck-assignments
+--require-unseen-main-decks --workers 4 --seeds 8` on the named holdouts and
+seed blocks 34100–34107 and 34108–34115; compare the matched Tactical reports
+with `scripts/compare_tournament_reports.py --require-unseen-main-decks`.
+
 ### Contemporary Charlotte Zombie holdout (27 October 2026)
 
 The [preserved 2005 SJC Charlotte Top 8 article](https://www.goatformat.com/home/top-8-decklists5124684)

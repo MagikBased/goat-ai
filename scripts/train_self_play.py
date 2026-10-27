@@ -10,13 +10,18 @@ from time import perf_counter
 
 import torch
 
+from goat_ai.agents import RandomAgent, load_card_facts, load_card_races, load_flip_monster_codes
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.replay import write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
-from goat_ai.training.self_play import VisibleStateValue, train_against_snapshot_pool
+from goat_ai.training.self_play import (
+    VisibleStateValue,
+    make_tactical_opponent,
+    train_against_snapshot_pool,
+)
 
 
 def sha256(path: Path) -> str:
@@ -66,6 +71,9 @@ def main() -> None:
     parser.add_argument("--games", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--historical-probability", type=float, default=0.75)
+    parser.add_argument("--baseline-opponent", choices=("random", "tactical"),
+                        default="random",
+                        help="opponent when a frozen snapshot is not sampled")
     parser.add_argument("--snapshot-every", type=int, default=4)
     parser.add_argument("--max-snapshots", type=int, default=8)
     parser.add_argument("--entropy-coefficient", type=float, default=0.001)
@@ -180,6 +188,12 @@ def main() -> None:
         parser.error("four_roles requires a whole four-role cycle for every matchup")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
+    baseline_factory = (partial(
+        make_tactical_opponent,
+        flip_codes=load_flip_monster_codes(args.native_root),
+        card_races=load_card_races(args.native_root),
+        card_facts=load_card_facts(args.native_root))
+        if args.baseline_opponent == "tactical" else None)
     parent_checkpoint_sha256 = sha256(args.checkpoint)
     recorded_games: dict[int, tuple[str, str]] = {}
 
@@ -229,6 +243,8 @@ def main() -> None:
         max_decisions=args.max_decisions, random_seed=args.seed,
         skip_capped_games=args.skip_capped_games,
         skip_unsupported_games=args.skip_unsupported_games,
+        baseline_opponent_factory=baseline_factory or RandomAgent,
+        baseline_opponent_name=("tactical_v14" if baseline_factory else "random"),
         record_episode=record,
     )
     terminal_reports = [report for report in reports if report["status"] == "terminal"]
@@ -256,6 +272,7 @@ def main() -> None:
         })
     config = {"engine": args.engine, "learning_rate": args.learning_rate,
               "historical_probability": args.historical_probability,
+              "baseline_opponent": args.baseline_opponent,
               "snapshot_every": args.snapshot_every, "max_snapshots": args.max_snapshots,
               "entropy_coefficient": args.entropy_coefficient,
               "learner_temperature": args.learner_temperature,

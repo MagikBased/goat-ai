@@ -13,7 +13,7 @@ import torch
 from torch import nn
 
 from goat_ai.actions import Action
-from goat_ai.agents import Agent, RandomAgent
+from goat_ai.agents import Agent, RandomAgent, TacticalHeuristicAgent
 from goat_ai.engine import RulesEngine
 from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
@@ -145,6 +145,13 @@ class EpisodeDecisionLimit(RuntimeError):
     def __reduce__(self):
         """Preserve constructor arguments when a rollout worker raises this."""
         return (type(self), (self.seed, self.max_decisions))
+
+
+def make_tactical_opponent(_seed: int, flip_codes: frozenset[int],
+                           card_races: dict[int, int],
+                           card_facts: dict[int, tuple[int, int, int]]) -> Agent:
+    """Build a fresh visible-state Tactical agent for one native duel."""
+    return TacticalHeuristicAgent(flip_codes, card_races, card_facts=card_facts)
 
 
 def episode_schedule(matchups: Sequence[tuple[str, str]],
@@ -393,7 +400,7 @@ def _parallel_rollout_worker(task):
     """Collect one CPU duel with a per-episode sampling stream."""
     (model_state, vocabulary, width, feature_version, opponent_state, decks,
      seed, learner_seat, engine_factory, max_decisions, temperature,
-     generator_seed) = task
+     generator_seed, baseline_opponent_factory) = task
     torch.set_num_threads(1)
     model = LegalActionPolicy(vocabulary.size, width=width,
                               feature_version=feature_version)
@@ -401,7 +408,7 @@ def _parallel_rollout_worker(task):
     model.eval()
     generator = torch.Generator(device="cpu").manual_seed(generator_seed)
     if opponent_state is None:
-        opponent: Agent = RandomAgent(seed)
+        opponent: Agent = baseline_opponent_factory(seed)
     else:
         frozen = LegalActionPolicy(vocabulary.size, width=width,
                                    feature_version=feature_version)
@@ -703,9 +710,11 @@ def train_against_snapshot_pool(
     reuse_rollout_features: bool = False,
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
+    baseline_opponent_factory: Callable[[int], Agent] = RandomAgent,
+    baseline_opponent_name: str = "random",
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
 ) -> tuple[dict, ...]:
-    """Train one learner seat per duel against random or frozen past policies.
+    """Train one learner seat per duel against a baseline or frozen past policies.
 
     Frozen snapshots prevent the opponent from changing within an episode.
     PPO can update from one or several duels sampled under the same policy.
@@ -719,6 +728,8 @@ def train_against_snapshot_pool(
             or value_learning_rate <= 0
             or not isfinite(parent_kl_weight) or parent_kl_weight < 0
             or (baseline_scope == "state_value") != (value_model is not None)
+            or not callable(baseline_opponent_factory)
+            or not baseline_opponent_name
             or schedule_mode not in ("paired_seats", "four_roles")):
         raise ValueError("invalid self-play schedule or hyperparameters")
     if (policy_update not in ("reinforce", "clipped_ppo")
@@ -804,22 +815,22 @@ def train_against_snapshot_pool(
                     snapshot_index = (rng.randrange(len(snapshots))
                                       if rng.random() < historical_probability else None)
                     names.append(f"snapshot_{snapshot_index}" if snapshot_index is not None
-                                 else "random")
+                                 else baseline_opponent_name)
                     tasks.append((model_state, vocabulary, model.card.embedding_dim,
                                   model.feature_version,
                                   snapshots[snapshot_index] if snapshot_index is not None else None,
                                   batch_decks, batch_seed, batch_seat, engine_factory,
                                   max_decisions, learner_temperature,
-                                  random_seed + batch_seed))
+                                  random_seed + batch_seed, baseline_opponent_factory))
                 if rollout_batch_inference:
                     batch_games = []
                     for task in tasks:
                         (_, _, _, _, opponent_state, batch_decks, batch_seed,
-                         batch_seat, _, _, _, generator_seed) = task
+                         batch_seat, _, _, _, generator_seed, _) = task
                         batch_generator = torch.Generator(device="cpu").manual_seed(
                             generator_seed)
                         if opponent_state is None:
-                            batch_opponent: Agent = RandomAgent(batch_seed)
+                            batch_opponent: Agent = baseline_opponent_factory(batch_seed)
                         else:
                             frozen = LegalActionPolicy(
                                 vocabulary.size, width=model.card.embedding_dim,
@@ -859,8 +870,8 @@ def train_against_snapshot_pool(
                     opponent: Agent = SamplingPolicyAgent(frozen, vocabulary, generator)
                     opponent_name = f"snapshot_{snapshot_index}"
                 else:
-                    opponent = RandomAgent(seed)
-                    opponent_name = "random"
+                    opponent = baseline_opponent_factory(seed)
+                    opponent_name = baseline_opponent_name
                 try:
                     episode = run_learning_episode(model, vocabulary, opponent, decks, seed,
                                                    learner_seat, engine_factory, generator,

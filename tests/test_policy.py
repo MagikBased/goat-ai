@@ -2150,6 +2150,32 @@ def test_self_play_can_track_terminal_baseline_by_learner_deck(monkeypatch):
                                     lambda: None, baseline_scope="unknown")
 
 
+def test_self_play_uses_named_opt_in_baseline_opponent(monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=8)
+    seen = []
+
+    class Baseline:
+        def __init__(self, seed):
+            self.seed = seed
+
+    def run_episode(_model, _vocabulary, opponent, _decks, seed, *_args, **_kwargs):
+        seen.append((opponent.seed, seed))
+        return SimpleNamespace(
+            seed=seed, winner=0, reward=1.0, decisions=1, learner_records=(),
+            trajectory=SimpleNamespace(deck_sha256=("a", "b"),
+                                       asset_sha256={"core": "hash"},
+                                       rules_profile="goat"))
+
+    monkeypatch.setattr("goat_ai.training.self_play.run_learning_episode", run_episode)
+    reports = train_against_snapshot_pool(
+        model, vocabulary, (("a", "b"),), (100, 101), lambda: None,
+        historical_probability=0, baseline_opponent_factory=Baseline,
+        baseline_opponent_name="test_baseline")
+    assert seen == [(100, 100), (101, 101)]
+    assert [report["opponent"] for report in reports] == ["test_baseline"] * 2
+
+
 @pytest.mark.parametrize("baseline_timing, first_advantages", [
     ("online", (1.0, -1.05, -1.05)),
     ("frozen_rollout", (1.0, -1.0, -1.0)),

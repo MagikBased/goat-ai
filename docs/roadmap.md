@@ -571,6 +571,13 @@ seeds. The paired Tactical difference interval includes zero. Retain the
 imitation child as the experimental comparison; M4 still needs a measured
 self-play strength gain. See [evaluation](evaluation.md#self-play-from-the-fresh-current-core-imitation-child-27-october-2026).
 
+An opt-in Tactical-v14 opponent for the non-snapshot PPO branch was tested
+on the same 64-duel training schedule. All 30,362 native decisions
+replay-verified, but the child scored 13–48–3 against Tactical on unseen
+Main Decks versus the unchanged parent's 21–42–1. The paired interval shows
+a decline on that schedule, so keep the parent and do not promote this PPO
+variant; see [evaluation](evaluation.md#tactical-baseline-opponent-in-ppo-27-october-2026).
+
 The new sourced 2005 Phoenix Control holdout passed native deck and replay
 checks. On Phoenix versus Dimension Fusion, the six-deck continuation beat its
 four-deck parent 56–40 directly over 96 paired games, but lost more often than
