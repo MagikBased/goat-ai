@@ -151,3 +151,39 @@ For the batched row, repeat the four-worker command with `--batched-forward`
 and a distinct output path. The held-out decision comparison used the ignored
 `resource_holdout_11100_11103` trajectories; it compared raw model argmax
 scores on their recorded visible states, without replaying alternative duels.
+
+## Native location-query cache
+
+On 27 October 2026, a bounded cache keyed by the entire native location-query
+response was measured on four random-agent control/Chaos probe duels (seeds
+12000–12003, **3,781 decisions**). The pinned native engine returned 37,850
+location buffers; only 1,164 distinct buffers were decoded in the cached
+schedule. The cache holds at most 4,096 immutable decoded tuples. Its key is
+the complete response bytes, so equal-size responses containing different
+private cards remain separate.
+
+The matched ablation ran twice in one process, reversing mode order. The
+cached and uncached schedules produced **identical complete trajectories** for
+all four seeds in both rounds. Four serialized cached trajectories also
+replay-verified all 3,781 decisions and passed the legal-choice visibility
+audit. Measured CPU times were:
+
+| Order | Uncached | Cached | Speedup |
+| :--- | ---: | ---: | ---: |
+| Uncached, cached | 4.426 s | 3.709 s | 1.19× |
+| Cached, uncached | 4.725 s | 3.477 s | 1.36× |
+
+These results used an Intel Core i7-10700K, Linux 6.8.0 x86_64, and the
+experimental native adapter. The mixed-process peak RSS was 956,160 KB;
+because both modes ran in the same process, that value does **not** isolate
+cache memory overhead. The comparison covers these decks, seeds, and random
+choices; it is not a policy-training benchmark or a historical-rules audit.
+Deck SHA-256 values were `04352ceadbf53684fe7d6bc4dc18b7e5bed756e01c5914649dda93073dcefc8b`
+and `51ca430a9ec9dc3e8b9ce400bcec469d3de39d2152add2a8feb5db814c38a48e`.
+
+Reproduce after [native setup](native_setup.md):
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/benchmark_native_query_cache.py \
+  --games 4 --rounds 2
+```

@@ -25,6 +25,21 @@ def test_query_location_rejects_truncation():
         decode_location(b"\x01\x00\x00\x00")
 
 
+def test_query_location_distinguishes_same_size_hidden_card_buffers():
+    def frame(code):
+        card = (struct.pack("<HII", 8, QUERY_CODE, code)
+                + struct.pack("<HII", 8, QUERY_POSITION, 8)
+                + struct.pack("<HI", 4, QUERY_END))
+        return struct.pack("<I", len(card)) + card
+
+    first = frame(31560081)  # Magician of Faith
+    second = frame(87621407)  # Dekoichi
+    assert len(first) == len(second)
+    assert decode_location(first)[0].code == 31560081
+    assert decode_location(second)[0].code == 87621407
+    assert decode_location(first)[0].code == 31560081
+
+
 def test_query_location_decodes_public_equip_target():
     def record(flag, payload=b""):
         return struct.pack("<HI", 4 + len(payload), flag) + payload

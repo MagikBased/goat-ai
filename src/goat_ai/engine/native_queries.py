@@ -2,6 +2,7 @@
 
 import struct
 from dataclasses import dataclass
+from functools import lru_cache
 
 QUERY_CODE = 0x1
 QUERY_POSITION = 0x2
@@ -28,8 +29,9 @@ class QueriedCard:
     owner: int | None = None
 
 
+@lru_cache(maxsize=4096)
 def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
-    """Parse API-11 QUERY_CODE | QUERY_POSITION frames for one location."""
+    """Parse an API-11 location frame; identical native bytes have identical views."""
     if len(buffer) < 4:
         raise ValueError("truncated query-location header")
     size = struct.unpack_from("<I", buffer)[0]
