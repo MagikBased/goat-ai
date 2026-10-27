@@ -465,6 +465,15 @@ Jar before resolution remains untested for this pair.
 
 **Thunder Dragon:** [Historical Netrep rulings](https://www.goatformat.com/rulings7.html) allow discarding Thunder Dragon to search for zero copies, even when copies remain, and [the historical mechanics guide](https://www.goatformat.com/basics.html) gives the no-copy case as a Deck verification example. The pinned official script requires at least one copy in Deck, so GOAT AI uses the pinned GOAT variant `504700054`. A seeded native fixture offers a zero-card selection alongside one- and two-card choices while two copies remain; both the explicit empty selection and the native cancel response leave the Deck unchanged and reveal nothing to the opponent. A second fixture takes both copies and checks the opponent-only reveal, then discards another Thunder Dragon with no copies in Deck. The opponent still remembers the remaining searched Thunder Dragon in hand after the other copy’s public discard. That effect remains legal and reveals the remaining 32-card Deck to the opponent for verification. This checks the historical search behavior and information boundary; other replacement effects remain untested.
 
+The OCG ruling supplied in player review says the effect cannot be activated
+with no Thunder Dragon in Deck. That conflicts with the archived TCG Netrep
+ruling used for this 2005 GOAT profile; it is not a reason to change the TCG
+adapter. The zero-card search is **legal here**, but choosing it while useful
+copies remain is generally a poor policy choice. The rules test checks legality;
+the replay audit separately flags that strategic choice for review. On the
+current pinned native assets, the nine Thunder Dragon search and staged-choice
+regressions passed on 27 October 2026.
+
 The same [period Thunder Dragon FAQ](https://www.goatformat.com/rulings7.html)
 explicitly permits discarding an opponent-owned copy obtained with Exchange
 to search the current controller's Deck. A seed-28 native fixture exchanges
