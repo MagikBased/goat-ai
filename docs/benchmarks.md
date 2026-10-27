@@ -1,5 +1,28 @@
 # Native benchmark log
 
+## Padded versus packed chain GRU in PPO batches (27 October 2026)
+
+The four-worker PPO profile identified batched policy scoring as a parent-process
+cost. A trial replaced `pack_padded_sequence` in `LegalActionPolicy.forward_batch`
+with a padded GRU pass and selected the output at each chain's last real row.
+The focused forward and PPO tests passed (6 tests). The trial used the same
+feature-v23 parent, Jesse Goat Control/Warrior decks, seeds 28000–28015,
+four rollout workers, two PPO epochs, minibatch 16, and one CPU Torch thread
+as the [worker benchmark](#sixteen-game-ppo-rollout-workers). The changed run
+reported **7.455 seconds** for 16 terminal duels and 1,196 learner decisions;
+a subsequent unchanged packed-GRU run reported **7.365 seconds**. The earlier
+packed-GRU runs reported **7.474 and 7.631 seconds**. All 16 replay files were
+byte-identical across the candidate and packed runs. The new packed run's 38
+model tensors exactly matched the earlier packed checkpoint, while the padded
+candidate matched 22 of 38; its maximum parameter difference was `9.07e-6`.
+
+This small, single-schedule comparison shows no complete-training speed gain
+and loses exact checkpoint reproduction. The padded-GRU change was reverted.
+The ignored candidate and repeat reports, checkpoints, and replays use
+`.cache/goat-ai/gru_{unpacked,packed_repeat}_28000` prefixes. The next speed
+experiment should inspect operations *inside* batched policy scoring rather
+than assume removing packed-sequence setup will help.
+
 ## Reusing the PPO vmap wrapper: no measured gain (27 October 2026)
 
 The four-worker PPO profile below identified 228 calls to the batched policy
