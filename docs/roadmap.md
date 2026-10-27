@@ -1398,8 +1398,10 @@ Dekoichi and Gravekeeper's Spy Flip Effects; both branches reach terminal,
 replay-verify, and pass the visibility audit. A two-player Peten/Torrential
 fixture also confirms simultaneous optional triggers: turn-player Link 1,
 opponent Link 2, with both replacements resolving in reverse order. Mixed
-mandatory/optional groups, effects recognized mid-chain, and wider historical
-SEGOC combinations remain to be independently checked. Re-record
+Sangan/Peten fixtures now confirm mandatory Sangan Link 1 and optional Peten
+Link 2 with their controllers swapped; both reach terminal and replay-verify.
+Effects recognized mid-chain and wider historical SEGOC combinations remain
+to be independently checked. Re-record
 old training trajectories before replay verification because the native core
 binary hash and potentially the resulting games have changed. See
 `docs/goat_rules.md` for source links and the conflicting Edison summary.
