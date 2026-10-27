@@ -905,6 +905,12 @@ unchanged imitation parent on fresh held-out seeds. All training duels replay-
 verified and passed the visibility audit, but sampled actions still included
 many visible resource-loss candidates. Keep the self-play gate open and test
 credit assignment or better sampled-action quality before promotion.
+Labeling 7,538 decisions from the fixed imitation checkpoint's own games
+with Tactical-v14 and upweighting 1,891 disagreements also failed a held-out
+strength check: the child scored 30–34 directly against that checkpoint and
+16–47–1 against Tactical-v14 versus the parent's 20–44. More synthetic
+teacher agreement alone is insufficient; prioritize independently reviewed
+action value and outcome-sensitive learning signals.
 
 ## M5 — Search and other formats
 

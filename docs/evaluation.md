@@ -6961,3 +6961,68 @@ Phoenix/Dimension Fusion `--matchup` pairs above,
 `--opponent-checkpoint` pointing to the unchanged imitation parent. The
 replay audit used `scripts/audit_selfplay_replays.py` on all
 `episode_*.json` files in the recorded directory.
+
+### Fixed-policy Tactical labels on visited states
+
+The PPO continuation above used a changing policy, so its saved decisions do
+not satisfy the fixed-checkpoint attribution required by the on-policy
+teacher-labeling path. Instead, the unchanged broader imitation checkpoint
+played Tactical-v14 on the two training pairings, seeds 18900–18915, with
+both policy seats. The collector recorded **64 complete games and 42,060
+replay-verified, visibility-audited decisions**. Its manifest SHA-256 is
+`8fdad424254613de6e72b615b08dd4ed37dc2897af4c1cd78bfb81de9d914535`.
+The teacher labeled **7,538** multi-option policy-seat decisions and disagreed
+with the recorded choice on **1,891**. These are synthetic Tactical labels on
+the policy's visited states, not human reviews or counterfactual outcomes.
+
+Starting from the same unchanged imitation checkpoint, a two-epoch,
+feature-v23, width-32 continuation used learning rate `0.0001`, minibatch 16,
+batched forward, disagreement sampling weight 4, seed 57, and four native
+verification workers. The source losses were `0.867216` and `0.651083`.
+The ignored checkpoint is `.cache/goat-ai/fv23_broader_teacher_18900_18915.pt`
+(SHA-256 `d48cd9815cfcb6983f02b5123ffc80163639c85948b020f86f0650487168ac60`).
+
+On held-out Phoenix/Dimension Fusion pairings, seeds 19000–19007 with both
+deck assignments and seats, the labeled child scored **30–34** against its
+unchanged parent (46.9%; paired 95% interval **39.1%–56.3%**). Its
+assigned-deck records were 18–14 Phoenix, 8–8 GoatFormat Dimension Fusion,
+and 4–12 WikiFormat Dimension Fusion. Against Tactical-v14 on matched seeds
+19008–19015, the child scored **16–47–1** while the parent scored **20–44**.
+The paired score difference was −5.47 points, with a 95% interval of
+−19.53 to +8.59 points. More teacher agreement on the source states did not
+produce a held-out gain in this experiment; retain the broader imitation
+checkpoint as the neural reference.
+
+The training, direct, child-versus-Tactical, and parent-versus-Tactical
+report SHA-256 values are respectively
+`4b5e68542adb1d6dbd5e6b16edfe7d2baea8656e1eca046d4cb05f3ff950a337`,
+`3ea44d663cec10d44fcf091ddbe17b5a9c5aa644be9533ca714636724e930681`,
+`6f2f502908bae8dd3bbc3ad3a5f3a7846fc97fea09f9d131257e0c7735219fe3`,
+and `3d611c71199c92700c274a1d1107bf77fec5c4be561245596ec2f23ec74a4b35`.
+The matched report comparator verified the Tactical controls and local deck
+bytes. To reproduce the fixed-policy source and fit:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_tactical_v14_broader_18500_18531.pt \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+            examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --opponent tactical --seed 18900 --seeds 16 --workers 4 \
+  --max-decisions 3000 \
+  --output-dir .cache/goat-ai/fv23_broader_vs_tactical_teacher_18900_18915
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/fv23_broader_vs_tactical_teacher_18900_18915/matchup_*.json \
+  --engine experimental --on-policy-teacher tactical_v14 \
+  --on-policy-disagreement-weight 4 --feature-version 23 --width 32 \
+  --epochs 2 --batch-size 16 --batched-forward --verification-workers 4 \
+  --learning-rate 0.0001 --seed 57 \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_broader_18500_18531.pt \
+  --output .cache/goat-ai/fv23_broader_teacher_18900_18915.pt
+```
+
+The evaluation used the same two held-out `--matchup` pairs, engine, deck
+assignment, unseen-composition gate, decision cap, and workers as the prior
+experiment, with `--seed 19000 --seeds 8` for the direct arm and
+`--seed 19008 --seeds 8 --opponent tactical` for both matched baseline arms.
