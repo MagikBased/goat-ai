@@ -6,6 +6,16 @@ Sources: [GoatFormat mechanics](https://www.goatformat.com/basics.html), [card p
 
 The M0 native probe confirms that a pinned core configured with `DUEL_MODE_GOAT` performs an opening draw for the first player in its vanilla-monster fixture. This is one startup behavior check, not a complete historical rules validation.
 
+**First-turn draw:** [GoatFormat's mechanics guide](https://www.goatformat.com/basics.html)
+states that the first player draws at the start of their first Draw Phase. A
+focused native regression with two 40-card vanilla decks checks that player 0
+has six cards and 34 Deck cards at the first decision while player 1 still has
+five and 35. After passing turn one, player 1 has six and 34 at their first
+Draw Phase. The adapter now rejects a `RulesProfile` that claims a different
+first-turn draw, Ignition-priority, banlist, or format setting: its pinned
+native startup always uses GOAT mode and the April 2005 whitelist. The
+historical/community Side Deck policy remains a deck-validation choice.
+
 **Magical Hats and monster Type:** [Historical Rivalry of Warlords rulings](https://www.goatformat.com/rulings6.html) explicitly say the Spell/Trap cards summoned by Magical Hats have no Type. In a distinct-whitelist native duel at seed 10247, Magical Hats places GOAT Energy Drain in a Monster Zone; battle flips it face-up with native `QUERY_RACE=0` and 0 ATK/DEF. The player-visible observation records `race=None`, and schema-v24+ trajectories serialize that explicit null while still requiring the Type field to be present. A full-duel regression reaches terminal, replay-verifies, and audits visibility. This does not establish every Magical Hats battle or Rivalry interaction. A separate seed 10227 activates GOAT Rivalry while its controller has Fiend and Winged Beast monsters face-up. The source says that player must send monsters until only one Type remains. The pinned GOAT script recursively entered its active adjust callback when doing so; a SHA-guarded in-memory condition now suppresses that re-entry during the send. Paired native tests choose either Type, verify the other monster reaches the Graveyard, and replay-verify complete duels. Multiple active copies, simultaneous mixed-Type fields on both sides, and Damage Step Type changes remain unaudited.
 
 The M1 deck gate uses a pinned [Project Ignis GOAT whitelist](https://github.com/ProjectIgnis/LFLists/blob/master/GOAT.lflist.conf) and checks copy limits against the pinned main and [GOAT-variant card databases](https://github.com/ProjectIgnis/BabelCDB/blob/master/goat-entries.cdb). For example, the GOAT list allows two copies of Nobleman of Crossout under variant ID `504700116`; the ordinary ID `71044499` is intentionally rejected. [GoatFormat's card-pool guide](https://www.goatformat.com/cardpool.html) also places Nobleman at two copies, and [its EDOPro guide](https://www.goatformat.com/home/what-is-edopro) explains the custom GOAT IDs. The independent membership comparison below checks the full pinned whitelist by card name.

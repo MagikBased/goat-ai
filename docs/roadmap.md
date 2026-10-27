@@ -262,6 +262,12 @@ Summon-negation window remain open. See
 
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
 
+A focused native first-turn draw fixture now checks both players' initial hand
+and Deck counts: six/34 for player 0 on turn one, then six/34 for player 1 on
+turn two after passing. The adapter rejects unsupported rule-profile flags
+instead of recording a profile that the GOAT-mode core did not execute. See
+[the source and fixture](goat_rules.md#first-turn-draw).
+
 **Exit:** Every required fixture passes with pinned engine assets, or is marked as a known incompatibility that blocks a GOAT-correct claim. Run differential checks against documented examples or independently observed duels where practical. Expand the legal-card test corpus beyond the initial fixture decks.
 
 The six-deck tournament action probe can now save and replay-verify complete

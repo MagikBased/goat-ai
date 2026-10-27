@@ -28,6 +28,13 @@ class RestrictedOcgcoreEngine:
                  ruleset: RulesProfile | None = None) -> None:
         self.root = Path(native_root)
         self.ruleset = ruleset or RulesProfile()
+        supported = RulesProfile()
+        if (self.ruleset.name != supported.name
+                or self.ruleset.april_2005_banlist is not True
+                or self.ruleset.first_turn_draw is not True
+                or self.ruleset.obsolete_ignition_priority is not True
+                or self.ruleset.side_deck_policy not in ("historical", "community")):
+            raise ValueError("native GOAT adapter does not support the requested rules profile")
         self.probe: OcgcoreProbe | None = None
         self._choices: tuple[NativeChoice, ...] = ()
         self._actions: tuple[Action, ...] = ()
