@@ -362,6 +362,16 @@ The sourced-deck single-process benchmark records reset overhead and peak proces
 
 A balanced six-deck evaluation now tests both deck assignments and both seats for HeuristicAgent versus RandomAgent and an identical random-versus-random control. The paired score-difference helper reports a measured heuristic advantage with a confidence interval on this small schedule; [the evaluation log](evaluation.md) gives the deck splits and limits. This supplies a stronger baseline for M4 comparisons without satisfying M4's held-out competitive-policy gate.
 
+A saved-report comparator now rejects mismatched opponents, deck hashes,
+global native-asset hashes, evaluation seeds, game schedules, and altered
+outcome summaries before computing a paired score difference. It reproduced
+the self-banish child's Tactical comparison with local deck-byte checks.
+Older reports still lack full loaded-card-script manifests; see
+[evaluation](evaluation.md#self-banish-preference-pilot-27-october-2026).
+New policy tournament reports fingerprint the complete Lua script tree and
+project/evaluator source, and the comparator enforces matching fingerprints
+when present. A two-game native smoke passed with those fields.
+
 An optional Flip-type-aware heuristic ablation increased Flip Control wins from 3/20 to 6/20 on that schedule, but its aggregate score was effectively unchanged and Chaos Control fell from 14/20 to 7/20. Keep the generic heuristic as the baseline while auditing the decision causes on high-play cards.
 
 A visible-stat CombatHeuristicAgent baseline now uses only player-visible field stats and legal actions. On a fresh, both-deck-assignments, three-pair native schedule it scored 54–42 against the original heuristic, with a paired 95% score interval of 52.1–61.5%; see [evaluation](evaluation.md). This is a limited baseline result, not a learned-policy gain. The evaluator now offers both deck assignments explicitly and clusters mirrored assignments together for score intervals, because fixed deck assignments produced misleadingly different head-to-head results. Further deck families and independent seeds remain necessary before promoting this baseline to a demonstration teacher.

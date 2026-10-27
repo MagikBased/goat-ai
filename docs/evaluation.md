@@ -6086,3 +6086,33 @@ The ignored evaluation reports are
 (`43f6f6fa784e7e399be4d5569d3ffdb7054235e5ff1e8a3c3b215448fdcca60d`),
 and `.cache/goat-ai/fv23_self_banish_parent_vs_tactical_14116_14123.json`
 (`a52e688fbaaff749a7142aee358c86b9fb21583d8a12d527de490fa82c09a40b`).
+
+`scripts/compare_tournament_reports.py` now validates saved game outcomes,
+declared evaluation seeds, training-seed separation, summary counts, and
+matched schedules before computing a paired score difference. It also
+requires identical opponent identity, opponent settings, deck hashes,
+engine, core commit, and recorded global native-asset hashes. With
+`--verify-local-decks`, it checks the currently available deck bytes against
+each report. Applied to the two Tactical reports above, it reproduced the
+**4.69-point** difference and **−4.69 to 14.06-point** paired interval.
+These older tournament reports do not bind every loaded card script, so
+matching their recorded global hashes does not independently prove their
+entire native script trees were identical. New `evaluate_policy.py` reports
+also include SHA-256 fingerprints of the complete Lua script tree and the
+project Python source plus evaluators. The comparator requires those
+fingerprints to match when either report contains them. A two-game native
+smoke report on seed 14300 recorded script-tree fingerprint
+`f886f54c419d3792fd69888d74190c070992609caad8f5737e3f563bd736b71c`
+and source fingerprint
+`78b6a2088879cfd7d1da034a59eee8f777a436d6f627533bfa5b699315d1298f`;
+comparing it to itself with local deck-byte verification returned exactly
+zero paired difference. Its ignored report is
+`.cache/goat-ai/evaluate_policy_script_tree_smoke_14300.json` (SHA-256
+`bd5fc7e7e3e1aab464ad3d6f08418cac8630428b3cf1ead6fb126fc538d59621`).
+
+```bash
+PYTHONPATH=src:. python scripts/compare_tournament_reports.py \
+  .cache/goat-ai/fv23_self_banish_vs_tactical_14116_14123.json \
+  .cache/goat-ai/fv23_self_banish_parent_vs_tactical_14116_14123.json \
+  --verify-local-decks
+```

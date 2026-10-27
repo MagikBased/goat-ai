@@ -27,6 +27,7 @@ from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import both_deck_assignments, run_tournament, run_tournament_parallel
 from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION
+from scripts.evaluate_native import card_scripts_sha256, file_set_sha256
 
 
 def make_policy_agent(_seed: int, checkpoint: str, tactical_guard: bool = False,
@@ -106,6 +107,15 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def policy_source_sha256(repository: Path) -> str:
+    """Bind tournament outcomes to the policy evaluator and project Python code."""
+    sources = list((repository / "src/goat_ai").rglob("*.py"))
+    sources.extend((repository / "scripts/evaluate_policy.py",
+                    repository / "scripts/evaluate_native.py",
+                    repository / "pyproject.toml"))
+    return file_set_sha256(repository, sources)
 
 
 def main() -> None:
@@ -230,6 +240,7 @@ def main() -> None:
             "global_utility": "scripts/utility.lua",
         }.items()
     }
+    repository = Path(__file__).resolve().parents[1]
     result = {
         "checkpoint_sha256": sha256(args.checkpoint),
         "policy_inference_version": POLICY_INFERENCE_VERSION,
@@ -245,6 +256,8 @@ def main() -> None:
         "policy_feature_version": checkpoint.get("feature_version", 1),
         "core_commit": "baa3881d0bae48e9994f915f5c931be53c1ba8ef",
         "asset_sha256": assets,
+        "card_scripts_sha256": card_scripts_sha256(args.native_root),
+        "source_code_sha256": policy_source_sha256(repository),
         "training_games": checkpoint["training_games"],
         "evaluation_seeds": seeds,
         "both_deck_assignments": args.both_deck_assignments,
