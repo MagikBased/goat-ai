@@ -39,12 +39,31 @@ each pairing with the same schedule. The comparison used
 `paired_score_difference` from `goat_ai.evaluation.tournament` on the three
 reports' saved `GameResult` fields.
 
+`scripts/compare_policy_baseline_mirror.py` now reproduces that comparison
+with gates for the exact role schedule, local deck bytes and compositions,
+native assets, core revision, card scripts, baseline version, and saved
+outcomes. It rejects a changed report or deck before reporting a difference.
+The ignored comparison report SHA-256 is
+`40608d142d26ff2350d0795bbc4fc480c87f78673b8fb48085755b843dd43bf6`.
+Run it as:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/compare_policy_baseline_mirror.py \
+  .cache/goat-ai/fv23_current_vs_tactical_2005_holdout_49500_49507.json \
+  .cache/goat-ai/tactical_mirror_phoenix_zombie_49500_49507_v2.json \
+  .cache/goat-ai/tactical_mirror_rhymus_zombie_49500_49507_v2.json
+```
+
 Separate development seeds 49600–49601 then yielded eight policy-versus-
 Tactical duels and **3,565 replay-verified, visibility-audited decisions**.
 The local review shortlister selected 24 of 122 candidates, balanced 12 per
 policy seat across eight duels. Two selected frames have conservative visible
 flags (own-only Nobleman and negative Heavy Storm); one flagged play was also
 chosen by Tactical. These are prompts for human judgment, not training labels.
+An independent full-replay audit reproduced the greedy policy choices and
+found exactly those two conservative flags among all 3,565 decisions; its
+ignored report SHA-256 is
+`64abb298113b7ea94e7216f95d0adfb52d29756e37d8bf7846aebb5db8946a21`.
 The [development review queue](../.cache/goat-ai/current_2005_development_review_49600_49601/queue.html)
 uses the local save server documented in [the replay audit](replay_audit.md).
 If its labels are used for training, these three deck compositions must be
