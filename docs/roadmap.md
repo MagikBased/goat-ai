@@ -1180,3 +1180,12 @@ matched four-game AB/BA run showed a 1.45–1.53× reset-subtotal speedup and a
 winners, and one byte-identical replay across versions. This improves rollout
 startup without changing the historical Lua patches; see
 [the native benchmark](benchmarks.md#native-script-path-dispatch).
+
+Staged multi-card picks now reuse their unchanged player-visible observation
+until the native response is submitted. A six-round matched complete-duel
+benchmark removed one observation build per 1,197-decision duel, with no
+reliable wall-time gain (median reference/reused ratio 1.006×). The next
+training-speed experiment should therefore target work that occurs on most
+decisions, such as batched policy inference across concurrent duels, and
+measure full training throughput and held-out strength before adoption; see
+[the benchmark](benchmarks.md#staged-selection-observation-reuse).

@@ -91,7 +91,8 @@ class RestrictedOcgcoreEngine:
             self.close()
             raise
 
-    def _decision(self, pending_attack: TargetSlotView | None = None) -> Decision:
+    def _decision(self, pending_attack: TargetSlotView | None = None,
+                  *, reuse_observation: bool = False) -> Decision:
         if self.probe is None or self.probe._pending_message is None:
             raise RuntimeError("no pending native decision")
         try:
@@ -134,7 +135,13 @@ class RestrictedOcgcoreEngine:
             native = replace(native, choices=tuple(choices))
         else:
             self._selection_indices = None
-        observation = self.probe.observation(native.player)
+        # Staged card picks only edit the adapter's selection prefix. Until a
+        # response is submitted, ocgcore has not advanced and its visible
+        # state is identical to the preceding decision.
+        observation = (self._last_observation if reuse_observation
+                       and self._last_observation is not None
+                       and self._last_observation.viewer == native.player
+                       else self.probe.observation(native.player))
         if pending_attack is not None and native.player == pending_attack.controller \
                 and any(choice.kind == "select_card" and choice.location == 0x04
                         for choice in native.choices):
@@ -295,13 +302,13 @@ class RestrictedOcgcoreEngine:
                 native = self.probe.decode_pending()
                 if native.sum_selection is not None:
                     self._selection_indices = selected
-                    return self._decision()
+                    return self._decision(reuse_observation=True)
                 selection = native.card_selection
                 if selection is None:
                     raise RuntimeError("staged selection lost its native prompt")
                 if len(selected) < selection.maximum:
                     self._selection_indices = selected
-                    return self._decision()
+                    return self._decision(reuse_observation=True)
                 response = self._card_selection_response(selected)
             else:
                 response = choice.response

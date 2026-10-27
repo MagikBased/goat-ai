@@ -434,3 +434,28 @@ self-play comparison of 1 versus 8 PyTorch CPU threads produced 3.259 versus
 3.323 seconds in one order and 3.354 versus 3.206 seconds in the other;
 trajectories matched and neither thread count won consistently. The training
 CLI keeps its current thread setting.
+
+## Staged-selection observation reuse
+
+On 27 October 2026, the native adapter began reusing the same player-visible
+observation while a multi-card selection is only staged in Python. It rebuilds
+the observation after the selected cards are submitted to ocgcore. The focused
+Graceful Charity and Thunder Dragon native regressions passed, including exact
+replay and visibility verification.
+
+The comparison forces staged Graceful Charity selection and runs one complete
+1,197-decision duel per arm in six AB/BA rounds:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/benchmark_staged_observation.py --rounds 6
+```
+
+Both arms produced identical complete trajectories. The reused arm made
+1,197 observation builds versus 1,198 in the reference arm in every round.
+The wall-time reference/reused ratios were 1.349, 1.030, 0.981, 1.030, 0.955,
+and 0.970; the median was **1.006×**. The first round includes warm-up effects.
+This saves an exact redundant query but shows no reliable whole-duel speedup
+for this fixture. It is not a training-throughput result. The ignored raw
+report is `.cache/goat-ai/staged_observation_benchmark_18.json`. This run used
+an Intel Core i7-10700K on Linux 6.8.0 with native core SHA-256
+`b2ce880275e07ae2cd5e6f8735e61e651dedaa6b752de471e6c0cf9d66db00eb`.

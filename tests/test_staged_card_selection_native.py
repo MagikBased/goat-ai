@@ -110,7 +110,10 @@ def test_staged_thunder_search_matches_flat_native_choice(tmp_path, monkeypatch,
                          a.parameters["selected_count"]) for a in actions} == {(0, 2, 0)}
                 for _ in range(copy_count):
                     action = next(a for a in env.legal_actions() if a.kind == "select_card")
+                    before_pick = obs
                     obs = env.step(action)
+                    if action.parameters["selected_count"] + 1 < 2:
+                        assert obs is before_pick
                 if copy_count < 2:
                     finish = next(a for a in env.legal_actions()
                                   if a.kind == "finish_selection")
@@ -176,7 +179,10 @@ def test_staged_graceful_discard_commits_one_exact_native_response(tmp_path, mon
                 selected_second = True
             if action is None:
                 action = agents[obs.acting_player].select_action(obs, actions)
+            before_step = obs
             obs = env.step(action)
+            if selected_first and not selected_second and action.kind == "select_card":
+                assert obs is before_step
             if selected_second and not committed_checked:
                 assert SANGAN in {card.code for card in obs.graveyards[0]}
                 assert len(env.engine.probe.observation(0).hand) == 6
