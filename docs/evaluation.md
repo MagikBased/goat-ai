@@ -7668,6 +7668,12 @@ default change. The ignored outputs have prefixes
 `.cache/goat-ai/rollout_{worker1,batch,worker4}_23010` with `_b` for the
 reversed order; the JSON reports contain deck and native asset fingerprints.
 
+A later [16-game matched benchmark](benchmarks.md#sixteen-game-ppo-rollout-workers)
+measured a 1.38× four-worker speedup on this host in both run orders, with
+identical trajectories and final tensors. Four workers are a supported
+throughput option for comparable CPU PPO schedules; the default remains
+unchanged pending wider hardware and matchup measurements.
+
 Reproduce each arm with the same checkpoint and command settings below,
 changing the execution flag and output path; the first arm used
 `--rollout-workers 1`, the second `--rollout-batch-inference`, and the third

@@ -525,6 +525,10 @@ worker processes with seed-scoped sampling. A measured eight-game run was
 1.23× faster with four persistent workers than with one, while model tensors
 and replay content matched exactly. This improves training throughput, not
 competitive strength; see [evaluation](evaluation.md).
+A later 16-game AB/BA run on this host measured a 1.38× four-worker speedup in
+both orders, with byte-identical trajectories and model tensors. One full arm
+replay-verified and passed the visibility audit; see
+[benchmarks](benchmarks.md#sixteen-game-ppo-rollout-workers).
 
 A 64-duel, four-role continuation with parallel PPO, per-deck baselines,
 per-episode weighting, and parent KL produced 33,341 replay-verified native

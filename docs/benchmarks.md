@@ -1046,3 +1046,54 @@ player-visibility audit. Standard/automatic reported training wall times were
 throughput estimate or evidence of improved playing strength. The ignored
 checkpoints and replays are under `.cache/goat-ai/` with
 `standard_json_18102` and `auto_json_18102` prefixes.
+
+## Sixteen-game PPO rollout workers
+
+On 27 October 2026, four consecutive matched self-play runs compared one
+versus four persistent rollout workers on an Intel Core i7-10700K. Each arm
+started from the same feature-v23 checkpoint (SHA-256
+`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`),
+played Jesse Goat Control against Warrior on seeds 28000–28015, and used
+four-game frozen PPO rollouts, two update epochs, minibatch 16, a 3,000-decision
+cap, and `OMP_NUM_THREADS=1`. The execution order was one, four, four, one.
+
+| Run | Workers | CLI-reported training wall | Complete decisions |
+| --- | ---: | ---: | ---: |
+| 1a | 1 | 10.332 s | 7,046 |
+| 4a | 4 | 7.474 s | 7,046 |
+| 4b | 4 | 7.631 s | 7,046 |
+| 1b | 1 | 10.529 s | 7,046 |
+
+Four workers were **1.38× faster** in both adjacent comparisons. Every arm
+finished all 16 duels with no decision-cap censoring and 1,196 learner
+decisions. The 16 trajectory SHA-256 values and all saved model tensors matched
+exactly across the four arms. One complete arm independently replay-verified
+all 7,046 decisions against the pinned native core and passed the
+player-visibility audit. The reports, checkpoints, and trajectories are ignored
+local artifacts named `.cache/goat-ai/worker_bench_{1a,4a,4b,1b}_28000*`;
+the report SHA-256 values in that order are
+`a73b503c3205b7b2f8e948661846b90cf6c98467f283df4cfad282d9e9298cbf`,
+`5643c2864718b74cdf2ea645bd1b51951e3c18bad5122bf089f4c7ec1232c247`,
+`fbf1cddd8fcb3c2fa00edcf4d08a31bbe07c80202aac6e79e4e8dc14c0a98fe9`,
+and `66be601c67ba20733431a437eee43a991a3f935ba64aa0a1fd885ece15ac3585`.
+
+Reproduce one arm after native setup, changing the worker count and output
+name for each run:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --seed 28000 --games 16 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 \
+  --ppo-epochs 2 --ppo-batch-size 16 --snapshot-every 4 \
+  --rollout-workers 4 --output .cache/goat-ai/worker_bench_4a_28000.pt
+```
+
+This supports using `--rollout-workers 4` for comparable CPU PPO jobs on this
+host. It does not establish speedup on other machines, deck families, or
+larger policies, nor any increase in playing strength. The measured wall time
+includes CLI training, replay writing, and checkpoint saving after Python
+startup; it is not a separate process-launch measurement.
