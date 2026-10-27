@@ -16,7 +16,8 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
                          learning_rate: float = 1e-3, seed: int = 0,
                          batch_size: int = 1,
                          batched_forward: bool = False,
-                         sampling_weights: Sequence[float] | None = None) -> tuple[float, ...]:
+                         sampling_weights: Sequence[float] | None = None,
+                         skip_forced: bool = False) -> tuple[float, ...]:
     """Return mean per-decision cross-entropy for each epoch.
 
     This function trains on its input as supplied. Callers must verify source,
@@ -32,6 +33,14 @@ def fit_behavioral_clone(model: LegalActionPolicy, vocabulary: CardVocabulary,
     if batched_forward and (model.feature_version < 10
                             or model.feature_version in (14, 15)):
         raise ValueError("batched forward requires a supported v10+ feature version")
+    if skip_forced:
+        selectable = [index for index, record in enumerate(records)
+                      if len(record.legal_actions) > 1]
+        if not selectable:
+            raise ValueError("training needs at least one multi-option decision")
+        if sampling_weights is not None:
+            sampling_weights = [sampling_weights[index] for index in selectable]
+        records = [records[index] for index in selectable]
     device = next(model.parameters()).device
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     losses = []

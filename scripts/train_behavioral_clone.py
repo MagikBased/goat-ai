@@ -229,6 +229,9 @@ def main() -> None:
                         help="decisions per optimizer update; combine forward passes with --batched-forward")
     parser.add_argument("--batched-forward", action="store_true",
                         help="opt-in padded variable-action policy forward for supported v10+ models")
+    parser.add_argument("--skip-forced-training", action="store_true",
+                        help="exclude one-legal-action records from cloning updates; "
+                             "they have zero choice loss but still remain in replay provenance")
     parser.add_argument("--verification-workers", type=int, default=1,
                         help="native replay verification processes (default: serial)")
     parser.add_argument("--width", type=int, default=64)
@@ -306,6 +309,8 @@ def main() -> None:
         parser.error("disagreement weighting is supported only for behavioral cloning")
     if args.batched_forward and args.parent_kl_steps:
         parser.error("batched forward is currently supported only for behavioral cloning")
+    if args.skip_forced_training and args.parent_kl_steps:
+        parser.error("skipping forced choices is currently supported only for behavioral cloning")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
                    else ExperimentalOcgcoreEngine)
     teacher = (TacticalHeuristicAgent(
@@ -499,7 +504,8 @@ def main() -> None:
                                       learning_rate=args.learning_rate, seed=args.seed,
                                       batch_size=args.batch_size,
                                       batched_forward=args.batched_forward,
-                                      sampling_weights=sampling_weights)
+                                      sampling_weights=sampling_weights,
+                                      skip_forced=args.skip_forced_training)
     fitting_seconds = perf_counter() - fitting_started
     args.output.parent.mkdir(parents=True, exist_ok=True)
     inherited_sources = Counter(parent.get("source_decisions", {})) if parent else Counter()
@@ -524,6 +530,10 @@ def main() -> None:
         "seed": args.seed, "torch_version": str(torch.__version__),
         "batch_size": args.batch_size,
         "batched_forward": args.batched_forward,
+        "skip_forced_training": args.skip_forced_training,
+        "fit_decisions": (sum(len(record.legal_actions) > 1 for record in records)
+                          if args.skip_forced_training and not preservation_metadata
+                          else len(records)),
         "focus_cards": tuple(sorted(focus_codes)),
         "focus_weight": args.focus_weight,
         "on_policy_activation_focus_only": args.on_policy_teacher_activation_focus_only,
@@ -542,6 +552,7 @@ def main() -> None:
     torch.save(checkpoint, args.output)
     summary = {"output": str(args.output), "decisions": len(records),
                "sources": sources, "focus_opportunity_decisions": focus_count}
+    summary["fit_decisions"] = checkpoint["fit_decisions"]
     if preservation_metadata:
         summary.update({"training_method": "parent_kl",
                         "final_labeled_loss": losses[-1],

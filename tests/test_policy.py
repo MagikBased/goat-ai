@@ -1151,6 +1151,29 @@ def test_behavioral_clone_minibatch_matches_mean_gradient():
         fit_behavioral_clone(actual, vocabulary, records, batch_size=0)
 
 
+def test_behavioral_clone_can_skip_forced_choices_without_changing_choice_updates():
+    vocabulary = CardVocabulary((10, 20), ((10, 0x21, 300), (20, 0x21, 1000)))
+    choices = actions()
+    forced = DecisionRecord(view(), choices[:1], choices[0])
+    selected = DecisionRecord(view(), choices, choices[1])
+    torch.manual_seed(82)
+    filtered = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    torch.manual_seed(82)
+    reference = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    filtered_losses = fit_behavioral_clone(
+        filtered, vocabulary, (forced, selected), epochs=2, learning_rate=0.01,
+        batch_size=2, batched_forward=True, sampling_weights=(100.0, 1.0),
+        skip_forced=True)
+    reference_losses = fit_behavioral_clone(
+        reference, vocabulary, (selected,), epochs=2, learning_rate=0.01,
+        batch_size=2, batched_forward=True, sampling_weights=(1.0,))
+    assert filtered_losses == reference_losses
+    assert all(torch.equal(left, right) for left, right in zip(
+        filtered.parameters(), reference.parameters(), strict=True))
+    with pytest.raises(ValueError, match="multi-option decision"):
+        fit_behavioral_clone(filtered, vocabulary, (forced,), skip_forced=True)
+
+
 @pytest.mark.parametrize("version", (10, 13, 23, 25))
 def test_padded_forward_matches_variable_length_single_decisions(version):
     vocabulary = CardVocabulary((10, 20), ((10, 0x21, 300), (20, 0x21, 1000)))

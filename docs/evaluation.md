@@ -7067,3 +7067,43 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
   --seed 30050 --seeds 100 --max-decisions 3000 --card-pool tournament \
   --verify-replays --distinct-opponents --count-card-actions
 ```
+
+### Optional forced-choice filtering for cloning (27 October 2026)
+
+`train_behavioral_clone.py --skip-forced-training` now removes decisions with
+only one legal action from the optimizer input, after the full native replay
+and visibility checks. Such decisions have zero choice cross-entropy. They
+remain counted in the verified replay and checkpoint provenance; the new
+`fit_decisions` field reports the actual optimizer input. The flag is limited
+to behavioral cloning. It is opt-in because removing records changes batch
+composition, update count, sampling distribution, and learned weights.
+
+One recorded policy-versus-Tactical duel, seed 10400, supplied **562** labeled
+decisions, including **351 forced** and **211 multi-option** choices. With
+feature v23, width 32, two epochs, batch size 16, batched forward, and one
+Torch thread, AB then BA full-command runs measured these process-internal
+times (seconds):
+
+| Order | All 562: fit / total | Filtered 211: fit / total |
+| --- | ---: | ---: |
+| AB | 1.357 / 2.958 | 0.880 / 2.545 |
+| BA | 1.338 / 2.904 | 0.901 / 2.510 |
+
+The fit step was **1.48–1.54× faster**; total command time was **1.14–1.16×
+faster** because replay verification still took roughly 1.05–1.12 seconds.
+Each mode produced identical model tensors on its two runs. The modes did
+**not** produce identical weights, and their mean losses have different
+denominators. This is a one-replay training-speed measurement, not evidence of
+playing-strength improvement. A cross-deck held-out tournament is required
+before using a filtered child as a stronger checkpoint.
+
+To reproduce, run the same command twice, once with and once without
+`--skip-forced-training`, using different ignored output paths:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/on_policy_teacher_10400_10407/jesse_warrior_10400_seat0.json \
+  --engine experimental --feature-version 23 --width 32 --epochs 2 \
+  --batch-size 16 --batched-forward --learning-rate 0.0002 --seed 82 \
+  --output .cache/goat-ai/forced_filter_example.pt
+```
