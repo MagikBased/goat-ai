@@ -108,6 +108,22 @@ can never be Set or are illegal in a deck. The audit checks one field slot
 and passive turn path; a separate Nobleman fixture checks a later target
 prompt for six common hidden monster identities.
 
+The full-pool audit can also continue to Nobleman of Crossout's target prompt:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_hidden_set_pool.py \
+  --zone monster --target-hidden \
+  --output .cache/goat-ai/hidden_nobleman_target_full_52.json
+```
+
+At seed 52, the same 644 Settable IDs all yielded identical player-zero
+observations and full legal-action lists at that prompt. Their target action
+named only the opponent's public Monster Zone slot. The other 229 still had no
+Set action in the empty-field fixture; no mismatch or runtime error occurred.
+The full run took 39.21 seconds on this host. The audit stops before Nobleman
+resolves, when a Flip monster may be publicly revealed; it does not validate
+the later effect or every possible prior information state.
+
 Keep older replay files byte-for-byte when they back SHA-256-bound reviews:
 reading and verifying v23 is supported, but rewriting it with a newer writer
 can change its JSON bytes and invalidate those sidecar hashes.

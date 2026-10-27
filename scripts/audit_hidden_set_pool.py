@@ -18,6 +18,7 @@ from goat_ai.replay.fingerprint import sha256_file
 from scripts.audit_hidden_opening_pool import candidate_deck
 
 MYSTICAL_SPACE_TYPHOON = 5318639
+NOBLEMAN_OF_CROSSOUT = 504700116
 
 
 class CardCannotBeSet(ValueError):
@@ -29,10 +30,10 @@ def reach_next_main_phase(own_deck: Path, opponent_deck: Path, root: Path,
                           target_hidden: bool = False):
     if zone not in ("spell_trap", "monster"):
         raise ValueError("zone must be spell_trap or monster")
-    if target_hidden and zone != "spell_trap":
-        raise ValueError("MST target audit requires spell_trap zone")
     set_kind = "set_spell_trap" if zone == "spell_trap" else "set_monster"
     location = 8 if zone == "spell_trap" else 4
+    target_spell = (MYSTICAL_SPACE_TYPHOON if zone == "spell_trap"
+                    else NOBLEMAN_OF_CROSSOUT)
     with GoatEnvironment(str(own_deck), str(opponent_deck), seed=seed,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
@@ -68,10 +69,10 @@ def reach_next_main_phase(own_deck: Path, opponent_deck: Path, root: Path,
                 if target_hidden:
                     activation = next((option for option in actions
                                        if option.kind == "activate" and
-                                       option.parameters.get("code") == MYSTICAL_SPACE_TYPHOON),
+                                       option.parameters.get("code") == target_spell),
                                       None)
                     if activation is None:
-                        raise AssertionError("MST activation absent at next Main Phase")
+                        raise AssertionError("targeting Spell absent at next Main Phase")
                     observation = env.step(activation)
                     actions = env.legal_actions()
                     if actions and all(option.kind == "place" for option in actions):
@@ -83,7 +84,7 @@ def reach_next_main_phase(own_deck: Path, opponent_deck: Path, root: Path,
                               and option.parameters.get("location") == location
                               and option.parameters.get("sequence") == hidden[0].sequence]
                     if len(target) != 1 or target[0].parameters.get("code") is not None:
-                        raise AssertionError("hidden MST target unavailable or reveals ID")
+                        raise AssertionError("hidden target unavailable or reveals ID")
                 return opening, (hidden[0].zone, hidden[0].sequence), (
                     observation, actions)
             if action is None:
@@ -99,19 +100,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--own-deck", type=Path,
-                        default=Path("examples/decks/nobleman_probe.ydk"))
+                        default=Path("examples/decks/nobleman_probe.ydk"),
+                        help="first-player Deck for the next-Main-Phase audit; "
+                             "target mode generates a fixture Deck instead")
     parser.add_argument("--seed", type=int, default=52)
     parser.add_argument("--zone", choices=("spell_trap", "monster"),
                         default="spell_trap", help="type of card the opponent Sets")
     parser.add_argument("--target-hidden", action="store_true",
-                        help="compare MST target prompts after the opponent Sets backrow")
+                        help="compare MST or Nobleman target prompts after a Set")
     parser.add_argument("--limit", type=int, help="audit only this many eligible IDs")
     parser.add_argument("--output", type=Path, help="write the complete JSON report")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be positive")
-    if args.target_hidden and args.zone != "spell_trap":
-        parser.error("--target-hidden requires --zone spell_trap")
 
     whitelist = args.native_root / "banlist/GOAT.lflist.conf"
     database = args.native_root / "database/cards.cdb"
@@ -136,9 +137,11 @@ def main() -> None:
         opponent = Path(directory) / "candidate.ydk"
         own_deck = args.own_deck
         if args.target_hidden:
-            own_deck = Path(directory) / "mst_probe.ydk"
+            target_spell = (MYSTICAL_SPACE_TYPHOON if args.zone == "spell_trap"
+                            else NOBLEMAN_OF_CROSSOUT)
+            own_deck = Path(directory) / "target_probe.ydk"
             own_deck.write_text("#main\n" + "\n".join(map(str, candidate_deck(
-                MYSTICAL_SPACE_TYPHOON))) + "\n#extra\n!side\n", encoding="utf-8")
+                target_spell))) + "\n#extra\n!side\n", encoding="utf-8")
         own_deck_sha256 = sha256_file(own_deck)
         for code in codes:
             opponent.write_text("#main\n" + "\n".join(map(str, candidate_deck(code)))
@@ -164,12 +167,14 @@ def main() -> None:
                 errors.append({"code": code, "error": f"{type(exc).__name__}: {exc}"})
 
     report = {
-        "scope": ("opening and MST hidden-target prompt after opponent Sets one card"
+        "scope": ("opening and hidden-target prompt after opponent Sets one card"
                   if args.target_hidden else
                   "opening and next own Main Phase after opponent Sets one card"),
         "zone": args.zone,
+        "target_hidden": args.target_hidden,
+        "target_spell": target_spell if args.target_hidden else None,
         "seed": args.seed,
-        "own_deck": ("generated MST plus vanilla probe" if args.target_hidden
+        "own_deck": (f"generated {target_spell} plus vanilla probe" if args.target_hidden
                      else str(args.own_deck)),
         "own_deck_sha256": own_deck_sha256,
         "whitelist_sha256": sha256_file(whitelist),
