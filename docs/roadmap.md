@@ -194,6 +194,14 @@ legal opponent decks and found no adapter error; neither proves complete
 arbitrary-deck or historical-ruling coverage. See
 [the sweep reports](evaluation.md#fresh-distinct-deck-protocol-sweeps-27-october-2026).
 
+Two additional independent 100-pair sweeps reached **200/200 terminal** with
+**204,472** replay-verified and visibility-audited decisions. The full GOAT
+whitelist mix loaded 22 script assets absent from three prior local reports;
+the six-deck tournament-card mix selected 68 chain-response pairs absent
+from its prior 50-pair run. These increase sampled protocol coverage but do
+not close M1's arbitrary-deck completeness or M2's historical ruling gate.
+See [evaluation](evaluation.md).
+
 ## M2 — Historical correctness gate
 
 A native-enabled local regression run on 2026-10-27 passed **1,003 tests**

@@ -7026,3 +7026,44 @@ The evaluation used the same two held-out `--matchup` pairs, engine, deck
 assignment, unseen-composition gate, decision cap, and workers as the prior
 experiment, with `--seed 19000 --seeds 8` for the direct arm and
 `--seed 19008 --seeds 8 --opponent tactical` for both matched baseline arms.
+
+### Further distinct-deck native protocol sweeps
+
+A fresh full-whitelist sweep used independent legal 40-card Main Decks for
+both players on seeds 10356–10455. RandomAgent completed **100/100** duels
+within a 3,000-decision cap; the longest took 1,655 decisions. All **109,551**
+decisions replay-verified and passed the player-visible audit, including
+1,021 hidden-field and 93 opponent-hand choices. The games loaded 1,306
+distinct native assets and offered 5,360 source-card/action-kind pairs.
+Relative to the union of the local reports for whitelist seeds 10274–10323,
+whitelist seeds 10324–10355, and tournament-mix seeds 30000–30049, this run
+loaded **22 previously unobserved script assets**. The ignored report is
+`.cache/goat-ai/whitelist_distinct_10356_10455/report.json` (SHA-256
+`71557cfa080c21dc1850355fff6be6c34b98956b4aab34853c5d79db941b9515`).
+
+A second sweep mixed cards from six sourced tournament Main Decks, using
+distinct legal opponent decks on seeds 30050–30149. RandomAgent completed
+**100/100** duels; the longest took 1,461 decisions. All **94,921** decisions
+replay-verified and passed visibility checks, including 1,162 hidden-field
+and 557 opponent-hand choices. It selected 115 distinct chain-response/source
+pairs, **68** absent from the earlier tournament-mix seeds 30000–30049.
+The run loaded no script asset absent from that earlier mix. The ignored
+report is `.cache/goat-ai/tournament_mix_distinct_30050_30149/report.json`
+(SHA-256 `422f3fe4f33918acd253c149ad7573f0de0bb100926fb5e2a7b6230bf3076e79`).
+
+These are sampled native protocol and information-boundary checks. The decks
+are randomly assembled, and random decisions do not validate historical
+card rulings or competitive strength. Reproduce after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_distinct_10356_10455 \
+  --seed 10356 --seeds 100 --max-decisions 3000 \
+  --verify-replays --distinct-opponents --count-card-actions
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/tournament_mix_distinct_30050_30149 \
+  --seed 30050 --seeds 100 --max-decisions 3000 --card-pool tournament \
+  --verify-replays --distinct-opponents --count-card-actions
+```
