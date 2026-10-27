@@ -1,5 +1,50 @@
 # Early replay decision audit
 
+## Full fixed-policy review audit (27 October 2026)
+
+The unchanged current-core feature-v23 checkpoint was audited on all 64
+fixed-policy Tactical-v14 duels from seeds 44000–44015, covering 31,729
+native-replay-verified and visibility-audited decisions. Its greedy choices
+were reproduced on all 15,704 policy-seat decisions. The conservative
+visible-state audit returned 58 prompts, not 58 proven mistakes:
+
+| Prompt | Occurrences | Distinct duels |
+| --- | ---: | ---: |
+| End turn with Thunder Dragon activatable | 34 | 11 |
+| Nobleman with only an own Set monster | 9 | 7 |
+| Metamorphosis spends a weak Flip monster on an empty opposing field | 3 | 3 |
+| Heavy Storm with a negative visible backrow trade | 3 | 3 |
+| Pot of Greed before an available Thunder Dragon activation | 3 | 3 |
+| Sakuretsu Armor while Royal Decree is face-up | 2 | 2 |
+| Four other categories | 4 | 4 |
+
+The Thunder Dragon prompts all came from the same matchup and policy seat,
+so they should be reviewed as a repeated local choice rather than 34
+independent deck-family failures. The Nobleman prompts span both matchups and
+both seats. The [full-corpus review queue](../replays/review_fixed_policy_44000_full/queue.html)
+links 32 varied frames from 22 complete duel viewers, including eight
+distinct flagged categories. It is an ignored local review artifact; no
+suggestion is a training label until a person authorizes and validates it.
+
+The ignored audit JSON SHA-256 is
+`cce61d33a85e7acfd4c12a2acfa0d7a78a633475085a34d171c9f0302dcc08e8`;
+the full-corpus queue JSON SHA-256 is
+`4e411dd1a0043e3deeea3951d05191a74e11fb0deb9d443066240b63bd83c94b`.
+Reproduce after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_replays.py \
+  .cache/goat-ai/fixed_policy_value_44000_44015/matchup_*.json \
+  --checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --output .cache/goat-ai/fixed_policy_value_44000_44015/review_audit.json
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/fixed_policy_value_44000_44015/matchup_*.json \
+  --limit 32 --per-replay 2 --render-viewers \
+  --output replays/review_fixed_policy_44000_full/queue.json
+```
+
 ## Fixed-policy resource and timing review (27 October 2026)
 
 The unchanged current-core feature-v23 checkpoint played Tactical-v14 on
