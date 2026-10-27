@@ -893,6 +893,11 @@ open; future training changes must improve held-out game outcomes.
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
 
+The [Edison feasibility audit](edison_research.md) records the official March
+2010 Advanced Format restrictions as a checked data asset and lists the
+remaining card-pool, native-rule, and observation validation gates. This is
+M5 preparation; Edison duels are not yet supported.
+
 ### Possible Stardust PC-port integration
 
 Keep training in Python. Define a versioned, game-independent decision boundary: the game supplies a player-visible observation and legal actions; the agent returns an action identifier. When Stardust exposes those decisions in a PC port, implement a small C or C++ bridge and native model inference. Stardust's 2009 rules, card IDs, and action protocol need their own adapter and validation; GOAT checkpoints should not be assumed directly compatible. This is future work and does not block the GOAT milestones.

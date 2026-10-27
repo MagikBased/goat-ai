@@ -68,6 +68,31 @@ def read_goat_whitelist(path: str | Path) -> dict[int, int]:
     return limits
 
 
+def read_advanced_restrictions(path: str | Path) -> dict[int, int]:
+    """Read canonical card IDs and copy caps; unrestricted cards are absent.
+
+    This table alone cannot establish format legality: release dates and the
+    historical rules profile must be validated separately.
+    """
+    lines = Path(path).read_text(encoding="utf-8-sig").splitlines()
+    rows = [line for line in lines if line and not line.startswith("#")]
+    if not rows or rows[0] != "card_id\tmax_copies\tcard_name":
+        raise ValueError("invalid Advanced Format restriction table header")
+    limits: dict[int, int] = {}
+    for number, row in enumerate(rows[1:], 2):
+        fields = row.split("\t")
+        if len(fields) != 3 or not fields[0].isdecimal() or fields[1] not in {"0", "1", "2"}:
+            raise ValueError(f"invalid restriction entry at data row {number}")
+        code, limit, name = fields
+        code = int(code)
+        if not name.strip() or code in limits:
+            raise ValueError(f"duplicate or unnamed restriction at data row {number}")
+        limits[code] = int(limit)
+    if not limits:
+        raise ValueError("empty Advanced Format restriction table")
+    return limits
+
+
 def validate_goat_deck(deck: Decklist, limits: dict[int, int], database: Path,
                        goat_database: Path | None = None,
                        unofficial_database: Path | None = None,
