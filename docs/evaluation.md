@@ -7464,6 +7464,52 @@ measure full training wall time and preserve exact trajectories and the
 visibility audit. Feature encoding and replay verification are separate
 candidates to profile before changing their semantics.
 
+### Four-game self-play call profile (27 October 2026)
+
+A single-process, four-game PPO training run from the unchanged feature-v23
+reference used Jesse Goat Control versus Warrior, seeds 23000–23003, a
+3,000-decision cap, one four-duel rollout, two update epochs, and minibatch
+size 16. All four duels reached terminal after **2,650 decisions**; the
+learner had **487** multi-option decisions. All **2,650** recorded decisions
+replay-verified against the pinned native core and passed the visibility audit.
+A second run with the same inputs and without `cProfile` produced four equal
+loaded trajectories. Its CLI-reported wall time was **4.80 s**, versus **6.74 s**
+with profiling enabled. These short-run times include startup and replay
+writing and are not throughput predictions for a long training job.
+
+The profiled run recorded **2,654** observation builds with **1.243 s**
+cumulative Python profiler time, **1,360** feature encodes with **0.908 s**,
+and **966** policy forwards with **1.293 s**. Four replay writes accumulated
+only **0.062 s** in the same profile. These cumulative figures may overlap
+their callers, omit native execution detail, and include profiling overhead;
+they must not be summed into a wall-time breakdown. The next measured
+optimization target is the per-decision observation/encoding/inference path,
+with exact trajectory and visibility checks. Replay writing is lower priority
+for this short schedule.
+
+The ignored profiler data, CLI report, and matching control report are
+`.cache/goat-ai/full_train_profile_23000.pstats`,
+`.cache/goat-ai/full_train_profile_23000.json`, and
+`.cache/goat-ai/full_train_profile_23000_control.json`. Reproduce the
+profiled arm after [native setup](native_setup.md) with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python -m cProfile \
+  -o .cache/goat-ai/full_train_profile_23000.pstats \
+  scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --seed 23000 --games 4 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 \
+  --ppo-epochs 2 --ppo-batch-size 16 --snapshot-every 4 \
+  --output .cache/goat-ai/full_train_profile_23000.pt
+```
+
+Use a distinct output and replay directory for each repeat. This profile is
+diagnostic only; the four-game outcomes do not establish policy strength.
+
 ### Frozen-rollout baseline ablation (27 October 2026)
 
 The existing four-duel PPO rollout freezes policy weights but, in its default
