@@ -469,6 +469,10 @@ Before using any `.yrp`/`.yrpX` for imitation, obtain a permitted real GOAT
 replay fixture, match its original core/scripts, recover each legal-action
 set and selected response, and pass the existing visibility and exact replay
 gates. See [research](research.md).
+The [replay contribution guide](replay_contributions.md) now distinguishes
+parser-only permission from model-training permission and gives a local,
+privacy-preserving intake command. Public replay archives found so far have
+not supplied an explicitly licensed GOAT training fixture.
 
 A 16-duel, sourced-deck native worker pilot now compares 1, 2, 4, and 8
 spawned processes on identical seeds and both deck seat orders. Ordered

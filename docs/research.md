@@ -27,6 +27,25 @@ Required regression cases: first-turn draw; summon response and Ignition priorit
 
 [Project Ignis FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html) says old `.yrp` replays re-enact decisions against a matching core and scripts, whereas `.yrpX` stores resulting actions and remains viewable across engine updates. Neither statement guarantees the complete legal action set or each player's knowledge at every choice. The [EDOPro replay header and flags](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.h) and [container reader](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp) define `yrp1` as saved Decks plus engine responses and `yrpX` as a packet stream, with optional LZMA compression and an extended four-word seed. GOAT AI has a bounded structural reader for these two EDOPro containers and conditional native response reconstruction tested on synthetic GOAT duels. The reader prints a privacy-preserving summary by default. A public YGOPro `yrp2` sample from [ygopro-yrp-encode](https://github.com/purerosefallen/ygopro-yrp-encode) is a distinct format and is rejected explicitly. Real EDOPro replay compatibility and player-knowledge validation are **not established**. No EDOPro replay is yet admitted as a training trajectory. DuelingBook data and video-derived trajectories require rights and a separate extraction pipeline.
 
+Another MIT-licensed [YGOPro/YGOPro2 replay parser](https://github.com/RemarkWang/yrp-parser)
+documents `.yrp2`, embedded `.yrp1`, and `.yrp3d` spectator streams. Its
+engine driver may synthesize responses when the recording and current engine
+disagree or the saved responses run out. That is useful for a human-readable
+log, but synthetic continuation cannot supply exact player decisions for
+imitation. Its target formats and YGOPro2 engine differ from the EDOPro
+`.yrp`/`.yrpX` path tested here; no parser code has been copied or adopted.
+
+[Goat World's match archive](https://goatworld.community/matches) describes
+downloadable GOAT replays, but the pages checked here did not expose a direct
+file fixture, and I found no express grant of external model-training rights
+in its [terms](https://goatworld.community/legal/terms). Similarly,
+[Goat Format's terms](https://beta.goatformat.com/terms) let the site publish
+submitted replays as tournament records; I infer that this does not authorize
+an unrelated project to train on them. We will seek a replay provided by its
+recorder with an explicit scope of permission, keep it out of Git, and
+separately test native compatibility.
+See [replay contributions](replay_contributions.md) for the intake steps.
+
 The reader was also checked against five actual `.yrpX` files from the
 [MIT-licensed Project Echelon repository at commit `cc969ba`](https://github.com/COTFK/project-echelon/tree/cc969ba7ebfa48fbe149287d14aee096e4dfe422/replays),
 kept only in ignored local cache. A 2021 file with SHA-256
