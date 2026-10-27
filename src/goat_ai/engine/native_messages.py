@@ -16,6 +16,7 @@ from goat_ai.engine.ocgcore_probe import MSG_SELECT_CHAIN, MSG_SELECT_IDLECMD
 # Return prompt. Larger card selections use staged, linear-size choices.
 MAX_CARD_SELECTION_COMBINATIONS = 4096
 MAX_SUM_SELECTION_COMBINATIONS = 4096
+MAX_ZONE_SELECTION_COMBINATIONS = 2048
 
 
 @dataclass(frozen=True)
@@ -177,11 +178,26 @@ class NativeSumSelection:
 
 
 @dataclass(frozen=True)
+class NativeZoneSelection:
+    zones: tuple[tuple[int, int, int], ...]
+    count: int
+    kind: str
+
+    def accepts(self, response: int | bytes) -> bool:
+        if not isinstance(response, bytes) or len(response) != 3 * self.count:
+            return False
+        selected = tuple(tuple(response[start:start + 3])
+                         for start in range(0, len(response), 3))
+        return len(set(selected)) == self.count and all(zone in self.zones for zone in selected)
+
+
+@dataclass(frozen=True)
 class NativeDecision:
     player: int
     choices: tuple[NativeChoice, ...]
     card_selection: NativeCardSelection | None = None
     sum_selection: NativeSumSelection | None = None
+    zone_selection: NativeZoneSelection | None = None
 
 
 class _Reader:
@@ -545,8 +561,12 @@ def decode_decision(message: bytes,
                     zones.append((controller, location, sequence))
         if count > len(zones):
             raise ValueError("field-zone selection has too few legal zones")
-        if comb(len(zones), count) > 2048:
-            raise NotImplementedError("field-zone selection has too many combinations")
+        if comb(len(zones), count) > MAX_ZONE_SELECTION_COMBINATIONS:
+            selection = NativeZoneSelection(tuple(zones), count, "place_zones" if kind == 18
+                                            else "disable_zones")
+            return NativeDecision(player, tuple(NativeChoice(
+                selection.kind, index, zones=(zone,))
+                for index, zone in enumerate(zones)), zone_selection=selection)
         choices = []
         for selected in combinations(zones, count):
             response = bytes(value for zone in selected for value in zone)

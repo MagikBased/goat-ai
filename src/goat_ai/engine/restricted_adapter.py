@@ -133,6 +133,16 @@ class RestrictedOcgcoreEngine:
             if selection.cancelable:
                 choices.append(NativeChoice("cancel", -1))
             native = replace(native, choices=tuple(choices))
+        elif native.zone_selection is not None:
+            selection = native.zone_selection
+            if self._selection_indices is None:
+                self._selection_indices = ()
+            selected = self._selection_indices
+            selected_zones = tuple(selection.zones[index] for index in selected)
+            choices = tuple(replace(choice, zones=(*selected_zones, *choice.zones))
+                            for choice in native.choices
+                            if choice.response not in selected)
+            native = replace(native, choices=choices)
         else:
             self._selection_indices = None
         # Staged card picks only edit the adapter's selection prefix. Until a
@@ -259,6 +269,10 @@ class RestrictedOcgcoreEngine:
                 parameters["selection_sum_target"] = native.sum_selection.target
                 parameters["selection_sum_mode"] = (
                     "exact" if native.sum_selection.mode == 0 else "greater")
+            if native.zone_selection is not None:
+                parameters["selection_minimum"] = native.zone_selection.count
+                parameters["selection_maximum"] = native.zone_selection.count
+                parameters["selected_count"] = len(self._selection_indices)
             if (choice.sequence is not None and choice.location not in (0x01, 0x40)
                     and not (choice.location == 0x02 and choice.controller != native.player)):
                 parameters["sequence"] = choice.sequence
@@ -295,7 +309,19 @@ class RestrictedOcgcoreEngine:
         index = self._actions.index(action)
         try:
             choice = self._choices[index]
-            if self._selection_indices is not None and choice.kind == "select_card":
+            if self._selection_indices is not None and choice.kind in (
+                    "place_zones", "disable_zones") and isinstance(choice.response, int):
+                native = self.probe.decode_pending()
+                selection = native.zone_selection
+                if selection is None:
+                    raise RuntimeError("staged zone selection lost its native prompt")
+                selected = (*self._selection_indices, choice.response)
+                if len(selected) < selection.count:
+                    self._selection_indices = selected
+                    return self._decision(reuse_observation=True)
+                response = bytes(value for candidate in selected
+                                 for value in selection.zones[candidate])
+            elif self._selection_indices is not None and choice.kind == "select_card":
                 if not isinstance(choice.response, int):
                     raise RuntimeError("staged selection candidate has no native index")
                 selected = (*self._selection_indices, choice.response)

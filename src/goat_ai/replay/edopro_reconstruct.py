@@ -96,14 +96,18 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                 action = engine.action_for_recorded_response(response)
             except ValueError as exc:
                 native = engine.probe.decode_pending()
-                selection = native.card_selection or native.sum_selection
+                selection = (native.card_selection or native.sum_selection
+                             or native.zone_selection)
                 if selection is None or not selection.accepts(response):
                     raise ReplayReconstructionError(
                         f"response {index}: saved bytes do not map to one legal action") from exc
-                if len(response) < 8:
-                    raise ReplayReconstructionError(f"response {index}: truncated selection")
-                size = struct.unpack_from("<I", response, 4)[0]
-                indices = struct.unpack_from(f"<{size}I", response, 8)
+                if native.zone_selection is not None:
+                    zones = native.zone_selection.zones
+                    indices = tuple(zones.index(tuple(response[start:start + 3]))
+                                    for start in range(0, len(response), 3))
+                else:
+                    size = struct.unpack_from("<I", response, 4)[0]
+                    indices = struct.unpack_from(f"<{size}I", response, 8)
                 for candidate in indices:
                     try:
                         action = engine.action_for_selection_index(candidate)
@@ -113,7 +117,7 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                     except (ValueError, RuntimeError) as stage_exc:
                         raise ReplayReconstructionError(
                             f"response {index}: staged selection diverged: {stage_exc}") from stage_exc
-                if engine.recorded_selection_in_progress():
+                if native.zone_selection is None and engine.recorded_selection_in_progress():
                     try:
                         action = engine.action_for_recorded_response(response)
                         if action.kind != "finish_selection":

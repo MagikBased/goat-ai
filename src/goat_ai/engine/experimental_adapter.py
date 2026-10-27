@@ -59,7 +59,8 @@ class ExperimentalOcgcoreEngine(RestrictedOcgcoreEngine):
     def action_for_selection_index(self, index: int) -> Action:
         """Find one staged public pick by the native candidate index."""
         matches = [action for choice, action in zip(self._choices, self._actions, strict=True)
-                   if choice.kind == "select_card" and choice.response == index]
+                   if choice.kind in ("select_card", "place_zones", "disable_zones")
+                   and choice.response == index]
         if len(matches) != 1:
             raise ValueError("recorded selection index has no unique public action")
         return matches[0]

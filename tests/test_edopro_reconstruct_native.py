@@ -35,6 +35,7 @@ from goat_ai.replay.edopro_reconstruct import (
 from scripts.probe_random_decks import generate_deck, write_deck
 
 THUNDER_DRAGON = 504700054
+GROUND_COLLAPSE = 90502999
 
 
 def _legacy_replay(responses: list[bytes], *, settings=(8000, 5, 1),
@@ -118,6 +119,45 @@ def test_reconstructs_complete_native_legacy_response_trace(native_legacy_respon
     assert trace.replay_sha256 == replay.sha256
     assert trace.embedded_replay_sha256 is None
     assert "build/libocgcore.so" in trace.asset_sha256
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_reconstructs_staged_field_zones_from_one_saved_response(monkeypatch):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    first = read_ydk("examples/decks/ground_collapse_probe.ydk")
+    second = read_ydk("examples/decks/vanilla_probe.ydk")
+    decks = (tuple(reversed(first.main)), tuple(reversed(second.main)))
+    responses = []
+    zone_prompts = 0
+    with OcgcoreProbe(root / "build/libocgcore.so", root / "database/cards.cdb",
+                      root / "scripts") as probe:
+        probe.first_replay_decision((43, 44, 45, 46), *decks)
+        for _ in range(2000):
+            native = probe.decode_pending()
+            zone_prompts += probe._pending_message[0] == 24
+            choice = next((item for item in native.choices
+                           if item.kind == "activate" and item.code == GROUND_COLLAPSE), None)
+            if choice is None:
+                choice = next((item for item in native.choices
+                               if item.kind in ("pass", "end_phase")), native.choices[0])
+            response = (struct.pack("<I", choice.response & 0xffffffff)
+                        if isinstance(choice.response, int) else choice.response)
+            responses.append(response)
+            if probe.respond(choice.response).terminal:
+                break
+        else:
+            pytest.fail("recorded Ground Collapse duel did not finish")
+    assert zone_prompts == 1
+    replay = _legacy_replay(responses, decks=decks)
+    monkeypatch.setattr(native_messages, "MAX_ZONE_SELECTION_COMBINATIONS", 1)
+    trace = reconstruct_legacy_responses(replay, root)
+    assert trace.saved_response_count == len(responses)
+    assert len(trace.decisions) == len(responses) + 1
+    zone_actions = [record.selected_action for record in trace.decisions
+                    if record.selected_action.kind == "disable_zones"]
+    assert len(zone_actions) == 2
+    assert [len(action.parameters["zones"]) for action in zone_actions] == [1, 2]
+    assert trace.winner in (0, 1)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

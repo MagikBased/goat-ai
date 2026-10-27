@@ -1242,6 +1242,8 @@ class OcgcoreProbe:
                  if decision.card_selection is not None
                  else decision.sum_selection.accepts(response_value)
                  if decision.sum_selection is not None
+                 else decision.zone_selection.accepts(response_value)
+                 if decision.zone_selection is not None
                  else response_value in {choice.response for choice in decision.choices})
         if not legal:
             raise ValueError("illegal native response")

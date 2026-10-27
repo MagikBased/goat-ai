@@ -89,6 +89,17 @@ A [sixth sourced tournament Main Deck](../examples/decks/bazoo_return_weirdchamp
 
 **Exit:** A clean setup completes seeded random-agent duels with valid outcomes and no unhandled native messages in the fixture decks. Illegal actions are rejected. Repeated seeds reproduce action/observation/outcome traces. Changing a hidden opponent hand or deck order while holding the visible state fixed cannot change the observation supplied to the agent.
 
+Large `MSG_SELECT_PLACE` and `MSG_SELECT_DISFIELD` choices now use staged,
+linear-size public zone actions when complete combinations exceed 2,048.
+The adapter preserves each chosen zone's order and submits one native response
+after the final pick. A synthetic five-zone prompt checks the bounded action
+set; forcing the staged route on Ground Collapse's two-zone prompt produces the
+same post-selection observation and legal actions as the flat route. Both
+complete duels replay-verify and pass the visibility audit. A synthetic GOAT
+`.yrp` with one saved zone response also reconstructs into staged choices and
+the same terminal duel. This widens protocol coverage; it does not establish
+historical correctness or real human replay compatibility.
+
 A previous six-deck pairwise random-agent sweep covered all 15 distinct pairings among the then-current deck corpus, both seats, and seeds 9500–9501. All 60 games reached native terminal outcomes below 3,000 decisions; the ordered game results and decision counts reproduced exactly. The later Bazoo Return list was not part of that sweep. A seeded Ring/BLS mutual-lethal draw exposed a stale terminal `step()` observation, which now refreshes the native public state and shows 0/0 LP. The draw trajectory replay-verifies. This is protocol coverage, not a full-deck historical-ruling audit; see [the evaluation log](evaluation.md).
 
 A tournament-pool random-deck mode now mixes only Main Deck cards from the
