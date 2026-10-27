@@ -7887,3 +7887,73 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
   --historical-probability PROBABILITY --rollout-workers 4 \
   --output .cache/goat-ai/historical_PROBABILITY_reproduction.pt
 ```
+### Fresh 64-duel current-core Tactical continuation (27 October 2026)
+
+The earlier 64-duel Tactical-v14 imitation gain used trajectories recorded
+before the GOAT SEGOC native-core correction. Its exact replay provenance
+therefore cannot train a current-core checkpoint. A later 16-duel current-core
+continuation had an inconclusive held-out result. To test whether fresh data
+volume mattered, the unchanged feature-v23 neural reference was continued on
+64 newly recorded native duels: 32 Chaos Control/Bazoo Return with Tactical-v14
+on both seats (seeds 33000–33015), and 32 Lolmarcus/Michael Goat Control
+with Tactical-v14 against Combat v3 (seeds 33016–33031). These produced
+42,005 total decisions and 21,815 Tactical-seat decisions. The clone trainer
+independently replay-verified all 64 complete duels and audited their
+player-visible observations before fitting. These are synthetic teacher
+demonstrations, not human play.
+
+The width-32 continuation used two epochs, batch size 16, batched forward,
+forced-forward omission, learning rate 0.0002, seed 55, and four verification
+workers. Imitation loss fell from 0.170915 to 0.144211. Reported training
+wall time was 55.99 seconds, including 13.22 seconds of verification and
+23.42 seconds of fitting. The ignored checkpoint is
+`.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt` (SHA-256
+`975d06284b3035bc8bf8dbafa041a8a25a80195574d1ff695f2fbd25d1c7ff45`).
+The SHA-256 of the sorted `relative_path + space + file_sha256 + newline`
+manifest for the 64 source trajectories is
+`c86b0b770efcd3824a7e4b5060bfb1bd06039dc740128c8ca664fda8311c40c8`.
+
+The held-out tournament used Phoenix Control against each of two Dimension
+Fusion Turbo lists, both deck assignments and policy seats, seeds 33100–33107.
+The evaluator rejected any training Main Deck composition or seed. The child
+scored **33–30–1** directly against its parent over 64 games (52.3%; paired
+95% interval 39.1%–65.6%), which does not establish a direct improvement.
+On separate matched seeds 33108–33115 against Tactical-v14, the child scored
+**20–44** and the parent **13–51**. Their paired score difference was **+10.9
+percentage points** (95% interval **+1.6 to +20.3**). The child's assigned-deck
+records were Phoenix 12–20, GoatFormat Dimension Fusion 5–11, and WikiFormat
+Dimension Fusion 3–13; the parent scored 6–26, 5–11, and 2–14 respectively.
+The report comparator verified matching native assets, card scripts, source
+code, opponent, seeds, and local deck hashes.
+
+An additional held-out Dimension Fusion Turbo mirror, without Phoenix,
+tested both deck assignments and seats. Against Tactical-v14 on matched seeds
+33120–33127, the child scored **11–21** and the parent **5–27**, a paired
+**+18.8-point** difference (95% interval **+6.3 to +31.3**). Directly against
+the parent on separate seeds 33128–33135, the child scored **17–15** over
+32 games (paired 95% interval 43.8%–62.5%). This supports a Tactical-baseline
+gain on a second matchup, while direct parent strength remains uncertain.
+The child still loses decisively to Tactical-v14 overall, has no human-play
+evaluation or self-play improvement, and is not promoted as the competitive
+reference. M4 remains open.
+
+The ignored training summary SHA-256 is
+`7522a0b26b21768ba5d0eb5e8098b5bc1e608733a6600f8a2f6d297c304a5ba1`.
+The six tournament report SHA-256 values, in the order described above, are
+`b55c87c25d591a8092b6f8f24cd883e60f282565fb1b79e636ac2a85462b90d7`,
+`c05cb27e068ca6345cfde9ad0cd57304db14ed10407e643ea61f2d724b40a8dc`,
+`20140c0a1ab57f4690d7833127607596c1d5779b0d9979377909d8843ba3044f`,
+`ff57a4ab8f52f6547f048b7050514825d32922329b120c73cf8c6aa171fa815e`,
+`b6ebcfa48999fbdb04900a47301f2cd5566362ace2a790e71caec2e0c195d7ed`,
+and `e674191b886be396a102d2d4e95f95882c884327fb5f2a37809304571b19c3a2`.
+Reproduce the collection with `scripts/collect_heuristic_demos.py --engine
+experimental --teacher tactical` using the two deck pairs and seed blocks
+above, then train with `scripts/train_behavioral_clone.py --engine experimental
+--feature-version 23 --width 32 --epochs 2 --batch-size 16 --batched-forward
+--omit-forced-forward --verification-workers 4 --learning-rate 0.0002
+--seed 55 --init-checkpoint
+.cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt`. Evaluate
+with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --workers 4 --seeds 8`
+and the matchups, seeds, and opponents above. Use distinct ignored output
+paths for each run.
