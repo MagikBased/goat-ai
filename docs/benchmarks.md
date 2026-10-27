@@ -576,3 +576,39 @@ respectively. The second round's difference is small relative to timing
 variation; this confirms correctness and a modest local CPU saving, not a
 reliable estimate of large-scale self-play speedup. The ignored raw report is
 `.cache/goat-ai/race_cache_complete_script_17100_17103.json`.
+
+## Optional fast trajectory JSON in self-play
+
+On 27 October 2026, `cProfile` of one seeded native training game identified
+replay JSON writing as a material CPU cost. The 11.4 MB recorded trajectory
+serialized in a mean 0.232 s with the standard writer versus 0.0178 s with
+`orjson` over eight passes on this host. The outputs were byte-identical for
+that trajectory. The profile and sample are ignored local artifacts at
+`.cache/goat-ai/train_profile_18000.prof` and
+`.cache/goat-ai/train_profile_18000_replays/`.
+
+An opt-in `--fast-trajectory-json` path now uses `orjson`'s native dataclass
+writer. Install the optional dependency with `pip install '.[speed]'`; the
+standard writer remains the default. The complete one-game training comparison
+used the same fv23 checkpoint, seed 18100, experimental native engine,
+control/Chaos probe decks, batch size 16, and one Torch CPU thread. Each arm
+recorded 1,115 decisions in a byte-identical 13,218,971-byte trajectory
+(SHA-256 `1fbd10a54ac9d0c8674753357dcdbe46a2f9ea58564552e8e7144f5cb8cb9081`).
+Model tensors were exactly equal. Standard/fast reported training wall times
+were **2.497/2.260 s** and **2.458/2.219 s** in AB/BA order, or **1.105×**
+and **1.108×** speedups. The fast trajectory passed native verification of
+all 1,115 decisions and the player-visibility audit. Full process wall times,
+which include Python/Torch startup, were 3.841/3.619 s and 3.800/3.582 s.
+These are one-game CPU measurements, not multi-game scaling or a strength gain.
+The ignored comparison is `.cache/goat-ai/fast_json_benchmark_18100/report.json`.
+
+Reproduce one arm from the repository root, changing `MODE` and optionally
+adding `--fast-trajectory-json` for the fast arm:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v6_current_assets.pt \
+  --output .cache/goat-ai/json_MODE_18100.pt --engine experimental \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk \
+  --seed 18100 --games 1 --max-decisions 3000 --reinforce-batch-size 16
+```

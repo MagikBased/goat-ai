@@ -307,6 +307,10 @@ The evaluator refuses seeds present in checkpoint training-game metadata. `--rej
 ## Initial self-play experiment
 
 `scripts/train_self_play.py` implements an episodic score-function policy-gradient update inspired by [Williams's REINFORCE paper](https://doi.org/10.1007/bf00992696). It samples legal actions from the current policy, plays native duels against a mixture of frozen historical policy snapshots and RandomAgent, and applies terminal rewards of +1 for a win, −1 for a loss, and 0 for a draw. A moving return baseline and entropy bonus are optional variance and exploration aids. Frozen snapshots preserve past opponents during updates; the first snapshot remains in the pool. The trainer alternates learner seats, records seeds and opponents, and can write complete player-visible trajectories with `--record-dir`. It never grants the learner access to an opponent's hidden cards.
+For replay-heavy CPU runs, `pip install '.[speed]'` enables the optional
+`--fast-trajectory-json` writer. A seeded one-duel AB/BA comparison measured
+about a 1.11× complete training speedup with identical replay bytes and policy
+tensors; see [benchmarks](benchmarks.md).
 
 ```bash
 OMP_NUM_THREADS=1 python scripts/train_self_play.py checkpoints/vanilla_bc.pt \

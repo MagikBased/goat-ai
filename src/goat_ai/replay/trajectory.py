@@ -55,7 +55,8 @@ def _json_dataclass(value):
     raise TypeError(f"object of type {type(value).__name__} is not JSON serializable")
 
 
-def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
+def write_trajectory(path: str | Path, trajectory: Trajectory, *,
+                     fast_json: bool = False) -> None:
     version = trajectory.schema_version
     if version not in range(1, 26):
         raise ValueError("unsupported trajectory schema")
@@ -104,8 +105,16 @@ def write_trajectory(path: str | Path, trajectory: Trajectory) -> None:
         if version >= 25 and any(card.zone == "monster" and card.position == "faceup"
                                  and card.owner is None for card in view.field):
             raise ValueError("schema v25 requires owner for face-up monsters")
-    Path(path).write_text(json.dumps(trajectory, default=_json_dataclass,
-                                     separators=(",", ":")) + "\n", encoding="utf-8")
+    if fast_json:
+        try:
+            import orjson
+        except ImportError as error:
+            raise RuntimeError("fast trajectory JSON requires the speed extra: "
+                               "pip install '.[speed]'") from error
+        Path(path).write_bytes(orjson.dumps(trajectory, option=orjson.OPT_APPEND_NEWLINE))
+    else:
+        Path(path).write_text(json.dumps(trajectory, default=_json_dataclass,
+                                         separators=(",", ":")) + "\n", encoding="utf-8")
 
 
 def read_trajectory(path: str | Path) -> Trajectory:

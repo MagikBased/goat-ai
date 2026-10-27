@@ -48,6 +48,20 @@ def view(hidden_code: int = 1) -> Observation:
     )
 
 
+def test_fast_trajectory_json_roundtrip_matches_standard_path(tmp_path):
+    pytest.importorskip("orjson")
+    observation = view()
+    action = Action("0", "pass", 0)
+    trajectory = Trajectory("goat", ("a", "b"), 7,
+                            (DecisionRecord(observation, (action,), action),), 0)
+    standard = tmp_path / "standard.json"
+    fast = tmp_path / "fast.json"
+    write_trajectory(standard, trajectory)
+    write_trajectory(fast, trajectory, fast_json=True)
+    assert fast.read_bytes() == standard.read_bytes()
+    assert read_trajectory(fast) == trajectory
+
+
 class ContractEngine:
     """Test double for boundary behavior only; it does not model Yu-Gi-Oh!."""
 
