@@ -1009,6 +1009,13 @@ duels replay-verify and pass the visibility audit. The narrow probe applies
 the March 2010 one-copy restriction for Black Rose Dragon. This expands
 Synchro protocol coverage without establishing a complete 2010 rules profile
 or release pool; see [the Edison audit](edison_research.md).
+A third sourced MR1 fixture Synchro Summons Stardust Dragon from Junk
+Synchron and Curse of Dragon, then tests both responses to an activated
+Mirror Force. The chain branch negates and destroys Mirror Force and returns
+Stardust at End Phase; the pass branch loses Stardust. Both complete duels
+replay-verify and pass the visibility audit. This remains a narrow protocol
+case, not an Edison historical-correctness or card-pool claim; see
+[the Edison audit](edison_research.md).
 An independent 2009 deck-construction validator now accepts an explicitly
 audited eligible-card set and checks Main, Extra, and Side sizes, Fusion/Synchro
 placement, and shared canonical copy caps. It deliberately does not infer

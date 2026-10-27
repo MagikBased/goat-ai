@@ -131,7 +131,7 @@ lists Junk Synchron and Junk Warrior; the [official Junk Warrior card record](ht
 dates its first TCG printing to 5 August 2008 and specifies Junk Synchron
 plus non-Tuner material. The separate `Mr1SynchroProbeEngine` admits only
 the old vanilla fixture cards, Bokoichi, this named pair, and the separately
-tested Black Rose Dragon below. It checks Main,
+tested Black Rose Dragon and Stardust Dragon/Mirror Force cases below. It checks Main,
 Extra, and copy limits using the March 2010 restriction table, but its tiny
 eligible-ID set is a **probe subset**, not the full Edison release pool.
 
@@ -225,6 +225,43 @@ This adds a distinct Synchro trigger and choice to the protocol evidence. It
 does not independently validate every 2010 Black Rose ruling, the script's
 other effect, the full Edison card pool, or an Edison rules profile.
 
+## Stardust Dragon versus Mirror Force
+
+The [official Stardust Dragon card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7734&ope=2&request_locale=en)
+identifies it as a Level 8 Synchro requiring one Tuner and at least one
+non-Tuner, and describes its response to an effect that would destroy cards on
+the field and its later End Phase return. Its listed first TCG release was in
+2008. The [official Mirror Force record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4887&ope=2&request_locale=en)
+describes destruction of the attacker's Attack Position monsters when an
+opponent attacks. These records support the narrow interaction selected for
+the fixture; modern card text alone does not settle every March 2010 ruling.
+
+In paired seed-536 native fixtures, a Level 4 Kabazauls is Tributed for Level
+5 Curse of Dragon. Level 3 Junk Synchron and Curse of Dragon then become the
+materials for Stardust Dragon. The opponent has Set Mirror Force. Stardust
+attacks directly, Mirror Force activates, and Stardust's controller can either
+chain its effect or pass. Chaining moves Stardust to the Graveyard, negates and
+destroys Mirror Force, and offers Stardust's return at End Phase. Passing lets
+Mirror Force destroy Stardust without an End Phase return. The two duels
+terminate after 1,413 and 1,465 decisions respectively. Both complete
+trajectories replay-verify against pinned native assets and pass the
+player-visibility audit; Mirror Force's identity remains hidden before it is
+activated. The fixture uses pinned official card scripts and the narrow MR1
+protocol allowlist. Reproduce after native setup:
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_stardust_probe.py \
+  --output replays/mr1_stardust_yes_seed536.json
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_stardust_probe.py \
+  --decline --output replays/mr1_stardust_no_seed536.json
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_synchro_probe.py
+```
+
+This establishes one destruction-response protocol path. It does not validate
+all historical Stardust timings, battle rulings, Synchro materials, or the
+complete Edison release pool and rules profile.
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including
@@ -239,8 +276,8 @@ other effect, the full Edison card pool, or an Edison rules profile.
    should settle individual cases.
 4. Audit player-visible observations and legal actions in Edison fixtures, then
    complete seeded duels and replay verification before benchmarking throughput.
-   MR1 vanilla, Junk Warrior, and Black Rose Dragon fixtures check protocol
-   paths only.
+   MR1 vanilla, Junk Warrior, Black Rose Dragon, and Stardust Dragon fixtures
+   check protocol paths only.
 
 No Edison simulator, deck-legality claim, or Edison training data is available
 yet. Keep GOAT and Edison trajectory ruleset versions distinct.

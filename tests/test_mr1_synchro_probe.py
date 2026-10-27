@@ -13,6 +13,8 @@ from goat_ai.engine.mr1_synchro_probe import (
     BOKOICHI,
     JUNK_SYNCHRON,
     JUNK_WARRIOR,
+    MIRROR_FORCE,
+    STARDUST_DRAGON,
     Mr1SynchroProbeEngine,
 )
 from goat_ai.engine.ocgcore_probe import MR1_FLAGS
@@ -20,6 +22,7 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from scripts.record_mr1_black_rose_probe import GEMINI_ELF, record_probe
+from scripts.record_mr1_stardust_probe import record_probe as record_stardust_probe
 from scripts.record_mr1_synchro_probe import record_attack_probe, select_setup_action
 from scripts.render_replay import render_replay
 
@@ -128,11 +131,11 @@ def test_mr1_junk_warrior_excludes_opposing_level_two_atk(tmp_path):
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_mr1_synchro_probe_rejects_unsourced_extra_card(tmp_path):
     native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    deck = tmp_path / "stardust.ydk"
-    deck.write_text(DECK.read_text().replace(str(JUNK_WARRIOR), "44508094"))
+    deck = tmp_path / "brionac.ydk"
+    deck.write_text(DECK.read_text().replace(str(JUNK_WARRIOR), "50321796"))
     with (GoatEnvironment(str(deck), str(OPPONENT), seed=3,
                           engine=Mr1SynchroProbeEngine(native_root)) as env,
-          pytest.raises(ValueError, match="Junk Warrior")):
+          pytest.raises(ValueError, match="MR1 Synchro probe allows only")):
         env.reset()
 
 
@@ -180,3 +183,51 @@ def test_mr1_black_rose_obeys_march_2010_one_copy_limit(tmp_path):
                           engine=Mr1SynchroProbeEngine(native_root)) as env,
           pytest.raises(ValueError, match="exceeds Edison copy limit 1")):
         env.reset()
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("negate,decisions,destroyed,revived", (
+    (True, 1413, 58, 68), (False, 1465, 57, None)))
+def test_mr1_stardust_negates_mirror_force_and_returns_at_end_phase(
+        tmp_path, negate, decisions, destroyed, revived):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    trajectory, (choice, destruction, return_step) = record_stardust_probe(
+        native_root, negate=negate)
+    assert choice == ("chain" if negate else "pass", 56)
+    assert (destruction, return_step) == (destroyed, revived)
+    assert len(trajectory.decisions) == decisions
+    assert trajectory.winner == 1
+    assert trajectory.ruleset == "mr1-synchro-protocol"
+    for code in (44508094, 44095762, 63977008):
+        assert f"scripts/official/c{code}.lua" in trajectory.asset_sha256
+    chain_view = trajectory.decisions[choice[1] - 1].observation
+    assert any(card.code == STARDUST_DRAGON and card.controller == 0
+               for card in chain_view.field)
+    assert any(card.code == MIRROR_FORCE and card.controller == 1
+               for card in chain_view.field)
+    before_activation = trajectory.decisions[53].observation
+    assert any(card.code is None and card.controller == 1
+               for card in before_activation.field)
+    after_force = trajectory.decisions[destroyed].observation
+    assert STARDUST_DRAGON in {card.code for card in after_force.graveyards[0]}
+    assert MIRROR_FORCE in {card.code for card in after_force.graveyards[1]}
+    assert STARDUST_DRAGON not in {card.code for card in after_force.field}
+    if negate:
+        assert after_force.life_points == (8000, 8000)
+        returned = trajectory.decisions[revived].observation
+        assert returned.turn == 5 and returned.phase == "end"
+        assert any(card.code == STARDUST_DRAGON and card.controller == 0
+                   for card in returned.field)
+        assert STARDUST_DRAGON not in {card.code for card in returned.graveyards[0]}
+    else:
+        assert after_force.life_points == (8000, 8000)
+        assert not any(card.code == STARDUST_DRAGON
+                       for record in trajectory.decisions[destroyed:]
+                       if record.observation.turn == 5
+                       for card in record.observation.field)
+    path = tmp_path / "stardust.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, Mr1SynchroProbeEngine(native_root)) == decisions
+    assert audit_trajectory_visibility(loaded)["decisions"] == decisions
