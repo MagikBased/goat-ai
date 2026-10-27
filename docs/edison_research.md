@@ -27,9 +27,11 @@ Edison cutoff still needs a territory-specific source check.
 
 Another API-only candidate, Restructer Revolution (`99518961`), has a
 [documented 2005 English TCG printing](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4871&ope=2&request_locale=en)
-and no March 2010 restriction in the official list. Its omission from the
-community candidate is unresolved; the printing date alone is not enough to
-certify North American event eligibility. These examples make regional
+in the [ordinary *Dark Beginning 2* booster](https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=1&pid=11104003&request_locale=en&rp=99999)
+and no March 2010 restriction in the official list. We include it in the
+partial historical release pool; this is an inference from the dated booster
+record, not a certification of every North American event edge case or the
+complete Edison whitelist. These examples make regional
 provenance a required release-pool gate, alongside first-print date, set
 distribution, copy limits, and historical rulings.
 
@@ -156,8 +158,11 @@ now records independent North American evidence and remaining questions.
 calls it the first product to offer Vice Dragon and gives 23 June 2010 as its
 tournament-legal date, after the cutoff. The current [official card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7991&ope=2&request_locale=en)
 also starts with that print. Restructer Revolution has a
-[dated 2005 ordinary booster printing](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4871&ope=2&request_locale=en)
-and is an inclusion *candidate*, not a finalized whitelist entry. The
+[dated 2005 English booster printing](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4871&ope=2&request_locale=en)
+in [*Dark Beginning 2*](https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=1&pid=11104003&request_locale=en&rp=99999),
+which supports including it in the partial historical release pool. This is
+an inference from the booster record and the [March 2010 restriction list](https://www.yugioh-card.com/en/downloads/alt_format/2010-03-01.pdf),
+not a period North American event ruling. The
 [2010 European Konami policy](https://www.etcg.de/uploads/pdf/KDE_YuGiOh_Policy.pdf)
 allows some video-game promos from games released in a different territory.
 Therefore [Konami's statement](https://www.yugioh-card.com/en/products/past_products/legendary_coll2/)
@@ -172,7 +177,7 @@ or event ruling. The
 and [Yu-Jo Friendship](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5754&ope=2&request_locale=en)
 have older promotional records, but their period North American legal dates
 have not been proved. Thus 29 of the 34 named API-only discrepancies have a
-source-backed exclusion, one is an inclusion candidate, and four await a
+source-backed exclusion, one has a dated-booster inclusion, and four await a
 promotional-card or cross-territory check. The two community-only promotions and the wider
 release pool remain open.
 

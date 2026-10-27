@@ -1120,8 +1120,10 @@ printing is after the April 20 cutoff. Their dated source table is a partial
 release exclusion asset, not a complete Edison whitelist. Konami's North
 American product page separately excludes Vice Dragon after the cutoff,
 bringing source-backed exclusions to 29 of the 34 named API-only
-discrepancies. Restructer Revolution is an inclusion candidate with a 2005
-booster printing; three older promotional cards and Darkness Destroyer's
+discrepancies. Restructer Revolution is included in the partial release pool
+from its dated 2005 English booster printing and unrestricted March 2010 list;
+this is an inference from those sources, not a complete regional whitelist.
+Three older promotional cards and Darkness Destroyer's
 cross-territory game promo still need period North American adjudication.
 The two community-only promotions also remain open. See the
 [six-card discrepancy ledger](../configs/historical/edison_non_dt01_candidate_discrepancies_2010_04_20.tsv)
