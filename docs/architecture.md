@@ -38,6 +38,23 @@ public observation fields on read. Native recordings use v24 and include a
 terminal observation; older hand-built v17 recordings remain readable for
 compatibility. Callers creating current records directly must set v24 and
 supply the terminal observation.
+
+The opening information-flow audit can be reproduced with the pinned native
+assets:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_hidden_opening_pool.py \
+  --output .cache/goat-ai/hidden_opening_pool_audit_52.json
+```
+
+At seed 52 it replaces one card in the opponent's Main Deck with each of the
+1,430 whitelist-eligible non-Fusion IDs present in the pinned database. The
+chosen card is confirmed in the opponent's opening hand. Every resulting
+player-zero observation and legal-action tuple matched; no startup errors
+occurred. The full run took 57.68 seconds on this host. The script reports
+asset hashes and exits nonzero on any difference or failed candidate. It
+checks only the first decision: later effects, private reveals, and hidden
+field states still need separate differential tests.
 Keep older replay files byte-for-byte when they back SHA-256-bound reviews:
 reading and verifying v23 is supported, but rewriting it with a newer writer
 can change its JSON bytes and invalidate those sidecar hashes.
