@@ -1400,8 +1400,11 @@ fixture also confirms simultaneous optional triggers: turn-player Link 1,
 opponent Link 2, with both replacements resolving in reverse order. Mixed
 Sangan/Peten fixtures now confirm mandatory Sangan Link 1 and optional Peten
 Link 2 with their controllers swapped; both reach terminal and replay-verify.
-Effects recognized mid-chain and wider historical SEGOC combinations remain
-to be independently checked. Re-record
+A paired Raigeki Break fixture also destroys opponent Sangan at Chain Link 2
+before turn-player Sangan at Link 1; the resulting mandatory triggers keep
+that event order, opponent Link 1 then turn-player Link 2. This full duel
+replay-verifies. Other effects recognized mid-chain and wider historical SEGOC
+combinations remain to be independently checked. Re-record
 old training trajectories before replay verification because the native core
 binary hash and potentially the resulting games have changed. See
 `docs/goat_rules.md` for source links and the conflicting Edison summary.
