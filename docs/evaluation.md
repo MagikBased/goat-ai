@@ -93,6 +93,131 @@ The deck fixture and prior hash-cache correction passed the Python suite:
 296 tests passed, with 696 native-gated skips. Six focused native-enabled
 deck/fingerprint tests passed. The full native suite was not rerun.
 
+## On-policy teacher diversity pilot (27 October 2026)
+
+The previous 64-duel, four-deck Tactical-v14 labeling collection contained
+4,679 multi-option labels but regressed on a held-out Dimension Fusion family.
+I combined those 64 verified trajectories with eight already recorded
+policy-versus-Tactical duels on the independently sourced WikiFormat Dimension
+Fusion list. The same unchanged feature-v23 parent, disagreement weight 4,
+two epochs, minibatch size 16, learning rate `1e-4`, and seed 37 produced a
+5,180-label clone (1,196 policy/teacher disagreements). All 72 source duels
+were replay-verified and visibility-audited during training; these are
+**synthetic teacher labels**, not human demonstrations. The experimental
+checkpoint SHA-256 is
+`2227a1f708784ad4df3e2f2ab895955c888377548920e11e4d3311211de893d4`.
+Training took 30.36 seconds, including 10.36 seconds of verification and
+8.25 seconds of fitting.
+
+Fresh seeds 13200–13207 evaluated three matchups with both deck assignments
+and both policy seats: GoatFormat guide Dimension Fusion/Bazoo Return,
+Insids Chaos Control/Bazoo Return, and Lolmarcus/Michael Goat Control. Every
+evaluation Main Deck composition and seed was excluded from the clone's
+training set. The mixed clone split **46–45–5** directly against its unchanged
+parent over 96 games (paired score interval **43.8%–57.3%**). Against Tactical
+on that same schedule it scored **26–70**, versus **19–77** for the parent and
+**18–76–2** for the prior four-deck clone. The mixed-minus-parent paired
+score difference was **+7.3 points** (95% interval **−1.0 to +15.6**); the
+mixed-minus-prior-clone difference was **+7.3 points** (95% interval **+0.5
+to +13.5**). On fresh seeds 13208–13215, the mixed clone scored **53–40–3**
+directly against that prior clone over 96 games, with a paired score interval
+of **47.9%–65.1%**. These exploratory comparisons suggested some transfer from
+the added Dimension Fusion labels, but neither a direct parent gain nor a
+strong result against Tactical was established.
+
+To test broader deck diversity, eight more policy-versus-Tactical duels on
+Riclar Chaos Turbo/Matt Peddle Goat Control, seeds 13300–13303 in both policy
+seats, completed with **3,734 replay-verified and visibility-audited
+decisions**. The collection manifest SHA-256 is
+`8015354185f482d9ff90321620dd91b6106250c8bd17a153ac1b9f6fe441fc6f`.
+Adding these to the same training schedule produced a 5,749-label clone
+(1,359 disagreements) in 33.69 seconds; checkpoint SHA-256
+`bbdcef649c1f01212fdf52bf49d08654c20b068a70acb9c018df0585b65b270c`.
+The held-out Insids, GoatFormat Dimension Fusion, Lolmarcus, Michael, and
+Bazoo Return Main Decks remained outside this training set.
+
+On fresh seeds 13340–13347, this three-family clone split **46–48–2**
+directly against the mixed clone in 96 games (paired score interval
+**41.7%–55.2%**). Against Tactical it scored **28–67–1** versus the mixed
+clone's **21–75** on that schedule. On the earlier seeds 13200–13207,
+however, it scored **24–72** versus the mixed clone's **26–70**. Combined
+across 192 paired Tactical games, the three-family clone scored **52–139–1**
+versus **47–145** for the mixed clone: a **+2.9-point** paired score difference
+with a 95% interval of **−2.1 to +8.1 points**. More synthetic labels did not
+demonstrate a reproducible competitive gain. Neither child is promoted, and
+no self-play gain is claimed. The unchanged v23 parent remains the reference.
+
+The ignored training summaries and key evaluation reports are below. All
+report SHA-256 values bind these numbers to the local artifacts:
+
+| Artifact under `.cache/goat-ai/` | SHA-256 |
+| --- | --- |
+| `fv23_on_policy_teacher_plus_wikiformat_df_disagreement4.train.json` | `d3a8117adfea639dd3b7d52a3b5269e72213f97bf138fc187936c19ab0431e57` |
+| `fv23_on_policy_teacher_diverse_threefamily_disagreement4.train.json` | `8c0008b0c8019080742b7f8f9255f2dde9e933cf449af6bc512276d48ca98c0f` |
+| `fv23_mixed_on_policy_vs_parent_13200_13207.json` | `0e3c0bd4fa225a04936c0fd6d5f9bf963de573befb1f5dbb3c6c0943c0c552d4` |
+| `fv23_mixed_vs_old_on_policy_13208_13215.json` | `3d5aca5ab6cefdac9ac76bba7e867ab3a29be9b6bb85985bb5dc5cef323637b4` |
+| `fv23_diverse_vs_mixed_on_policy_13340_13347.json` | `ebac68af1e8a97744449e6a91f6f896dbb01819c42bd71e33d37d4776b80f77d` |
+| `fv23_mixed_on_policy_vs_tactical_13200_13207.json` | `ce99c9636a611c37b647677a812c708c95663939e8d49236639a3c484818407e` |
+| `fv23_old_on_policy_vs_tactical_mixed_eval_13200_13207.json` | `6fbd76c464bfea8ab1caf70d6ea04f3664f4770b68ec9ace7eeb6844420960d3` |
+| `fv23_parent_vs_tactical_mixed_eval_13200_13207.json` | `5eec2b2beba051533644cc9bc13555d631a77aac1795f43f1abb373f2c81d4a6` |
+| `fv23_diverse_vs_tactical_13200_13207.json` | `75639604f269319a1ea2db35ad9f0e1f3f319e7816a994c80a012ce130366c65` |
+| `fv23_diverse_vs_tactical_13340_13347.json` | `75139f9fed0afea9bd1b19d0990e0b75402a6cfa6b23730bb0699f783ca14f56` |
+| `fv23_mixed_vs_tactical_13340_13347.json` | `2f1e46fb3fe4379f0289a1aa5e47c7c16569dc61f532571d6d85f2f44cda48df` |
+
+The Chaos Turbo/Matt Peddle addition can be collected from the pinned parent
+checkpoint after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --matchup examples/decks/chaos_turbo_riclar_2020.ydk \
+            examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+  --opponent tactical --seed 13300 --seeds 4 --workers 4 \
+  --max-decisions 3000 \
+  --output-dir .cache/goat-ai/on_policy_chaos_turbo_matt_13300_13303
+```
+
+The current code reproduces the two-family training with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/policy_vs_tactical_12100_12115/matchup*.json \
+  .cache/goat-ai/on_policy_wikiformat_df_13100_13103/matchup*.json \
+  --engine experimental --on-policy-teacher tactical_v14 \
+  --on-policy-disagreement-weight 4 --feature-version 23 --width 32 \
+  --epochs 2 --batch-size 16 --batched-forward --verification-workers 4 \
+  --learning-rate 0.0001 --seed 37 \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/fv23_on_policy_teacher_plus_wikiformat_df_disagreement4.pt
+```
+
+For the three-family child, add
+`.cache/goat-ai/on_policy_chaos_turbo_matt_13300_13303/matchup*.json` to the
+trajectory arguments and change the output path to its checkpoint name above.
+The saved reports record the full held-out deck schedules, seeds, hashes, and
+seat results. For example, rerun the first mixed-versus-parent schedule with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv23_on_policy_teacher_plus_wikiformat_df_disagreement4.pt \
+  --engine experimental \
+  --opponent-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --matchup examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+            examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+            examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 13200 --seeds 8 --workers 4 \
+  --output .cache/goat-ai/fv23_mixed_on_policy_vs_parent_13200_13207.json
+```
+
+This experiment supports a data-diversity hypothesis for future
+work, while showing that another small dose of the same Tactical teacher is
+insufficient to close M4. A different learning signal, stronger authorized
+human decisions, or value learning needs separate testing.
+
 ## Chaos Return versus Warrior protocol sweep
 
 Simon “Dingosig” Guinhut's [first-place 2022 Worlds Chaos Return list](https://formatlibrary.com/decks/6540) was downloaded as a public YDK and converted to pinned GOAT/pre-errata IDs in [`chaos_return_dingosig_worlds_2022.ydk`](../examples/decks/chaos_return_dingosig_worlds_2022.ydk). The source has 40 Main, 15 Extra, and 15 Side cards; all three sections pass the pinned GOAT legality gate. Two seat-swapped full duels against the sourced Warrior list serialize and replay-verify exact trajectories.

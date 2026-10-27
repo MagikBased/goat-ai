@@ -1041,6 +1041,19 @@ regression. This is useful evidence of deck-family overfitting, not M4's
 cross-deck strength gain. Keep the parent as the neural reference; see
 [the expanded evaluation](evaluation.md).
 
+An exploratory continuation combined those 64 verified duels with eight
+policy-visited Tactical labels from a separate WikiFormat Dimension Fusion
+list. The 5,180-label child split 46–45–5 directly against its parent on 96
+held-out games and scored 26–70 versus Tactical, compared with the parent's
+19–77 on the same schedule. Another eight verified Chaos Turbo/Matt Peddle
+duels expanded training to 5,749 labels. The three-family child split 46–48–2
+against the two-family child on 96 fresh held-out games; across two 96-game
+Tactical schedules its paired score advantage was only +2.9 points with a
+95% interval of −2.1 to +8.1. These synthetic-teacher data additions did not
+demonstrate a direct parent gain, broad competitive strength, or self-play
+gain. Keep the v23 parent as reference; [the pilot log](evaluation.md#on-policy-teacher-diversity-pilot-27-october-2026)
+records the decks, pins, and report hashes.
+
 Four-duel PPO rollout batching and equal-duel loss weighting were tested
 from that same parent on the same 32-game training schedule. The unweighted
 rollout child lost 20–44 to single-duel PPO on 64 held-out games; the
