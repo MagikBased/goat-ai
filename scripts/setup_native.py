@@ -22,11 +22,32 @@ DATABASE_SHA256 = "d5166c35296a6c65dcc0230c7bc0e9f25721639159b80fa78bf724be61183
 GOAT_DATABASE_SHA256 = "042ffc3de692245d13d144656a79a34cb114d291ddd0c93a21bee9c0e607b4b4"
 UNOFFICIAL_DATABASE_SHA256 = "7753f01785fbf174be2ec3833610306b02a8ce2cb45ac09339ea50afe164bb6a"
 GOAT_LIST_SHA256 = "2159b6eb0868816860c4913571b514c27fd777755a09c358f250e6cc7cc5db37"
+CORE_PROCESSOR_UPSTREAM_SHA256 = "083b4da8e33f22890d186c7d19ebbcf0113aa4c89d59e30f73cef0d2dd8cda90"
+CORE_PROCESSOR_GOAT_SHA256 = "544f99bb3e8f3148c6abe17a01b0d8cde27466ccaba062b6a9c815edff9bf3b5"
+CORE_SEGOC_PATCH = Path(__file__).resolve().parent / "native_patches/0001-goat-cross-controller-segoc.patch"
+CORE_SEGOC_PATCH_SHA256 = "fb2bc9fde96863af230085c1b03aa444fa75145b81eb20479620d18fd2126aef"
 
 
 def run(*args: str) -> None:
     print("+", *args, flush=True)
     subprocess.run(args, check=True)
+
+
+def apply_goat_core_patch(core: Path) -> None:
+    """Apply the pinned GOAT-only SEGOC correction, or verify it is present."""
+    patch_hash = hashlib.sha256(CORE_SEGOC_PATCH.read_bytes()).hexdigest()
+    if patch_hash != CORE_SEGOC_PATCH_SHA256:
+        raise SystemExit(f"GOAT core patch checksum mismatch: {patch_hash}")
+    processor = core / "processor.cpp"
+    current_hash = hashlib.sha256(processor.read_bytes()).hexdigest()
+    if current_hash == CORE_PROCESSOR_GOAT_SHA256:
+        return
+    if current_hash != CORE_PROCESSOR_UPSTREAM_SHA256:
+        raise SystemExit(f"unexpected native processor.cpp checksum: {current_hash}")
+    run("git", "-C", str(core), "apply", str(CORE_SEGOC_PATCH))
+    patched_hash = hashlib.sha256(processor.read_bytes()).hexdigest()
+    if patched_hash != CORE_PROCESSOR_GOAT_SHA256:
+        raise SystemExit(f"GOAT core patch produced unexpected checksum: {patched_hash}")
 
 
 def fetch(root: Path, name: str, url: str, revision: str,
@@ -78,6 +99,7 @@ def main() -> None:
     root.mkdir(parents=True, exist_ok=True)
     paths = {name: fetch(root, name, url, revision, args.full_card_scripts)
              for name, url, revision in SOURCES}
+    apply_goat_core_patch(paths["core"])
     actual_hash = hashlib.sha256((paths["database"] / "cards.cdb").read_bytes()).hexdigest()
     if actual_hash != DATABASE_SHA256:
         raise SystemExit(f"database checksum mismatch: {actual_hash}")

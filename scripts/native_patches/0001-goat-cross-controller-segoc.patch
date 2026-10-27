@@ -1,0 +1,29 @@
+diff --git a/processor.cpp b/processor.cpp
+index ab8a51d..e87e352 100644
+--- a/processor.cpp
++++ b/processor.cpp
+@@ -630,7 +630,9 @@ bool field::process(Processors::PointEvent& arg) {
+ 			   && check_trigger_effect(*clit)
+ 			   && peffect->is_chainable(tp)
+ 			   && peffect->is_activateable(tp, clit->evt, TRUE, FALSE, FALSE, is_flag(DUEL_TRIGGER_WHEN_PRIVATE_KNOWLEDGE), is_flag(DUEL_TRIGGER_WHEN_PRIVATE_KNOWLEDGE))) {
+-				if(tp == core.current_player)
++				// Historical TCG SEGOC starts with the earliest trigger time,
++				// even when that trigger belongs to the non-turn player.
++				if(is_flag(DUEL_TCG_SEGOC_FIRSTTRIGGER) || tp == core.current_player)
+ 					core.select_chains.push_back(*clit);
+ 			} else {
+ 				peffect->active_type = 0;
+@@ -650,6 +652,13 @@ bool field::process(Processors::PointEvent& arg) {
+ 				};
+ 				auto endit = std::find_if_not(core.select_chains.begin(), core.select_chains.end(), pred);
+ 				core.select_chains.erase(endit, core.select_chains.end());
++				// Within the same trigger time, the turn player's mandatory
++				// effects still precede the non-turn player's. Each player
++				// chooses the order of their own effects in that group.
++				const bool turn_player_has_trigger = std::any_of(core.select_chains.begin(), core.select_chains.end(),
++					[&](const chain& ch) { return ch.triggering_player == infos.turn_player; });
++				core.current_player = turn_player_has_trigger ? infos.turn_player : 1 - infos.turn_player;
++				core.select_chains.remove_if([&](const chain& ch) { return ch.triggering_player != core.current_player; });
+ 			}
+ 			if(core.select_chains.size() == 1) {
+ 				returns.set<int32_t>(0, 0);

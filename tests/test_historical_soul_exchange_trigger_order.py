@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 
 SOUL_EXCHANGE = 68005187
@@ -16,10 +18,6 @@ THESTALOS = 26205777
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.xfail(
-    strict=True,
-    reason="pinned ocgcore places turn-player Thestalos before earlier opponent Sangan",
-)
 def test_soul_exchange_opponent_sangan_triggers_before_thestalos(tmp_path):
     """GoatFormat.com Rule #9 gives Sangan CL1 and Thestalos CL2 here."""
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
@@ -49,7 +47,7 @@ def test_soul_exchange_opponent_sangan_triggers_before_thestalos(tmp_path):
             if tribute_paid and len(obs.chain) >= 2:
                 assert tuple((link.index, link.card_code) for link in obs.chain[:2]) == (
                     (1, SANGAN), (2, THESTALOS))
-                return
+                break
 
             action = None
             if obs.turn == 2 and obs.acting_player == 1 and not summoned:
@@ -73,4 +71,18 @@ def test_soul_exchange_opponent_sangan_triggers_before_thestalos(tmp_path):
             if action is None:
                 action = choose("place") or choose("pass") or choose("end_phase") or actions[0]
             obs = env.step(action)
-        pytest.fail("Soul Exchange / Sangan / Thestalos chain was not reached")
+        else:
+            pytest.fail("Soul Exchange / Sangan / Thestalos chain was not reached")
+
+        agents = (RandomAgent(15), RandomAgent(16))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            obs = env.step(agents[obs.acting_player].select_action(
+                obs, env.legal_actions()))
+        assert env.is_terminal()
+        path = tmp_path / "soul_thestalos.json"
+        write_trajectory(path, env.trajectory())
+        assert verify_trajectory(read_trajectory(path),
+                                 ExperimentalOcgcoreEngine(root)) == len(
+                                     env.trajectory().decisions)
