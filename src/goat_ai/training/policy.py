@@ -56,6 +56,8 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # and Nobleman of Crossout activations. It cannot predict chain responses.
 # Version 25 adds an opt-in, zero-initialized learned correction for that
 # estimate. With only this head trainable, all other action logits stay frozen.
+# Version 26 branches from v23 and adds separate own/opponent visible-card
+# pools. The residual is zero-initialized for exact v23 checkpoint behavior.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 SPELL_TYPE = 0x2  # TYPE_SPELL in pinned ocgcore constant.lua
@@ -154,7 +156,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 26):
+    if feature_version not in range(1, 27):
         raise ValueError("unsupported policy feature version")
     if feature_version >= 22 and not vocabulary.card_properties:
         raise ValueError("feature version 22 requires pinned printed card properties")
@@ -403,7 +405,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                         min(visible_enemy_stats, default=0) / 8000,
                         float(bool(opponent_monsters) and
                               len(visible_enemy_stats) == len(opponent_monsters)))
-        if feature_version >= 24:
+        if feature_version in (24, 25):
             trade = 0
             own_collateral = 0
             estimated = action.kind == "activate" and params.get("code") in (
@@ -478,7 +480,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 26):
+        if feature_version not in range(1, 27):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -498,7 +500,7 @@ class LegalActionPolicy(nn.Module):
                         if feature_version == 15 else 42 if feature_version >= 4 else 10)
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
-        action_number_width = (104 if feature_version >= 24 else 101
+        action_number_width = (104 if feature_version in (24, 25) else 101
                                if feature_version >= 23 else 93
                                if feature_version >= 22 else 85
                                if feature_version >= 21 else 81
@@ -534,9 +536,12 @@ class LegalActionPolicy(nn.Module):
             # of requiring the pooled state scorer to discover that relation.
             self.source_target_pair = nn.Sequential(nn.Linear(width * 2, width), nn.ReLU(),
                                                     nn.Linear(width, width))
-        if feature_version >= 25:
+        if feature_version == 25:
             self.trade_head = nn.Linear(2, 1, bias=False)
             nn.init.zeros_(self.trade_head.weight)
+        if feature_version == 26:
+            self.player_pool = nn.Linear(width * 2, width, bias=False)
+            nn.init.zeros_(self.player_pool.weight)
 
     def forward(self, features: DecisionFeatures) -> Tensor:
         return self._forward(features)
@@ -563,6 +568,13 @@ class LegalActionPolicy(nn.Module):
         pooled = (visible * mask).sum(0) / mask.sum().clamp(min=1)
         state = pooled + self.phase(features.phase) + self.state_numbers(
             features.state_numbers)
+        if self.feature_version == 26:
+            own_mask = (cards[:, 1] != 0) & (cards[:, 2] == 1)
+            opponent_mask = (cards[:, 1] != 0) & (cards[:, 2] == 2)
+            own_pool = (visible * own_mask.unsqueeze(1)).sum(0) / own_mask.sum().clamp(min=1)
+            opponent_pool = (visible * opponent_mask.unsqueeze(1)).sum(0) / (
+                opponent_mask.sum().clamp(min=1))
+            state = state + self.player_pool(torch.cat((own_pool, opponent_pool)))
         if self.feature_version >= 5:
             deck_mask = (features.deck_cards != 0).unsqueeze(1)
             deck = (self.card(features.deck_cards) * deck_mask).sum(0) / deck_mask.sum().clamp(
@@ -637,7 +649,7 @@ class LegalActionPolicy(nn.Module):
             multi_mask = (multi_slots[:, :, 1] != 0).unsqueeze(-1)
             action = action + (matched * multi_mask).sum(1) / multi_mask.sum(1).clamp(min=1)
         logits = self.score(torch.cat((state.expand(action.shape[0], -1), action), dim=1)).squeeze(1)
-        if self.feature_version >= 25:
+        if self.feature_version == 25:
             trade = features.action_numbers[:, -3] * 5
             present = features.action_numbers[:, -1]
             logits = logits + self.trade_head(torch.stack((trade, present), dim=1)).squeeze(1)

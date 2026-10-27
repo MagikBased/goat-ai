@@ -8529,3 +8529,48 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
   --seed 37100 --seeds 4 --workers 4 --max-decisions 3000 \
   --output .cache/goat-ai/rhymus_vs_zombie_current_37100_37103.json
 ```
+
+### Separate player-card pools, feature v26 (27 October 2026)
+
+The feature-v23 policy averages all visible state cards into one vector. An
+opt-in v26 branch adds separate own/opponent visible-card means through a
+zero-initialized residual projection. It uses the same v23 decision inputs,
+preserves exact parent logits before training, and leaves hidden-card values
+absent from the encoded inputs. A unit test checks exact warm-start logits,
+batched-forward equivalence, and a strict parent-version gate.
+
+Matched v23 control and v26 child continuations used the same feature-v23
+parent, eight replay-verified fixed-policy games from seed 44000–44003,
+437 Tactical-v14 labels on policy-visited states, one epoch, batch size 16,
+seed 81, learning rate 0.0002, and identical optimizer settings. Their final
+training losses were **0.6391** (v23) and **0.5974** (v26). This is a
+training-set fit comparison, not a strength metric. The ignored checkpoints
+are `.cache/goat-ai/v23_owner_pool_control_44000_44003.pt` (SHA-256
+`852f5704062b65b85c35c0ba539456a12b45bacaba58e3293b97ad1b470e334c`)
+and `.cache/goat-ai/v26_owner_pool_child_44000_44003.pt` (SHA-256
+`38169149494acf547cc8009e688b357875ef4e39c95403db389677e463050a10`).
+
+On Rhymus New Jersey versus Charlotte Zombie, both Main Deck assignments,
+both policy seats, and held-out seeds 37200–37207, v26 scored **13–19**
+directly against v23 over 32 terminal duels (paired-bootstrap 95% score
+interval **31.25–46.875%**; maximum 873 decisions). It scored **4–12** as
+first player and **9–7** as second. This does not justify promoting v26;
+the tested continuation was weaker on this matchup. The ignored direct
+report is `.cache/goat-ai/v26_owner_pool_vs_v23_rhymus_zombie_37200_37207.json`
+(SHA-256 `c427082b577ab498b627e8e78cd7089c24f512947dbe6fe5dc60a8ce5c275a96`).
+Neither deck composition occurs in either child's training provenance.
+
+Reproduce the control and child with `scripts/train_behavioral_clone.py` on
+`.cache/goat-ai/fixed_policy_value_44000_44015/matchup_00_seed_4400[0-3]_seat_*.json`
+using `--on-policy-teacher tactical_v14 --engine experimental --init-checkpoint
+.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt --epochs 1
+--batch-size 16 --batched-forward --omit-forced-forward --verification-workers 4
+--width 32 --learning-rate 0.0002 --seed 81`; use `--feature-version 23`
+for the control and `--feature-version 26 --upgrade-feature-23-to-26` for
+the child, with distinct ignored output paths. Evaluate with
+`scripts/evaluate_policy.py --engine experimental --opponent-checkpoint
+.cache/goat-ai/v23_owner_pool_control_44000_44003.pt --matchup
+examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk
+examples/decks/zombie_jae_kim_charlotte_2005.ydk --both-deck-assignments
+--require-unseen-main-decks --seed 37200 --seeds 8 --workers 4
+--max-decisions 3000` and the v26 checkpoint as the positional argument.

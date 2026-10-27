@@ -1506,6 +1506,49 @@ def test_v25_trade_head_starts_at_parent_logits_and_can_price_visible_trade(tmp_
                                allow_v23_to_v25=True)
 
 
+def test_v26_separate_player_pool_loads_exact_v23_logits_and_batches(tmp_path):
+    vocabulary = CardVocabulary((10, 20), ((10, 33, 300), (20, 33, 2000)))
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    checkpoint = {
+        "schema_version": 1, "model_state": parent.state_dict(),
+        "vocabulary_codes": vocabulary.codes,
+        "vocabulary_card_properties": vocabulary.card_properties,
+        "width": 8, "feature_version": 23,
+        "trajectory_sha256": {"training.json": "a" * 64},
+        "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                            "main_deck_composition_sha256": ("c", "d")}],
+    }
+    path = tmp_path / "parent.pt"
+    torch.save(checkpoint, path)
+    child = LegalActionPolicy(vocabulary.size, width=8, feature_version=26)
+    with pytest.raises(ValueError, match="architecture or vocabulary"):
+        load_parent_checkpoint(path, child, vocabulary)
+    load_parent_checkpoint(path, child, vocabulary, allow_v23_to_v26=True)
+    assert torch.count_nonzero(child.player_pool.weight) == 0
+    assert all(torch.equal(child.state_dict()[key], value)
+               for key, value in parent.state_dict().items())
+    observation = replace(view(), field=(
+        CardView(0, "monster", "faceup", 10, 0),
+        CardView(1, "monster", "faceup", 20, 0),
+    ))
+    old = encode_decision(observation, actions(), vocabulary, 23)
+    new = encode_decision(observation, actions(), vocabulary, 26)
+    with torch.no_grad():
+        expected = parent(old)
+        actual = child(new)
+        batched, mask = child.forward_batch((new, new))
+    assert torch.allclose(actual, expected, atol=1e-6)
+    assert torch.allclose(batched[0, mask[0]], actual, atol=1e-6)
+    assert torch.allclose(batched[1, mask[1]], actual, atol=1e-6)
+    checkpoint["feature_version"] = 26
+    checkpoint["model_state"] = child.state_dict()
+    torch.save(checkpoint, path)
+    with pytest.raises(ValueError, match="feature-v23 parent"):
+        load_parent_checkpoint(path, LegalActionPolicy(vocabulary.size, width=8,
+                                                      feature_version=26), vocabulary,
+                               allow_v23_to_v26=True)
+
+
 def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):
     vocabulary = CardVocabulary((10, 20))
     legacy = LegalActionPolicy(vocabulary.size, width=16, feature_version=1)
