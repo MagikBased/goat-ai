@@ -20,7 +20,7 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from scripts.record_mr1_black_rose_probe import GEMINI_ELF, record_probe
-from scripts.record_mr1_synchro_probe import select_setup_action
+from scripts.record_mr1_synchro_probe import record_attack_probe, select_setup_action
 from scripts.render_replay import render_replay
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -58,6 +58,10 @@ def test_mr1_junk_warrior_synchro_complete_duel(tmp_path):
         assert "official/c63977008.lua" in engine.probe.loaded_script_sha256
         assert "official/c60800381.lua" in engine.probe.loaded_script_sha256
     assert summoned_at == 55
+    assert any(card.code == JUNK_WARRIOR and card.attack == 2300
+               for record in trajectory.decisions[55:]
+               if record.observation.turn == 3
+               for card in record.observation.field)
     assert len(trajectory.decisions) == 1439
     assert trajectory.winner == 1
     assert trajectory.ruleset == "mr1-synchro-protocol"
@@ -73,6 +77,29 @@ def test_mr1_junk_warrior_synchro_complete_duel(tmp_path):
     assert review["source_trajectory_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
     assert len(review["frames"]) == 1440
     assert any(JUNK_WARRIOR in frame["extra"][0] for frame in review["frames"])
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_mr1_junk_warrior_gains_atk_from_surviving_level_two(tmp_path):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    trajectory, (summoned_at, boosted_at) = record_attack_probe(native_root)
+    assert (summoned_at, boosted_at) == (69, 73)
+    assert len(trajectory.decisions) == 1202
+    assert trajectory.winner == 1
+    before = trajectory.decisions[boosted_at - 1].observation
+    after = trajectory.decisions[boosted_at].observation
+    assert next(card.attack for card in before.field
+                if card.code == JUNK_WARRIOR) == 2300
+    assert next(card.attack for card in after.field
+                if card.code == JUNK_WARRIOR) == 2800
+    assert sum(card.code == BOKOICHI and card.controller == 0
+               for card in after.field) == 1
+    path = tmp_path / "junk_warrior_atk.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, Mr1SynchroProbeEngine(native_root)) == 1202
+    assert audit_trajectory_visibility(loaded)["decisions"] == 1202
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

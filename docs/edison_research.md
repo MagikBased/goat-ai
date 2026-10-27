@@ -157,6 +157,29 @@ The current script text, Junk Synchron's effect details, historical priority,
 and Synchro timing have **not** been compared against 2010 source rulings.
 This fixture proves the native decision protocol can represent one Synchro
 line; it does not establish an Edison simulator or justify Edison training.
+An additional seed-18 fixture leaves a second face-up Bokoichi (500 ATK,
+Level 2) on the field after Junk Synchron and a revived Bokoichi become
+Junk Warrior's materials. The native Warrior appears at 2300 ATK, then its
+trigger resolves to 2800; the original seed-3 line has no remaining Level 2
+monster and stays at 2300. The 1,202-decision seed-18 duel replay-verifies and
+passes the visibility audit. [Konami's current card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7696&ope=2&request_locale=en)
+specifies that controlled Level 2 or lower monsters contribute to this gain.
+[Konami's Duelist Pack - Yusei listing](https://www.yugioh-card.com/en/products/past_products/dp_yusei/)
+dates a Junk Warrior reprint to February 2009, before Edison. However, the
+current card database does not preserve that printing's exact historical text;
+the first 2008 English printing is reported with different wording. A scan of
+the 2009 reprint or a contemporary official ruling is still needed before
+calling this an independently validated 2010 card-text regression. The test
+currently checks the pinned script against the official current text and the
+known board arithmetic, without certifying historical card-text equivalence.
+Reproduce it with:
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_synchro_probe.py \
+  --attack-probe --output replays/mr1_junk_warrior_atk_seed18.json
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_synchro_probe.py
+```
 The replay viewer now chooses the matching MR1 protocol engine to verify the
 entire trajectory before exporting hidden reviewer cards. It rejects unknown
 rulesets. Reviewer reveals stay in the generated HTML and SHA-bound sidecar,

@@ -970,6 +970,11 @@ both selected materials to the Graveyard; the complete 1,439-decision duel
 replay-verifies and passes the visibility audit. The fixture uses a tiny sourced
 card subset and modern pinned scripts. It does not validate all 2010 Synchro
 rulings, effect text, or Edison legality; see [the Edison audit](edison_research.md).
+A second Junk Warrior fixture tests its ATK trigger with a surviving Level 2
+monster: the native result rises from 2300 to 2800, and the complete 1,202-
+decision duel replay-verifies and passes the visibility audit. The 2009 printed
+text still needs independent confirmation before this becomes a historically
+validated Edison card-text test; see [the Edison audit](edison_research.md).
 A second sourced MR1 fixture now Synchro Summons Black Rose Dragon from Junk
 Synchron and a Level 4 Normal Monster. Accepting or declining its optional
 field-wipe trigger produces different verified board outcomes; both complete
