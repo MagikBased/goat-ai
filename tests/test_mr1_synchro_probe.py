@@ -140,8 +140,8 @@ def test_mr1_junk_warrior_excludes_opposing_level_two_atk(tmp_path):
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_mr1_synchro_probe_rejects_unsourced_extra_card(tmp_path):
     native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    deck = tmp_path / "brionac.ydk"
-    deck.write_text(DECK.read_text().replace(str(JUNK_WARRIOR), "50321796"))
+    deck = tmp_path / "red_dragon_archfiend.ydk"
+    deck.write_text(DECK.read_text().replace(str(JUNK_WARRIOR), "70902743"))
     with (GoatEnvironment(str(deck), str(OPPONENT), seed=3,
                           engine=Mr1SynchroProbeEngine(native_root)) as env,
           pytest.raises(ValueError, match="MR1 Synchro probe allows only")):

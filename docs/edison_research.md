@@ -566,6 +566,38 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_synchro_probe.py -k goyo
 ```
 
+## Brionac's 2010 effect versus the pinned current script
+
+[Konami's 2010 Hidden Arsenal rulings](https://img.yugioh-card.com/ygo_cms/ygo/all/uploads/100304-HA_SDWS_ST09_Rules.pdf)
+give Brionac's original effect as discarding any number of cards to return the
+same number of cards *from the field*, and identify the discard as a cost and
+the chosen cards as targets. The current pinned `official/c50321796.lua`
+instead limits the effect to once per turn and to opposing cards. A
+[Konami-recorded 2011 match](https://yugiohblog.konami.com/2011/ycs/round-10-alex-its-aliiive-vansant-vs-ken-mccarthy-of-the-future/)
+shows two separate Brionac activations in one turn, corroborating the
+absence of a once-per-turn restriction before the later errata. The 2010
+rulings PDF is currently unavailable at its live URL; the indexed excerpt
+supplies the original wording, while the 2011 match is directly accessible.
+This supports a focused probe, not a broad claim about all Brionac rulings.
+
+The `mr1-synchro-protocol` now applies a checksum-guarded, in-memory
+correction to that one pinned script. Seed 5 Synchro Summons Brionac, activates
+it twice during turn 3, returns the opponent's Dark Blade with the first
+activation, and targets Brionac itself with the second. Brionac then returns
+to its owner's Extra Deck. The 1,111-decision duel reaches terminal, verifies
+from its trajectory, and passes the player-visibility audit. The source file
+remains unchanged; the loaded corrected script SHA-256 is
+`b895a1bd35aa7260e0604602961ba5b6b4880f24ce0eff19c9c4bb64300c5198`.
+Reproduce after [native setup](native_setup.md):
+
+```sh
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/record_mr1_brionac_probe.py \
+  --output .cache/goat-ai/mr1_brionac_probe_seed5.json
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai OMP_NUM_THREADS=1 PYTHONPATH=src:. \
+  .venv/bin/pytest -q tests/test_mr1_brionac_probe.py
+```
+
 ## One-active-Field-Spell MR1 check
 
 The [2009 official rulebook, pages 8 and 24](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)

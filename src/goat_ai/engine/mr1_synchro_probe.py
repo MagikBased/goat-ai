@@ -13,6 +13,7 @@ JUNK_WARRIOR = 60800381
 BLACK_ROSE_DRAGON = 73580471
 STARDUST_DRAGON = 44508094
 GOYO_GUARDIAN = 7391448
+BRIONAC = 50321796
 CURSE_OF_DRAGON = 28279543
 MIRROR_FORCE = 44095762
 EXILED_FORCE = 74131780
@@ -28,7 +29,7 @@ YAMI = 59197169
 UMI = 22702055
 PROBE_ELIGIBLE_IDS = frozenset(VANILLA_DECK) | {
     JUNK_SYNCHRON, JUNK_WARRIOR, BLACK_ROSE_DRAGON, STARDUST_DRAGON,
-    GOYO_GUARDIAN,
+    GOYO_GUARDIAN, BRIONAC,
     CURSE_OF_DRAGON, MIRROR_FORCE, EXILED_FORCE, TORRENTIAL_TRIBUTE,
     DEKOICHI, GRAVEKEEPERS_SPY, DESERT_SUNLIGHT, BOKOICHI,
     SOUL_EXCHANGE, SANGAN, CAIUS, YAMI, UMI}
@@ -47,10 +48,11 @@ class Mr1SynchroProbeEngine(Mr1VanillaEngine):
     def _load_deck(self, path: str) -> Decklist:
         deck = read_ydk(path)
         if deck.side or any(code not in (JUNK_WARRIOR, BLACK_ROSE_DRAGON,
-                                        STARDUST_DRAGON, GOYO_GUARDIAN)
+                                        STARDUST_DRAGON, GOYO_GUARDIAN, BRIONAC)
                             for code in deck.extra):
             raise ValueError("MR1 Synchro probe allows only Junk Warrior, "
-                             "Black Rose Dragon, Stardust Dragon, or Goyo Guardian "
+                             "Black Rose Dragon, Stardust Dragon, Goyo Guardian, "
+                             "or Brionac "
                              "in Extra, no Side")
         restrictions = read_advanced_restrictions(
             Path(__file__).resolve().parents[3]

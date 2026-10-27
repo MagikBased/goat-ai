@@ -39,6 +39,7 @@ MR1_SYNCHRO_CARDS = frozenset({
     73580471,  # Black Rose Dragon
     44508094,  # Stardust Dragon
     7391448,   # Goyo Guardian (2010 unrestricted Tuner requirement below)
+    50321796,  # Brionac (2010 bounce target and activation count below)
     44095762,  # Mirror Force
     74131780,  # Exiled Force
     53582587,  # Torrential Tribute
@@ -51,7 +52,7 @@ MR1_SYNCHRO_CARDS = frozenset({
     59197169,  # Yami; period Field Spell replacement probe
     22702055,  # Umi; period Field Spell replacement probe
 })
-MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094, 7391448})
+MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094, 7391448, 50321796})
 UPSTREAM_GOYO_SHA256 = "b1f8f68c428302b537a1bf4b660ef33ae800afd4a1716cd962f3908b2f24302b"
 GOYO_TUNER_REQUIREMENT_CURRENT = (
     b"Synchro.AddProcedure(c,aux.FilterBoolFunctionEx(Card.IsAttribute,"
@@ -60,6 +61,10 @@ GOYO_TUNER_REQUIREMENT_CURRENT = (
 GOYO_TUNER_REQUIREMENT_2010 = (
     b"Synchro.AddProcedure(c,nil,1,1,Synchro.NonTuner(nil),1,99)"
 )
+UPSTREAM_BRIONAC_SHA256 = "05debfa028436a9ad386dbd950dff76915c0fccdf4f87b2bc0af7c782f89eb39"
+BRIONAC_COUNT_LIMIT_CURRENT = b"\te1:SetCountLimit(1,id)\n"
+BRIONAC_OPPONENT_FIELD_CURRENT = b"tp,0,LOCATION_ONFIELD"
+BRIONAC_BOTH_FIELDS_2010 = b"tp,LOCATION_ONFIELD,LOCATION_ONFIELD"
 UPSTREAM_UTILITY_SHA256 = "59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a"
 GOAT_DECK_CONFIRM_OLD = b"Duel.ConfirmCards(tp,dg)"
 GOAT_DECK_CONFIRM_HISTORICAL = b"Duel.ConfirmCards(1-tp,dg)"
@@ -687,6 +692,15 @@ class OcgcoreProbe:
                 return 0
             contents = contents.replace(GOYO_TUNER_REQUIREMENT_CURRENT,
                                         GOYO_TUNER_REQUIREMENT_2010)
+        if relative_path == "official/c50321796.lua" and self.mode == "mr1_synchro_probe":
+            if (hashlib.sha256(contents).hexdigest() != UPSTREAM_BRIONAC_SHA256
+                    or contents.count(BRIONAC_COUNT_LIMIT_CURRENT) != 1
+                    or contents.count(BRIONAC_OPPONENT_FIELD_CURRENT) != 3):
+                self.errors.append("pinned Brionac script changed; 2010 effect correction not applied")
+                return 0
+            contents = (contents.replace(BRIONAC_COUNT_LIMIT_CURRENT, b"")
+                        .replace(BRIONAC_OPPONENT_FIELD_CURRENT,
+                                 BRIONAC_BOTH_FIELDS_2010))
         self.loaded_script_sha256[relative_path] = (
             hashlib.sha256(contents).hexdigest()
         )

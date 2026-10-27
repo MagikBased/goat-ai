@@ -1132,6 +1132,12 @@ non-EARTH Tuner, accept or decline its battle recruitment effect, reach
 terminal, replay-verify, and pass the visibility audit. This is one validated
 historical card path, not a complete Edison profile; see the
 [Edison audit](edison_research.md#goyo-guardian-historical-material-correction).
+The separate Brionac fixture now restores the original any-field target and
+repeatable activation in memory under MR1. Its full seed-5 duel activates
+Brionac twice, first against an opponent's monster and then against itself;
+the 1,111-decision trajectory replay-verifies and passes visibility checks.
+This tests a material errata boundary, not the full Edison rules profile; see
+the [Brionac audit](edison_research.md#brionacs-2010-effect-versus-the-pinned-current-script).
 The separate MR1 protocol also checks the 2009 one-active-Field-Spell rule:
 player 1's Umi replaces player 0's Yami in a complete, replay-verified,
 visibility-audited duel. This narrows one historical mechanics gap without
