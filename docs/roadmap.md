@@ -274,8 +274,10 @@ A paired Dimension Fusion / pre-errata Dark Magician of Chaos fixture now
 checks the optional immediate Spell recovery after Bazoo banishes DMoC. The
 spent Dimension Fusion is a selectable Graveyard target, and the opponent
 learns its identity in hand only when recovery is accepted. Both full duels
-replay-verify and pass the visibility audit; the [ruling log](goat_rules.md)
-records the source and untested middle-of-chain timing case.
+replay-verify and pass the visibility audit. A separate Return chained to
+Heavy Storm fixture checks that a DMoC Summoned at Chain Link 2 misses its
+optional recovery timing. It also replay-verifies and passes the visibility
+audit; the [ruling log](goat_rules.md) records the sources and limits.
 
 ## M3 — Evaluation and data
 
