@@ -31,8 +31,11 @@ class VisibleStateValue(nn.Module):
     """Estimate learner outcome from the same player-visible contract as the policy."""
 
     def __init__(self, vocabulary_size: int, state_number_width: int,
-                 width: int = 32) -> None:
+                 width: int = 32, *, architecture: str = "v1") -> None:
         super().__init__()
+        if architecture not in ("v1", "v2"):
+            raise ValueError("unsupported visible-state critic architecture")
+        self.architecture = architecture
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
         self.zone = nn.Embedding(len(ZONES) + 1, width, padding_idx=0)
         self.owner = nn.Embedding(3, width, padding_idx=0)
@@ -40,13 +43,37 @@ class VisibleStateValue(nn.Module):
         self.phase = nn.Embedding(len(PHASES) + 1, width, padding_idx=0)
         self.numbers = nn.Sequential(nn.Linear(state_number_width, width), nn.ReLU(),
                                      nn.Linear(width, width))
-        self.value = nn.Sequential(nn.Linear(width, width), nn.ReLU(),
+        if architecture == "v2":
+            self.card_numbers = nn.Sequential(nn.Linear(5, width), nn.ReLU(),
+                                              nn.Linear(width, width))
+            self.deck_projection = nn.Linear(width, width)
+            self.resource_counts = nn.Linear(14, width)
+        self.value = nn.Sequential(nn.Linear(width * (4 if architecture == "v2" else 1),
+                                             width), nn.ReLU(),
                                    nn.Linear(width, 1), nn.Tanh())
 
     def forward(self, features: DecisionFeatures) -> torch.Tensor:
         cards = features.state_cards
         visible = (self.card(cards[:, 0]) + self.zone(cards[:, 1])
                    + self.owner(cards[:, 2]) + self.position(cards[:, 3]))
+        if self.architecture == "v2":
+            visible = visible + self.card_numbers(features.state_card_numbers)
+            own_mask = ((cards[:, 1] != 0) & (cards[:, 2] == 1)).unsqueeze(1)
+            opposing_mask = ((cards[:, 1] != 0) & (cards[:, 2] == 2)).unsqueeze(1)
+            own = (visible * own_mask).sum(0) / own_mask.sum().clamp(min=1)
+            opposing = ((visible * opposing_mask).sum(0)
+                        / opposing_mask.sum().clamp(min=1))
+            counts = torch.stack([
+                ((cards[:, 2] == owner) & (cards[:, 1] == zone)).sum() / 10
+                for owner in (1, 2) for zone in range(1, 8)
+            ]).to(visible.dtype)
+            deck_mask = (features.deck_cards != 0).unsqueeze(1)
+            deck = (self.card(features.deck_cards) * deck_mask).sum(0) / (
+                deck_mask.sum().clamp(min=1))
+            context = (self.phase(features.phase) + self.numbers(features.state_numbers)
+                       + self.resource_counts(counts))
+            return self.value(torch.cat((own, opposing, context,
+                                         self.deck_projection(deck)))).squeeze()
         mask = (cards[:, 1] != 0).unsqueeze(1)
         pooled = (visible * mask).sum(0) / mask.sum().clamp(min=1)
         return self.value(pooled + self.phase(features.phase)

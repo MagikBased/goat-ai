@@ -65,6 +65,7 @@ from scripts.audit_policy_agreement import (
     decision_scopes,
     staple_context,
 )
+from scripts.compare_value_architectures import selected_records
 from scripts.evaluate_policy import (
     make_policy_agent,
     validate_heldout_seeds,
@@ -1729,6 +1730,52 @@ def test_visible_value_baseline_scales_policy_gradient_and_ignores_action_order(
     after = predict_state_values(value, vocabulary, (record,), 1)[0]
     assert value_loss >= 0
     assert after > before
+
+
+def test_value_v2_uses_visible_stats_and_own_deck_without_action_order():
+    vocabulary = CardVocabulary((10, 20), ((10, 0, 1000), (20, 0, 2000)))
+    base = replace(view(),
+                   field=(CardView(0, "monster", "faceup", 10, 0, "attack",
+                                   attack=1000, defense=1000),),
+                   own_main_deck=(10, 20))
+    stronger = replace(base, field=(replace(base.field[0], attack=3000),))
+    changed_deck = replace(base, own_main_deck=(10, 10))
+    features = [encode_decision(observation, actions(), vocabulary, 23)
+                for observation in (base, stronger, changed_deck)]
+    torch.manual_seed(171)
+    old = VisibleStateValue(vocabulary.size, features[0].state_numbers.numel(),
+                            width=16)
+    new = VisibleStateValue(vocabulary.size, features[0].state_numbers.numel(),
+                            width=16, architecture="v2")
+    with torch.no_grad():
+        old_scores = [float(old(item)) for item in features]
+        new_scores = [float(new(item)) for item in features]
+        reversed_actions = encode_decision(base, actions()[::-1], vocabulary, 23)
+        reversed_score = float(new(reversed_actions))
+    assert old_scores[0] == pytest.approx(old_scores[1])
+    assert old_scores[0] == pytest.approx(old_scores[2])
+    assert new_scores[0] != pytest.approx(new_scores[1])
+    assert new_scores[0] != pytest.approx(new_scores[2])
+    assert new_scores[0] == pytest.approx(reversed_score)
+    with pytest.raises(ValueError, match="architecture"):
+        VisibleStateValue(vocabulary.size, features[0].state_numbers.numel(),
+                          architecture="unsupported")
+
+
+def test_critic_corpus_selects_only_learner_visible_decisions():
+    learner = DecisionRecord(view(), actions(), actions()[0])
+    opponent_view = replace(view(), viewer=1, acting_player=1,
+                            hand=(CardView(1, "hand", "hidden", 20, 0),))
+    opponent_actions = (Action("a", "pass", 1), Action("b", "chain", 1))
+    opponent = DecisionRecord(opponent_view, opponent_actions, opponent_actions[0])
+    trajectory = Trajectory("goat", ("a", "b"), 4,
+                            (learner, opponent, learner), 0,
+                            source="self_play_rl", skill_metadata={"learner_seat": 0})
+    selected, reward = selected_records(trajectory, 1)
+    assert selected == (learner,)
+    assert reward == 1.0
+    with pytest.raises(ValueError, match="learner-seat"):
+        selected_records(replace(trajectory, source="policy_evaluation"), 1)
 
 
 def test_self_play_schedule_covers_each_deck_in_both_seats():

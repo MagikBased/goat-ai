@@ -1,5 +1,56 @@
 # Baseline evaluation log
 
+## Visible-state critic architecture transfer check (27 October 2026)
+
+The original opt-in Monte Carlo critic (v1) averages all visible card
+embeddings. A versioned v2 experiment separately pools each player's visible
+cards, adds current public ATK/DEF and counters, counts cards in each visible
+zone, and embeds the player's own initial Main Deck. It receives only
+`DecisionFeatures` made from the acting player's observation; action order
+does not affect its score. The prior v1 architecture and existing critic
+checkpoints remain compatible, and v1 remains the default.
+
+Both critics were fitted to terminal outcomes from the same 48 replay-verified
+self-play games (seeds 17000–17047), with 16 evenly spaced learner decisions
+per game, two epochs, width 32, learning rate `0.001`, and seed 171. The next
+16 games from that run (17048–17063) were held out. Another 32 complete
+replays (11820–11851), generated from the same parent but a different PPO
+continuation, formed an independent validation corpus. All **96 replays and
+49,851 decisions** passed fresh native replay verification and the visibility
+audit; no opponent-seat decisions became training examples.
+
+Per-game mean squared error on the first holdout was **0.739** for v1 and
+**0.702** for v2, against **0.813** for a constant training-return predictor.
+On the independent corpus, v1 scored **0.894**, v2 **1.094**, and the constant
+predictor **0.969**. The paired bootstrap interval for v2 minus v1 MSE was
+−0.364 to +0.269 on the 16-game holdout and −0.096 to +0.509 on the
+32-game independent set. The v2 result does not establish a better value
+signal and does not justify changing the training default or claiming a
+playing-strength gain. These are outcomes from changing policies' recorded
+games; a future critic test should also use fixed-policy data and a larger
+independent holdout.
+
+An opt-in `--baseline-scope state_value --value-architecture v2` one-game
+native training smoke at seed 17200 reached terminal, saved versioned critic
+weights, and replay-verified all 587 decisions with the visibility audit. It
+checks that the architecture can be trained and resumed as a separate critic;
+it is not a strength or calibration result.
+
+The ignored report is
+`.cache/goat-ai/value_v1_v2_independent_17000_17063.json` (SHA-256
+`f5d3a630c2ec188f134d85fc9205805174e80de26fb6e135b85bf4b3ad45a5a7`).
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/compare_value_architectures.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  .cache/goat-ai/ppo_balanced_64_17000_17063_replays \
+  --independent-replay-dir .cache/goat-ai/ppo_rollout4_equal_11820_11851_replays \
+  --train-games 48 --max-records-per-game 16 --epochs 2 --width 32 \
+  --learning-rate 0.001 --seed 171 \
+  --output .cache/goat-ai/value_v1_v2_independent_17000_17063.json
+```
+
 ## Balanced parallel PPO continuation across four roles (27 October 2026)
 
 The feature-v23 four-deck parent

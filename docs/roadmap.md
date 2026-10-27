@@ -484,6 +484,13 @@ on a separate 64-game schedule. Do not promote this child; prioritize
 stronger decision feedback or a validated value signal over more of the same
 terminal-reward updates. See [evaluation](evaluation.md).
 
+A versioned, visible-state critic experiment added public monster stats,
+separate player pools, visible zone counts, and the learner's initial Main
+Deck. Its first 16-game holdout MSE was slightly lower than the old critic's,
+but its independent 32-game MSE was higher (1.094 versus 0.894). Keep the
+original critic as the default; neither value architecture has a validated
+competitive benefit. See [evaluation](evaluation.md).
+
 A feature-version-10 checkpoint trained on the same 4,630 sourced teacher decisions as version 9 won 20–11 with one draw in 32 paired duels on separate Chaos Return and Warrior deck files. Its held-out chain-decision teacher agreement was 116/135 versus version 9's 114/135, while its overall agreement was two choices lower. Feature version 11 now supplies an equal-capacity unordered-chain GRU control. Ordered version 10 scored 16–15 with one draw against it on a fresh 32-duel schedule, and matched one more of 135 held-out multi-option chain decisions. This does not establish a chain-order strength gain; repeat the comparison across deck families and training seeds. See [the evaluation log](evaluation.md) for protocols and intervals. M4 remains open.
 
 On another sourced Chaos Control/Warrior schedule, ordered version 10 split 16–16 against the unordered control and won 17–15 versus version 9. A same-seed HeuristicAgent control favored Warrior 24–8, revealing a large deck effect. The [evaluation log](evaluation.md) has the deck and seat splits. M4 still needs improved held-out play across decks, with audited full-deck rules.

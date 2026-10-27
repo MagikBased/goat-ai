@@ -95,6 +95,8 @@ def main() -> None:
                         help="moving global/per-deck return or experimental visible-state critic")
     parser.add_argument("--value-width", type=int, default=32,
                         help="hidden width of experimental visible-state critic")
+    parser.add_argument("--value-architecture", choices=("v1", "v2"), default="v1",
+                        help="v2 separates visible player zones and adds public card stats")
     parser.add_argument("--value-learning-rate", type=float, default=1e-3)
     parser.add_argument("--max-decisions", type=int, default=5000)
     parser.add_argument("--skip-capped-games", action="store_true",
@@ -137,10 +139,13 @@ def main() -> None:
         torch.manual_seed(args.seed)
         number_width = agent.model.state_numbers[0].in_features
         value_model = VisibleStateValue(agent.vocabulary.size, number_width,
-                                        width=args.value_width)
+                                        width=args.value_width,
+                                        architecture=args.value_architecture)
         if "value_model_state" in parent:
             if (parent.get("value_model_width") != args.value_width
-                    or parent.get("value_state_number_width") != number_width):
+                    or parent.get("value_state_number_width") != number_width
+                    or parent.get("value_model_architecture", "v1")
+                    != args.value_architecture):
                 parser.error("parent critic architecture differs from requested value model")
             value_model.load_state_dict(parent["value_model_state"], strict=True)
     fixtures = Path(__file__).resolve().parent.parent / "examples/decks"
@@ -241,6 +246,8 @@ def main() -> None:
               "ppo_rollout_weighting": (args.ppo_rollout_weighting
                                         if args.policy_update == "clipped_ppo" else None),
               "value_width": args.value_width if value_model is not None else None,
+              "value_architecture": (args.value_architecture
+                                     if value_model is not None else None),
               "value_learning_rate": (args.value_learning_rate
                                       if value_model is not None else None),
               "schedule_mode": args.schedule_mode,
@@ -267,6 +274,7 @@ def main() -> None:
     if value_model is not None:
         checkpoint["value_model_state"] = value_model.state_dict()
         checkpoint["value_model_width"] = args.value_width
+        checkpoint["value_model_architecture"] = args.value_architecture
         checkpoint["value_state_number_width"] = agent.model.state_numbers[0].in_features
     args.output.parent.mkdir(parents=True, exist_ok=True)
     torch.save(checkpoint, args.output)
