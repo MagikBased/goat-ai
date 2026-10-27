@@ -8247,3 +8247,38 @@ checks using `scripts/evaluate_policy.py --engine experimental
 --opponent-checkpoint .cache/goat-ai/fv23_visible_resource_v3_34000_34063.pt
 --both-deck-assignments --require-unseen-main-decks --workers 4 --seeds 8
 --max-decisions 3000`, the named deck pairs, and the two seed blocks.
+
+### Additional distinct-whitelist protocol sweep (27 October 2026)
+
+Starting from source commit `dc7e3eb` and the pinned experimental native
+assets, `scripts/probe_random_decks.py` generated 100 independently sampled
+legal Main Deck pairs on seeds 30150–30249. Every duel reached terminal
+before the 3000-decision cap (maximum **1,571** decisions), with no adapter
+error. All **107,628** decisions replay-verified against fresh engines and
+passed the player-visibility audit. The audit counted 1,085 hidden-field,
+5,349 opponent-field, and 47 opponent-hand legal-choice contexts. The 200
+generated decklists contained **1,616 distinct Main Deck IDs**. The run
+loaded 1,302 native assets and offered 5,339 distinct source-card/action-kind
+pairs; it selected 59 distinct chain-response/source pairs. These are
+sampled protocol and information-boundary measurements, not historical
+card-ruling or competitive-strength measurements.
+
+Relative to the prior distinct-whitelist seeds 10356–10455 report, this
+run loaded 11 previously unobserved official card scripts: D.D. Designator,
+Gamble, Aussa the Earth Charmer, Monk Fighter, Kiseitai, Sword of the
+Soul-Eater, Token Thanksgiving, Mystic Swordsman LV6, Koitsu, Final Flame,
+and Total Defense Shogun. Loading a script does not establish that its
+effects were exercised or that its 2005 behavior is correct. The ignored
+report is `.cache/goat-ai/whitelist_distinct_30150_30249/report.json`
+(SHA-256 `ba10153a4cd9674d8baf4cf7ec96ef1c4be8d4efaee881f3ca6b67bf6da3c131`).
+Its asset hashes, deck hashes, rules profile, action counts, and per-game
+outcomes are saved in that report. Reproduce after
+[native setup](native_setup.md) with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_distinct_30150_30249 \
+  --seed 30150 --seeds 100 --max-decisions 3000 \
+  --verify-replays --distinct-opponents --count-card-actions
+```

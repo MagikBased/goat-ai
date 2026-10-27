@@ -222,6 +222,14 @@ from its prior 50-pair run. These increase sampled protocol coverage but do
 not close M1's arbitrary-deck completeness or M2's historical ruling gate.
 See [evaluation](evaluation.md).
 
+An additional 100-pair full-whitelist sweep on new seeds 30150–30249 reached
+**100/100 terminal** with **107,628** decisions replay-verified and
+visibility-audited. The generated decks contained 1,616 distinct Main Deck
+IDs and loaded 11 scripts absent from the earlier 100-pair whitelist report.
+This expands sampled M1 protocol coverage; no sampled sweep can certify
+arbitrary-card completeness or M2 rulings. See
+[the report](evaluation.md#additional-distinct-whitelist-protocol-sweep-27-october-2026).
+
 ## M2 — Historical correctness gate
 
 A native-enabled local regression run on 2026-10-27 passed **1,003 tests**
