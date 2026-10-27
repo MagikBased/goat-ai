@@ -1,5 +1,27 @@
 # Early replay decision audit
 
+## Current-core Jesse versus Warrior review (27 October 2026)
+
+The current-core feature-v23 Tactical-imitation checkpoint played Jesse
+Goat Control against Tactical-v14 on Warrior, seed 43100, with the neural
+policy in each seat. Both duels reached terminal and the collector plus
+shortlister independently replay-verified and visibility-audited all **963
+decisions**. The policy won from seat 0 after 560 decisions and lost from
+seat 1 after 403. The replay [for seat 0](../replays/review_current_ai_43100/matchup_00_seed_43100_seat_0.html)
+has reviewer-only hidden-card reveals for inspection; those reveals are not
+part of the agent's observations.
+
+The [review index](../replays/review_current_ai_43100/queue.html) selected 14
+varied policy/Tactical disagreements from 26 candidates, at most eight per
+replay. No selected decision triggered a conservative visible-state audit
+flag. The Tactical alternatives are prompts for expert review, not verified
+better actions or training labels. The ignored collection manifest SHA-256 is
+`7ea1467e60186717636cc7cdd997704c0811247fe61609be362724f260bfef45`;
+the review queue SHA-256 is
+`c7505bd10d6189027d7795e35d58f3260fc0ed73063bf2c1f8955c99dbf37cdf`.
+Using labels from these games for training would remove their Main Decks
+from future unseen-deck evaluations of that child.
+
 ## Charlotte Zombie holdout review (27 October 2026)
 
 The current-core feature-v23 imitation child played Tactical-v14 on Jae Kim's
