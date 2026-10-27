@@ -262,6 +262,32 @@ This establishes one destruction-response protocol path. It does not validate
 all historical Stardust timings, battle rulings, Synchro materials, or the
 complete Edison release pool and rules profile.
 
+## Summon priority and Torrential Tribute
+
+The [contemporary 5D's official rulebook](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
+states that the turn player starts with priority to activate a card or effect,
+then passes priority after the activation. The official card records identify
+[Exiled Force's self-Tribute destruction effect](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5323&ope=2&request_locale=en)
+and [Torrential Tribute's Summon response](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5114&ope=2&request_locale=en).
+The Exiled Force record lists a 2009 printing and both cards predate the
+Edison cutoff. The March 2010 restriction table is applied to the MR1 decks.
+
+The existing seed-52 GOAT fixture now also runs under the pinned MR1 flag set.
+After Exiled Force is Normal Summoned, its controller can activate its effect
+before the opponent takes a response. Exiled Force Tributes itself as a cost;
+the opponent is then offered Torrential Tribute as a chain response. In the
+chain branch, Torrential destroys the other monsters before Exiled Force's
+targeted effect resolves. In the pass branch, the targeted opposing monster
+is destroyed while Torrential stays Set. Both branches complete, replay-verify,
+and pass the player-visibility audit under MR1 as well as GOAT. This confirms
+one priority interaction in the native MR1 protocol. It does not certify all
+2010 summon windows or card-specific rulings. Reproduce with:
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_historical_exiled_torrential.py
+```
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including

@@ -7,8 +7,11 @@ import pytest
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.engine.mr1_synchro_probe import Mr1SynchroProbeEngine
+from goat_ai.engine.ocgcore_probe import MR1_FLAGS
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 EXILED = 74131780
@@ -17,8 +20,11 @@ TORRENTIAL = 53582587
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("chain_torrential", [False, True])
+@pytest.mark.parametrize("engine_type", [ExperimentalOcgcoreEngine,
+                                          Mr1SynchroProbeEngine])
 def test_torrential_can_chain_to_exiled_force_priority_effect(tmp_path,
-                                                               chain_torrential):
+                                                               chain_torrential,
+                                                               engine_type):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = {f"official/c{EXILED}.lua", f"official/c{TORRENTIAL}.lua"}
     if any(not (root / "scripts" / script).is_file() for script in scripts):
@@ -31,8 +37,10 @@ def test_torrential_can_chain_to_exiled_force_priority_effect(tmp_path,
         TORRENTIAL, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
 
     with GoatEnvironment(str(attacker), str(defender), seed=52,
-                         engine=ExperimentalOcgcoreEngine(root)) as env:
+                         engine=engine_type(root)) as env:
         obs = env.reset()
+        if engine_type is Mr1SynchroProbeEngine:
+            assert env.engine.probe.flags == MR1_FLAGS
         assert EXILED in {c.code for c in obs.hand}
         assert TORRENTIAL in {c.code for c in env.engine.probe.observation(1).hand}
         own_summoned = defender_summoned = trap_set = exiled_summoned = False
@@ -117,10 +125,14 @@ def test_torrential_can_chain_to_exiled_force_priority_effect(tmp_path,
                 else:
                     pytest.fail("Exiled / Torrential continuation exceeded 3000 decisions")
                 trajectory = env.trajectory()
+                if engine_type is Mr1SynchroProbeEngine:
+                    assert trajectory.ruleset == "mr1-synchro-protocol"
+                assert audit_trajectory_visibility(trajectory)["decisions"] == len(
+                    trajectory.decisions)
                 path = tmp_path / f"exiled_torrential_{chain_torrential}.json"
                 write_trajectory(path, trajectory)
                 assert verify_trajectory(read_trajectory(path),
-                                         ExperimentalOcgcoreEngine(root)) == len(
+                                         engine_type(root)) == len(
                                              trajectory.decisions)
                 return
         pytest.fail(f"Exiled / Torrential line stalled: first={own_summoned} "

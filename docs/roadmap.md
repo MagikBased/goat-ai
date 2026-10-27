@@ -1016,6 +1016,10 @@ Stardust at End Phase; the pass branch loses Stardust. Both complete duels
 replay-verify and pass the visibility audit. This remains a narrow protocol
 case, not an Edison historical-correctness or card-pool claim; see
 [the Edison audit](edison_research.md).
+The existing Exiled Force/Torrential Tribute summon-priority fixture now also
+runs in the MR1 protocol, with both chain and pass branches replay-verified and
+visibility-audited. It checks one rulebook-backed priority interaction while
+leaving the complete historical Edison rules profile open.
 An independent 2009 deck-construction validator now accepts an explicitly
 audited eligible-card set and checks Main, Extra, and Side sizes, Fusion/Synchro
 placement, and shared canonical copy caps. It deliberately does not infer
