@@ -71,6 +71,20 @@ UPSTREAM_BOOK_SHA256 = "25848f596f425817a250bef9038343fbbcd482b40a0312d84c143e92
 UPSTREAM_FIREBIRD_SHA256 = "76c351a0006682d2a31449084cb821d43e6fc5f9f0b98931cae1859d632c2600"
 UPSTREAM_GOAT_RIVALRY_SHA256 = "5da97ba11bd10b53817b9812076d51e116415fe3a5aee3d09265f08ead0fb693"
 UPSTREAM_SINISTER_SHA256 = "92886fb585816f0e4466b682a0858dd3e514b2965b556e8d72c661b1f1337ed1"
+UPSTREAM_DARK_BALTER_SHA256 = "fa1f87eba33a9e87b48ac9d34569dad107e9405ae71320662e491cc658918a8f"
+BALTER_NEGATE_OLD = b"function s.disop(e,tp,eg,ep,ev,re,r,rp,chk)\n\tDuel.NegateEffect(ev)\nend"
+BALTER_NEGATE_SWORDS_HISTORICAL = b"""function s.disop(e,tp,eg,ep,ev,re,r,rp,chk)
+	Duel.NegateEffect(ev)
+	-- Negating Swords' activation effect also negates its lingering attack lock.
+	local rc=re:GetHandler()
+	if rc and rc:IsCode(72302403) and rc:IsLocation(LOCATION_SZONE) then
+		local e1=Effect.CreateEffect(e:GetHandler())
+		e1:SetType(EFFECT_TYPE_SINGLE)
+		e1:SetCode(EFFECT_DISABLE)
+		e1:SetReset(RESET_EVENT|RESETS_STANDARD)
+		rc:RegisterEffect(e1)
+	end
+end"""
 RIVALRY_ADJUST_OLD = b"\te2:SetOperation(s.adjustop)"
 RIVALRY_ADJUST_GUARDED = b"\te2:SetCondition(s.adjustcon)\n\te2:SetOperation(s.adjustop)"
 RIVALRY_SEND_OLD = (b"\tg1:Merge(g2)\n\tif #g1>0 then\n"
@@ -605,6 +619,13 @@ class OcgcoreProbe:
             # offers a futile optional return repeatedly in one Standby Phase.
             contents = contents.replace(SINISTER_STANDBY_CONDITION_OLD,
                                         SINISTER_STANDBY_CONDITION_HISTORICAL)
+        if relative_path == "official/c80071763.lua":
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_DARK_BALTER_SHA256 \
+                    or contents.count(BALTER_NEGATE_OLD) != 1:
+                self.errors.append("pinned Dark Balter script changed; Swords correction not applied")
+                return 0
+            contents = contents.replace(BALTER_NEGATE_OLD,
+                                        BALTER_NEGATE_SWORDS_HISTORICAL)
         self.loaded_script_sha256[relative_path] = (
             hashlib.sha256(contents).hexdigest()
         )

@@ -26,6 +26,8 @@ The pinned Dekoichi script has upstream SHA-256 `567bbe75ff84936c93419f54fa2f5ce
 
 The pinned Book of Moon script has upstream SHA-256 `25848f596f425817a250bef9038343fbbcd482b40a0312d84c143e927b12083d`. A SHA-guarded in-memory correction permits a face-down monster to be selected while its controller's Desert Sunlight is already pending on the chain; the ordinary face-up target rule remains in effect elsewhere. The loaded-script SHA-256 is `6c6460ac13bfbc961c197d938768cb4a35bc56b3b57e9f382f5593478f0f3ce9`. This follows the [contemporary June 2005 chain report](https://www.cogonline.net/threads/ruling-changes.40395/) and the [UDE game designer's double-Flip explanation](https://www.pojo.com/yu-gi-oh/FeaturedWriters/GSAttack/2005/6-13.shtml). Existing replay manifests that loaded Book have the earlier effective hash and need fresh recordings for exact verification. The upstream AGPL CardScripts file is unchanged on disk.
 
+The pinned Dark Balter script has upstream SHA-256 `fa1f87eba33a9e87b48ac9d34569dad107e9405ae71320662e491cc658918a8f`. Its GOAT-only in-memory correction keeps Swords of Revealing Light's separate attack restriction negated when Balter negates that Normal Spell's effect; the loaded-script SHA-256 is `a72cad992e77d6b861faf615a4c5da2906d068dd01f6aef4c40a14f6f1ba78ad`. The [historical Balter FAQ](https://www.goatformat.com/rulings2.html) says Swords remains on the field for three turns with its effect negated even if Balter leaves. This correction is limited to Swords and leaves the upstream script file unchanged. Replay manifests that loaded Balter before the correction require fresh recordings for exact verification.
+
 Requires Linux, Git, a C++17 compiler, Python 3.10+, Meson 1.7+, and Ninja. From a clean clone:
 
 ```bash
