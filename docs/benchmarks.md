@@ -279,8 +279,12 @@ databases at duel completion. The library alone is about 90 MiB. The adapter
 now reuses each required asset's SHA-256 while its resolved path, device,
 inode, size, modification time, and change time match. Loaded scripts retain
 their per-duel hashes. Deck files and trajectories still use direct content
-hashing. A file edit, including a same-size edit with restored modification
-time, invalidates the cache through the change time.
+hashing. Replacing a file invalidates the cache through its inode even when
+the replacement has the same size and modification time. An in-place edit
+usually changes modification or change time, but a same-inode rewrite that
+restores all observed timestamps cannot be detected from metadata. Pinned
+native assets must therefore stay immutable during one Python process; use a
+fresh process after regenerating them.
 
 Four complete policy-versus-random native duels (seeds 13000–13003,
 control/Chaos probe decks, 3,816 total decisions) were run with direct and

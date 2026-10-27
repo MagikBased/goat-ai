@@ -1,5 +1,98 @@
 # Baseline evaluation log
 
+## Independent Dimension Fusion reference list (27 October 2026)
+
+[WikiFormat's published Dimension Fusion Turbo reference list](https://www.wikiformat.com/en/mazzi/dimension-fusion-turbo/)
+provides a complete 40 Main / 15 Extra / 15 Side composition. Its [saved
+source YDKE](../configs/decks/dimension_fusion_turbo_wikiformat_reference.ydke)
+is transcribed into [a playable YDK](../examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk)
+with ten printed-card IDs replaced by the pinned GOAT or pre-errata variants.
+The source snapshot SHA-256 is
+`14573914215bc34b5d23d7c505675d4c61d60489facbe817c6abcc8b2d6ea192`;
+the YDK SHA-256 is
+`aaa971829ce795a90cafbafb8a84ee540ee141c10431e7c1c5d5f0871e5529d1`.
+A test decodes every source card ID, checks the exact three-section
+transcription and whitelist legality, then runs both deck seats against the
+sourced Chaos Turbo list. Both native duels reached terminal, serialized,
+replay-verified, and passed the player-visible trajectory audit. This is a
+modern published reference list, not evidence of play in 2005 or a ruling
+certification for every included card.
+
+The feature-v23 checkpoint with SHA-256
+`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`
+was evaluated against Tactical v14, using seeds 13040–13047 and both deck
+assignments and seats. Both this list and Michael Fukuyama's 2005 Goat
+Control Main Deck passed the checkpoint's unseen-composition gate. The policy
+scored **12–20 overall**: **2–14** piloting Dimension Fusion and **10–6**
+piloting Goat Control. The paired bootstrap score interval was 28.1–46.9%.
+On the same 32-game schedule, Tactical versus Tactical scored 5–11 with
+Dimension Fusion and 11–5 with Goat Control, showing that the deck matchup
+itself is uneven under this baseline. These are separate games; the score
+differences are descriptive, not a paired policy-effect estimate.
+
+A separate same-deck Dimension Fusion mirror on seeds 13060–13075 put the
+policy against Tactical v14 in both seats. It scored **5–27** (paired bootstrap
+score interval 6.25–28.13%), including 1–15 in first seat and 4–12 in
+second seat. This is a direct new-composition weakness for the current policy,
+although 32 games cannot identify its cause or establish general archetype
+strength. A seed-13060 loss replayed and passed the visibility audit; the
+greedy policy's 161 choices were reproduced. The existing review auditor
+flagged a Thunder Dragon zero-copy search while two copies remained and a
+Heavy Storm with three own backrow cards and no opposing backrow. These are
+concrete follow-up decisions for supervised review, not proof that correcting
+them alone would change match outcomes.
+
+The three detailed JSON reports are ignored local artifacts under
+`.cache/goat-ai/` named `eval_v23_wikiformat_df_vs_fukuyama_tactical_13040_13047.json`,
+`eval_tactical_mirror_wikiformat_df_vs_fukuyama_13040_13047.json`, and
+`eval_v23_wikiformat_df_mirror_tactical_13060_13075.json`; their SHA-256 values
+are respectively `1a5b37374fb2fa338796f206085cab1adff0876aea69a3cdacaa90e7e1c35bd3`,
+`5fdaaebb4a43bd451451a3cde512d1ecd89c5dfa08d9d892fad7e3aa74f6ba7f`,
+and `bc10df1b857c46aaa6aff8464bb7fad8b0866031cb876b8162aba9e2b6efea95`.
+Reproduce the policy mirror with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --engine experimental --opponent tactical \
+  --matchup examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk \
+    examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk \
+  --seed 13060 --seeds 16 --max-decisions 3000 \
+  --require-unseen-main-decks --workers 2 \
+  --output .cache/goat-ai/eval_v23_wikiformat_df_mirror_tactical_13060_13075.json
+```
+
+To test whether targeted imitation transfers across Dimension Fusion lists,
+eight policy-versus-Tactical duels on the WikiFormat composition (seeds
+13100–13103, both policy seats) were recorded, fully replay-verified, and
+visibility-audited. They contained 3,057 decisions. Tactical v14 labeled
+501 multi-option policy decisions, and a warm-start feature-v23 clone fit
+those labels for one epoch with batch size 16, batched forward, learning rate
+`3e-5`, and seed 42. The batch manifest SHA-256 is
+`f2d9569c6314589fa7db9123fcaddfe0c5eff4140327796b40315593ba8216a8`;
+the experimental child checkpoint SHA-256 is
+`0664997efc1e4f859ec84de587984fd108f83df4bf4cd22fbc99498920c1082f`.
+
+The separate GoatFormat guide Dimension Fusion Main Deck was excluded from
+both parent and child training compositions. In a 32-game mirror against
+Tactical on seeds 13140–13155, the unchanged parent scored **5–26–1** and
+the child **7–25–0**. A direct 64-game child-versus-parent mirror on fresh
+seeds 13160–13191 scored **30–34** for the child, with a paired bootstrap
+score interval of **35.9–57.8%**. The small Tactical-score change and direct
+match do not establish a strength gain. The child remains an ignored research
+checkpoint; the reference is unchanged. The three evaluation report SHA-256
+values are `fd31524acd505dc69d9ce716776b12c0bb4062f22b9780cd225c770b81877e9e`,
+`7e4b83f195bd5a5b0ab4d3cf25f7b564f973bfa99ef4e2cbce51f21f0d9fd5cf`,
+and `64b3353990a0d5d546240b6acffe1b184d9a0d24bb6398c1f80238f7b3259817`.
+This is one small single-archetype training run, and says nothing yet about
+performance on other deck families. It indicates that simply labeling a few
+hundred policy-visited choices with the existing Tactical teacher is
+insufficient evidence to promote a new policy.
+
+The deck fixture and prior hash-cache correction passed the Python suite:
+296 tests passed, with 696 native-gated skips. Six focused native-enabled
+deck/fingerprint tests passed. The full native suite was not rerun.
+
 ## Chaos Return versus Warrior protocol sweep
 
 Simon “Dingosig” Guinhut's [first-place 2022 Worlds Chaos Return list](https://formatlibrary.com/decks/6540) was downloaded as a public YDK and converted to pinned GOAT/pre-errata IDs in [`chaos_return_dingosig_worlds_2022.ydk`](../examples/decks/chaos_return_dingosig_worlds_2022.ydk). The source has 40 Main, 15 Extra, and 15 Side cards; all three sections pass the pinned GOAT legality gate. Two seat-swapped full duels against the sourced Warrior list serialize and replay-verify exact trajectories.

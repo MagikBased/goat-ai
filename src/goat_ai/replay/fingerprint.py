@@ -28,10 +28,12 @@ def _hash_unchanged_file(path: Path, signature: tuple[int, int, int, int, int]) 
 
 
 def sha256_unchanged_file(path: str | Path) -> str:
-    """Reuse an asset digest while its filesystem identity and timestamps hold.
+    """Reuse a pinned asset digest while its identity and timestamps hold.
 
     Only use this for pinned native assets. Trajectory/deck inputs retain direct
-    content hashing; the native manifest checks metadata again each duel.
+    content hashing; the native manifest checks metadata again each duel. A
+    same-inode edit that restores all timestamps cannot be detected, so native
+    assets must be treated as immutable for the life of the Python process.
     """
     source = Path(path).resolve(strict=True)
     return _hash_unchanged_file(source, _file_signature(source))
