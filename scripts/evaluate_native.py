@@ -20,6 +20,7 @@ from goat_ai.agents import (
     load_card_races,
     load_flip_monster_codes,
 )
+from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import both_deck_assignments, run_tournament, run_tournament_parallel
@@ -206,6 +207,7 @@ def main() -> None:
             "core_library": "build/libocgcore.so",
             "cards_database": "database/cards.cdb",
             "goat_database": "database/goat-entries.cdb",
+            "unofficial_database": "database/cards-unofficial.cdb",
             "goat_whitelist": "banlist/GOAT.lflist.conf",
             "global_constants": "scripts/constant.lua",
             "global_utility": "scripts/utility.lua",
@@ -253,6 +255,10 @@ def main() -> None:
         "duels_per_second": len(report.games) / wall_seconds,
         "decisions_per_second": sum(game.decisions for game in report.games) / wall_seconds,
         "asset_sha256": assets, "deck_sha256": deck_hashes,
+        "main_deck_composition_sha256": {
+            deck: main_deck_composition_sha256(read_ydk(deck))
+            for deck in deck_hashes
+        },
         "source_code_sha256": source_code_sha256(Path(__file__).resolve().parents[1]),
         "card_scripts_sha256": card_scripts_sha256(args.native_root),
         "seeds": seeds, "both_deck_assignments": args.both_deck_assignments,

@@ -1,5 +1,35 @@
 # Early replay decision audit
 
+## Current 2005-deck development queue (27 October 2026)
+
+The [new local queue](../.cache/goat-ai/current_2005_development_review_49600_49601/queue.html)
+targets Phoenix Control/Charlotte Zombie and Rhymus Goat Control/Charlotte
+Zombie, the independent 2005 deck pairings in the
+[latest strength diagnostic](evaluation.md#current-core-policy-on-independent-2005-decks-27-october-2026).
+Eight fresh, complete policy-versus-Tactical duels on development seeds
+49600–49601 yielded 3,565 native replay-verified and visibility-audited
+decisions. The queue selects 24 of 122 candidates, 12 from each policy seat
+and three per duel. Own-only Nobleman and negative Heavy Storm are flagged
+once each; one of those flagged plays was also chosen by Tactical. Every
+other card is a disagreement prompt. None is a human label yet.
+
+For automatic saving, run from the repository root:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/serve_review_queue.py \
+  .cache/goat-ai/current_2005_development_review_49600_49601/queue.json
+```
+
+The server prints the localhost URL and the ignored folder receiving choices.
+Open **Open label view** and choose a legal action in the sidebar. The
+reviewer-only reveal is for diagnosis and cannot be labeled. Do not use this
+queue's choices in training without validating them, and do not evaluate a
+trained child on these three Main Deck compositions after using their labels.
+The collection manifest SHA-256 is
+`4da1601e45980b420b7dbcb914ebecb8a5a91312bf6181dbdbd77d09122eacba`;
+the queue JSON SHA-256 is
+`3abe11ebfb605c47c52630f3634bb79ce16d2b181124fc49ab60a2b205b434f5`.
+
 ## Breaker targeting only friendly backrow (27 October 2026)
 
 The visible-state audit now prompts review when Breaker the Magical Warrior

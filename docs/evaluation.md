@@ -1,5 +1,55 @@
 # Baseline evaluation log
 
+## Current-core policy on independent 2005 decks (27 October 2026)
+
+The selected feature-v23 checkpoint
+`.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt` (SHA-256
+`975d06284b3035bc8bf8dbafa041a8a25a80195574d1ff695f2fbd25d1c7ff45`)
+played Tactical-v14 on Phoenix Control versus Charlotte Zombie and Rhymus
+Goat Control versus Charlotte Zombie. These are three published 2005 Main
+Decks absent by composition hash from the checkpoint's training provenance.
+Seeds 49500–49507 covered both deck assignments and both policy seats: **64
+terminal duels**, **25 wins and 39 losses** for the policy (39.1%, paired-seed
+95% score interval 29.7%–50.0%). By assigned policy deck it went 7–9 with
+Phoenix, 9–7 with Rhymus, and 9–23 with Zombie. This does not show strength
+over Tactical or close M4.
+
+A Tactical-v14 mirror on the same seeds and deck assignments went 16–16 in
+each pairing. Its assigned Zombie deck went 11–21 across the pairings, showing
+substantial deck asymmetry even with the same agent on both sides. The policy
+scored **10.9 percentage points lower** than the matched mirror baseline;
+the paired matchup-seed bootstrap interval was **−20.3 to 0.0 points**.
+Thus the raw Zombie split should not be read as a 23-game policy deficit.
+The policy and rerun mirror reports match on the native core commit, every
+recorded native asset hash, card-script hash, local YDK hashes, and Main Deck
+composition hashes. `evaluate_native.py` now records the unofficial card
+database and Main Deck compositions as `evaluate_policy.py` already did; the
+initial mirror reports omitted those fingerprints and were replaced.
+
+The ignored policy report SHA-256 is
+`34e53735526350504a84c268559220a9c22d0f749c611cb15cf62be3af3aa94f`.
+The Phoenix/Zombie and Rhymus/Zombie mirror report hashes are respectively
+`d20f2a95c90ff801cf1a46f756fa8890544b1bd736441e84152412ae42723f5a`
+and `ee07eb7272af4f7c6928b2dc701e10ae5dabc37df85fbf487ea88ad9f41a3a2a`.
+Reproduce with `scripts/evaluate_policy.py --engine experimental --opponent
+tactical --both-deck-assignments --require-unseen-main-decks --seed 49500
+--seeds 8 --workers 4 --max-decisions 3000` and the two pairings above;
+use `scripts/evaluate_native.py --agent-a tactical --agent-b tactical` on
+each pairing with the same schedule. The comparison used
+`paired_score_difference` from `goat_ai.evaluation.tournament` on the three
+reports' saved `GameResult` fields.
+
+Separate development seeds 49600–49601 then yielded eight policy-versus-
+Tactical duels and **3,565 replay-verified, visibility-audited decisions**.
+The local review shortlister selected 24 of 122 candidates, balanced 12 per
+policy seat across eight duels. Two selected frames have conservative visible
+flags (own-only Nobleman and negative Heavy Storm); one flagged play was also
+chosen by Tactical. These are prompts for human judgment, not training labels.
+The [development review queue](../.cache/goat-ai/current_2005_development_review_49600_49601/queue.html)
+uses the local save server documented in [the replay audit](replay_audit.md).
+If its labels are used for training, these three deck compositions must be
+excluded from later held-out strength evaluations.
+
 ## Fixed-policy visible-margin outcome diagnostic (27 October 2026)
 
 The same 64 frozen-checkpoint, native-verified policy-versus-Tactical duels
