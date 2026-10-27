@@ -209,3 +209,50 @@ def test_skip_passes_does_not_stop_at_each_changed_board_view(tmp_path):
     assert match.group(1) == (
         "4:1,0:activate · First · P1 Monster 1|5|1,0|"
         "activate · Second · P2 Monster 1")
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_perspective_change_does_not_animate_hidden_card_disclosure(tmp_path):
+    first = _observation()
+    first["field"] = [
+        {"controller": 0, "zone": "spell_trap", "sequence": 0,
+         "code": 3, "position": "facedown"},
+        {"controller": 1, "zone": "spell_trap", "sequence": 0,
+         "code": None, "position": "facedown"},
+    ]
+    other = deepcopy(first)
+    other.update(viewer=1, acting_player=1)
+    other["field"][0]["code"] = None
+    other["field"][1]["code"] = 4
+    actual_placement = deepcopy(other)
+    actual_placement["field"].append({
+        "controller": 1, "zone": "monster", "sequence": 0,
+        "code": 5, "position": "faceup", "orientation": "attack"})
+    actions = [{"id": str(i), "kind": "pass", "actor": player, "parameters": {}}
+               for i, player in enumerate((0, 1, 1))]
+    replay = {"seed": 5, "source": "test", "winner": 0, "decisions": [
+        {"observation": observation, "selected_action": action,
+         "legal_actions": [action]}
+        for observation, action in zip((first, other, actual_placement), actions)
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {3: "Set A", 4: "Set B", 5: "New"}, {}, {})
+    probe = """<script>
+      byId('skip').checked = false;
+      move(1);
+      const viewpointOnly = [index, document.querySelectorAll('.card-flip').length,
+        document.querySelectorAll('.card-arrive').length,
+        document.querySelectorAll('.travel-card').length].join(':');
+      move(1);
+      document.body.dataset.viewAnimationProbe = [viewpointOnly, index,
+        document.querySelectorAll('.card-arrive').length].join('|');
+    </script></body>"""
+    path = tmp_path / "viewpoint_animation.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-view-animation-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "1:0:0:0|2|1"

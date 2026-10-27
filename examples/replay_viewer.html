@@ -901,6 +901,10 @@
       const terminal = Boolean(replay.terminal_observation) && index === decisions.length;
       const record = terminal ? null : decisions[index];
       const observation = terminal ? replay.terminal_observation : record.observation;
+      // A player-view switch changes which Set card codes are visible. That
+      // disclosure is not a card flip, draw, placement, or pile movement.
+      if (previousObservation && previousObservation.viewer !== observation.viewer)
+        animateNext = false;
       currentObservation = observation;
       const lastIndex = decisions.length - 1 + Number(Boolean(replay.terminal_observation));
       const known = knownMap(observation);
