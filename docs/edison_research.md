@@ -97,7 +97,10 @@ with 3,622 shared. Of 80 API-only
 canonical IDs, 43 are Forbidden, two are tokens, one lacks pinned metadata,
 and **34 still need individual release and eligibility checks**. The
 missing-metadata ID `149694341` is an API "???" placeholder rather than an
-identified card. Two community-only canonical
+identified card. Of the 34 named disagreements, **28 have a Duel Terminal 1
+printing** in the API response. That report category means only that the card
+appears in that product; it does not assert the product was its first printing
+or decide legality. Two community-only canonical
 IDs are Exodius (`13893596`) and Genesis Dragon (`31038159`); [Konami's
 Exodius card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7392&ope=2)
 and [Genesis Dragon card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7978&ope=2&request_locale=en)
@@ -110,9 +113,27 @@ verification for individual cards. The pinned database also lacks metadata
 for ten raw API IDs and nine raw community IDs. No complete Edison whitelist
 has been selected.
 
+A [December 2009 trade report of Konami's Duel Terminal announcement](https://icv2.com/articles/games/view/16545/yu-gi-oh-5ds-duel-terminals)
+says those cards would become tournament legal after wider distribution in
+non-Duel-Terminal products. The community [Duel Terminal 1 article](https://www.edisonformat.com/home/why-arent-they-legal-duel-terminal-1)
+links a former Konami blog notice, but that link did not load during this
+audit. Treat the announcement as a strongly supported historical lead, not a
+substitute for checking each card's actual non-Duel-Terminal releases and
+territory. The official card records show three concrete examples: [Genex
+Undine](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7808&ope=2&request_locale=en)
+first appears in Duel Terminal 1 on 29 January 2010 and then in *The Shining
+Darkness* on 11 May; [X-Saber Wayne](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7835&ope=2&request_locale=en)
+has its next listed print in the 1 June 2010 Starter Deck; and [Mist Valley
+Watcher](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7815&ope=2&request_locale=en)
+has its next listed print in *Gold Series 3* on 23 June. All three dates are
+after the April 20 cutoff. Under the reported distribution policy, these
+three would be excluded from the historical North American pool. Their exact
+event legality remains provisional until the period Konami notice or a
+contemporary event ruling can be inspected directly.
+
 The ignored report is
 `.cache/goat-ai/edison_pool_candidate_comparison_20261027.json` (SHA-256
-`5a0d5f4af413ef35141dd4e1361dd0d24dea896d88ed77aee5f7e402a044eab6`).
+`cbfbb64c1dae363a67c97eb61762139e27594646b2f366d6d55e2963b59e8429`).
 Reproduce it with locally cached sources:
 
 ```sh

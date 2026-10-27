@@ -16,18 +16,26 @@ from goat_ai.replay.fingerprint import sha256_file
 TOKEN = 0x4000
 
 
-def _api_ids(path: Path) -> set[int]:
+def _api_ids(path: Path) -> tuple[set[int], set[int]]:
     response = json.loads(path.read_text(encoding="utf-8"))
     rows = response.get("data") if isinstance(response, dict) else None
     if not isinstance(rows, list) or not rows:
         raise ValueError("API JSON must contain a nonempty data list")
     ids: set[int] = set()
+    duel_terminal_1_ids: set[int] = set()
     for row in rows:
         code = row.get("id") if isinstance(row, dict) else None
         if type(code) is not int or code <= 0 or code in ids:
             raise ValueError("API JSON has an invalid or duplicate card ID")
         ids.add(code)
-    return ids
+        card_sets = row.get("card_sets", [])
+        if not isinstance(card_sets, list):
+            raise ValueError("API JSON card_sets must be a list")
+        if any(isinstance(card_set, dict)
+               and card_set.get("set_name") == "Duel Terminal 1"
+               for card_set in card_sets):
+            duel_terminal_1_ids.add(code)
+    return ids, duel_terminal_1_ids
 
 
 def _community_ids(path: Path) -> set[int]:
@@ -51,7 +59,7 @@ def _community_ids(path: Path) -> set[int]:
 
 def compare(api_json: Path, community_csv: Path, database: Path,
             restrictions: Path) -> dict[str, object]:
-    api_ids = _api_ids(api_json)
+    api_ids, api_dt1_ids = _api_ids(api_json)
     community_ids = _community_ids(community_csv)
     limits = read_advanced_restrictions(restrictions)
     with sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True) as connection:
@@ -71,6 +79,8 @@ def compare(api_json: Path, community_csv: Path, database: Path,
     missing_metadata_ids = sorted(code for code in api_only if code not in types)
     unresolved_ids = sorted(api_only - set(token_ids) - set(forbidden_ids)
                             - set(missing_metadata_ids))
+    unresolved_dt1_ids = sorted(set(unresolved_ids) & {
+        metadata.get(code, (code, 0))[0] for code in api_dt1_ids})
     return {
         "purpose": "candidate_disagreement_not_edison_legality",
         "jurisdiction_status": "not_established_by_candidate_sources",
@@ -89,6 +99,7 @@ def compare(api_json: Path, community_csv: Path, database: Path,
         "api_only_token_ids": token_ids,
         "api_only_missing_metadata_ids": missing_metadata_ids,
         "api_only_unresolved_ids": unresolved_ids,
+        "api_only_unresolved_with_duel_terminal_1_print_ids": unresolved_dt1_ids,
         "community_only_ids": sorted(community_canonical - api_canonical),
     }
 
