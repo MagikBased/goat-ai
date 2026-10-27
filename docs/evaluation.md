@@ -8489,3 +8489,43 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_historical_thunder_dragon.py \
   tests/test_historical_thunder_exchange.py
 ```
+
+### SJC New Jersey Rhymus deck held-out check (27 October 2026)
+
+The [preserved 2005 SJC New Jersey Top 8 list](https://www.goatformat.com/home/top-8-decklists)
+prints Rhymus Lizo's 40-card Main Deck and eight-card Fusion Deck. The
+[YDK transcription](../examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk)
+keeps those exact counts and omits the Side Deck for single duels. Four
+focused tests passed: published counts, source names and GOAT whitelist,
+and two seat-swapped complete native duels against the Charlotte Zombie
+fixture. Both test duels serialized, replay-verified, and passed the
+player-visibility audit.
+
+Both Main Deck composition hashes are absent from the current feature-v23
+checkpoint's 12 recorded training compositions: Rhymus
+`86dcdaea47d58fd7bd1eaaa8849fb6b2cb60aa17fc991d4df11f134bfa21ac00`,
+Charlotte Zombie `f8e6e57b95f4eb3927202980931fe2efebbca8fb75a2fa08b76bbfff55eeba67`.
+The unchanged checkpoint played Tactical-v14 across seeds 37100–37103,
+both Main Deck assignments and policy seats. All **16 duels** reached terminal
+before 3,000 decisions (maximum **888**). The policy scored **8–8–0**;
+paired-bootstrap 95% score interval **25–75%**. It won **6/8** as first
+player and **2/8** as second. This small sample supplies a reproducible
+held-out baseline, not evidence of improvement over Tactical-v14.
+
+The ignored report is
+`.cache/goat-ai/rhymus_vs_zombie_current_37100_37103.json` (SHA-256
+`03659a5f9892b020b5367d87c8e3032b6ef8d48882c41c6482c64569ecf0f3ea`).
+Reproduce with pinned native assets:
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_2005_new_jersey_rhymus_deck.py
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk \
+    examples/decks/zombie_jae_kim_charlotte_2005.ydk \
+  --both-deck-assignments --require-unseen-main-decks --opponent tactical \
+  --seed 37100 --seeds 4 --workers 4 --max-decisions 3000 \
+  --output .cache/goat-ai/rhymus_vs_zombie_current_37100_37103.json
+```

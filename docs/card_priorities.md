@@ -8,6 +8,8 @@ Five published lists are encoded as playable 2005 fixtures: [Matt Peddle's](../e
 
 The separately [preserved 2005 SJC Charlotte Top 8 lists](https://www.goatformat.com/home/top-8-decklists5124684) supply [Jae Kim's 40-card Zombie Main Deck](../examples/decks/zombie_jae_kim_charlotte_2005.ydk) as another historical evaluation fixture. Its published Side Deck is omitted for single duels; no Fusion Deck is listed. Exact-name and pinned whitelist checks plus two seat-swapped, replay-verified native duels cover this transcription. Charlotte is not included in the Indianapolis prevalence table below.
 
+The [preserved SJC New Jersey 2005 Top 8 lists](https://www.goatformat.com/home/top-8-decklists) also supply [Rhymus Lizo's 40-card Main and eight-card Fusion Deck](../examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk). Its printed Side Deck is omitted for single-duel evaluation. Exact-name, copy-limit, and two seat-swapped complete-duel tests cover this transcription. Its Main Deck and Jae Kim's Charlotte Zombie Main Deck are both absent from the current feature-v23 checkpoint's recorded training compositions, so the pair can test held-out-deck behavior. Neither deck is included in the Indianapolis prevalence table below.
+
 | Card | Published Top 8 lists | Copies |
 | --- | ---: | ---: |
 | Book of Moon | 8 | 15 |
