@@ -59,3 +59,22 @@ def filter_activation_opportunities(
             kept.append(teacher)
             disagreements += original.selected_action != teacher.selected_action
     return tuple(kept), disagreements
+
+
+def teacher_disagreement_flags(
+    trajectory: Trajectory, labeled: Sequence[DecisionRecord],
+) -> tuple[bool, ...]:
+    """Identify corrections using only the recorded policy seat's legal choices."""
+    seat = (trajectory.skill_metadata or {}).get("demonstrator_seat")
+    originals = [record for record in trajectory.decisions
+                 if record.observation.acting_player == seat
+                 and len(record.legal_actions) > 1]
+    if len(originals) != len(labeled):
+        raise ValueError("teacher disagreement flags need aligned policy decisions")
+    flags = []
+    for original, teacher in zip(originals, labeled, strict=True):
+        if (original.observation != teacher.observation
+                or original.legal_actions != teacher.legal_actions):
+            raise ValueError("teacher labels do not match recorded visible decisions")
+        flags.append(original.selected_action != teacher.selected_action)
+    return tuple(flags)

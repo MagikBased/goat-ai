@@ -5055,6 +5055,106 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_behavioral_clone.py \
   --output .cache/goat-ai/fv23_on_policy_teacher_9900_9901.pt
 ```
 
+### Expanded policy-visited synthetic teacher pilot
+
+The deterministic batch collector recorded 64 native feature-v23 policy
+versus Tactical-v14 duels on Jesse Goat Control/Warrior and DingoSig Chaos
+Return/Flip Control, seeds 12100–12115 and both policy seats. All 27,983
+decisions replay-verified and passed the player-visible audit. The policy
+won 18, lost 43, and drew three of those collection games; those are
+collection outcomes, not a strength evaluation. Tactical-v14 labeled
+4,679 multi-option policy-seat decisions and disagreed with the policy's
+executed choice on 1,025. These remain **synthetic** labels; no human
+demonstrations were added. The ignored collection manifest is
+`.cache/goat-ai/policy_vs_tactical_12100_12115/manifest.json` (SHA-256
+`fc3f00ff437a1e6dd141fd926196bbeac968e70132175988eafdb1d037cb1df2`).
+
+Two continuations from the same unchanged v23 parent used all 64 verified
+trajectories, two epochs, batched forward with minibatch size 16, learning
+rate 0.0001, and seed 37. The plain fit took 32.51 seconds including 14.03
+seconds of replay verification. An opt-in
+`--on-policy-disagreement-weight 4` fit sampled policy/teacher disagreements
+at four times the weight of agreements; it took 31.91 seconds including
+13.93 seconds of verification. This changes sampling frequency, not the
+number of distinct labels. The checkpoint records the weight and correction
+count. The ignored checkpoints are
+`.cache/goat-ai/fv23_on_policy_teacher_12100_12115_plain.pt` (SHA-256
+`7ed7a90f3fc4dc8ac5d6ba3f9a5183ac01845fd479e5d35ca9e0bb7c6eb176e6`)
+and `.cache/goat-ai/fv23_on_policy_teacher_12100_12115_disagreement4.pt`
+(SHA-256 `8221c5f72dddfd43bb727e254cdc486c0341a8a84ae331976aa91643d780d99f`).
+
+Evaluation excluded the training seeds and Main Deck compositions and used
+both deck assignments and both policy seats. On Insids Chaos Control/Bazoo
+Return and Lolmarcus/Michael GOAT Control, seeds 12200–12215, the weighted
+child scored **62–66** directly against its parent over 128 games (paired
+95% score interval 41.4%–55.5%). Against Tactical it scored **27–101**;
+the parent scored **15–112 with one draw** on the same schedule. The paired
+Tactical score difference was **+9.0 percentage points** (95% interval
++2.3 to +16.0 points). On the first 64 games, the plain child scored
+**31–33** against its parent and **12–52** against Tactical; the weighted
+child scored **29–35** directly against the plain child. The weighted
+child's direct parent comparison on those 64 games was **28–36**. The
+Tactical gain on these two pairings did not establish a direct parent gain.
+
+An additional unseen Main Deck family, guide Dimension Fusion Turbo versus
+Bazoo Return and Insids Chaos Control, was evaluated on seeds 12216–12223
+with the same assignment and seat controls. The weighted child scored
+**8–55 with one draw** against Tactical versus the parent's **14–49 with
+one draw**. The paired score difference was **−9.4 points** (95% interval
+−17.2 to −0.8). The plain child also scored **8–55 with one draw** against
+Tactical. Both children split **31–31 with two draws** directly against the
+parent on that schedule. The new family contradicts a general Tactical
+strength gain. Neither child is promoted; M4 remains open.
+
+With the pinned native assets and parent checkpoint present, reproduce the
+weighted training path with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk examples/decks/warrior_montague_clash.ydk \
+  --matchup examples/decks/chaos_return_dingosig_worlds_2022.ydk examples/decks/flip_control_goatformat_guide.ydk \
+  --opponent tactical --seed 12100 --seeds 16 --workers 4 \
+  --max-decisions 3000 \
+  --output-dir .cache/goat-ai/policy_vs_tactical_12100_12115
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/policy_vs_tactical_12100_12115/matchup*.json \
+  --engine experimental --on-policy-teacher tactical_v14 \
+  --on-policy-disagreement-weight 4 --feature-version 23 --width 32 \
+  --epochs 2 --batch-size 16 --batched-forward \
+  --verification-workers 4 --learning-rate 0.0001 --seed 37 \
+  --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/fv23_on_policy_teacher_12100_12115_disagreement4.pt
+```
+
+The ignored reports for the first two pairings are:
+
+| Comparison and seeds | Report SHA-256 |
+| --- | --- |
+| Plain/parent 12200–12207: `fv23_on_policy_teacher_plain_vs_parent_12200_12207.json` | `0dd01bd1a86bb08a1f1c1a0f9cf1fd5043668e23c54c9e9a4fb42a2a5fad84a3` |
+| Plain/Tactical 12200–12207: `fv23_on_policy_teacher_plain_vs_tactical_12200_12207.json` | `45b32764b51b74683abb4acacd0296eb1c511207b8c31287420392efe41fb9cb` |
+| Weighted/plain 12200–12207: `fv23_on_policy_disagreement4_vs_plain_12200_12207.json` | `c760b3b9888cfb45930ba1a2a35d63be87132e82bac2c483b3b545871974af63` |
+| Weighted/parent 12200–12207: `fv23_on_policy_disagreement4_vs_parent_12200_12207.json` | `f41b2d8f79d7f166cce6ed6771f8e66efbebf63c30870c0dca6797dd0c454c5b` |
+| Weighted/parent 12208–12215: `fv23_on_policy_disagreement4_vs_parent_12208_12215.json` | `823fb292739a03394ef7363b6135dda99fe168275de12a8d3b131d6bcd1f8eef` |
+| Weighted/Tactical 12200–12207: `fv23_on_policy_disagreement4_vs_tactical_12200_12207.json` | `eb8964456a5933504074cd617a9c77a9804dce51e04c516b9db5d07f37c2ea96` |
+| Weighted/Tactical 12208–12215: `fv23_on_policy_disagreement4_vs_tactical_12208_12215.json` | `f3a21bf43eeef6618fa2503bffed14d70d649e1bdeb2fd45c32261e33a6ab778` |
+| Parent/Tactical 12200–12207: `fv23_parent_vs_tactical_12200_12207.json` | `111015da4c15ec50c3b6003b5cf48ca5344865dfcf3b6d702e320581f0edc0d1` |
+| Parent/Tactical 12208–12215: `fv23_parent_vs_tactical_12208_12215.json` | `bacb65fa6a76c3db78d0ad233340fd2ee0085ecae8ca9436bbda7754b19f249c` |
+
+For the Dimension Fusion schedule, the reports are
+`.cache/goat-ai/fv23_on_policy_disagreement4_vs_tactical_dimension_12216_12223.json`
+(SHA-256 `6ce34394eb0d2abcfdded1f807b812a1fed42e7ffbfad81f1af7f39930cb7ce5`),
+`.cache/goat-ai/fv23_parent_vs_tactical_dimension_12216_12223.json`
+(SHA-256 `3e709370e68b480783a01036eaa1820c9e215344cf0b6bd58aa14769f05653a8`),
+`.cache/goat-ai/fv23_on_policy_plain_vs_tactical_dimension_12216_12223.json`
+(SHA-256 `8c29a71940837907fae414b1dbffc5d9e382f744b467e60a148d85314bd63937`),
+`.cache/goat-ai/fv23_on_policy_disagreement4_vs_parent_dimension_12216_12223.json`
+(SHA-256 `c31c4df4a61782d824b4ea0b6effda5b68a5db3ba23f559afa54d8d4cc81ce28`),
+and `.cache/goat-ai/fv23_on_policy_plain_vs_parent_dimension_12216_12223.json`
+(SHA-256 `e1e37ed71f26551225b930d7ec8e016c86a3b8be5a60379efb83d56d217737ea`).
+All full reports and checkpoints are ignored by Git; their hashes bind the
+measured claims to the local artifacts.
+
 ### Spirit Reaper Set preference and Balter/Serpent correction
 
 An opt-in Tactical-v14 variant prefers Setting GOAT Spirit Reaper if it has

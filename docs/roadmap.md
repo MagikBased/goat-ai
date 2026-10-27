@@ -955,6 +955,17 @@ as the neural reference and require a measured gain against the parent and
 Tactical across deck families before promoting an RL update; see
 [the evaluation](evaluation.md).
 
+A 64-duel policy-versus-Tactical collection supplied 4,679 replay-verified,
+player-visible synthetic labels, including 1,025 policy/teacher
+disagreements. Plain and disagreement-weighted clones did not beat their
+unchanged v23 parent directly. The weighted child improved its paired score
+against Tactical by 9.0 points over the parent on two held-out pairings
+(95% interval +2.3 to +16.0), but lost 9.4 points on an additional unseen
+Dimension Fusion family (−17.2 to −0.8). The plain child shared that
+regression. This is useful evidence of deck-family overfitting, not M4's
+cross-deck strength gain. Keep the parent as the neural reference; see
+[the expanded evaluation](evaluation.md).
+
 Four-duel PPO rollout batching and equal-duel loss weighting were tested
 from that same parent on the same 32-game training schedule. The unweighted
 rollout child lost 20–44 to single-duel PPO on 64 held-out games; the

@@ -43,6 +43,7 @@ from goat_ai.training import (
 from goat_ai.training.on_policy_teacher import (
     filter_activation_opportunities,
     label_policy_trajectory,
+    teacher_disagreement_flags,
 )
 from goat_ai.training.policy import ACTION_KINDS
 from goat_ai.training.self_play import (
@@ -92,8 +93,13 @@ def test_clone_sampling_composes_source_focus_and_selected_kind_weights():
     assert decision_sampling_weights(records, ("teacher", "teacher"),
                                      {"teacher": 2.0}, {10}, 3.0,
                                      {"set_monster": 5.0}) == [30.0, 6.0]
+    assert decision_sampling_weights(records, ("teacher", "teacher"), {},
+                                     set(), 1.0, {}, (True, False), 4.0) == [4.0, 1.0]
     with pytest.raises(ValueError, match="source"):
         decision_sampling_weights(records, ("teacher",), {}, set(), 1.0, {})
+    with pytest.raises(ValueError, match="source"):
+        decision_sampling_weights(records, ("teacher", "teacher"), {}, set(),
+                                  1.0, {}, (True,), 4.0)
 
 
 def view() -> Observation:
@@ -133,6 +139,9 @@ def test_on_policy_teacher_labels_only_checkpoint_policy_seat():
     assert len(labeled) == 1
     assert labeled[0].selected_action == actions()[1]
     assert disagreements == 1
+    assert teacher_disagreement_flags(trajectory, labeled) == (True,)
+    with pytest.raises(ValueError, match="aligned"):
+        teacher_disagreement_flags(trajectory, ())
     assert trajectory.decisions[0].selected_action == actions()[0]
     with pytest.raises(ValueError, match="matching checkpoint"):
         label_policy_trajectory(trajectory, Teacher(), "b" * 64)

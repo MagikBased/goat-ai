@@ -14,8 +14,12 @@ from time import perf_counter
 
 import torch
 
-from goat_ai.agents import (TacticalHeuristicAgent, load_card_facts,
-                            load_card_races, load_flip_monster_codes)
+from goat_ai.agents import (
+    TacticalHeuristicAgent,
+    load_card_facts,
+    load_card_races,
+    load_flip_monster_codes,
+)
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
@@ -33,11 +37,12 @@ from goat_ai.training import (
     fit_behavioral_clone,
     fit_with_parent_kl,
 )
-from goat_ai.training.policy import POLICY_FEATURE_VERSION
 from goat_ai.training.on_policy_teacher import (
     filter_activation_opportunities,
     label_policy_trajectory,
+    teacher_disagreement_flags,
 )
+from goat_ai.training.policy import POLICY_FEATURE_VERSION
 
 SOURCE_KINDS = frozenset((
     "activate", "attack", "chain", "change_position", "flip_summon",
@@ -112,17 +117,22 @@ def parse_source_weights(assignments: list[str], *, option: str = "source") -> d
 
 
 def decision_sampling_weights(records, sources, source_weights, focus_codes,
-                              focus_weight, kind_weights):
+                              focus_weight, kind_weights,
+                              disagreement_flags=None, disagreement_weight=1.0):
     """Compose opt-in BC sampling factors without changing unweighted runs."""
-    if not (len(records) == len(sources)):
+    if (len(records) != len(sources)
+            or disagreement_flags is not None
+            and len(disagreement_flags) != len(records)):
         raise ValueError("one source is required for each decision")
-    if (not kind_weights and focus_weight == 1
+    if (not kind_weights and focus_weight == 1 and disagreement_weight == 1
             and all(weight == 1 for weight in source_weights.values())):
         return None
     return [source_weights.get(source, 1.0)
             * (focus_weight if focus_opportunity(record, focus_codes) else 1.0)
             * kind_weights.get(record.selected_action.kind, 1.0)
-            for record, source in zip(records, sources)]
+            * (disagreement_weight if disagreement_flags is not None
+               and disagreement_flags[index] else 1.0)
+            for index, (record, source) in enumerate(zip(records, sources))]
 
 
 def restrict_trainable_modules(model: LegalActionPolicy, modules: list[str]) -> None:
@@ -203,6 +213,8 @@ def main() -> None:
                              "named synthetic teacher; requires --init-checkpoint")
     parser.add_argument("--on-policy-teacher-activation-focus-only", action="store_true",
                         help="train only decisions offering activation of a --focus-card")
+    parser.add_argument("--on-policy-disagreement-weight", type=float, default=1.0,
+                        help="relative sampling weight for policy/teacher disagreements")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--output", type=Path, required=True)
@@ -251,6 +263,7 @@ def main() -> None:
     if (args.epochs < 1 or args.width < 1 or args.learning_rate <= 0
             or args.batch_size < 1 or args.verification_workers < 1
             or not 1 <= args.focus_weight < float("inf")
+            or not 1 <= args.on_policy_disagreement_weight < float("inf")
             or any(code <= 0 for code in args.focus_card)
             or args.focus_weight > 1 and not args.focus_card):
         parser.error("training parameters must be positive; focus weight needs focus cards")
@@ -276,6 +289,9 @@ def main() -> None:
     if args.on_policy_teacher_activation_focus_only and (
             not args.on_policy_teacher or not args.focus_card):
         parser.error("activation focus requires --on-policy-teacher and --focus-card")
+    if args.on_policy_disagreement_weight > 1 and (
+            not args.on_policy_teacher or args.on_policy_teacher_activation_focus_only):
+        parser.error("disagreement weighting requires unfiltered on-policy teacher labels")
     if (args.parent_kl_steps < 0 or args.preserve_per_trajectory < 1
             or args.preserve_batch < 1 or not isfinite(args.parent_kl_weight)
             or args.parent_kl_weight <= 0):
@@ -286,6 +302,8 @@ def main() -> None:
         parser.error("--preserve-trajectories requires --parent-kl-steps")
     if args.parent_kl_steps and (source_weights or args.focus_weight > 1):
         parser.error("parent KL uses labeled decisions directly; omit sampling weights")
+    if args.parent_kl_steps and args.on_policy_disagreement_weight > 1:
+        parser.error("disagreement weighting is supported only for behavioral cloning")
     if args.batched_forward and args.parent_kl_steps:
         parser.error("batched forward is currently supported only for behavioral cloning")
     engine_type = (RestrictedOcgcoreEngine if args.engine == "restricted"
@@ -300,6 +318,7 @@ def main() -> None:
                            if teacher is not None else None)
     records = []
     record_sources = []
+    record_disagreements = []
     sources: Counter[str] = Counter()
     trajectory_hashes = {}
     training_games = []
@@ -345,9 +364,11 @@ def main() -> None:
         if teacher is not None:
             selected, disagreements = label_policy_trajectory(
                 trajectory, teacher, teacher_parent_hash)
+            disagreement_flags = teacher_disagreement_flags(trajectory, selected)
             if args.on_policy_teacher_activation_focus_only:
                 selected, disagreements = filter_activation_opportunities(
                     trajectory, selected, args.focus_card)
+                disagreement_flags = (False,) * len(selected)
         elif label_path is not None:
             annotation, selected = read_decision_annotations(
                 label_path, hashlib.sha256(raw).hexdigest(), trajectory)
@@ -366,6 +387,8 @@ def main() -> None:
             source = trajectory.source
         records.extend(selected)
         record_sources.extend([source] * len(selected))
+        record_disagreements.extend(
+            disagreement_flags if teacher is not None else (False,) * len(selected))
         sources[source] += len(selected)
         trajectory_hashes[str(path)] = hashlib.sha256(raw).hexdigest()
         training_games.append({"seed": trajectory.seed,
@@ -427,7 +450,8 @@ def main() -> None:
     focus_count = sum(focus_opportunity(record, focus_codes) for record in records)
     sampling_weights = decision_sampling_weights(
         records, record_sources, source_weights, focus_codes,
-        args.focus_weight, label_kind_weights)
+        args.focus_weight, label_kind_weights,
+        record_disagreements, args.on_policy_disagreement_weight)
     preservation_metadata = None
     if args.parent_kl_steps:
         if len({path.resolve() for path in args.preserve_trajectories}) != len(
@@ -503,6 +527,8 @@ def main() -> None:
         "focus_cards": tuple(sorted(focus_codes)),
         "focus_weight": args.focus_weight,
         "on_policy_activation_focus_only": args.on_policy_teacher_activation_focus_only,
+        "on_policy_disagreement_weight": args.on_policy_disagreement_weight,
+        "on_policy_disagreements": sum(record_disagreements),
         "source_weights": source_weights,
         "label_kind_weights": label_kind_weights,
         "trainable_modules": tuple(args.trainable_module) or ("all",),

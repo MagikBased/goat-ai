@@ -14,6 +14,15 @@ in per-game provenance. This is synthetic on-policy distillation, not human
 demonstration or a claim that the teacher's choice is always best. The first
 held-out experiment [did not improve playing strength](evaluation.md).
 
+`--on-policy-disagreement-weight 4` optionally samples policy/teacher
+disagreements four times as often during cloning. It requires unfiltered
+on-policy teacher labels and records the weight and disagreement count in
+the checkpoint. It does not create new decisions or imply an expert label.
+In a 64-duel collection, it improved score versus Tactical on two held-out
+deck pairings but regressed on a separate Dimension Fusion family; see the
+[expanded evaluation](evaluation.md). The unchanged parent remains the
+neural reference.
+
 The additional opt-in `tactical_card_advantage` teacher changes only the
 visible Heavy Storm trade preference; it remains a synthetic heuristic.
 `--on-policy-teacher-activation-focus-only` limits labels to decisions where
