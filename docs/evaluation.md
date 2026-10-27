@@ -1,5 +1,62 @@
 # Baseline evaluation log
 
+## Balanced parallel PPO continuation across four roles (27 October 2026)
+
+The feature-v23 four-deck parent
+(`.cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt`, SHA-256
+`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`)
+was continued through **64 native self-play duels** on two established deck
+pairings: Jesse Twohig Goat Control versus Montague Warrior, and DingoSig
+Chaos Return versus GoatFormat Guide Flip Control. The four-role schedule
+assigned the learner each deck in both seats. Seeds were 17000–17063, with
+four duels per frozen-policy PPO rollout, four CPU rollout workers, per-episode
+weighting, three PPO epochs, minibatch 16, learning rate `1e-4`, learner-deck
+moving baselines, historical-snapshot probability 0.75, and frozen-parent KL
+weight 0.5. All **64/64** games reached terminal (30 wins, 31 losses, three
+draws), producing 5,440 multi-option learner decisions in **43.48 seconds**
+of reported wall time. Every saved replay passed full native verification and
+the player-visible audit, totaling **33,341 decisions**. The checkpoint is
+`.cache/goat-ai/ppo_balanced_64_17000_17063.pt` (SHA-256
+`3abbabf0508dae326d1666e6e64e0b8cbd9d2c647d256507978576899a7a4c4b`).
+
+Both parent and child passed the exact unseen-Main-Deck composition gate for
+the 2005 Phoenix Control versus WikiFormat Dimension Fusion matchup. On fresh
+seeds 17100–17123, both deck assignments and both agent seats, the child
+scored **44–50–2** directly against its parent over 96 duels (paired-bootstrap
+score interval **39.6–54.2%**). By child deck it scored **30–17–1** with
+Phoenix and **14–33–1** with Dimension Fusion. On another fresh 64-game
+schedule against Tactical v14 (seeds 17130–17145), both child and parent
+scored **16–48** overall. Child deck splits were 13–19 Phoenix and 3–29
+Dimension Fusion; parent splits were 11–21 and 5–27. These separate baseline
+matches do not establish a paired improvement; the direct match also fails
+the strength gate. Keep this child experimental and the parent as the neural
+reference. More terminal-reward PPO updates of this form are lower priority
+than stronger decision feedback or a validated value signal.
+
+The ignored training JSON is
+`.cache/goat-ai/ppo_balanced_64_17000_17063.json` (SHA-256
+`5903bbccb9a4a463217dcfea88ee34a7080db99b4e93b5ce0cd4518460c4cd59`);
+the 64-replay audit is
+`.cache/goat-ai/ppo_balanced_64_17000_17063_audit.json`
+(`23c0dcae2f685af445d940f8933b47b802d699ad82dc75ce2a55b1f08aff0628`).
+The direct report is
+`.cache/goat-ai/ppo_balanced_64_vs_parent_17100_17123.json`
+(`33b063eef88f1eb443a5cdedfced1bc301dd4f575d7665014e34a0672bc3c19e`);
+child/parent Tactical reports are
+`.cache/goat-ai/ppo_balanced_64_vs_tactical_17130_17145.json`
+(`46eafbf797da61997ce25cfd3f71728e8dcc5d98615f4945268b7438622400c9`)
+and `.cache/goat-ai/ppo_parent_vs_tactical_17130_17145.json`
+(`33af91ca7e0dc71454f6b21a7fd2332b4fae0631c7718003fc887380cf52a77f`).
+Reproduce with `scripts/train_self_play.py` using the two `--matchup` pairs,
+`--schedule-mode four_roles --seed 17000 --games 64 --max-decisions 3000
+--learning-rate 0.0001 --historical-probability 0.75 --snapshot-every 8
+--baseline-scope learner_deck --parent-kl-weight 0.5 --policy-update
+clipped_ppo --ppo-rollout-games 4 --rollout-workers 4
+--ppo-rollout-weighting per_episode --ppo-epochs 3 --ppo-batch-size 16`.
+Use `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --workers 4` with the
+two held-out decks and the recorded evaluation seed ranges.
+
 ## Phoenix Control historical effect line (27 October 2026)
 
 The pinned GOAT scripts completed a sourced Hand of Nephthys / Scapegoat /
