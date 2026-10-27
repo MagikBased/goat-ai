@@ -941,6 +941,13 @@ both selected materials to the Graveyard; the complete 1,439-decision duel
 replay-verifies and passes the visibility audit. The fixture uses a tiny sourced
 card subset and modern pinned scripts. It does not validate all 2010 Synchro
 rulings, effect text, or Edison legality; see [the Edison audit](edison_research.md).
+A second sourced MR1 fixture now Synchro Summons Black Rose Dragon from Junk
+Synchron and a Level 4 Normal Monster. Accepting or declining its optional
+field-wipe trigger produces different verified board outcomes; both complete
+duels replay-verify and pass the visibility audit. The narrow probe applies
+the March 2010 one-copy restriction for Black Rose Dragon. This expands
+Synchro protocol coverage without establishing a complete 2010 rules profile
+or release pool; see [the Edison audit](edison_research.md).
 An independent 2009 deck-construction validator now accepts an explicitly
 audited eligible-card set and checks Main, Extra, and Side sizes, Fusion/Synchro
 placement, and shared canonical copy caps. It deliberately does not infer
