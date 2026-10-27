@@ -1,5 +1,56 @@
 # Native benchmark log
 
+## Single-process batched PPO inference (27 October 2026)
+
+The optional `--rollout-batch-inference` path advances independent native
+duels in one process and batches only learner policy calls at decision
+boundaries. Each duel retains its own engine, player-visible observation, and
+sampling generator. It requires multi-duel clipped PPO and the policy versions
+supported by `forward_batch`; process workers, censored games, and a learned
+critic are excluded from this experimental path.
+
+An end-to-end eight-duel run used the feature-v23 parent checkpoint SHA-256
+`9af25af5348eb9c857596aafca617afe6dce222d247de84da630b2b5f2f2d56c`,
+control/Chaos probe decks, seeds 16630–16637, a frozen random opponent,
+one PPO epoch, rollout size eight, batch size 16, and one Torch CPU thread.
+It ran on an Intel Core i7-10700K under Linux 6.8.0-146-generic. Each mode
+completed the same 5,865 decisions and 1,092 learner decisions. All eight
+replays had byte-identical counterparts across modes, and the resulting
+policy tensors were equal. The batched replays passed complete native
+verification and the player-visibility audit.
+
+| Rollout mode | Complete training wall time |
+| :--- | ---: |
+| One independent worker | 8.710 s |
+| Batched inference in one process | 8.322 s |
+| Four independent process workers | 6.897 s |
+
+The four-duel smoke on seeds 16620–16623 took 4.318 s with one worker and
+4.265 s with batched inference; its replays and trained tensors also matched.
+These small measurements show a modest CPU gain over a single worker and a
+slower run than four process workers. Batch inference remains opt-in. No
+competitive strength gain follows from byte-identical training data.
+
+To reproduce one arm from the repository root, run the command below with a
+fresh output name and append either `--rollout-workers 1`,
+`--rollout-workers 4`, or `--rollout-batch-inference`:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --output .cache/goat-ai/rollout_MODE_16630.pt \
+  --engine experimental \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk \
+  --seed 16630 --games 8 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 8 \
+  --ppo-epochs 1 --ppo-batch-size 16 \
+  --historical-probability 0 --snapshot-every 8
+```
+
+The ignored stdout reports and checkpoints have matching names under
+`.cache/goat-ai/`: `batch_inference_16630`, `worker1_16630`, and
+`workers4_16630`.
+
 The benchmark runs the real pinned ocgcore through `RestrictedOcgcoreEngine` with two normal-monster fixture decks and two seeded `RandomAgent` seats. It measures wall time around reset, action selection, steps, and teardown. It is a narrow protocol baseline, not a measure of general GOAT gameplay or training throughput. Run it with `python scripts/benchmark_native.py --games 3 --seed 42` after [native setup](native_setup.md).
 
 | Date | Platform | Games | Decisions | Elapsed | Duels/s | Decisions/s | Peak process RSS |

@@ -1259,3 +1259,12 @@ orders, with an identical recorded 924-decision rollout. This is a useful CPU
 experiment setting, but one training game does not justify changing the
 reproducibility default or establish strength; see
 [the training benchmark](benchmarks.md#complete-one-duel-reinforce-training-scalar-versus-batch-16).
+
+An opt-in multi-duel PPO rollout now batches learner inference across native
+duels in one process. Eight matched games produced byte-identical trajectories
+and equal policy tensors across one-worker, batched, and four-worker modes.
+Complete training took 8.710, 8.322, and 6.897 seconds respectively on the
+measured CPU. Four process workers remain faster for this workload; the new
+mode is an experiment for machines where process scaling or accelerator
+inference changes that tradeoff. See
+[the full benchmark](benchmarks.md#single-process-batched-ppo-inference-27-october-2026).

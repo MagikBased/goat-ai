@@ -4,6 +4,7 @@ import copy
 import random
 from collections.abc import Callable, Sequence
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from math import isfinite
 from multiprocessing import get_context
@@ -17,6 +18,7 @@ from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import DecisionRecord, Trajectory
 from goat_ai.training.policy import (
+    CHAIN_TARGET_FEATURE_VERSIONS,
     PHASES,
     POSITIONS,
     ZONES,
@@ -186,6 +188,93 @@ def run_learning_episode(
                 return EpisodeResult(seed, learner_seat, env.result(), count,
                                      tuple(records), trajectory)
     raise EpisodeDecisionLimit(seed, max_decisions)
+
+
+def run_batched_learning_episodes(
+    model: LegalActionPolicy, vocabulary: CardVocabulary,
+    games: Sequence[tuple[Agent, tuple[str, str], int, int, torch.Generator]],
+    engine_factory: Callable[[], RulesEngine], *, max_decisions: int = 5000,
+    learner_temperature: float = 1.0,
+) -> tuple[EpisodeResult, ...]:
+    """Run independent native duels together and batch only learner inference.
+
+    Each duel keeps its own engine, observation, and sampling generator. No
+    hidden simulator state is shared with or passed to the policy.
+    """
+    if (not games or max_decisions < 1 or learner_temperature <= 0
+            or model.feature_version < 10
+            or model.feature_version in CHAIN_TARGET_FEATURE_VERSIONS
+            or any(seat not in (0, 1) for _, _, _, seat, _ in games)):
+        raise ValueError("batched rollout requires v10+ policy and valid games")
+    with ExitStack() as stack:
+        environments = [stack.enter_context(GoatEnvironment(
+            *decks, seed=seed, engine=engine_factory()))
+            for _, decks, seed, _, _ in games]
+        observations = [env.reset() for env in environments]
+        counts = [0] * len(games)
+        records: list[list[DecisionRecord]] = [[] for _ in games]
+        results: list[EpisodeResult | None] = [None] * len(games)
+        remaining = set(range(len(games)))
+
+        def advance(index: int, action) -> None:
+            _, _, seed, seat, _ = games[index]
+            env = environments[index]
+            legal = env.legal_actions()
+            observation = observations[index]
+            if observation.acting_player == seat and len(legal) > 1:
+                records[index].append(DecisionRecord(observation, legal, action))
+            counts[index] += 1
+            observations[index] = env.step(action)
+            if env.is_terminal():
+                trajectory = replace(env.trajectory(), source="self_play_rl",
+                                     skill_metadata={"learner_seat": seat,
+                                                     "demonstrator_seat": seat})
+                results[index] = EpisodeResult(seed, seat, env.result(), counts[index],
+                                               tuple(records[index]), trajectory)
+                remaining.remove(index)
+
+        while remaining:
+            ready = []
+            for index in sorted(remaining):
+                opponent, _, seed, seat, _ = games[index]
+                env = environments[index]
+                while index in remaining:
+                    if counts[index] >= max_decisions:
+                        raise EpisodeDecisionLimit(seed, max_decisions)
+                    legal = env.legal_actions()
+                    observation = observations[index]
+                    if observation.acting_player == seat and len(legal) > 1:
+                        ready.append(index)
+                        break
+                    action = (legal[0] if observation.acting_player == seat
+                              else opponent.select_action(observation, legal))
+                    advance(index, action)
+            if not ready:
+                continue
+            features = [encode_decision(observations[index],
+                                        environments[index].legal_actions(),
+                                        vocabulary, model.feature_version)
+                        for index in ready]
+            device = next(model.parameters()).device
+            with torch.inference_mode():
+                if len(ready) == 1:
+                    logits = [model(features[0].to(device))]
+                else:
+                    batch, _ = model.forward_batch(
+                        [item.to(device) for item in features])
+                    logits = [batch[row, :len(environments[index].legal_actions())]
+                              for row, index in enumerate(ready)]
+                chosen = []
+                for index, scores in zip(ready, logits, strict=True):
+                    generator = games[index][4]
+                    probabilities = torch.softmax(scores / learner_temperature,
+                                                  dim=0).cpu()
+                    choice = int(torch.multinomial(probabilities, 1,
+                                                   generator=generator).item())
+                    chosen.append(environments[index].legal_actions()[choice])
+            for index, action in zip(ready, chosen, strict=True):
+                advance(index, action)
+        return tuple(result for result in results if result is not None)
 
 
 def _parallel_rollout_worker(task):
@@ -472,6 +561,7 @@ def train_against_snapshot_pool(
     ppo_rollout_games: int = 1,
     ppo_rollout_weighting: str = "per_decision",
     rollout_workers: int = 0,
+    rollout_batch_inference: bool = False,
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
@@ -510,6 +600,11 @@ def train_against_snapshot_pool(
                             or skip_capped_games or skip_unsupported_games
                             or baseline_scope == "state_value"):
         raise ValueError("parallel rollout needs multi-duel PPO and terminal games")
+    if rollout_batch_inference and (
+            rollout_workers or policy_update != "clipped_ppo"
+            or ppo_rollout_games < 2 or skip_capped_games
+            or skip_unsupported_games or baseline_scope == "state_value"):
+        raise ValueError("batched inference needs multi-duel PPO without workers or skips")
     if (policy_update == "clipped_ppo" and
             (model.feature_version < 10 or model.feature_version in (14, 15))):
         raise ValueError("clipped PPO requires a supported batched policy version")
@@ -539,8 +634,9 @@ def train_against_snapshot_pool(
     try:
         parallel_batch: dict[int, tuple[EpisodeResult, str]] = {}
         for index, (seed, decks, learner_seat) in enumerate(schedule):
-            if rollout_workers and index % ppo_rollout_games == 0:
-                model_state = copy.deepcopy(model.state_dict())
+            if (rollout_workers or rollout_batch_inference) and index % ppo_rollout_games == 0:
+                model_state = (None if rollout_batch_inference
+                               else copy.deepcopy(model.state_dict()))
                 tasks = []
                 names = []
                 for batch_index in range(index, min(index + ppo_rollout_games, len(schedule))):
@@ -555,7 +651,30 @@ def train_against_snapshot_pool(
                                   batch_decks, batch_seed, batch_seat, engine_factory,
                                   max_decisions, learner_temperature,
                                   random_seed + batch_seed))
-                if rollout_workers == 1:
+                if rollout_batch_inference:
+                    batch_games = []
+                    for task in tasks:
+                        (_, _, _, _, opponent_state, batch_decks, batch_seed,
+                         batch_seat, _, _, _, generator_seed) = task
+                        batch_generator = torch.Generator(device="cpu").manual_seed(
+                            generator_seed)
+                        if opponent_state is None:
+                            batch_opponent: Agent = RandomAgent(batch_seed)
+                        else:
+                            frozen = LegalActionPolicy(
+                                vocabulary.size, width=model.card.embedding_dim,
+                                feature_version=model.feature_version)
+                            frozen.load_state_dict(opponent_state)
+                            frozen.eval()
+                            batch_opponent = SamplingPolicyAgent(
+                                frozen, vocabulary, batch_generator)
+                        batch_games.append((batch_opponent, batch_decks,
+                                            batch_seed, batch_seat, batch_generator))
+                    episodes = run_batched_learning_episodes(
+                        model, vocabulary, batch_games, engine_factory,
+                        max_decisions=max_decisions,
+                        learner_temperature=learner_temperature)
+                elif rollout_workers == 1:
                     previous_threads = torch.get_num_threads()
                     try:
                         episodes = list(map(_parallel_rollout_worker, tasks))
@@ -566,7 +685,7 @@ def train_against_snapshot_pool(
                 parallel_batch = {batch_index: (episode, name)
                                   for batch_index, (episode, name) in enumerate(
                                       zip(episodes, names, strict=True), start=index)}
-            if rollout_workers:
+            if rollout_workers or rollout_batch_inference:
                 episode, opponent_name = parallel_batch.pop(index)
             else:
                 if rng.random() < historical_probability:
