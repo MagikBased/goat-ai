@@ -1118,11 +1118,12 @@ were tournament legal. All 28 API-only DT01 candidates have now been checked
 against their official English TCG card pages: each first listed non-DT01
 printing is after the April 20 cutoff. Their dated source table is a partial
 release exclusion asset, not a complete Edison whitelist. Konami's North
-American product pages separately exclude Darkness Destroyer and Vice Dragon
-after the cutoff, bringing source-backed exclusions to 30 of the 34 named
-API-only discrepancies. Restructer Revolution is an inclusion candidate with
-a 2005 booster printing; three older promotional cards and the two
-community-only promotions still need regional adjudication. See the
+American product page separately excludes Vice Dragon after the cutoff,
+bringing source-backed exclusions to 29 of the 34 named API-only
+discrepancies. Restructer Revolution is an inclusion candidate with a 2005
+booster printing; three older promotional cards and Darkness Destroyer's
+cross-territory game promo still need period North American adjudication.
+The two community-only promotions also remain open. See the
 [six-card discrepancy ledger](../configs/historical/edison_non_dt01_candidate_discrepancies_2010_04_20.tsv)
 and [Edison audit](edison_research.md).
 The MR1 Synchro probe now applies a checksum-guarded in-memory correction for
