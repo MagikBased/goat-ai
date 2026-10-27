@@ -1,8 +1,9 @@
-"""Minimal native ocgcore GOAT-mode startup probe, not a duel adapter.
+"""Minimal native ocgcore startup probe, not a duel adapter.
 
 The ABI and flag value are pinned to edo9300/ygopro-core baa3881. Do not use
 this class as a player-facing environment: raw native messages may reveal
-private information and most decision messages are not decoded here.
+private information and most decision messages are not decoded here. The MR1
+mode is restricted to vanilla-card startup research, not Edison simulation.
 """
 
 import ctypes as c
@@ -13,6 +14,7 @@ import struct
 from collections import Counter
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Literal
 
 from goat_ai.observations import (
     CardView,
@@ -29,6 +31,7 @@ from goat_ai.observations import (
 
 CORE_API_VERSION = (11, 0)
 GOAT_FLAGS = 34226374444  # DUEL_MODE_GOAT in pinned ocgapi_constants.h
+MR1_FLAGS = 853760  # DUEL_MODE_MR1 in pinned ocgapi_constants.h
 UPSTREAM_UTILITY_SHA256 = "59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a"
 GOAT_DECK_CONFIRM_OLD = b"Duel.ConfirmCards(tp,dg)"
 GOAT_DECK_CONFIRM_HISTORICAL = b"Duel.ConfirmCards(1-tp,dg)"
@@ -279,7 +282,12 @@ class OcgcoreProbe:
     use_field_summary_queries = True
     """Owns one native duel; intended only for startup verification."""
 
-    def __init__(self, library: Path, database: Path, scripts: Path) -> None:
+    def __init__(self, library: Path, database: Path, scripts: Path, *,
+                 mode: Literal["goat", "mr1_startup"] = "goat") -> None:
+        if mode not in ("goat", "mr1_startup"):
+            raise ValueError("unsupported native startup mode")
+        self.mode = mode
+        self.flags = GOAT_FLAGS if mode == "goat" else MR1_FLAGS
         self.lib = c.CDLL(str(library.resolve()))
         self.db_path = database.resolve()
         self.db = sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True)
@@ -390,6 +398,8 @@ class OcgcoreProbe:
 
     def decode_pending(self):
         """Decode the native prompt using the pinned historical card-name catalog."""
+        if getattr(self, "mode", "goat") != "goat":
+            raise RuntimeError("MR1 startup probe does not expose gameplay decisions")
         from goat_ai.engine.native_messages import decode_decision
 
         if self._pending_message is None:
@@ -456,6 +466,11 @@ class OcgcoreProbe:
         if relative.is_absolute() or ".." in relative.parts:
             self.errors.append(f"unsafe script path: {relative}")
             return 0
+        if (self.mode == "mr1_startup" and relative.name.startswith("c")
+                and relative.suffix == ".lua" and relative.stem[1:].isdigit()):
+            # Core requests a script for each card, even when a normal monster
+            # needs none. The deck was checked before any cards were inserted.
+            return 0
         path = self.scripts / relative
         if not path.is_file():
             path = self.scripts / "official" / relative
@@ -480,8 +495,13 @@ class OcgcoreProbe:
                 self.errors.append(f"missing script: {relative}")
             return 0
         relative_path = path.relative_to(self.scripts).as_posix()
+        if (self.mode == "mr1_startup" and path.parent != self.scripts
+                and not (relative == Path("proc_unofficial.lua")
+                         and path.parent == self.scripts / "unofficial")):
+            self.errors.append(f"MR1 startup probe cannot load {relative}")
+            return 0
         contents = path.read_bytes()
-        if relative == Path("utility.lua"):
+        if relative == Path("utility.lua") and self.mode == "goat":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_UTILITY_SHA256 \
                     or contents.count(GOAT_DECK_CONFIRM_OLD) != 1 \
                     or contents.count(GOAT_FIXED_LP_COST_OLD) != 1:
@@ -598,6 +618,8 @@ class OcgcoreProbe:
         This only reproduces startup inputs. Saved responses still need
         version-matched reconstruction and player-visible validation.
         """
+        if getattr(self, "mode", "goat") != "goat":
+            raise ValueError("MR1 startup probe does not reconstruct replays")
         if (len(seed_words) != 4
                 or any(not isinstance(word, int) or word < 0
                        or word >= 1 << 64 for word in seed_words)
@@ -616,12 +638,19 @@ class OcgcoreProbe:
             raise ValueError("probe deck requires at least six cards")
         if len(deck) < 40 or (opponent_deck is not None and len(opponent_deck) < 40):
             raise ValueError("native duel requires at least 40 main-deck cards per player")
+        if self.mode == "mr1_startup":
+            if extra or opponent_extra:
+                raise ValueError("MR1 startup probe requires empty Extra Decks")
+            for code in (*deck, *(opponent_deck if opponent_deck is not None else deck)):
+                row = self._card_row(code, "type")
+                if row is None or row[0] != 17:
+                    raise ValueError("MR1 startup probe requires normal monsters only")
         self._initial_main_decks = (tuple(sorted(deck)),
                                     tuple(sorted(opponent_deck if opponent_deck is not None
                                                  else deck)))
         # Exact RNG words and insertion order are part of replay fidelity.
         opts = DuelOptions(
-            (c.c_uint64 * 4)(*words), GOAT_FLAGS,
+            (c.c_uint64 * 4)(*words), self.flags,
             Player(8000, 5, 1), Player(8000, 5, 1),
             self._reader, None, self._script_reader, None,
             self._logger, None, self._reader_done, None, 0,
@@ -675,7 +704,7 @@ class OcgcoreProbe:
                     raise ValueError("truncated MSG_DRAW")
                 draw_events.append((message[1], struct.unpack_from("<I", message, 2)[0]))
         return FirstDecision(
-            seed, self.version, GOAT_FLAGS,
+            seed, self.version, self.flags,
             tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_HAND) for p in (0, 1)),
             tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_DECK) for p in (0, 1)),
             tuple(message[0] for message in messages), tuple(draw_events), decision[0], decision[1],
@@ -980,6 +1009,8 @@ class OcgcoreProbe:
 
     def observation(self, viewer: int, *, terminal: bool = False) -> Observation:
         """Build a redacted view; only audited fields are requested or returned."""
+        if getattr(self, "mode", "goat") != "goat":
+            raise RuntimeError("MR1 startup probe does not expose gameplay observations")
         if (self._pending_message is None and not terminal) or viewer not in (0, 1):
             raise RuntimeError("observation requires a pending decision and valid viewer")
         from goat_ai.engine.native_queries import (
@@ -1148,6 +1179,8 @@ class OcgcoreProbe:
 
     def respond(self, response_value: int | bytes) -> NativeTransition:
         """Send one native response and process until another decision or terminal."""
+        if getattr(self, "mode", "goat") != "goat":
+            raise RuntimeError("MR1 startup probe does not resolve gameplay")
         if self._pending_message is None:
             raise RuntimeError("no pending native decision")
         decision = self.decode_pending()

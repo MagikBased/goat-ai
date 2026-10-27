@@ -1,4 +1,4 @@
-"""Print the first real ocgcore GOAT-mode decision as JSON."""
+"""Print a pinned ocgcore GOAT or MR1 startup decision as JSON."""
 
 import argparse
 import json
@@ -13,10 +13,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--mode", choices=("goat", "mr1_startup"), default="goat")
     args = parser.parse_args()
     root = args.native_root
     with OcgcoreProbe(root / "build/libocgcore.so", root / "database/cards.cdb",
-                      root / "scripts") as probe:
+                      root / "scripts", mode=args.mode) as probe:
         result = probe.first_decision(args.seed, VANILLA_DECK)
     print(json.dumps(asdict(result), indent=2))
 

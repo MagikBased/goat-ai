@@ -83,6 +83,23 @@ flags. Choosing an Edison flag combination requires sourced ruling tests. The
 current native bridge also contains GOAT-specific card and script corrections.
 It must be separated or revalidated before Edison play is enabled.
 
+An isolated `mr1_startup` probe now starts the pinned core with its exact
+`DUEL_MODE_MR1` bit mask (`853760`) and the unmodified upstream `utility.lua`.
+It accepts only 40-card-or-larger Normal Monster Main Decks and empty Extra
+Decks. On seed 42, the 40-card vanilla fixture reached the first native
+decision with hand counts `(6, 5)`, Deck counts `(34, 35)`, and draw events
+`(0, 5)`, `(1, 5)`, `(0, 1)`. The GOAT mode produced the same startup counts
+with its separate flag mask. This checks that the native mode can start and
+that first-turn draw is active; it does **not** test 2010 card effects, Synchro
+Summoning, legal actions, or a complete Edison duel. The MR1 probe refuses
+gameplay responses and player observations to prevent accidental use as an
+Edison environment. Reproduce it after [native setup](native_setup.md):
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/probe_native.py --mode mr1_startup --seed 42
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q tests/test_mr1_startup.py
+```
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including
