@@ -1365,3 +1365,14 @@ reduced reported training time from 8.203 to 7.586 seconds; minor floating-point
 weight differences left all 965 recorded learner top actions unchanged. This
 speeds a regularized update but does not address M4's held-out strength gate;
 see [the measurement](benchmarks.md#cached-frozen-parent-scores-for-ppo-27-october-2026).
+
+An opt-in cloning continuation omitted 15,296 forced decisions from a
+23,566-decision, replay-verified demonstration set. Matched fitting was 2.64×
+faster, but the filtered child tied the unfiltered child 32–32 directly and
+scored 16–48 versus Tactical-v14, compared with 21–43 for the unfiltered
+child on matched unseen-deck seeds. Neither result promotes the filtered
+checkpoint or closes M4. A separate rule to conserve ordinary Spell Sets
+also failed two held-out Tactical comparisons and was discarded. Future M4
+work should improve decision quality and credit assignment, then verify a
+neural gain across independent deck families and a subsequent self-play gain;
+see [the evaluation](evaluation.md#filtered-cloning-continuation-and-held-out-strength-27-october-2026).

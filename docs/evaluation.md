@@ -7107,3 +7107,52 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clo
   --batch-size 16 --batched-forward --learning-rate 0.0002 --seed 82 \
   --output .cache/goat-ai/forced_filter_example.pt
 ```
+
+### Filtered cloning continuation and held-out strength (27 October 2026)
+
+The speed option was also applied to the existing 32 replay-verified
+Tactical-v14 demonstrations on Chaos Control/Bazoo Return and
+Lolmarcus/Michael Goat Control, starting from the same v23 parent as the
+unfiltered broader imitation child. The matched settings were width 32,
+two epochs, batch 16, batched forward, learning rate 0.0002, and seed 55.
+**8,270 of 23,566** labeled decisions had more than one legal action.
+The filtered run took **13.51 s** to fit and **50.89 s** for the full command;
+the current-code unfiltered run took **35.66 s** and **72.99 s**. Both runs
+verified all source replays. Thus fitting was **2.64× faster** and the full
+command **1.43× faster** in this matched workload. A rerun of the unfiltered
+command produced tensors identical to the original broader checkpoint.
+
+On two unseen Phoenix Control/Dimension Fusion pairings, both deck
+assignments and seats, seeds 19116–19123, the filtered child scored
+**32–32** directly against the unfiltered child (paired 95% score interval
+**39.1%–59.4%**). On matched seeds 19124–19131 versus Tactical-v14, the
+filtered child scored **16–48** and the unfiltered child **21–43**. The
+paired score difference was **−7.81 percentage points**, with a 95% interval
+of **−20.31 to +4.69 points**. There is no demonstrated strength gain; the
+unfiltered broader checkpoint remains the neural reference. The filtered
+checkpoint is an experimental speed/learning-schedule variant, not a
+promoted policy. Its SHA-256 is
+`500b8ab02d577e7cd570f8d6f301b01d4636f12c08d49d0c57b64fdd29129111`.
+
+The ignored training summaries are
+`.cache/goat-ai/fv23_tactical_v14_broader_skip_forced_18500_18531.stdout.json`
+(SHA-256 `aa6ca76ad6633edd37184a43f0736676ee034149e0b1ec142783e3341a346206`)
+and `.cache/goat-ai/fv23_tactical_v14_broader_unfiltered_matched_18500_18531.stdout.json`
+(`d11be67ace0db5bb1f9d7c2dbecc401d1102c40073b84f5438636a63e89281a1`).
+The direct, filtered-versus-Tactical, and unfiltered-versus-Tactical reports
+have SHA-256 values `f85d8c8dcacae2caba5b594ece9ac2cd60184e31a5d77a8386831d38bb7628f3`,
+`a65f9fa3e5fb926a98fc62e7d494f5a40e4d75a779496353f9b97cf5733175ce`,
+and `6cce3dac837f3a859b76efd396b2e6f7102c66e0b6c595043ae76ccc46169835`.
+The report comparator verified the Tactical controls and local deck bytes.
+
+An additional *uncommitted* Tactical-v14 candidate deferred Setting ordinary
+Spells while a phase transition was available, but allowed Quick-Play Spells,
+Traps, and a seven-card hand. Four sampled Tactical replays offered the
+condition at 68 decisions and selected such a Set at 13. On two fresh
+64-game, seat- and deck-swapped schedules, the candidate scored **32–32**
+(Phoenix/Dimension Fusion) and **30–34** (Matt/Chaos and Jesse/Flip)
+against Tactical-v14. This did not establish a competitive gain, so the
+candidate code was discarded and the baseline/teacher version remains 14.
+The ignored local reports have SHA-256 values
+`3aa82048e2b5ee8633dc8f9ce6e85d3d6bba25bc3ec44a26296513223779a82d`
+and `6900d91dcee93a168dabf62d5a2a4f63059f80cb84b51ce1dfc57297a0f102b1`.
