@@ -48,6 +48,56 @@ PYTHONPATH=. .venv/bin/python scripts/audit_edison_pool.py \
   configs/historical/edison_2010_03_01_advanced_limits.tsv
 ```
 
+### Independent date-filtered candidate comparison (27 October 2026)
+
+The [YGOPRODeck API guide](https://ygoprodeck.com/api-guide.php) documents a
+TCG release-date filter. Its `format=tcg&enddate=2010-04-20&dateregion=tcg`
+response supplies an independent *candidate*, using the date on [Konami's
+*Duelist Pack: Kaiba* page](https://www.yugioh-card.com/en/products/past_products/dp_kaiba/).
+The response is neither an official tournament-legality list nor a historical
+rulings source. Both external inputs stay in ignored local cache; the response
+had SHA-256 `962293dea8bfcd25ead0712d51b52515ac30efa28b2b6fb40f8c1dcc80d87482`.
+
+`scripts/compare_edison_pool_candidates.py` compares the two candidate ID
+sets, resolves alternate-print aliases through the pinned database, checks
+the March 2010 Forbidden list, and writes a machine-readable disagreement
+report. The cached comparison found 3,702 canonical IDs in the date-filtered
+response and 3,624 in the community CSV, with 3,622 shared. Of 80 API-only
+canonical IDs, 43 are Forbidden, two are tokens, and **35 still need
+individual release and eligibility checks**. Two community-only canonical
+IDs are Exodius (`13893596`) and Genesis Dragon (`31038159`); [Konami's
+Exodius card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7392&ope=2)
+and [Genesis Dragon card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7978&ope=2&request_locale=en)
+show older promotional printings. This illustrates that the API date filter
+can omit a historically printed card. Conversely, the date filter can include
+cards without establishing their tournament eligibility: the community
+[Duel Terminal 1 analysis](https://www.edisonformat.com/home/why-arent-they-legal-duel-terminal-1)
+raises a period distribution-policy question that still needs primary-source
+verification for individual cards. The pinned database also lacks metadata
+for ten raw API IDs and nine raw community IDs. No complete Edison whitelist
+has been selected.
+
+The ignored report is
+`.cache/goat-ai/edison_pool_candidate_comparison_20261027.json` (SHA-256
+`969c59f64d074cee9ac62a64520b43a78ed0b43b09c3807d0b3375dcd30b69b7`).
+Reproduce it with locally cached sources:
+
+```sh
+mkdir -p .cache/goat-ai
+curl --fail --location --silent --show-error \
+  'https://db.ygoprodeck.com/api/v7/cardinfo.php?format=tcg&enddate=2010-04-20&dateregion=tcg' \
+  -o .cache/goat-ai/ygoprodeck_tcg_through_2010_04_20.json
+PYTHONPATH=src:. .venv/bin/python scripts/compare_edison_pool_candidates.py \
+  .cache/goat-ai/ygoprodeck_tcg_through_2010_04_20.json \
+  .cache/goat-ai/edison_community_cardpool.csv \
+  .cache/goat-ai/database/cards.cdb \
+  configs/historical/edison_2010_03_01_advanced_limits.tsv \
+  --output .cache/goat-ai/edison_pool_candidate_comparison_20261027.json
+```
+
+The API may change after this cached comparison. Recheck all source hashes
+before treating reproduced counts as the same evidence.
+
 ## Native engine assessment
 
 The [contemporary Yu-Gi-Oh! 5D's official rulebook](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
