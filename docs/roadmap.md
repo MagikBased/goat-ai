@@ -1112,6 +1112,10 @@ contemporary Konami policy makes promotional-card legality region-dependent.
 The two external candidate pools do not establish regional eligibility, and
 their differences must be adjudicated before a complete release whitelist can
 be used. See [the regional scope audit](edison_research.md#regional-scope-of-the-historical-target).
+An archived March 2010 Konami notice now directly establishes that newly
+introduced Duel Terminal cards required another product release before they
+were tournament legal. Three dated DT01 examples are excluded at the Edison
+cutoff; the other DT01 candidate discrepancies still need individual checks.
 The MR1 Synchro probe now applies a checksum-guarded in-memory correction for
 Goyo Guardian's period generic-Tuner material text. Paired seed-5 duels use a
 non-EARTH Tuner, accept or decline its battle recruitment effect, reach
