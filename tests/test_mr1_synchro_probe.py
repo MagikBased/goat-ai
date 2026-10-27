@@ -103,6 +103,29 @@ def test_mr1_junk_warrior_gains_atk_from_surviving_level_two(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_mr1_junk_warrior_excludes_opposing_level_two_atk(tmp_path):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    trajectory, (summoned_at, resolved_at) = record_attack_probe(
+        native_root, opposing_level_two=True)
+    assert (summoned_at, resolved_at) == (69, 73)
+    assert len(trajectory.decisions) == 1592
+    assert trajectory.winner == 1
+    after = trajectory.decisions[resolved_at].observation
+    assert next(card.attack for card in after.field
+                if card.code == JUNK_WARRIOR) == 2300
+    assert sum(card.code == BOKOICHI and card.controller == 1
+               for card in after.field) == 1
+    assert not any(card.code == BOKOICHI and card.controller == 0
+                   for card in after.field)
+    path = tmp_path / "junk_warrior_opposing_level2.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, Mr1SynchroProbeEngine(native_root)) == 1592
+    assert audit_trajectory_visibility(loaded)["decisions"] == 1592
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_mr1_synchro_probe_rejects_unsourced_extra_card(tmp_path):
     native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     deck = tmp_path / "stardust.ydk"

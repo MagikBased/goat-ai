@@ -153,8 +153,8 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_synchro_probe.py
 ```
 
-The current script text, Junk Synchron's effect details, historical priority,
-and Synchro timing have **not** been compared against 2010 source rulings.
+Junk Synchron's effect details, historical priority, and broader Synchro
+timing have **not** been compared against 2010 source rulings.
 This fixture proves the native decision protocol can represent one Synchro
 line; it does not establish an Edison simulator or justify Edison training.
 An additional seed-18 fixture leaves a second face-up Bokoichi (500 ATK,
@@ -162,21 +162,28 @@ Level 2) on the field after Junk Synchron and a revived Bokoichi become
 Junk Warrior's materials. The native Warrior appears at 2300 ATK, then its
 trigger resolves to 2800; the original seed-3 line has no remaining Level 2
 monster and stays at 2300. The 1,202-decision seed-18 duel replay-verifies and
-passes the visibility audit. [Konami's current card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7696&ope=2&request_locale=en)
-specifies that controlled Level 2 or lower monsters contribute to this gain.
-[Konami's Duelist Pack - Yusei listing](https://www.yugioh-card.com/en/products/past_products/dp_yusei/)
-dates a Junk Warrior reprint to February 2009, before Edison. However, the
-current card database does not preserve that printing's exact historical text;
-the first 2008 English printing is reported with different wording. A scan of
-the 2009 reprint or a contemporary official ruling is still needed before
-calling this an independently validated 2010 card-text regression. The test
-currently checks the pinned script against the official current text and the
-known board arithmetic, without certifying historical card-text equivalence.
-Reproduce it with:
+passes the visibility audit. A second, 1,592-decision seed-100 fixture leaves
+only an **opposing** face-up Bokoichi after the Synchro Summon. Junk Warrior
+stays at 2300; that complete duel also replay-verifies and passes the
+visibility audit. These two branches distinguish whose Level 2 monsters the
+native script counts.
+
+The physical [first 2008 English printing (5DS1-EN041)](https://cdn.nubently.com.mx/2023/01/5DS1-EN041-510x680.jpg)
+uses "on the field," while a photographed [Duelist Pack - Yusei printing
+(DP08-EN012)](https://www.deckboosters.co.uk/cdn/shop/products/DP08-EN012.jpg?v=1671126847)
+uses "you control." [Konami dates that reprint to 24 February 2009](https://www.yugioh-card.com/en/products/past_products/dp_yusei/),
+before Edison, and its [current official card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7696&ope=2&request_locale=en)
+matches the later wording. The two photographed cards are primary printed-text
+artifacts hosted by sellers; their images are linked, not redistributed here.
+This validates the specific printed-text distinction and native outcome under
+the 2009 wording. It does **not** establish every 2010 Junk Warrior ruling or
+prove the general historical errata policy. Reproduce both branches with:
 
 ```sh
 PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_synchro_probe.py \
   --attack-probe --output replays/mr1_junk_warrior_atk_seed18.json
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_synchro_probe.py \
+  --opposing-level-two --output replays/mr1_junk_warrior_opposing_level2_seed100.json
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_synchro_probe.py
 ```
