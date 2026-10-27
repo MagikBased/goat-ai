@@ -22,12 +22,30 @@ from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import fit_preferences_with_parent_kl, load_policy_agent
 
 
+def validate_preservation_reference(path: Path, digest: str, seed: int, *,
+                                    parent_replay: bool, old_hashes: dict[str, str],
+                                    new_hashes: dict[str, str], old_seeds: set[int],
+                                    reviewed_seeds: set[int]) -> None:
+    """Keep both preservation modes distinct in checkpoint provenance."""
+    if parent_replay:
+        if old_hashes.get(str(path)) != digest:
+            raise ValueError(f"preservation replay is absent from parent provenance: {path}")
+    elif (str(path) in old_hashes or digest in old_hashes.values()
+          or digest in new_hashes.values()):
+        raise ValueError(f"current preservation replay duplicates training data: {path}")
+    if not parent_replay and seed in old_seeds | reviewed_seeds:
+        raise ValueError(f"current preservation seed overlaps training: {seed}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("checkpoint", type=Path)
     parser.add_argument("--case", nargs=2, action="append", metavar=("REPLAY", "PREFERENCES"),
                         required=True)
-    parser.add_argument("--preserve-trajectory", type=Path, action="append", required=True)
+    parser.add_argument("--preserve-trajectory", type=Path, action="append", default=[],
+                        help="exact replay from parent training provenance")
+    parser.add_argument("--preserve-current-trajectory", type=Path, action="append", default=[],
+                        help="fresh replay under current native assets for parent-policy KL")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--steps", type=int, default=200)
     parser.add_argument("--preserve-per-trajectory", type=int, default=16)
@@ -37,6 +55,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if not args.preserve_trajectory and not args.preserve_current_trajectory:
+        parser.error("at least one preservation trajectory is required")
     if (args.steps < 1 or args.preserve_per_trajectory < 1
             or args.preserve_batch < 1 or not isfinite(args.parent_kl_weight)
             or args.parent_kl_weight <= 0 or not isfinite(args.learning_rate)
@@ -94,15 +114,23 @@ def main() -> None:
             "preference_sha256": preference_hashes[str(preferences_path)],
             "selected_decisions": len(preferences.preferences),
         })
-    if len({str(path) for path in args.preserve_trajectory}) != len(args.preserve_trajectory):
+    reviewed_seeds = {game["seed"] for game in training_games}
+    all_preservation = [*args.preserve_trajectory, *args.preserve_current_trajectory]
+    if len({path.resolve() for path in all_preservation}) != len(all_preservation):
         raise ValueError("duplicate preservation trajectory")
+    if {Path(path).resolve() for path, _ in args.case} & {
+            path.resolve() for path in all_preservation}:
+        raise ValueError("reviewed replay cannot also be a preservation replay")
     preservation = []
     preservation_hashes = {}
-    for path in args.preserve_trajectory:
+    for path in all_preservation:
         digest = sha256_file(path)
-        if old_hashes.get(str(path)) != digest:
-            raise ValueError(f"preservation replay is absent from parent provenance: {path}")
+        parent_replay = path in args.preserve_trajectory
         trajectory = read_trajectory(path)
+        validate_preservation_reference(
+            path, digest, trajectory.seed, parent_replay=parent_replay,
+            old_hashes=old_hashes, new_hashes=new_hashes,
+            old_seeds=old_seeds, reviewed_seeds=reviewed_seeds)
         verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
         candidates = [record for record in demonstrator_records(trajectory)
@@ -112,6 +140,17 @@ def main() -> None:
         preservation.extend(rng.sample(candidates, min(
             args.preserve_per_trajectory, len(candidates))))
         preservation_hashes[str(path)] = digest
+        if not parent_replay:
+            training_games.append({
+                "seed": trajectory.seed,
+                "deck_sha256": trajectory.deck_sha256,
+                "main_deck_composition_sha256": tuple(
+                    main_deck_composition_sha256(read_ydk(deck))
+                    for deck in trajectory.decks),
+                "source": "parent_kl_preservation",
+                "selected_decisions": 0,
+            })
+            new_hashes[str(path)] = digest
     if args.preserve_batch > len(preservation):
         parser.error("preserve batch exceeds available preservation decisions")
     preference_losses, kl_losses = fit_preferences_with_parent_kl(
@@ -122,7 +161,8 @@ def main() -> None:
     sources = dict(metadata.get("source_decisions", {}))
     for game in training_games:
         source = game["source"]
-        sources[source] = sources.get(source, 0) + game["selected_decisions"]
+        if game["selected_decisions"]:
+            sources[source] = sources.get(source, 0) + game["selected_decisions"]
     child = {
         "schema_version": 1, "model_state": model.state_dict(),
         "vocabulary_codes": agent.vocabulary.codes,
@@ -135,7 +175,8 @@ def main() -> None:
         "new_source_decisions": {
             source: sum(game["selected_decisions"] for game in training_games
                         if game["source"] == source)
-            for source in {game["source"] for game in training_games}},
+            for source in {game["source"] for game in training_games
+                           if game["selected_decisions"]}},
         "training_method": "review_preference_parent_kl",
         "preference_sha256": preference_hashes,
         "preservation_sha256": preservation_hashes,

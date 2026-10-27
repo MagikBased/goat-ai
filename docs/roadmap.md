@@ -1097,6 +1097,15 @@ Black Luster Soldier target states, but their feature-v23 child scored
 interval including 50%, and remained well behind Tactical-v14. Keep it
 experimental; see [the preference pilot](evaluation.md#self-banish-preference-pilot-27-october-2026).
 
+Preference training can now use fresh, current-asset native replays for
+frozen-parent KL preservation while retaining exact replay verification,
+visibility audits, and held-out provenance. A two-preference pilot using
+four such preservation games fit both training choices but scored 18–14
+against its parent and 5–27 against Tactical on a 32-game unseen-deck
+schedule; neither paired interval establishes a strength gain. Keep the
+parent as reference and gather broader reviewed choices before another
+promotion; see [the pilot](evaluation.md#fresh-asset-kl-preservation-for-replay-preferences-27-october-2026).
+
 Four-duel PPO rollout batching and equal-duel loss weighting were tested
 from that same parent on the same 32-game training schedule. The unweighted
 rollout child lost 20–44 to single-duel PPO on 64 held-out games; the

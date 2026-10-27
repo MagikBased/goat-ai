@@ -6189,3 +6189,66 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_behavioral_clone.py \
   --init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
   --output .cache/goat-ai/fv23_tactical_v14_sixdeck_continuation_14400_14413.pt
 ```
+
+### Fresh-asset KL preservation for replay preferences (27 October 2026)
+
+`train_review_preferences.py` now accepts `--preserve-current-trajectory`
+for new full-duel replays in addition to `--preserve-trajectory` for exact
+parent-training replays. Both modes replay-verify against current native
+assets and pass the visibility audit. The new mode rejects replay bytes
+already in parent or review training, seeds used by the parent or reviews,
+and duplicate paths or bytes. Its games and hashes enter the child checkpoint
+as **preservation-only training provenance**: they affect the frozen-parent
+KL loss, so held-out evaluation excludes their seeds and Main Deck
+compositions. This permits preservation coverage after a historical script
+correction makes some old parent recordings unverifiable; it does not silently
+accept those old recordings under changed rules.
+
+A native pilot reused the two rule-derived self-banish preferences above and
+four current-asset Tactical trajectories from seeds 14400 and 14410, each
+with both teacher seats. All six complete replays verified. The trainer
+sampled 64 multi-option preservation decisions and took 120 steps with the
+same preference optimizer settings as the earlier pilot. Preference loss fell
+from **1.53573 to 0.04901**; sampled preservation KL ended at **0.00177**.
+The child chose a preferred non-self target at both **training** decisions.
+Its checkpoint contains 80 parent training games, two preference games,
+and four preservation-only games, with exact hashes for all 86. It is ignored
+at `.cache/goat-ai/fv23_self_banish_current_preservation_14400_14410.pt`
+(SHA-256 `16c62333fe3087c10d9cf4223400fda5dc550c969e9108d240a202421ad28595`).
+
+The GoatFormat Guide/WikiFormat Dimension Fusion Turbo pair remained unseen
+by parent, preference, and preservation training. On seeds 14600–14607,
+both deck assignments and seats, the child scored **18–14** directly against
+its parent (32 games; paired 95% score interval **50–62.5%**). Against
+Tactical-v14 on the same schedule it scored **5–27**, while the parent scored
+**3–29**. Their paired score difference was **6.25 points**, interval
+**0–15.625 points**. These small tests do not establish a competitive gain;
+the parent stays the reference. The three ignored reports are
+`fv23_current_preservation_vs_parent_dimension_14600_14607.json` (SHA-256
+`fcacaf42984de0153c0d533c112a6f1098c2690bd32d12b3be01aea268e39b4f`),
+`fv23_current_preservation_vs_tactical_dimension_14600_14607.json`
+(`94dc2a038497c40f81a46b402cab80533edf25b623ef93209cd39d4ddeba2215`),
+and `fv23_parent_vs_tactical_dimension_14600_14607.json`
+(`0f184b1d8de21ecffd1eb63a9512e5728debb216675707fecff7d17d6ff75a61`).
+The focused preference and provenance tests passed (**15 tests**).
+The original parent-replay option also completed a one-step native smoke
+using the replay-verified seed-9110 Return/Flip game.
+
+After collecting the source trajectories using the commands above, reproduce
+the pilot with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/train_review_preferences.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --case .cache/goat-ai/policy_vs_tactical_12100_12115/matchup_01_seed_12105_seat_0.json \
+    examples/preferences/fv23_chaos_sorcerer_self_banish_12105_p0.preference.json \
+  --case .cache/goat-ai/policy_vs_tactical_12100_12115/matchup_00_seed_12115_seat_1.json \
+    examples/preferences/fv23_bls_self_banish_12115_p1.preference.json \
+  --preserve-current-trajectory .cache/goat-ai/tactical_v14_insids_bazoo_14400_14403/seed_14400_seat_0.json \
+  --preserve-current-trajectory .cache/goat-ai/tactical_v14_insids_bazoo_14400_14403/seed_14400_seat_1.json \
+  --preserve-current-trajectory .cache/goat-ai/tactical_v14_lolmarcus_fukuyama_14410_14413/seed_14410_seat_0.json \
+  --preserve-current-trajectory .cache/goat-ai/tactical_v14_lolmarcus_fukuyama_14410_14413/seed_14410_seat_1.json \
+  --steps 120 --preserve-per-trajectory 16 --preserve-batch 16 \
+  --parent-kl-weight 1 --learning-rate 0.0001 --seed 27 \
+  --output .cache/goat-ai/fv23_self_banish_current_preservation_14400_14410.pt
+```
