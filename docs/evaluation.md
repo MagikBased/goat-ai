@@ -8009,3 +8009,39 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
   --historical-probability 0.75 --rollout-workers 4 \
   --output .cache/goat-ai/current_broader_ppo_reproduction.pt
 ```
+
+### Contemporary Charlotte Zombie holdout (27 October 2026)
+
+The [preserved 2005 SJC Charlotte Top 8 article](https://www.goatformat.com/home/top-8-decklists5124684)
+prints Jae Kim's 40-card Zombie Main Deck. The exact transcription is
+`examples/decks/zombie_jae_kim_charlotte_2005.ydk` (SHA-256
+`80dbb16071a314a333d6c6d8cf6365b712d2611a490ff96c41cd707d095a35ad`).
+The published Side Deck is omitted because this experiment plays single duels;
+no Fusion Deck was listed. A four-test fixture verifies card names, copy
+counts, whitelist legality, and two seat-swapped native terminal duels against
+2005 Phoenix Control, including exact replay verification and visibility audit.
+This is protocol evidence, not a full card-by-card 2005 ruling audit.
+
+The current-core Tactical-imitation child and its neural parent had never
+trained on this Main Deck composition. On seeds 36100–36107 with both deck
+assignments and agent seats, the child scored **33–31** directly against the
+parent over 64 Zombie/Phoenix and Zombie/Wiki Dimension Fusion duels (51.56%;
+paired 95% interval 43.75–60.94%). Against Tactical-v14 on matched seeds
+36108–36115, the child scored **19–45**, versus **18–46** for the parent. The
+paired difference was **+1.56 percentage points**, with a 95% interval of
+**−10.94 to +14.06 points**. With Zombie assigned to the candidate, the
+child scored 7–25 and the parent 10–22. The broader transfer gain seen on an
+earlier Phoenix/Dimension Fusion schedule does not carry over convincingly to
+this new Zombie pairing; neither policy is promoted. M4 remains open.
+
+The three ignored reports are
+`.cache/goat-ai/current_clone_zombie_vs_parent_36100_36107.json`,
+`.cache/goat-ai/current_clone_zombie_vs_tactical_36108_36115.json`, and
+`.cache/goat-ai/current_parent_zombie_vs_tactical_36108_36115.json`, with
+SHA-256 values `72ac447adbbaad5b410a99b85269fd3105cfb0bf75f311e680029e97f6d02ef5`,
+`73d588c8d8a81b9fc7563386c33946d1ddaba32e238f82a383321006ec2cd2fc`,
+and `7d3e399bc6a2727e0de0b048c1f2dd7492eda733c6a8beeea3aaf79fdff66fdf`.
+The evaluator required unseen Main Decks and bound the same native assets,
+card scripts, source, local deck hashes, opponent, and seeds in the paired
+Tactical comparison. All 192 tournament duels reached terminal; the fixture
+tests, rather than the tournaments, recorded full replay-verified trajectories.

@@ -47,6 +47,13 @@ four workers. This extends protocol coverage across contemporary submitted
 decks, while the separate historical ruling and hidden-information audits
 remain open. See [evaluation](evaluation.md).
 
+A [2005 SJC Charlotte Zombie Main Deck](../examples/decks/zombie_jae_kim_charlotte_2005.ydk)
+adds a distinct historical holdout. Its exact 40 published Main cards pass the
+pinned GOAT whitelist; two seeded, seat-swapped RandomAgent duels against
+Phoenix Control reached terminal and replay-verified. The source lists no
+Fusion Deck, and its Side Deck is omitted for single-duel evaluation. See
+[evaluation](evaluation.md) for the current policy's held-out transfer result.
+
 A [GoatFormat guide Flip Control Main Deck](../examples/decks/flip_control_goatformat_guide.ydk) adds a fourth archetype centered on Tsukuyomi, Dekoichi, Magician of Faith, Mask of Darkness, and Time Seal. The guide does not name a tournament pilot or list an Extra Deck, so the fixture records neither. Forty random-agent duels against Chaos Turbo and Goat Control, paired across seats on seeds 31–40, all reached terminal under the 3,000-decision cap. Four full-duel fixtures serialize and replay-verify trajectories. A targeted native M2 fixture now checks two Mask of Darkness / Time Seal recoveries and skipped Draw Phases; interruptions and other timing branches remain open. Measured runtime and exact reproduction are in [the evaluation log](evaluation.md).
 
 A [GoatFormat guide Dimension Fusion Turbo Main Deck](../examples/decks/dimension_fusion_turbo_goatformat_guide.ydk) adds a combo archetype centered on Thunder Dragon, Bazoo, and Dimension Fusion. The guide lists no Extra or Side Deck, and this is not a submitted tournament list. Twenty paired random-agent duels against sourced Chaos Turbo reached terminal under 3,000 decisions; two seat-swapped full-duel trajectories replay-verify. Targeted native fixtures verify Dimension Fusion's 2,000 LP cost, empty-banished-zone activation gate, revival of both Chaos Summon costs, both-player revival after D.D. Warrior Lady's battle banish, persistence through the End Phase, and matched Torrential Tribute and Solemn Judgment response windows. See [the evaluation log](evaluation.md) and [GOAT rules](goat_rules.md).
