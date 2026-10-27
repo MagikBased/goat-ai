@@ -14,6 +14,8 @@ QUERY_COUNTERS = 0x20000
 QUERY_OWNER = 0x40000
 QUERY_IS_PUBLIC = 0x100000
 QUERY_END = 0x80000000
+MONSTER_FIELD_SLOTS = 7  # Pinned API-11 player.list_mzone layout.
+SPELL_FIELD_SLOTS = 8  # Pinned API-11 player.list_szone layout.
 
 
 @dataclass(frozen=True)
@@ -27,6 +29,67 @@ class QueriedCard:
     equip_target: tuple[int, int, int] | None = None  # controller, location, sequence
     race: int | None = None  # Current Type mask; public only for face-up monsters.
     owner: int | None = None
+
+
+@dataclass(frozen=True)
+class FieldSummary:
+    """Public counts and field occupancy from one pinned OCG_DuelQueryField call."""
+
+    life_points: tuple[int, int]
+    monster_occupied: tuple[tuple[bool, ...], tuple[bool, ...]]
+    spell_occupied: tuple[tuple[bool, ...], tuple[bool, ...]]
+    deck_counts: tuple[int, int]
+    hand_counts: tuple[int, int]
+    grave_counts: tuple[int, int]
+    banished_counts: tuple[int, int]
+    extra_counts: tuple[int, int]
+
+
+def decode_field_summary(buffer: bytes) -> FieldSummary:
+    """Parse the public part of the pinned API-11 field query.
+
+    The trailing chain payload is handled through native messages elsewhere.
+    """
+    if len(buffer) < 4:
+        raise ValueError("truncated field query options")
+    offset = 4
+    life_points = []
+    monster_occupied = []
+    spell_occupied = []
+    counts = []
+    for _ in (0, 1):
+        if offset + 4 > len(buffer):
+            raise ValueError("truncated field query life points")
+        life_points.append(struct.unpack_from("<I", buffer, offset)[0])
+        offset += 4
+        zones = []
+        for size in (MONSTER_FIELD_SLOTS, SPELL_FIELD_SLOTS):
+            occupied_slots = []
+            for _ in range(size):
+                if offset >= len(buffer):
+                    raise ValueError("truncated field query zone")
+                occupied = buffer[offset]
+                if occupied not in (0, 1):
+                    raise ValueError("invalid field query occupancy")
+                offset += 6 if occupied else 1  # Occupancy, position, overlay count.
+                if offset > len(buffer):
+                    raise ValueError("truncated field query occupied zone")
+                occupied_slots.append(bool(occupied))
+            zones.append(tuple(occupied_slots))
+        monster_occupied.append(zones[0])
+        spell_occupied.append(zones[1])
+        if offset + 24 > len(buffer):
+            raise ValueError("truncated field query counts")
+        counts.append(struct.unpack_from("<6I", buffer, offset))
+        offset += 24
+    if offset + 4 > len(buffer):
+        raise ValueError("truncated field query chain count")
+    return FieldSummary(
+        tuple(life_points), tuple(monster_occupied), tuple(spell_occupied),
+        tuple(player[0] for player in counts), tuple(player[1] for player in counts),
+        tuple(player[2] for player in counts), tuple(player[3] for player in counts),
+        tuple(player[4] for player in counts),
+    )
 
 
 @lru_cache(maxsize=4096)

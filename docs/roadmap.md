@@ -411,6 +411,13 @@ trajectories and measured 1.14–1.21× lower whole-duel wall time in two
 reversed-order rounds; see [the benchmark](benchmarks.md#native-replay-manifest-hash-cache).
 This improves data collection overhead without changing the M4 strength gate.
 
+Parsing the pinned native field summary before location queries now skips
+empty zones and reuses public counts. Two order-reversed four-duel schedules
+on both probe and sourced decks reproduced identical complete trajectories;
+measured whole-duel CPU gains ranged from 1.023× to 1.055×. The gain is small
+and does not address the M4 policy-strength gate; see
+[the benchmark](benchmarks.md#native-field-summary-observation-queries).
+
 A new feature-v12 clone trained on 10,449 replay-verified CombatHeuristicAgent v2 decisions from four tournament Main Decks was checked against its teacher and an older two-deck clone on unseen Chaos Control and Chaos Return decks. It scored 12–20 against the teacher and 34–30 directly against the older clone on separate balanced schedules; both direct-score intervals include 50%. Held-out multi-option teacher agreement improved by only 5/718. The broader data did not demonstrate a competitive gain or satisfy M4; [the evaluation log](evaluation.md) records checkpoints, hashes, and schedule details. Future policy work should use the six-deck baseline and per-deck splits to judge practical strength, not training loss or teacher agreement alone.
 
 An opt-in feature-v15 encoder now supplies public field and pile counts to

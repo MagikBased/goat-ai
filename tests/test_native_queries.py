@@ -12,6 +12,7 @@ from goat_ai.engine.native_queries import (
     QUERY_OWNER,
     QUERY_POSITION,
     QUERY_RACE,
+    decode_field_summary,
     decode_location,
 )
 from goat_ai.engine.ocgcore_probe import OcgcoreProbe
@@ -23,6 +24,32 @@ def test_query_location_rejects_truncation():
         decode_location(b"\x00")
     with pytest.raises(ValueError, match="size mismatch"):
         decode_location(b"\x01\x00\x00\x00")
+
+
+def test_field_summary_reads_public_counts_and_rejects_truncation():
+    def player(lp, monster, spell, counts):
+        def zones(size, occupied):
+            return b"".join((b"\x01\x01" + struct.pack("<I", 0))
+                            if slot == occupied else b"\x00"
+                            for slot in range(size))
+        return (struct.pack("<I", lp) + zones(7, monster) + zones(8, spell)
+                + struct.pack("<6I", *counts))
+
+    frame = (struct.pack("<I", 0)
+             + player(8000, 2, None, (34, 6, 0, 1, 15, 0))
+             + player(6000, None, 7, (30, 3, 4, 2, 0, 0))
+             + struct.pack("<I", 0))
+    summary = decode_field_summary(frame)
+    assert summary.life_points == (8000, 6000)
+    assert summary.monster_occupied[0][2] and not any(summary.monster_occupied[1])
+    assert summary.spell_occupied[1][7] and not any(summary.spell_occupied[0])
+    assert summary.deck_counts == (34, 30)
+    assert summary.hand_counts == (6, 3)
+    assert summary.grave_counts == (0, 4)
+    assert summary.banished_counts == (1, 2)
+    assert summary.extra_counts == (15, 0)
+    with pytest.raises(ValueError, match="chain count"):
+        decode_field_summary(frame[:-4])
 
 
 def test_query_location_distinguishes_same_size_hidden_card_buffers():

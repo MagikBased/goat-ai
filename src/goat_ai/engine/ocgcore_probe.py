@@ -275,6 +275,8 @@ def split_messages(buffer: bytes) -> tuple[bytes, ...]:
 
 
 class OcgcoreProbe:
+    # The reference path remains available for a matched native ablation.
+    use_field_summary_queries = True
     """Owns one native duel; intended only for startup verification."""
 
     def __init__(self, library: Path, database: Path, scripts: Path) -> None:
@@ -944,24 +946,60 @@ class OcgcoreProbe:
         """Build a redacted view; only audited fields are requested or returned."""
         if (self._pending_message is None and not terminal) or viewer not in (0, 1):
             raise RuntimeError("observation requires a pending decision and valid viewer")
-        from goat_ai.engine.native_queries import decode_life_points
+        from goat_ai.engine.native_queries import (
+            MONSTER_FIELD_SLOTS, SPELL_FIELD_SLOTS, decode_field_summary,
+            decode_life_points,
+        )
 
         locations = {}
-        for player in (0, 1):
-            for location in (LOCATION_MZONE, LOCATION_SZONE, LOCATION_GRAVE,
-                             LOCATION_REMOVED):
-                locations[player, location] = self._query_location(player, location)
-        hand = self._query_location(viewer, LOCATION_HAND)
-        own_extra = self._query_location(viewer, LOCATION_EXTRA)
-        length = c.c_uint32()
-        pointer = self.lib.OCG_DuelQueryField(self._duel, c.byref(length))
-        if not pointer or not length.value:
-            raise RuntimeError("native field query returned no data")
-        lp = decode_life_points(
-            c.string_at(pointer, length.value),
-            tuple(len(locations[p, LOCATION_MZONE]) for p in (0, 1)),
-            tuple(len(locations[p, LOCATION_SZONE]) for p in (0, 1)),
-        )
+        if self.use_field_summary_queries:
+            length = c.c_uint32()
+            pointer = self.lib.OCG_DuelQueryField(self._duel, c.byref(length))
+            if not pointer or not length.value:
+                raise RuntimeError("native field query returned no data")
+            summary = decode_field_summary(c.string_at(pointer, length.value))
+            for player in (0, 1):
+                for location, occupied, empty in (
+                    (LOCATION_MZONE, any(summary.monster_occupied[player]),
+                     (None,) * MONSTER_FIELD_SLOTS),
+                    (LOCATION_SZONE, any(summary.spell_occupied[player]),
+                     (None,) * SPELL_FIELD_SLOTS),
+                    (LOCATION_GRAVE, bool(summary.grave_counts[player]), ()),
+                    (LOCATION_REMOVED, bool(summary.banished_counts[player]), ()),
+                ):
+                    locations[player, location] = (
+                        self._query_location(player, location) if occupied else empty)
+            hand = (self._query_location(viewer, LOCATION_HAND)
+                    if summary.hand_counts[viewer] else ())
+            own_extra = (self._query_location(viewer, LOCATION_EXTRA)
+                         if summary.extra_counts[viewer] else ())
+            lp = summary.life_points
+            opponent_hand_count = summary.hand_counts[1 - viewer]
+            deck_counts = summary.deck_counts
+            extra_deck_counts = summary.extra_counts
+        else:
+            for player in (0, 1):
+                for location in (LOCATION_MZONE, LOCATION_SZONE, LOCATION_GRAVE,
+                                 LOCATION_REMOVED):
+                    locations[player, location] = self._query_location(player, location)
+            hand = self._query_location(viewer, LOCATION_HAND)
+            own_extra = self._query_location(viewer, LOCATION_EXTRA)
+            length = c.c_uint32()
+            pointer = self.lib.OCG_DuelQueryField(self._duel, c.byref(length))
+            if not pointer or not length.value:
+                raise RuntimeError("native field query returned no data")
+            lp = decode_life_points(
+                c.string_at(pointer, length.value),
+                tuple(len(locations[p, LOCATION_MZONE]) for p in (0, 1)),
+                tuple(len(locations[p, LOCATION_SZONE]) for p in (0, 1)),
+            )
+            opponent_hand_count = self.lib.OCG_DuelQueryCount(
+                self._duel, 1 - viewer, LOCATION_HAND)
+            deck_counts = tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_DECK)
+                                for p in (0, 1))
+            extra_deck_counts = tuple(
+                self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_EXTRA)
+                for p in (0, 1))
         if terminal:
             # The native field query stores lethal negative LP as uint32.
             lp = tuple(max(0, value if value < (1 << 31) else value - (1 << 32))
@@ -1015,12 +1053,9 @@ class OcgcoreProbe:
             hand=tuple(CardView(viewer, "hand", "hidden", card.code, sequence)
                        for sequence, card in enumerate(hand) if card is not None),
             field=field, graveyards=graveyards, banished=banished,
-            opponent_hand_count=self.lib.OCG_DuelQueryCount(self._duel, 1 - viewer,
-                                                            LOCATION_HAND),
-            deck_counts=tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_DECK)
-                              for p in (0, 1)),
-            extra_deck_counts=tuple(self.lib.OCG_DuelQueryCount(self._duel, p, LOCATION_EXTRA)
-                                    for p in (0, 1)),
+            opponent_hand_count=opponent_hand_count,
+            deck_counts=deck_counts,
+            extra_deck_counts=extra_deck_counts,
             own_extra_deck=tuple(view_card(viewer, LOCATION_EXTRA, sequence, card)
                                  for sequence, card in enumerate(own_extra)
                                  if card is not None),

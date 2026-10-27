@@ -207,6 +207,49 @@ The extra test and uncontrolled machine load make those suite times unsuitable
 as a cache-speed comparison; the matched duel ablation above isolates that
 effect.
 
+## Native field-summary observation queries
+
+The pinned API-11 `OCG_DuelQueryField` response already carries both players'
+public field occupancy and zone counts. The adapter now parses that response
+first, skips full native location queries for empty zones, and uses its counts
+instead of five separate `OCG_DuelQueryCount` calls per observation. The
+reference path remains selectable in the benchmark. Both modes produced
+**identical complete trajectories** in two order-reversed rounds per deck
+pair; all optimized trajectories replay-verified and passed the legal-choice
+visibility audit. Timing excludes those verification passes.
+
+On an Intel Core i7-10700K, Linux x86_64, four control/Chaos probe duels
+(seeds 12000–12003, 3,781 decisions per schedule) made **37,850** native
+location queries on the reference path versus **30,038** on the optimized
+path. CPU times were **2.998 vs 2.840 seconds** (1.055×) and **2.854 vs
+2.756 seconds** (1.036×). Four sourced Goat Control/Chaos Turbo duels (seeds
+12100–12103, 4,487 decisions per schedule) made **44,910** versus **34,256**
+location queries. CPU times were **3.191 vs 3.109 seconds** (1.027×) and
+**3.104 vs 3.034 seconds** (1.023×). The two reports together contain
+**16,536 replay-verified decisions** across their optimized schedules.
+
+The ignored reports are
+`.cache/goat-ai/benchmark_native_field_summary_12000_12003.json` (SHA-256
+`f7ff85b519bae2306011f7e41668622828e3885d7dcadf64bfe9f416124d4fc6`)
+and `.cache/goat-ai/benchmark_native_field_summary_sourced_12100_12103.json`
+(SHA-256 `5f9012a867eeb9e70ef25a863107134036db0c5aea0c21eab7cdbbd3ac3b172c`).
+Both reports record the benchmark's dirty pre-commit worktree and SHA-256
+hashes of the two changed engine files and benchmark script. Those file
+hashes identify the tested code independently of the parent commit field.
+Reproduce after [native setup](native_setup.md):
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/benchmark_native_field_summary.py \
+  --games 4 --rounds 2
+PYTHONPATH=src:. .venv/bin/python scripts/benchmark_native_field_summary.py \
+  --deck-a examples/decks/goat_control_lolmarcus_2020.ydk \
+  --deck-b examples/decks/chaos_turbo_riclar_2020.ydk \
+  --seed 12100 --games 4 --rounds 2
+```
+
+This is a small whole-duel CPU gain under random play. It does not measure
+neural inference, optimizer updates, GPU utilization, or competitive strength.
+
 ## Batched REINFORCE update
 
 The self-play trainer now accepts opt-in `--reinforce-batch-size 16` for
