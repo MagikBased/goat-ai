@@ -14,6 +14,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import encode_decision
+from goat_ai.training.resource_value import FrozenResourceRidge, visible_resource_features
 from goat_ai.training.self_play import (
     VisibleStateValue,
     predict_state_values,
@@ -30,25 +31,15 @@ class VisibleResourceValue(torch.nn.Module):
 
     @staticmethod
     def _resources(features):
-        numbers = features.state_numbers
-        cards = features.state_cards
-        own_monsters = ((cards[:, 1] == 2) & (cards[:, 2] == 1)).sum() / 5
-        other_monsters = ((cards[:, 1] == 2) & (cards[:, 2] == 2)).sum() / 5
-        own_backrow = ((cards[:, 1] == 3) & (cards[:, 2] == 1)).sum() / 5
-        other_backrow = ((cards[:, 1] == 3) & (cards[:, 2] == 2)).sum() / 5
-        return torch.stack((numbers[0] - numbers[1],
-                            numbers[6] - numbers[7],
-                            own_monsters - other_monsters,
-                            own_backrow - other_backrow,
-                            numbers[2] - numbers[3],
-                            numbers[8]))
+        return visible_resource_features(features).float()
 
     def forward_batch(self, decisions):
         return self.value(torch.stack([self._resources(item) for item in decisions])
                           ).squeeze(1)
 
 
-def fit_resource_ridge(games, vocabulary, feature_version, penalty: float = 0.1):
+def fit_resource_ridge_model(games, vocabulary, feature_version,
+                             penalty: float = 0.1) -> FrozenResourceRidge:
     """Fit six visible features with equal game weight and fixed L2 shrinkage."""
     if not games or penalty <= 0:
         raise ValueError("resource ridge needs games and positive shrinkage")
@@ -76,16 +67,29 @@ def fit_resource_ridge(games, vocabulary, feature_version, penalty: float = 0.1)
     coefficients = torch.linalg.solve(z.T @ (weight[:, None] * z) + regularizer,
                                       z.T @ (weight * y))
 
+    return FrozenResourceRidge(tuple(float(value) for value in mean),
+                               tuple(float(value) for value in scale),
+                               tuple(float(value) for value in coefficients))
+
+
+def fit_resource_ridge(games, vocabulary, feature_version, penalty: float = 0.1):
+    model = fit_resource_ridge_model(games, vocabulary, feature_version, penalty)
+    mean = torch.tensor(model.mean, dtype=torch.float64)
+    scale = torch.tensor(model.scale, dtype=torch.float64)
+    coefficients = torch.tensor(model.coefficients, dtype=torch.float64)
+
     def mse(other_games):
         losses = []
         for records, target in other_games:
-            inputs = rows(records)
+            inputs = torch.stack([visible_resource_features(encode_decision(
+                record.observation, record.legal_actions, vocabulary,
+                feature_version)) for record in records])
             predictions = (((inputs - mean) / scale) @ coefficients[:-1]
                            + coefficients[-1]).clamp(-1, 1)
             losses.append(float((predictions - target).square().mean()))
         return tuple(losses)
 
-    return mse, tuple(float(value) for value in coefficients)
+    return mse, model.coefficients
 
 
 def selected_records(trajectory, limit: int, source: str = "self_play_rl"):

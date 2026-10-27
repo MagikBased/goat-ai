@@ -17,6 +17,7 @@ from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.replay import write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
+from goat_ai.training.resource_value import load_frozen_resource_ridge
 from goat_ai.training.self_play import (
     VisibleStateValue,
     make_tactical_opponent,
@@ -109,9 +110,12 @@ def main() -> None:
                              "uses other terminal duels of the same learner deck in that rollout")
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
-    parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value"),
+    parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value",
+                                                     "resource_ridge"),
                         default="global",
-                        help="moving global/per-deck return or experimental visible-state critic")
+                        help="moving return, online critic, or frozen visible-resource ridge")
+    parser.add_argument("--resource-ridge-artifact", type=Path,
+                        help="verified frozen mirror regression artifact for resource_ridge")
     parser.add_argument("--value-width", type=int, default=32,
                         help="hidden width of experimental visible-state critic")
     parser.add_argument("--value-architecture", choices=("v1", "v2"), default="v1",
@@ -154,6 +158,8 @@ def main() -> None:
             or not 0 < args.ppo_clip_epsilon < 1
             or not 0 <= args.historical_probability <= 1):
         parser.error("invalid training schedule or hyperparameters")
+    if (args.baseline_scope == "resource_ridge") != bool(args.resource_ridge_artifact):
+        parser.error("resource_ridge baseline requires --resource-ridge-artifact")
     parent = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     if not isinstance(parent, dict) or parent.get("schema_version") != 1:
         parser.error("unsupported parent checkpoint schema")
@@ -170,6 +176,12 @@ def main() -> None:
         parser.error(str(exc))
     agent = load_policy_agent(args.checkpoint)
     value_model = None
+    resource_value_model = None
+    resource_artifact = None
+    if args.resource_ridge_artifact:
+        resource_value_model, resource_artifact = load_frozen_resource_ridge(
+            args.resource_ridge_artifact, sha256(args.checkpoint),
+            agent.model.feature_version)
     if args.baseline_scope == "state_value":
         torch.manual_seed(args.seed)
         number_width = agent.model.state_numbers[0].in_features
@@ -241,6 +253,7 @@ def main() -> None:
         ppo_baseline_timing=args.ppo_baseline_timing,
         schedule_mode=args.schedule_mode,
         value_model=value_model,
+        resource_value_model=resource_value_model,
         value_learning_rate=args.value_learning_rate,
         max_decisions=args.max_decisions, random_seed=args.seed,
         skip_capped_games=args.skip_capped_games,
@@ -306,6 +319,8 @@ def main() -> None:
                                      if value_model is not None else None),
               "value_learning_rate": (args.value_learning_rate
                                       if value_model is not None else None),
+              "resource_ridge_artifact_sha256": (sha256(args.resource_ridge_artifact)
+                                                  if resource_artifact is not None else None),
               "schedule_mode": args.schedule_mode,
               "record_dir": str(record_dir),
               "max_decisions": args.max_decisions, "seed": args.seed,
@@ -332,6 +347,8 @@ def main() -> None:
         checkpoint["value_model_width"] = args.value_width
         checkpoint["value_model_architecture"] = args.value_architecture
         checkpoint["value_state_number_width"] = agent.model.state_numbers[0].in_features
+    if resource_artifact is not None:
+        checkpoint["resource_ridge_artifact"] = resource_artifact
     args.output.parent.mkdir(parents=True, exist_ok=True)
     torch.save(checkpoint, args.output)
     wins = sum(report["reward"] > 0 for report in terminal_reports)

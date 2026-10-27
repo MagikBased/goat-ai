@@ -306,6 +306,97 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/compare_value_archit
   --output .cache/goat-ai/fixed_policy_mirror_ridge_48300_48331.json
 ```
 
+## Frozen resource-ridge PPO ablation (27 October 2026)
+
+An opt-in `resource_ridge` baseline now supplies a separate predicted return
+for every learner decision in multi-duel PPO. It is fitted only on the 96
+frozen mirror training records above, then held constant during PPO. The
+exporter independently native replay-verifies and visibility-audits those
+source records, reproduces the reported regression coefficients, and writes
+normalization, coefficients, checkpoint/report hashes, and all 96 replay
+hashes. The trainer checks those bytes before using the artifact. Neither
+the resource model nor its training replays enter the agent's observations.
+
+A four-game native smoke run completed. The controlled training run then used
+the same selected feature-v23 parent, two 2022 training pairings, 128 four-role
+seeds 47000–47127, four workers, four-duel PPO rollouts, per-episode weighting,
+three epochs, batch size 16, learning rate 0.0001, parent KL 0.1, and snapshot
+pool as the [longer lower-KL control](#longer-lower-kl-ppo-continuation-27-october-2026).
+Only the advantage baseline changed from learner-deck moving return to the
+frozen visible-resource prediction. All 128 games reached terminal: 76 learner
+wins, 52 losses, 16,304 learner decisions. Measured training wall time was
+**107.09 s** with `OMP_NUM_THREADS=1`. These training wins do not estimate
+playing strength. All **91,218** recorded decisions independently replay-
+verified and passed the visibility audit; 218 heuristic review flags are
+prompts, not proven mistakes.
+
+Held-out competitive tests used both deck assignments and policy seats, 16
+new seeds per pairing, `--require-unseen-main-decks`, and the same native
+assets. Phoenix Control versus the GoatFormat Guide Dimension Fusion list
+used seeds 47300–47315; Phoenix versus the separate WikiFormat Dimension
+Fusion reference used seeds 49200–49215. The exact Main Deck compositions are
+absent from both policy checkpoints' training histories. The ridge value fit
+used neither evaluation composition in its 96 fitting records; Phoenix/Guide
+was an earlier value-validation pairing, so it is not untouched for model
+selection.
+
+| Held-out pairing | Ridge child vs PPO control | Ridge child vs original parent | Ridge vs Tactical | PPO control vs Tactical |
+| --- | ---: | ---: | ---: | ---: |
+| Phoenix / Guide Dimension Fusion | 33–31 | 31–33 | 23–41 | 20–42–2 |
+| Phoenix / Wiki Dimension Fusion | 28–36 | Not run | 17–45–2 | 15–49 |
+
+The direct ridge-versus-control paired bootstrap score intervals were
+**40.6–62.5%** and **34.4–51.6%**. The paired ridge-minus-control Tactical
+score differences were **+3.1 points** (95% interval −8.6 to +14.1) and
+**+4.7 points** (−6.3 to +16.4). The Phoenix/Guide direct result against the
+original parent was 31–33 (95% score interval 37.5–59.4%). No interval
+establishes a gain. The selected parent remains unchanged; better
+terminal-outcome prediction did not translate into demonstrated stronger play
+under this PPO schedule.
+
+Ignored artifacts are the ridge model
+`.cache/goat-ai/frozen_resource_ridge_48300_48323.json` (SHA-256
+`7115d29f4a6bedd2de870d26f43c570a902ab342a50593d185e4aa55dbb092dc`),
+child checkpoint `.cache/goat-ai/fv23_ppo_ridge_128_47000_47127.pt`
+(`7d2f1fa807f87f169fcedcc4a1bc48705bce9c1138e31768d16a5e5ed399bc42`),
+and audit `.cache/goat-ai/fv23_ppo_ridge_128_47000_47127_audit.json`
+(`5a9e8fa375e2520fd45899b5f07ca5583ca175784f00971ccd6735703c31b18d`).
+The seven ignored held-out reports are bound by their SHA-256 hashes:
+Phoenix/Guide direct control `52fa817b7c506173354c994bae5ffbf9482e90a0efdf7c9edec61eba97391c9c`,
+direct parent `f924b5660c229016271ab3bca7fdded206514dd22d51e7e900c2aec5b98ac1ea`,
+ridge Tactical `e74551a7bb092229480b4f30a119bff863e79c45a019affb37199b5ffe256a84`,
+control Tactical `288c99773dc24c65c358bf0d8031c9eef9aa995803335ffc1cbf05c11f2f9f66`;
+Phoenix/Wiki direct control `d82fd31fbbd5040fa43e98d780886d828e530f7779fa9e237bc978a875b2ae68`,
+ridge Tactical `960316709c1ad6d0ad08d46a2aa45bc6d6dfcfc777c1b2ed8b49380c83326944`,
+control Tactical `ebe420af454369347869ec162603ca19da17ea853dd6bb5bd00de0d9a7d19757`.
+The current-source comparator verified both matched Tactical pairs against
+local deck files and unseen Main Deck provenance.
+
+Reproduce the fitted baseline and training after the mirror collections:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/export_resource_ridge.py \
+  .cache/goat-ai/fixed_policy_mirror_ridge_48300_48331.json \
+  .cache/goat-ai/fixed_policy_mirror_rhymus_zombie_48300_48331 \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --output .cache/goat-ai/frozen_resource_ridge_48300_48323.json
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --engine experimental \
+  --matchup examples/decks/chaos_control_insids_worlds_2022.ydk \
+            examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/goat_control_michael_fukuyama_indianapolis_2005.ydk \
+  --schedule-mode four_roles --seed 47000 --games 128 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 --rollout-workers 4 \
+  --ppo-rollout-weighting per_episode --ppo-baseline-timing online \
+  --ppo-epochs 3 --ppo-batch-size 16 --ppo-clip-epsilon 0.2 \
+  --learning-rate 0.0001 --parent-kl-weight 0.1 --baseline-scope resource_ridge \
+  --resource-ridge-artifact .cache/goat-ai/frozen_resource_ridge_48300_48323.json \
+  --snapshot-every 4 --max-snapshots 8 \
+  --output .cache/goat-ai/fv23_ppo_ridge_128_47000_47127.pt
+```
+
 ## Visible-state critic architecture transfer check (27 October 2026)
 
 The original opt-in Monte Carlo critic (v1) averages all visible card

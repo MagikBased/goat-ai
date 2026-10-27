@@ -7,6 +7,7 @@ from scripts import compare_value_architectures as critic_comparison
 from scripts.compare_value_architectures import (
     VisibleResourceValue,
     fit_resource_ridge,
+    fit_resource_ridge_model,
     seed_clustered_difference_interval,
     selected_records,
 )
@@ -76,6 +77,8 @@ def test_resource_ridge_weights_complete_games_equally(monkeypatch) -> None:
     record = SimpleNamespace(observation=features, legal_actions=(1, 2))
     games = (((record,) * 4, 1.0), ((record,), -1.0))
     mse, coefficients = fit_resource_ridge(games, None, 23)
+    model = fit_resource_ridge_model(games, None, 23)
+    assert model.coefficients == coefficients
     assert abs(coefficients[-1]) < 1e-12
     assert mse(games) == (1.0, 1.0)
 

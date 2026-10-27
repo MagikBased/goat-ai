@@ -28,6 +28,7 @@ from goat_ai.training.policy import (
     LegalActionPolicy,
     encode_decision,
 )
+from goat_ai.training.resource_value import FrozenResourceRidge
 
 
 class VisibleStateValue(nn.Module):
@@ -693,6 +694,7 @@ def train_against_snapshot_pool(
     baseline_scope: str = "global",
     schedule_mode: str = "paired_seats",
     value_model: VisibleStateValue | None = None,
+    resource_value_model: FrozenResourceRidge | None = None,
     value_learning_rate: float = 1e-3,
     policy_gradient_reduction: str = "sum",
     parent_kl_weight: float = 0.0,
@@ -723,11 +725,13 @@ def train_against_snapshot_pool(
     if (not matchups or not seeds or learning_rate <= 0 or snapshot_every < 1
             or max_snapshots < 1 or learner_temperature <= 0
             or not 0 <= historical_probability <= 1
-            or baseline_scope not in ("global", "learner_deck", "state_value")
+            or baseline_scope not in ("global", "learner_deck", "state_value",
+                                      "resource_ridge")
             or policy_gradient_reduction not in ("sum", "mean")
             or value_learning_rate <= 0
             or not isfinite(parent_kl_weight) or parent_kl_weight < 0
             or (baseline_scope == "state_value") != (value_model is not None)
+            or (baseline_scope == "resource_ridge") != (resource_value_model is not None)
             or not callable(baseline_opponent_factory)
             or not baseline_opponent_name
             or schedule_mode not in ("paired_seats", "four_roles")):
@@ -743,6 +747,9 @@ def train_against_snapshot_pool(
     if ppo_baseline_timing in ("frozen_rollout", "leave_one_out") and (
             policy_update != "clipped_ppo" or ppo_rollout_games < 2):
         raise ValueError("rollout baseline requires multi-duel PPO")
+    if resource_value_model is not None and (
+            policy_update != "clipped_ppo" or ppo_baseline_timing != "online"):
+        raise ValueError("frozen resource ridge requires PPO and online baseline timing")
     if ppo_rollout_games > 1 and (policy_update != "clipped_ppo"
                                   or baseline_scope == "state_value"
                                   or skip_capped_games or skip_unsupported_games
@@ -906,9 +913,14 @@ def train_against_snapshot_pool(
             if record_episode is not None:
                 record_episode(index, episode)
             baseline_key = decks[learner_seat] if baseline_scope == "learner_deck" else "global"
-            state_baselines = (predict_state_values(
-                value_model, vocabulary, episode.learner_records, model.feature_version)
-                if value_model is not None and episode.learner_records else None)
+            state_baselines = (
+                predict_state_values(value_model, vocabulary, episode.learner_records,
+                                     model.feature_version)
+                if value_model is not None and episode.learner_records else
+                resource_value_model.predict_records(
+                    episode.learner_records, vocabulary, model.feature_version)
+                if resource_value_model is not None and episode.learner_records
+                else None)
             baseline = (sum(state_baselines) / len(state_baselines)
                         if state_baselines else
                         (rollout_baselines if ppo_baseline_timing in
@@ -936,6 +948,8 @@ def train_against_snapshot_pool(
                         if reuse_rollout_features:
                             rollout_features.extend(episode.learner_features)
                         rollout_advantages.extend(
+                            (episode.reward - value for value in state_baselines)
+                            if state_baselines is not None else
                             [episode.reward - baseline] * len(episode.learner_records))
                         if ppo_baseline_timing == "leave_one_out":
                             rollout_record_episode_indices.extend(
@@ -957,7 +971,7 @@ def train_against_snapshot_pool(
                 value_model, vocabulary, episode.learner_records, episode.reward,
                 model.feature_version, value_optimizer)
                 if value_model is not None and episode.learner_records else None)
-            if value_model is None:
+            if value_model is None and resource_value_model is None:
                 baselines[baseline_key] = (
                     0.95 * baselines.get(baseline_key, 0.0)
                     + 0.05 * episode.reward)

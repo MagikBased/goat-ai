@@ -1781,6 +1781,14 @@ This supports an opt-in PPO advantage-baseline ablation, followed by paired
 held-out competitive evaluation; it does not yet satisfy M4's policy-strength
 gate. See [the mirror check](evaluation.md#frozen-mirror-self-play-value-transfer-27-october-2026).
 
+That ablation now exists and ran for 128 matched PPO games. The resource
+baseline child scored 33–31 and 28–36 directly against the existing PPO
+control on two unseen-Main-Deck pairings; both score intervals cross 50%.
+Matched Tactical comparisons likewise have paired intervals crossing zero.
+The outcome-prediction gain did not establish a policy-strength gain, so the
+selected parent remains unchanged. See
+[the ablation](evaluation.md#frozen-resource-ridge-ppo-ablation-27-october-2026).
+
 An opt-in leave-one-out PPO baseline now uses other terminal duels from the
 same rollout and learner deck to reduce return variance without consulting
 the acting agent's hidden state. A matched 32-game ablation replay-verified

@@ -2310,6 +2310,40 @@ def test_leave_one_out_uses_other_same_deck_games_even_without_policy_choices(
     assert [report["policy_loss"] for report in reports] == [7.0, None, 7.0, 7.0]
 
 
+def test_frozen_resource_ridge_supplies_per_decision_multi_duel_advantages(
+        monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    seen = []
+
+    def run_episode(_policy, _vocabulary, _opponent, _decks, seed, *_args):
+        record = DecisionRecord(view(), actions(), actions()[0])
+        return SimpleNamespace(
+            seed=seed, winner=0, reward=1.0 if seed == 100 else -1.0,
+            decisions=2, learner_records=(record, record) if seed == 100 else (record,),
+            trajectory=SimpleNamespace(deck_sha256=("a", "b"),
+                                       asset_sha256={"core": "hash"},
+                                       rules_profile="goat"))
+
+    def update(_policy, _vocabulary, _records, _reward, _baseline,
+               _optimizer, **kwargs):
+        seen.append(tuple(kwargs["advantages"]))
+        return 1.0
+
+    class Ridge:
+        def predict_records(self, records, _vocabulary, _feature_version):
+            return (0.2, -0.4) if len(records) == 2 else (0.2,)
+
+    monkeypatch.setattr("goat_ai.training.self_play.run_learning_episode", run_episode)
+    monkeypatch.setattr("goat_ai.training.self_play.ppo_clipped_update", update)
+    reports = train_against_snapshot_pool(
+        model, vocabulary, (("a", "b"),), (100, 101), lambda: None,
+        policy_update="clipped_ppo", baseline_scope="resource_ridge",
+        resource_value_model=Ridge(), ppo_rollout_games=2, snapshot_every=2)
+    assert seen == [pytest.approx((0.8, 1.4, -1.2))]
+    assert [report["baseline"] for report in reports] == pytest.approx((-0.1, 0.2))
+
+
 def test_self_play_can_censor_over_cap_game_without_learning_from_it(monkeypatch):
     vocabulary = CardVocabulary((10, 20))
     model = LegalActionPolicy(vocabulary.size, width=16)
