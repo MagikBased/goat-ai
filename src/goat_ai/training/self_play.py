@@ -171,9 +171,17 @@ def episode_schedule(matchups: Sequence[tuple[str, str]],
 def sample_legal_action(model: LegalActionPolicy, vocabulary: CardVocabulary,
                         observation, legal_actions, generator: torch.Generator,
                         temperature: float = 1.0):
-    action, _ = _sample_legal_action_with_features(
+    action, _, _ = _sample_legal_action_with_features(
         model, vocabulary, observation, legal_actions, generator, temperature)
     return action
+
+
+def _selection_progress_actions(legal_actions: Sequence[Action]) -> tuple[Action, ...]:
+    """Avoid reversible unselection while a legal forward choice is available."""
+    actions = tuple(legal_actions)
+    if any(action.kind in ("select_card", "finish_selection") for action in actions):
+        return tuple(action for action in actions if action.kind != "unselect_card")
+    return actions
 
 
 def _sample_legal_action_with_features(
@@ -181,22 +189,24 @@ def _sample_legal_action_with_features(
     observation, legal_actions, generator: torch.Generator,
     temperature: float = 1.0,
     scorer: Callable[[DecisionFeatures], torch.Tensor] | None = None,
-) -> tuple[Action, DecisionFeatures | None]:
+) -> tuple[Action, DecisionFeatures | None, tuple[Action, ...]]:
     """Sample from visible legal options, with no native-state access."""
     if temperature <= 0:
         raise ValueError("temperature must be positive")
-    if len(legal_actions) == 1:
+    policy_actions = _selection_progress_actions(legal_actions)
+    if len(policy_actions) == 1:
         # A forced choice needs neither feature encoding nor a neural forward
         # pass. It also need not consume the policy's sampling generator.
-        return legal_actions[0], None
-    features = encode_decision(observation, legal_actions, vocabulary, model.feature_version)
+        return policy_actions[0], None, policy_actions
+    features = encode_decision(observation, policy_actions, vocabulary,
+                               model.feature_version)
     device = next(model.parameters()).device
     with torch.inference_mode():
         logits = (scorer(features.to(device)) if scorer is not None
                   else model(features.to(device))) / temperature
         probabilities = torch.softmax(logits, dim=0).cpu()
         index = int(torch.multinomial(probabilities, 1, generator=generator).item())
-    return legal_actions[index], features
+    return policy_actions[index], features, policy_actions
 
 
 class _FlatPolicy(nn.Module):
@@ -260,11 +270,11 @@ def run_learning_episode(
         for count in range(1, max_decisions + 1):
             legal_actions = env.legal_actions()
             if observation.acting_player == learner_seat:
-                action, features = _sample_legal_action_with_features(
+                action, features, policy_actions = _sample_legal_action_with_features(
                     model, vocabulary, observation, legal_actions, generator,
                     temperature=learner_temperature, scorer=rollout_scorer)
-                if len(legal_actions) > 1:
-                    records.append(DecisionRecord(observation, legal_actions, action))
+                if len(policy_actions) > 1:
+                    records.append(DecisionRecord(observation, policy_actions, action))
                     if collect_features:
                         assert features is not None
                         learner_features.append(features)
@@ -313,8 +323,10 @@ def run_batched_learning_episodes(
             env = environments[index]
             legal = env.legal_actions()
             observation = observations[index]
-            if observation.acting_player == seat and len(legal) > 1:
-                records[index].append(DecisionRecord(observation, legal, action))
+            policy_actions = (_selection_progress_actions(legal)
+                              if observation.acting_player == seat else ())
+            if len(policy_actions) > 1:
+                records[index].append(DecisionRecord(observation, policy_actions, action))
             counts[index] += 1
             observations[index] = env.step(action)
             if env.is_terminal():
@@ -336,18 +348,21 @@ def run_batched_learning_episodes(
                         raise EpisodeDecisionLimit(seed, max_decisions)
                     legal = env.legal_actions()
                     observation = observations[index]
-                    if observation.acting_player == seat and len(legal) > 1:
+                    policy_actions = (_selection_progress_actions(legal)
+                                      if observation.acting_player == seat else ())
+                    if len(policy_actions) > 1:
                         ready.append(index)
                         break
-                    action = (legal[0] if observation.acting_player == seat
+                    action = (policy_actions[0] if observation.acting_player == seat
                               else opponent.select_action(observation, legal))
                     advance(index, action)
             if not ready:
                 continue
-            features = [encode_decision(observations[index],
-                                        environments[index].legal_actions(),
+            policy_actions = [_selection_progress_actions(
+                environments[index].legal_actions()) for index in ready]
+            features = [encode_decision(observations[index], actions,
                                         vocabulary, model.feature_version)
-                        for index in ready]
+                        for index, actions in zip(ready, policy_actions, strict=True)]
             if collect_features:
                 for index, features_for_index in zip(ready, features, strict=True):
                     feature_records[index].append(features_for_index)
@@ -358,16 +373,17 @@ def run_batched_learning_episodes(
                 else:
                     batch, _ = model.forward_batch(
                         [item.to(device) for item in features])
-                    logits = [batch[row, :len(environments[index].legal_actions())]
-                              for row, index in enumerate(ready)]
+                    logits = [batch[row, :len(actions)]
+                              for row, actions in enumerate(policy_actions)]
                 chosen = []
-                for index, scores in zip(ready, logits, strict=True):
+                for index, scores, actions in zip(ready, logits, policy_actions,
+                                                   strict=True):
                     generator = games[index][4]
                     probabilities = torch.softmax(scores / learner_temperature,
                                                   dim=0).cpu()
                     choice = int(torch.multinomial(probabilities, 1,
                                                    generator=generator).item())
-                    chosen.append(environments[index].legal_actions()[choice])
+                    chosen.append(actions[choice])
             for index, action in zip(ready, chosen, strict=True):
                 advance(index, action)
         return tuple(result for result in results if result is not None)

@@ -258,6 +258,7 @@ def main() -> None:
               "snapshot_every": args.snapshot_every, "max_snapshots": args.max_snapshots,
               "entropy_coefficient": args.entropy_coefficient,
               "learner_temperature": args.learner_temperature,
+              "selection_progress_mask": 1,
               "baseline_scope": args.baseline_scope,
               "policy_gradient_reduction": args.policy_gradient_reduction,
               "reinforce_batch_size": (args.reinforce_batch_size

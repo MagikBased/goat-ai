@@ -947,6 +947,16 @@ temperature from 1.0 to 0.5 failed to terminate seed 21211 even after raising
 the decision cap from 3,000 to 10,000. It yielded no checkpoint or strength
 claim. The process-worker cap error now reports its seed correctly; see the
 [evaluation log](evaluation.md).
+The seed's final 1,000 decisions were an exact select/unselect loop. Self-play
+sampling now shares the greedy policy's selection-progress mask, and PPO scores
+the same filtered action set it samples. The first 16 lower-temperature games
+now all terminate and replay-verify, including that seed; process-worker and
+batched-inference runs produced identical trajectories and weights. This
+removes a training protocol failure.
+The complete 32-game masked continuation also terminated and replay-verified,
+but scored 26–35–3 directly against its parent and 14–50 against Tactical-v14
+on unseen Main Decks (parent 18–46 on matched Tactical games). Keep the
+checkpoint experimental and prioritize action valuation or credit assignment.
 Labeling 7,538 decisions from the fixed imitation checkpoint's own games
 with Tactical-v14 and upweighting 1,891 disagreements also failed a held-out
 strength check: the child scored 30–34 directly against that checkpoint and

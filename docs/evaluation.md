@@ -7377,6 +7377,68 @@ attempt reported `seed=21211` and the real cap. This changes error reporting,
 not game outcomes. The attempted trajectories remain ignored under
 `.cache/goat-ai/fv23_ppo_temp05_{capcheck,10000_21200_21231}_replays/`.
 
+The capped seed was reproduced with one rollout worker. Its last 1,000
+decisions all occurred in turn 6 Main Phase 1, alternating 500 `select_card`
+and 500 `unselect_card` actions on the same card, with unchanged Life Points
+and Deck counts. The ignored diagnostic summary is
+`.cache/goat-ai/seed21211_cap_diagnostic.json`. This is a policy action cycle,
+not a native engine hang or a slowly progressing duel.
+
+### Selection-progress masking in sampled PPO rollouts (27 October 2026)
+
+The greedy policy already avoids reversing a selected card while a legal
+`select_card` or `finish_selection` action is available. Sampled self-play
+previously bypassed that safeguard. Its learner and frozen neural opponent now
+sample from the same static progress-filtered action set. The learner's PPO
+decision records use that filtered set, so the update computes probabilities
+under the distribution actually sampled. The saved trajectory still records
+**all** native legal actions, preserving replay verification and the public
+environment contract. The filter does not change native legality and allows
+`unselect_card` when no forward selection or finish is offered. New checkpoints
+record `selection_progress_mask: 1` in their self-play configuration.
+
+With the otherwise same first 16 games of the lower-temperature schedule,
+four process workers completed **16/16 terminal duels** under the original
+3,000-decision cap. Seed 21211 now ended after **299 decisions**. The run
+recorded **13,170 decisions**, **2,342** multi-option learner decisions,
+and seven learner wins; all 16 complete trajectories passed fresh native
+replay verification and the visibility audit. A separate batched-inference
+run on the same inputs produced **16 byte-identical trajectories and identical
+final model tensors**. This verifies that the two execution paths use the same
+masked sampling/update semantics. The ignored checkpoints are
+`.cache/goat-ai/fv23_ppo_temp05_masked_21200_21215.pt` and
+`.cache/goat-ai/fv23_ppo_temp05_masked_batch_21200_21215.pt`; the replay audit
+is `.cache/goat-ai/fv23_ppo_temp05_masked_21200_21215_audit.json`.
+This establishes protocol progress and deterministic training behavior on a
+specific schedule, **not** a held-out playing-strength improvement.
+
+The complete 32-game masked continuation from the same parent and four-role
+training schedule also terminated **32/32** times below 3,000 decisions,
+recording **28,271** decisions and **5,162** multi-option learner decisions
+in **34.02 seconds** of training wall time with one Torch thread. All 32
+trajectories passed native replay verification and the visibility audit. Its
+ignored checkpoint
+`.cache/goat-ai/fv23_ppo_temp05_masked_21200_21231.pt` has SHA-256
+`af3a2a139115f6e388148572aefc94811554155d6193796652500c6139ee6041`;
+the replay audit is
+`.cache/goat-ai/fv23_ppo_temp05_masked_21200_21231_audit.json`.
+
+On the unseen Phoenix Control versus two Dimension Fusion matchups, both deck
+assignments and seats, seeds 21300–21307 gave the child **26–35–3** directly
+against its unchanged parent over 64 duels (42.97% of points; paired-bootstrap
+95% interval **36.72%–50.00%**). On matched seeds 21308–21315 against
+Tactical-v14, the child scored **14–50** versus the parent's **18–46**.
+The report comparator verified matching opponent, seed schedule, deck hashes,
+native assets, and source fingerprints; child-minus-parent paired score
+difference was **−6.25 percentage points**, 95% interval **−14.06 to +1.56**.
+The reports are ignored under `.cache/goat-ai/` with prefixes
+`fv23_ppo_temp05_masked_vs_parent_21300_21307`,
+`fv23_ppo_temp05_masked_vs_tactical_21308_21315`, and
+`fv23_parent_vs_tactical_after_selection_mask_21308_21315`. The masked PPO
+child is **not promoted**: avoiding a training loop did not produce a measured
+competitive gain. A next self-play method needs better action valuation or
+credit assignment, assessed on fresh held-out matchups.
+
 ### Automated visible-rule preference experiment (27 October 2026)
 
 The 32 replay-verified patched-core PPO self-play duels above supplied

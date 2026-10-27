@@ -53,6 +53,8 @@ from goat_ai.training.self_play import (
     EpisodeDecisionLimit,
     TracedRolloutScorer,
     VisibleStateValue,
+    _sample_legal_action_with_features,
+    _selection_progress_actions,
     clipped_surrogate,
     episode_schedule,
     policy_gradient_update,
@@ -1592,6 +1594,24 @@ def test_forced_self_play_action_skips_inference_and_sampling(monkeypatch):
     assert torch.equal(generator.get_state(), before)
     with pytest.raises(ValueError, match="temperature"):
         sample_legal_action(model, vocabulary, view(), forced, generator, temperature=0)
+
+
+def test_sampled_selection_uses_same_progress_mask_as_training_features():
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=16)
+    selected = Action("undo", "unselect_card", 0, {"code": 10, "sequence": 0})
+    add = Action("add", "select_card", 0, {"code": 20, "sequence": 1})
+    finish = Action("finish", "finish_selection", 0)
+    legal = (selected, add, finish)
+    assert _selection_progress_actions(legal) == (add, finish)
+    assert _selection_progress_actions((selected,)) == (selected,)
+    for seed in range(20):
+        action, features, policy_actions = _sample_legal_action_with_features(
+            model, vocabulary, view(), legal, torch.Generator().manual_seed(seed))
+        assert action in (add, finish)
+        assert policy_actions == (add, finish)
+        assert features is not None and len(features.action_kinds) == 2
+        assert DecisionRecord(view(), policy_actions, action).selected_action == action
 
 
 def test_forced_greedy_action_skips_inference(monkeypatch):
