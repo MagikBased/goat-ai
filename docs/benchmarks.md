@@ -197,6 +197,16 @@ PYTHONPATH=src:. .venv/bin/python scripts/benchmark_native_query_cache.py \
   --games 4 --rounds 2
 ```
 
+After the cache change, the full native-enabled pytest suite passed **985
+tests in 958.33 seconds**. The ignored log is
+`.cache/goat-ai/native_full_20261027_query_cache.log` (SHA-256
+`92cfffddae0a03bdc836f7ed33e50f8ab62835a55540c06a91802d96aacbfdf3`).
+The preceding uncached full suite passed 984 tests in 1,139.55 seconds (log
+SHA-256 `3b7e8d045628a02ae9ae9896d8410d7e81dc7825c913cb683701553d1266a044`).
+The extra test and uncontrolled machine load make those suite times unsuitable
+as a cache-speed comparison; the matched duel ablation above isolates that
+effect.
+
 ## Batched REINFORCE update
 
 The self-play trainer now accepts opt-in `--reinforce-batch-size 16` for
@@ -255,3 +265,8 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
   --reinforce-batch-size 16 \
   --record-dir .cache/goat-ai/batched_reinforce_smoke_records
 ```
+
+After merging the opt-in trainer path, the Python suite passed 294 tests
+(694 native-gated skips), and the focused policy/native-query suite passed 95
+tests with native assets. The 985-test full native run above preceded this
+trainer commit; the native CLI smoke and focused tests exercise its new path.
