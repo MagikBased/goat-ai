@@ -250,12 +250,14 @@ scoped to a pending Desert Sunlight from the target's controller; other
 face-down Book-target cases still need independent rulings. See
 [GOAT rules](goat_rules.md) and [native setup](native_setup.md).
 
-A source-backed Jinzo/Skill Drain timing pair now checks whether Skill Drain
+A source-backed Jinzo/Skill Drain timing pair checks whether Skill Drain
 resolves before Premature Burial revives Jinzo or Jinzo is already active when
-Traps could respond. Mirror Force is legal only in the former branch. Both
-complete duels replay-verify and pass the visibility audit; this covers a
-high-play monster's interaction with an already active Continuous Trap,
-while Royal Decree and Summon-negation order remain open. See
+Traps could respond. Mirror Force is legal only in the former branch. A third
+branch activates Royal Decree after both Skill Drain and Jinzo are face-up;
+Mirror Force becomes unavailable again, matching the archived ruling's
+observable consequence. All three complete duels replay-verify and pass the
+visibility audit. Other continuous-effect permutations and Jinzo's
+Summon-negation window remain open. See
 [GOAT rules](goat_rules.md).
 
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
