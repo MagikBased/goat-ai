@@ -299,6 +299,7 @@ class OcgcoreProbe:
         self._setcodes: dict[int, c.Array] = {}
         self._duel = c.c_void_p()
         self._pending_message: bytes | None = None
+        self._decoded_pending = None
         self._turn = 0
         self._turn_player: int | None = None
         self._phase = "unknown"
@@ -393,8 +394,13 @@ class OcgcoreProbe:
 
         if self._pending_message is None:
             raise RuntimeError("no pending native decision")
-        if self._pending_message[0] != 142:
-            return decode_decision(self._pending_message)
+        prompt = self._pending_message
+        if self._decoded_pending is not None and self._decoded_pending[0] is prompt:
+            return self._decoded_pending[1]
+        if prompt[0] != 142:
+            decision = decode_decision(prompt)
+            self._decoded_pending = (prompt, decision)
+            return decision
         if self._announcement_codes is None:
             from goat_ai.engine.decks import read_goat_whitelist
 
@@ -423,9 +429,10 @@ class OcgcoreProbe:
             self._announcement_monster_non_extra_codes = tuple(
                 code for code, card_type in entries
                 if card_type & 1 and not card_type & 0x4802040)
-        prompt = self._pending_message
         if len(prompt) < 3 or len(prompt) != 3 + 8 * prompt[2]:
-            return decode_decision(prompt)
+            decision = decode_decision(prompt)
+            self._decoded_pending = (prompt, decision)
+            return decision
         expression = struct.unpack_from(f"<{prompt[2]}Q", prompt, 3)
         is_type = 0x4000010200000000
         and_op = 0x4000000400000000
@@ -440,7 +447,9 @@ class OcgcoreProbe:
             codes = self._announcement_monster_non_extra_codes
         else:
             codes = self._announcement_codes
-        return decode_decision(prompt, codes)
+        decision = decode_decision(prompt, codes)
+        self._decoded_pending = (prompt, decision)
+        return decision
 
     def _read_script(self, _payload: int, duel: int, name: bytes) -> int:
         relative = Path(name.decode("utf-8"))

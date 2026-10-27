@@ -400,3 +400,37 @@ and run `scripts/benchmark_native.py` under each source tree with the same
 `--deck-b examples/decks/chaos_probe.ydk --seed 15000 --games 4` arguments.
 The benchmark now reports per-game decision counts and the loaded probe
 source hash as well as total timing.
+
+## Pending prompt decoding and policy evaluation mode
+
+On 27 October 2026, a one-duel CPU profile of the experimental native adapter
+showed 3,333 pending-prompt decodes across 1,111 decisions. The adapter now
+reuses a decoded prompt while the same native response window is pending.
+PolicyAgent also skips its recursive PyTorch `eval()` call when the model is
+already in evaluation mode. Both changes preserve the decoded choices and
+model outputs; a new native prompt gets a new decode.
+
+The reproducible prompt-cache AB/BA command is:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/benchmark_pending_decode.py \
+  --native-root .cache/goat-ai --seed 15000 --games 4
+```
+
+The command forces a fresh decode for the reference arm. On an Intel Core
+i7-10700K, the four control/Chaos probe duels completed 4,230 decisions in
+each arm. Complete trajectories matched. The fresh/cached wall times were
+2.997/2.872 seconds in the first round and 2.908/2.938 seconds in the
+reversed round, giving **1.043× and 0.990×** ratios. The measured effect is
+small relative to run variation; this is a CPU overhead reduction, not a
+demonstrated self-play throughput or playing-strength gain. The ignored raw
+report is `.cache/goat-ai/pending_decode_benchmark_15000.json`.
+
+A separate four-game greedy-policy comparison forced the former recursive
+`eval()` behavior at every decision. Changed and reference trajectories
+matched; old/new wall-time ratios were 1.087× and 1.011× in reversed-order
+rounds. The comparison did not include a training update. A four-game sampled
+self-play comparison of 1 versus 8 PyTorch CPU threads produced 3.259 versus
+3.323 seconds in one order and 3.354 versus 3.206 seconds in the other;
+trajectories matched and neither thread count won consistently. The training
+CLI keeps its current thread setting.

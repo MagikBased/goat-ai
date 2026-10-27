@@ -25,6 +25,27 @@ from goat_ai.engine.probe_deck import VANILLA_DECK
 from scripts.run_native_smoke import run
 
 
+def test_pending_prompt_is_decoded_once_and_replaced_with_next_prompt():
+    probe = object.__new__(OcgcoreProbe)
+    probe._decoded_pending = None
+    first = bytes([13, 0]) + (123).to_bytes(8, "little")
+    probe._pending_message = first
+    decoded = probe.decode_pending()
+    assert probe.decode_pending() is decoded
+    assert decoded.choices[0].prompt_id == 123
+
+    # A new native response window can have the same request type and length.
+    probe._pending_message = bytes([13, 1]) + (456).to_bytes(8, "little")
+    next_decoded = probe.decode_pending()
+    assert next_decoded is not decoded
+    assert next_decoded.player == 1
+    assert next_decoded.choices[0].prompt_id == 456
+
+    probe._pending_message = None
+    with pytest.raises(RuntimeError, match="no pending"):
+        probe.decode_pending()
+
+
 def test_message_frame_parser():
     frame = struct.pack("<I", 2) + b"\x5a\x01"
     assert split_messages(frame + frame) == (b"\x5a\x01", b"\x5a\x01")

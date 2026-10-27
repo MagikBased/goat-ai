@@ -710,7 +710,8 @@ class PolicyAgent:
         features = encode_decision(observation, legal_actions, self.vocabulary,
                                    getattr(self.model, "feature_version", POLICY_FEATURE_VERSION))
         device = next(self.model.parameters()).device
-        self.model.eval()
+        if self.model.training:
+            self.model.eval()
         with torch.inference_mode():
             scores = self.model(features.to(device))
         admissible = (admissible_action_indices(observation, legal_actions,
