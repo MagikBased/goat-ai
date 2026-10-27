@@ -63,8 +63,10 @@ sets, resolves alternate-print aliases through the pinned database, checks
 the March 2010 Forbidden list, and writes a machine-readable disagreement
 report. The cached comparison found 3,702 canonical IDs in the date-filtered
 response and 3,624 in the community CSV, with 3,622 shared. Of 80 API-only
-canonical IDs, 43 are Forbidden, two are tokens, and **35 still need
-individual release and eligibility checks**. Two community-only canonical
+canonical IDs, 43 are Forbidden, two are tokens, one lacks pinned metadata,
+and **34 still need individual release and eligibility checks**. The
+missing-metadata ID `149694341` is an API "???" placeholder rather than an
+identified card. Two community-only canonical
 IDs are Exodius (`13893596`) and Genesis Dragon (`31038159`); [Konami's
 Exodius card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7392&ope=2)
 and [Genesis Dragon card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7978&ope=2&request_locale=en)
@@ -79,7 +81,7 @@ has been selected.
 
 The ignored report is
 `.cache/goat-ai/edison_pool_candidate_comparison_20261027.json` (SHA-256
-`969c59f64d074cee9ac62a64520b43a78ed0b43b09c3807d0b3375dcd30b69b7`).
+`6fe8b46bcc46d873896be9916168f13f2288c9844542575d4d7b56a57efbf490`).
 Reproduce it with locally cached sources:
 
 ```sh

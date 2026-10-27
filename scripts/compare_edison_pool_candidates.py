@@ -68,7 +68,9 @@ def compare(api_json: Path, community_csv: Path, database: Path,
     token_ids = sorted(code for code in api_only if types.get(code, 0) & TOKEN)
     forbidden_ids = sorted(code for code in api_only
                            if code not in token_ids and limits.get(code, 3) == 0)
-    unresolved_ids = sorted(api_only - set(token_ids) - set(forbidden_ids))
+    missing_metadata_ids = sorted(code for code in api_only if code not in types)
+    unresolved_ids = sorted(api_only - set(token_ids) - set(forbidden_ids)
+                            - set(missing_metadata_ids))
     return {
         "purpose": "candidate_disagreement_not_edison_legality",
         "api_response_sha256": sha256_file(api_json),
@@ -84,6 +86,7 @@ def compare(api_json: Path, community_csv: Path, database: Path,
         "community_ids_missing_database": community_missing,
         "api_only_forbidden_ids": forbidden_ids,
         "api_only_token_ids": token_ids,
+        "api_only_missing_metadata_ids": missing_metadata_ids,
         "api_only_unresolved_ids": unresolved_ids,
         "community_only_ids": sorted(community_canonical - api_canonical),
     }

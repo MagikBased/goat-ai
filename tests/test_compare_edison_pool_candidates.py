@@ -31,7 +31,8 @@ def test_candidate_comparison_resolves_aliases_and_exposes_disagreements(tmp_pat
     assert report["community_ids_missing_database"] == [8]
     assert report["api_only_forbidden_ids"] == [3]
     assert report["api_only_token_ids"] == [4]
-    assert report["api_only_unresolved_ids"] == [5, 7]
+    assert report["api_only_missing_metadata_ids"] == [7]
+    assert report["api_only_unresolved_ids"] == [5]
     assert report["community_only_ids"] == [6, 8]
 
     api.write_text(json.dumps({"data": [{"id": 1}, {"id": 1}]}))
