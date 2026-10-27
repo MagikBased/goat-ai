@@ -135,6 +135,10 @@ for exact and exceed sums, but that extension has parser-only tests. Large
 sum-choice sets now use incremental legal-prefix selection; a forced staged
 Puppet Magic duel matches the flat native outcome and replay-verifies. A
 native mandatory-card sum prompt has not yet been observed.
+A paired Firebird fixture checks the corrected callback's effect, not just
+termination: a friendly Winged Beast's battle destruction adds 500 ATK,
+while a friendly non-Winged Beast's does not. Both full duels replay-verify;
+see [GOAT rules](goat_rules.md).
 An independent second 100-pair whitelist sweep also reached **100/100
 terminal** with **103,185 replay-verified decisions**; see [evaluation](evaluation.md).
 This is a protocol and reproducibility result, not a historical correctness
@@ -164,13 +168,13 @@ coverage; see [the protocol log](evaluation.md).
 
 ## M2 — Historical correctness gate
 
-A native-enabled local regression run on 2026-10-27 finished with 981 passed
-and one failed in 19 minutes 28 seconds. The sole failure was a schema-v6
-test projection carrying newer owner and pending-summon fields; the test
-projection was corrected, and pytest's last-failed rerun passed. The full
-suite was not repeated after that correction. The ignored original log is
-`.cache/goat-ai/native_full_20261027.log` (SHA-256
-`5e086b971939b30caf47247a4f8020117df1133f2a9f229176a91be2f323df3d`).
+A native-enabled local regression run on 2026-10-27 passed **1,003 tests**
+in 13 minutes 43 seconds after correction of a schema-v6 test projection
+carrying newer owner and pending-summon fields. The ignored full-run log is
+`.cache/goat-ai/native_full_20261027_rerun.log` (SHA-256
+`9da9d6baf3b2b25e0a95745f8c94ada560cdf3d669e5da2183efc7a35784602a`).
+Two Firebird effect tests and two review-queue tests were added after that
+run started; both test files then passed separately, **7 tests in 13.25s**.
 This is regression coverage for the tested fixtures, not a blanket claim
 that every GOAT ruling is historical.
 
@@ -1054,9 +1058,10 @@ demonstrate a direct parent gain, broad competitive strength, or self-play
 gain. Keep the v23 parent as reference; [the pilot log](evaluation.md#on-policy-teacher-diversity-pilot-27-october-2026)
 records the decks, pins, and report hashes.
 
-A player-visible review queue now ranks diverse policy/Tactical disagreements
-from native-verified, checkpoint-attributed greedy replays. Its first 16-duel
-pass selected 20 of 291 disagreements for human inspection. These are not
+A player-visible review queue prioritizes conservative audit flags and then
+diverse policy/Tactical disagreements from native-verified,
+checkpoint-attributed greedy replays. Its first 16-duel pass selected 20 of
+292 candidates for human inspection. These are not
 ground-truth labels; reviewed preferences and fresh held-out outcome gains
 remain necessary before using them to support an M4 strength claim. See
 [the queue protocol](evaluation.md#player-visible-disagreement-review-queue-27-october-2026).

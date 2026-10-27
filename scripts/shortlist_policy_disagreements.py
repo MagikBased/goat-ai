@@ -14,10 +14,14 @@ from urllib.parse import quote
 import torch
 
 from goat_ai.agents import (
-    TacticalHeuristicAgent, load_card_facts, load_card_races,
+    TacticalHeuristicAgent,
+    load_card_facts,
+    load_card_races,
     load_flip_monster_codes,
 )
+from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.evaluation.replay_review import review_candidates
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
@@ -35,7 +39,8 @@ def select_diverse_candidates(candidates: list[dict], limit: int,
     fingerprints = set()
     replay_counts: Counter[str] = Counter()
     for candidate in sorted(candidates, key=lambda item: (
-            -item["probability_margin"], item["trajectory"], item["decision_index"])):
+            not item["audit_flags"], -item["probability_margin"],
+            item["trajectory"], item["decision_index"])):
         fingerprint = candidate["_fingerprint"]
         replay = candidate["trajectory"]
         if fingerprint in fingerprints or replay_counts[replay] >= per_replay:
@@ -89,11 +94,13 @@ def write_review_index(selected: list[dict], output: Path,
         viewer, fragment = item["viewer"].split("#", 1)
         relative = Path(viewer).relative_to(output.parent.resolve())
         href = quote(str(relative), safe="/") + "#" + fragment
+        reasons = ", ".join(item["audit_flags"]) or "Tactical disagreement"
         rows.append(
             f'<tr><td><a href="{escape(href, quote=True)}">'
             f'{item["turn"]} · {escape(item["phase"])} · frame {item["viewer_frame"]}'
             f'</a></td><td>{action_label(item["policy_action"])}</td>'
             f'<td>{action_label(item["teacher_action"])}</td>'
+            f'<td>{escape(reasons)}</td>'
             f'<td>{item["probability_margin"]:.3f}</td></tr>')
     html = ("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\">"
             "<title>GOAT AI review queue</title><style>"
@@ -102,11 +109,13 @@ def write_review_index(selected: list[dict], output: Path,
             "table{border-collapse:collapse;width:100%}th,td{padding:.7rem;"
             "border-bottom:1px solid #42606b;text-align:left}a{color:#8bd9ee}"
             "</style><h1>GOAT AI review queue</h1>"
-            "<p>Policy and Tactical-v14 disagree here. These are review prompts,"
+            "<p>Visible-state audit flags come first, followed by diverse"
+            " policy and Tactical-v14 disagreements. These are review prompts,"
             " not correct-play labels. Open a frame to inspect the complete duel."
             " The viewer preserves each player's information boundary.</p>"
             "<table><thead><tr><th>Replay frame</th><th>Policy played</th>"
-            "<th>Tactical suggested</th><th>Model margin</th></tr></thead><tbody>"
+            "<th>Tactical suggested</th><th>Review reason</th>"
+            "<th>Model margin</th></tr></thead><tbody>"
             + "".join(rows) + "</tbody></table></html>\n")
     index = output.with_suffix(".html")
     index.write_text(html, encoding="utf-8")
@@ -126,13 +135,14 @@ def main() -> None:
     args = parser.parse_args()
     if args.limit < 1 or args.per_replay < 1:
         parser.error("review limits must be positive")
-    if len(set(path.resolve() for path in args.replays)) != len(args.replays):
+    if len({path.resolve() for path in args.replays}) != len(args.replays):
         parser.error("duplicate replay path")
     checkpoint_hash = sha256_file(args.checkpoint)
     agent = load_policy_agent(args.checkpoint)
     model = agent.model.eval()
     flip_codes = load_flip_monster_codes(args.native_root)
     card_races = load_card_races(args.native_root)
+    weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
     card_facts = load_card_facts(args.native_root)
 
     def fresh_teacher():
@@ -162,6 +172,9 @@ def main() -> None:
         audit_trajectory_visibility(trajectory)
         if sha256_file(path) != source_hash:
             raise ValueError(f"{path}: replay changed during verification")
+        audit_by_index: dict[int, list[str]] = {}
+        for finding in review_candidates(trajectory, card_races, weak_flip_attacks):
+            audit_by_index.setdefault(finding.decision_index, []).append(finding.category)
         disagreements = 0
         policy_choices = 0
         replay_agent = load_policy_agent(args.checkpoint)
@@ -183,9 +196,11 @@ def main() -> None:
             alternative = fresh_teacher().select_action(record.observation, legal)
             if alternative not in legal:
                 raise ValueError(f"{path}: teacher choice is illegal at {index}")
-            if alternative == record.selected_action:
+            disagreed = alternative != record.selected_action
+            audit_flags = audit_by_index.get(index, [])
+            if not disagreed and not audit_flags:
                 continue
-            disagreements += 1
+            disagreements += disagreed
             teacher_index = legal.index(alternative)
             margin = float(probabilities[policy_index] - probabilities[teacher_index])
             candidates.append({
@@ -202,7 +217,13 @@ def main() -> None:
                 "policy_probability": round(float(probabilities[policy_index]), 6),
                 "teacher_probability": round(float(probabilities[teacher_index]), 6),
                 "probability_margin": round(margin, 6),
-                "_fingerprint": disagreement_fingerprint(record, alternative),
+                "audit_flags": audit_flags,
+                "teacher_disagrees": disagreed,
+                "_fingerprint": (("audit", tuple(audit_flags),
+                                  record.selected_action.kind,
+                                  record.selected_action.parameters.get("code"))
+                                 if audit_flags else
+                                 disagreement_fingerprint(record, alternative)),
             })
         replay_report.append({"trajectory": str(path.resolve()),
                               "trajectory_sha256": source_hash,
@@ -227,7 +248,7 @@ def main() -> None:
               "purpose": "human_review_candidates_not_training_labels",
               "checkpoint_sha256": checkpoint_hash,
               "teacher": "TacticalHeuristicAgent_v14",
-              "selection": "greedy_model_probability_margin_distinct_prompt_max_per_replay",
+              "selection": "visible_audit_then_model_margin_distinct_prompt_max_per_replay",
               "replays": replay_report,
               "candidate_count": len(candidates),
               "selected": selected}
