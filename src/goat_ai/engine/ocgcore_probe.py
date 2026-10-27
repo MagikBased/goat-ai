@@ -470,6 +470,7 @@ class OcgcoreProbe:
             if not path.is_file():
                 self.errors.append(f"missing script: {relative}")
             return 0
+        relative_path = path.relative_to(self.scripts).as_posix()
         contents = path.read_bytes()
         if relative == Path("utility.lua"):
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_UTILITY_SHA256 \
@@ -485,7 +486,7 @@ class OcgcoreProbe:
             # remaining LP. The modern core's CheckLPCost permits equality.
             contents = contents.replace(GOAT_FIXED_LP_COST_OLD,
                                         GOAT_FIXED_LP_COST_HISTORICAL)
-        if path.relative_to(self.scripts) == Path("goat/c504700102.lua"):
+        if relative_path == "goat/c504700102.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RESTRICT_SHA256 \
                     or contents.count(GOAT_RESTRICT_EFFECT_MARKER) != 1 \
                     or contents.count(GOAT_RESTRICT_EQUIP_MARKER) != 1:
@@ -496,7 +497,7 @@ class OcgcoreProbe:
                         .replace(GOAT_RESTRICT_EQUIP_MARKER,
                                  GOAT_RESTRICT_HISTORICAL_EQUIP)
                         + GOAT_RESTRICT_DAMAGE_FUNCTIONS)
-        if path.relative_to(self.scripts) == Path("official/c55144522.lua"):
+        if relative_path == "official/c55144522.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_POT_SHA256 \
                     or contents.count(POT_DRAW_CHECK_OLD) != 1:
                 self.errors.append("pinned Pot script changed; GOAT overdraw patch not applied")
@@ -504,14 +505,14 @@ class OcgcoreProbe:
             # Keep draw-prohibition effects, but permit an attempted draw
             # beyond the Deck, which loses the duel under GOAT rules.
             contents = contents.replace(POT_DRAW_CHECK_OLD, POT_DRAW_CHECK_GOAT)
-        if path.relative_to(self.scripts) == Path("official/c79571449.lua"):
+        if relative_path == "official/c79571449.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_GRACEFUL_SHA256 \
                     or contents.count(GRACEFUL_DRAW_CHECK_OLD) != 1:
                 self.errors.append("pinned Graceful script changed; GOAT overdraw patch not applied")
                 return 0
             contents = contents.replace(GRACEFUL_DRAW_CHECK_OLD,
                                         GRACEFUL_DRAW_CHECK_GOAT)
-        if path.relative_to(self.scripts) == Path("official/c87621407.lua"):
+        if relative_path == "official/c87621407.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_DEKOICHI_SHA256 \
                     or contents.count(DEKOICHI_DRAW_OLD) != 1:
                 self.errors.append("pinned Dekoichi script changed; historical draw patch not applied")
@@ -520,27 +521,27 @@ class OcgcoreProbe:
             # when Dekoichi's Flip Effect enters the chain.
             contents = contents.replace(DEKOICHI_DRAW_OLD,
                                         DEKOICHI_DRAW_HISTORICAL)
-        if path.relative_to(self.scripts) == Path("official/c46411259.lua"):
+        if relative_path == "official/c46411259.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_METAMORPHOSIS_SHA256 \
                     or contents.count(METAMORPHOSIS_COST_FILTER_OLD) != 1:
                 self.errors.append("pinned Metamorphosis script changed; historical cost patch not applied")
                 return 0
             contents = contents.replace(METAMORPHOSIS_COST_FILTER_OLD,
                                         METAMORPHOSIS_COST_FILTER_GOAT)
-        if path.relative_to(self.scripts) == Path("official/c14087893.lua"):
+        if relative_path == "official/c14087893.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_BOOK_SHA256 \
                     or contents.count(BOOK_TARGET_OLD) != 1:
                 self.errors.append("pinned Book script changed; historical Desert target patch not applied")
                 return 0
             contents = contents.replace(BOOK_TARGET_OLD, BOOK_TARGET_HISTORICAL)
-        if path.relative_to(self.scripts) == Path("goat/c504700151.lua"):
+        if relative_path == "goat/c504700151.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_FIREBIRD_SHA256 \
                     or contents.count(FIREBIRD_BATTLE_CONDITION_OLD) != 1:
                 self.errors.append("pinned Firebird script changed; battle callback patch not applied")
                 return 0
             contents = contents.replace(FIREBIRD_BATTLE_CONDITION_OLD,
                                         FIREBIRD_BATTLE_CONDITION_FIXED)
-        if path.relative_to(self.scripts) == Path("goat/c504700158.lua"):
+        if relative_path == "goat/c504700158.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RIVALRY_SHA256 \
                     or contents.count(RIVALRY_ADJUST_OLD) != 1 \
                     or contents.count(RIVALRY_SEND_OLD) != 1:
@@ -552,7 +553,7 @@ class OcgcoreProbe:
             contents = (contents.replace(RIVALRY_ADJUST_OLD, RIVALRY_ADJUST_GUARDED)
                         .replace(RIVALRY_SEND_OLD, RIVALRY_SEND_GUARDED)
                         + RIVALRY_ADJUST_CONDITION)
-        if path.relative_to(self.scripts) == Path("pre-errata/c511000818.lua"):
+        if relative_path == "pre-errata/c511000818.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_SINISTER_SHA256 \
                     or contents.count(SINISTER_STANDBY_CONDITION_OLD) != 1:
                 self.errors.append("pinned pre-errata Serpent script changed; battle-negation patch not applied")
@@ -562,7 +563,7 @@ class OcgcoreProbe:
             # offers a futile optional return repeatedly in one Standby Phase.
             contents = contents.replace(SINISTER_STANDBY_CONDITION_OLD,
                                         SINISTER_STANDBY_CONDITION_HISTORICAL)
-        self.loaded_script_sha256[path.relative_to(self.scripts).as_posix()] = (
+        self.loaded_script_sha256[relative_path] = (
             hashlib.sha256(contents).hexdigest()
         )
         return self.lib.OCG_LoadScript(duel, contents, len(contents), name)
@@ -947,7 +948,9 @@ class OcgcoreProbe:
         if (self._pending_message is None and not terminal) or viewer not in (0, 1):
             raise RuntimeError("observation requires a pending decision and valid viewer")
         from goat_ai.engine.native_queries import (
-            MONSTER_FIELD_SLOTS, SPELL_FIELD_SLOTS, decode_field_summary,
+            MONSTER_FIELD_SLOTS,
+            SPELL_FIELD_SLOTS,
+            decode_field_summary,
             decode_life_points,
         )
 

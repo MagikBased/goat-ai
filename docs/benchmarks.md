@@ -359,3 +359,44 @@ PYTHONPATH=src:. .venv/bin/python scripts/benchmark_native_manifest_cache.py \
 The targeted fingerprint/native environment test run passed 5 tests. The
 Python suite passed 295 tests with 694 native-gated skips. The full native
 suite has not been rerun after this change.
+
+## Native script-path dispatch
+
+On 27 October 2026, a 30-reset profile of the experimental adapter found
+repeated `Path.relative_to()` calls in every native script load. The loader
+now computes that relative name once per script and uses it for the historical
+patch checks and loaded-script manifest. The SHA-guarded patch contents are
+unchanged.
+
+An AB/BA comparison used four complete RandomAgent duels per run, seeds
+15000–15003, control/Chaos probe decks, and one CPU thread on an Intel
+Core i7-10700K. The prior adapter source was commit `a4c12e9` (probe SHA-256
+`b834c4abbf496bc0c158f9d42e91f212a51262749162fc2295b2cfe0d75ab3bc`);
+the changed probe SHA-256 was
+`5b4c80de9b4d1e834bab263537dfa20f631db7bb8e4f36bbfdf50f5016cce1c6`.
+Every run completed the same **4,230 decisions** with identical per-game
+counts and winners.
+
+| Order | Prior total / reset | Changed total / reset |
+| :--- | ---: | ---: |
+| Prior, changed | 2.879 / 0.334 s | 2.820 / 0.219 s |
+| Changed, prior | 2.871 / 0.317 s | 2.769 / 0.217 s |
+
+The four-game reset subtotal improved **1.45–1.53×**; total duel wall time
+improved **1.02–1.04×** in these two runs. A complete 985-decision replay
+recorded under each source was byte-identical (9,678,584 bytes), and the
+changed-source replay passed native verification and the visibility audit.
+These are measured startup and complete-duel results for one deck pairing,
+not a measured self-play training gain. The ignored AB/BA report is
+`.cache/goat-ai/script_path_abba_15000.json` (SHA-256
+`e50260cc379cc56e1146d54387bda5211bbbc8a50a3bf98cf4d66c03724f5948`).
+The changed replay is `.cache/goat-ai/script_path_new_15000.json` (SHA-256
+`6b8b7d681f1a72db14fc8fa5d9ad4be802691965f4b44838b5f7488e07e69e84`).
+The related native script regressions passed **16 tests**.
+
+For a source-level comparison, check out `a4c12e9` in a separate worktree
+and run `scripts/benchmark_native.py` under each source tree with the same
+`--engine experimental --deck-a examples/decks/control_probe.ydk`
+`--deck-b examples/decks/chaos_probe.ydk --seed 15000 --games 4` arguments.
+The benchmark now reports per-game decision counts and the loaded probe
+source hash as well as total timing.

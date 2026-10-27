@@ -1,6 +1,7 @@
 """Measure complete duels through the real native adapter."""
 
 import argparse
+import inspect
 import json
 import platform
 import subprocess
@@ -9,6 +10,7 @@ from time import perf_counter
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.engine.ocgcore_probe import OcgcoreProbe
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay.fingerprint import sha256_file
@@ -53,6 +55,7 @@ def main() -> None:
     reset_seconds = 0.0
     decisions = 0
     results = []
+    decision_counts = []
     for game in range(args.games):
         seed = args.seed + game
         with GoatEnvironment(str(deck1), str(deck2), seed,
@@ -61,13 +64,14 @@ def main() -> None:
             observation = env.reset()
             reset_seconds += perf_counter() - before_reset
             agents = (RandomAgent(seed), RandomAgent(seed + 1))
-            for _ in range(args.max_decisions):
+            for game_decisions in range(1, args.max_decisions + 1):
                 action = agents[observation.acting_player].select_action(
                     observation, env.legal_actions())
                 observation = env.step(action)
                 decisions += 1
                 if env.is_terminal():
                     results.append(env.result())
+                    decision_counts.append(game_decisions)
                     break
             else:
                 raise RuntimeError(f"game seed {seed} exceeded {args.max_decisions} decisions")
@@ -86,11 +90,13 @@ def main() -> None:
         "elapsed_seconds": elapsed, "reset_seconds_total": reset_seconds,
         "reset_seconds_per_duel": reset_seconds / args.games,
         "duels_per_second": args.games / elapsed,
-        "decisions": decisions, "decisions_per_second": decisions / elapsed,
+        "decisions": decisions, "decision_counts": decision_counts,
+        "decisions_per_second": decisions / elapsed,
         "average_decisions_per_duel": decisions / args.games,
         "initial_peak_rss_kb": initial_peak_rss_kb,
         "peak_process_rss_kb": process_peak_rss_kb(),
         "winners": results,
+        "probe_source_sha256": sha256_file(Path(inspect.getsourcefile(OcgcoreProbe))),
     }, indent=2))
 
 

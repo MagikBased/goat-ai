@@ -1147,3 +1147,10 @@ same current-schema JSON bytes. Four-round serialization benchmarks on two
 native self-play replays showed 1.36–1.78× faster in-memory encoding, with
 no measured whole-training speedup yet. See
 [the serialization benchmark](evaluation.md#replay-serialization-cost-27-october-2026).
+
+Native script loading now computes each script's relative path once. A
+matched four-game AB/BA run showed a 1.45–1.53× reset-subtotal speedup and a
+1.02–1.04× complete-duel wall-time gain, with identical per-game decisions,
+winners, and one byte-identical replay across versions. This improves rollout
+startup without changing the historical Lua patches; see
+[the native benchmark](benchmarks.md#native-script-path-dispatch).
