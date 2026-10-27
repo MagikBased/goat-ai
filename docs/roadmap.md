@@ -136,6 +136,16 @@ not a full observation or historical ruling certificate; see
 
 ## M2 — Historical correctness gate
 
+A native-enabled local regression run on 2026-10-27 finished with 981 passed
+and one failed in 19 minutes 28 seconds. The sole failure was a schema-v6
+test projection carrying newer owner and pending-summon fields; the test
+projection was corrected, and pytest's last-failed rerun passed. The full
+suite was not repeated after that correction. The ignored original log is
+`.cache/goat-ai/native_full_20261027.log` (SHA-256
+`5e086b971939b30caf47247a4f8020117df1133f2a9f229176a91be2f323df3d`).
+This is regression coverage for the tested fixtures, not a blanket claim
+that every GOAT ruling is historical.
+
 Prioritize rulings by observed GOAT tournament play. The reproducible
 `python -m scripts.report_competitive_card_priorities --native-root .cache/goat-ai`
 report ranks cards in six sourced tournament Main Decks by deck presence and

@@ -194,12 +194,13 @@ def test_public_scapegoat_restriction_replays_in_new_and_old_schemas(
     def legacy_six_view(view):
         def old_cards(cards):
             return tuple(replace(card, attack=None, defense=None, counters=(),
-                                 equipped_to=None, race=None) for card in cards)
+                                 equipped_to=None, race=None, owner=None)
+                         for card in cards)
 
         return replace(
             view, restrictions=(), public_reveals=(), disabled_zones=(),
             private_reveals=(), own_main_deck=(), known_opponent_hand_cards=(),
-            pending_attack=None, turn_player=None,
+            pending_attack=None, pending_summon=None, turn_player=None,
             chain=tuple(replace(link, targets=()) for link in view.chain),
             hand=old_cards(view.hand), field=old_cards(view.field),
             own_extra_deck=old_cards(view.own_extra_deck),
