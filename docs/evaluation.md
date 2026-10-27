@@ -6640,3 +6640,46 @@ Use `scripts/evaluate_policy.py` with the two held-out pairings above,
 For the direct comparison use `--seed 17300` and `--opponent-checkpoint`
 pointing to the unchanged v23 parent. For the matched Tactical reports use
 `--seed 17308 --opponent tactical` with each checkpoint in turn.
+
+### Early visible-value signal audit (27 October 2026)
+
+The current synthetic-teacher and sparse-terminal-reward experiments have not
+produced a cross-deck strength gain. Before adding card-advantage reward
+shaping, `scripts/audit_visible_value_signals.py` measured two fixed,
+player-visible quantities at the **first learner Main Phase at or after turn
+four**, once per completed policy-versus-Tactical game. Card margin is own hand
+size minus opponent hand size plus the count of controlled field cards minus
+opposing field cards, excluding visible Sheep Tokens. LP margin is the same
+player's Life Point difference in thousands. The audit uses only the acting
+player's observation and compares each game's early value with its eventual
+binary win/loss; draws and games without the snapshot are excluded. Its AUC is
+pairwise win-versus-loss ranking accuracy, with 0.5 for ties.
+
+| Fresh source batch | Games sampled | Policy wins | Card margin AUC | LP margin AUC |
+| --- | ---: | ---: | ---: | ---: |
+| Seeds 10400–10407 | 32 | 8 | 0.771 | 0.365 |
+| Seeds 10408–10415 | 31 | 8 | 0.595 | 0.766 |
+
+Both batches use Jesse/Warrior and Return/Flip training-deck pairings, with
+both policy seats. One second-batch duel ended before the chosen snapshot.
+The reversal means this tiny retrospective sample does not support a fixed
+card-margin or LP-margin reward weight. Deck effects and later decisions can
+confound either metric; AUC here does not identify causal action value. This
+does not refute the user's card-advantage insight, but it is insufficient to
+alter the terminal-win objective. Future value experiments need broader deck
+families, calibration on held-out games, and competitive comparisons.
+
+Reproduce the ignored reports from the 64 replay-verified source duels:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_visible_value_signals.py \
+  .cache/goat-ai/on_policy_teacher_10400_10407 \
+  --output .cache/goat-ai/value_signals_10400_10407.json
+PYTHONPATH=src:. .venv/bin/python scripts/audit_visible_value_signals.py \
+  .cache/goat-ai/on_policy_teacher_10408_10415 \
+  --output .cache/goat-ai/value_signals_10408_10415.json
+```
+
+The report SHA-256 values are
+`ce5fb3f58da74e8c75026a3566dabe99d87117f787a8da5ca0c463735f8ef7e0` and `64baf655633de5aa942388333adde697333d3c5b4c8592c22af7b616a6b6612e`, respectively; each report binds the
+individual source replay hashes and sampled snapshot turns.
