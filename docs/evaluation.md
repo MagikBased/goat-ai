@@ -7432,6 +7432,38 @@ Use the command above with `--repeat-seeds` and a distinct output directory.
 This tests determinism for these seeds, decks, and RandomAgent; it is not a
 proof that every possible GOAT duel is deterministic or historically correct.
 
+### Native field-summary query check (27 October 2026)
+
+The field-summary observation path was already enabled. An AB/BA run compared
+it with the full-query reference on three complete control/Chaos probe duels
+per arm, seeds 12000–12002, with `RandomAgent` on both sides. Each arm made
+**2,671 decisions**; both rounds had exactly matching complete trajectories,
+and the benchmark replay-verified **5,342 optimized-arm decisions**. The
+optimized path used **21,310** native location queries instead of **26,740**
+(20.3% fewer). On the Intel Core i7-10700K, Linux 6.8.0 x86_64, with
+`OMP_NUM_THREADS=1`, CPU time was **2.036 vs 1.900 seconds** in
+reference-first order and
+**1.923 vs 1.780 seconds** in optimized-first order: **1.072× and 1.080×**
+for these duels. Peak process RSS was **123,332 KiB**. This measures a native
+observation path in random play, not full neural training or a strength gain.
+
+The ignored report is
+`.cache/goat-ai/native_field_summary_20261027.json`, recorded from commit
+`7743836` with a clean worktree; it includes core, deck, and source hashes.
+Reproduce it after [native setup](native_setup.md) with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/benchmark_native_field_summary.py --games 3 --rounds 2 --seed 12000
+```
+
+The previously profiled neural duel spent about half its profiler-accounted
+time building observations, while this narrow query reduction yielded only a
+single-digit whole-duel speedup. Further observation changes should first
+measure full training wall time and preserve exact trajectories and the
+visibility audit. Feature encoding and replay verification are separate
+candidates to profile before changing their semantics.
+
 ### Frozen-rollout baseline ablation (27 October 2026)
 
 The existing four-duel PPO rollout freezes policy weights but, in its default
