@@ -560,3 +560,44 @@ it, whereas passing leaves those monsters in the Graveyard. Both complete
 duels replay-verify and pass the visibility audit. The sweep detects adapter
 failures and decision exposure for its deck schedule. It does not establish
 historical correctness, metagame play rates, or agent strength.
+
+## Mixed-deck legal-choice visibility sweep
+
+`scripts/probe_random_decks.py --verify-replays` now audits recorded
+legal-choice payloads after replay verification. On seeds 13000–13031, 32
+independently generated legal deck pairs drawn from the six tournament Main
+Decks all reached terminal in **30,450 verified decisions**. The visibility
+audit covered all 32 duels, including 1,630 opposing field choices (383
+face-down) and 179 opposing hand choices, without a violation. Its ignored
+report is `.cache/goat-ai/tournament_mix_probe_13000_13031_audit/report.json`
+(SHA-256 `42b3be7d3edb6cbc31828b64ee991d34974bfe806c059bf33912bc042`).
+Rerunning the same 32 seeds against the same pinned assets reproduced that
+report's exact SHA-256.
+
+On separate seeds 13100–13131, 32 pairs generated from the full pinned
+GOAT whitelist also all reached terminal. Their **33,994 decisions**
+replay-verified and passed the legal-choice audit, which examined 1,645
+opposing field choices (382 face-down) and four opposing hand choices. That
+run offered additional native choices including card, number, Attribute,
+and Race announcements, multiple-zone selection, card ordering, and
+multi-card Tributes. Its ignored report is
+`.cache/goat-ai/whitelist_probe_13100_13131_audit/report.json` (SHA-256
+`8b0478bc1b4ec99ba0898ccb830961d327a4d8032861177f252225d3ad6c6de2`).
+
+Reproduce the two schedules after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/probe_random_decks.py \
+  --card-pool tournament --distinct-opponents --verify-replays \
+  --seed 13000 --seeds 32 --max-decisions 3000 \
+  --output .cache/goat-ai/tournament_mix_probe_13000_13031_audit
+OMP_NUM_THREADS=1 PYTHONPATH=src:. python scripts/probe_random_decks.py \
+  --card-pool whitelist --distinct-opponents --verify-replays \
+  --seed 13100 --seeds 32 --max-decisions 3000 \
+  --output .cache/goat-ai/whitelist_probe_13100_13131_audit
+```
+
+The audit checks legal-choice references against recorded player-visible
+field slots and known opponent hand cards. It does not prove that every
+observation field is hidden-information-safe, that all GOAT cards resolve,
+or that randomly assembled decks play strategically.

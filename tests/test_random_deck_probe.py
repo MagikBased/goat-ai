@@ -34,6 +34,8 @@ def test_tournament_mix_is_legal_and_replay_verifies(tmp_path):
         "verified_games": 1,
         "verified_decisions": report["games"][0]["decisions"],
     }
+    assert report["visibility_audit"]["audited_games"] == 1
+    assert report["visibility_audit"]["decisions"] == report["games"][0]["decisions"]
     assert report["games"][0]["terminal"]
     assert report["games"][0]["error"] is None
 
@@ -51,6 +53,8 @@ def test_distinct_tournament_mixes_replay_verify(tmp_path):
     assert Path(game["deck"]).is_file() and Path(game["opponent_deck"]).is_file()
     assert game["terminal"] and game["error"] is None
     assert game["replay_verified_decisions"] == game["decisions"]
+    assert report["visibility_audit"]["audited_games"] == 1
+    assert report["visibility_audit"]["decisions"] == game["decisions"]
     assert report["card_actions"]
     assert all(row["selected_decisions"] <= row["offered_decisions"]
                for row in report["card_actions"])

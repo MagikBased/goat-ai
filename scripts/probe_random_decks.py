@@ -13,12 +13,16 @@ from pathlib import Path
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.decks import (
-    Decklist, read_goat_whitelist, read_ydk, validate_goat_deck,
+    Decklist,
+    read_goat_whitelist,
+    read_ydk,
+    validate_goat_deck,
 )
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.card_actions import count_chain_response, count_source_actions
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 
@@ -106,6 +110,8 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
     offered: Counter[tuple[int, str]] = Counter()
     selected: Counter[tuple[int, str]] = Counter()
     responses: Counter[tuple[int, int]] = Counter()
+    visibility_counts: Counter[str] = Counter()
+    visibility_games = 0
     loaded_assets: dict[str, str] = {}
     rules_profile = None
     for seed in range(first_seed, first_seed + seeds):
@@ -137,6 +143,9 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
                             if trajectory is not None and verify_replays else None)
                 if verified is not None and verified != decisions:
                     raise RuntimeError("replay verifier returned a partial decision count")
+                if verified is not None:
+                    visibility_counts.update(audit_trajectory_visibility(trajectory))
+                    visibility_games += 1
                 if trajectory is not None and (card_pool == "tournament"
                                                or verify_replays):
                     if rules_profile is None:
@@ -197,6 +206,10 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
                                   for game in games),
             "verified_decisions": sum(game["replay_verified_decisions"] or 0
                                       for game in games),
+        }
+        report["visibility_audit"] = {
+            "audited_games": visibility_games,
+            **dict(sorted(visibility_counts.items())),
         }
     if count_card_actions:
         report["card_actions"] = [

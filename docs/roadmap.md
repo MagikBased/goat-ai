@@ -127,6 +127,13 @@ certificate for arbitrary decks. Focused native fixtures verify the
 declaration catalogs against two hidden opponent Decks and the Spy reveal
 boundary; see [GOAT rules](goat_rules.md).
 
+A new 32-pair tournament-card mix and 32-pair full-whitelist mix each used
+independent legal decks for both players. All **64** duels reached terminal,
+and all **64,444** decisions replay-verified and passed the legal-choice
+visibility audit. These are broader protocol and selection-boundary checks,
+not a full observation or historical ruling certificate; see
+[the action-coverage report](competitive_action_coverage.md).
+
 ## M2 — Historical correctness gate
 
 Prioritize rulings by observed GOAT tournament play. The reproducible
