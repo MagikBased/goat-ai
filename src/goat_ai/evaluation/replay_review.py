@@ -127,13 +127,22 @@ def review_candidates(trajectory: Trajectory,
                 and any(_is_action(a, "activate", THUNDER_DRAGON)
                         for a in record.legal_actions)):
             found.append(("pot_before_available_thunder_dragon", {"thunder_offered": 1}))
+        initial_thunder = obs.own_main_deck.count(THUNDER_DRAGON)
+        known_thunder_outside_deck = (
+            sum(card.code == THUNDER_DRAGON for card in obs.hand)
+            + sum(card.code == THUNDER_DRAGON for card in obs.graveyards[seat])
+            + sum(card.code == THUNDER_DRAGON for card in obs.banished[seat])
+            + sum(card.code == THUNDER_DRAGON and card.owner == seat
+                  for card in obs.field)
+        )
         if (selected.kind == "end_phase" and obs.phase in ("main1", "main2")
                 and obs.turn_player == seat
+                and initial_thunder > known_thunder_outside_deck
                 and any(_is_action(a, "activate", THUNDER_DRAGON)
                         for a in record.legal_actions)):
             found.append(("end_turn_with_activatable_thunder_dragon", {
                 "thunder_in_hand": sum(card.code == THUNDER_DRAGON for card in obs.hand),
-                "initial_thunder_copies": obs.own_main_deck.count(THUNDER_DRAGON),
+                "initial_thunder_copies": initial_thunder,
             }))
         if (selected.kind == "select_cards" and not selected.parameters.get("cards")
                 and obs.chain and obs.chain[-1].card_code == THUNDER_DRAGON

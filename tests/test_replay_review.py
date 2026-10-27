@@ -268,6 +268,17 @@ def test_shortlist_flags_unused_activatable_thunder_only_at_own_turn_end():
     assert review_candidates(policy(record(own, battle, available))) == ()
     assert review_candidates(policy(record(replace(own, turn_player=1), end,
                                            available))) == ()
+    grave_card = CardView(0, "graveyard", "faceup", thunder)
+    banished_card = CardView(0, "banished", "faceup", thunder)
+    exhausted = replace(own, graveyards=((grave_card, grave_card), ()))
+    assert review_candidates(policy(record(exhausted, end, available))) == ()
+    banished = replace(own, graveyards=((grave_card,), ()),
+                       banished=((banished_card,), ()))
+    assert review_candidates(policy(record(banished, end, available))) == ()
+    one_left = replace(own, graveyards=((grave_card,), ()))
+    assert [item.category for item in review_candidates(
+        policy(record(one_left, end, available)))] == [
+            "end_turn_with_activatable_thunder_dragon"]
 
 
 def test_opponent_review_keeps_bls_and_solemn_findings_separate():

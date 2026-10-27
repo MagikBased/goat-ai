@@ -6,11 +6,11 @@ The unchanged current-core feature-v23 checkpoint was audited on all 64
 fixed-policy Tactical-v14 duels from seeds 44000–44015, covering 31,729
 native-replay-verified and visibility-audited decisions. Its greedy choices
 were reproduced on all 15,704 policy-seat decisions. The conservative
-visible-state audit returned 58 prompts, not 58 proven mistakes:
+visible-state audit returned 56 prompts, not 56 proven mistakes:
 
 | Prompt | Occurrences | Distinct duels |
 | --- | ---: | ---: |
-| End turn with Thunder Dragon activatable | 34 | 11 |
+| End turn with Thunder Dragon activatable while a copy may remain in Deck | 32 | 11 |
 | Nobleman with only an own Set monster | 9 | 7 |
 | Metamorphosis spends a weak Flip monster on an empty opposing field | 3 | 3 |
 | Heavy Storm with a negative visible backrow trade | 3 | 3 |
@@ -19,17 +19,21 @@ visible-state audit returned 58 prompts, not 58 proven mistakes:
 | Four other categories | 4 | 4 |
 
 The Thunder Dragon prompts all came from the same matchup and policy seat,
-so they should be reviewed as a repeated local choice rather than 34
-independent deck-family failures. The Nobleman prompts span both matchups and
+so they should be reviewed as a repeated local choice rather than 32
+independent deck-family failures. Two additional passes with all three copies
+visibly outside the Deck were removed from this category: the [historical GOAT
+ruling](https://www.goatformat.com/basics.html) still permits activation to
+find zero, but passing there is not itself suspicious. The Nobleman prompts
+span both matchups and
 both seats. The [full-corpus review queue](../replays/review_fixed_policy_44000_full/queue.html)
 links 32 varied frames from 22 complete duel viewers, including eight
 distinct flagged categories. It is an ignored local review artifact; no
 suggestion is a training label until a person authorizes and validates it.
 
 The ignored audit JSON SHA-256 is
-`cce61d33a85e7acfd4c12a2acfa0d7a78a633475085a34d171c9f0302dcc08e8`;
+`3f5a9f6104d5bd9ecd73a1ee9fe8f301da78c71a010430edfa964849db235163`;
 the full-corpus queue JSON SHA-256 is
-`4e411dd1a0043e3deeea3951d05191a74e11fb0deb9d443066240b63bd83c94b`.
+`1b0045756863fa62dd1c5b391dda0b5f54caabb2975dfdbcff831736a9d485ca`.
 Reproduce after [native setup](native_setup.md):
 
 ```bash
@@ -55,7 +59,7 @@ fixed-policy corpus. Collection and shortlisting independently native-replayed
 and visibility-audited all **7,830 decisions** in this subset; the shortlister
 also reproduced every policy-seat choice from the saved checkpoint. The
 [offline review index](../replays/review_fixed_policy_44000/queue.html) selects
-**20 frames** from 410 candidates and links to 11 complete duel viewers.
+**20 frames** from 409 candidates and links to 11 complete duel viewers.
 All linked viewer files exist. None of these prompts has been used as a
 training label.
 
@@ -73,7 +77,7 @@ child's future unseen-deck evaluation.
 The ignored 64-game collection manifest SHA-256 is
 `93c2f2f5f768b912b76d9033408f833a1eef972a6d1371021f6a3287b72fffa6`;
 the 16-game review queue JSON SHA-256 is
-`5815ef1b6677d9f8ec14ef07641ac59613e50a0368e9c42ea3c233c6ed45aef5`.
+`ec46f84606f9cfb2a158ee849e51e836929462979b74cf835cad6784903db3c5`.
 The review index is an ignored local artifact. Reproduce the queue after the
 [fixed-policy collection](evaluation.md#fixed-policy-visible-state-critic-check-27-october-2026)
 with:
