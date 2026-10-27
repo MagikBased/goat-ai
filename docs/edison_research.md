@@ -288,6 +288,29 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_historical_exiled_torrential.py
 ```
 
+## Same-time trigger ordering
+
+The [2009 official rulebook's simultaneous-effects section](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
+states that the turn player builds a chain from their own simultaneous
+Spell Speed 1 effects and chooses their order when they control more than one.
+The existing GOAT Desert Sunlight fixture now has a separate MR1 branch using
+ordinary Dekoichi and Gravekeeper's Spy IDs and pinned official scripts. Desert
+Sunlight flips both Set monsters at once. In either branch the controller is
+offered both mandatory Flip Effects as Chain Link 1, selects one, and the other
+becomes Chain Link 2. Both selected orders draw with Dekoichi and recruit with
+Spy, reach terminal, replay-verify, and pass the visibility audit. The MR1
+branch uses unmodified upstream utility and ordinary card scripts; the GOAT
+branch retains its separate historically patched scripts.
+
+This verifies a concrete same-controller trigger choice, including the issue
+of owner-selected chain order. Cross-controller triggers, optional effects,
+and historical card-text changes still need independent Edison checks. Run:
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_historical_same_time_trigger_choice.py
+```
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including

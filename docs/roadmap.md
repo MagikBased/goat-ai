@@ -1020,6 +1020,10 @@ The existing Exiled Force/Torrential Tribute summon-priority fixture now also
 runs in the MR1 protocol, with both chain and pass branches replay-verified and
 visibility-audited. It checks one rulebook-backed priority interaction while
 leaving the complete historical Edison rules profile open.
+An MR1 Desert Sunlight fixture now checks both owner-selected chain orders for
+simultaneous Dekoichi and Gravekeeper's Spy Flip Effects. Both full duels
+replay-verify and pass visibility checks under the pinned MR1 mode, advancing
+one contemporary rulebook timing case without validating the full format.
 An independent 2009 deck-construction validator now accepts an explicitly
 audited eligible-card set and checks Main, Extra, and Side sizes, Fusion/Synchro
 placement, and shared canonical copy caps. It deliberately does not infer

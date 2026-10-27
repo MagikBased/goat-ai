@@ -41,6 +41,9 @@ MR1_SYNCHRO_CARDS = frozenset({
     44095762,  # Mirror Force
     74131780,  # Exiled Force
     53582587,  # Torrential Tribute
+    87621407,  # Dekoichi the Battlechanted Locomotive
+    24317029,  # Gravekeeper's Spy
+    93747864,  # Desert Sunlight
 })
 MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094})
 UPSTREAM_UTILITY_SHA256 = "59ebe317dbec0ef5134f485f039bbe0cee031aa68e6d0ac028123a318ee2cd2a"
@@ -720,7 +723,7 @@ class OcgcoreProbe:
                 row = self._card_row(code, "type")
                 if row is None or (row[0] != 17 and not (
                         self.mode == "mr1_synchro_probe"
-                        and code in (63977008, 44095762, 74131780, 53582587))):
+                        and code in MR1_SYNCHRO_CARDS)):
                     raise ValueError("MR1 startup probe requires normal monsters only")
         self._initial_main_decks = (tuple(sorted(deck)),
                                     tuple(sorted(opponent_deck if opponent_deck is not None
