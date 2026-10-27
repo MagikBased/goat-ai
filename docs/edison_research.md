@@ -4,6 +4,35 @@ Edison is a future, separate rules profile. The current GOAT adapter must reject
 an Edison request; a March 2010 list cannot make its 2005 card scripts and rules
 historically correct for 2010.
 
+## Regional scope of the historical target
+
+The intended historical Edison profile is **North American TCG play in April
+2010**. This is a project scope decision; it does not turn a general TCG card
+database into a North American tournament whitelist. The [North America Time
+Travel FAQ](https://www.yugioh-card.com/en/play/alternate_format_tournaments/time-travel/)
+uses April 20, 2010 and *Duelist Pack: Kaiba* as one period example, but that
+modern event format uses current card text and mechanics. The historical
+profile pursued here remains separate.
+
+[Konami's February 2010 European tournament policy](https://www.etcg.de/uploads/pdf/KDE_YuGiOh_Policy.pdf)
+says set and promotional-card legality depends on the territory of official
+release, including magazine promos. This is contemporary policy evidence for
+the regional distinction, although its governing organization and events are
+European. The [current Konami Europe card-legality page](https://www.yugioh-card.com/eu/play/card-legality/)
+still lists Yu-Jo Friendship (`81332143`, `JUMP-EN007`) as unavailable for
+European tournament play. Its [official card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5754&ope=2)
+shows a 2006 promotional printing. Therefore a bare first-print date cannot
+adjudicate this card across TCG territories. Its North American status at the
+Edison cutoff still needs a territory-specific source check.
+
+Another API-only candidate, Restructer Revolution (`99518961`), has a
+[documented 2005 English TCG printing](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4871&ope=2&request_locale=en)
+and no March 2010 restriction in the official list. Its omission from the
+community candidate is unresolved; the printing date alone is not enough to
+certify North American event eligibility. These examples make regional
+provenance a required release-pool gate, alongside first-print date, set
+distribution, copy limits, and historical rulings.
+
 ## Verified format boundary
 
 [Konami's Time Travel FAQ](https://www.yugioh-card.com/en/play/alternate_format_tournaments/time-travel/)
@@ -61,8 +90,10 @@ had SHA-256 `962293dea8bfcd25ead0712d51b52515ac30efa28b2b6fb40f8c1dcc80d87482`.
 `scripts/compare_edison_pool_candidates.py` compares the two candidate ID
 sets, resolves alternate-print aliases through the pinned database, checks
 the March 2010 Forbidden list, and writes a machine-readable disagreement
-report. The cached comparison found 3,702 canonical IDs in the date-filtered
-response and 3,624 in the community CSV, with 3,622 shared. Of 80 API-only
+report. Its `jurisdiction_status` explicitly remains
+`not_established_by_candidate_sources`. The cached comparison found 3,702
+canonical IDs in the date-filtered response and 3,624 in the community CSV,
+with 3,622 shared. Of 80 API-only
 canonical IDs, 43 are Forbidden, two are tokens, one lacks pinned metadata,
 and **34 still need individual release and eligibility checks**. The
 missing-metadata ID `149694341` is an API "???" placeholder rather than an
@@ -81,7 +112,7 @@ has been selected.
 
 The ignored report is
 `.cache/goat-ai/edison_pool_candidate_comparison_20261027.json` (SHA-256
-`6fe8b46bcc46d873896be9916168f13f2288c9844542575d4d7b56a57efbf490`).
+`5a0d5f4af413ef35141dd4e1361dd0d24dea896d88ed77aee5f7e402a044eab6`).
 Reproduce it with locally cached sources:
 
 ```sh

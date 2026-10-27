@@ -73,6 +73,7 @@ def compare(api_json: Path, community_csv: Path, database: Path,
                             - set(missing_metadata_ids))
     return {
         "purpose": "candidate_disagreement_not_edison_legality",
+        "jurisdiction_status": "not_established_by_candidate_sources",
         "api_response_sha256": sha256_file(api_json),
         "community_csv_sha256": sha256_file(community_csv),
         "database_sha256": sha256_file(database),

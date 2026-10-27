@@ -25,6 +25,7 @@ def test_candidate_comparison_resolves_aliases_and_exposes_disagreements(tmp_pat
 
     report = compare(api, community, database, restrictions)
     assert report["purpose"] == "candidate_disagreement_not_edison_legality"
+    assert report["jurisdiction_status"] == "not_established_by_candidate_sources"
     assert (report["api_canonical_ids"], report["community_canonical_ids"],
             report["shared_canonical_ids"]) == (5, 3, 1)
     assert report["api_ids_missing_database"] == [7]

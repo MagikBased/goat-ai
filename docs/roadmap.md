@@ -1107,6 +1107,11 @@ The [Edison feasibility audit](edison_research.md) records the official March
 2010 Advanced Format restrictions as a checked data asset and lists the
 remaining card-pool, native-rule, and observation validation gates. This is
 M5 preparation; Edison duels are not yet supported.
+The historical Edison target is now explicitly North American TCG play;
+contemporary Konami policy makes promotional-card legality region-dependent.
+The two external candidate pools do not establish regional eligibility, and
+their differences must be adjudicated before a complete release whitelist can
+be used. See [the regional scope audit](edison_research.md#regional-scope-of-the-historical-target).
 The MR1 Synchro probe now applies a checksum-guarded in-memory correction for
 Goyo Guardian's period generic-Tuner material text. Paired seed-5 duels use a
 non-EARTH Tuner, accept or decline its battle recruitment effect, reach
