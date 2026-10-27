@@ -299,6 +299,17 @@ def review_candidates(trajectory: Trajectory,
                                   {"safe_enemy_targets": safe_enemy_targets}))
         if (selected.kind == "select_card" and obs.chain
                 and obs.chain[-1].controller == seat
+                and obs.chain[-1].card_code == BREAKER_THE_MAGICAL_WARRIOR
+                and selected.parameters.get("controller") == seat
+                and selected.parameters.get("location") == 8
+                and enemy_backrow == 0
+                and any(card.controller == seat and card.zone == "spell_trap"
+                        and card.sequence == selected.parameters.get("sequence")
+                        for card in obs.field)):
+            found.append(("breaker_targets_only_own_backrow",
+                          {"own_backrow": own_backrow, "enemy_backrow": 0}))
+        if (selected.kind == "select_card" and obs.chain
+                and obs.chain[-1].controller == seat
                 and obs.chain[-1].card_code in (MYSTICAL_SPACE_TYPHOON, RAIGEKI_BREAK)
                 and selected.parameters.get("location") == 8):
             target = next((link for link in obs.chain[:-1]

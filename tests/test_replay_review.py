@@ -614,6 +614,25 @@ def test_selfplay_shortlist_uses_learner_seat_and_flags_breaker_target():
         (1, "breaker_targets_own_card_with_enemy_option")]
 
 
+def test_breaker_own_only_backrow_prompt_uses_visible_target_and_field():
+    breaker = 71413901
+    own_set = CardView(0, "spell_trap", "facedown", 64697231, 2)
+    obs = replace(view(own_set), chain=(ChainLinkView(1, breaker, 0, 4, 0),))
+    own_target = Action("own", "select_card", 0,
+                        {"code": 64697231, "controller": 0,
+                         "location": 8, "sequence": 2})
+    saved = policy(record(obs, own_target))
+    found = review_candidates(saved)
+    assert [(c.viewer_frame, c.category, c.evidence) for c in found] == [
+        (1, "breaker_targets_only_own_backrow",
+         {"own_backrow": 1, "enemy_backrow": 0})]
+    no_field_target = replace(obs, field=())
+    assert not review_candidates(policy(record(no_field_target, own_target)))
+    with_enemy = replace(obs, field=(own_set, CardView(
+        1, "spell_trap", "facedown", None, 3)))
+    assert not review_candidates(policy(record(with_enemy, own_target)))
+
+
 def test_selfplay_shortlist_requires_learner_seat():
     saved = replace(policy(record(view(), Action("pass", "pass", 0))),
                     source="self_play_rl", skill_metadata={"demonstrator_seat": 0})

@@ -1,5 +1,23 @@
 # Early replay decision audit
 
+## Breaker targeting only friendly backrow (27 October 2026)
+
+The visible-state audit now prompts review when Breaker the Magical Warrior
+selects its controller's Spell/Trap card while the opponent has no backrow.
+The prompt checks the public Breaker chain link and an actual friendly field
+slot, so a hidden card identity is not needed to raise it. Destroying one's
+own card can sometimes be purposeful; this is a review prompt, not a
+correct-play label.
+
+Scanning the 16 stored Tactical-v8 through v14 seed-6803 trajectories finds
+two examples: v8 seat-0 frame 104 targets its own Set Heavy Storm, and v9
+seat-0 frame 112 targets a friendly Spell/Trap slot. These older trajectories
+were not native replay-verified against the current pinned assets in this
+scan. The same scanner found **zero** such prompts among 31,729 decisions in
+the 64-duel current-core fixed-policy corpus, which had separately passed
+native replay verification and visibility auditing. This is an absence in
+that particular corpus, not evidence that the policy never makes the play.
+
 ## Resolving one-shot Spell/Trap removal prompt (27 October 2026)
 
 The player-visible audit now flags Mystical Space Typhoon or Raigeki Break
