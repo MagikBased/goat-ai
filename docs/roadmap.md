@@ -1420,6 +1420,9 @@ all replay bytes and policy tensors identical while reducing complete reported
 training time by about 2% and increasing observed peak RSS by 3,604 KiB. This
 is a modest local saving, not a change to the default or evidence of stronger
 play; see [the benchmark](benchmarks.md#reusing-visible-ppo-features-from-rollout-27-october-2026).
+An eight-game repeat found no clear whole-trainer speed gain despite identical
+replays and model tensors, so feature reuse remains lower priority than the
+observation and inference paths; see [the repeat](evaluation.md#ppo-rollout-feature-reuse-check-27-october-2026).
 
 A separate four-duel PPO profile on sourced decks found native observation
 construction, policy forward calls, and visible feature encoding to be the

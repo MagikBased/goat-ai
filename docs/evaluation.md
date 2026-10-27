@@ -7600,6 +7600,47 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python -m cProfile \
 Use a distinct output and replay directory for each repeat. This profile is
 diagnostic only; the four-game outcomes do not establish policy strength.
 
+### PPO rollout feature-reuse check (27 October 2026)
+
+The opt-in `--reuse-rollout-features` retains each learner feature tensor from
+sampling and passes it to the PPO update, avoiding a second feature encode.
+We compared that path with the ordinary re-encode path on eight Jesse Goat
+Control versus Warrior duels, seeds 26000–26007, from the unchanged feature-v23
+reference. Both used one process, two four-duel PPO rollouts, two update epochs,
+minibatch 16, a 3,000-decision cap, and `OMP_NUM_THREADS=1`. The execution
+order was ordinary, reuse, reuse, ordinary. CLI-reported wall times were
+**7.318 and 7.202 seconds** for ordinary encoding and **7.166 and 7.214
+seconds** for reuse. This small difference is within the variation of these
+short runs; it does not establish a useful training-speed gain.
+
+Every arm completed the same eight terminal games with **4,848 total decisions**
+and **833 multi-option learner decisions**. All corresponding trajectory JSON
+files were byte-identical across arms, and all final model tensors were
+bit-identical. One eight-game arm passed full native replay verification and
+the player-visibility audit for all 4,848 decisions. The retained feature
+tensors add memory cost, which was not measured here. Keep reuse opt-in until
+a longer, representative schedule shows a worthwhile wall-time gain.
+
+The ignored outputs are `.cache/goat-ai/reuse_bench_{off_a,on_a,on_b,off_b}_26000.pt`
+with JSON reports for all except the first ordinary arm, and
+`.cache/goat-ai/reuse_bench_on_a_26000_audit.json`. Reproduce an arm after
+[native setup](native_setup.md) with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --seed 26000 --games 8 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 \
+  --ppo-epochs 2 --ppo-batch-size 16 --snapshot-every 4 \
+  --reuse-rollout-features --output .cache/goat-ai/reuse_bench_on_a_26000.pt
+```
+
+Omit `--reuse-rollout-features` for the ordinary path and use a separate
+output name for each run. Replay directories default beside each checkpoint.
+
 ### PPO rollout execution comparison (27 October 2026)
 
 The same unchanged feature-v23 parent played Jesse Goat Control versus
