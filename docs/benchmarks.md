@@ -1,5 +1,38 @@
 # Native benchmark log
 
+## Reused opponent statistics in policy encoding (27 October 2026)
+
+Feature-v23 encoding now computes visible opposing monster statistics once per
+decision, rather than once for every legal action, and looks up action-kind
+indices through a local map. It does not alter the observation or action
+contract. On 615 multi-action decisions from the seed-18200 recorded replay,
+the baseline and candidate produced the same combined feature SHA-256
+`b6dfed5b4f8da6dab29d0f26ccd5bfd50d6c580caf9476f0b03d9a63c228b83e`.
+Eight encoding passes per arm, excluding the first warm-up pass, measured
+median times of **166.984/164.990 ms** and **168.316/162.489 ms** in
+baseline/candidate and candidate/baseline order respectively.
+
+A complete one-duel REINFORCE comparison used the same feature-v23 checkpoint,
+control/Chaos probe decks, seed 18240, one Torch CPU thread, and update batch
+size 16. The candidate/baseline and baseline/candidate training times reported
+by the CLI were **2.251/2.286 s** and **2.232/2.273 s**. Every run completed
+1,178 decisions, wrote byte-identical trajectory JSON (SHA-256
+`d2073f4c5e955cfb9379b124f7cb9a42dd1687f1f34872a2f033306b307ef4c7`),
+and produced identical model tensors. The candidate replay passed full native
+verification and the visibility audit. This is a small measured improvement on
+one seed and CPU, with no evidence of improved playing strength. Ignored logs,
+checkpoints, and replays have the `encode_{baseline,candidate}_{a,b}_18240`
+prefix under `.cache/goat-ai/`. Reproduce a training arm against the matching
+source revision with a fresh output path:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v6_current_assets.pt \
+  --output .cache/goat-ai/encode_example_18240.pt --engine experimental \
+  --matchup examples/decks/control_probe.ydk examples/decks/chaos_probe.ydk \
+  --seed 18240 --games 1 --max-decisions 3000 --reinforce-batch-size 16
+```
+
 ## Fixed zone and position lookup in policy encoding (27 October 2026)
 
 Policy feature encoding now looks up the seven fixed zones and three fixed

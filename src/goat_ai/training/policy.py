@@ -259,6 +259,16 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                           if card.zone == "monster" and card.controller == own}
     opponent_monsters = tuple(card for card in observation.field
                               if card.zone == "monster" and card.controller == opponent)
+    if feature_version >= 16:
+        opposing_stats = tuple(card.attack if card.orientation == "attack"
+                               else card.defense for card in opponent_monsters)
+        fully_visible = all(card.position == "faceup" and stat is not None
+                            for card, stat in zip(opponent_monsters, opposing_stats,
+                                                  strict=True))
+    if feature_version >= 23:
+        visible_enemy_stats = tuple(
+            stat for card, stat in zip(opponent_monsters, opposing_stats, strict=True)
+            if card.position == "faceup" and stat is not None)
     if feature_version >= 22:
         own_gy_spells = sum(bool(vocabulary.properties(card.code)[0] & SPELL_TYPE)
                             for card in observation.graveyards[own])
@@ -273,6 +283,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         kinds += ANNOUNCE_ACTION_KINDS
     if feature_version >= 7:
         kinds += SORT_ACTION_KINDS
+    kind_ids = {kind: index + 1 for index, kind in enumerate(kinds)}
 
     def field_slot(params: dict) -> tuple[int, int, int]:
         location = params.get("location")
@@ -286,8 +297,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
 
     for action in legal_actions:
         params = action.parameters
-        kind_indices.append(kinds.index(action.kind) + 1
-                            if action.kind in kinds else 0)
+        kind_indices.append(kind_ids.get(action.kind, 0))
         card_indices.append(vocabulary.index(visible_code(
             params.get("code"), params.get("controller"), params.get("location"),
             params.get("sequence"))))
@@ -330,12 +340,6 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
             attacker = own_field_monsters.get((action.actor, params.get("sequence"))) \
                 if action.kind == "attack" else None
             attack = attacker.attack if attacker is not None else None
-            fully_visible = all(card.position == "faceup"
-                                and (card.attack if card.orientation == "attack"
-                                     else card.defense) is not None
-                                for card in opponent_monsters)
-            opposing_stats = tuple(card.attack if card.orientation == "attack"
-                                   else card.defense for card in opponent_monsters)
             margin = (attack - min(opposing_stats)
                       if attack is not None and opposing_stats and fully_visible else 0)
             numeric += (attack / 8000 if attack is not None else 0.0,
@@ -388,11 +392,6 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         if feature_version >= 23:
             moved = (own_field_monsters.get((own, params.get("sequence")))
                      if action.kind == "change_position" else None)
-            visible_enemy_stats = tuple(
-                (card.attack if card.orientation == "attack" else card.defense)
-                for card in opponent_monsters if card.position == "faceup"
-                and (card.attack if card.orientation == "attack"
-                     else card.defense) is not None)
             attack = moved.attack if moved is not None else None
             defense = moved.defense if moved is not None else None
             numeric += (float(moved is not None),
