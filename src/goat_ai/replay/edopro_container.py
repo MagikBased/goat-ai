@@ -77,6 +77,7 @@ class EdoReplayContainer:
     responses: tuple[bytes, ...]
     packets: tuple[ReplayPacket, ...]
     settings: ReplayDuelSettings | None
+    rule_cards: tuple[int, ...]
 
     def embedded_legacy_replay(self) -> "EdoReplayContainer | None":
         """Read EDOPro's optional old-mode replay inside a yrpX stream."""
@@ -112,6 +113,7 @@ class EdoReplayContainer:
             } if self.settings is not None else None),
             "main_deck_counts": [len(deck.main) for deck in self.decks],
             "extra_deck_counts": [len(deck.extra) for deck in self.decks],
+            "rule_card_count": len(self.rule_cards),
             "response_count": len(self.responses),
             "packet_count": len(self.packets),
             "selection_prompt_packet_count": sum(
@@ -228,11 +230,12 @@ def parse_edopro_container(data: bytes) -> EdoReplayContainer:
     if magic == YRP1 and flags & SINGLE_MODE:
         reader.take(reader.uint(2))  # single-player script name
     decks: list[ReplayDeck] = []
+    rule_cards: tuple[int, ...] = ()
     if magic == YRP1 and (not flags & SINGLE_MODE or flags & HAND_TEST):
         for _ in range(player_count):
             decks.append(ReplayDeck(reader.cards(), reader.cards()))
         if flags & NEW_REPLAY and not flags & HAND_TEST:
-            reader.cards()  # custom rule-card IDs, not Main Deck cards
+            rule_cards = reader.cards()  # custom rules, never ordinary Deck cards
     responses: list[bytes] = []
     packets: list[ReplayPacket] = []
     if magic == YRP1:
@@ -252,7 +255,8 @@ def parse_edopro_container(data: bytes) -> EdoReplayContainer:
                           timestamp, size, header_version, seed_words)
     return EdoReplayContainer(header, hashlib.sha256(data).hexdigest(),
                               player_count, duel_flags, tuple(decks),
-                              tuple(responses), tuple(packets), settings)
+                              tuple(responses), tuple(packets), settings,
+                              rule_cards)
 
 
 def read_edopro_container(path: str | Path) -> EdoReplayContainer:

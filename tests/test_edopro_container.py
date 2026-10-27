@@ -96,6 +96,15 @@ def test_yrpx_reads_packet_stream_without_mislabeling_as_decisions():
     assert not replay.decks
 
 
+def test_yrp1_retains_custom_rule_cards_without_exposing_ids_in_summary():
+    payload = (_prefix(YRP1) + struct.pack("<I", 0) * 4
+               + struct.pack("<II", 1, 987654321) + b"\x00")
+    replay = parse_edopro_container(_container(YRP1, payload))
+    assert replay.rule_cards == (987654321,)
+    assert replay.summary()["rule_card_count"] == 1
+    assert "987654321" not in str(replay.summary())
+
+
 def test_yrpx_exposes_bounded_embedded_yrp1_without_private_summary_values():
     legacy_payload = (_prefix(YRP1) + struct.pack("<I2II", 2, 10, 20, 0)
                       + struct.pack("<I1II", 1, 30, 0)

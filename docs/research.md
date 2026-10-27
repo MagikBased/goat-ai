@@ -70,6 +70,29 @@ card legality, the matching core/script revision, player-visible knowledge,
 or reconstructible decisions. The CLI still omits player names, Deck IDs,
 and response bytes from its report.
 
+The pinned EDOPro [old replay startup](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/old_replay_mode.cpp)
+passes the replay's four 64-bit RNG words to `SetupDuel` and inserts Main and
+Extra Deck cards in their recorded order before starting ocgcore. GOAT AI's
+normal seeded duels previously applied a separate Python Deck shuffle and
+derived the four RNG words from one integer. The native probe now has a
+separate replay-start method using exact words and preordered Deck entries.
+A native vanilla-fixture regression feeds that method the same inputs as an
+ordinary seeded duel and checks every decoded prompt, acting-player view,
+response transition, and terminal outcome across the whole duel. This proves
+the replay startup path is deterministic on the pinned core. A separate
+synthetic `yrp1` fixture now serializes the native responses of an entire
+vanilla duel and reconstructs them through the experimental public adapter.
+Every response maps to one legal action and the reconstructed observations
+match the source native views, except for the adapter's additional public
+attacker-slot hint. Altered or incomplete responses fail. The reader retains
+custom rule-card IDs internally so this path can reject them; its public
+summary reports only their count. This is **synthetic format coverage**, not
+established compatibility with a real EDOPro replay, whose original core and
+scripts may differ. Ambiguous responses and staged multi-card selections
+still fail explicitly. No human demonstration import is claimed. Legacy
+headers without four recorded RNG words also need a separately validated
+RNG path.
+
 An optional `--goat-whitelist .cache/goat-ai/banlist/GOAT.lflist.conf` screen
 reads the embedded Decks and reports only the number of Main/Extra cards
 absent from or forbidden by the pinned GOAT list, plus whether both Main

@@ -1,4 +1,5 @@
 import os
+import random
 import struct
 from pathlib import Path
 
@@ -254,6 +255,46 @@ def test_real_goat_mode_first_draw_and_determinism():
     assert first.draw_events == ((0, 5), (1, 5), (0, 1))
     assert first.decision_message_id == MSG_SELECT_CHAIN
     assert first.decision_player == 0
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_replay_startup_uses_exact_native_seed_and_preordered_decks():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    ordered = []
+    for team in (0, 1):
+        cards = list(VANILLA_DECK)
+        random.Random(42 * 2 + team).shuffle(cards)
+        ordered.append(tuple(cards))
+    paths = (root / "build/libocgcore.so", root / "database/cards.cdb",
+             root / "scripts")
+    with OcgcoreProbe(*paths) as seeded, OcgcoreProbe(*paths) as replay:
+        seeded_start = seeded.first_decision(42, VANILLA_DECK)
+        replay_start = replay.first_replay_decision((43, 44, 45, 46),
+                                                    ordered[0], ordered[1])
+        assert seeded_start.hand_counts == replay_start.hand_counts
+        assert seeded_start.draw_events == replay_start.draw_events
+        assert seeded_start.message_ids == replay_start.message_ids
+        for _ in range(1000):
+            left = seeded.decode_pending()
+            right = replay.decode_pending()
+            assert left == right
+            assert seeded.observation(left.player) == replay.observation(right.player)
+            response = left.choices[0].response
+            left_step = seeded.respond(response)
+            right_step = replay.respond(response)
+            assert left_step == right_step
+            if left_step.terminal:
+                break
+        else:
+            pytest.fail("matched replay startup did not reach a terminal duel")
+
+
+def test_replay_startup_rejects_invalid_native_rng_words():
+    probe = object.__new__(OcgcoreProbe)
+    for words in ((0, 0, 0, 0), (1, 2, 3), (1, 2, 3, -1),
+                  (1, 2, 3, 1 << 64)):
+        with pytest.raises(ValueError, match="native seed words"):
+            probe.first_replay_decision(words, VANILLA_DECK, VANILLA_DECK)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

@@ -584,6 +584,32 @@ class OcgcoreProbe:
                        opponent_deck: tuple[int, ...] | None = None,
                        extra: tuple[int, ...] = (),
                        opponent_extra: tuple[int, ...] = ()) -> FirstDecision:
+        """Start a project-seeded duel with reproducible Python deck shuffles."""
+        words = tuple((seed + i + 1) & ((1 << 64) - 1) for i in range(4))
+        return self._first_decision(seed, words, deck, opponent_deck, extra,
+                                    opponent_extra, shuffle_seed=seed)
+
+    def first_replay_decision(self, seed_words: tuple[int, int, int, int],
+                              deck: tuple[int, ...], opponent_deck: tuple[int, ...],
+                              extra: tuple[int, ...] = (),
+                              opponent_extra: tuple[int, ...] = ()) -> FirstDecision:
+        """Start from a replay's exact RNG state and preordered Deck entries.
+
+        This only reproduces startup inputs. Saved responses still need
+        version-matched reconstruction and player-visible validation.
+        """
+        if (len(seed_words) != 4
+                or any(not isinstance(word, int) or word < 0
+                       or word >= 1 << 64 for word in seed_words)
+                or not any(seed_words)):
+            raise ValueError("replay needs four nonzero-range native seed words")
+        return self._first_decision(0, seed_words, deck, opponent_deck, extra,
+                                    opponent_extra, shuffle_seed=None)
+
+    def _first_decision(self, seed: int, words: tuple[int, int, int, int],
+                        deck: tuple[int, ...], opponent_deck: tuple[int, ...] | None,
+                        extra: tuple[int, ...], opponent_extra: tuple[int, ...],
+                        *, shuffle_seed: int | None) -> FirstDecision:
         if self._duel.value:
             raise RuntimeError("probe instance already used")
         if len(deck) < 6:
@@ -593,8 +619,7 @@ class OcgcoreProbe:
         self._initial_main_decks = (tuple(sorted(deck)),
                                     tuple(sorted(opponent_deck if opponent_deck is not None
                                                  else deck)))
-        # Four nonzero 64-bit words; exact split is part of reproducibility.
-        words = tuple((seed + i + 1) & ((1 << 64) - 1) for i in range(4))
+        # Exact RNG words and insertion order are part of replay fidelity.
         opts = DuelOptions(
             (c.c_uint64 * 4)(*words), GOAT_FLAGS,
             Player(8000, 5, 1), Player(8000, 5, 1),
@@ -609,7 +634,8 @@ class OcgcoreProbe:
                 raise RuntimeError(f"could not load {name.decode()}: {self.errors}")
         for team, cards in enumerate((deck, opponent_deck or deck)):
             shuffled = list(cards)
-            random.Random(seed * 2 + team).shuffle(shuffled)
+            if shuffle_seed is not None:
+                random.Random(shuffle_seed * 2 + team).shuffle(shuffled)
             for code in shuffled:
                 card = NewCard(team, 0, code, team, LOCATION_DECK, 0,
                                POSITION_FACEDOWN_DEFENSE)

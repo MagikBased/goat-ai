@@ -365,6 +365,19 @@ embedded legacy replay, when present, with this project's two-player,
 modern samples fail; four differ in rule flags, and one also differs in LP
 and opening hand size. A match remains only a reconstruction candidate, not
 permission to train or evidence of historical correctness.
+The native probe can now start from the four recorded EDOPro RNG words and
+preordered Main/Extra Deck entries, matching the pinned old-replay startup
+contract instead of applying the project's normal Python Deck shuffle. A
+complete vanilla native duel proves that this alternate startup reproduces
+all decoded prompts, player views, responses, and terminal outcome when fed
+identical inputs. A synthetic extended-header `yrp1` with every response from
+one vanilla duel now reconstructs a complete sequence of public observations,
+legal actions, selected actions, and terminal outcome on the pinned adapter;
+altered and missing responses fail. Custom rule cards are rejected, and
+ambiguous or staged selection responses still fail explicitly. This does not
+prove that a real EDOPro recording replays on our core or that its original
+asset versions match. A permitted real GOAT fixture and independent
+player-knowledge audit remain open.
 Before using any `.yrp`/`.yrpX` for imitation, obtain a permitted real GOAT
 replay fixture, match its original core/scripts, recover each legal-action
 set and selected response, and pass the existing visibility and exact replay
