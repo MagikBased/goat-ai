@@ -7355,6 +7355,28 @@ the Phoenix/Dimension Fusion pair named above. Set `--seed 21300` for the
 direct arm and `--seed 21308` for the Tactical arms. Run
 `scripts/audit_selfplay_replays.py` on the 32 recorded `episode_*.json` files.
 
+### Lower-temperature PPO rollout diagnostic (27 October 2026)
+
+The patched-core PPO schedule above was rerun from the same parent checkpoint,
+training decks, seeds 21200–21231, four-role assignments, and update settings,
+changing only learner sampling temperature from 1.0 to 0.5. The reference
+finished all 32 games below its 3,000-decision cap. The 0.5 run recorded the
+first eight complete games, then seed **21211** exceeded 3,000 decisions.
+Raising only that run's decision cap to **10,000** still left the same seed
+unfinished. These attempts produced no final checkpoint or held-out strength
+comparison; lower temperature is rejected for this schedule rather than
+promoted on the intuition that more confident actions are better. The
+completed prefix had decision counts 2,221, 1,071, 758, 350, 764, 448,
+1,506, and 2,406; those prefix files were not used for training claims.
+
+The first failure also revealed that `EpisodeDecisionLimit` could not be
+unpickled from a process worker, so the parent saw `BrokenProcessPool` instead
+of the seed and limit. Its constructor arguments now survive serialization.
+A spawned-process regression checks this boundary; rerunning the 3,000-decision
+attempt reported `seed=21211` and the real cap. This changes error reporting,
+not game outcomes. The attempted trajectories remain ignored under
+`.cache/goat-ai/fv23_ppo_temp05_{capcheck,10000_21200_21231}_replays/`.
+
 ### Automated visible-rule preference experiment (27 October 2026)
 
 The 32 replay-verified patched-core PPO self-play duels above supplied

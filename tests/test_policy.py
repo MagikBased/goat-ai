@@ -1,9 +1,12 @@
 """Contract checks for the optional PyTorch legal-action policy."""
 
 import copy
+import pickle
 import random
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
 from functools import partial
+from multiprocessing import get_context
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -81,6 +84,10 @@ from scripts.train_behavioral_clone import (
     parse_source_weights,
     restrict_trainable_modules,
 )
+
+
+def _raise_capped_episode_for_worker_test():
+    raise EpisodeDecisionLimit(21211, 3000)
 
 
 def test_clone_sampling_composes_source_focus_and_selected_kind_weights():
@@ -2142,6 +2149,21 @@ def test_self_play_can_censor_over_cap_game_without_learning_from_it(monkeypatch
     assert reports[0]["learner_decisions"] == 0
     assert "reward" not in reports[0]
     assert saved == [(1, 101)]
+
+
+def test_episode_decision_limit_round_trips_across_process_boundary():
+    raised = pickle.loads(pickle.dumps(EpisodeDecisionLimit(100, 3000)))
+    assert isinstance(raised, EpisodeDecisionLimit)
+    assert (raised.seed, raised.max_decisions) == (100, 3000)
+    assert str(raised) == "self-play duel exceeded 3000 decisions: seed=100"
+
+
+def test_capped_episode_from_spawned_worker_retains_seed_and_limit():
+    with ProcessPoolExecutor(max_workers=1, mp_context=get_context("spawn")) as pool:
+        future = pool.submit(_raise_capped_episode_for_worker_test)
+        with pytest.raises(EpisodeDecisionLimit) as error:
+            future.result()
+    assert (error.value.seed, error.value.max_decisions) == (21211, 3000)
 
 
 def test_self_play_reports_unsupported_native_prompt_without_learning(monkeypatch):

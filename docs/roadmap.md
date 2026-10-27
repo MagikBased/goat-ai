@@ -942,6 +942,11 @@ unchanged imitation parent on fresh held-out seeds. All training duels replay-
 verified and passed the visibility audit, but sampled actions still included
 many visible resource-loss candidates. Keep the self-play gate open and test
 credit assignment or better sampled-action quality before promotion.
+A matched attempt to sharpen sampled actions by lowering PPO rollout
+temperature from 1.0 to 0.5 failed to terminate seed 21211 even after raising
+the decision cap from 3,000 to 10,000. It yielded no checkpoint or strength
+claim. The process-worker cap error now reports its seed correctly; see the
+[evaluation log](evaluation.md).
 Labeling 7,538 decisions from the fixed imitation checkpoint's own games
 with Tactical-v14 and upweighting 1,891 disagreements also failed a held-out
 strength check: the child scored 30–34 directly against that checkpoint and

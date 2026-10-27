@@ -142,6 +142,10 @@ class EpisodeDecisionLimit(RuntimeError):
         self.max_decisions = max_decisions
         super().__init__(f"self-play duel exceeded {max_decisions} decisions: seed={seed}")
 
+    def __reduce__(self):
+        """Preserve constructor arguments when a rollout worker raises this."""
+        return (type(self), (self.seed, self.max_decisions))
+
 
 def episode_schedule(matchups: Sequence[tuple[str, str]],
                      seeds: Sequence[int], *,
