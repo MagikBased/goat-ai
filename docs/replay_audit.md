@@ -1,5 +1,30 @@
 # Early replay decision audit
 
+## Resolving one-shot Spell/Trap removal prompt (27 October 2026)
+
+The player-visible audit now flags Mystical Space Typhoon or Raigeki Break
+targeting an already activated Normal Spell, Quick-Play Spell, or Normal Trap
+on the public chain. These removal effects destroy their target; they do not
+negate an activated one-shot effect. This follows the [period MST explanation](https://www.pojo.com/yu-gi-oh/CCGTips/2004/Sept2004/Yugi-17/Pojo%20Tip%20-%20Yu-Gi-Oh%20etiquette.htm)
+and the [GOAT ruling distinction for Continuous and Normal Spell cards](https://www.goatformat.com/rulings7.html).
+The prompt requires a matching face-up field slot and public chain link, and
+uses the pinned card database's printed Type. It excludes Continuous cards
+and the lingering Normal Spells Swords of Revealing Light and Different
+Dimension Capsule. It remains a review prompt, since the play could have
+another purpose and the audit does not simulate the alternative.
+
+In the older Tactical-v13 seed-6803 seat-0 trajectory, the opponent seat's
+frame 86 is the reported Raigeki Break target on an activated Metamorphosis;
+the new detector identifies it. That old trajectory's native asset hashes
+no longer match the current pinned core, so it is **retrospective context,
+not a current replay-verified result**. On the current-core fixed-policy
+64-duel corpus, all 31,729 decisions were independently replay-verified and
+visibility-audited again, and the new category occurred **zero** times. The
+56 previously recorded review prompts and their audit SHA-256 remained
+unchanged. Six positive unit cases cover MST/Raigeki Break against Pot, Book,
+and Torrential; negative cases cover Continuous Decree, lingering Swords,
+and a card absent from the pending chain.
+
 ## Full fixed-policy review audit (27 October 2026)
 
 The unchanged current-core feature-v23 checkpoint was audited on all 64

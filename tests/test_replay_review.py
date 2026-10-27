@@ -125,6 +125,77 @@ def test_shortlist_flags_own_monster_removal_as_review_candidates():
         "torrential_only_own_monsters", "ring_without_visible_enemy_target"]
 
 
+@pytest.mark.parametrize("removal", [5318639, 4178474])
+@pytest.mark.parametrize("target_code, card_type", [
+    (55144522, 0x2),              # Pot of Greed: Normal Spell
+    (14087893, 0x2 | 0x10000),    # Book of Moon: Quick-Play Spell
+    (53582587, 0x4),              # Torrential Tribute: Normal Trap
+])
+def test_shortlist_flags_removal_of_resolving_one_shot_card(
+    removal, target_code, card_type,
+):
+    target = CardView(1, "spell_trap", "faceup", target_code, 0)
+    obs = replace(view(target), chain=(
+        ChainLinkView(1, target_code, 1, 8, 0),
+        ChainLinkView(2, removal, 0, 8, 1),
+    ))
+    select = Action("target", "select_card", 0, {
+        "controller": 1, "location": 8, "sequence": 0, "code": target_code,
+    })
+    candidates = review_candidates(policy(record(obs, select)),
+                                   card_facts={target_code: (card_type, 0, 0)})
+    assert [(item.category, item.evidence) for item in candidates] == [(
+        "removal_targets_resolving_one_shot_spell_trap",
+        {"removal_code": removal, "target_code": target_code})]
+
+
+def test_shortlist_does_not_flag_persistent_or_unchained_spell_trap_removal():
+    decree = CardView(1, "spell_trap", "faceup", 51452091, 0)
+    pot = CardView(1, "spell_trap", "faceup", 55144522, 1)
+    select = Action("target", "select_card", 0, {
+        "controller": 1, "location": 8, "sequence": 0,
+    })
+    chained = replace(view(decree, pot), chain=(
+        ChainLinkView(1, 51452091, 1, 8, 0),
+        ChainLinkView(2, 5318639, 0, 8, 2),
+    ))
+    unchained = replace(view(pot), chain=(ChainLinkView(1, 5318639, 0, 8, 2),))
+    facts = {51452091: (0x4 | 0x20000, 0, 0),
+             55144522: (0x2, 0, 0)}
+    assert review_candidates(policy(record(chained, select)), card_facts=facts) == ()
+    assert review_candidates(policy(record(unchained, select)), card_facts=facts) == ()
+    swords = CardView(1, "spell_trap", "faceup", 72302403, 0)
+    persistent = replace(view(swords), chain=(
+        ChainLinkView(1, 72302403, 1, 8, 0),
+        ChainLinkView(2, 5318639, 0, 8, 2),
+    ))
+    assert review_candidates(policy(record(persistent, select)),
+                             card_facts={72302403: (0x2, 0, 0)}) == ()
+
+
+def test_one_shot_prompt_survives_frozen_parent_greedy_comparison():
+    pot = CardView(1, "spell_trap", "faceup", 55144522, 0)
+    obs = replace(view(pot), chain=(
+        ChainLinkView(1, 55144522, 1, 8, 0),
+        ChainLinkView(2, 5318639, 0, 8, 1),
+    ))
+    target = Action("pot", "select_card", 0, {
+        "controller": 1, "location": 8, "sequence": 0,
+    })
+    sampled = replace(policy(record(obs, target)), source="self_play_rl",
+                      skill_metadata={"learner_seat": 0})
+    facts = {55144522: (0x2, 0, 0)}
+    candidates = review_candidates(sampled, card_facts=facts)
+
+    class SameAgent:
+        def select_action(self, _observation, _legal_actions):
+            return target
+
+    compared = compare_parent_greedy_candidates(
+        sampled, candidates, SameAgent(), card_facts=facts)
+    assert compared[0]["parent_greedy_same_category_flagged"] is True
+
+
 def test_heavy_storm_does_not_count_its_own_set_card_as_collateral():
     storm = Action("storm", "activate", 0,
                    {"code": 19613556, "location": 8, "sequence": 0,

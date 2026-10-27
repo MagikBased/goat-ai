@@ -176,7 +176,8 @@ def main() -> None:
         if sha256_file(path) != source_hash:
             raise ValueError(f"{path}: replay changed during verification")
         audit_by_index: dict[int, list[str]] = {}
-        for finding in review_candidates(trajectory, card_races, weak_flip_attacks):
+        for finding in review_candidates(trajectory, card_races, weak_flip_attacks,
+                                         card_facts=card_facts):
             audit_by_index.setdefault(finding.decision_index, []).append(finding.category)
         disagreements = 0
         policy_choices = 0

@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from goat_ai.agents import load_card_races
+from goat_ai.agents import load_card_facts, load_card_races
 from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import category_counts, review_candidates
@@ -21,6 +21,7 @@ def main() -> None:
     args = parser.parse_args()
     card_races = load_card_races(args.native_root)
     weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
+    card_facts = load_card_facts(args.native_root)
     reports = []
     for path in args.replays:
         trajectory = read_trajectory(path)
@@ -29,7 +30,8 @@ def main() -> None:
         verified = verify_trajectory(
             trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
-        candidates = review_candidates(trajectory, card_races, weak_flip_attacks)
+        candidates = review_candidates(trajectory, card_races, weak_flip_attacks,
+                                       card_facts=card_facts)
         reports.append({
             "trajectory": str(path),
             "trajectory_sha256": sha256_file(path),

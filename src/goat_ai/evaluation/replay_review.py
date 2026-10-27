@@ -31,6 +31,10 @@ THUNDER_DRAGON = 504700054
 METAMORPHOSIS = 46411259
 SOLEMN_JUDGMENT = 41420027
 SINISTER_SERPENT = 511000818
+FIELD_PERSISTENT_NORMAL_SPELLS = frozenset({
+    72302403,  # Swords of Revealing Light
+    11961740,  # Different Dimension Capsule
+})
 
 
 @dataclass(frozen=True)
@@ -58,6 +62,7 @@ def review_candidates(trajectory: Trajectory,
                       card_races: Mapping[int, int] | None = None,
                       weak_flip_attacks: Mapping[int, int] | None = None,
                       review_seat: int | None = None,
+                      card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                       ) -> tuple[ReviewCandidate, ...]:
     """Flag selected actions of one seat using only that seat's visible view.
 
@@ -91,6 +96,7 @@ def review_candidates(trajectory: Trajectory,
     candidates: list[ReviewCandidate] = []
     card_races = card_races or {}
     weak_flip_attacks = weak_flip_attacks or {}
+    card_facts = card_facts or {}
     seen: set[tuple[str, int, str]] = set()
     for index, record in enumerate(trajectory.decisions):
         obs = record.observation
@@ -291,6 +297,29 @@ def review_candidates(trajectory: Trajectory,
                 if safe_enemy_targets:
                     found.append(("ring_targets_own_with_safe_enemy_option",
                                   {"safe_enemy_targets": safe_enemy_targets}))
+        if (selected.kind == "select_card" and obs.chain
+                and obs.chain[-1].controller == seat
+                and obs.chain[-1].card_code in (MYSTICAL_SPACE_TYPHOON, RAIGEKI_BREAK)
+                and selected.parameters.get("location") == 8):
+            target = next((link for link in obs.chain[:-1]
+                           if (link.controller == selected.parameters.get("controller")
+                               and link.location == selected.parameters.get("location")
+                               and link.sequence == selected.parameters.get("sequence"))), None)
+            target_type = card_facts.get(target.card_code, (0, 0, 0))[0] if target else 0
+            # The pinned database stores Normal Spells/Traps as bare TYPE_SPELL
+            # or TYPE_TRAP. Swords and Capsule are Normal Spells that remain
+            # face-up after resolution, so destruction can still matter.
+            nonpersistent = (target is not None
+                             and target_type in (0x2, 0x4, 0x2 | 0x10000)
+                             and target.card_code not in FIELD_PERSISTENT_NORMAL_SPELLS)
+            if (target is not None and nonpersistent
+                    and any(card.controller == target.controller
+                            and card.zone == "spell_trap" and card.sequence == target.sequence
+                            and card.position == "faceup" for card in obs.field)):
+                found.append(("removal_targets_resolving_one_shot_spell_trap", {
+                    "removal_code": obs.chain[-1].card_code,
+                    "target_code": target.card_code,
+                }))
         if (selected.kind == "pass" and goat_offered
                 and obs.turn_player is not None and obs.turn_player != seat):
             if (obs.phase in ("battle_start", "battle_step")
@@ -322,6 +351,7 @@ def compare_parent_greedy_candidates(
     trajectory: Trajectory, candidates: tuple[ReviewCandidate, ...], agent,
     card_races: Mapping[int, int] | None = None,
     weak_flip_attacks: Mapping[int, int] | None = None,
+    card_facts: Mapping[int, tuple[int, int, int]] | None = None,
 ) -> tuple[dict, ...]:
     """Diagnose sampled flags using a frozen parent's greedy choice at that view.
 
@@ -339,7 +369,8 @@ def compare_parent_greedy_candidates(
             raise ValueError("parent selected an action outside the visible legal set")
         one_decision = replace(
             trajectory, decisions=(replace(record, selected_action=greedy),))
-        flags = review_candidates(one_decision, card_races, weak_flip_attacks)
+        flags = review_candidates(one_decision, card_races, weak_flip_attacks,
+                                  card_facts=card_facts)
         categories = sorted({flag.category for flag in flags})
         result.append({
             "decision_index": candidate.decision_index,

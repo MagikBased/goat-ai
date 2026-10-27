@@ -44,6 +44,7 @@ def main() -> None:
     checkpoint_sha256 = sha256_file(args.checkpoint) if args.checkpoint else None
     card_races = load_card_races(args.native_root)
     weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
+    card_facts = load_card_facts(args.native_root)
     parent_policy = (load_policy_agent(args.checkpoint)
                      if args.compare_parent_greedy else None)
     reports = []
@@ -134,9 +135,11 @@ def main() -> None:
                           "verified_teacher_choices": teacher_choices}
         else:
             raise ValueError(f"{path}: unsupported trajectory source {trajectory.source!r}")
-        candidates = review_candidates(trajectory, card_races, weak_flip_attacks)
+        candidates = review_candidates(trajectory, card_races, weak_flip_attacks,
+                                       card_facts=card_facts)
         parent_greedy_review = (compare_parent_greedy_candidates(
-            trajectory, candidates, parent_policy, card_races, weak_flip_attacks)
+            trajectory, candidates, parent_policy, card_races, weak_flip_attacks,
+            card_facts)
             if parent_policy is not None else None)
         opponent_review = None
         if args.include_opponent:
@@ -144,7 +147,8 @@ def main() -> None:
                 raise ValueError("--include-opponent requires policy_evaluation replays")
             other_seat = 1 - provenance["policy_seat"]
             other_candidates = review_candidates(
-                trajectory, card_races, weak_flip_attacks, review_seat=other_seat)
+                trajectory, card_races, weak_flip_attacks, review_seat=other_seat,
+                card_facts=card_facts)
             opponent_review = {
                 "seat": other_seat,
                 "agent": metadata.get("opponent"),
