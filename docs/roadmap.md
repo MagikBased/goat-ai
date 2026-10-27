@@ -1310,6 +1310,12 @@ Black Luster Soldier with legal opposing targets, selecting 24 of 335
 candidates after 8,578 native-verified decisions. The audit also recognizes
 Raigeki Break targeting a friendly card while an opposing target is legal;
 no such case occurred in this measured set.
+A new four-matchup development collection with both seats produced 16
+native-verified duels and 11,617 decisions. Its 24-frame review queue spans
+all four pairings and ten conservative audit prompts, including own-only
+Nobleman, empty Thunder Dragon search, and BLS self-targeting. It is a
+human-review artifact, not training labels or a strength result; see
+[the replay audit](replay_audit.md#four-matchup-development-review-queue-27-october-2026).
 An AB/BA eight-game REINFORCE pilot measured about 1.38–1.40× shorter
 training wall time with the existing opt-in batch size 16 versus scalar
 updates. Its matching summaries are not a held-out strength result; see

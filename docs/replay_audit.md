@@ -1,5 +1,45 @@
 # Early replay decision audit
 
+## Four-matchup development review queue (27 October 2026)
+
+The unchanged feature-v23 reference played Tactical-v14 across four distinct
+development matchups: Jesse Goat Control/Warrior, Matt Goat Control/Chaos Turbo,
+Michael Goat Control/Cas Flip Control, and Daryl Gravekeepers/Bazoo Return.
+Seeds 24100–24101 with both policy seats produced **16 terminal duels** and
+**11,617 native-verified decisions**. The collector audited player visibility
+and bound every replay to its deck and checkpoint hashes. The shortlist then
+reverified each replay, reproduced the checkpoint's greedy choices, and found
+**695** policy/Tactical disagreements or conservative audit prompts.
+
+The bounded queue selected **24** distinct prompts from **14** replays. Their
+matchup counts were 4, 7, 6, and 7; ten selected prompts carried a visible
+audit flag, including own-only Nobleman, an empty Thunder Dragon search, BLS
+targeting itself, and missed opponent-End-Phase Scapegoat timing. All 24
+linked offline viewer frames exist. Tactical's suggested action is a review
+candidate, not a correctness label: at one flagged weak-Flip Summon it chose
+to activate Thunder Dragon first, which does not by itself answer whether to
+Set the Flip monster later. No selected prompt has been used for training.
+
+The local index is
+`.cache/goat-ai/review_broad_24100_24101/queue.html`; the corresponding
+JSON is `queue.json`. The collection manifest SHA-256 is
+`e6494c6cb5104bbfec8d98120370a9fda35a3151f18986cb2e7c8e2ec062d602`;
+the queue JSON SHA-256 is
+`ac8ad61a4704f520b0ece8a761f96a81f193d98f35392c70740e0f6505177f16`.
+These are ignored local artifacts. The four pairings are development review
+data; using reviewed choices later would require a separate held-out deck and
+seed schedule for competitive evaluation. Reproduce the collector with the
+four `--matchup` pairs above, `--seed 24100 --seeds 2 --workers 4`, then run:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  .cache/goat-ai/review_broad_24100_24101/matchup_*.json \
+  --limit 24 --per-replay 2 --render-viewers \
+  --output .cache/goat-ai/review_broad_24100_24101/queue.json
+```
+
 ## Frozen-parent check of sampled self-play flags (27 October 2026)
 
 Sixteen fresh PPO training replays from two Jesse Goat Control versus Warrior
