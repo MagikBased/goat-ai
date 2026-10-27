@@ -16,6 +16,7 @@ from goat_ai.replay import DecisionRecord, Trajectory, read_decision_annotations
 from goat_ai.replay.fingerprint import sha256_file
 from scripts import serve_review_queue
 from scripts.render_replay import render_replay
+from scripts.shortlist_policy_disagreements import write_review_index
 
 
 def _queue(tmp_path):
@@ -70,6 +71,20 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
     try:
         assert _request(f"{base}/api/review/state?source={digest}")[1] == {
             "choices": [], "saved": True}
+        mark = {"source": digest, "decision_index": 0, "bookmarked": True}
+        assert _request(f"{base}/api/review/bookmarks")[1] == {"bookmarks": []}
+        assert _request(f"{base}/api/review/bookmark", mark)[1] == {
+            "bookmarks": [{"source": digest, "decision_index": 0}]}
+        assert _request(f"{base}/api/review/bookmarks")[1]["bookmarks"] == [
+            {"source": digest, "decision_index": 0}]
+        assert (output / "_review_state/bookmarks.json").is_file()
+        assert list(output.glob("*.json")) == []
+        for invalid_mark in ({**mark, "decision_index": 1},
+                             {**mark, "bookmarked": 1},
+                             {**mark, "source": "a" * 64}):
+            with pytest.raises(HTTPError) as error:
+                _request(f"{base}/api/review/bookmark", invalid_mark)
+            assert error.value.code == 400
         payload = {"source": digest, "decision_index": 0, "action_index": 1}
         assert _request(f"{base}/api/review/choice", payload)[1]["choices"] == [
             {"decision_index": 0, "action_index": 1}]
@@ -89,9 +104,14 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
         assert _request(f"{base}/api/review/choice",
                         {**payload, "action_index": None})[1]["choices"] == []
         assert not saved.exists()
+        assert _request(f"{base}/api/review/bookmark",
+                        {**mark, "bookmarked": False})[1] == {"bookmarks": []}
         replay.write_text(replay.read_text() + " ")
         with pytest.raises(HTTPError) as error:
             _request(f"{base}/api/review/choice", payload)
+        assert error.value.code == 400
+        with pytest.raises(HTTPError) as error:
+            _request(f"{base}/api/review/bookmark", mark)
         assert error.value.code == 400
     finally:
         server.shutdown()
@@ -137,6 +157,7 @@ def test_browser_review_choice_autosaves_without_name_or_download(tmp_path, monk
         setTimeout(() => { document.body.dataset.localReviewProbe = [
           localReviewMode, byId('manual-review-export').hidden,
           byId('annotation-status').textContent.includes('Saved on this computer'),
+          byId('annotation-status').textContent.includes('differs from AI played'),
           annotations.get(0)].join('|'); }, 250);
       }, 200);
     </script></body>"""
@@ -154,9 +175,52 @@ def test_browser_review_choice_autosaves_without_name_or_download(tmp_path, monk
         ], capture_output=True, text=True, timeout=20, check=True)
         match = re.search(r'data-local-review-probe="([^"]+)"', result.stdout)
         assert match, result.stderr[-1000:]
-        assert match.group(1) == "true|true|true|1"
+        assert match.group(1) == "true|true|true|true|1"
         raw = json.loads((output / f"{digest}.json").read_text())
         assert raw["choices"] == [{"decision_index": 0, "action_index": 1}]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_queue_bookmark_button_saves_without_creating_training_label(tmp_path, monkeypatch):
+    queue, replay, digest, _ = _queue(tmp_path)
+    viewer = tmp_path / "game.html"
+    render_replay(replay, viewer, tmp_path / "native")
+    selected = json.loads(queue.read_text())["selected"]
+    selected[0]["viewer"] = str(viewer) + "#decision=1"
+    selected[0]["audit_flags"] = []
+    write_review_index(selected, queue, tmp_path / "native")
+    probe = """<script>
+      setTimeout(() => {
+        const button = document.querySelector('.bookmark-item');
+        button.click();
+        setTimeout(() => { document.body.dataset.bookmarkProbe = [
+          button.hidden, button.getAttribute('aria-pressed'),
+          button.textContent.includes('Bookmarked')].join('|'); }, 200);
+      }, 200);
+    </script></html>"""
+    page = queue.with_suffix(".html")
+    page.write_text(page.read_text().replace("</html>", probe))
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    output = tmp_path / "saved"
+    server = serve_review_queue.make_server(queue, output, port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = subprocess.run([
+            shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+            "--disable-dev-shm-usage", "--virtual-time-budget=700", "--dump-dom",
+            f"http://127.0.0.1:{server.server_port}/queue.html",
+        ], capture_output=True, text=True, timeout=20, check=True)
+        match = re.search(r'data-bookmark-probe="([^"]+)"', result.stdout)
+        assert match, result.stderr[-1000:]
+        assert match.group(1) == "false|true|true"
+        assert not list(output.glob("*.json"))
+        assert json.loads((output / "_review_state/bookmarks.json").read_text())[
+            "bookmarks"] == [{"source": digest, "decision_index": 0}]
     finally:
         server.shutdown()
         server.server_close()

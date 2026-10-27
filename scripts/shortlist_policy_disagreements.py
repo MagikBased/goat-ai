@@ -121,9 +121,12 @@ def write_review_index(selected: list[dict], output: Path,
             f'<h3>{escape(reason)}</h3>'
             f'{choices}'
             f'<div class="links"><a class="primary" href="{escape(label_href, quote=True)}">Open label view</a>'
-            f'{reveal}</div></article>')
+            f'{reveal}<button class="bookmark-item" type="button" hidden '
+            f'aria-label="Bookmark review item {number}">Bookmark</button></div></article>')
         queue_items.append({"visible": label_href, "reveal": reveal_href,
-                            "title": f"#{number} · {reason}"})
+                            "title": f"#{number} · {reason}",
+                            "source": item.get("trajectory_sha256"),
+                            "decision_index": item.get("decision_index")})
         (flagged if item["audit_flags"] else disagreements).append(card)
     queue_json = json.dumps(queue_items, ensure_ascii=True).replace("<", "\\u003c")
     html = ("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\">"
@@ -165,7 +168,9 @@ def write_review_index(selected: list[dict], output: Path,
             " and all legal alternatives.</li><li>Use the queue bar to move between"
             " review items. Inside the replay, Previous and Next move between"
             " decisions in that duel.</li>"
-            "<li>If you know a better legal action, choose it under All legal"
+            "<li>Use Bookmark to mark an item for later without endorsing any action."
+            " Bookmarks save locally when using the review server and are never"
+            " training labels.</li><li>If you know a better legal action, choose it under All legal"
             " actions. When this queue is opened through the local review server,"
             " choices save automatically. An offline file viewer still offers a"
             " manual label download. <strong>Reveal all cards</strong> opens a separate inspection"
@@ -182,12 +187,43 @@ def write_review_index(selected: list[dict], output: Path,
             "<span id=\"item-position\"></span>"
             "<button id=\"next-item\" type=\"button\">Next item</button>"
             "<button id=\"toggle-reveal\" type=\"button\">Reveal all cards</button>"
+            "<button id=\"stage-bookmark\" type=\"button\" hidden>Bookmark</button>"
             "<span class=\"stage-title\" id=\"stage-title\"></span>"
             "<a id=\"open-tab\" target=\"_blank\" rel=\"noopener\">Open in new tab</a>"
             "</nav><iframe id=\"stage-frame\" title=\"GOAT AI replay viewer\"></iframe>"
             "</section><script>\"use strict\";const items=" + queue_json + ";"
             "const stage=document.getElementById('stage'),frame=document.getElementById('stage-frame');"
             "let current=-1,mode='visible',pendingLabels=false;"
+            "let bookmarks=new Set(),bookmarkMode=false;"
+            "const bookmarkKey=item=>`${item.source}:${item.decision_index}`;"
+            "function updateBookmarks(){document.querySelectorAll('.bookmark-item').forEach(button=>{"
+            "const i=Number(button.closest('.review-card').dataset.queueIndex);"
+            "button.hidden=!bookmarkMode||!items[i].source;"
+            "const saved=bookmarks.has(bookmarkKey(items[i]));"
+            "button.textContent=saved?'★ Bookmarked':'☆ Bookmark';"
+            "button.setAttribute('aria-pressed',String(saved));});"
+            "const button=document.getElementById('stage-bookmark');"
+            "button.hidden=!bookmarkMode||current<0||!items[current]?.source;"
+            "if(!button.hidden){const saved=bookmarks.has(bookmarkKey(items[current]));"
+            "button.textContent=saved?'★ Bookmarked':'☆ Bookmark';"
+            "button.setAttribute('aria-pressed',String(saved));}}"
+            "async function toggleBookmark(i){if(!bookmarkMode||!items[i]?.source)return;"
+            "const item=items[i],saved=!bookmarks.has(bookmarkKey(item));"
+            "const response=await fetch('/api/review/bookmark',{method:'POST',"
+            "headers:{'Content-Type':'application/json'},body:JSON.stringify({"
+            "source:item.source,decision_index:item.decision_index,bookmarked:saved})});"
+            "const data=await response.json();if(!response.ok)throw Error(data.error||'Bookmark save failed');"
+            "bookmarks=new Set(data.bookmarks.map(bookmarkKey));updateBookmarks();}"
+            "async function loadBookmarks(){if(location.protocol!=='http:'||"
+            "!['127.0.0.1','localhost'].includes(location.hostname))return;"
+            "try{const response=await fetch('/api/review/bookmarks');if(!response.ok)return;"
+            "const data=await response.json();bookmarks=new Set(data.bookmarks.map(bookmarkKey));"
+            "bookmarkMode=true;updateBookmarks();}catch(_){}}loadBookmarks();"
+            "document.querySelectorAll('.bookmark-item').forEach(button=>button.onclick=()=>{"
+            "toggleBookmark(Number(button.closest('.review-card').dataset.queueIndex))"
+            ".catch(error=>alert(error.message));});"
+            "document.getElementById('stage-bookmark').onclick=()=>{"
+            "toggleBookmark(current).catch(error=>alert(error.message));};"
             "window.addEventListener('message',event=>{if(event.source===frame.contentWindow&&"
             "event.data?.type==='goat-ai-review-label-state')"
             "pendingLabels=Boolean(event.data.pending);});"
@@ -198,6 +234,7 @@ def write_review_index(selected: list[dict], output: Path,
             "const url=items[i][mode];frame.src=url;stage.hidden=false;"
             "document.getElementById('item-position').textContent=`${i+1} / ${items.length}`;"
             "document.getElementById('stage-title').textContent=items[i].title;"
+            "updateBookmarks();"
             "document.getElementById('open-tab').href=url;"
             "document.getElementById('previous-item').disabled=i===0;"
             "document.getElementById('next-item').disabled=i===items.length-1;"

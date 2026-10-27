@@ -21,7 +21,15 @@ PYTHONPATH=src:. .venv/bin/python scripts/serve_review_queue.py \
 ```
 
 The server prints the localhost URL and the ignored folder receiving choices.
-Open **Open label view** and choose a legal action in the sidebar. The
+Use **☆ Bookmark** in the queue or replay bar to mark an item for follow-up;
+it saves locally in `_review_state/bookmarks.json` and never becomes a
+training label. Open **Open label view** and choose a legal action in the
+sidebar only when you want to record the play you would make. The recorded
+action has an **AI played** marker, and the saved-choice line says whether
+your choice matches it. **Approve AI-played action** explicitly labels the
+recorded action. No reviewer name or file download is needed with the local
+server; the default `local-reviewer` alias is provenance for the validator.
+The
 reviewer-only reveal is for diagnosis and cannot be labeled. Do not use this
 queue's choices in training without validating them, and do not evaluate a
 trained child on these three Main Deck compositions after using their labels.
@@ -29,6 +37,12 @@ The collection manifest SHA-256 is
 `4da1601e45980b420b7dbcb914ebecb8a5a91312bf6181dbdbd77d09122eacba`;
 the queue JSON SHA-256 is
 `3abe11ebfb605c47c52630f3634bb79ce16d2b181124fc49ab60a2b205b434f5`.
+
+Twelve earlier local choices in the fixed-policy full queue validated against
+their source replays, but all twelve stored the recorded AI action. The
+reviewer recalls choosing alternatives for some of them. The files are kept
+locally and **excluded from training** pending re-review of the affected
+frames; their present bytes do not establish the intended alternatives.
 
 ## Breaker targeting only friendly backrow (27 October 2026)
 

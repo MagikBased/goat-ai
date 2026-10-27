@@ -4,7 +4,6 @@ import re
 import shutil
 import subprocess
 from copy import deepcopy
-from pathlib import Path
 
 import pytest
 
@@ -57,10 +56,11 @@ def test_attack_target_life_fill_and_field_card_movement(tmp_path, destination):
       move(1);
       const travel = Boolean(document.querySelector('.travel-card'));
       const destinationWaits = Boolean(document.querySelector('.incoming-pile'));
+      const noChainBadge = !document.querySelector('.chain-link-badge');
       setTimeout(() => {
         const life = document.querySelector('.life[data-player="0"]');
         document.body.dataset.animationProbe = [arrow, corners, travel,
-          destinationWaits, !document.querySelector('.incoming-pile'),
+          destinationWaits, !document.querySelector('.incoming-pile'), noChainBadge,
           lifeFraction(12000) === 1, life.querySelector('.life-value').textContent,
           life.querySelector('.life-fill').style.width].join('|');
       }, 650);
@@ -74,7 +74,7 @@ def test_attack_target_life_fill_and_field_card_movement(tmp_path, destination):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-animation-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "true|true|true|true|true|true|7000 LP|87.5%"
+    assert match.group(1) == "true|true|true|true|true|true|true|7000 LP|87.5%"
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
@@ -107,7 +107,9 @@ def test_skip_passes_keeps_newly_chained_trap_face_up(tmp_path):
       move(1);
       const trap = document.querySelector('[data-field-key="1:spell_trap:0"]');
       document.body.dataset.chainProbe = [index, trap?.classList.contains('facedown'),
-        trap?.title, document.querySelectorAll('.card-flip').length].join('|');
+        trap?.title, document.querySelectorAll('.card-flip').length,
+        document.querySelector('.chain-link-badge')?.getAttribute('aria-label'),
+        document.querySelector('.chain-link-badge strong')?.textContent].join('|');
     </script></body>"""
     path = tmp_path / "chained_trap.html"
     path.write_text(html.replace("</body>", probe), encoding="utf-8")
@@ -118,7 +120,7 @@ def test_skip_passes_keeps_newly_chained_trap_face_up(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-chain-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "2|false|Second Trap|1"
+    assert match.group(1) == "2|false|Second Trap|1|Chain Link 2|2"
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")

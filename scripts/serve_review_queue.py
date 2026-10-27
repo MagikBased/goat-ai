@@ -36,6 +36,64 @@ class ReviewStore:
         self.reviewer_alias = reviewer_alias.strip()
         self.lock = Lock()
 
+    @property
+    def bookmark_path(self) -> Path:
+        # Keep review reminders outside the annotation glob used by training.
+        return self.output_dir / "_review_state" / "bookmarks.json"
+
+    def _bookmarks(self) -> set[tuple[str, int]]:
+        path = self.bookmark_path
+        if not path.is_file():
+            return set()
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if (payload.get("schema_version") != 1
+                or payload.get("queue_sha256") != self.queue_sha256
+                or not isinstance(payload.get("bookmarks"), list)):
+            raise ValueError("saved bookmarks do not match this queue")
+        marks = set()
+        for mark in payload["bookmarks"]:
+            if (not isinstance(mark, dict) or set(mark) != {"source", "decision_index"}
+                    or mark["source"] not in self.sources
+                    or type(mark["decision_index"]) is not int
+                    or mark["decision_index"] not in self.sources[mark["source"]][1]):
+                raise ValueError("saved bookmark is outside this queue")
+            marks.add((mark["source"], mark["decision_index"]))
+        return marks
+
+    def bookmark_state(self) -> dict:
+        with self.lock:
+            if sha256_file(self.queue_path) != self.queue_sha256:
+                raise ValueError("review queue changed while serving")
+            return {"bookmarks": [{"source": source, "decision_index": index}
+                                  for source, index in sorted(self._bookmarks())]}
+
+    def bookmark(self, digest: str, decision_index: int, bookmarked: bool) -> dict:
+        with self.lock:
+            if type(bookmarked) is not bool or type(decision_index) is not int:
+                raise ValueError("invalid bookmark payload")
+            self.label_path(digest)
+            _, offered = self._trajectory(digest)
+            if decision_index not in offered:
+                raise ValueError("decision is absent from this queue")
+            marks = self._bookmarks()
+            key = (digest, decision_index)
+            if bookmarked:
+                marks.add(key)
+            else:
+                marks.discard(key)
+            path = self.bookmark_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {"schema_version": 1, "queue_sha256": self.queue_sha256,
+                       "bookmarks": [{"source": source, "decision_index": index}
+                                     for source, index in sorted(marks)]}
+            temporary = path.with_suffix(".json.tmp")
+            try:
+                temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+                temporary.replace(path)
+            finally:
+                temporary.unlink(missing_ok=True)
+            return {"bookmarks": payload["bookmarks"]}
+
     def label_path(self, digest: str) -> Path:
         if not SHA256.fullmatch(digest) or digest not in self.sources:
             raise ValueError("source replay is absent from this queue")
@@ -148,6 +206,12 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
                 except (ValueError, KeyError, OSError) as error:
                     self._json(400, {"error": str(error)})
                 return
+            if parsed.path == "/api/review/bookmarks":
+                try:
+                    self._json(200, store.bookmark_state())
+                except (ValueError, KeyError, TypeError, OSError) as error:
+                    self._json(400, {"error": str(error)})
+                return
             target = Path(self.translate_path(self.path)).resolve()
             queue_html = target.is_relative_to(queue.parent) and target.suffix == ".html"
             art = (target.is_relative_to(ROOT / "replays/card_images")
@@ -158,7 +222,8 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
             super().do_GET()
 
         def do_POST(self) -> None:
-            if urlsplit(self.path).path != "/api/review/choice":
+            endpoint = urlsplit(self.path).path
+            if endpoint not in ("/api/review/choice", "/api/review/bookmark"):
                 self._json(404, {"error": "unknown endpoint"})
                 return
             origin = self.headers.get("Origin")
@@ -172,11 +237,17 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
                 if not 1 <= size <= 4096:
                     raise ValueError("request body size is invalid")
                 data = json.loads(self.rfile.read(size))
-                if not isinstance(data, dict) or set(data) != {
-                        "source", "decision_index", "action_index"}:
-                    raise ValueError("invalid choice payload")
-                result = store.choose(data["source"], data["decision_index"],
-                                      data["action_index"])
+                expected = ({"source", "decision_index", "action_index"}
+                            if endpoint == "/api/review/choice" else
+                            {"source", "decision_index", "bookmarked"})
+                if not isinstance(data, dict) or set(data) != expected:
+                    raise ValueError("invalid review payload")
+                if endpoint == "/api/review/choice":
+                    result = store.choose(data["source"], data["decision_index"],
+                                          data["action_index"])
+                else:
+                    result = store.bookmark(data["source"], data["decision_index"],
+                                            data["bookmarked"])
             except (ValueError, TypeError, KeyError, OSError) as error:
                 self._json(400, {"error": str(error)})
                 return
