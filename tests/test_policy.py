@@ -1631,6 +1631,53 @@ def test_ppo_update_accepts_mixed_rollout_advantages():
     assert torch.softmax(policy(features), 0)[1].item() > before
 
 
+def test_ppo_update_reuses_identical_visible_rollout_features(monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    choices = actions()
+    records = (DecisionRecord(view(), choices, choices[1]),
+               DecisionRecord(replace(view(), chain=(ChainLinkView(1, 20, 1, 8, 0),)),
+                              choices[:2], choices[0]))
+    features = tuple(encode_decision(record.observation, record.legal_actions,
+                                     vocabulary, 10) for record in records)
+    torch.manual_seed(91)
+    original = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    reference = copy.deepcopy(original)
+    candidate = copy.deepcopy(original)
+    baseline_loss = ppo_clipped_update(
+        reference, vocabulary, records, 1.0, 0.0,
+        torch.optim.SGD(reference.parameters(), lr=0.01),
+        epochs=2, batch_size=2, random_seed=91)
+
+    def unexpected_encode(*_args, **_kwargs):
+        pytest.fail("PPO update rebuilt a cached decision")
+
+    monkeypatch.setattr("goat_ai.training.self_play.encode_decision", unexpected_encode)
+    cached_loss = ppo_clipped_update(
+        candidate, vocabulary, records, 1.0, 0.0,
+        torch.optim.SGD(candidate.parameters(), lr=0.01),
+        epochs=2, batch_size=2, random_seed=91, encoded_features=features)
+    assert cached_loss == baseline_loss
+    assert all(torch.equal(reference.state_dict()[key], candidate.state_dict()[key])
+               for key in reference.state_dict())
+    with pytest.raises(ValueError, match="encoded features"):
+        ppo_clipped_update(candidate, vocabulary, records, 1.0, 0.0,
+                           torch.optim.SGD(candidate.parameters(), lr=0.01),
+                           encoded_features=features[:1])
+
+
+def test_rollout_feature_reuse_rejects_incompatible_update_modes():
+    vocabulary = CardVocabulary((10, 20))
+    policy = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    with pytest.raises(ValueError, match="single-process PPO"):
+        train_against_snapshot_pool(policy, vocabulary, (("a", "b"),), (100,),
+                                    lambda: None, reuse_rollout_features=True)
+    with pytest.raises(ValueError, match="single-process PPO"):
+        train_against_snapshot_pool(policy, vocabulary, (("a", "b"),), (100, 101),
+                                    lambda: None, policy_update="clipped_ppo",
+                                    ppo_rollout_games=2, rollout_workers=2,
+                                    reuse_rollout_features=True)
+
+
 def test_ppo_decision_weights_change_conflicting_updates():
     vocabulary = CardVocabulary((10, 20))
     choices = actions()

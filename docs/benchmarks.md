@@ -1,5 +1,52 @@
 # Native benchmark log
 
+## Reusing visible PPO features from rollout (27 October 2026)
+
+The opt-in `--reuse-rollout-features` path retains the learner's already
+encoded, player-visible decision tensors until its single-process PPO update.
+It skips a second encoding pass over the same decisions. It is unavailable
+with process rollout workers, which would have to send these tensors between
+processes. The default training path remains unchanged.
+
+An AB/BA complete-training comparison used the feature-v23 checkpoint
+`fv23_tactical_v14_unseen_fourdeck_continuation.pt`, Jesse Goat Control versus
+Warrior, seeds 23000–23003, four terminal games per PPO rollout, two epochs,
+batch size 16, and one Torch CPU thread. Every arm played **2,650 decisions**,
+including **487 multi-option learner decisions**. The four corresponding replay
+files were byte-identical across arms; all **38 policy tensors** were exactly
+equal. The cached arm's four trajectories replay-verified against the pinned
+native engine and passed the player-visibility audit.
+
+| Run order | Re-encode update | Reuse rollout features |
+| :--- | ---: | ---: |
+| Reference, reuse | 4.704 s | 4.610 s |
+| Reuse, reference | 4.720 s | 4.606 s |
+
+One additional matched `/usr/bin/time` run reported peak process RSS of
+**341,844 KiB** for the reference and **345,448 KiB** for reuse, an observed
+3,604 KiB increase. The comparison is short and on one CPU/deck schedule;
+the roughly 2% wall-time gain is not a large-scale throughput or strength
+claim. Raw outputs are ignored under `.cache/goat-ai/reuse_features_23000/`.
+A separate four-game smoke with `--rollout-batch-inference` completed 3,857
+decisions in both modes, kept replay bytes and all policy tensors equal, and
+reported 5.940 versus 5.773 seconds (reference versus reuse). This checks
+compatibility with that opt-in rollout mode, not its overall value against
+process workers.
+Reproduce an arm after [native setup](native_setup.md), using a fresh output
+name and adding `--reuse-rollout-features` for the cached arm:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt \
+  --engine experimental \
+  --matchup examples/decks/goat_control_jesse_twohig_indianapolis_2005.ydk \
+            examples/decks/warrior_montague_clash.ydk \
+  --seed 23000 --games 4 --max-decisions 3000 \
+  --policy-update clipped_ppo --ppo-rollout-games 4 \
+  --ppo-epochs 2 --ppo-batch-size 16 --snapshot-every 4 \
+  --output .cache/goat-ai/reuse_features_example.pt
+```
+
 ## Reused opponent statistics in policy encoding (27 October 2026)
 
 Feature-v23 encoding now computes visible opposing monster statistics once per

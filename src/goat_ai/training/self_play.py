@@ -12,6 +12,7 @@ from multiprocessing import get_context
 import torch
 from torch import nn
 
+from goat_ai.actions import Action
 from goat_ai.agents import Agent, RandomAgent
 from goat_ai.engine import RulesEngine
 from goat_ai.engine.protocol import SimulatorUnavailable
@@ -124,6 +125,7 @@ class EpisodeResult:
     decisions: int
     learner_records: tuple[DecisionRecord, ...]
     trajectory: Trajectory
+    learner_features: tuple[DecisionFeatures, ...] = ()
 
     @property
     def reward(self) -> float:
@@ -165,20 +167,30 @@ def episode_schedule(matchups: Sequence[tuple[str, str]],
 def sample_legal_action(model: LegalActionPolicy, vocabulary: CardVocabulary,
                         observation, legal_actions, generator: torch.Generator,
                         temperature: float = 1.0):
+    action, _ = _sample_legal_action_with_features(
+        model, vocabulary, observation, legal_actions, generator, temperature)
+    return action
+
+
+def _sample_legal_action_with_features(
+    model: LegalActionPolicy, vocabulary: CardVocabulary,
+    observation, legal_actions, generator: torch.Generator,
+    temperature: float = 1.0,
+) -> tuple[Action, DecisionFeatures | None]:
     """Sample from visible legal options, with no native-state access."""
     if temperature <= 0:
         raise ValueError("temperature must be positive")
     if len(legal_actions) == 1:
         # A forced choice needs neither feature encoding nor a neural forward
         # pass. It also need not consume the policy's sampling generator.
-        return legal_actions[0]
+        return legal_actions[0], None
     features = encode_decision(observation, legal_actions, vocabulary, model.feature_version)
     device = next(model.parameters()).device
     with torch.inference_mode():
         logits = model(features.to(device)) / temperature
         probabilities = torch.softmax(logits, dim=0).cpu()
         index = int(torch.multinomial(probabilities, 1, generator=generator).item())
-    return legal_actions[index]
+    return legal_actions[index], features
 
 
 class SamplingPolicyAgent:
@@ -198,20 +210,25 @@ def run_learning_episode(
     decks: tuple[str, str], seed: int, learner_seat: int,
     engine_factory: Callable[[], RulesEngine], generator: torch.Generator,
     max_decisions: int = 5000, learner_temperature: float = 1.0,
+    collect_features: bool = False,
 ) -> EpisodeResult:
     if learner_seat not in (0, 1) or max_decisions < 1 or learner_temperature <= 0:
         raise ValueError("invalid learner seat or decision cap")
     records = []
+    learner_features = []
     with GoatEnvironment(*decks, seed=seed, engine=engine_factory()) as env:
         observation = env.reset()
         for count in range(1, max_decisions + 1):
             legal_actions = env.legal_actions()
             if observation.acting_player == learner_seat:
-                action = sample_legal_action(model, vocabulary, observation,
-                                             legal_actions, generator,
-                                             temperature=learner_temperature)
+                action, features = _sample_legal_action_with_features(
+                    model, vocabulary, observation, legal_actions, generator,
+                    temperature=learner_temperature)
                 if len(legal_actions) > 1:
                     records.append(DecisionRecord(observation, legal_actions, action))
+                    if collect_features:
+                        assert features is not None
+                        learner_features.append(features)
             else:
                 action = opponent.select_action(observation, legal_actions)
             observation = env.step(action)
@@ -220,7 +237,7 @@ def run_learning_episode(
                                      skill_metadata={"learner_seat": learner_seat,
                                                      "demonstrator_seat": learner_seat})
                 return EpisodeResult(seed, learner_seat, env.result(), count,
-                                     tuple(records), trajectory)
+                                     tuple(records), trajectory, tuple(learner_features))
     raise EpisodeDecisionLimit(seed, max_decisions)
 
 
@@ -229,6 +246,7 @@ def run_batched_learning_episodes(
     games: Sequence[tuple[Agent, tuple[str, str], int, int, torch.Generator]],
     engine_factory: Callable[[], RulesEngine], *, max_decisions: int = 5000,
     learner_temperature: float = 1.0,
+    collect_features: bool = False,
 ) -> tuple[EpisodeResult, ...]:
     """Run independent native duels together and batch only learner inference.
 
@@ -247,6 +265,7 @@ def run_batched_learning_episodes(
         observations = [env.reset() for env in environments]
         counts = [0] * len(games)
         records: list[list[DecisionRecord]] = [[] for _ in games]
+        feature_records: list[list[DecisionFeatures]] = [[] for _ in games]
         results: list[EpisodeResult | None] = [None] * len(games)
         remaining = set(range(len(games)))
 
@@ -264,7 +283,8 @@ def run_batched_learning_episodes(
                                      skill_metadata={"learner_seat": seat,
                                                      "demonstrator_seat": seat})
                 results[index] = EpisodeResult(seed, seat, env.result(), counts[index],
-                                               tuple(records[index]), trajectory)
+                                               tuple(records[index]), trajectory,
+                                               tuple(feature_records[index]))
                 remaining.remove(index)
 
         while remaining:
@@ -289,6 +309,9 @@ def run_batched_learning_episodes(
                                         environments[index].legal_actions(),
                                         vocabulary, model.feature_version)
                         for index in ready]
+            if collect_features:
+                for index, features_for_index in zip(ready, features, strict=True):
+                    feature_records[index].append(features_for_index)
             device = next(model.parameters()).device
             with torch.inference_mode():
                 if len(ready) == 1:
@@ -443,6 +466,7 @@ def ppo_clipped_update(
     random_seed: int = 0,
     advantages: Sequence[float] | None = None,
     sample_weights: Sequence[float] | None = None,
+    encoded_features: Sequence[DecisionFeatures] | None = None,
 ) -> float:
     """Reuse on-policy visible decisions with a clipped objective.
 
@@ -470,12 +494,16 @@ def ppo_clipped_update(
                  or any(not isfinite(weight) or weight <= 0
                         for weight in sample_weights))):
         raise ValueError("sample weights must be positive, finite, and match decisions")
+    if encoded_features is not None and len(encoded_features) != len(records):
+        raise ValueError("encoded features must match decisions")
     if not 0 < clip_epsilon < 1:
         raise ValueError("PPO clip epsilon must be between zero and one")
     device = next(model.parameters()).device
-    features = [encode_decision(record.observation, record.legal_actions,
-                                vocabulary, model.feature_version).to(device)
-                for record in records]
+    features = ([encode_decision(record.observation, record.legal_actions,
+                                 vocabulary, model.feature_version).to(device)
+                 for record in records]
+                if encoded_features is None else
+                [item.to(device) for item in encoded_features])
     selected = [record.legal_actions.index(record.selected_action) for record in records]
     old_log_probs = []
     parent_log_prob_rows: list[torch.Tensor] = []
@@ -616,6 +644,7 @@ def train_against_snapshot_pool(
     ppo_baseline_timing: str = "online",
     rollout_workers: int = 0,
     rollout_batch_inference: bool = False,
+    reuse_rollout_features: bool = False,
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
@@ -663,6 +692,8 @@ def train_against_snapshot_pool(
             or ppo_rollout_games < 2 or skip_capped_games
             or skip_unsupported_games or baseline_scope == "state_value"):
         raise ValueError("batched inference needs multi-duel PPO without workers or skips")
+    if reuse_rollout_features and (policy_update != "clipped_ppo" or rollout_workers):
+        raise ValueError("rollout feature reuse needs single-process PPO")
     if (policy_update == "clipped_ppo" and
             (model.feature_version < 10 or model.feature_version in (14, 15))):
         raise ValueError("clipped PPO requires a supported batched policy version")
@@ -683,6 +714,7 @@ def train_against_snapshot_pool(
     rollout_baselines: dict[str, float] = {}
     reports = []
     rollout_records: list[DecisionRecord] = []
+    rollout_features: list[DecisionFeatures] = []
     rollout_advantages: list[float] = []
     rollout_record_counts: list[int] = []
     rollout_report_indices: list[int] = []
@@ -734,7 +766,8 @@ def train_against_snapshot_pool(
                     episodes = run_batched_learning_episodes(
                         model, vocabulary, batch_games, engine_factory,
                         max_decisions=max_decisions,
-                        learner_temperature=learner_temperature)
+                        learner_temperature=learner_temperature,
+                        collect_features=reuse_rollout_features)
                 elif rollout_workers == 1:
                     previous_threads = torch.get_num_threads()
                     try:
@@ -764,7 +797,9 @@ def train_against_snapshot_pool(
                 try:
                     episode = run_learning_episode(model, vocabulary, opponent, decks, seed,
                                                    learner_seat, engine_factory, generator,
-                                                   max_decisions, learner_temperature)
+                                                   max_decisions, learner_temperature,
+                                                   **({"collect_features": True}
+                                                      if reuse_rollout_features else {}))
                 except EpisodeDecisionLimit:
                     if not skip_capped_games:
                         raise
@@ -807,9 +842,13 @@ def train_against_snapshot_pool(
                             state_baselines=state_baselines,
                             parent_model=parent_model,
                             parent_kl_weight=parent_kl_weight,
-                            random_seed=random_seed + seed)
+                            random_seed=random_seed + seed,
+                            encoded_features=(episode.learner_features
+                                              if reuse_rollout_features else None))
                     else:
                         rollout_records.extend(episode.learner_records)
+                        if reuse_rollout_features:
+                            rollout_features.extend(episode.learner_features)
                         rollout_advantages.extend(
                             [episode.reward - baseline] * len(episode.learner_records))
                         rollout_record_counts.append(len(episode.learner_records))
@@ -857,10 +896,12 @@ def train_against_snapshot_pool(
                     parent_model=parent_model,
                     parent_kl_weight=parent_kl_weight,
                     random_seed=random_seed + seed,
-                    advantages=rollout_advantages, sample_weights=weights)
+                    advantages=rollout_advantages, sample_weights=weights,
+                    encoded_features=(rollout_features if reuse_rollout_features else None))
                 for report_index in rollout_report_indices:
                     reports[report_index]["policy_loss"] = rollout_loss
                 rollout_records.clear()
+                rollout_features.clear()
                 rollout_advantages.clear()
                 rollout_record_counts.clear()
                 rollout_report_indices.clear()

@@ -1377,6 +1377,13 @@ mode is an experiment for machines where process scaling or accelerator
 inference changes that tradeoff. See
 [the full benchmark](benchmarks.md#single-process-batched-ppo-inference-27-october-2026).
 
+An opt-in single-process PPO path now reuses the player-visible feature tensors
+computed when sampling each learner action. A matched four-game AB/BA run kept
+all replay bytes and policy tensors identical while reducing complete reported
+training time by about 2% and increasing observed peak RSS by 3,604 KiB. This
+is a modest local saving, not a change to the default or evidence of stronger
+play; see [the benchmark](benchmarks.md#reusing-visible-ppo-features-from-rollout-27-october-2026).
+
 Clipped PPO with frozen-parent KL now caches parent action probabilities once
 per recorded decision instead of recomputing them in each epoch. One matched
 native training game kept its 2,384-decision trajectory byte-identical and
