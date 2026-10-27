@@ -358,6 +358,13 @@ not replay decision reconstruction or an authorized human-data pipeline.
 An optional private-safe GOAT card-pool screen rejects all five modern
 samples without publishing their Deck card IDs; it is only an intake filter,
 not historical or training validation.
+The structural reader now retains the three legacy duel settings required
+to recreate startup. A separate private-safe setup screen compares the
+embedded legacy replay, when present, with this project's two-player,
+8000-LP, five-card, one-draw, exact-`DUEL_MODE_GOAT` profile. All five real
+modern samples fail; four differ in rule flags, and one also differs in LP
+and opening hand size. A match remains only a reconstruction candidate, not
+permission to train or evidence of historical correctness.
 Before using any `.yrp`/`.yrpX` for imitation, obtain a permitted real GOAT
 replay fixture, match its original core/scripts, recover each legal-action
 set and selected response, and pass the existing visibility and exact replay

@@ -5,7 +5,32 @@ import json
 from pathlib import Path
 
 from goat_ai.engine.decks import read_goat_whitelist
+from goat_ai.engine.ocgcore_probe import GOAT_FLAGS
 from goat_ai.replay import ReplayContainerError, read_edopro_container
+
+
+def goat_rules_screen(replay) -> dict:
+    """Check replay setup against the one native rules profile we currently run."""
+    deck_replay = replay.embedded_legacy_replay() or replay
+    settings = deck_replay.settings
+    if settings is None:
+        return {"goat_rules_screen": "unavailable_no_legacy_settings"}
+    mismatches = []
+    if deck_replay.player_count != 2:
+        mismatches.append("player_count")
+    if deck_replay.duel_flags != GOAT_FLAGS:
+        mismatches.append("duel_flags")
+    if settings.starting_life_points != 8000:
+        mismatches.append("starting_life_points")
+    if settings.opening_hand_size != 5:
+        mismatches.append("opening_hand_size")
+    if settings.draw_count != 1:
+        mismatches.append("draw_count")
+    return {
+        "goat_rules_screen": ("setup_candidate_only" if not mismatches
+                              else "unsupported_setup"),
+        "goat_rules_mismatches": mismatches,
+    }
 
 
 def goat_pool_screen(replay, whitelist: dict[int, int]) -> dict:
@@ -44,7 +69,8 @@ def main() -> None:
     for path in args.replays:
         try:
             replay = read_edopro_container(path)
-            report = {"path": str(path), **replay.summary()}
+            report = {"path": str(path), **replay.summary(),
+                      **goat_rules_screen(replay)}
             if whitelist is not None:
                 report.update(goat_pool_screen(replay, whitelist))
             summaries.append(report)

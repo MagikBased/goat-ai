@@ -58,6 +58,18 @@ matched. A response byte sequence still does not identify the corresponding
 player-visible observation or all legal actions. Do not train on it without
 re-running and validating the duel.
 
+The reader now retains the three `yrp1` duel settings that the pinned upstream
+`Replay::ParseParams` reads: starting LP, opening hand size, and cards drawn
+per turn. The inspection CLI screens those settings, two-player count, and
+the exact native `DUEL_MODE_GOAT` flag value supported by this project. It
+uses the embedded `yrp1` settings for `yrpX` when available. All five real
+modern samples fail this setup screen: four differ in duel flags alone; the
+2023 sample also differs in starting LP and opening hand size. A passing
+screen is only a setup candidate. It does not prove a historical ruling,
+card legality, the matching core/script revision, player-visible knowledge,
+or reconstructible decisions. The CLI still omits player names, Deck IDs,
+and response bytes from its report.
+
 An optional `--goat-whitelist .cache/goat-ai/banlist/GOAT.lflist.conf` screen
 reads the embedded Decks and reports only the number of Main/Extra cards
 absent from or forbidden by the pinned GOAT list, plus whether both Main

@@ -1,7 +1,7 @@
 """Source-layout replay container tests; no decision reconstruction claim."""
 
-import lzma
 import json
+import lzma
 import struct
 import sys
 
@@ -13,9 +13,9 @@ from goat_ai.replay.edopro_container import (
     EXTENDED_HEADER,
     HEADER,
     NEW_REPLAY,
-    ReplayContainerError,
     YRP1,
     YRPX,
+    ReplayContainerError,
     parse_edopro_container,
 )
 
@@ -44,11 +44,12 @@ def _container(magic: int, payload: bytes, *, compressed: bool = False,
     return header + body
 
 
-def _prefix(magic: int) -> bytes:
+def _prefix(magic: int, *, settings: tuple[int, int, int] = (8000, 5, 1),
+            duel_flags: int = 34226374444) -> bytes:
     names = (struct.pack("<I", 1) + _name("Private player A")
              + struct.pack("<I", 1) + _name("Private player B"))
-    settings = struct.pack("<III", 8000, 5, 1) if magic == YRP1 else b""
-    return names + settings + struct.pack("<Q", 34226374444)
+    encoded_settings = struct.pack("<III", *settings) if magic == YRP1 else b""
+    return names + encoded_settings + struct.pack("<Q", duel_flags)
 
 
 def test_yrp1_reads_decks_and_responses_without_exporting_private_values():
@@ -61,6 +62,10 @@ def test_yrp1_reads_decks_and_responses_without_exporting_private_values():
     assert replay.header.format == "yrp"
     assert replay.header.seed_words == (11, 12, 13, 14)
     assert replay.duel_flags == 34226374444
+    assert replay.settings is not None
+    assert (replay.settings.starting_life_points,
+            replay.settings.opening_hand_size,
+            replay.settings.draw_count) == (8000, 5, 1)
     assert replay.player_count == 2
     assert replay.decks[0].main == (10, 20)
     assert replay.decks[1].main == (30, 40, 50)
@@ -69,6 +74,9 @@ def test_yrp1_reads_decks_and_responses_without_exporting_private_values():
     assert summary["decision_reconstruction"] == "not_implemented"
     assert summary["main_deck_counts"] == [2, 3]
     assert summary["response_count"] == 2
+    assert summary["duel_settings"] == {
+        "starting_life_points": 8000, "opening_hand_size": 5, "draw_count": 1,
+    }
     assert "Private player" not in str(summary)
     assert "10, 20" not in str(summary)
 
@@ -78,6 +86,7 @@ def test_yrpx_reads_packet_stream_without_mislabeling_as_decisions():
                + bytes((41,)) + struct.pack("<I", 1) + b"C")
     replay = parse_edopro_container(_container(YRPX, payload))
     assert replay.header.format == "yrpX"
+    assert replay.settings is None
     assert [(p.message, p.payload) for p in replay.packets] == [
         (40, b"AB"), (41, b"C")]
     assert replay.summary()["packet_count"] == 2
@@ -100,6 +109,8 @@ def test_yrpx_exposes_bounded_embedded_yrp1_without_private_summary_values():
     assert embedded.header.format == "yrp"
     assert embedded.decks[0].main == (10, 20)
     assert embedded.responses == (b"\x05",)
+    assert embedded.settings is not None
+    assert embedded.settings.draw_count == 1
     summary = replay.summary()
     assert summary["selection_prompt_packet_count"] == 1
     assert summary["embedded_yrp_response_count"] == 1
@@ -151,6 +162,7 @@ def test_inspection_cli_outputs_only_structural_summary(tmp_path, monkeypatch, c
     report = json.loads(capsys.readouterr().out)
     assert report[0]["format"] == "yrpX"
     assert report[0]["decision_reconstruction"] == "not_implemented"
+    assert report[0]["goat_rules_screen"] == "unavailable_no_legacy_settings"
     assert "Private player" not in str(report)
 
 
@@ -175,6 +187,31 @@ def test_goat_pool_screen_reports_counts_without_private_card_ids(tmp_path,
     assert report["goat_extra_cards_outside_whitelist"] == 0
     assert report["goat_pool_screen"] == "outside_pool_or_deck_size"
     assert "30" not in str(report)
+
+
+def test_goat_rules_screen_rejects_wrong_setup_without_private_values():
+    from scripts.inspect_edopro_replay import goat_rules_screen
+
+    payload = (_prefix(YRP1, settings=(4000, 6, 2), duel_flags=0)
+               + struct.pack("<I", 0) * 5)
+    replay = parse_edopro_container(_container(YRP1, payload))
+    assert goat_rules_screen(replay) == {
+        "goat_rules_screen": "unsupported_setup",
+        "goat_rules_mismatches": ["duel_flags", "starting_life_points",
+                                  "opening_hand_size", "draw_count"],
+    }
+
+
+def test_goat_rules_screen_checks_embedded_legacy_settings():
+    from scripts.inspect_edopro_replay import goat_rules_screen
+
+    payload = _prefix(YRP1) + struct.pack("<I", 0) * 5
+    legacy = _container(YRP1, payload)
+    packet = bytes((231,)) + struct.pack("<I", len(legacy)) + legacy
+    replay = parse_edopro_container(_container(YRPX, _prefix(YRPX) + packet))
+    assert goat_rules_screen(replay) == {
+        "goat_rules_screen": "setup_candidate_only", "goat_rules_mismatches": [],
+    }
 
 
 @pytest.mark.parametrize("damage", (

@@ -55,6 +55,13 @@ class ReplayDeck:
 
 
 @dataclass(frozen=True)
+class ReplayDuelSettings:
+    starting_life_points: int
+    opening_hand_size: int
+    draw_count: int
+
+
+@dataclass(frozen=True)
 class ReplayPacket:
     message: int
     payload: bytes
@@ -69,6 +76,7 @@ class EdoReplayContainer:
     decks: tuple[ReplayDeck, ...]
     responses: tuple[bytes, ...]
     packets: tuple[ReplayPacket, ...]
+    settings: ReplayDuelSettings | None
 
     def embedded_legacy_replay(self) -> "EdoReplayContainer | None":
         """Read EDOPro's optional old-mode replay inside a yrpX stream."""
@@ -97,6 +105,11 @@ class EdoReplayContainer:
             "header_version": self.header.header_version,
             "player_count": self.player_count,
             "duel_flags": self.duel_flags,
+            "duel_settings": ({
+                "starting_life_points": self.settings.starting_life_points,
+                "opening_hand_size": self.settings.opening_hand_size,
+                "draw_count": self.settings.draw_count,
+            } if self.settings is not None else None),
             "main_deck_counts": [len(deck.main) for deck in self.decks],
             "extra_deck_counts": [len(deck.extra) for deck in self.decks],
             "response_count": len(self.responses),
@@ -208,8 +221,9 @@ def parse_edopro_container(data: bytes) -> EdoReplayContainer:
     player_count = sum(counts)
     if player_count > MAX_PLAYERS:
         raise ReplayContainerError("replay player count exceeds intake bound")
+    settings = None
     if magic == YRP1:
-        reader.take(12)  # starting LP, opening hand, draw count
+        settings = ReplayDuelSettings(reader.uint(), reader.uint(), reader.uint())
     duel_flags = reader.uint(8 if flags & DUEL_FLAG_64BIT else 4)
     if magic == YRP1 and flags & SINGLE_MODE:
         reader.take(reader.uint(2))  # single-player script name
@@ -238,7 +252,7 @@ def parse_edopro_container(data: bytes) -> EdoReplayContainer:
                           timestamp, size, header_version, seed_words)
     return EdoReplayContainer(header, hashlib.sha256(data).hexdigest(),
                               player_count, duel_flags, tuple(decks),
-                              tuple(responses), tuple(packets))
+                              tuple(responses), tuple(packets), settings)
 
 
 def read_edopro_container(path: str | Path) -> EdoReplayContainer:
