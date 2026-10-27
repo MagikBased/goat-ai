@@ -17,15 +17,20 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.replay.fingerprint import sha256_file
 from scripts.audit_hidden_opening_pool import candidate_deck
 
+MYSTICAL_SPACE_TYPHOON = 5318639
+
 
 class CardCannotBeSet(ValueError):
     """The native Main Phase offers no Set action for this card."""
 
 
 def reach_next_main_phase(own_deck: Path, opponent_deck: Path, root: Path,
-                          seed: int, hidden_code: int, zone: str = "spell_trap"):
+                          seed: int, hidden_code: int, zone: str = "spell_trap",
+                          target_hidden: bool = False):
     if zone not in ("spell_trap", "monster"):
         raise ValueError("zone must be spell_trap or monster")
+    if target_hidden and zone != "spell_trap":
+        raise ValueError("MST target audit requires spell_trap zone")
     set_kind = "set_spell_trap" if zone == "spell_trap" else "set_monster"
     location = 8 if zone == "spell_trap" else 4
     with GoatEnvironment(str(own_deck), str(opponent_deck), seed=seed,
@@ -60,6 +65,25 @@ def reach_next_main_phase(own_deck: Path, opponent_deck: Path, root: Path,
                     raise AssertionError("private Set identity differs from candidate")
                 if len(actions) < 2:
                     raise AssertionError("next Main Phase lacks alternative actions")
+                if target_hidden:
+                    activation = next((option for option in actions
+                                       if option.kind == "activate" and
+                                       option.parameters.get("code") == MYSTICAL_SPACE_TYPHOON),
+                                      None)
+                    if activation is None:
+                        raise AssertionError("MST activation absent at next Main Phase")
+                    observation = env.step(activation)
+                    actions = env.legal_actions()
+                    if actions and all(option.kind == "place" for option in actions):
+                        observation = env.step(actions[0])
+                        actions = env.legal_actions()
+                    target = [option for option in actions
+                              if option.kind == "select_card"
+                              and option.parameters.get("controller") == 1
+                              and option.parameters.get("location") == location
+                              and option.parameters.get("sequence") == hidden[0].sequence]
+                    if len(target) != 1 or target[0].parameters.get("code") is not None:
+                        raise AssertionError("hidden MST target unavailable or reveals ID")
                 return opening, (hidden[0].zone, hidden[0].sequence), (
                     observation, actions)
             if action is None:
@@ -79,11 +103,15 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=52)
     parser.add_argument("--zone", choices=("spell_trap", "monster"),
                         default="spell_trap", help="type of card the opponent Sets")
+    parser.add_argument("--target-hidden", action="store_true",
+                        help="compare MST target prompts after the opponent Sets backrow")
     parser.add_argument("--limit", type=int, help="audit only this many eligible IDs")
     parser.add_argument("--output", type=Path, help="write the complete JSON report")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be positive")
+    if args.target_hidden and args.zone != "spell_trap":
+        parser.error("--target-hidden requires --zone spell_trap")
 
     whitelist = args.native_root / "banlist/GOAT.lflist.conf"
     database = args.native_root / "database/cards.cdb"
@@ -106,13 +134,19 @@ def main() -> None:
     errors = []
     with tempfile.TemporaryDirectory(prefix="goat-hidden-set-") as directory:
         opponent = Path(directory) / "candidate.ydk"
+        own_deck = args.own_deck
+        if args.target_hidden:
+            own_deck = Path(directory) / "mst_probe.ydk"
+            own_deck.write_text("#main\n" + "\n".join(map(str, candidate_deck(
+                MYSTICAL_SPACE_TYPHOON))) + "\n#extra\n!side\n", encoding="utf-8")
+        own_deck_sha256 = sha256_file(own_deck)
         for code in codes:
             opponent.write_text("#main\n" + "\n".join(map(str, candidate_deck(code)))
                                 + "\n#extra\n!side\n", encoding="utf-8")
             try:
                 opening, slot, next_main = reach_next_main_phase(
-                    args.own_deck, opponent, args.native_root, args.seed, code,
-                    args.zone)
+                    own_deck, opponent, args.native_root, args.seed, code,
+                    args.zone, args.target_hidden)
                 if opening_baseline is None:
                     opening_baseline = opening
                 elif opening != opening_baseline:
@@ -130,11 +164,14 @@ def main() -> None:
                 errors.append({"code": code, "error": f"{type(exc).__name__}: {exc}"})
 
     report = {
-        "scope": "opening and next own Main Phase after opponent Sets one card",
+        "scope": ("opening and MST hidden-target prompt after opponent Sets one card"
+                  if args.target_hidden else
+                  "opening and next own Main Phase after opponent Sets one card"),
         "zone": args.zone,
         "seed": args.seed,
-        "own_deck": str(args.own_deck),
-        "own_deck_sha256": sha256_file(args.own_deck),
+        "own_deck": ("generated MST plus vanilla probe" if args.target_hidden
+                     else str(args.own_deck)),
+        "own_deck_sha256": own_deck_sha256,
         "whitelist_sha256": sha256_file(whitelist),
         "database_sha256": sha256_file(database),
         "core_sha256": sha256_file(core),

@@ -74,6 +74,23 @@ action. The full run recorded zero mismatches and zero errors in 25.55 seconds
 on this host. This checks one passive route to the following Main Phase; it
 does not validate chain responses, later reveals, or all possible field states.
 
+The same script can continue through activating Mystical Space Typhoon from a
+generated first-player Deck and compare the **target-selection** decision:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_hidden_set_pool.py \
+  --target-hidden --output .cache/goat-ai/hidden_mst_target_full_52.json
+```
+
+At seed 52, all 551 Settable Spell/Trap IDs retained a hidden target ID and
+identical player-zero observation and complete legal-action list within their
+public placement group (532 ordinary slots, 19 Field Spell slots). The same
+six placement-only cards had no manual Set action. The full run found zero
+mismatches and zero errors in 26.09 seconds on this host. A focused native
+regression compares ten common GOAT backrow cards at that prompt. This checks
+one target window before MST resolves; it does not establish that every chain
+response or subsequent public reveal is handled correctly.
+
 The same command accepts `--zone monster` to audit face-down monsters:
 
 ```bash

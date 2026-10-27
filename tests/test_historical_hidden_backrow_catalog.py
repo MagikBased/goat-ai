@@ -8,6 +8,7 @@ import pytest
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from scripts.audit_hidden_opening_pool import candidate_deck
 from scripts.audit_hidden_set_pool import CardCannotBeSet, reach_next_main_phase
 
 # Common GOAT Spells, Quick-Play Spells, Normal/Counter Traps, and GOAT variants.
@@ -81,6 +82,31 @@ def test_common_hidden_backrow_has_identical_opening_and_next_main_phase(tmp_pat
                 pytest.fail(f"next Main Phase was not reached for {hidden_code}")
 
     assert len(snapshots) == len(HIDDEN_BACKROW)
+    assert all(snapshot == snapshots[0] for snapshot in snapshots[1:])
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
+                    reason="native assets not installed")
+def test_common_hidden_backrow_has_identical_mst_target_choices(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    own = tmp_path / "mst_probe.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, candidate_deck(5318639)))
+                   + "\n#extra\n!side\n")
+    snapshots = []
+    for hidden_code in HIDDEN_BACKROW:
+        opponent = tmp_path / f"mst_hidden_{hidden_code}.ydk"
+        opponent.write_text("#main\n" + "\n".join(map(str, candidate_deck(hidden_code)))
+                            + "\n#extra\n!side\n")
+        opening, slot, target = reach_next_main_phase(
+            own, opponent, root, 52, hidden_code, target_hidden=True)
+        assert slot == ("spell_trap", 0)
+        assert target[0].known_opponent_field_cards == ()
+        assert target[0].private_reveals == ()
+        assert any(action.kind == "select_card"
+                   and action.parameters == {"location": 8, "sequence": 0,
+                                             "controller": 1}
+                   for action in target[1])
+        snapshots.append((opening, target))
     assert all(snapshot == snapshots[0] for snapshot in snapshots[1:])
 
 
