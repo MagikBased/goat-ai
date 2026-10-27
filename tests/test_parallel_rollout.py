@@ -1,0 +1,56 @@
+"""Parallel PPO rollout keeps seed-scoped samples and updates reproducible."""
+
+import copy
+import os
+from functools import partial
+from pathlib import Path
+
+import pytest
+import torch
+
+from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
+from goat_ai.training.policy import CardVocabulary, LegalActionPolicy
+from goat_ai.training.self_play import train_against_snapshot_pool
+
+ROOT = Path(__file__).resolve().parents[1]
+VANILLA = ROOT / "examples/decks/vanilla_probe.ydk"
+REVERSE = ROOT / "examples/decks/vanilla_reverse.ydk"
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_worker_count_preserves_rollout_trajectories_and_update():
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    vocabulary = CardVocabulary.from_goat_whitelist(
+        native_root / "banlist/GOAT.lflist.conf")
+    torch.manual_seed(79)
+    initial = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    results = []
+    for workers in (1, 2):
+        model = copy.deepcopy(initial)
+        episodes = []
+        reports = train_against_snapshot_pool(
+            model, vocabulary, ((str(VANILLA), str(REVERSE)),),
+            (90000, 90001), partial(RestrictedOcgcoreEngine, native_root),
+            policy_update="clipped_ppo", ppo_rollout_games=2,
+            rollout_workers=workers, snapshot_every=2,
+            ppo_epochs=1, ppo_batch_size=8, historical_probability=0.5,
+            max_decisions=2000, random_seed=79,
+            record_episode=lambda _, episode, sink=episodes: sink.append(episode),
+        )
+        assert len(episodes) == 2
+        assert all(report["status"] == "terminal" for report in reports)
+        results.append((reports, episodes, model.state_dict()))
+    serial, parallel = results
+    assert serial[:2] == parallel[:2]
+    assert all(torch.equal(serial[2][name], parallel[2][name])
+               for name in serial[2])
+
+
+def test_parallel_rollout_requires_multi_game_ppo():
+    vocabulary = CardVocabulary((1,))
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    with pytest.raises(ValueError, match="parallel rollout needs multi-duel PPO"):
+        train_against_snapshot_pool(
+            model, vocabulary, (("a", "b"),), (1,), lambda: None,
+            rollout_workers=2,
+        )

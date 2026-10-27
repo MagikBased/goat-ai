@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from dataclasses import replace
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 
@@ -82,6 +83,8 @@ def main() -> None:
     parser.add_argument("--ppo-clip-epsilon", type=float, default=0.2)
     parser.add_argument("--ppo-rollout-games", type=int, default=1,
                         help="collect this many terminal duels under one frozen policy before PPO updates")
+    parser.add_argument("--rollout-workers", type=int, default=0,
+                        help="opt-in independent CPU processes per frozen PPO rollout; 0 preserves prior sampling")
     parser.add_argument("--ppo-rollout-weighting", choices=("per_decision", "per_episode"),
                         default="per_decision",
                         help="per_episode equalizes total decision weight across rollout duels")
@@ -110,6 +113,7 @@ def main() -> None:
             or args.reinforce_batch_size < 1
             or args.ppo_epochs < 1 or args.ppo_batch_size < 1
             or args.ppo_rollout_games < 1
+            or args.rollout_workers < 0
             or not 0 < args.ppo_clip_epsilon < 1
             or not 0 <= args.historical_probability <= 1):
         parser.error("invalid training schedule or hyperparameters")
@@ -167,7 +171,7 @@ def main() -> None:
 
     reports = train_against_snapshot_pool(
         agent.model, agent.vocabulary, matchups, seeds,
-        lambda: engine_type(args.native_root),
+        partial(engine_type, args.native_root),
         learning_rate=args.learning_rate,
         historical_probability=args.historical_probability,
         snapshot_every=args.snapshot_every, max_snapshots=args.max_snapshots,
@@ -182,6 +186,7 @@ def main() -> None:
         ppo_batch_size=args.ppo_batch_size,
         ppo_clip_epsilon=args.ppo_clip_epsilon,
         ppo_rollout_games=args.ppo_rollout_games,
+        rollout_workers=args.rollout_workers,
         ppo_rollout_weighting=args.ppo_rollout_weighting,
         schedule_mode=args.schedule_mode,
         value_model=value_model,
@@ -232,6 +237,7 @@ def main() -> None:
                                    if args.policy_update == "clipped_ppo" else None),
               "ppo_rollout_games": (args.ppo_rollout_games
                                     if args.policy_update == "clipped_ppo" else None),
+              "rollout_workers": args.rollout_workers,
               "ppo_rollout_weighting": (args.ppo_rollout_weighting
                                         if args.policy_update == "clipped_ppo" else None),
               "value_width": args.value_width if value_model is not None else None,

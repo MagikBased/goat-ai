@@ -3,8 +3,10 @@
 import copy
 import random
 from collections.abc import Callable, Sequence
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, replace
 from math import isfinite
+from multiprocessing import get_context
 
 import torch
 from torch import nn
@@ -157,6 +159,30 @@ def run_learning_episode(
                 return EpisodeResult(seed, learner_seat, env.result(), count,
                                      tuple(records), trajectory)
     raise EpisodeDecisionLimit(seed, max_decisions)
+
+
+def _parallel_rollout_worker(task):
+    """Collect one CPU duel with a per-episode sampling stream."""
+    (model_state, vocabulary, width, feature_version, opponent_state, decks,
+     seed, learner_seat, engine_factory, max_decisions, temperature,
+     generator_seed) = task
+    torch.set_num_threads(1)
+    model = LegalActionPolicy(vocabulary.size, width=width,
+                              feature_version=feature_version)
+    model.load_state_dict(model_state)
+    model.eval()
+    generator = torch.Generator(device="cpu").manual_seed(generator_seed)
+    if opponent_state is None:
+        opponent: Agent = RandomAgent(seed)
+    else:
+        frozen = LegalActionPolicy(vocabulary.size, width=width,
+                                   feature_version=feature_version)
+        frozen.load_state_dict(opponent_state)
+        frozen.eval()
+        opponent = SamplingPolicyAgent(frozen, vocabulary, generator)
+    return run_learning_episode(model, vocabulary, opponent, decks, seed,
+                                learner_seat, engine_factory, generator,
+                                max_decisions, temperature)
 
 
 def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
@@ -418,6 +444,7 @@ def train_against_snapshot_pool(
     ppo_clip_epsilon: float = 0.2,
     ppo_rollout_games: int = 1,
     ppo_rollout_weighting: str = "per_decision",
+    rollout_workers: int = 0,
     skip_capped_games: bool = False,
     skip_unsupported_games: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
@@ -441,6 +468,7 @@ def train_against_snapshot_pool(
     if (policy_update not in ("reinforce", "clipped_ppo")
             or reinforce_batch_size < 1 or ppo_epochs < 1
             or ppo_batch_size < 1 or ppo_rollout_games < 1
+            or rollout_workers < 0
             or ppo_rollout_weighting not in ("per_decision", "per_episode")
             or not 0 < ppo_clip_epsilon < 1):
         raise ValueError("invalid self-play policy update")
@@ -450,6 +478,11 @@ def train_against_snapshot_pool(
                                   or snapshot_every % ppo_rollout_games):
         raise ValueError("multi-duel PPO requires terminal duels, a moving baseline, "
                          "and snapshot intervals divisible by rollout size")
+    if rollout_workers and (policy_update != "clipped_ppo"
+                            or ppo_rollout_games < 2
+                            or skip_capped_games or skip_unsupported_games
+                            or baseline_scope == "state_value"):
+        raise ValueError("parallel rollout needs multi-duel PPO and terminal games")
     if (policy_update == "clipped_ppo" and
             (model.feature_version < 10 or model.feature_version in (14, 15))):
         raise ValueError("clipped PPO requires a supported batched policy version")
@@ -472,123 +505,161 @@ def train_against_snapshot_pool(
     rollout_advantages: list[float] = []
     rollout_record_counts: list[int] = []
     rollout_report_indices: list[int] = []
-    for index, (seed, decks, learner_seat) in enumerate(episode_schedule(
-            matchups, seeds, mode=schedule_mode)):
-        if rng.random() < historical_probability:
-            snapshot_index = rng.randrange(len(snapshots))
-            frozen = LegalActionPolicy(vocabulary.size, width=model.card.embedding_dim,
-                                       feature_version=model.feature_version)
-            frozen.load_state_dict(snapshots[snapshot_index])
-            frozen.eval()
+    schedule = episode_schedule(matchups, seeds, mode=schedule_mode)
+    pool = (ProcessPoolExecutor(max_workers=min(rollout_workers, ppo_rollout_games),
+                                mp_context=get_context("spawn"))
+            if rollout_workers > 1 else None)
+    try:
+        parallel_batch: dict[int, tuple[EpisodeResult, str]] = {}
+        for index, (seed, decks, learner_seat) in enumerate(schedule):
+            if rollout_workers and index % ppo_rollout_games == 0:
+                model_state = copy.deepcopy(model.state_dict())
+                tasks = []
+                names = []
+                for batch_index in range(index, min(index + ppo_rollout_games, len(schedule))):
+                    batch_seed, batch_decks, batch_seat = schedule[batch_index]
+                    snapshot_index = (rng.randrange(len(snapshots))
+                                      if rng.random() < historical_probability else None)
+                    names.append(f"snapshot_{snapshot_index}" if snapshot_index is not None
+                                 else "random")
+                    tasks.append((model_state, vocabulary, model.card.embedding_dim,
+                                  model.feature_version,
+                                  snapshots[snapshot_index] if snapshot_index is not None else None,
+                                  batch_decks, batch_seed, batch_seat, engine_factory,
+                                  max_decisions, learner_temperature,
+                                  random_seed + batch_seed))
+                if rollout_workers == 1:
+                    previous_threads = torch.get_num_threads()
+                    try:
+                        episodes = list(map(_parallel_rollout_worker, tasks))
+                    finally:
+                        torch.set_num_threads(previous_threads)
+                else:
+                    episodes = list(pool.map(_parallel_rollout_worker, tasks))
+                parallel_batch = {batch_index: (episode, name)
+                                  for batch_index, (episode, name) in enumerate(
+                                      zip(episodes, names, strict=True), start=index)}
+            if rollout_workers:
+                episode, opponent_name = parallel_batch.pop(index)
+            else:
+                if rng.random() < historical_probability:
+                    snapshot_index = rng.randrange(len(snapshots))
+                    frozen = LegalActionPolicy(vocabulary.size, width=model.card.embedding_dim,
+                                               feature_version=model.feature_version)
+                    frozen.load_state_dict(snapshots[snapshot_index])
+                    frozen.eval()
 
-            opponent: Agent = SamplingPolicyAgent(frozen, vocabulary, generator)
-            opponent_name = f"snapshot_{snapshot_index}"
-        else:
-            opponent = RandomAgent(seed)
-            opponent_name = "random"
-        try:
-            episode = run_learning_episode(model, vocabulary, opponent, decks, seed,
-                                           learner_seat, engine_factory, generator,
-                                           max_decisions, learner_temperature)
-        except EpisodeDecisionLimit:
-            if not skip_capped_games:
-                raise
-            reports.append({"seed": seed, "learner_seat": learner_seat,
-                            "decks": decks, "opponent": opponent_name,
-                            "status": "decision_limit", "decisions": max_decisions,
-                            "learner_decisions": 0, "policy_loss": None,
-                            "value_loss": None})
-            continue
-        except SimulatorUnavailable as exc:
-            if not skip_unsupported_games:
-                raise
-            reports.append({"seed": seed, "learner_seat": learner_seat,
-                            "decks": decks, "opponent": opponent_name,
-                            "status": "simulator_unavailable", "error": str(exc),
-                            "learner_decisions": 0, "policy_loss": None,
-                            "value_loss": None})
-            continue
-        if record_episode is not None:
-            record_episode(index, episode)
-        baseline_key = decks[learner_seat] if baseline_scope == "learner_deck" else "global"
-        state_baselines = (predict_state_values(
-            value_model, vocabulary, episode.learner_records, model.feature_version)
-            if value_model is not None and episode.learner_records else None)
-        baseline = (sum(state_baselines) / len(state_baselines)
-                    if state_baselines else baselines.get(baseline_key, 0.0))
-        loss = None
-        if episode.learner_records:
-            if policy_update == "clipped_ppo":
-                if ppo_rollout_games == 1:
-                    loss = ppo_clipped_update(
+                    opponent: Agent = SamplingPolicyAgent(frozen, vocabulary, generator)
+                    opponent_name = f"snapshot_{snapshot_index}"
+                else:
+                    opponent = RandomAgent(seed)
+                    opponent_name = "random"
+                try:
+                    episode = run_learning_episode(model, vocabulary, opponent, decks, seed,
+                                                   learner_seat, engine_factory, generator,
+                                                   max_decisions, learner_temperature)
+                except EpisodeDecisionLimit:
+                    if not skip_capped_games:
+                        raise
+                    reports.append({"seed": seed, "learner_seat": learner_seat,
+                                    "decks": decks, "opponent": opponent_name,
+                                    "status": "decision_limit", "decisions": max_decisions,
+                                    "learner_decisions": 0, "policy_loss": None,
+                                    "value_loss": None})
+                    continue
+                except SimulatorUnavailable as exc:
+                    if not skip_unsupported_games:
+                        raise
+                    reports.append({"seed": seed, "learner_seat": learner_seat,
+                                    "decks": decks, "opponent": opponent_name,
+                                    "status": "simulator_unavailable", "error": str(exc),
+                                    "learner_decisions": 0, "policy_loss": None,
+                                    "value_loss": None})
+                    continue
+            if record_episode is not None:
+                record_episode(index, episode)
+            baseline_key = decks[learner_seat] if baseline_scope == "learner_deck" else "global"
+            state_baselines = (predict_state_values(
+                value_model, vocabulary, episode.learner_records, model.feature_version)
+                if value_model is not None and episode.learner_records else None)
+            baseline = (sum(state_baselines) / len(state_baselines)
+                        if state_baselines else baselines.get(baseline_key, 0.0))
+            loss = None
+            if episode.learner_records:
+                if policy_update == "clipped_ppo":
+                    if ppo_rollout_games == 1:
+                        loss = ppo_clipped_update(
+                            model, vocabulary, episode.learner_records,
+                            episode.reward, baseline, optimizer,
+                            epochs=ppo_epochs, batch_size=ppo_batch_size,
+                            clip_epsilon=ppo_clip_epsilon,
+                            entropy_coefficient=entropy_coefficient,
+                            temperature=learner_temperature,
+                            state_baselines=state_baselines,
+                            parent_model=parent_model,
+                            parent_kl_weight=parent_kl_weight,
+                            random_seed=random_seed + seed)
+                    else:
+                        rollout_records.extend(episode.learner_records)
+                        rollout_advantages.extend(
+                            [episode.reward - baseline] * len(episode.learner_records))
+                        rollout_record_counts.append(len(episode.learner_records))
+                        rollout_report_indices.append(len(reports))
+                else:
+                    loss = policy_gradient_update(
                         model, vocabulary, episode.learner_records,
                         episode.reward, baseline, optimizer,
-                        epochs=ppo_epochs, batch_size=ppo_batch_size,
-                        clip_epsilon=ppo_clip_epsilon,
-                        entropy_coefficient=entropy_coefficient,
+                        entropy_coefficient,
                         temperature=learner_temperature,
                         state_baselines=state_baselines,
+                        reduction=policy_gradient_reduction,
                         parent_model=parent_model,
                         parent_kl_weight=parent_kl_weight,
-                        random_seed=random_seed + seed)
-                else:
-                    rollout_records.extend(episode.learner_records)
-                    rollout_advantages.extend(
-                        [episode.reward - baseline] * len(episode.learner_records))
-                    rollout_record_counts.append(len(episode.learner_records))
-                    rollout_report_indices.append(len(reports))
-            else:
-                loss = policy_gradient_update(
-                    model, vocabulary, episode.learner_records,
-                    episode.reward, baseline, optimizer,
-                    entropy_coefficient,
+                        batch_size=reinforce_batch_size)
+            value_loss = (state_value_update(
+                value_model, vocabulary, episode.learner_records, episode.reward,
+                model.feature_version, value_optimizer)
+                if value_model is not None and episode.learner_records else None)
+            if value_model is None:
+                baselines[baseline_key] = 0.95 * baseline + 0.05 * episode.reward
+            reports.append({"seed": seed, "learner_seat": learner_seat,
+                            "decks": decks, "opponent": opponent_name,
+                            "status": "terminal",
+                            "deck_sha256": episode.trajectory.deck_sha256,
+                            "asset_sha256": episode.trajectory.asset_sha256,
+                            "rules_profile": episode.trajectory.rules_profile,
+                            "winner": episode.winner, "reward": episode.reward,
+                            "baseline": baseline,
+                            "decisions": episode.decisions,
+                            "learner_decisions": len(episode.learner_records),
+                            "policy_loss": loss, "value_loss": value_loss})
+            if (ppo_rollout_games > 1 and rollout_records
+                    and ((index + 1) % ppo_rollout_games == 0 or index + 1 == len(seeds))):
+                weights = None
+                if ppo_rollout_weighting == "per_episode":
+                    weights = [len(rollout_records) / (len(rollout_record_counts) * count)
+                               for count in rollout_record_counts for _ in range(count)]
+                rollout_loss = ppo_clipped_update(
+                    model, vocabulary, rollout_records, 0.0, 0.0, optimizer,
+                    epochs=ppo_epochs, batch_size=ppo_batch_size,
+                    clip_epsilon=ppo_clip_epsilon,
+                    entropy_coefficient=entropy_coefficient,
                     temperature=learner_temperature,
-                    state_baselines=state_baselines,
-                    reduction=policy_gradient_reduction,
                     parent_model=parent_model,
                     parent_kl_weight=parent_kl_weight,
-                    batch_size=reinforce_batch_size)
-        value_loss = (state_value_update(
-            value_model, vocabulary, episode.learner_records, episode.reward,
-            model.feature_version, value_optimizer)
-            if value_model is not None and episode.learner_records else None)
-        if value_model is None:
-            baselines[baseline_key] = 0.95 * baseline + 0.05 * episode.reward
-        reports.append({"seed": seed, "learner_seat": learner_seat,
-                        "decks": decks, "opponent": opponent_name,
-                        "status": "terminal",
-                        "deck_sha256": episode.trajectory.deck_sha256,
-                        "asset_sha256": episode.trajectory.asset_sha256,
-                        "rules_profile": episode.trajectory.rules_profile,
-                        "winner": episode.winner, "reward": episode.reward,
-                        "baseline": baseline,
-                        "decisions": episode.decisions,
-                        "learner_decisions": len(episode.learner_records),
-                        "policy_loss": loss, "value_loss": value_loss})
-        if (ppo_rollout_games > 1 and rollout_records
-                and ((index + 1) % ppo_rollout_games == 0 or index + 1 == len(seeds))):
-            weights = None
-            if ppo_rollout_weighting == "per_episode":
-                weights = [len(rollout_records) / (len(rollout_record_counts) * count)
-                           for count in rollout_record_counts for _ in range(count)]
-            rollout_loss = ppo_clipped_update(
-                model, vocabulary, rollout_records, 0.0, 0.0, optimizer,
-                epochs=ppo_epochs, batch_size=ppo_batch_size,
-                clip_epsilon=ppo_clip_epsilon,
-                entropy_coefficient=entropy_coefficient,
-                temperature=learner_temperature,
-                parent_model=parent_model,
-                parent_kl_weight=parent_kl_weight,
-                random_seed=random_seed + seed,
-                advantages=rollout_advantages, sample_weights=weights)
-            for report_index in rollout_report_indices:
-                reports[report_index]["policy_loss"] = rollout_loss
-            rollout_records.clear()
-            rollout_advantages.clear()
-            rollout_record_counts.clear()
-            rollout_report_indices.clear()
-        if (index + 1) % snapshot_every == 0:
-            snapshots.append(copy.deepcopy(model.state_dict()))
-            if len(snapshots) > max_snapshots:
-                snapshots.pop(1)  # keep the initial teacher in the pool
+                    random_seed=random_seed + seed,
+                    advantages=rollout_advantages, sample_weights=weights)
+                for report_index in rollout_report_indices:
+                    reports[report_index]["policy_loss"] = rollout_loss
+                rollout_records.clear()
+                rollout_advantages.clear()
+                rollout_record_counts.clear()
+                rollout_report_indices.clear()
+            if (index + 1) % snapshot_every == 0:
+                snapshots.append(copy.deepcopy(model.state_dict()))
+                if len(snapshots) > max_snapshots:
+                    snapshots.pop(1)  # keep the initial teacher in the pool
+    finally:
+        if pool is not None:
+            pool.shutdown()
     return tuple(reports)

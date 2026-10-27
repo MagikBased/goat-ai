@@ -1,5 +1,45 @@
 # Baseline evaluation log
 
+## Parallel frozen-policy PPO rollouts (27 October 2026)
+
+The multi-duel PPO path now has an opt-in `--rollout-workers` setting. A frozen
+learner and frozen snapshot opponent are copied at the start of each rollout
+group; independent native duels run in CPU worker processes, and their results
+are returned in schedule order before the PPO update. Worker processes stay
+alive across groups. Each duel uses a seed-scoped Torch sampling generator,
+so changing the worker count within this opt-in mode preserves sampled play.
+The default `0` retains the earlier sequential sampling stream. One worker is
+useful as a deterministic reference; more than one enables concurrency. This
+path requires multi-duel PPO with terminal games and a moving baseline; it
+does not parallelize REINFORCE or an individual duel.
+
+On the Phoenix Control versus WikiFormat Dimension Fusion matchup, seeds
+14860–14867, eight games in two frozen four-game PPO groups, the one-worker
+run took **14.07 s** end to end and the persistent four-worker run **11.46 s**
+(`time` wall clock, **1.23×** speedup). Training-reported wall time was
+12.73 versus 10.12 s. Both runs had 5 wins, 3 losses, 1,290 learner
+decisions, identical per-game reports and trajectory content hashes, and
+bit-identical model tensors after both updates. The four-worker run's eight
+replays passed full native verification and visibility audit across **5,592
+decisions**. These timings include Python launch, rollout, PPO updates,
+trajectory writing, hashing, and checkpoint writing. They are one measured
+schedule on this machine, not a general scaling claim; process startup and
+trajectory transfer limit the gain for short runs.
+
+The ignored one-worker and four-worker JSON reports are
+`.cache/goat-ai/ppo_parallel_long_serial_14860.json` (SHA-256
+`977bfdf9f6c6f6192ecc3ff7b5c5596b2f6d10d19f8b3ed4eb88606b970a4e94`)
+and `.cache/goat-ai/ppo_parallel_persistent_workers4_14860.json`
+(`33830b74bd0e7e5ea9a11be34fc31eae773260e363db3fed4797d30148f214d1`).
+The replay audit is `.cache/goat-ai/ppo_parallel_persistent_14860_audit.json`
+(`04edbe48ff5e0749a0cfd7df67307fafe9d162915f56b733bed90d057b68844c`).
+Reproduce with `scripts/train_self_play.py`, the feature-v23 four-deck parent,
+`--engine experimental`, the two listed deck paths, `--seed 14860 --games 8
+--max-decisions 3000 --policy-update clipped_ppo --ppo-rollout-games 4
+--ppo-epochs 2 --ppo-batch-size 16 --snapshot-every 4`, and
+`--rollout-workers 1` or `4`. Use distinct `--output` paths. This is a
+throughput optimization; no policy-strength improvement is claimed.
+
 ## New Jersey 2005 Phoenix Control holdout (27 October 2026)
 
 [Roberto Martinez's SJC New Jersey 2005 Top 8 list](https://www.goatformat.com/home/top-8-decklists)
