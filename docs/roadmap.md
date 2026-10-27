@@ -124,6 +124,22 @@ all **25,833** decisions replay-verified. The ignored report is
 `.cache/goat-ai/random-probe-distinct-10000-fixed/report.json` (SHA-256
 `86576a1cf12a0836956348ee6a48735d1698e96295de1cc1f049654a038fd378`).
 
+Fresh independent-opponent whitelist sweeps on seeds 10124–10147 and
+10148–10247 reached **124/124 terminal duels** under 3,000 decisions,
+with **129,521/129,521 decisions** replay-verified and visibility-audited.
+The 248 generated Main Deck files had distinct hashes. The larger sweep
+exercised 32 action kinds and loaded 1,306 distinct pinned native assets.
+The ignored reports are
+`.cache/goat-ai/random-probe-distinct-10124-10147/report.json` (SHA-256
+`2a1c88991aa70f941d5198ee5c082544cbd39e41301215c062002e498daaf4d2`)
+and `.cache/goat-ai/random-probe-distinct-10148-10247/report.json`
+(SHA-256 `105427a10511dba17838af22f13edd3a6ef6de584d1be342a840f82ca6f86f2b`).
+Both were produced at project commit `f2c209d` with
+`scripts/probe_random_decks.py` SHA-256
+`a5da3951f901b75a135d5db2c6b840c496e12f0e90d8b1d4ae7bde76411f6856`.
+This is broad protocol and information-boundary evidence, not a ruling audit
+for all cards loaded or a proof of GOAT-correct outcomes.
+
 The next 100 independent whitelist-deck pairs on seeds 10024–10123 initially
 yielded 93 terminal, replay-verified duels. A SHA-guarded in-memory correction
 fixed three pinned Firebird battle callback crashes. Bounded native
@@ -210,6 +226,12 @@ when Typhoon targets a Set Break. Chaining Break pays its discard and destroys
 an opposing monster before Typhoon removes Break; passing preserves the
 monster. Both complete duels replay-verify and pass the visibility audit; see
 [GOAT rules](goat_rules.md).
+
+A battle-flip Magical Merchant fixture now confirms that an attacked Set
+Merchant resolves its excavation while still on the field, then reaches the
+Graveyard after the Damage Step. The public excavation, opponent's known-hand
+card, hidden attack-target choice, complete replay, and visibility audit all
+pass; see [GOAT rules](goat_rules.md).
 
 A paired Metamorphosis fixture now confirms that Raigeki Break can discard a
 card and destroy the activated Normal Spell without stopping its Fusion

@@ -10,6 +10,7 @@ from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 MAGICAL_MERCHANT = 32362575
@@ -162,3 +163,96 @@ def test_magical_merchant_without_spell_reveals_deck_and_adds_nothing(tmp_path):
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Magical Merchant did not reveal its Spell-free Deck")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_battle_destroyed_merchant_still_resolves_flip_effect(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (MAGICAL_MERCHANT, POT_OF_GREED):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    deck = tmp_path / "merchant_battle.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        MAGICAL_MERCHANT, MAGICAL_MERCHANT, MAGICAL_MERCHANT,
+        POT_OF_GREED, *VANILLA_DECK[4:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=10,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert MAGICAL_MERCHANT in {card.code for card in obs.hand}
+        assert POT_OF_GREED not in {card.code for card in obs.hand}
+        merchant_set = attacker_summoned = attacked = effect_checked = checked = False
+        deck_before = hand_before = None
+        grave_before = Counter()
+        agents = (RandomAgent(10), RandomAgent(11))
+        for _ in range(3000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / "merchant_battle.json"
+                write_trajectory(path, env.trajectory())
+                replay = read_trajectory(path)
+                assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) \
+                    == len(replay.decisions)
+                audit_trajectory_visibility(replay)
+                return
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not merchant_set:
+                action = next((candidate for candidate in actions
+                               if candidate.kind == "set_monster"
+                               and candidate.parameters.get("code") == MAGICAL_MERCHANT), None)
+                merchant_set = action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and merchant_set:
+                if obs.phase == "main1" and not attacker_summoned:
+                    action = next((candidate for candidate in actions
+                                   if candidate.kind == "normal_summon"), None)
+                    attacker_summoned = action is not None
+                elif obs.phase == "main1" and attacker_summoned:
+                    action = next((candidate for candidate in actions
+                                   if candidate.kind == "battle_phase"), None)
+                elif obs.phase == "battle_start" and not attacked:
+                    action = next((candidate for candidate in actions
+                                   if candidate.kind == "attack"), None)
+                    if action is not None:
+                        deck_before = obs.deck_counts[0]
+                        hand_before = obs.opponent_hand_count
+                        grave_before = Counter(card.code for card in obs.graveyards[0])
+                        attacked = True
+                elif attacked and actions[0].kind == "select_card":
+                    action = next((candidate for candidate in actions
+                                   if candidate.parameters.get("controller") == 0
+                                   and candidate.parameters.get("location") == 4), None)
+                    if action is not None:
+                        assert "code" not in action.parameters
+            if action is None and not checked:
+                action = next((candidate for candidate in actions
+                               if candidate.kind in ("place", "pass", "end_phase")),
+                              actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+            if attacked and not effect_checked and POT_OF_GREED in {
+                    card.code for card in env.engine.probe.observation(0).hand}:
+                owner = env.engine.probe.observation(0)
+                opponent = env.engine.probe.observation(1)
+                milled = Counter(card.code for card in owner.graveyards[0]) - grave_before
+                # Flip effects resolve after damage calculation, while the
+                # battle-destroyed monster has not yet reached the Graveyard.
+                assert milled[MAGICAL_MERCHANT] == 0
+                reveal = next(event for event in owner.public_reveals
+                              if event.player == 0 and event.zone == "deck_top"
+                              and POT_OF_GREED in event.codes)
+                assert Counter(reveal.codes) == milled + Counter((POT_OF_GREED,))
+                assert owner.deck_counts[0] == deck_before - len(reveal.codes)
+                assert len(owner.hand) == hand_before + 1
+                assert opponent.known_opponent_hand_cards == (POT_OF_GREED,)
+                assert any(card.code == MAGICAL_MERCHANT for card in owner.field)
+                assert f"official/c{MAGICAL_MERCHANT}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                effect_checked = True
+            if effect_checked and not checked and MAGICAL_MERCHANT in {
+                    card.code for card in obs.graveyards[0]}:
+                assert all(card.code != MAGICAL_MERCHANT for card in
+                           env.engine.probe.observation(0).field)
+                checked = True
+    pytest.fail("battle-destroyed Magical Merchant effect did not resolve")
