@@ -7,6 +7,7 @@ from scripts import compare_value_architectures as critic_comparison
 from scripts.compare_value_architectures import (
     VisibleResourceValue,
     fit_resource_ridge,
+    seed_clustered_difference_interval,
     selected_records,
 )
 
@@ -77,3 +78,10 @@ def test_resource_ridge_weights_complete_games_equally(monkeypatch) -> None:
     mse, coefficients = fit_resource_ridge(games, None, 23)
     assert abs(coefficients[-1]) < 1e-12
     assert mse(games) == (1.0, 1.0)
+
+
+def test_seed_bootstrap_keeps_all_seats_and_matchups_in_one_block() -> None:
+    assert seed_clustered_difference_interval(
+        (1, 1, 3, 3), (0, 0, 0, 0), (10, 10, 20, 20), 171) == (1, 3)
+    with pytest.raises(ValueError, match="equal nonempty"):
+        seed_clustered_difference_interval((1,), (0,), (), 171)

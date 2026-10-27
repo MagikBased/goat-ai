@@ -98,7 +98,8 @@ def main() -> None:
                         required=True, metavar=("DECK1", "DECK2"))
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--opponent", choices=("combat_heuristic", "combat_flip",
-                                               "tactical", "heuristic", "random"),
+                                               "tactical", "heuristic", "random",
+                                               "mirror_policy"),
                         default="tactical")
     parser.add_argument("--seed", type=int, default=12000)
     parser.add_argument("--seeds", type=int, default=8)

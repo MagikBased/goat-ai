@@ -1772,6 +1772,15 @@ new unseen-Main-Deck pairing, but both 16-game paired intervals cross zero.
 It remains an outcome-prediction diagnostic; no self-play policy gain has
 been shown. See [the fixed-policy check](evaluation.md#fixed-policy-resource-regression-check-27-october-2026).
 
+Frozen checkpoint mirror self-play separated value-model training from policy
+updates. The Tactical-trained ridge lost to a zero-return baseline on mirror
+games. A ridge trained on 96 mirror records then reduced outcome MSE to 0.727
+on 32 held-out records and 0.790 on 16 different-deck records, against 1.000
+for zero on both. The different-deck interval uses only four seed blocks.
+This supports an opt-in PPO advantage-baseline ablation, followed by paired
+held-out competitive evaluation; it does not yet satisfy M4's policy-strength
+gate. See [the mirror check](evaluation.md#frozen-mirror-self-play-value-transfer-27-october-2026).
+
 An opt-in leave-one-out PPO baseline now uses other terminal duels from the
 same rollout and learner deck to reduce return variance without consulting
 the acting agent's hidden state. A matched 32-game ablation replay-verified

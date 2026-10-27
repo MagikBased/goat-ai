@@ -224,6 +224,88 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/compare_value_archit
   --output .cache/goat-ai/fixed_policy_resource_ridge_44000_48103.json
 ```
 
+## Frozen mirror self-play value transfer (27 October 2026)
+
+The policy recorder now supports `--opponent mirror_policy`: it loads the same
+frozen checkpoint independently for each seat and records the opponent
+checkpoint hash. This makes a deterministic self-play value diagnostic without
+PPO changing the policy during data collection. With both `--policy-seat`
+values on each seed/deck assignment, a physical duel is recorded twice, once
+for each player's outcome perspective. These are **not independent duels**;
+uncertainty below resamples whole seed blocks, keeping both assignments and
+perspectives together. All replays were native verified and visibility audited.
+
+First, the six-resource ridge fitted on policy-versus-Tactical games above
+was tested on **16 mirror records** (eight distinct duels) from Phoenix
+Control versus Guide Dimension Fusion Turbo, both assignments, seeds
+48200–48203. It scored **1.071** per-game outcome MSE. The Tactical-trained
+constant scored 1.210, but a zero-return mirror baseline scored **1.000**.
+The ridge-minus-zero seed-clustered bootstrap 95% interval was **+0.003 to
++0.141**. This fit does not justify use in self-play PPO.
+
+A separate ridge was then fitted on **96 mirror records** from 2005 Rhymus
+Goat Control versus Charlotte Zombie, both assignments and perspectives,
+seeds 48300–48323. The remaining **32 records**, seeds 48324–48331, were
+held out; the Phoenix/Dimension 16 records supplied a different-deck check.
+The 128 Rhymus/Zombie records contain 64 distinct frozen-policy duels and
+**68,840** decisions. The final comparison independently replay-verified and
+visibility-audited **77,124** decisions across all 144 records. The ridge
+uses only six acting-player-visible resource differences, equal total weight
+per recorded perspective, fixed L2 shrinkage, and no hidden card identities.
+
+| Predictor | Held-out Rhymus/Zombie MSE | Phoenix/Dimension MSE |
+| --- | ---: | ---: |
+| Zero-return mirror baseline | 1.000 | 1.000 |
+| v1 embedding critic, two epochs | 0.895 | 1.342 |
+| v2 embedding critic, two epochs | 0.895 | 2.050 |
+| Resource network, two epochs | 1.089 | 1.083 |
+| Self-play-trained resource ridge | **0.727** | **0.790** |
+
+Ridge-minus-zero 95% intervals from whole-seed bootstrap were **−0.394 to
+−0.122** on eight held-out seeds and **−0.292 to −0.067** on four
+different-deck seeds. The point estimate and interval favor this small
+value model on these fixed-policy trajectories, but the different-deck check
+has only four seed blocks. Outcome prediction is not a measured improvement
+in decisions or competitive strength. The selected policy and PPO baseline
+remain unchanged pending a controlled PPO ablation and held-out matches.
+
+The ignored 128-record collection manifest SHA-256 is
+`a25f84b405cc9859e281299b5c8cbfc3584008e6bc134b842ae22baef0341116`;
+the independent 16-record manifest SHA-256 is
+`04c4d2b0ec07acfcf067a2a2aafd29dccfb158582657d5c1c4450a0fc955e4b5`.
+The mirror-trained report SHA-256 is
+`6c720d808f6221fa8132d0b610b69ea4f603caa5eb78ad023b90ce124ebdb37c`.
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --opponent mirror_policy \
+  --matchup examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk \
+            examples/decks/zombie_jae_kim_charlotte_2005.ydk \
+  --matchup examples/decks/zombie_jae_kim_charlotte_2005.ydk \
+            examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk \
+  --seed 48300 --seeds 32 --workers 4 \
+  --output-dir .cache/goat-ai/fixed_policy_mirror_rhymus_zombie_48300_48331
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_policy_matches.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --opponent mirror_policy \
+  --matchup examples/decks/phoenix_control_roberto_martinez_new_jersey_2005.ydk \
+            examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+  --matchup examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+            examples/decks/phoenix_control_roberto_martinez_new_jersey_2005.ydk \
+  --seed 48200 --seeds 4 --workers 4 \
+  --output-dir .cache/goat-ai/fixed_policy_mirror_phoenix_dimension_48200_48203
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/compare_value_architectures.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/fixed_policy_mirror_rhymus_zombie_48300_48331 \
+  --corpus-source policy_evaluation --primary-mirror-policy \
+  --independent-replay-dir .cache/goat-ai/fixed_policy_mirror_phoenix_dimension_48200_48203 \
+  --independent-mirror-policy --train-games 96 --max-records-per-game 16 \
+  --epochs 2 --width 32 --learning-rate 0.001 --seed 171 \
+  --output .cache/goat-ai/fixed_policy_mirror_ridge_48300_48331.json
+```
+
 ## Visible-state critic architecture transfer check (27 October 2026)
 
 The original opt-in Monte Carlo critic (v1) averages all visible card

@@ -93,7 +93,8 @@ def selected_records(trajectory, limit: int, source: str = "self_play_rl"):
     seat = (trajectory.skill_metadata or {}).get(seat_key)
     if (trajectory.source != source or type(seat) is not int
             or seat not in (0, 1)):
-        raise ValueError(f"critic comparison needs {source} replays with {seat_key}")
+        label = f"learner-seat ({seat_key})" if source == "self_play_rl" else seat_key
+        raise ValueError(f"critic comparison needs {source} replays with {label}")
     records = [record for record in trajectory.decisions
                if record.observation.acting_player == seat
                and len(record.legal_actions) > 1]
@@ -130,6 +131,21 @@ def paired_difference_interval(first, second, seed: int):
     return (samples[125], samples[4875])
 
 
+def seed_clustered_difference_interval(first, second, seeds, seed: int):
+    """Resample whole seed blocks, preserving matchup and seat correlation."""
+    if len(first) != len(second) or len(first) != len(seeds) or not first:
+        raise ValueError("seed-clustered MSE needs equal nonempty game sets")
+    grouped = {}
+    for a, b, game_seed in zip(first, second, seeds, strict=True):
+        grouped.setdefault(game_seed, []).append(a - b)
+    blocks = [sum(values) / len(values) for values in grouped.values()]
+    rng = random.Random(seed)
+    samples = sorted(sum(blocks[rng.randrange(len(blocks))]
+                         for _ in blocks) / len(blocks)
+                     for _ in range(5000))
+    return (samples[125], samples[4875])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("checkpoint", type=Path,
@@ -139,6 +155,10 @@ def main() -> None:
                         default="self_play_rl")
     parser.add_argument("--independent-replay-dir", type=Path,
                         help="separate same-policy corpus for transfer validation")
+    parser.add_argument("--independent-mirror-policy", action="store_true",
+                        help="require independent duels to use the same frozen checkpoint on both seats")
+    parser.add_argument("--primary-mirror-policy", action="store_true",
+                        help="require training and held-out duels to be frozen mirror self-play")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--train-games", type=int, default=48)
     parser.add_argument("--max-records-per-game", type=int, default=16)
@@ -151,6 +171,8 @@ def main() -> None:
     if (args.train_games < 1 or args.max_records_per_game < 1 or args.epochs < 1
             or args.width < 1 or args.learning_rate <= 0):
         parser.error("invalid critic comparison settings")
+    if args.independent_mirror_policy and not args.independent_replay_dir:
+        parser.error("--independent-mirror-policy requires --independent-replay-dir")
     pattern = ("episode_*.json" if args.corpus_source == "self_play_rl"
                else "matchup_*.json")
 
@@ -176,11 +198,16 @@ def main() -> None:
     parent_key = ("parent_checkpoint_sha256" if args.corpus_source == "self_play_rl"
                   else "policy_checkpoint_sha256")
     started = perf_counter()
-    for path in paths:
+    for game_index, path in enumerate(paths):
         digest = sha256_file(path)
         trajectory = read_trajectory(path)
         if (trajectory.skill_metadata or {}).get(parent_key) != parent_digest:
             raise ValueError(f"replay does not descend from selected parent: {path}")
+        if (((args.independent_mirror_policy and game_index >= len(primary_paths))
+             or (args.primary_mirror_policy and game_index < len(primary_paths)))
+                and (trajectory.skill_metadata or {}).get("opponent_checkpoint_sha256")
+                != parent_digest):
+            raise ValueError(f"duel is not frozen mirror self-play: {path}")
         verified += verify_trajectory(
             trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
@@ -244,6 +271,10 @@ def main() -> None:
     ridge_train = ridge_mse(train)
     ridge_holdout = ridge_mse(holdout)
     ridge_independent = ridge_mse(independent) if independent else ()
+    mirror_zero_losses = (tuple(target * target for _, target in independent)
+                          if args.independent_mirror_policy else ())
+    mirror_holdout_zero_losses = (tuple(target * target for _, target in holdout)
+                                  if args.primary_mirror_policy else ())
     scores["resource_ridge"] = {
         "final_training_mse_per_game": sum(ridge_train) / len(ridge_train),
         "holdout_mse_per_game": sum(ridge_holdout) / len(ridge_holdout),
@@ -254,6 +285,8 @@ def main() -> None:
     }
     result = {
         "corpus_source": args.corpus_source,
+        "independent_mirror_policy": args.independent_mirror_policy,
+        "primary_mirror_policy": args.primary_mirror_policy,
         "policy_checkpoint_sha256": parent_digest,
         "replay_sha256": fingerprints,
         "train_games": len(train), "holdout_games": len(holdout),
@@ -270,6 +303,12 @@ def main() -> None:
         "constant_training_return": baseline,
         "constant_holdout_mse_per_game": baseline_mse,
         "constant_independent_mse_per_game": independent_baseline_mse,
+        "mirror_zero_independent_mse_per_game": (
+            sum(mirror_zero_losses) / len(mirror_zero_losses)
+            if mirror_zero_losses else None),
+        "mirror_zero_holdout_mse_per_game": (
+            sum(mirror_holdout_zero_losses) / len(mirror_holdout_zero_losses)
+            if mirror_holdout_zero_losses else None),
         "v2_minus_v1_holdout_mse_95pct_paired_bootstrap":
             paired_difference_interval(heldout_losses["v2"], heldout_losses["v1"],
                                        args.seed),
@@ -283,6 +322,25 @@ def main() -> None:
             paired_difference_interval(ridge_independent,
                                        independent_baseline_losses, args.seed)
             if independent else None),
+        "ridge_minus_constant_holdout_mse_95pct_seed_clustered_bootstrap":
+            seed_clustered_difference_interval(
+                ridge_holdout, baseline_losses,
+                seeds[args.train_games:len(primary_paths)], args.seed),
+        "ridge_minus_constant_independent_mse_95pct_seed_clustered_bootstrap": (
+            seed_clustered_difference_interval(
+                ridge_independent, independent_baseline_losses,
+                seeds[len(primary_paths):], args.seed)
+            if independent else None),
+        "ridge_minus_mirror_zero_independent_mse_95pct_seed_clustered_bootstrap": (
+            seed_clustered_difference_interval(
+                ridge_independent, mirror_zero_losses,
+                seeds[len(primary_paths):], args.seed)
+            if mirror_zero_losses else None),
+        "ridge_minus_mirror_zero_holdout_mse_95pct_seed_clustered_bootstrap": (
+            seed_clustered_difference_interval(
+                ridge_holdout, mirror_holdout_zero_losses,
+                seeds[args.train_games:len(primary_paths)], args.seed)
+            if mirror_holdout_zero_losses else None),
         "scores": scores, "wall_seconds": perf_counter() - started,
     }
     payload = json.dumps(result, indent=2) + "\n"

@@ -1,4 +1,4 @@
-"""Record a greedy checkpoint against a named baseline in a native GOAT duel."""
+"""Record a greedy checkpoint against a baseline or itself in a native duel."""
 
 import argparse
 import json
@@ -33,7 +33,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=2202)
     parser.add_argument("--policy-seat", type=int, choices=(0, 1), default=0)
     parser.add_argument("--opponent", choices=("combat_heuristic", "combat_flip", "tactical",
-                                               "heuristic", "random"),
+                                               "heuristic", "random", "mirror_policy"),
                         default="combat_heuristic")
     parser.add_argument("--max-decisions", type=int, default=3000)
     parser.add_argument("--tactical-guard", action="store_true",
@@ -57,13 +57,13 @@ def main() -> None:
         parser.error("choose one experimental extension of guard v3")
     if args.position_guard and args.tactical_guard:
         parser.error("position guard is a standalone ablation")
-    policy = load_policy_agent(
-        args.checkpoint, tactical_guard=args.tactical_guard,
+    policy_options = dict(tactical_guard=args.tactical_guard,
         card_races=load_card_races(args.native_root) if args.tactical_guard else None,
         weak_flip_attacks=(load_weak_flip_monster_attack(args.native_root)
                            if args.weak_flip_guard else None),
         self_target_guard=args.self_target_guard,
         position_guard=args.position_guard)
+    policy = load_policy_agent(args.checkpoint, **policy_options)
     flip_codes = (load_flip_monster_codes(args.native_root)
                   if args.opponent in ("combat_flip", "tactical") else frozenset())
     opponent = {
@@ -74,6 +74,7 @@ def main() -> None:
             card_facts=load_card_facts(args.native_root)),
         "heuristic": lambda: HeuristicAgent(),
         "random": lambda: RandomAgent(args.seed),
+        "mirror_policy": lambda: load_policy_agent(args.checkpoint, **policy_options),
     }[args.opponent]()
     agents = [None, None]
     agents[args.policy_seat] = policy
@@ -103,6 +104,8 @@ def main() -> None:
                         "policy_feature_version": policy.model.feature_version,
                         "opponent": type(opponent).__name__,
                         "opponent_version": getattr(opponent, "teacher_version", 1),
+                        **({"opponent_checkpoint_sha256": sha256_file(args.checkpoint)}
+                           if args.opponent == "mirror_policy" else {}),
                     },
                 )
                 args.output.parent.mkdir(parents=True, exist_ok=True)
