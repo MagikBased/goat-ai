@@ -155,6 +155,43 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
   --output .cache/goat-ai/new_jersey_high_margin_review_96000_96001/queue.json
 ```
 
+## Seattle and Rhymus parent-policy review queue (28 October 2026)
+
+The [save-enabled local queue](../.cache/goat-ai/seattle_parent_review_99200_99201/queue.html)
+contains **22** high-margin review prompts from eight complete selected-v23
+versus Tactical-v14 duels. The pairings are the published 2005 SJC Seattle
+Theeresak Poonsombat/Christian Martinez lists and Rhymus Lizo Goat Control
+versus the GoatFormat Guide Dimension Fusion list. Seeds 99200–99201 cover
+both policy seats for each pairing. All **4,042** decisions replay-verified and
+passed the player-visibility audit. Selection considered 164 disagreements,
+kept at most three per duel, and required a raw policy-to-Tactical logit gap
+of at least 2. The selected gaps range from 2.2980 to 9.4486; none carries an
+automated audit flag. Tactical's alternatives are review prompts, not labels.
+The four source Main Decks in the two pairings are distinct compositions
+absent from the selected checkpoint's recorded training history, but these
+families have been used for model selection and are not an untouched strength
+holdout. The ignored source manifest and queue JSON SHA-256 values are
+`9f9690677e3962e52912eb8c8984b00688464c2dcb048af9e887cd4f2e355b6a`
+and `5626fbaab1467ef3f8169dcac1df44454bccd3fc1c8a98a889ceec634ee4c181`.
+The live queue server reported **0/22** saved choices when this queue was
+created; later progress should be read from the server rather than this note.
+
+Open or reopen its own save-enabled server with:
+
+```bash
+./start_review_viewer.sh \
+  .cache/goat-ai/seattle_parent_review_99200_99201/queue.json
+```
+
+Reproduce the ignored source collection with `scripts/collect_policy_matches.py`
+using the selected `fv23_current_tactical_broader_33000_33031.pt`, the two
+named pairings, `--opponent tactical --seed 99200 --seeds 2 --workers 4
+--max-decisions 3000`, and an empty output directory. Then run
+`scripts/shortlist_policy_disagreements.py` on its eight `matchup_*.json`
+replays with that checkpoint and `--rank-by logit --min-logit-margin 2
+--limit 24 --per-replay 3 --render-viewers`. Do not treat selected prompts as
+authorized preferences before a reviewer saves a different legal action.
+
 ## Broader-deck parent-policy review queue (28 October 2026)
 
 The [optional local review queue](../.cache/goat-ai/broad_parent_review_97200_97201/queue.html)
