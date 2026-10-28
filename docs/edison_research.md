@@ -724,6 +724,18 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_field_spells.py
 ```
 
+## Ryko's historical targeting needs a native fixture
+
+An [April 2010 Konami feature match](https://yugiohblog.konami.com/2010/sjc/10-04-75thsjc/round-11-feature-match-nik-ristoski-vs-luis-zambrana/)
+describes a player chaining Dust Tornado to the card targeted by a flipped
+Ryko, Lightsworn Hunter. This is evidence that the destruction choice was
+made when Ryko's effect was placed on the Chain. The pinned current
+`official/c21502796.lua` instead selects a card during resolution. The pinned
+`pre-errata/c511003007.lua` selects a target before resolution, but its other
+behavior and compatibility with the current core still need a seeded native
+duel test. Until that test, the MR1 probe does not allow Ryko, and no Edison
+correctness claim is made for this card.
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including
