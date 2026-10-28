@@ -28,6 +28,13 @@ native duel, replay-verifies, and passes the visibility audit. This removes
 one explicit protocol limit, while a real seven-card sort remains unobserved.
 See [architecture](architecture.md).
 
+The sum-selection adapter's exact and minimum-exceed modes now have a
+deterministic 120-case test against exhaustive legal-subset enumeration. It
+checks both final choices and every staged prefix against the pinned core's
+selection conditions, including mandatory cards and dual level values. This
+supports the decoder's pruning logic; it does not prove that every card using
+sum selection reaches the prompt correctly.
+
 A deterministic coverage suite now partitions every one of the **1,624**
 canonical legal Main Deck IDs into 41 valid decks and distributes all **52**
 canonical legal Fusion IDs into their Extra Decks. Pairing those decks ran

@@ -2,7 +2,9 @@
 
 import os
 import struct
+from itertools import combinations, product
 from pathlib import Path
+from random import Random
 
 import pytest
 
@@ -12,6 +14,7 @@ from goat_ai.engine.decks import read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.native_messages import (
     MAX_CARD_SELECTION_COMBINATIONS,
+    NativeSumSelection,
     decode_decision,
 )
 from goat_ai.engine.ocgcore_probe import (
@@ -123,6 +126,54 @@ def test_large_sum_selection_has_only_completable_staged_prefixes(monkeypatch):
     assert len(large.cards) == 32
     assert large.has_completion((0,))
     assert large.accepts_indices(tuple(range(10)))
+
+
+def test_staged_sum_prefixes_match_exhaustive_native_rules():
+    """Compare pruning against independent enumeration of the core's two modes."""
+    rng = Random(1729)
+
+    def values(card):
+        packed = card[4]
+        low, high = packed & 0xffff, packed >> 16
+        return (low, high) if high else (low,)
+
+    for case in range(120):
+        mode = case % 2
+        count = rng.randint(1, 6)
+        required_count = rng.randint(0, 2)
+
+        def card(index):
+            low = rng.randint(1, 5)
+            high = rng.choice((0, rng.randint(1, 6)))
+            return (100 + index, 0, LOCATION_MZONE, index, low | (high << 16))
+
+        required = tuple(card(index) for index in range(required_count))
+        optional = tuple(card(required_count + index) for index in range(count))
+        minimum = rng.randint(0, min(3, count))
+        maximum = count if mode else rng.randint(max(1, minimum), count)
+        target = rng.randint(1, 18)
+        selection = NativeSumSelection(required, optional, minimum, maximum,
+                                       target, mode)
+
+        def native_legal(indices):
+            selected = required + tuple(optional[index] for index in indices)
+            if not minimum <= len(indices) <= maximum or not selected:
+                return False
+            if mode == 0:
+                return any(sum(levels) == target
+                           for levels in product(*(values(card) for card in selected)))
+            lows = [min(values(card)) for card in selected]
+            highs = [max(values(card)) for card in selected]
+            return sum(highs) >= target and sum(lows) - min(lows) < target
+
+        complete = [indices for size in range(minimum, maximum + 1)
+                    for indices in combinations(range(count), size)
+                    if native_legal(indices)]
+        for size in range(maximum + 1):
+            for prefix in combinations(range(count), size):
+                assert selection.accepts_indices(prefix) == native_legal(prefix)
+                assert selection.has_completion(prefix) == any(
+                    indices[:size] == prefix for indices in complete)
 
 
 def test_new_native_choice_formats():
