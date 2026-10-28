@@ -98,6 +98,45 @@ def test_local_review_only_enables_decisions_offered_by_queue(tmp_path):
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_offline_queue_does_not_offer_unsavable_action_labels(tmp_path):
+    played = {"id": "played", "kind": "battle_phase", "actor": 0, "parameters": {}}
+    other = {"id": "other", "kind": "end_phase", "actor": 0, "parameters": {}}
+    replay = {"seed": 1, "source": "test", "winner": 0, "decisions": [
+        {"observation": _observation(), "selected_action": played,
+         "legal_actions": [played, other]},
+    ]}
+    viewer = tmp_path / "viewer.html"
+    viewer_html = _embed_viewer(replay, "0" * 64, {}, {}, {})
+    probe = """<script>setTimeout(() => {
+      const alternative = document.querySelector('#legal button:not(.recorded)');
+      alternative.click();
+      parent.postMessage({type: 'offline-probe', result: [
+        alternative.disabled,
+        document.getElementById('choose-alternative').hidden,
+        document.getElementById('review-instructions').textContent.includes(
+          'This queue is open as a file'),
+        annotations.size === 0,
+        !goatAiReviewNavigationState().pending].join('|')}, '*');
+    }, 100)</script></body>"""
+    viewer.write_text(viewer_html.replace("</body>", probe), encoding="utf-8")
+    queue = tmp_path / "queue.html"
+    queue.write_text("""<iframe id="viewer" src="viewer.html"></iframe><script>
+      window.addEventListener('message', event => {
+        if (event.data?.type === 'offline-probe')
+          document.body.dataset.offlineProbe = event.data.result;
+      });
+    </script>""", encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        queue.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-offline-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "true|true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_failed_clear_can_be_retried_without_exporting_empty_labels(tmp_path):
     played = {"id": "played", "kind": "battle_phase", "actor": 0, "parameters": {}}
     other = {"id": "other", "kind": "end_phase", "actor": 0, "parameters": {}}

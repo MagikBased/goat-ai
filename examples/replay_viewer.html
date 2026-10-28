@@ -285,6 +285,9 @@
     let localReviewableFrames = null;
     let localReviewLoading = false;
     let localReviewUnavailable = false;
+    // An embedded file:// queue cannot reach the local save API. Standalone
+    // replay files still support manual label export.
+    const offlineQueueMode = window.parent !== window && location.protocol === "file:";
     let saveRevision = 0;
     let saveQueue = Promise.resolve();
     let saveError = false;
@@ -332,6 +335,7 @@
     function canAnnotateFrame(observation) {
       const authorization = annotationAuthorization();
       return !reviewerData && !localReviewLoading && !localReviewUnavailable &&
+        !offlineQueueMode &&
         authorization && observation &&
         (!localReviewMode || !localReviewableFrames || localReviewableFrames.has(index)) &&
         (authorization === "policy_review"
@@ -1343,8 +1347,10 @@
       localReviewLoading = location.protocol === "http:" &&
         ["127.0.0.1", "localhost"].includes(location.hostname) && /^[a-f0-9]{64}$/.test(hash);
       byId("manual-review-export").hidden = false;
-      if (location.protocol === "file:")
-        byId("review-instructions").textContent = "This file was opened directly, so choices cannot save automatically. Open the queue through start_review_viewer.sh for automatic saving, or download labels manually before leaving.";
+      if (offlineQueueMode)
+        byId("review-instructions").textContent = "This queue is open as a file, so choices cannot be saved here. Run ./start_review_viewer.sh from the project folder and open the http://127.0.0.1 address it prints.";
+      else if (location.protocol === "file:")
+        byId("review-instructions").textContent = "This replay was opened directly, so choices cannot save automatically. Open the queue through start_review_viewer.sh for automatic saving, or download labels manually before leaving.";
       notifyLabelState();
       reviewerData = embeddedReviewer?.source_trajectory_sha256 === hash ? embeddedReviewer : null;
       const seat = data.skill_metadata?.learner_seat ?? data.skill_metadata?.demonstrator_seat;
