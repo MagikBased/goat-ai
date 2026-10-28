@@ -298,8 +298,10 @@ The saved-choice line says whether your choice matches it.
 recorded action. No reviewer name or file download is needed with the local
 server; the default `local-reviewer` alias is provenance for the validator.
 The **Choose a different action** button beside the recorded play opens the
-legal list and brings it into view. Click the action you would play; the saved
-choice line shows its name and whether it differs from the AI's play.
+legal list and focuses **Find an action**. Type a card or action name to filter
+the list, then click the action you would play. **Show more** reveals additional
+matches when needed. The saved-choice line shows the selected action and whether
+it differs from the AI's play.
 The
 reviewer-only reveal is for diagnosis and cannot be labeled. Do not use this
 queue's choices in training without validating them, and do not evaluate a

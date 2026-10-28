@@ -64,6 +64,47 @@ def test_inspecting_ai_played_row_does_not_create_review_label(tmp_path):
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_search_selects_alternative_beyond_first_100_actions(tmp_path):
+    played = {"id": "played", "kind": "pass", "actor": 0, "parameters": {}}
+    alternatives = [
+        {"id": f"choice-{number}", "kind": "announce_number", "actor": 0,
+         "parameters": {"number": number}}
+        for number in range(150)
+    ]
+    alternatives[-1]["parameters"]["number"] = 7777
+    replay = {"seed": 1, "source": "test", "winner": 0, "decisions": [
+        {"observation": _observation(), "selected_action": played,
+         "legal_actions": [played, *alternatives]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {}, {}, {})
+    probe = """<script>
+      const initial = document.querySelectorAll('#legal li').length === 100;
+      byId('choose-alternative').click();
+      const opened = byId('legal-details').open &&
+        document.activeElement === byId('legal-filter');
+      const filter = byId('legal-filter');
+      filter.value = '7777';
+      filter.dispatchEvent(new Event('input', {bubbles: true}));
+      const found = document.querySelectorAll('#legal li').length === 1 &&
+        byId('legal-filter-count').textContent === '1 matching action';
+      document.querySelector('#legal button').click();
+      document.body.dataset.searchProbe = [initial, opened, found,
+        annotations.get(0) === 150,
+        byId('annotation-status').textContent.includes('different from AI played')].join('|');
+    </script></body>"""
+    path = tmp_path / "search_actions.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=300", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-search-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "true|true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 @pytest.mark.parametrize("destination", ["graveyards", "banished"])
 def test_attack_target_life_fill_and_field_card_movement(tmp_path, destination):
     attack = {"id": "0", "kind": "attack", "actor": 0,
