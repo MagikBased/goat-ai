@@ -877,6 +877,17 @@ pass the player-visibility audit. This checks the pinned official Survivor
 script with GOAT Bottomless and Nobleman; full Monster Zones, effect negation,
 and other banish routes remain separate cases.
 
+The [same archived FAQ](https://www.goatformat.com/rulings2.html) says Skill
+Drain does not stop this return: Survivor's effect activates while it is
+banished, outside Skill Drain's field-monster negation. A separate seed-15
+native duel Sets Bottomless and Skill Drain, activates Skill Drain in the
+opponent's Draw Phase for 1,000 LP, then banishes that opponent's face-up
+Survivor with Bottomless. Survivor still offers an End Phase chain action
+from the banished zone and returns face-up while Skill Drain remains active.
+The duel reaches terminal, serializes, replay-verifies, and passes the
+visibility audit. Other continuous negation or End Phase response cards
+remain unaudited.
+
 **Call of the Haunted Summon inside a resolving chain:** The archived
 [Bottomless Trap Hole individual FAQ](https://www.goatformat.com/rulings1.html)
 distinguishes a monster Summoned by Call at Chain Link 2 from a later monster

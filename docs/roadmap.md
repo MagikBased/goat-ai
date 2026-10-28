@@ -407,6 +407,10 @@ banished by Nobleman of Crossout, which does not. Both full duels replay-verify
 and pass the visibility audit; see [GOAT rules](goat_rules.md). This extends
 coverage to a card in a published 2005 Seattle Top 8 Deck without certifying
 every banishment route or the full historical ruleset.
+An additional full-duel branch confirms the archived Skill Drain interaction:
+Survivor returns from banishment in the End Phase even while Skill Drain is
+active, because the effect activates outside the field. It also replay-verifies
+and passes the visibility audit; see [GOAT rules](goat_rules.md).
 
 A paired Call of the Haunted/Solemn Judgment fixture checks activation
 negation before Call revives its targeted monster. Both branches complete,
