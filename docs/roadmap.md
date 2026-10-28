@@ -1482,6 +1482,13 @@ identical. Both full duels replay-verify and pass visibility checks. This
 narrows the M1 hidden-information boundary for a high-use Flip monster; see
 [GOAT rules](goat_rules.md#cyber-jar).
 
+A second paired Cyber Jar differential carries those hidden permutations
+through Nobleman of Crossout's target choice. The five legal target actions
+and acting-player views remain identical before selection; targeting the same
+zone reveals different actual cards only after resolution. Both full duels
+replay-verify and pass visibility checks; see
+[GOAT rules](goat_rules.md#nobleman-targeting-a-cyber-jar-set-monster).
+
 A Metamorphosis fixture now checks the historical option to Tribute the
 player's own face-down Level 1 Dark Mimic for Thousand-Eyes Restrict, without
 triggering Mimic's Flip draw. With no matching Fusion in the Extra Deck,
