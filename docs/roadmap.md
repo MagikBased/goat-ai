@@ -257,6 +257,12 @@ card IDs; 15 scripts were loaded that the preceding 100-pair sweep had not
 loaded. This broadens sampled protocol coverage without closing arbitrary-deck
 or historical-ruling correctness; see [the report](evaluation.md#further-distinct-whitelist-protocol-sweep-27-october-2026).
 
+A paired Black Illusion Ritual/GOAT Relinquished native fixture now covers
+`MSG_SELECT_SUM` Ritual material selection from either hand or field. Both
+complete duels replay-verify and pass the player-visibility audit. The native
+prompt has no mandatory cards, leaving that decoder path parser-tested only;
+see [GOAT rules](goat_rules.md).
+
 ## M2 — Historical correctness gate
 
 A source-backed Card Destruction/Banisher of the Light fixture now confirms
