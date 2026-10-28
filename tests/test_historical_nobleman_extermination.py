@@ -50,8 +50,8 @@ def test_extermination_hidden_trap_vs_spell_has_same_target_choice(tmp_path):
                     break
                 actions = env.legal_actions()
 
-                def choose(kind, code=None):
-                    return next((a for a in actions if a.kind == kind and
+                def choose(kind, code=None, legal_actions=actions):
+                    return next((a for a in legal_actions if a.kind == kind and
                                  (code is None or a.parameters.get("code") == code)), None)
 
                 action = None

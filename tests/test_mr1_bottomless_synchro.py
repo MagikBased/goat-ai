@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 
 from goat_ai.engine.mr1_synchro_probe import (
-    BOTTOMLESS_TRAP_HOLE, JUNK_WARRIOR, Mr1SynchroProbeEngine,
+    BOTTOMLESS_TRAP_HOLE,
+    JUNK_WARRIOR,
+    Mr1SynchroProbeEngine,
 )
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory

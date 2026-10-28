@@ -30,6 +30,27 @@ The pinned Dark Balter script has upstream SHA-256 `fa1f87eba33a9e87b48ac9d34569
 
 The pinned Morale Boost script has upstream SHA-256 `4520559566f5d84b72b1d6dbd012b62e0b191f9ff4e1a0705cf5f8f9baf5c3e5`. Its leave-field trigger inspected the removed Equip Card's *current* controller, which can be `PLAYER_NONE`; the resulting zero-player mask indexed a nonexistent Lua table entry and stopped a seeded duel. A hash-guarded in-memory correction checks the card's previous controller and declines the trigger when neither player controlled it. The loaded-script SHA-256 is `3cda0dc2671fb47d6b2dcb212e7f99bff1bc5e142686e7c35b0c6ded7dc65c20`. We infer the previous field controller from [Konami's published card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5734&ope=2), which assigns 1,000 damage to the controller of the removed Equip Card. A focused Snatch Steal/MST fixture tests both the 1,000 LP gain and loss, completes the duel, and replay-verifies; other historical edge cases remain unaudited. Older replays that loaded Morale Boost require re-recording for exact verification.
 
+The October 2026 human-review queue predates the interrupted-attack patch.
+To reproduce its first-patch binary for exact replay and label verification,
+run this from a fully set up checkout **while no other process starts native
+duels from the same root**:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/rebuild_first_patch_native.py \
+  --native-root .cache/goat-ai \
+  --output-root .cache/goat-ai/first_patch_review_native
+```
+
+The command requires the pinned final source and checks the core commit, patch
+hash, first-patch source hash, and recorded first-patch library SHA-256
+`df1774ae5d2f23e52ec2290bcd23e20713d908404539dfffc8f34e1c853e9a00`.
+It builds at the original Meson path because an isolated build changes the
+binary hash, copies the earlier source and library into an ignored review
+root, then recompiles and checks the original active library. A hash mismatch
+removes the incomplete review root and restores the active source and library.
+Use `--native-root .cache/goat-ai/first_patch_review_native` with the review
+label validator. Do not use this older binary for current-core evaluation.
+
 Requires Linux, Git, a C++17 compiler, Python 3.10+, Meson 1.7+, and Ninja. From a clean clone:
 
 ```bash

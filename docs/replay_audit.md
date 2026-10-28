@@ -113,6 +113,9 @@ original Meson build location and copied into the ignored
 `.cache/goat-ai/legacy_review_native` root for verification. The current
 native source and binary were restored afterward. The validation manifest is
 `.cache/goat-ai/current_2005_development_review_49600_49601/validated_local_labels.json`.
+The repeatable [first-patch rebuild command](native_setup.md) subsequently
+reproduced the same binary in `.cache/goat-ai/reproduced_first_patch_native`;
+all eight exports and 24 choices validated again against that root.
 The selected feature-v23 checkpoint's top action agrees with 13 of the 24
 saved choices. None of the eight exact replays or their seeds appears in that
 checkpoint's recorded training provenance. These 24 labels are feedback on
