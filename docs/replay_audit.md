@@ -48,6 +48,28 @@ and the local server saved that different index (0 versus the recorded 1).
 This confirms the current viewer/server path for that frame; it does not
 explain how the earlier twelve selections became recorded-action labels.
 
+## Book of Moon under Torrential Tribute (27 October 2026)
+
+The player-visible audit now flags a Book of Moon target choice made while
+Torrential Tribute is already on the chain. It requires the public Book and
+Torrential links and a target still visible in a Monster Zone. This is a
+review prompt, never an automatic correction: another chain link or effect
+may create a reason to use Book. The [paired native fixture](goat_rules.md)
+confirms that Book chained directly to Torrential does not save the targeted
+monster in the tested Summon response.
+
+The new prompt finds the user's older Tactical-v12 self-play example at
+`replays/tactical_v12_self_6803/seed_6803_seat_0.json`, frame 165, where the
+other Tactical seat targets its opponent's Dekoichi with Book after its own
+Torrential. That old replay was read for retrospective triage and was not
+replay-verified against current assets. A fresh audit of 16 previously saved
+current-core policy-versus-Tactical games on seeds 44000–44003 verified all
+7,830 decisions, reproduced the policy seat's choices, passed the visibility
+audit, and found **zero** instances of this category. Its ignored report is
+`.cache/goat-ai/fixed_policy_value_44000_44015/book_torrential_review_audit_44000_44003.json`
+(SHA-256 `34b56a9f57c8943a654754c7b920b2917f1c84755d94e4816b26b74b14fbbd70`).
+This absence is specific to those 16 duels.
+
 ## Breaker targeting only friendly backrow (27 October 2026)
 
 The visible-state audit now prompts review when Breaker the Magical Warrior

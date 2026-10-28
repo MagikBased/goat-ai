@@ -17,6 +17,7 @@ HEAVY_STORM = 19613556
 NOBLEMAN_OF_CROSSOUT = 504700116
 RING_OF_DESTRUCTION = 511000824
 TORRENTIAL_TRIBUTE = 53582587
+BOOK_OF_MOON = 14087893
 SCAPEGOAT = 504700123
 ROYAL_DECREE = 51452091
 SAKURETSU_ARMOR = 56120475
@@ -297,6 +298,23 @@ def review_candidates(trajectory: Trajectory,
                 if safe_enemy_targets:
                     found.append(("ring_targets_own_with_safe_enemy_option",
                                   {"safe_enemy_targets": safe_enemy_targets}))
+        if (selected.kind == "select_card" and obs.chain
+                and obs.chain[-1].card_code == BOOK_OF_MOON
+                and obs.chain[-1].controller == seat
+                and any(link.card_code == TORRENTIAL_TRIBUTE
+                        for link in obs.chain[:-1])
+                and selected.parameters.get("location") == 4):
+            target = next((card for card in obs.field
+                           if card.zone == "monster"
+                           and card.controller == selected.parameters.get("controller")
+                           and card.sequence == selected.parameters.get("sequence")), None)
+            if target is not None:
+                found.append(("book_targets_monster_under_torrential",
+                              {"target_code": target.code or 0,
+                               "target_controller": target.controller,
+                               "torrential_chain_links": sum(
+                                   link.card_code == TORRENTIAL_TRIBUTE
+                                   for link in obs.chain[:-1])}))
         if (selected.kind == "select_card" and obs.chain
                 and obs.chain[-1].controller == seat
                 and obs.chain[-1].card_code == BREAKER_THE_MAGICAL_WARRIOR

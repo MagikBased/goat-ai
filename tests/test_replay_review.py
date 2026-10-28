@@ -125,6 +125,36 @@ def test_shortlist_flags_own_monster_removal_as_review_candidates():
         "torrential_only_own_monsters", "ring_without_visible_enemy_target"]
 
 
+def test_book_on_monster_under_torrential_is_a_review_prompt_only():
+    own = CardView(0, "monster", "faceup", 87621407, 0,
+                   "attack", 1400, 1000)
+    enemy = CardView(1, "monster", "faceup", 71413901, 0,
+                     "attack", 1600, 1000)
+    torrential = ChainLinkView(1, 53582587, 1, 8, 0)
+    book = ChainLinkView(2, 14087893, 0, 8, 0)
+    own_target = Action("own", "select_card", 0,
+                        {"controller": 0, "location": 4, "sequence": 0,
+                         "code": own.code})
+    enemy_target = Action("enemy", "select_card", 0,
+                          {"controller": 1, "location": 4, "sequence": 0,
+                           "code": enemy.code})
+    chained = replace(view(own, enemy), chain=(torrential, book))
+    no_torrential = replace(chained, chain=(book,))
+    saved = policy(record(chained, own_target, enemy_target),
+                   record(chained, enemy_target, own_target),
+                   record(no_torrential, own_target, enemy_target))
+    candidates = review_candidates(saved)
+    assert [(candidate.decision_index, candidate.category) for candidate in candidates] == [
+        (0, "book_targets_monster_under_torrential"),
+        (1, "book_targets_monster_under_torrential")]
+    assert candidates[0].evidence == {"target_code": own.code,
+                                      "target_controller": 0,
+                                      "torrential_chain_links": 1}
+    assert candidates[1].evidence == {"target_code": enemy.code,
+                                      "target_controller": 1,
+                                      "torrential_chain_links": 1}
+
+
 @pytest.mark.parametrize("removal", [5318639, 4178474])
 @pytest.mark.parametrize("target_code, card_type", [
     (55144522, 0x2),              # Pot of Greed: Normal Spell
