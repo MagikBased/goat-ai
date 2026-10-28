@@ -494,11 +494,14 @@ observable consequence. All three complete duels replay-verify and pass the
 visibility audit. Other continuous-effect permutations remain open. See
 [GOAT rules](goat_rules.md).
 
-A Skilled Dark Magician fixture now tests two Spell activations in one chain:
+A Skilled Dark Magician fixture tests two Spell activations in one chain:
 Mystical Space Typhoon targets an activated Pot of Greed, both resolve, Pot
-draws two cards, and Skilled gains two visible Spell Counters. Its full duel
-replay-verifies and passes the visibility audit. This extends the existing
-Pot/Solemn counter timing pair; other counter interactions remain open. See
+draws two cards, and Skilled gains two visible Spell Counters. A paired Skill
+Drain fixture then confirms that chaining the Trap to Pot removes Skilled's
+existing counter and blocks a new one, while declining it leaves two counters.
+All three complete duels replay-verify and pass the visibility audit. These
+extend the existing Pot/Solemn counter timing pair; other counter interactions
+remain open. See
 [GOAT rules](goat_rules.md#skilled-dark-magician-spell-counter-timing).
 
 Three Relinquished fixture branches now check the historical response to its
