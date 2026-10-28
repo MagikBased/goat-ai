@@ -9526,6 +9526,40 @@ experimental --both-deck-assignments --require-unseen-main-decks --seeds 2
 above, followed by `scripts/compare_tournament_reports.py
 --require-unseen-main-decks` for the matched Tactical arms.
 
+### Action-conditioned attention on the same on-policy labels (28 October 2026)
+
+The opt-in feature-v27 action-attention policy was trained on the **same 32
+replay-verified games, 3,018 Tactical-v14 labels, one epoch, batch size 16,
+seed, and learning rate** as the feature-v23 child above. Its v23 weights
+were imported through the zero-output attention upgrade. Its training loss
+was **0.5648**, versus **0.5783** for the matched v23 child, but this is
+synthetic-teacher fit, not playing strength. The ignored v27 checkpoint is
+`.cache/goat-ai/fv27_on_policy_mix_61000_61001.pt` (SHA-256
+`4b4da683197090054c1e9746996d1cb1bf04fb28eb47d637f3ca05a21191efdf`).
+
+On the same 20 training-unseen mixed Main Deck compositions with fresh duel
+seeds 63000–63001, v27 scored **36–44** directly against its matched v23
+child (paired score interval **37.5–52.5%**). On separate matched Tactical
+seeds 63002–63003, v27 scored **23–57** and v23 **22–56–2**, both a **28.75%**
+score. The validated paired v27-minus-v23 Tactical score difference was
+**0.0 points**, 95% interval **−5.0 to +6.25 points**. The attention branch
+does not establish a competitive gain on this schedule and remains
+experimental; neither child replaces the selected v23 parent.
+
+The ignored direct, v27-versus-Tactical, and v23-versus-Tactical reports are
+`.cache/goat-ai/fv27_vs_v23_on_policy_mix_direct_63000_63001.json` (SHA-256
+`c7e4351041734c0966dd231a9cd6a9a2d1aecefd35866b837f1619f70369b112`),
+`.cache/goat-ai/fv27_on_policy_mix_tactical_63002_63003.json` (SHA-256
+`26163d6138e60d896f040924ea3fa7086fc251d548a1c9d2d9399a8b72442e88`),
+and `.cache/goat-ai/fv23_on_policy_mix_tactical_63002_63003.json` (SHA-256
+`6724b0213ec846bdc700d118491bf52c36d1d6d7876de68b313d6314755ce1f1`).
+Reproduce the v27 fit with the preceding cloning command, replacing
+`--feature-version 23` by `--feature-version 27
+--upgrade-feature-23-to-27`, and evaluate with the same ten held-out deck
+pairs, both assignments and seats, and the fresh seeds above. The matched
+Tactical reports passed `scripts/compare_tournament_reports.py
+--require-unseen-main-decks`.
+
 ### Half-Tactical PPO continuation from the current-core child (27 October 2026)
 
 A new clipped-PPO trial began from the current-core Tactical-imitation child,

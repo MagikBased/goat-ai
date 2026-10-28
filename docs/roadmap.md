@@ -668,6 +668,11 @@ Tactical score improved by five points with a paired interval including no
 gain. This does not justify promotion or satisfy the separate self-play gate;
 see the [on-policy experiment](evaluation.md#on-policy-tactical-labels-on-mixed-tournament-cards-28-october-2026).
 
+The action-attention v27 branch trained on those same 3,018 labels lowered
+synthetic-teacher loss but scored 36–44 against the matched v23 child and tied
+its Tactical score on fresh, training-unseen duels. Keep attention
+experimental; see the [matched architecture check](evaluation.md#action-conditioned-attention-on-the-same-on-policy-labels-28-october-2026).
+
 The current-core feature-v23 reference scored 25–39 versus Tactical-v14 on
 two independent 2005 deck pairings. A matched Tactical mirror showed a
 10.9-point policy score deficit with a paired 95% interval from −20.3 to
