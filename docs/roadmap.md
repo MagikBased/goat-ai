@@ -441,7 +441,7 @@ cost-paid activations on separate chains in one turn. All four seeded full
 duels replay-verify and pass the visibility audit; see
 [GOAT rules](goat_rules.md).
 
-Four Morphing Jar deck-out fixtures verify the historical five-card draw boundary for either player: with four Deck cards the effect ends the duel, while with five it resolves and the next required draw ends the duel. Four more native fixtures check both players near empty: 3/4, 4/4, and 4/3 cards remaining each give a draw, while five each resolves and the next required draw determines the loser. All eight terminal trajectories replay-verify. A contemporaneous 2005 TCG source for the simultaneous failed-draw outcome remains to be located, so that historical interpretation is provisional. See [GOAT rules](goat_rules.md).
+Four Morphing Jar deck-out fixtures verify the historical five-card draw boundary for either player: with four Deck cards the effect ends the duel, while with five it resolves and the next required draw ends the duel. Four more native fixtures check both players near empty: 3/4, 4/4, and 4/3 cards remaining each give a draw, while five each resolves and the next required draw determines the loser. All eight terminal trajectories replay-verify. A 2007 discussion corroborates the simultaneous-draw result, but a contemporaneous explicit 2005 TCG ruling remains to be located, so that historical interpretation is provisional. See [GOAT rules](goat_rules.md).
 
 A June 2005 Desert Sunlight / Book of Moon correction now enables the recorded
 four-link Nobleman response against a Set Morphing Jar. The fixture observes
@@ -460,11 +460,12 @@ observable consequence. All three complete duels replay-verify and pass the
 visibility audit. Other continuous-effect permutations remain open. See
 [GOAT rules](goat_rules.md).
 
-A paired Relinquished fixture now checks the historical Book of Moon response
-to its equip effect on a Set monster: the target stays in its owner's Monster
-Zone when Book Sets Relinquished before resolution. The pass branch equips the
-Set monster, and both full duels replay-verify and pass visibility checks; see
-[GOAT rules](goat_rules.md#relinquisheds-equip-target-when-book-of-moon-is-chained).
+Three Relinquished fixture branches now check the historical response to its
+equip effect on a Set monster: the target stays in its owner's Monster Zone
+when Book of Moon Sets Relinquished or Raigeki Break destroys it before
+resolution, while the pass branch equips that monster. All three full duels
+replay-verify and pass visibility checks; see
+[GOAT rules](goat_rules.md#relinquisheds-equip-target-when-book-of-moon-or-raigeki-break-is-chained).
 
 A paired Jinzo/Solemn Judgment fixture now checks the Tribute Summon window:
 Solemn is legal before Jinzo's continuous Trap suppression applies, but is
