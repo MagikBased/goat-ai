@@ -273,7 +273,8 @@
     let saveError = false;
     function notifyLabelState() {
       if (window.parent !== window) window.parent.postMessage(
-        {type: "goat-ai-review-label-state", pending: annotations.size > 0 && !labelsExported}, "*");
+        {type: "goat-ai-review-label-state", pending: annotations.size > 0 && !labelsExported,
+         saving: localReviewMode && annotations.size > 0 && !labelsExported && !saveError}, "*");
     }
     function annotationAuthorization() {
       if (!replay) return null;
@@ -1165,7 +1166,7 @@
     function setAnnotation(frame, actionIndex) {
       if (actionIndex == null) annotations.delete(frame);
       else annotations.set(frame, actionIndex);
-      labelsExported = false; notifyLabelState(); render();
+      labelsExported = false; saveError = false; notifyLabelState(); render();
       if (!localReviewMode) return;
       const revision = ++saveRevision;
       const digest = sourceSha256;

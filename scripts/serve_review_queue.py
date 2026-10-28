@@ -190,6 +190,11 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(ROOT), **kwargs)
 
+        def end_headers(self) -> None:
+            if urlsplit(self.path).path.endswith(".html"):
+                self.send_header("Cache-Control", "no-store")
+            super().end_headers()
+
         def _json(self, status: int, payload: dict) -> None:
             body = json.dumps(payload, separators=(",", ":")).encode()
             self.send_response(status)

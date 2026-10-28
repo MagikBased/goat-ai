@@ -141,6 +141,13 @@ server. For a specific queue path:
   .cache/goat-ai/new_jersey_parent_review_96000_96001/queue.json
 ```
 
+The address should start with `http://127.0.0.1`, not `file://`.
+Choosing an alternative saves automatically; the queue now waits for an
+in-progress save before opening another item or returning to the list. The
+viewer shows **Saved on this computer** when the server confirms the choice.
+If it shows **Save failed**, keep the current tab open and use **Download
+labels** as a backup before reloading.
+
 Record the eight `matchup_*.json` duels from the repository root with:
 
 ```bash

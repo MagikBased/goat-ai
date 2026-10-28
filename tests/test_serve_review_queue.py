@@ -193,6 +193,50 @@ def test_browser_review_choice_autosaves_without_name_or_download(tmp_path, monk
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_queue_waits_for_automatic_save_before_leaving_duel(tmp_path, monkeypatch):
+    queue, replay, digest, _ = _queue(tmp_path)
+    viewer = tmp_path / "game.html"
+    render_replay(replay, viewer, tmp_path / "native")
+    selected = json.loads(queue.read_text())["selected"]
+    selected[0]["viewer"] = str(viewer) + "#decision=1"
+    selected[0]["audit_flags"] = []
+    write_review_index(selected, queue, tmp_path / "native")
+    probe = """<script>
+      let warnings = 0;
+      window.confirm = () => { warnings++; return false; };
+      setTimeout(() => {
+        frame.contentDocument.querySelector('#legal button:not(.recorded)').click();
+        document.getElementById('back-to-queue').click();
+        setTimeout(() => { document.body.dataset.saveBeforeLeave = [
+          warnings, stage.hidden, labels.size, pendingLabels].join('|'); }, 600);
+      }, 300);
+    </script></html>"""
+    page = queue.with_suffix(".html")
+    page.write_text(page.read_text().replace("</html>", probe))
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    output = tmp_path / "saved"
+    server = serve_review_queue.make_server(queue, output, port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = subprocess.run([
+            shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+            "--disable-dev-shm-usage", "--virtual-time-budget=1300", "--dump-dom",
+            f"http://127.0.0.1:{server.server_port}/queue.html#item=1&mode=visible",
+        ], capture_output=True, text=True, timeout=20, check=True)
+        match = re.search(r'data-save-before-leave="([^"]+)"', result.stdout)
+        assert match, result.stderr[-1000:]
+        warning_count, hidden, _, pending = match.group(1).split("|")
+        assert (warning_count, hidden, pending) == ("0", "true", "false")
+        assert json.loads((output / f"{digest}.json").read_text())["choices"] == [
+            {"decision_index": 0, "action_index": 1}]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_queue_bookmark_button_saves_without_creating_training_label(tmp_path, monkeypatch):
     queue, replay, digest, _ = _queue(tmp_path)
     viewer = tmp_path / "game.html"
