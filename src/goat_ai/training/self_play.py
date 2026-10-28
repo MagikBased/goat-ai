@@ -259,6 +259,12 @@ class SamplingPolicyAgent:
                                    legal_actions, self.generator)
 
 
+def independent_opponent_generator(seed: int) -> torch.Generator:
+    """Give a frozen opponent its own deterministic action-sampling stream."""
+    return torch.Generator(device="cpu").manual_seed(
+        (seed ^ 0x9E3779B97F4A7C15) & ((1 << 64) - 1))
+
+
 def run_learning_episode(
     model: LegalActionPolicy, vocabulary: CardVocabulary, opponent: Agent,
     decks: tuple[str, str], seed: int, learner_seat: int,
@@ -401,7 +407,7 @@ def _parallel_rollout_worker(task):
     """Collect one CPU duel with a per-episode sampling stream."""
     (model_state, vocabulary, width, feature_version, opponent_state, decks,
      seed, learner_seat, engine_factory, max_decisions, temperature,
-     generator_seed, baseline_opponent_factory) = task
+     generator_seed, baseline_opponent_factory, independent_opponent_rng) = task
     torch.set_num_threads(1)
     model = LegalActionPolicy(vocabulary.size, width=width,
                               feature_version=feature_version)
@@ -415,7 +421,10 @@ def _parallel_rollout_worker(task):
                                    feature_version=feature_version)
         frozen.load_state_dict(opponent_state)
         frozen.eval()
-        opponent = SamplingPolicyAgent(frozen, vocabulary, generator)
+        opponent = SamplingPolicyAgent(
+            frozen, vocabulary,
+            (independent_opponent_generator(generator_seed)
+             if independent_opponent_rng else generator))
     return run_learning_episode(model, vocabulary, opponent, decks, seed,
                                 learner_seat, engine_factory, generator,
                                 max_decisions, temperature)
@@ -714,6 +723,7 @@ def train_against_snapshot_pool(
     skip_unsupported_games: bool = False,
     baseline_opponent_factory: Callable[[int], Agent] = RandomAgent,
     baseline_opponent_name: str = "random",
+    independent_opponent_rng: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
 ) -> tuple[dict, ...]:
     """Train one learner seat per duel against a baseline or frozen past policies.
@@ -833,12 +843,13 @@ def train_against_snapshot_pool(
                                   snapshots[snapshot_index] if snapshot_index is not None else None,
                                   batch_decks, batch_seed, batch_seat, engine_factory,
                                   max_decisions, learner_temperature,
-                                  random_seed + batch_seed, baseline_opponent_factory))
+                                  random_seed + batch_seed, baseline_opponent_factory,
+                                  independent_opponent_rng))
                 if rollout_batch_inference:
                     batch_games = []
                     for task in tasks:
                         (_, _, _, _, opponent_state, batch_decks, batch_seed,
-                         batch_seat, _, _, _, generator_seed, _) = task
+                         batch_seat, _, _, _, generator_seed, _, _) = task
                         batch_generator = torch.Generator(device="cpu").manual_seed(
                             generator_seed)
                         if opponent_state is None:
@@ -850,7 +861,9 @@ def train_against_snapshot_pool(
                             frozen.load_state_dict(opponent_state)
                             frozen.eval()
                             batch_opponent = SamplingPolicyAgent(
-                                frozen, vocabulary, batch_generator)
+                                frozen, vocabulary,
+                                (independent_opponent_generator(generator_seed)
+                                 if independent_opponent_rng else batch_generator))
                         batch_games.append((batch_opponent, batch_decks,
                                             batch_seed, batch_seat, batch_generator))
                     episodes = run_batched_learning_episodes(
@@ -879,7 +892,10 @@ def train_against_snapshot_pool(
                     frozen.load_state_dict(snapshots[snapshot_index])
                     frozen.eval()
 
-                    opponent: Agent = SamplingPolicyAgent(frozen, vocabulary, generator)
+                    opponent: Agent = SamplingPolicyAgent(
+                        frozen, vocabulary,
+                        (independent_opponent_generator(random_seed + seed)
+                         if independent_opponent_rng else generator))
                     opponent_name = f"snapshot_{snapshot_index}"
                 else:
                     opponent = baseline_opponent_factory(seed)

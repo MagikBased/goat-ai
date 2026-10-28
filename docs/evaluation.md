@@ -10227,3 +10227,43 @@ PYTHONPATH=src:. OMP_NUM_THREADS=1 .venv/bin/python scripts/probe_random_decks.p
 
 This is native protocol and observation coverage. Random play and a sampled
 card pool cannot establish historical GOAT correctness for the loaded cards.
+
+## Independent frozen-opponent sampling stream (28 October 2026)
+
+The self-play trainer now offers `--independent-opponent-rng`. Without it,
+the sampled learner and frozen neural opponent share one Torch generator in a
+duel, so an extra random draw by either player changes the other's future
+action samples. The opt-in mode derives a separate deterministic opponent
+stream from the duel seed. It applies to sequential, worker, and batched PPO
+rollouts; the default shared stream is retained for reproduction of earlier
+experiments. The checkpoint configuration and each replay record the flag.
+This does not change the native duel seed or expose hidden state.
+
+The local native rollout test passed for one worker, two workers, and batched
+inference with a frozen snapshot opponent: reports, decision trajectories,
+and updated model tensors matched exactly across all three paths. The full
+`tests/test_parallel_rollout.py` file passed **8 tests** with two existing
+TorchScript tracing warnings. A two-game restricted-engine CLI smoke run on
+vanilla fixtures, seeds 90200–90201, produced two terminal games (one learner
+win, one loss), **697 decisions**, and a checkpoint with the opt-in flag.
+Both replay files passed exact native verification and the player-visibility
+audit. The checkpoint SHA-256 is
+`d0350547f30993cf920802d079675c188f9803bd9e4677e9516914587822e3ec`;
+the replay SHA-256 values are
+`1b4bc8daf4ff3035f40c307e6b77da9c6ec7174cf9ef3a644ea31c6b06f0f04b`
+and `2e6c049dc0a0794135eb95ceebcd7f0f16069ce971bcc1719f5a98b373d781df`.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --output .cache/goat-ai/independent_rng_smoke_90200.pt \
+  --native-root .cache/goat-ai --engine restricted \
+  --matchup examples/decks/vanilla_probe.ydk examples/decks/vanilla_reverse.ydk \
+  --seed 90200 --games 2 --historical-probability 1 \
+  --independent-opponent-rng --policy-update clipped_ppo \
+  --ppo-rollout-games 2 --rollout-workers 2 --snapshot-every 2 \
+  --ppo-epochs 1 --ppo-batch-size 16 --max-decisions 3000
+```
+
+This smoke run checks isolation and reproducibility of the sampling path. It
+does not measure a competitive strength gain or close M4's self-play gate.

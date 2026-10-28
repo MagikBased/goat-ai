@@ -12,11 +12,58 @@ from goat_ai.agents import load_card_facts, load_card_races, load_flip_monster_c
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.training.policy import CardVocabulary, LegalActionPolicy
-from goat_ai.training.self_play import make_tactical_opponent, train_against_snapshot_pool
+from goat_ai.training.self_play import (
+    independent_opponent_generator,
+    make_tactical_opponent,
+    train_against_snapshot_pool,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 VANILLA = ROOT / "examples/decks/vanilla_probe.ydk"
 REVERSE = ROOT / "examples/decks/vanilla_reverse.ydk"
+
+
+def test_independent_opponent_sampling_does_not_advance_learner_stream():
+    seed = 90100
+    learner = torch.Generator(device="cpu").manual_seed(seed)
+    opponent = independent_opponent_generator(seed)
+    expected = torch.rand(3, generator=torch.Generator(device="cpu").manual_seed(seed))
+    torch.rand(17, generator=opponent)
+    assert torch.equal(torch.rand(3, generator=learner), expected)
+    assert not torch.equal(
+        torch.rand(3, generator=independent_opponent_generator(seed)), expected)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_independent_snapshot_stream_matches_worker_and_batch_rollouts():
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    vocabulary = CardVocabulary.from_goat_whitelist(
+        native_root / "banlist/GOAT.lflist.conf")
+    torch.manual_seed(90)
+    initial = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    results = []
+    for workers, batch_inference in ((1, False), (2, False), (0, True)):
+        model = copy.deepcopy(initial)
+        episodes = []
+        reports = train_against_snapshot_pool(
+            model, vocabulary, ((str(VANILLA), str(REVERSE)),),
+            (90100, 90101), partial(RestrictedOcgcoreEngine, native_root),
+            policy_update="clipped_ppo", ppo_rollout_games=2,
+            rollout_workers=workers, rollout_batch_inference=batch_inference,
+            independent_opponent_rng=True, historical_probability=1,
+            snapshot_every=2, ppo_epochs=1, ppo_batch_size=8,
+            max_decisions=2000, random_seed=90,
+            record_episode=lambda _, episode, sink=episodes: sink.append(episode),
+        )
+        assert len(episodes) == 2
+        assert all(report["status"] == "terminal" for report in reports)
+        assert all(report["opponent"] == "snapshot_0" for report in reports)
+        results.append((reports, episodes, model.state_dict()))
+    serial = results[0]
+    for other in results[1:]:
+        assert serial[:2] == other[:2]
+        assert all(torch.equal(serial[2][name], other[2][name])
+                   for name in serial[2])
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

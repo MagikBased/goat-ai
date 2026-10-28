@@ -72,6 +72,8 @@ def main() -> None:
     parser.add_argument("--games", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--historical-probability", type=float, default=0.75)
+    parser.add_argument("--independent-opponent-rng", action="store_true",
+                        help="give a frozen policy opponent a separate deterministic sampling stream")
     parser.add_argument("--baseline-opponent", choices=("random", "tactical"),
                         default="random",
                         help="opponent when a frozen snapshot is not sampled")
@@ -222,6 +224,7 @@ def main() -> None:
                 "learner_temperature": args.learner_temperature,
                 "learner_action_selection": "sampled_softmax",
                 "selection_progress_mask": 1,
+                "independent_opponent_rng": args.independent_opponent_rng,
             },
         )
         path = record_dir / f"episode_{index:05d}_seed_{episode.seed}.json"
@@ -260,6 +263,7 @@ def main() -> None:
         skip_unsupported_games=args.skip_unsupported_games,
         baseline_opponent_factory=baseline_factory or RandomAgent,
         baseline_opponent_name=("tactical_v14" if baseline_factory else "random"),
+        independent_opponent_rng=args.independent_opponent_rng,
         record_episode=record,
     )
     terminal_reports = [report for report in reports if report["status"] == "terminal"]
@@ -287,6 +291,7 @@ def main() -> None:
         })
     config = {"engine": args.engine, "learning_rate": args.learning_rate,
               "historical_probability": args.historical_probability,
+              "independent_opponent_rng": args.independent_opponent_rng,
               "baseline_opponent": args.baseline_opponent,
               "snapshot_every": args.snapshot_every, "max_snapshots": args.max_snapshots,
               "entropy_coefficient": args.entropy_coefficient,
