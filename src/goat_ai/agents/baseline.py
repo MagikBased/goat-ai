@@ -159,6 +159,9 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
     SINISTER: ClassVar[int] = 511000818
     TRIBE: ClassVar[int] = 33184167
     SPIRIT_REAPER: ClassVar[int] = 504700038  # GOAT variant
+    MAGICIAN_OF_FAITH: ClassVar[int] = 31560081
+    SANGAN: ClassVar[int] = 504700178  # GOAT variant
+    SPELL_TYPE: ClassVar[int] = 0x2
 
     def __init__(self, flip_monster_codes: Collection[int] = (),
                  card_races: Mapping[int, int] | None = None,
@@ -171,7 +174,8 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                  v14_guards: bool | None = None,
                  reaper_set_guard: bool = False,
                  card_advantage_guard: bool = False,
-                 thunder_search_guard: bool = False) -> None:
+                 thunder_search_guard: bool = False,
+                 mof_readiness_guard: bool = False) -> None:
         super().__init__(flip_monster_codes)
         self.card_races = dict(card_races or {})
         self.card_facts = dict(card_facts or {})
@@ -185,6 +189,7 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
         self.reaper_set_guard = reaper_set_guard
         self.card_advantage_guard = card_advantage_guard
         self.thunder_search_guard = thunder_search_guard
+        self.mof_readiness_guard = mof_readiness_guard
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
@@ -366,6 +371,22 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                            if action.kind == "battle_phase"), None)
             if bls_ready and battle is not None:
                 return battle
+        if self.mof_readiness_guard and observation.phase in ("main1", "main2"):
+            own_graveyard = observation.graveyards[observation.viewer]
+            known_graveyard = all(
+                card.code is not None and card.code in self.card_facts
+                for card in own_graveyard)
+            spell_available = any(
+                self.card_facts[card.code][0] & self.SPELL_TYPE
+                for card in own_graveyard if card.code in self.card_facts)
+            faith = any(action.kind == "set_monster"
+                        and action.parameters.get("code") == self.MAGICIAN_OF_FAITH
+                        for action in filtered)
+            sangan = next((action for action in filtered
+                           if action.kind == "set_monster"
+                           and action.parameters.get("code") == self.SANGAN), None)
+            if known_graveyard and not spell_available and faith and sangan is not None:
+                return sangan
         return super().select_action(observation, filtered)
 
 

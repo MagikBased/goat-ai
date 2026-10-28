@@ -218,6 +218,34 @@ def test_optional_weak_flip_guard_prefers_set_except_visible_direct_lethal():
     assert weak_flip_set_substitute(board(opponent), (summon,), summon, weak) is None
 
 
+def test_opt_in_mof_readiness_prefers_sangan_only_without_recoverable_spell():
+    faith = 31560081
+    sangan = 504700178
+    set_faith = Action("faith", "set_monster", 0, {"code": faith})
+    set_sangan = Action("sangan", "set_monster", 0, {"code": sangan})
+    actions = (set_faith, set_sangan)
+    facts = {faith: (0x200021, 1, 300), sangan: (0x21, 3, 1000),
+             55144522: (0x2, 0, 0), 33396948: (0x4, 0, 0)}
+    baseline = TacticalHeuristicAgent({faith}, card_facts=facts)
+    candidate = TacticalHeuristicAgent({faith}, card_facts=facts,
+                                       mof_readiness_guard=True)
+    empty = board()
+    assert baseline.select_action(empty, actions) == set_faith
+    assert candidate.select_action(empty, actions) == set_sangan
+    trap = CardView(0, "graveyard", "faceup", 33396948, 0)
+    with_trap = replace(empty, graveyards=((trap,), ()))
+    assert candidate.select_action(with_trap, actions) == set_sangan
+    spell = CardView(0, "graveyard", "faceup", 55144522, 0)
+    with_spell = replace(empty, graveyards=((spell,), ()))
+    assert candidate.select_action(with_spell, actions) == set_faith
+    unknown = CardView(0, "graveyard", "faceup", 99999999, 0)
+    with_unknown = replace(empty, graveyards=((unknown,), ()))
+    assert candidate.select_action(with_unknown, actions) == set_faith
+    assert candidate.select_action(empty, (set_faith,)) == set_faith
+
+
+
+
 def test_tribe_requires_visible_enemy_and_names_the_best_race():
     tribe_code = 33184167
     races = {504700044: 2, 32362575: 2048, 17881964: 8192, tribe_code: 64}

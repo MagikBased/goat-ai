@@ -11532,3 +11532,27 @@ Reproduce the collection with the selected
 directory above. The next option-specific experiment needs independently
 verified situations where the better visible choice differs from the policy's
 current default, then separate deck and seed holdouts for match evaluation.
+
+### Magician of Faith readiness baseline probe (28 October 2026)
+
+The New Jersey seed-96000 replay's frame 3 belongs to Tactical-v14, not the
+neural policy. Tactical-v14 Set Magician of Faith with no Spell in its
+Graveyard, even though Set Sangan was legal. The opt-in
+`tactical_mof_readiness` variant prefers Set Sangan only when both Sets are
+legal and every card in its own Graveyard has known printed Type with no
+Spell present. The variant retains Magician of Faith when a Spell is
+recoverable. The source replay reproduces the changed choice; the normal
+`tactical` baseline remains unchanged so older comparisons keep their
+meaning. This is a tactical probe, not a trained neural improvement.
+
+Against unchanged Tactical-v14 on the Ryan Hayakawa and Theeresak Poonsombat
+New Jersey GOAT Control Main Decks, seeds 96500–96515 with both deck
+assignments and both seats produced **64 complete duels: 32 wins, 32 losses,
+0 draws** for the variant. The measured tournament wall time was **7.43 s**
+with four native workers; this number describes this run, not a general
+throughput claim. The ignored report is
+`.cache/goat-ai/mof_readiness_vs_tactical_96500_96515.json` (SHA-256
+`56cfcf0e262a547d01bd4f804d73762ff1edc0639c4f5811d04a0abb5eda352f`).
+This narrow sample shows no competitive gain. The variant remains opt-in,
+and the next policy work should target reviewed timing and resource-use
+decisions across held-out decks.
