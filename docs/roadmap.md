@@ -21,6 +21,15 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+A tactical-agent Fusion stress sweep now adds 20 complete seeded duels on 40
+independently generated legal Main Decks with Scapegoat, Metamorphosis, and
+sampled Extra Decks containing Thousand-Eyes Restrict. All 12,385 decisions
+replay-verified and passed visibility checks; the action counter confirms 34
+selected Scapegoat chain responses and 33 selected Metamorphosis activations.
+This extends sampled protocol evidence for a common GOAT control line, while
+full arbitrary-deck and historical-ruling validation remain open. See the
+[evaluation log](evaluation.md#tactical-fusion-stress-random-deck-protocol-probe-28-october-2026).
+
 A further whitelist-wide seed-110000–110019 probe used 40 independently
 generated legal Main Decks with sampled 15-card Fusion Extra Decks. All 20
 duels reached terminal within 3,000 decisions, and all 21,811 decisions

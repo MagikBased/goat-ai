@@ -1,5 +1,35 @@
 # Baseline evaluation log
 
+## Tactical Fusion-stress random-deck protocol probe (28 October 2026)
+
+Twenty new seeded pairs of independently generated whitelist-legal Main Decks
+each included three Scapegoats, three Metamorphoses, and a 15-card sampled
+Fusion Extra Deck containing Thousand-Eyes Restrict. Both seats used
+TacticalHeuristicAgent v14. All **20/20** duels reached terminal within 3,000
+decisions, with zero errors; all **12,385** decisions replay-verified and passed
+the player-visibility audit. The seeded duels took **286–1,553** decisions
+(mean **619.25**). The action counter recorded **34 selected Scapegoat chain
+responses** and **33 selected Metamorphosis activations**; Thousand-Eyes
+Restrict appeared in selected field actions. Thus the sweep exercised the
+intended interaction rather than only including those cards in Deck lists.
+
+Two separate runs with the same seeds produced identical ordered winner and
+decision-count lists. The second run enabled card-action counting; its ignored
+report is `.cache/goat-ai/fusion_tactical_probe_111000_111019_counted/report.json`,
+SHA-256 `a485e331a1de0f2055a48249bbb3488be5224070b617942a352a8d7e6f26f67a`.
+This checks sampled native protocol and information handling, not historical
+correctness for every Fusion or strategic strength. Runtime throughput was
+not measured.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/fusion_tactical_probe_111000_111019_counted \
+  --seed 111000 --seeds 20 --max-decisions 3000 \
+  --distinct-opponents --random-extra --fusion-stress --agent tactical \
+  --verify-replays --count-card-actions --isolate-games
+```
+
 ## Random legal decks with independent opponents and Fusion Extra Decks (28 October 2026)
 
 A new whitelist-wide protocol sweep generated 20 seeded pairs of independently
