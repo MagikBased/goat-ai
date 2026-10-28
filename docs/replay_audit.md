@@ -1,5 +1,23 @@
 # Early replay decision audit
 
+## Refreshing older review queues (28 October 2026)
+
+The player-visible pages for all 12 locally available review and recheck
+queues were refreshed with the current viewer layout. Their queue JSON,
+selected decisions, saved labels, and existing reviewer-only reveal files
+were left unchanged. Some older reveals cannot be regenerated because their
+trajectories record a different native-core fingerprint. To refresh a queue's
+label views without re-deriving those hidden-card reveals, run:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/refresh_review_queue.py \
+  .cache/goat-ai/PATH_TO_QUEUE/queue.json --skip-reviewer-reveal
+```
+
+Reviewer-only pages preserved this way retain their earlier visual layout;
+label views use the current layout. Regenerating a reveal still requires
+native assets matching its trajectory and full replay verification.
+
 ## New Jersey high-margin review queue (28 October 2026)
 
 The [local queue](../.cache/goat-ai/new_jersey_high_margin_review_96000_96001/queue.html)

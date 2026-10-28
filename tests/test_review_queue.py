@@ -1,5 +1,6 @@
 """Candidate ranking and queue navigation stay deterministic."""
 
+import hashlib
 import json
 import re
 import shutil
@@ -123,6 +124,37 @@ def test_refresh_rejects_changed_trajectory(tmp_path):
     }]}))
     with pytest.raises(ValueError, match="trajectory hash differs"):
         refresh_review_queue(queue, tmp_path, index_only=True)
+
+
+def test_refresh_visible_pages_preserves_existing_reviewer_reveal(tmp_path, monkeypatch):
+    from scripts import refresh_review_queue as refresh_module
+
+    queue = tmp_path / "queue.json"
+    replay = tmp_path / "replay.json"
+    replay.write_text("recorded duel", encoding="utf-8")
+    digest = hashlib.sha256(replay.read_bytes()).hexdigest()
+    viewer = tmp_path / "game.html"
+    reveal = viewer.with_suffix(".review.html")
+    reveal.write_text("previously verified hidden cards", encoding="utf-8")
+    selected = [{"trajectory": str(replay), "trajectory_sha256": digest,
+                 "viewer": str(viewer) + "#decision=1"}]
+    queue.write_text(json.dumps({"selected": selected}), encoding="utf-8")
+    rendered = []
+
+    def render(source, output, native_root, *, reviewer_reveal=False):
+        rendered.append((source, output, reviewer_reveal))
+        if reviewer_reveal:
+            raise AssertionError("old hidden-card reveal must not be recomputed")
+        output.write_text("updated visible layout", encoding="utf-8")
+
+    monkeypatch.setattr(refresh_module, "render_replay", render)
+    monkeypatch.setattr(refresh_module, "write_review_index",
+                        lambda items, path, root: path.with_suffix(".html"))
+    assert refresh_review_queue(queue, tmp_path, skip_reviewer_reveal=True) == (1, 1)
+    assert rendered == [(replay, viewer, False)]
+    assert viewer.read_text(encoding="utf-8") == "updated visible layout"
+    assert reveal.read_text(encoding="utf-8") == "previously verified hidden cards"
+    assert json.loads(queue.read_text(encoding="utf-8"))["selected"] == selected
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")

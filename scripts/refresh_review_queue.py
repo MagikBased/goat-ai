@@ -14,7 +14,8 @@ from scripts.shortlist_policy_disagreements import write_review_index
 
 
 def refresh_review_queue(queue: Path, native_root: Path, *,
-                         index_only: bool = False) -> tuple[int, int]:
+                         index_only: bool = False,
+                         skip_reviewer_reveal: bool = False) -> tuple[int, int]:
     report = json.loads(queue.read_text(encoding="utf-8"))
     selected = report.get("selected", [])
     if not selected:
@@ -37,7 +38,7 @@ def refresh_review_queue(queue: Path, native_root: Path, *,
             # Existing verified reviewer pages are refreshed as well. Older queues
             # without a reviewer page remain player-visible only.
             reveal = viewer.with_suffix(".review.html")
-            if reveal.is_file():
+            if reveal.is_file() and not skip_reviewer_reveal:
                 render_replay(source, reveal, native_root, reviewer_reveal=True)
     write_review_index(selected, queue, native_root)
     return len(selected), len(viewers)
@@ -50,10 +51,14 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--index-only", action="store_true",
                         help="refresh queue navigation without rebuilding duel pages")
+    parser.add_argument("--skip-reviewer-reveal", action="store_true",
+                        help="refresh player-visible pages, preserving existing verified "
+                             "reveal files whose historical native assets may be unavailable")
     args = parser.parse_args()
     for queue in args.queues:
         items, viewers = refresh_review_queue(queue, args.native_root,
-                                              index_only=args.index_only)
+                                              index_only=args.index_only,
+                                              skip_reviewer_reveal=args.skip_reviewer_reveal)
         verb = "linked" if args.index_only else "refreshed"
         print(f"{queue.with_suffix('.html')}: {items} items, {viewers} {verb} duels")
 
