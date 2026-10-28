@@ -1,5 +1,33 @@
 # Baseline evaluation log
 
+## Random legal decks with independent opponents and Fusion Extra Decks (28 October 2026)
+
+A new whitelist-wide protocol sweep generated 20 seeded pairs of independently
+sampled legal 40-card Main Decks, each with 15 randomly sampled legal Fusion
+cards. All **20/20** native duels reached terminal within the 3,000-decision
+ceiling, with no process errors. The **21,811** saved decisions across those
+duels all replay-verified and passed the player-visibility audit. Individual
+duels took **228–1,654** decisions (mean **1,090.55**). The sample exercised
+announcement, ordering, tribute, target, and effect-option prompts as well as
+ordinary game actions. The first run with the script's default 500-decision
+ceiling ended only 3/20 games; those limits were not simulator failures.
+
+The ignored report is
+`.cache/goat-ai/random_extra_probe_110000_110019_3000/report.json`, SHA-256
+`8f943ca7c995ae681c86451eac13135900c3d13d9a2e99e1f5494711a2b6ccdf`.
+It records each deck and pinned asset hash, result, decision count, replay
+verification, and visibility audit. This is sampled protocol coverage, not a
+claim of arbitrary-card or historical-ruling completeness; throughput was not
+measured in this run.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/random_extra_probe_110000_110019_3000 \
+  --seed 110000 --seeds 20 --max-decisions 3000 \
+  --distinct-opponents --random-extra --verify-replays --isolate-games
+```
+
 ## Self-play action-margin check on independent 2005 lists (28 October 2026)
 
 The 240-duel PPO child's limited change to the selected parent's greedy
