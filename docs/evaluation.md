@@ -11292,3 +11292,29 @@ outcomes. A separate run with the same seeds produced identical game-level
 decision counts, winners, generated Deck hashes, offered action kinds,
 visibility counts, and loaded asset hashes. The broader M1 information-flow
 and M2 historical-ruling gates remain open.
+
+## Indianapolis 2005 source-card visibility sweep (28 October 2026)
+
+The native probe now accepts `--card-pool indianapolis-2005`. It generates
+whitelist-legal 40-card mixes using only Main Deck copies from the five
+complete published Indianapolis 2005 Top 8 lists, and records those five
+source-file hashes. The mixes are synthetic and do not claim to reproduce
+the published strategies or their matchup frequencies.
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --card-pool indianapolis-2005 --verify-replays --distinct-opponents \
+  --count-card-actions --repeat-seeds --seed 23100 --seeds 10 \
+  --max-decisions 3000 \
+  --output .cache/goat-ai/indianapolis_visibility_23100_23109
+```
+
+All ten games reached terminal in 707–1,424 decisions. All **10,267**
+decisions replay-verified and passed the visibility audit, including 101
+hidden-field and 614 opponent-field choices. The seed repeat matched all
+10,267 ordered decisions, terminal observations, and outcomes. The report
+records 27 offered action kinds and 113 loaded asset hashes. Its ignored
+path is `.cache/goat-ai/indianapolis_visibility_23100_23109/report.json`,
+SHA-256 `9234e39984d24478fe3e0f82ee98d1fde0427002e6dd34f7c0669a4ab17970f4`.
+This extends native protocol coverage to a 2005-sourced card mix; the M1
+information-flow and M2 card-ruling gates remain open.

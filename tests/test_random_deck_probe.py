@@ -10,7 +10,10 @@ from pathlib import Path
 import pytest
 
 from goat_ai.engine.decks import read_goat_whitelist, read_ydk, validate_goat_deck
-from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
+from goat_ai.evaluation.competitive_corpus import (
+    INDIANAPOLIS_2005_MAIN_DECKS,
+    TOURNAMENT_MAIN_DECKS,
+)
 from goat_ai.replay.fingerprint import sha256_file
 from scripts.probe_random_decks import (
     METAMORPHOSIS,
@@ -120,6 +123,34 @@ def test_tournament_mix_is_legal_and_replay_verifies(tmp_path):
     assert report["visibility_audit"]["decisions"] == report["games"][0]["decisions"]
     assert report["games"][0]["terminal"]
     assert report["games"][0]["error"] is None
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_2005_indianapolis_mix_is_legal_and_visibility_audited(tmp_path):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    deck = generate_tournament_mix(
+        native_root, 23100, source_names=INDIANAPOLIS_2005_MAIN_DECKS)
+    assert deck == generate_tournament_mix(
+        native_root, 23100, source_names=INDIANAPOLIS_2005_MAIN_DECKS)
+    source_root = Path(__file__).resolve().parents[1] / "examples/decks"
+    source_codes = set().union(*(set(read_ydk(source_root / name).main)
+                                 for name in INDIANAPOLIS_2005_MAIN_DECKS))
+    assert len(deck.main) == 40 and set(deck.main) <= source_codes
+    limits = read_goat_whitelist(native_root / "banlist/GOAT.lflist.conf")
+    validate_goat_deck(deck, limits, native_root / "database/cards.cdb",
+                       native_root / "database/goat-entries.cdb",
+                       native_root / "database/cards-unofficial.cdb")
+
+    report = probe(native_root, tmp_path / "indianapolis", 23100, 1, 3000,
+                   card_pool="indianapolis-2005", verify_replays=True,
+                   distinct_opponents=True)
+    game = report["games"][0]
+    assert game["terminal"] and game["error"] is None
+    assert game["replay_verified_decisions"] == game["decisions"]
+    assert report["visibility_audit"]["decisions"] == game["decisions"]
+    assert report["source_deck_sha256"] == {
+        name: sha256_file(source_root / name)
+        for name in INDIANAPOLIS_2005_MAIN_DECKS}
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

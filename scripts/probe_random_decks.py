@@ -29,7 +29,10 @@ from goat_ai.engine.decks import (
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.card_actions import count_chain_response, count_source_actions
-from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
+from goat_ai.evaluation.competitive_corpus import (
+    INDIANAPOLIS_2005_MAIN_DECKS,
+    TOURNAMENT_MAIN_DECKS,
+)
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
@@ -109,11 +112,15 @@ def generate_deck(root: Path, seed: int, *, include_random_extra: bool = False,
     return deck
 
 
-def generate_tournament_mix(root: Path, seed: int) -> Decklist:
-    """Sample legal 40-card lists from copies in six sourced tournament decks."""
+def generate_tournament_mix(root: Path, seed: int, *,
+                            source_names: tuple[str, ...] = TOURNAMENT_MAIN_DECKS
+                            ) -> Decklist:
+    """Sample a legal 40-card list from copies in a sourced deck corpus."""
+    if not source_names:
+        raise ValueError("tournament mix requires sourced Main Decks")
     limits = read_goat_whitelist(root / "banlist/GOAT.lflist.conf")
     fixtures = Path(__file__).resolve().parents[1] / "examples/decks"
-    sources = tuple(read_ydk(fixtures / name) for name in TOURNAMENT_MAIN_DECKS)
+    sources = tuple(read_ydk(fixtures / name) for name in source_names)
     candidates = [code for deck in sources for code in deck.main]
     random.Random(seed).shuffle(candidates)
     chosen = []
@@ -150,7 +157,7 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
           random_extra: bool = False,
           fusion_stress: bool = False,
           agent_name: str = "random") -> dict:
-    if card_pool not in ("whitelist", "tournament"):
+    if card_pool not in ("whitelist", "tournament", "indianapolis-2005"):
         raise ValueError("unknown card pool")
     if agent_name not in ("random", "tactical"):
         raise ValueError("unknown probe agent")
@@ -171,6 +178,8 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
     rules_profile = None
     tactical_metadata = ((load_flip_monster_codes(root), load_card_races(root),
                           load_card_facts(root)) if agent_name == "tactical" else None)
+    source_names = (INDIANAPOLIS_2005_MAIN_DECKS if card_pool == "indianapolis-2005"
+                    else TOURNAMENT_MAIN_DECKS)
 
     def agents_for(seed: int):
         if tactical_metadata is None:
@@ -184,7 +193,8 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
         generator = (lambda deck_seed: generate_deck(
             root, deck_seed, include_random_extra=random_extra,
             fusion_stress=fusion_stress)
-            if card_pool == "whitelist" else generate_tournament_mix(root, deck_seed))
+            if card_pool == "whitelist" else generate_tournament_mix(
+                root, deck_seed, source_names=source_names))
         deck = generator(seed)
         path = output / f"seed_{seed}.ydk"
         write_deck(path, deck)
@@ -217,7 +227,7 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
                 if verified is not None:
                     visibility_counts.update(audit_trajectory_visibility(trajectory))
                     visibility_games += 1
-                if trajectory is not None and (card_pool == "tournament"
+                if trajectory is not None and (card_pool in ("tournament", "indianapolis-2005")
                                                or verify_replays):
                     if rules_profile is None:
                         rules_profile = trajectory.rules_profile
@@ -285,7 +295,7 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
         report["extra_seed_offset"] = 2_000_000
     if fusion_stress:
         report["fusion_stress"] = True
-    if card_pool == "tournament" or verify_replays:
+    if card_pool in ("tournament", "indianapolis-2005") or verify_replays:
         report["rules_profile"] = rules_profile
         report["loaded_asset_sha256"] = dict(sorted(loaded_assets.items()))
         report["asset_sha256"] = {
@@ -299,10 +309,12 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
                 "global_utility": "scripts/utility.lua",
             }.items()
         }
-    if card_pool == "tournament":
+    if card_pool in ("tournament", "indianapolis-2005"):
         source_root = Path(__file__).resolve().parents[1] / "examples/decks"
         report["source_deck_sha256"] = {
-            name: sha256_file(source_root / name) for name in TOURNAMENT_MAIN_DECKS
+            name: sha256_file(source_root / name) for name in (
+                INDIANAPOLIS_2005_MAIN_DECKS if card_pool == "indianapolis-2005"
+                else TOURNAMENT_MAIN_DECKS)
         }
     if verify_replays:
         report["replay_verification"] = {
@@ -473,7 +485,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--seeds", type=int, default=10)
     parser.add_argument("--max-decisions", type=int, default=500)
-    parser.add_argument("--card-pool", choices=("whitelist", "tournament"),
+    parser.add_argument("--card-pool", choices=("whitelist", "tournament",
+                                                "indianapolis-2005"),
                         default="whitelist")
     parser.add_argument("--agent", choices=("random", "tactical"), default="random",
                         help="visible-observation agent used by both seats")
