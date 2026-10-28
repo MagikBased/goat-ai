@@ -94,6 +94,66 @@ def test_launcher_rejects_running_server_with_old_api(monkeypatch):
     assert called == ["http://127.0.0.1:8765/api/review/version"]
 
 
+def test_launcher_reuses_game_server_without_a_queue(monkeypatch):
+    monkeypatch.setattr(launch_review_server, "PORTS", range(8765, 8768))
+    monkeypatch.setattr(launch_review_server, "server_queue",
+                        lambda port: "/games/new" if port == 8767 else None)
+    monkeypatch.setattr(launch_review_server, "server_healthy",
+                        lambda port, source: port == 8767 and source is None)
+    assert launch_review_server.launch(None, open_browser=False, page="games") == (
+        "http://127.0.0.1:8767/games/new")
+
+
+def test_game_creator_page_and_api_reject_unlisted_decks(tmp_path, monkeypatch):
+    queue, _, _, _ = _queue(tmp_path)
+    page = tmp_path / "examples/create_game.html"
+    page.parent.mkdir(parents=True)
+    shutil.copyfile(serve_review_queue.ROOT / "examples/create_game.html", page)
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    server = serve_review_queue.make_server(queue, tmp_path / "saved", port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with urlopen(f"{base}/games/new", timeout=5) as response:
+            assert b"Create a GOAT AI game" in response.read()
+        options = _request(f"{base}/api/games/options")[1]
+        assert options["decks"] == []
+        assert not options["native_ready"]
+        with pytest.raises(HTTPError) as error:
+            _request(f"{base}/api/games", {
+                "deck1": "../../secret.ydk", "deck2": "missing.ydk",
+                "agent1": "tactical", "agent2": "random", "seed": 42})
+        assert error.value.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
+    page = tmp_path / "examples/create_game.html"
+    page.parent.mkdir(parents=True)
+    shutil.copyfile(serve_review_queue.ROOT / "examples/create_game.html", page)
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    server = serve_review_queue.make_server(None, None, port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with urlopen(base, timeout=5) as response:
+            assert response.url.endswith("/examples/create_game.html")
+            assert b"Create a GOAT AI game" in response.read()
+        assert _request(f"{base}/api/games/options")[1]["decks"] == []
+        with pytest.raises(HTTPError) as error:
+            _request(f"{base}/api/review/progress")
+        assert error.value.code == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, monkeypatch):
     queue, replay, digest, trajectory = _queue(tmp_path)
     monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
@@ -103,7 +163,7 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
     thread.start()
     base = f"http://127.0.0.1:{server.server_port}"
     try:
-        assert _request(f"{base}/api/review/version")[1] == {"api_version": 2}
+        assert _request(f"{base}/api/review/version")[1] == {"api_version": 3}
         assert launch_review_server.REVIEW_API_VERSION == serve_review_queue.REVIEW_API_VERSION
         assert server_healthy(server.server_port, digest)
         assert _request(f"{base}/api/review/state?source={digest}")[1] == {

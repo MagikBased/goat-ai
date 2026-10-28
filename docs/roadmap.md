@@ -2353,6 +2353,14 @@ and both policy seats. All 3,295 source decisions replay-verified and passed
 visibility checks. This expands the independent human-review surface for M4;
 the queue starts unlabeled and establishes no policy-strength gain.
 
+The local replay server now offers a browser game creator for two selected AI
+agents and Decks. It records complete native duels, replay-verifies them, and
+opens reviewer-only visual replays. Browser human-versus-AI play remains future
+work: the server must keep a duel session alive across requests, expose only
+the human seat's observation and legal actions, reject stale or illegal
+choices, and keep hidden cards inaccessible until a separate postgame replay.
+The existing terminal `HumanAgent` already exercises the same action contract.
+
 An [action-encoding audit](evaluation.md#legal-action-representation-collision-audit-28-october-2026)
 found no collision in the current 22 shortlisted review comparisons, but did
 find that v23 cannot distinguish two card-announcement prompts in the source

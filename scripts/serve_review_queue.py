@@ -1,8 +1,8 @@
-"""Serve an existing review queue and save choices immediately on this computer.
+"""Serve local review queues and verified AI game creation on this computer.
 
 The localhost endpoint accepts only shortlisted, legal policy-seat choices.
-Saved files use the existing annotation schema; the full native replay and
-visibility audit still run when those files are validated for training.
+Saved review files use the existing annotation schema. Generated AI matches
+run through full native replay and visibility checks before being displayed.
 """
 
 import argparse
@@ -15,11 +15,12 @@ from urllib.parse import parse_qs, urlsplit
 
 from goat_ai.replay import read_decision_annotations, read_trajectory
 from goat_ai.replay.fingerprint import sha256_file
+from scripts.create_viewer_game import GameCreator
 from scripts.validate_review_queue_labels import queue_sources, verify_queue_items
 
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
-REVIEW_API_VERSION = 2
+REVIEW_API_VERSION = 3
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -331,16 +332,21 @@ class ReviewStore:
             return {"choices": payload["choices"], "saved": True}
 
 
-def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
+def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765,
                 host: str = "127.0.0.1",
                 reviewer_alias: str = "local-reviewer") -> ThreadingHTTPServer:
-    queue = queue.resolve()
-    if not queue.is_file() or not queue.is_relative_to(ROOT):
-        raise ValueError("queue must be an existing file inside this repository")
-    if not queue.with_suffix(".html").is_file():
-        raise ValueError("queue HTML is missing; refresh the queue first")
-    store = ReviewStore(queue, output_dir, reviewer_alias)
-    start_path = "/" + queue.with_suffix(".html").relative_to(ROOT).as_posix()
+    if queue is not None:
+        queue = queue.resolve()
+        if not queue.is_file() or not queue.is_relative_to(ROOT):
+            raise ValueError("queue must be an existing file inside this repository")
+        if not queue.with_suffix(".html").is_file():
+            raise ValueError("queue HTML is missing; refresh the queue first")
+        if output_dir is None:
+            raise ValueError("review queue requires a label output directory")
+    store = ReviewStore(queue, output_dir, reviewer_alias) if queue is not None else None
+    creator = GameCreator(root=ROOT)
+    start_path = ("/" + queue.with_suffix(".html").relative_to(ROOT).as_posix()
+                  if queue is not None else "/games/new")
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -370,8 +376,19 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
                 self.send_header("Location", start_path)
                 self.end_headers()
                 return
+            if parsed.path == "/games/new":
+                self.send_response(302)
+                self.send_header("Location", "/examples/create_game.html")
+                self.end_headers()
+                return
+            if parsed.path == "/api/games/options":
+                self._json(200, creator.options())
+                return
             if parsed.path == "/api/review/version":
                 self._json(200, {"api_version": REVIEW_API_VERSION})
+                return
+            if parsed.path.startswith("/api/review/") and store is None:
+                self._json(404, {"error": "no review queue is open"})
                 return
             if parsed.path == "/api/review/state":
                 digest = parse_qs(parsed.query).get("source", [""])[0]
@@ -400,19 +417,26 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
                     self._json(400, {"error": str(error)})
                 return
             target = Path(self.translate_path(self.path)).resolve()
-            queue_html = target.is_relative_to(queue.parent) and target.suffix == ".html"
+            queue_html = (queue is not None and target.is_relative_to(queue.parent)
+                          and target.suffix == ".html")
             art = (target.is_relative_to(ROOT / "replays/card_images")
                    and target.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
-            if not (queue_html or art):
-                self.send_error(404, "Only review pages and card art are served")
+            creator_html = target == ROOT / "examples/create_game.html"
+            game_html = (target.is_relative_to(creator.output_dir)
+                         and target.suffix == ".html")
+            if not (queue_html or art or creator_html or game_html):
+                self.send_error(404, "Only review, game, and card-art pages are served")
                 return
             super().do_GET()
 
         def do_POST(self) -> None:
             endpoint = urlsplit(self.path).path
             if endpoint not in ("/api/review/choice", "/api/review/bookmark",
-                                "/api/review/note"):
+                                "/api/review/note", "/api/games"):
                 self._json(404, {"error": "unknown endpoint"})
+                return
+            if endpoint != "/api/games" and store is None:
+                self._json(404, {"error": "no review queue is open"})
                 return
             origin = self.headers.get("Origin")
             host_header = self.headers.get("Host")
@@ -425,14 +449,18 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
                 if not 1 <= size <= (16384 if endpoint == "/api/review/note" else 4096):
                     raise ValueError("request body size is invalid")
                 data = json.loads(self.rfile.read(size))
-                expected = ({"source", "decision_index", "action_index"}
+                expected = ({"deck1", "deck2", "agent1", "agent2", "seed"}
+                            if endpoint == "/api/games" else
+                            {"source", "decision_index", "action_index"}
                             if endpoint == "/api/review/choice" else
                             {"source", "decision_index", "bookmarked"}
                             if endpoint == "/api/review/bookmark" else
                             {"source", "decision_index", "kind", "text"})
                 if not isinstance(data, dict) or set(data) != expected:
                     raise ValueError("invalid review payload")
-                if endpoint == "/api/review/choice":
+                if endpoint == "/api/games":
+                    result = creator.create(data)
+                elif endpoint == "/api/review/choice":
                     result = store.choose(data["source"], data["decision_index"],
                                           data["action_index"])
                 elif endpoint == "/api/review/bookmark":
@@ -441,7 +469,7 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
                 else:
                     result = store.save_note(data["source"], data["decision_index"],
                                              data["kind"], data["text"])
-            except (ValueError, TypeError, KeyError, OSError) as error:
+            except (ValueError, TypeError, KeyError, OSError, RuntimeError) as error:
                 self._json(400, {"error": str(error)})
                 return
             self._json(200, result)
@@ -451,21 +479,26 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("queue", type=Path, help="existing queue.json inside this repository")
+    parser.add_argument("queue", nargs="?", type=Path,
+                        help="existing queue.json; omit for game creator only")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--output-dir", type=Path,
                         help="ignored label folder; defaults to a queue-hash-specific cache folder")
     parser.add_argument("--reviewer-alias", default="local-reviewer",
                         help="optional provenance alias when separate people review the same queue")
     args = parser.parse_args()
-    digest = sha256_file(args.queue)
-    output = args.output_dir or ROOT / ".cache/goat-ai/review_labels" / digest[:12]
-    carried = prepare_review_labels(args.queue, output, args.reviewer_alias)
+    digest = sha256_file(args.queue) if args.queue else None
+    output = (args.output_dir or ROOT / ".cache/goat-ai/review_labels" / digest[:12]
+              if digest else None)
+    carried = (prepare_review_labels(args.queue, output, args.reviewer_alias)
+               if args.queue else 0)
     server = make_server(args.queue, output, port=args.port,
                          reviewer_alias=args.reviewer_alias)
-    path = args.queue.resolve().with_suffix(".html").relative_to(ROOT).as_posix()
+    path = (args.queue.resolve().with_suffix(".html").relative_to(ROOT).as_posix()
+            if args.queue else "games/new")
     print(f"Open http://127.0.0.1:{server.server_port}/{path}", flush=True)
-    print(f"Choices save in {output.resolve()}", flush=True)
+    if output:
+        print(f"Choices save in {output.resolve()}", flush=True)
     if carried:
         print(f"Carried {carried} matching choices from an earlier queue revision", flush=True)
     try:

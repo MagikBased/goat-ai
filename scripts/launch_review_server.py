@@ -1,4 +1,4 @@
-"""Open the newest local GOAT AI review queue with its save-enabled server."""
+"""Open a local review queue or AI game creator with its save-enabled server."""
 
 import argparse
 import json
@@ -13,7 +13,7 @@ import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-REVIEW_API_VERSION = 2  # Keep in sync with serve_review_queue.py.
+REVIEW_API_VERSION = 3  # Keep in sync with serve_review_queue.py.
 SEARCH_DIRS = (ROOT / "replays", ROOT / ".cache/goat-ai")
 LOG = ROOT / ".cache/goat-ai/review_server.log"
 PORTS = range(8765, 8865)
@@ -48,13 +48,18 @@ def port_in_use(port: int) -> bool:
         return probe.connect_ex(("127.0.0.1", port)) == 0
 
 
-def server_healthy(port: int, source: str) -> bool:
+def server_healthy(port: int, source: str | None) -> bool:
     try:
         # A running process keeps its imported code after the files change.
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/review/version",
                                     timeout=5) as response:
             if response.status != 200 or json.load(response).get("api_version") != REVIEW_API_VERSION:
                 return False
+        if source is None:
+            with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/api/games/options", timeout=5) as response:
+                return response.status == 200 and isinstance(
+                    json.load(response).get("decks"), list)
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/review/progress",
                                     timeout=5) as response:
             if response.status != 200 or not isinstance(
@@ -79,23 +84,34 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def launch(queue: Path, *, open_browser: bool = True) -> str:
-    queue = queue.resolve()
-    if not queue.is_file() or not queue.is_relative_to(ROOT):
-        raise ValueError("queue must be an existing file inside the goat-ai repository")
-    if not queue.with_suffix(".html").is_file():
-        raise ValueError(f"{queue.stem}.html is missing; refresh this queue first")
-    selected = json.loads(queue.read_text(encoding="utf-8")).get("selected")
-    if not isinstance(selected, list) or not selected:
-        raise ValueError("review queue has no selected decisions")
-    source = selected[0]["trajectory_sha256"]
-    route = "/" + queue.with_suffix(".html").relative_to(ROOT).as_posix()
+def launch(queue: Path | None, *, open_browser: bool = True,
+           page: str = "queue") -> str:
+    if page not in ("queue", "games"):
+        raise ValueError("unknown server page")
+    if queue is None and page != "games":
+        raise ValueError("a review page requires a queue")
+    if queue is not None:
+        queue = queue.resolve()
+        if not queue.is_file() or not queue.is_relative_to(ROOT):
+            raise ValueError("queue must be an existing file inside the goat-ai repository")
+        if not queue.with_suffix(".html").is_file():
+            raise ValueError(f"{queue.stem}.html is missing; refresh this queue first")
+        selected = json.loads(queue.read_text(encoding="utf-8")).get("selected")
+        if not isinstance(selected, list) or not selected:
+            raise ValueError("review queue has no selected decisions")
+        source = selected[0]["trajectory_sha256"]
+        route = "/" + queue.with_suffix(".html").relative_to(ROOT).as_posix()
+    else:
+        source = None
+        route = "/games/new"
+    open_route = "/games/new" if page == "games" else route
     # Reuse a compatible server before claiming a free lower port. Reviewers
     # may still have older queue tabs open on several local ports.
     for port in reversed(PORTS):
         existing = server_queue(port)
-        if existing == route and server_healthy(port, source):
-            url = f"http://127.0.0.1:{port}{route}"
+        if (existing == route or (queue is None and existing is not None)) and server_healthy(
+                port, source):
+            url = f"http://127.0.0.1:{port}{open_route}"
             if open_browser:
                 webbrowser.open(url)
             return url
@@ -109,12 +125,12 @@ def launch(queue: Path, *, open_browser: bool = True) -> str:
         with LOG.open("ab") as log:
             child = subprocess.Popen(
                 [sys.executable, str(ROOT / "scripts/serve_review_queue.py"),
-                 str(queue), "--port", str(port)],
+                 *([str(queue)] if queue is not None else []), "--port", str(port)],
                 cwd=ROOT, env=env, stdin=subprocess.DEVNULL,
                 stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         for _ in range(40):
             if server_queue(port) == route:
-                url = f"http://127.0.0.1:{port}{route}"
+                url = f"http://127.0.0.1:{port}{open_route}"
                 if open_browser:
                     webbrowser.open(url)
                 return url
@@ -133,11 +149,14 @@ def main() -> None:
     parser.add_argument("queue", nargs="?", type=Path,
                         help="queue or recheck JSON to open; defaults to the newest local queue")
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--game-creator", action="store_true",
+                        help="open AI game creation instead of the review queue")
     args = parser.parse_args()
     queue = args.queue or latest_queue()
-    if queue is None:
+    if queue is None and not args.game_creator:
         parser.error("no review queue found; generate a queue first")
-    print(launch(queue, open_browser=not args.no_browser), flush=True)
+    print(launch(queue, open_browser=not args.no_browser,
+                 page="games" if args.game_creator else "queue"), flush=True)
 
 
 if __name__ == "__main__":

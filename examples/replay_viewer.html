@@ -177,6 +177,7 @@
   <header class="topbar">
     <div><h1>GOAT AI Replay Viewer</h1><p id="view-mode" class="muted subtitle">Player-visible decision snapshots</p></div>
     <div class="toolbar">
+      <a id="create-game-link" href="/games/new" hidden>Create AI game</a>
       <label>Open trajectory <input id="file" type="file" accept=".json,application/json"></label>
       <label>Reviewer reveals <input id="review-file" type="file" accept=".json,application/json" title="Choose a verified .review.json sidecar"></label>
       <label class="image-picker" title="Select your local card image folder">Card images <input id="images" type="file" webkitdirectory directory multiple accept="image/jpeg,image/png,image/webp"></label>
@@ -1329,7 +1330,7 @@
     async function loadLocalReview(hash) {
       try {
         const versionResponse = await fetch("/api/review/version");
-        if (!versionResponse.ok || (await versionResponse.json()).api_version !== 2)
+        if (!versionResponse.ok || (await versionResponse.json()).api_version !== 3)
           throw new Error("Review server is outdated; reopen this queue with ./start_review_viewer.sh");
         const response = await fetch(`/api/review/state?source=${encodeURIComponent(hash)}`);
         if (!response.ok) throw new Error("local review endpoint unavailable");
@@ -1564,6 +1565,7 @@
       placePreview();
     }, {passive: false});
     addEventListener("resize", placePreview);
+    byId("create-game-link").hidden = !["127.0.0.1", "localhost"].includes(location.hostname);
     try {
       names = JSON.parse(byId("embedded-names").textContent);
       optionTexts = JSON.parse(byId("embedded-options").textContent);

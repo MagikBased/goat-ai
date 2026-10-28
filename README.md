@@ -107,6 +107,25 @@ the saved game can be opened in the replay viewer afterward. See
 
 ## View a replay
 
+To create an AI-versus-AI game in the browser, start the local game creator:
+
+```bash
+./start_game_creator.sh
+```
+
+Choose two Decks, two agents (Random, Tactical, or the selected neural v23
+checkpoint), and a seed. The server runs a complete native GOAT duel, verifies
+its trajectory and player visibility, then opens a replay with both players'
+hidden cards available to the reviewer. The AI agents still receive only their
+own legal player-visible observations. Generated games stay in ignored
+`.cache/goat-ai/user_games/`; the page lists recent games so you can reopen
+them. Add a legal `.ydk` file to `examples/decks/` to use a custom Deck.
+The creator is also linked from replay pages served on localhost.
+
+Live browser play against an AI is a later step. The terminal human-versus-AI
+workflow above already uses the same observation and legal-action interface;
+the browser currently creates complete AI-versus-AI games for review.
+
 The offline [replay viewer](examples/replay_viewer.html) shows each recorded decision as a board snapshot from the acting player's visible view. Record and render a Scapegoat fixture duel:
 
 ```bash
