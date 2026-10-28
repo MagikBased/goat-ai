@@ -1,6 +1,9 @@
 """Tournament-mix protocol probes use legal, reproducible sourced cards."""
 
+import json
 import os
+import subprocess
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -8,7 +11,84 @@ import pytest
 
 from goat_ai.engine.decks import read_goat_whitelist, read_ydk, validate_goat_deck
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
-from scripts.probe_random_decks import generate_tournament_mix, probe
+from scripts.probe_random_decks import (
+    METAMORPHOSIS,
+    SCAPEGOAT,
+    THOUSAND_EYES_RESTRICT,
+    generate_deck,
+    generate_tournament_mix,
+    probe,
+)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_random_fusion_extra_decks_keep_main_seed_and_replay_verify(tmp_path):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    plain = generate_deck(native_root, 10700)
+    expanded = generate_deck(native_root, 10700, include_random_extra=True)
+    assert plain.main == expanded.main
+    assert plain.extra == ()
+    assert len(expanded.extra) == len(set(expanded.extra)) == 15
+    assert expanded == generate_deck(native_root, 10700, include_random_extra=True)
+    report = probe(native_root, tmp_path / "fusion", 10700, 1, 3000,
+                   verify_replays=True, distinct_opponents=True,
+                   random_extra=True)
+    assert report["random_extra"] is True
+    assert report["extra_seed_offset"] == 2_000_000
+    assert len(read_ydk(report["games"][0]["deck"]).extra) == 15
+    assert len(read_ydk(report["games"][0]["opponent_deck"]).extra) == 15
+    assert report["games"][0]["terminal"]
+    assert report["games"][0]["error"] is None
+    assert report["games"][0]["replay_verified_decisions"] == report["games"][0]["decisions"]
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_fusion_stress_reaches_extra_deck_card_actions(tmp_path):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    deck = generate_deck(native_root, 10753, include_random_extra=True,
+                         fusion_stress=True)
+    assert Counter(deck.main)[SCAPEGOAT] == 3
+    assert Counter(deck.main)[METAMORPHOSIS] == 3
+    assert THOUSAND_EYES_RESTRICT in deck.extra
+    report = probe(native_root, tmp_path / "stress", 10753, 1, 3000,
+                   verify_replays=True, distinct_opponents=True,
+                   count_card_actions=True, random_extra=True,
+                   fusion_stress=True)
+    assert report["fusion_stress"] is True
+    assert report["games"][0]["terminal"]
+    assert report["games"][0]["error"] is None
+    assert any(row["code"] == THOUSAND_EYES_RESTRICT
+               and row["selected_decisions"] > 0
+               for row in report["card_actions"])
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize(("seed", "source_code"),
+                         [(10772, 93671934), (10786, 28566710)])
+def test_fusion_stress_native_regressions(tmp_path, seed, source_code):
+    """Morale Boost and Last Turn each exposed a native duel failure."""
+    root = Path(__file__).resolve().parents[1]
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve()
+    result = subprocess.run(
+        [sys.executable, str(root / "scripts/probe_random_decks.py"),
+         "--native-root", str(native_root), "--output", str(tmp_path),
+         "--seed", str(seed), "--seeds", "1", "--max-decisions", "3000",
+         "--random-extra", "--fusion-stress", "--distinct-opponents",
+         "--verify-replays", "--count-card-actions"],
+        cwd=root, env={**os.environ, "PYTHONPATH": f"{root / 'src'}{os.pathsep}{root}"},
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads((tmp_path / "report.json").read_text())
+    game = report["games"][0]
+    assert game["seed"] == seed
+    assert game["terminal"] and game["error"] is None
+    assert game["replay_verified_decisions"] == game["decisions"]
+    assert any(row["code"] == source_code and row["selected_decisions"] > 0
+               for row in report["card_actions"])
+    if seed == 10772:
+        assert report["loaded_asset_sha256"]["scripts/official/c93671934.lua"] == (
+            "3cda0dc2671fb47d6b2dcb212e7f99bff1bc5e142686e7c35b0c6ded7dc65c20")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

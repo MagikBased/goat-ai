@@ -1,0 +1,16 @@
+--- a/processor.cpp
++++ b/processor.cpp
+@@ -2178,6 +2178,13 @@
+ 		return FALSE;
+ 	}
+ 	case 11: {
++			// A forced battle started by a resolving effect (for example Last
++			// Turn) can replace this attack and clear the shared attacker when
++			// it finishes. The interrupted attack has nothing left to resolve.
++			if(!core.attacker) {
++				arg.step = Processors::restart;
++				return FALSE;
++			}
+ 		if(core.attacker->is_affected_by_effect(EFFECT_ATTACK_DISABLED)) {
+ 			core.attacker->reset(EFFECT_ATTACK_DISABLED, RESET_CODE);
+ 			pduel->new_message(MSG_ATTACK_DISABLED);

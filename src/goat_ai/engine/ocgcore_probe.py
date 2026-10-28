@@ -99,6 +99,18 @@ UPSTREAM_FIREBIRD_SHA256 = "76c351a0006682d2a31449084cb821d43e6fc5f9f0b98931cae1
 UPSTREAM_GOAT_RIVALRY_SHA256 = "5da97ba11bd10b53817b9812076d51e116415fe3a5aee3d09265f08ead0fb693"
 UPSTREAM_SINISTER_SHA256 = "92886fb585816f0e4466b682a0858dd3e514b2965b556e8d72c661b1f1337ed1"
 UPSTREAM_DARK_BALTER_SHA256 = "fa1f87eba33a9e87b48ac9d34569dad107e9405ae71320662e491cc658918a8f"
+UPSTREAM_MORALE_BOOST_SHA256 = "4520559566f5d84b72b1d6dbd012b62e0b191f9ff4e1a0705cf5f8f9baf5c3e5"
+MORALE_BOOST_LEAVE_OLD = (
+    b"if g:IsExists(Card.IsControler,1,nil,0) then flag=flag+1 end\n"
+    b"\tif g:IsExists(Card.IsControler,1,nil,1) then flag=flag+2 end\n"
+    b"\te:SetLabel(({0,1,PLAYER_ALL})[flag])"
+)
+MORALE_BOOST_LEAVE_FIXED = (
+    b"if g:IsExists(Card.IsPreviousControler,1,nil,0) then flag=flag+1 end\n"
+    b"\tif g:IsExists(Card.IsPreviousControler,1,nil,1) then flag=flag+2 end\n"
+    b"\tif flag==0 then return false end\n"
+    b"\te:SetLabel(({0,1,PLAYER_ALL})[flag])"
+)
 BALTER_NEGATE_OLD = b"function s.disop(e,tp,eg,ep,ev,re,r,rp,chk)\n\tDuel.NegateEffect(ev)\nend"
 BALTER_NEGATE_SWORDS_HISTORICAL = b"""function s.disop(e,tp,eg,ep,ev,re,r,rp,chk)
 	Duel.NegateEffect(ev)
@@ -686,6 +698,16 @@ class OcgcoreProbe:
                 return 0
             contents = contents.replace(BALTER_NEGATE_OLD,
                                         BALTER_NEGATE_SWORDS_HISTORICAL)
+        if relative_path == "official/c93671934.lua":
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_MORALE_BOOST_SHA256 \
+                    or contents.count(MORALE_BOOST_LEAVE_OLD) != 1:
+                self.errors.append("pinned Morale Boost script changed; leave-field correction not applied")
+                return 0
+            # After an Equip Card leaves the field, its current controller
+            # may be PLAYER_NONE. The printed damage applies to its last
+            # field controller, which the native event retains separately.
+            contents = contents.replace(MORALE_BOOST_LEAVE_OLD,
+                                        MORALE_BOOST_LEAVE_FIXED)
         if relative_path == "official/c7391448.lua" and self.mode == "mr1_synchro_probe":
             if (hashlib.sha256(contents).hexdigest() != UPSTREAM_GOYO_SHA256
                     or contents.count(GOYO_TUNER_REQUIREMENT_CURRENT) != 1):

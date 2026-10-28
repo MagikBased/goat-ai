@@ -26,6 +26,10 @@ CORE_PROCESSOR_UPSTREAM_SHA256 = "083b4da8e33f22890d186c7d19ebbcf0113aa4c89d59e3
 CORE_PROCESSOR_GOAT_SHA256 = "544f99bb3e8f3148c6abe17a01b0d8cde27466ccaba062b6a9c815edff9bf3b5"
 CORE_SEGOC_PATCH = Path(__file__).resolve().parent / "native_patches/0001-goat-cross-controller-segoc.patch"
 CORE_SEGOC_PATCH_SHA256 = "fb2bc9fde96863af230085c1b03aa444fa75145b81eb20479620d18fd2126aef"
+CORE_PROCESSOR_FORCED_BATTLE_SHA256 = "eae85af2da638d227b2f992f3d200d2ecc0ff16110e66e2e7faf3da47a148f01"
+CORE_FORCED_BATTLE_PATCH = (Path(__file__).resolve().parent
+                            / "native_patches/0002-goat-forced-battle-interrupted-attack.patch")
+CORE_FORCED_BATTLE_PATCH_SHA256 = "6fea71d5a9af520738aa6cac5d33623a8c9c9c04607bdcf8d75221c9f4e698cf"
 
 
 def run(*args: str) -> None:
@@ -34,19 +38,25 @@ def run(*args: str) -> None:
 
 
 def apply_goat_core_patch(core: Path) -> None:
-    """Apply the pinned GOAT-only SEGOC correction, or verify it is present."""
+    """Apply checksum-verified GOAT native corrections, or verify them."""
     patch_hash = hashlib.sha256(CORE_SEGOC_PATCH.read_bytes()).hexdigest()
     if patch_hash != CORE_SEGOC_PATCH_SHA256:
         raise SystemExit(f"GOAT core patch checksum mismatch: {patch_hash}")
+    forced_patch_hash = hashlib.sha256(CORE_FORCED_BATTLE_PATCH.read_bytes()).hexdigest()
+    if forced_patch_hash != CORE_FORCED_BATTLE_PATCH_SHA256:
+        raise SystemExit(f"GOAT forced-battle patch checksum mismatch: {forced_patch_hash}")
     processor = core / "processor.cpp"
     current_hash = hashlib.sha256(processor.read_bytes()).hexdigest()
-    if current_hash == CORE_PROCESSOR_GOAT_SHA256:
+    if current_hash == CORE_PROCESSOR_FORCED_BATTLE_SHA256:
         return
-    if current_hash != CORE_PROCESSOR_UPSTREAM_SHA256:
+    if current_hash == CORE_PROCESSOR_UPSTREAM_SHA256:
+        run("git", "-C", str(core), "apply", str(CORE_SEGOC_PATCH))
+        current_hash = hashlib.sha256(processor.read_bytes()).hexdigest()
+    if current_hash != CORE_PROCESSOR_GOAT_SHA256:
         raise SystemExit(f"unexpected native processor.cpp checksum: {current_hash}")
-    run("git", "-C", str(core), "apply", str(CORE_SEGOC_PATCH))
+    run("git", "-C", str(core), "apply", str(CORE_FORCED_BATTLE_PATCH))
     patched_hash = hashlib.sha256(processor.read_bytes()).hexdigest()
-    if patched_hash != CORE_PROCESSOR_GOAT_SHA256:
+    if patched_hash != CORE_PROCESSOR_FORCED_BATTLE_SHA256:
         raise SystemExit(f"GOAT core patch produced unexpected checksum: {patched_hash}")
 
 

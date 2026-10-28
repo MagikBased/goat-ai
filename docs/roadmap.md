@@ -265,6 +265,18 @@ see [GOAT rules](goat_rules.md).
 
 A fresh 50-pair whitelist sweep exposed `MSG_SORT_CHAIN` while ordering Dark Elf's and Toll's attack payments; the native message name does not mean chain links were present. The adapter now decodes that bounded ordering request, and both orders complete full replay-verified, visibility-audited duels. Rerunning the exact seeds produced 50/50 terminal games and 50,084 verified decisions; see [the protocol sweep](evaluation.md#chain-order-native-protocol-sweep-27-october-2026). This broadens native action coverage without certifying historical rulings for every sampled card.
 
+The random-whitelist probe now optionally generates 15-card Fusion Decks and a
+Scapegoat/Metamorphosis stress composition while preserving the original Main
+Deck seed stream. Fifty random-Extra duels completed and verified, but offered
+no Fusion card actions; 10 stress duels reached real Thousand-Eyes Restrict
+actions. An additional 40 stress seeds exposed a Last Turn forced-battle native
+null dereference and a Morale Boost script error. Checksum-verified corrections
+and subprocess regressions now cover both; all 40 rerun duels reached terminal
+with 39,677 replay-verified, visibility-audited decisions and 111 selected
+Metamorphosis activations. These are protocol and crash-resistance samples,
+not arbitrary-deck completeness or card-ruling certification. See [the Fusion
+stress report](evaluation.md#random-fusion-deck-protocol-sweep-27-october-2026).
+
 The native adapter now decodes bounded `MSG_SELECT_COUNTER` prompts as
 `select_counters` actions with explicit per-card amounts. It sends the core's
 ordered 16-bit allocation response and checks that each offered amount is

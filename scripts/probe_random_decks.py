@@ -26,9 +26,17 @@ from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 
+SCAPEGOAT = 504700123
+METAMORPHOSIS = 46411259
+THOUSAND_EYES_RESTRICT = 504700102
+FUSION_STRESS_MAIN = (SCAPEGOAT, METAMORPHOSIS)
 
-def generate_deck(root: Path, seed: int) -> Decklist:
-    """Choose 40 distinct canonical Main Deck cards from the pinned GOAT list."""
+
+def generate_deck(root: Path, seed: int, *, include_random_extra: bool = False,
+                  fusion_stress: bool = False) -> Decklist:
+    """Choose distinct whitelist cards, optionally including 15 Fusion cards."""
+    if fusion_stress and not include_random_extra:
+        raise ValueError("Fusion stress requires a random Extra Deck")
     limits = read_goat_whitelist(root / "banlist/GOAT.lflist.conf")
     database = root / "database/cards.cdb"
     goat = root / "database/goat-entries.cdb"
@@ -38,6 +46,7 @@ def generate_deck(root: Path, seed: int) -> Decklist:
         connection.execute("ATTACH DATABASE ? AS unofficial",
                            (f"file:{unofficial.resolve()}?mode=ro",))
         candidates = []
+        fusion_candidates = []
         for code, limit in sorted(limits.items()):
             if not limit:
                 continue
@@ -47,21 +56,47 @@ def generate_deck(root: Path, seed: int) -> Decklist:
                                          (code,)).fetchone()
                 if row is not None:
                     break
-            if row is not None and not row[1] & 0x40 and not row[1] & 0x4000:
-                candidates.append((code, row[0] or code))
+            if row is not None and not row[1] & 0x4000:
+                (fusion_candidates if row[1] & 0x40 else candidates).append(
+                    (code, row[0] or code))
     random.Random(seed).shuffle(candidates)
     chosen = []
     canonical = set()
+    enabler_names = {name_code for code, name_code in candidates
+                     if code in FUSION_STRESS_MAIN} if fusion_stress else set()
+    target_main_size = 34 if fusion_stress else 40
     for code, name_code in candidates:
-        if name_code in canonical:
+        if name_code in canonical or name_code in enabler_names:
             continue
         chosen.append(code)
         canonical.add(name_code)
-        if len(chosen) == 40:
+        if len(chosen) == target_main_size:
             break
-    if len(chosen) != 40:
-        raise ValueError("GOAT card pool contains fewer than 40 distinct Main Deck cards")
-    deck = Decklist(tuple(chosen))
+    if len(chosen) != target_main_size or fusion_stress and len(enabler_names) != 2:
+        raise ValueError("GOAT card pool lacks Fusion stress Main Deck cards")
+    if fusion_stress:
+        chosen = [*(code for code in FUSION_STRESS_MAIN for _ in range(3)), *chosen]
+    extra = []
+    if include_random_extra:
+        random.Random(seed + 2_000_000).shuffle(fusion_candidates)
+        extra_canonical = set()
+        if fusion_stress:
+            restrict = next(((code, name_code) for code, name_code in fusion_candidates
+                             if code == THOUSAND_EYES_RESTRICT), None)
+            if restrict is None:
+                raise ValueError("GOAT Fusion stress card is absent from whitelist")
+            extra.append(restrict[0])
+            extra_canonical.add(restrict[1])
+        for code, name_code in fusion_candidates:
+            if name_code in extra_canonical:
+                continue
+            extra.append(code)
+            extra_canonical.add(name_code)
+            if len(extra) == 15:
+                break
+        if len(extra) != 15:
+            raise ValueError("GOAT card pool contains fewer than 15 distinct Fusion cards")
+    deck = Decklist(tuple(chosen), tuple(extra))
     validate_goat_deck(deck, limits, database, goat, unofficial)
     return deck
 
@@ -103,9 +138,15 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
           verify_replays: bool = False,
           distinct_opponents: bool = False,
           count_card_actions: bool = False,
-          repeat_seeds: bool = False) -> dict:
+          repeat_seeds: bool = False,
+          random_extra: bool = False,
+          fusion_stress: bool = False) -> dict:
     if card_pool not in ("whitelist", "tournament"):
         raise ValueError("unknown card pool")
+    if random_extra and card_pool != "whitelist":
+        raise ValueError("random Extra Decks require the whitelist card pool")
+    if fusion_stress and not random_extra:
+        raise ValueError("Fusion stress requires random Extra Decks")
     output.mkdir(parents=True, exist_ok=True)
     games = []
     offered: Counter[tuple[int, str]] = Counter()
@@ -118,14 +159,17 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
     loaded_assets: dict[str, str] = {}
     rules_profile = None
     for seed in range(first_seed, first_seed + seeds):
-        generator = generate_deck if card_pool == "whitelist" else generate_tournament_mix
-        deck = generator(root, seed)
+        generator = (lambda deck_seed: generate_deck(
+            root, deck_seed, include_random_extra=random_extra,
+            fusion_stress=fusion_stress)
+            if card_pool == "whitelist" else generate_tournament_mix(root, deck_seed))
+        deck = generator(seed)
         path = output / f"seed_{seed}.ydk"
         write_deck(path, deck)
         opponent_path = path
         if distinct_opponents:
             opponent_path = output / f"seed_{seed}_opponent.ydk"
-            write_deck(opponent_path, generator(root, seed + 1_000_000))
+            write_deck(opponent_path, generator(seed + 1_000_000))
         decisions = 0
         kinds = set()
         try:
@@ -209,6 +253,11 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
     if distinct_opponents:
         report["distinct_opponents"] = True
         report["opponent_seed_offset"] = 1_000_000
+    if random_extra:
+        report["random_extra"] = True
+        report["extra_seed_offset"] = 2_000_000
+    if fusion_stress:
+        report["fusion_stress"] = True
     if card_pool == "tournament" or verify_replays:
         report["rules_profile"] = rules_profile
         report["loaded_asset_sha256"] = dict(sorted(loaded_assets.items()))
@@ -274,13 +323,17 @@ def main() -> None:
                         help="count source-card options and selected chain responses")
     parser.add_argument("--repeat-seeds", action="store_true",
                         help="rerun each complete duel and require identical decisions, terminal state, and outcome")
+    parser.add_argument("--random-extra", action="store_true",
+                        help="add 15 random whitelist-legal Fusion cards to each generated Extra Deck")
+    parser.add_argument("--fusion-stress", action="store_true",
+                        help="with --random-extra, add three Scapegoat/Metamorphosis copies and Thousand-Eyes Restrict")
     args = parser.parse_args()
     if args.seeds < 1 or args.max_decisions < 1:
         parser.error("--seeds and --max-decisions must be positive")
     report = probe(args.native_root, args.output, args.seed, args.seeds,
                    args.max_decisions, args.card_pool, args.verify_replays,
                    args.distinct_opponents, args.count_card_actions,
-                   args.repeat_seeds)
+                   args.repeat_seeds, args.random_extra, args.fusion_stress)
     for game in report["games"]:
         status = "error" if game["error"] else "terminal" if game["terminal"] else "limit"
         suffix = f" error={game['error']}" if game["error"] else ""

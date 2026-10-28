@@ -9739,3 +9739,64 @@ experimental --both-deck-assignments --require-unseen-main-decks --workers 4
 `--opponent-checkpoint` with the parent or `--opponent tactical` for each
 checkpoint. Use seeds 57300 and 57316 as above. Compare the Tactical reports
 with `scripts/compare_tournament_reports.py --require-unseen-main-decks`.
+
+## Random Fusion Deck protocol sweep (27 October 2026)
+
+`scripts/probe_random_decks.py --random-extra` now gives each independently
+sampled whitelist Main Deck a deterministic 15-card Fusion Deck. The original
+Main Deck seed sequence is unchanged. On seeds 10700–10749, 50/50 duels
+reached terminal; 55,685/55,685 decisions replay-verified and passed the
+visibility audit. These random Main Decks offered **zero Fusion card actions**,
+so their successful loading of 1,266 assets did not test Fusion decisions.
+The ignored report is
+`.cache/goat-ai/whitelist_random_extra_10700_10749/report.json` (SHA-256
+`4b3f360b41f1e0ff6ccf6178011f90047e0fb00a0e228b7d410dc9c2cd490280`).
+
+The opt-in `--fusion-stress` composition includes three Scapegoats, three
+Metamorphoses, and Thousand-Eyes Restrict. Ten initial seeds 10750–10759
+reached terminal with 10,119/10,119 replay-verified and visibility-audited
+decisions. This sample selected real Thousand-Eyes Restrict actions. Its
+ignored report is
+`.cache/goat-ai/whitelist_fusion_stress_10750_10759/report.json` (SHA-256
+`464e3e1acaa97fa4634431e8f66e5164b86d120c2f2db9f9bcde53bf43d8c0d2`).
+
+The next 40 seeds initially exposed two failures. Seed 10786 activated Last
+Turn during an attack; its forced battle cleared the shared native attacker,
+and the interrupted battle command dereferenced a null pointer. A
+checksum-verified core patch now restarts that interrupted command. Seed 10772
+activated Morale Boost; when an Equip Card left the field, its pinned script
+used the card's current controller to identify who takes damage. That value
+can be absent after the move. A hash-guarded in-memory script correction uses
+the previous field controller. Both formerly failing seeds now complete and
+replay-verify in subprocess regressions. The corrections change the core or
+loaded-script fingerprints, so the earlier two reports above describe their
+own pre-correction assets and should be regenerated before use as exact
+current-build training evidence.
+
+On the corrected build, seeds 10760–10799 reached **40/40 terminal** with
+**39,677/39,677 decisions** replay-verified and visibility-audited. The run
+selected 111 Metamorphosis activations and offered 50 Thousand-Eyes Restrict
+activations, selecting eight. It loaded 1,122 distinct native assets. The
+ignored report is
+`.cache/goat-ai/whitelist_fusion_stress_10760_10799_verified/report.json`
+(SHA-256
+`915db48fb0063c913c992ed8001fef4bc49dc464d3a4da437af5bebf166d35f3`).
+Its native library SHA-256 is
+`b082628bb944b62f64cfa6b945e32bd2cb69b4e0cbff0ad3be7b24d94ddd58a5`.
+Reproduce from a full-card-scripts native setup:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/probe_random_decks.py --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_fusion_stress_10760_10799_verified \
+  --seed 10760 --seeds 40 --max-decisions 3000 \
+  --random-extra --fusion-stress --distinct-opponents \
+  --verify-replays --count-card-actions
+```
+
+This probes native protocol coverage under random play. It neither validates
+the historical rulings of every sampled card nor establishes arbitrary-deck
+completeness or playing strength. A separate Morale Boost fixture checks the
+1,000 LP gain from Snatch Steal being equipped and the 1,000 LP loss after MST
+removes it, then replay-verifies the complete duel. Last Turn's forced-battle
+outcome still needs a smaller card-specific ruling fixture.
