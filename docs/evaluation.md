@@ -37,6 +37,38 @@ Both intervals include no gain, and the direct result favors the parent. Keep
 the v23 parent selected. The next M4 experiment needs independently reviewed
 decisions from more deck families and fresh evaluation compositions.
 
+### New 2005 SJC Seattle holdout
+
+The [preserved Metagame.com SJC Seattle 2005 Top 8 lists](https://www.goatformat.com/home/top-8-decklists9351056)
+provide two further published compositions: Theeresak Poonsombat's **41-card**
+Main and **30-card** Fusion Deck, and Christian Martinez's **40-card** Main and
+**21-card** Fusion Deck. The committed
+[`Theeresak`](../examples/decks/goat_control_theeresak_poonsombat_seattle_2005.ydk)
+and [`Christian`](../examples/decks/goat_control_christian_martinez_seattle_2005.ydk)
+YDK files preserve the printed Main and Fusion quantities with pinned GOAT
+card IDs; Side Decks are omitted because this evaluation does not sideboard.
+Four native tests verify the printed names and counts and historical GOAT
+whitelist legality. The two Main Deck compositions were absent from both
+checkpoints' training provenance.
+
+On fresh seeds 98900–98907, both deck assignments and policy seats, the
+25-preference child scored **19–13** directly against its v23 parent in 32
+terminal duels (59.4%; paired 95% interval **53.1%–68.8%**). The largest duel
+took 1,217 decisions, below the 3,000-decision cap. On matched fresh seeds
+98908–98915 against Tactical-v14, the child scored **8–23–1** and the parent
+**9–23**. The strict comparator verified matching Deck compositions, native
+assets, card scripts, source code, seeds, and opponent; the child-minus-parent
+paired score difference was **−1.56 percentage points**, interval **−12.5 to
++9.38**. Combined with the preceding 13–19 direct result on Rhymus/Dimension
+Fusion, the two new Main Deck matchups yield **32–32** direct play. These
+small, matchup-dependent results do not establish a general strength gain; the
+v23 parent stays selected.
+
+Ignored Seattle report SHA-256 values: direct child/parent
+`30f79153d80e694846b8617588095ba9a61648ec8aaadbc918bcf3fef446e8b3`,
+child/Tactical `d5f6280664bae64a533b9b2a043ba2473ad4c7a8797926e9100bd039569da1a4`,
+and parent/Tactical `d989894b2cc3d65f483ad663f9720efa67a9b43bef65d4ad745397751835725d`.
+
 Ignored report SHA-256 values: parent and child reviewed-decision scores
 `b185c7a767e56774408be6e5a2515e67306a43f2dfdc7db2cc0a164cb3165e67`
 and `bddbef0f1fd502faba653c8423cb91d02c044f8f2c1c2b80798657a675ecac4b`;
