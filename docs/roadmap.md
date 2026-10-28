@@ -2352,3 +2352,12 @@ now offers 23 high-margin disagreements across three additional Deck pairings
 and both policy seats. All 3,295 source decisions replay-verified and passed
 visibility checks. This expands the independent human-review surface for M4;
 the queue starts unlabeled and establishes no policy-strength gain.
+
+An [action-encoding audit](evaluation.md#legal-action-representation-collision-audit-28-october-2026)
+found no collision in the current 22 shortlisted review comparisons, but did
+find that v23 cannot distinguish two card-announcement prompts in the source
+duels. Experimental v30 resolves the observed option-choice collisions while
+the announcement collisions remain. Before using reviewer labels on those
+prompts, represent announced card identity without exposing hidden state and
+verify that distinct names produce distinct action features. This is an M4
+representation gap, not evidence of improved playing strength.

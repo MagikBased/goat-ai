@@ -11793,3 +11793,41 @@ Run `scripts/audit_selfplay_replays.py` over the recorded trajectories. Use
 `scripts/evaluate_policy.py --engine experimental --both-deck-assignments
 --require-unseen-main-decks --workers 4 --max-decisions 3000` with the named
 holdout pairings, each stated seed range, and the stated opponent checkpoint.
+
+### Legal-action representation collision audit (28 October 2026)
+
+`scripts/audit_action_encoding.py` compares every action-specific tensor row
+within each recorded legal set. It uses the checkpoint's pinned vocabulary and
+player-visible trajectory observations; it does not infer playing strength.
+For the eight replay-verified Seattle/Rhymus review trajectories, selected
+feature v23 had 1,422 decisions with multiple actions and 9,280 legal actions.
+Seven groups (272 actions) shared identical encodings. Three groups were
+structurally identical choices, such as selecting a duplicate copy of the
+same card. Four groups contained **distinct** choices: two `announce_card`
+prompts and two `select_option` prompts. None of the 22 shortlisted
+policy-versus-Tactical review pairs collide; their 737 within-prompt action
+pairs are distinct.
+
+Re-encoding the same visible records with experimental feature v30 leaves
+five collision groups (268 actions) and only two distinct-choice groups,
+both `announce_card`. Its option-ordinal feature separates the two option
+prompts. In both card-announcement prompts, different card codes fall outside
+the checkpoint vocabulary and map to the shared unknown-card index; the
+other v23/v30 action features do not encode their identity. Preference labels
+that distinguish those card names therefore cannot be fitted by either
+version. Add a collision-free representation for announced card identity,
+using visible information only, before training on such labels. This audit
+does not justify promoting v30 or claim a competitive gain.
+
+Reproduce from the pinned environment:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_action_encoding.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/seattle_parent_review_99200_99201/matchup_*_seed_*.json
+```
+
+Pass `--feature-version 30` to audit that alternative with the same
+vocabulary. The ignored v23 and v30 report hashes are respectively
+`4ca0b6eed16e7c6fb1c038f10742c8adfaa1c55305fd7908f11838aac150eb8c`
+and `f0a628b1af6a3802344c8df522bf78ff8a2a69ecc74b80f30f64f360e356f026`.
