@@ -299,6 +299,11 @@ still uses the ordinary eager model and original feature tensors. A fresh
 trace is made after the next policy update. It is currently restricted to
 feature version 23, clipped PPO with at least two games per rollout, and no
 process workers or batched rollout inference.
+The traced and eager scorer also agree in a regression that changes legal
+action count, visible field size, and chain length from zero to two links
+within one trace. PyTorch emits its GRU shape-check tracing warnings during
+that test; the varying-size equality check covers these sampled inputs, not
+every possible observation shape.
 
 On 400 varied multi-option decisions from recorded sourced-deck duels, traced
 and eager scorers returned exactly equal logits. Two warm CPU passes took

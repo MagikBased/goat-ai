@@ -143,6 +143,30 @@ def test_traced_rollout_scores_varying_legal_action_counts_exactly():
                                               feature_version=23))
 
 
+def test_traced_rollout_scores_changing_chain_and_field_sizes():
+    vocabulary = CardVocabulary((10, 20, 30), ((10, 1, 300),))
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=23).eval()
+    scorer = TracedRolloutScorer(model)
+    base = view()
+    open_monster = CardView(0, "monster", "faceup", 20, 0, "attack",
+                            attack=1800, defense=1000)
+    chain = (ChainLinkView(1, 20, 0, 8, 0),
+             ChainLinkView(2, 30, 1, 8, 0))
+    observations = (
+        base,
+        replace(base, field=base.field + (open_monster,), chain=chain[:1]),
+        replace(base, field=(open_monster,), chain=chain),
+        base,
+    )
+    with torch.inference_mode():
+        for observation, legal in zip(
+                observations, (actions(), actions()[:2], actions()[1:], actions()),
+                strict=True):
+            features = encode_decision(observation, legal, vocabulary, 23)
+            assert torch.allclose(scorer(features), model(features),
+                                  atol=1e-6, rtol=1e-6)
+
+
 def test_traced_rollout_requires_supported_training_schedule():
     vocabulary = CardVocabulary((10,), ((10, 1, 300),))
     policy = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
