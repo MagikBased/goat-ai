@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 
 from goat_ai.replay import read_trajectory
+from goat_ai.replay.fingerprint import sha256_file
 from scripts.create_viewer_game import ROOT, GameCreator
+from scripts.validate_review_queue_labels import queue_sources, verify_queue_items
 
 DECK1 = "goat_control_rhymus_lizo_new_jersey_2005.ydk"
 DECK2 = "chaos_bryan_coronel_new_jersey_2005.ydk"
@@ -41,10 +43,13 @@ def test_game_creator_rejects_unlisted_paths_and_invalid_agents(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_game_creator_generates_verified_reviewer_replay(tmp_path):
+@pytest.mark.parametrize("agent1,source", [
+    ("tactical", "local_ai_match"), ("policy", "policy_evaluation"),
+])
+def test_game_creator_generates_verified_reviewer_replay(tmp_path, agent1, source):
     creator = _creator(tmp_path, Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve())
     spec = {"deck1": DECK1, "deck2": DECK2,
-            "agent1": "tactical", "agent2": "random", "seed": 4321}
+            "agent1": agent1, "agent2": "random", "seed": 4321}
     result = creator.create(spec)
     assert result["winner"] in (0, 1, None)
     assert result["decisions"] > 0
@@ -56,8 +61,13 @@ def test_game_creator_generates_verified_reviewer_replay(tmp_path):
     assert replay.is_file() and viewer.is_file() and reviewer.is_file()
     trajectory = read_trajectory(replay)
     assert len(trajectory.decisions) == result["decisions"]
-    assert trajectory.source == "local_ai_match"
-    assert trajectory.skill_metadata["agents"] == ["Tactical heuristic", "Random"]
+    assert trajectory.source == source
+    assert trajectory.skill_metadata["agents"] == [
+        "Neural policy v23" if agent1 == "policy" else "Tactical heuristic", "Random"]
+    if agent1 == "policy":
+        assert trajectory.skill_metadata["demonstrator_seat"] == 0
+        assert trajectory.skill_metadata["policy_inference"] == "greedy"
+        assert trajectory.skill_metadata["policy_feature_version"] == 23
     assert "__EMBEDDED_REPLAY__" not in viewer.read_text(encoding="utf-8")
     reveals = json.loads(reviewer.read_text(encoding="utf-8"))
     assert len(reveals["frames"]) == result["decisions"] + 1
@@ -67,3 +77,27 @@ def test_game_creator_generates_verified_reviewer_replay(tmp_path):
     assert all(flag["viewer_frame"] == flag["decision_index"] + 1
                for flag in audit["flags"])
     assert creator.recent()[0] == result
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_policy_game_review_queue_separates_visible_labels_from_reveals(tmp_path):
+    creator = _creator(tmp_path, Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve())
+    result = creator.create({"deck1": DECK1, "deck2": DECK2,
+                             "agent1": "policy", "agent2": "tactical", "seed": 6804})
+    assert result["policy_review_flags"] >= 1
+    queue = creator.review_queue(result["id"])
+    digest = sha256_file(queue)
+    assert creator.review_queue(result["id"]) == queue
+    assert sha256_file(queue) == digest
+    report = json.loads(queue.read_text(encoding="utf-8"))
+    assert len(report["selected"]) == result["policy_review_flags"]
+    assert report["purpose"] == "human_review_candidates_not_training_labels"
+    visible = queue.parent / "visible.html"
+    reveal = queue.parent / "visible.review.html"
+    assert visible.is_file() and reveal.is_file()
+    assert queue.with_suffix(".html").is_file()
+    source = creator.output_dir / f"{result['id']}.json"
+    sources = queue_sources(report, queue)
+    assert list(sources) == [sha256_file(source)]
+    verify_queue_items(read_trajectory(source), sources[sha256_file(source)][1],
+                       report["checkpoint_sha256"])

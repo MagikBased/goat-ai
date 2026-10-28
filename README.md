@@ -124,6 +124,12 @@ The creator is also linked from replay pages served on localhost.
 Recent games show clickable **review flags** for simple player-visible
 mistake patterns. These are prompts to inspect, not correctness judgments or
 training labels; clicking one opens the recorded decision frame.
+If a selected-policy game has flagged policy decisions, **Review policy
+choices** opens a separate save-enabled queue. Its label view shows only what
+the AI could see at that moment; **Reveal all cards** remains a distinct
+inspection view with labeling disabled. Saved choices are kept in the local
+review-label folder and require replay and visibility validation before use
+for training.
 
 Live browser play against an AI is a later step. The terminal human-versus-AI
 workflow above already uses the same observation and legal-action interface;

@@ -138,6 +138,14 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
     page = tmp_path / "examples/create_game.html"
     page.parent.mkdir(parents=True)
     shutil.copyfile(serve_review_queue.ROOT / "examples/create_game.html", page)
+    def review_queue(self, identifier):
+        if identifier != "a" * 16:
+            raise ValueError("invalid game ID")
+        return tmp_path / "generated/queue.json"
+
+    monkeypatch.setattr(serve_review_queue.GameCreator, "review_queue", review_queue)
+    monkeypatch.setattr(serve_review_queue, "launch",
+                        lambda queue, open_browser: "http://127.0.0.1:9999/queue.html")
     monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
     server = serve_review_queue.make_server(None, None, port=0)
     thread = Thread(target=server.serve_forever, daemon=True)
@@ -148,6 +156,8 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
             assert response.url.endswith("/examples/create_game.html")
             assert b"Create a GOAT AI game" in response.read()
         assert _request(f"{base}/api/games/options")[1]["decks"] == []
+        assert _request(f"{base}/api/games/review", {"id": "a" * 16})[1] == {
+            "url": "http://127.0.0.1:9999/queue.html"}
         with pytest.raises(HTTPError) as error:
             _request(f"{base}/api/review/progress")
         assert error.value.code == 404

@@ -82,6 +82,13 @@
           button.textContent = `${game.review_flags} review ${game.review_flags === 1 ? "flag" : "flags"}`;
           item.append(button);
         }
+        if (game.policy_review_flags > 0) {
+          const button = document.createElement("button");
+          button.type = "button"; button.className = "audit-button";
+          button.dataset.reviewGame = game.id;
+          button.textContent = `Review ${game.policy_review_flags} policy ${game.policy_review_flags === 1 ? "choice" : "choices"}`;
+          item.append(button);
+        }
         list.append(item);
       }
       if (!games.length) list.textContent = "No local games yet.";
@@ -129,6 +136,23 @@
       }
     });
     byId("recent").addEventListener("click", async event => {
+      const review = event.target.closest("button[data-review-game]");
+      if (review) {
+        review.disabled = true;
+        status("Opening a player-visible, save-enabled review queue…");
+        try {
+          const response = await fetch("/api/games/review", {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({id: review.dataset.reviewGame}),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "Review queue unavailable");
+          location.href = result.url;
+        } catch (error) {
+          status(error.message, true); review.disabled = false;
+        }
+        return;
+      }
       const button = event.target.closest("button[data-game-id]");
       if (!button) return;
       const game = (await (await fetch("/api/games/options")).json()).recent

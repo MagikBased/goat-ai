@@ -2368,6 +2368,13 @@ versus Random game at seed 4321 it reported two flags for Random and none for
 Tactical. A separate verified 348-decision selected-policy-versus-Tactical
 game at seed 6803 produced no flags for either seat. This is a narrow
 diagnostic, not a policy-strength comparison.
+The game creator can now open a save-enabled review queue for flagged choices
+made by its selected neural policy. Policy games carry checkpoint and
+inference provenance, while non-policy AI games cannot be misidentified as
+human `self_recorded` demonstrations. Queue generation verifies the native
+replay, writes a player-visible label page, and keeps full-information
+reveals separate. The heuristic flag and Tactical alternative are prompts,
+not endorsed training labels; a person must select a legal alternative.
 
 An [action-encoding audit](evaluation.md#legal-action-representation-collision-audit-28-october-2026)
 found no collision in the current 22 shortlisted review comparisons, but did

@@ -52,7 +52,7 @@ def read_decision_annotations(path: str | Path, trajectory_sha256: str,
                           or policy_seat != learner_seat)))):
         raise ValueError("self_play_review requires a learner-seat self-play replay")
     if authorization == "self_recorded" and trajectory.source in (
-            "self_play_rl", "policy_evaluation"):
+            "self_play_rl", "policy_evaluation", "local_ai_match"):
         raise ValueError("agent replay labels require their review authorization")
     if raw.get("source_trajectory_sha256") != trajectory_sha256:
         raise ValueError("annotation source trajectory SHA-256 mismatch")

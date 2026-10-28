@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlsplit
 from goat_ai.replay import read_decision_annotations, read_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from scripts.create_viewer_game import GameCreator
+from scripts.launch_review_server import launch
 from scripts.validate_review_queue_labels import queue_sources, verify_queue_items
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -391,6 +392,9 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 except (ValueError, OSError) as error:
                     self._json(400, {"error": str(error)})
                 return
+            if parsed.path == "/api/games/review":
+                self._json(405, {"error": "POST required"})
+                return
             if parsed.path == "/api/review/version":
                 self._json(200, {"api_version": REVIEW_API_VERSION})
                 return
@@ -439,10 +443,10 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
         def do_POST(self) -> None:
             endpoint = urlsplit(self.path).path
             if endpoint not in ("/api/review/choice", "/api/review/bookmark",
-                                "/api/review/note", "/api/games"):
+                                "/api/review/note", "/api/games", "/api/games/review"):
                 self._json(404, {"error": "unknown endpoint"})
                 return
-            if endpoint != "/api/games" and store is None:
+            if endpoint not in ("/api/games", "/api/games/review") and store is None:
                 self._json(404, {"error": "no review queue is open"})
                 return
             origin = self.headers.get("Origin")
@@ -456,7 +460,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 if not 1 <= size <= (16384 if endpoint == "/api/review/note" else 4096):
                     raise ValueError("request body size is invalid")
                 data = json.loads(self.rfile.read(size))
-                expected = ({"deck1", "deck2", "agent1", "agent2", "seed"}
+                expected = ({"id"} if endpoint == "/api/games/review" else
+                            {"deck1", "deck2", "agent1", "agent2", "seed"}
                             if endpoint == "/api/games" else
                             {"source", "decision_index", "action_index"}
                             if endpoint == "/api/review/choice" else
@@ -465,7 +470,10 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                             {"source", "decision_index", "kind", "text"})
                 if not isinstance(data, dict) or set(data) != expected:
                     raise ValueError("invalid review payload")
-                if endpoint == "/api/games":
+                if endpoint == "/api/games/review":
+                    result = {"url": launch(creator.review_queue(data["id"]),
+                                            open_browser=False)}
+                elif endpoint == "/api/games":
                     result = creator.create(data)
                 elif endpoint == "/api/review/choice":
                     result = store.choose(data["source"], data["decision_index"],

@@ -43,6 +43,13 @@ def test_annotations_select_only_reviewed_legal_action(tmp_path):
     assert records[0].observation == trajectory().decisions[0].observation
 
 
+def test_local_ai_match_cannot_be_labeled_as_human_recording(tmp_path):
+    generated = replace(trajectory(), source="local_ai_match",
+                        skill_metadata={"agents": ["Random", "Tactical"]})
+    with pytest.raises(ValueError, match="agent replay labels require"):
+        read_decision_annotations(annotation_file(tmp_path), "a" * 64, generated)
+
+
 @pytest.mark.parametrize("change,message", [
     ({"authorization": "third_party"}, "authorization"),
     ({"reviewer": " "}, "reviewer"),

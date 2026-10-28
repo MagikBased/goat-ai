@@ -64,6 +64,13 @@ def server_healthy(port: int, source: str | None) -> bool:
         except urllib.error.HTTPError as error:
             if error.code != 400:
                 return False
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/games/review",
+                                   timeout=5)
+            return False
+        except urllib.error.HTTPError as error:
+            if error.code != 405:
+                return False
         if source is None:
             with urllib.request.urlopen(
                     f"http://127.0.0.1:{port}/api/games/options", timeout=5) as response:
