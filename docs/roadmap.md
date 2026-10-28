@@ -2105,3 +2105,12 @@ control. Neither child beat the selected parent convincingly. Keep GAE
 opt-in and v23 selected; M4 still needs an independently useful decision
 signal and competitive gain across deck families. See
 [the ablation](evaluation.md#frozen-visible-value-local-advantage-ppo-ablation-28-october-2026).
+
+A replay-verified raw-logit diagnostic on eight previously inspected,
+training-seed-held-out parent-policy duels measured the selected v23 parent
+against its 240-duel PPO child. Only 7/710 multi-option choices changed; the
+parent's top-two action-score margin was at most 0.191 for all seven changes,
+while unchanged choices had a 2.840 median margin. This does not explain the
+competitive plateau by itself, but it narrows the next M4 experiment toward
+independently sourced corrections of confidently wrong decisions, checked on
+new deck families and seeds. See [the diagnostic](evaluation.md#raw-action-margin-diagnostic-for-the-240-duel-ppo-child-28-october-2026).

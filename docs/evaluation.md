@@ -10739,3 +10739,46 @@ For the Tactical sweep use the same command with output
 `--card-pool tournament --agent tactical`, and omit `--random-extra
 --fusion-stress`. For the two-seed repeats, change `--seeds` to 2, choose
 new empty output directories, and add `--repeat-seeds`.
+## Raw action-margin diagnostic for the 240-duel PPO child (28 October 2026)
+
+The reusable `scripts/audit_policy_margins.py` replays each duel against the
+pinned native engine, audits player-visible observations, rejects seeds used
+to train either checkpoint, and measures the gap between the two highest raw
+network logits at each multi-option demonstrator decision. This diagnostic
+uses the eight previously inspected parent-policy/Tactical-v14 replays from
+seeds 90500–90501. They are held out from both checkpoint training sets, but
+they are **not** an untouched model-selection test set. The parent is the
+selected feature-v23 checkpoint (SHA-256
+`975d06284b3035bc8bf8dbafa041a8a25a80195574d1ff695f2fbd25d1c7ff45`);
+the child is the 240-duel mixed-deck PPO continuation (SHA-256
+`05698f306769dcb8cca873a048588010d5f74851a3f0137cfcc4acc7dcabc96c`).
+
+All eight trajectories replay-verified and passed visibility audits. Of **710**
+multi-option parent-policy decisions, the child changed **7** final choices.
+The parent's raw top-two margin had median **2.817** overall; **448/710**
+decisions had a margin of at least 2. Among the seven changed choices, its
+median margin was **0.091** and maximum **0.191**. Among the 703 unchanged
+choices, median margin was **2.840**. The child had median raw margin **2.773**.
+This is consistent with the update moving near-tied decisions while leaving
+larger existing preferences intact on this sample. It does not prove the
+cause of the held-out competitive plateau: raw logits are not calibrated
+probabilities, policy guards can alter final choices, and the sample has
+already been used for other diagnostics. The next M4 experiment should
+test an independently sourced decision signal or a targeted correction of
+high-margin errors on *new* held-out deck families and seeds, with direct
+competitive evaluation before promotion.
+
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_margins.py \
+  --parent .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --child .cache/goat-ai/ppo_mixed_240_91000_91239.pt \
+  --output .cache/goat-ai/ppo_mixed_240_margins_90500_90501.json \
+  .cache/goat-ai/public_age_policy_90500_90501/matchup_*.json
+```
+
+The ignored JSON report has SHA-256
+`33c2159c53a911bfdad8e062c4591168eae1d71dce56a80c92cacd336ddef951`;
+it records the eight exact replay hashes and verified decision counts. The
+diagnostic is off-policy and is not a tournament result.
