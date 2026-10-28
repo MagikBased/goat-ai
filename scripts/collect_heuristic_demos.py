@@ -18,7 +18,9 @@ from goat_ai.agents import (
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
-from goat_ai.replay import write_trajectory
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import verify_trajectory, write_trajectory
+from goat_ai.replay.fingerprint import sha256_file
 
 
 def main() -> None:
@@ -39,6 +41,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=1000)
     parser.add_argument("--seeds", type=int, default=4)
     parser.add_argument("--max-decisions", type=int, default=5000)
+    parser.add_argument("--verify-replays", action="store_true",
+                        help="verify each native replay and player-visible action before saving")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     if args.seeds < 1 or args.max_decisions < 1:
@@ -138,21 +142,39 @@ def main() -> None:
                                                                  else getattr(
                                                                      opponent, "teacher_version", 1))},
                         )
+                        verified = None
+                        visibility = None
+                        if args.verify_replays:
+                            verified = verify_trajectory(trajectory, engine_type(args.native_root))
+                            if verified != len(trajectory.decisions):
+                                raise RuntimeError("native replay verification was incomplete")
+                            visibility = dict(audit_trajectory_visibility(trajectory))
                         path = args.output_dir / f"seed_{seed}_seat_{teacher_seat}.json"
                         write_trajectory(path, trajectory)
-                        games.append({"seed": seed, "teacher_seat": teacher_seat,
-                                      "winner": env.result(),
-                                      "decisions": len(trajectory.decisions),
-                                      "teacher_decisions": sum(
-                                          record.observation.acting_player == teacher_seat
-                                          for record in trajectory.decisions),
-                                      "path": str(path)})
+                        game = {"seed": seed, "teacher_seat": teacher_seat,
+                                "winner": env.result(),
+                                "decisions": len(trajectory.decisions),
+                                "teacher_decisions": sum(
+                                    record.observation.acting_player == teacher_seat
+                                    for record in trajectory.decisions),
+                                "path": str(path),
+                                "trajectory_sha256": sha256_file(path)}
+                        if args.verify_replays:
+                            game["replay_verified_decisions"] = verified
+                            game["visibility_audit"] = visibility
+                        games.append(game)
                         break
                 else:
                     raise RuntimeError(f"duel exceeded {args.max_decisions} decisions: "
                                        f"seed={seed}, teacher seat={teacher_seat}")
-    print(json.dumps({"games": games, "teacher_wins": sum(
-        game["winner"] == game["teacher_seat"] for game in games)}, indent=2))
+    report = {"teacher": args.teacher, "opponent": args.opponent,
+              "engine": args.engine, "verify_replays": args.verify_replays,
+              "decks": [{"path": str(deck), "sha256": sha256_file(deck)}
+                        for deck in (deck_a, deck_b)],
+              "games": games, "teacher_wins": sum(
+                  game["winner"] == game["teacher_seat"] for game in games)}
+    (args.output_dir / ".manifest.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2))
 
 
 if __name__ == "__main__":

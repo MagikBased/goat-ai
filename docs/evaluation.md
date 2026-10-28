@@ -9833,3 +9833,35 @@ high-use cards under random decisions. It is neither a historical-rulings
 certification nor a playing-strength result. Probe initialization failures
 now retain a per-game error report even when replay verification was requested;
 the probe regression test exercises that failure path.
+
+## Verified 2005 Tactical demonstration collection (28 October 2026)
+
+`scripts/collect_heuristic_demos.py --verify-replays` now verifies every
+decision against a fresh native engine and audits player-visible legal actions
+before writing a demonstration. It saves a hidden `.manifest.json` beside the
+trajectory files with run settings, source-deck hashes, per-replay hashes, and
+verification counts. The hidden filename keeps `*.json` trajectory input globs
+from accidentally including the manifest.
+
+Two current-core, seat-swapped Tactical-v14 mirror collections used published
+2005 deck files. Cas Stomphorst Flip Control versus Daryl Gessler Gravekeeper
+on seeds 10900–10901 produced **4 terminal games, 2,493 verified and
+visibility-audited decisions**, including 1,261 decisions from the designated
+demonstrator seats. Its ignored manifest is
+`.cache/goat-ai/tactical_2005_verified_cas_daryl_10900_10901/.manifest.json`
+(SHA-256 `125fad52682da49be8f15dcd11ccef6d7bddce172c47e8a9600f3b211c91eefb`).
+Rhymus Lizo Goat Control versus Jae Kim Zombie on seeds 10902–10903 produced
+**4 terminal games, 2,155 verified and visibility-audited decisions**, including
+1,053 demonstrator-seat decisions. Its ignored manifest is
+`.cache/goat-ai/tactical_2005_verified_rhymus_zombie_10902_10903/.manifest.json`
+(SHA-256 `050bd3541b1ac1c6d46ad700ab444993191493766650ce8cde3945dbf2901888`).
+All eight replay hashes matched their manifests after collection.
+
+Reproduce a collection with `OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python
+scripts/collect_heuristic_demos.py --native-root .cache/goat-ai --engine
+experimental --teacher tactical --opponent tactical --deck-a DECK_A --deck-b
+DECK_B --seed FIRST_SEED --seeds 2 --max-decisions 3000 --verify-replays
+--output-dir OUTPUT_DIR`, substituting the named deck files and seed ranges
+above. These are **synthetic Tactical choices**, not human demonstrations or
+new evidence of a stronger policy. Any checkpoint trained on them must exclude
+these exact Main Deck compositions and seeds from its held-out evaluation.
