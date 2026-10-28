@@ -4,6 +4,8 @@ Target: TCG GOAT Format with April 2005 Forbidden/Limited list and the widely us
 
 Sources: [GoatFormat mechanics](https://www.goatformat.com/basics.html), [card pool and banlist](https://www.goatformat.com/cardpool.html), and [ocgcore GOAT flags](https://github.com/edo9300/ygopro-core/blob/master/ocgapi_constants.h).
 
+**Simultaneous lethal Ring damage:** [Konami's English rulebook version 5.0](https://ms.yugipedia.com/2/25/Rulebook_v5.0.pdf) declares a draw when both players reach zero Life Points at the same time; the [historical Ring text](https://www.goatformat.com/rulings6.html) deals the destroyed monster's current ATK to both players. A seeded native duel has each player activate Wall of Revealing Light and pay 7000 LP, then the first player activates pre-errata Ring on their own 1900 ATK Archfiend Soldier. Both Life Points become zero, the engine returns a terminal draw with no winner, and the serialized full duel replay-verifies and passes the player-visible information audit. This covers one simultaneous lethal effect; other simultaneous win and loss conditions remain unaudited.
+
 The M0 native probe confirms that a pinned core configured with `DUEL_MODE_GOAT` performs an opening draw for the first player in its vanilla-monster fixture. This is one startup behavior check, not a complete historical rules validation.
 
 **First-turn draw:** [GoatFormat's mechanics guide](https://www.goatformat.com/basics.html)
