@@ -666,6 +666,13 @@ Tactical on fresh held-out mixed decks, compared with the selected parent's
 The parent remains selected. More epochs on these synthetic labels have not
 closed the competitive gain gate.
 
+A larger [160-duel policy-visited collection](evaluation.md#larger-on-policy-tactical-label-collection-28-october-2026)
+fitted 12,973 synthetic Tactical labels across 40 new mixed-deck pairs. Its
+v23 child tied the selected parent directly on 80 held-out games, then scored
+18–61–1 versus Tactical against the parent's matched 26–53–1. Keep the
+selected parent unchanged and seek independent action-quality feedback or a
+different learning signal before scaling this teacher-label approach again.
+
 A four-duel Tactical imitation continuation on previously unseen Rhymus/Zombie
 2005 decks scored 35–28–1 against its parent on an independent Phoenix/Dimension
 Fusion pairing. The paired interval includes 50%, and its matched Tactical
