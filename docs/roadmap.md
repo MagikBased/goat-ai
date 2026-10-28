@@ -490,6 +490,13 @@ Phoenix cases are recorded in [GOAT rules](goat_rules.md).
 
 A paired native Ring of Destruction and Book of Moon fixture now checks target validity at resolution, the no-damage outcome when Book sets the target, and the opponent's hidden field view. Its historical interpretation is identified as an inference in [GOAT rules](goat_rules.md).
 
+A paired Ceasefire fixture now distinguishes a Set Magician of Faith from a
+Set Normal Monster. Both turn face-up in Defense Position, but only Faith
+counts toward Ceasefire's 500 damage, and its Flip Effect does not recover the
+previously spent Pot of Greed. Both duels reach terminal, replay-verify, and
+pass the visibility audit; see [GOAT rules](goat_rules.md). Other Ceasefire
+chains and Token/Jinzo interactions remain open.
+
 An attacked Morphing Jar / Skill Drain pair now checks a sourced Damage Step
 boundary: an aged Set Drain cannot be chained to Jar's battle-triggered Flip
 Effect, whereas activating Drain before the attack negates that effect while
