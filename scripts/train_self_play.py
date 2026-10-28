@@ -189,7 +189,9 @@ def main() -> None:
         number_width = agent.model.state_numbers[0].in_features
         value_model = VisibleStateValue(agent.vocabulary.size, number_width,
                                         width=args.value_width,
-                                        architecture=args.value_architecture)
+                                        architecture=args.value_architecture,
+                                        card_number_width=(6 if agent.model.feature_version >= 29
+                                                           else 5))
         if "value_model_state" in parent:
             if (parent.get("value_model_width") != args.value_width
                     or parent.get("value_state_number_width") != number_width

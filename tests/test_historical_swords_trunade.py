@@ -69,6 +69,9 @@ def test_trunade_returns_swords_and_restarts_three_opposing_turns(tmp_path):
                 if obs.phase == "battle_start" and obs.turn not in checked_turns:
                     assert any(card.code == attacker_code and card.controller == 1
                                for card in obs.field)
+                    if obs.turn != 10:
+                        swords = next(card for card in obs.field if card.code == SWORDS)
+                        assert swords.faceup_turns == (1 if obs.turn == 2 else obs.turn - 3)
                     assert bool([a for a in actions if a.kind == "attack"]) \
                         == (obs.turn == 10)
                     checked_turns.add(obs.turn)

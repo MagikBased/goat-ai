@@ -63,6 +63,7 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # cards before scoring. Its output is zero-initialized for exact v23 behavior.
 # Version 28 branches from v23 and encodes the amount removed from each
 # selected field card in a counter-allocation action.
+# Version 29 adds public face-up field age to v28's card inputs.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 SPELL_TYPE = 0x2  # TYPE_SPELL in pinned ocgcore constant.lua
@@ -131,7 +132,7 @@ class CardVocabulary:
 @dataclass(frozen=True)
 class DecisionFeatures:
     state_cards: Tensor  # [N, 4]: card, zone, owner, position
-    state_card_numbers: Tensor  # [N, 5]: ATK, DEF, counters, Spell Counters, visible
+    state_card_numbers: Tensor  # [N, 5/6]: ATK, DEF, counters, Spell Counters, visible, age
     state_numbers: Tensor  # [10] for v1-v3, [42] for v4
     phase: Tensor  # scalar
     action_kinds: Tensor  # [A]
@@ -161,7 +162,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 29):
+    if feature_version not in range(1, 30):
         raise ValueError("unsupported policy feature version")
     if feature_version >= 22 and not vocabulary.card_properties:
         raise ValueError("feature version 22 requires pinned printed card properties")
@@ -199,21 +200,24 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                            and card.equipped_to is not None
                            else (0, 0, -1))
         spell_count = sum(count for kind, count in card.counters if kind == 1)
-        card_numbers.append((card.attack / 8000 if card.attack is not None else 0.0,
-                             card.defense / 8000 if card.defense is not None else 0.0,
-                             sum(count for _, count in card.counters) / 10,
-                             spell_count / 10,
-                             float(card.attack is not None))
-                            if feature_version >= 8 else (0.0,) * 5)
+        values = ((card.attack / 8000 if card.attack is not None else 0.0,
+                   card.defense / 8000 if card.defense is not None else 0.0,
+                   sum(count for _, count in card.counters) / 10,
+                   spell_count / 10,
+                   float(card.attack is not None))
+                  if feature_version >= 8 else (0.0,) * 5)
+        if feature_version >= 29:
+            values += (min(card.faceup_turns or 0, 20) / 20,)
+        card_numbers.append(values)
     for link in observation.chain:
         cards.append((vocabulary.index(link.card_code), ZONE_IDS["chain"],
                       int(link.controller != observation.viewer) + 1, 3))
-        card_numbers.append((0.0,) * 5)
+        card_numbers.append((0.0,) * (6 if feature_version >= 29 else 5))
         card_sequences.append(-1)
         equip_slots.append((0, 0, -1))
     if not cards:
         cards.append((0, 0, 0, 0))
-        card_numbers.append((0.0,) * 5)
+        card_numbers.append((0.0,) * (6 if feature_version >= 29 else 5))
         card_sequences.append(-1)
         equip_slots.append((0, 0, -1))
 
@@ -494,7 +498,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 29):
+        if feature_version not in range(1, 30):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -502,7 +506,8 @@ class LegalActionPolicy(nn.Module):
         self.owner = nn.Embedding(3, width, padding_idx=0)
         self.position = nn.Embedding(len(POSITIONS) + 1, width, padding_idx=0)
         if feature_version >= 8:
-            self.card_numbers = nn.Sequential(nn.Linear(5, width), nn.ReLU(),
+            self.card_numbers = nn.Sequential(nn.Linear(
+                6 if feature_version >= 29 else 5, width), nn.ReLU(),
                                               nn.Linear(width, width))
         self.phase = nn.Embedding(len(PHASES) + 1, width, padding_idx=0)
         kind_count = (len(ACTION_KINDS)

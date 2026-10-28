@@ -62,6 +62,12 @@ def test_swords_expires_after_opponents_third_turn(tmp_path):
                     assert bool(attacks) == (obs.turn == 8)
                     assert (SWORDS in {c.code for c in obs.field}) == (
                         obs.turn != 8)
+                    if obs.turn != 8:
+                        swords = next(c for c in obs.field if c.code == SWORDS)
+                        assert swords.faceup_turns == obs.turn - 1
+                        owner_view = env.engine.probe.observation(0)
+                        assert next(c for c in owner_view.field
+                                    if c.code == SWORDS).faceup_turns == swords.faceup_turns
                     battle_checked.add(obs.turn)
                     if obs.turn == 8:
                         assert expired_seen

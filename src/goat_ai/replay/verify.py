@@ -75,6 +75,10 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                            banished=tuple(cards(zone) for zone in view.banished),
                            own_extra_deck=cards(view.own_extra_deck))
 
+        def without_faceup_age(view):
+            return replace(view, field=tuple(replace(card, faceup_turns=None)
+                                             for card in view.field))
+
         observation = env.reset()
         for index, record in enumerate(trajectory.decisions):
             if env.is_terminal():
@@ -87,6 +91,9 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             if trajectory.schema_version < 25:
                 compared_observation = without_summon_context(compared_observation)
                 recorded_observation = without_summon_context(recorded_observation)
+            if trajectory.schema_version < 26:
+                compared_observation = without_faceup_age(compared_observation)
+                recorded_observation = without_faceup_age(recorded_observation)
             if trajectory.schema_version < 19:
                 compared_observation = without_equips(compared_observation)
             elif trajectory.schema_version == 19:
@@ -155,6 +162,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             terminal_observation = without_races(terminal_observation)
         if trajectory.schema_version < 25:
             terminal_observation = without_summon_context(terminal_observation)
+        if trajectory.schema_version < 26:
+            terminal_observation = without_faceup_age(terminal_observation)
         if trajectory.schema_version < 21:
             terminal_observation = without_chain_targets(terminal_observation)
         if trajectory.schema_version < 22:
@@ -162,6 +171,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
         if trajectory.schema_version < 23:
             terminal_observation = replace(terminal_observation, turn_player=None)
         recorded_terminal = trajectory.terminal_observation
+        if trajectory.schema_version < 26 and recorded_terminal is not None:
+            recorded_terminal = without_faceup_age(recorded_terminal)
         if trajectory.schema_version < 24 and recorded_terminal is not None:
             recorded_terminal = without_races(recorded_terminal)
         if trajectory.schema_version < 25 and recorded_terminal is not None:

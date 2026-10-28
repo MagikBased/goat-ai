@@ -25,6 +25,13 @@ The repository has a Python environment contract, observation and action types, 
 
 A paired Pot of Greed fixture swaps the two privately drawn cards while preserving the Deck multiset and public play. The opponent's complete observation and legal actions are identical at the next Main Phase decision; the acting player's drawn hand differs. A Book of Moon / Compulsory native fixture found and fixed lost opponent-hand knowledge when a previously public, now face-down monster returns to hand. A never-revealed Set monster remains unknown in the paired control fixture; the known-card duel serializes and replay-verifies. See [GOAT rules](goat_rules.md).
 
+Schema-v26 observations now count public turn boundaries since each face-up
+field card became face-up. Native Swords expiration and Giant Trunade/replay
+fixtures check the count advancing and resetting across turns, with matching
+views for both players. Opt-in policy feature v29 exposes that value to the
+model without changing older checkpoints. This closes one timing-information
+gap; other public state and broad historical validation remain open.
+
 A paired Trap Dustshoot/Mystical Space Typhoon fixture now changes one
 unrevealed opposing hand card and confirms that the Trap controller's
 observation and legal responses are identical before Dustshoot activates.

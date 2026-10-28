@@ -35,7 +35,8 @@ class VisibleStateValue(nn.Module):
     """Estimate learner outcome from the same player-visible contract as the policy."""
 
     def __init__(self, vocabulary_size: int, state_number_width: int,
-                 width: int = 32, *, architecture: str = "v1") -> None:
+                 width: int = 32, *, architecture: str = "v1",
+                 card_number_width: int = 5) -> None:
         super().__init__()
         if architecture not in ("v1", "v2"):
             raise ValueError("unsupported visible-state critic architecture")
@@ -48,7 +49,7 @@ class VisibleStateValue(nn.Module):
         self.numbers = nn.Sequential(nn.Linear(state_number_width, width), nn.ReLU(),
                                      nn.Linear(width, width))
         if architecture == "v2":
-            self.card_numbers = nn.Sequential(nn.Linear(5, width), nn.ReLU(),
+            self.card_numbers = nn.Sequential(nn.Linear(card_number_width, width), nn.ReLU(),
                                               nn.Linear(width, width))
             self.deck_projection = nn.Linear(width, width)
             self.resource_counts = nn.Linear(14, width)

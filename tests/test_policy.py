@@ -603,6 +603,25 @@ def test_feature_version_eight_uses_visible_monster_stats_and_counters():
     assert torch.equal(legacy_before.state_card_numbers, legacy_after.state_card_numbers)
 
 
+def test_feature_version_twenty_nine_encodes_only_public_faceup_age():
+    vocabulary = CardVocabulary((10, 20), ((10, 0, 1000), (20, 0, 2000)))
+    base = replace(view(), field=(CardView(
+        0, "monster", "faceup", 20, 0, "attack", 1900, 1000,
+        faceup_turns=0),))
+    older = replace(base, field=(replace(base.field[0], faceup_turns=2),))
+    first = encode_decision(base, actions(), vocabulary, 29)
+    second = encode_decision(older, actions(), vocabulary, 29)
+    assert first.state_card_numbers.shape == (2, 6)
+    assert first.state_card_numbers[1, -1] == 0
+    assert second.state_card_numbers[1, -1] == pytest.approx(0.1)
+    assert torch.equal(encode_decision(base, actions(), vocabulary, 23).state_card_numbers,
+                       encode_decision(older, actions(), vocabulary, 23).state_card_numbers)
+    assert LegalActionPolicy(vocabulary.size, width=8, feature_version=29)(first).shape == (3,)
+    value = VisibleStateValue(vocabulary.size, first.state_numbers.numel(),
+                              width=8, architecture="v2", card_number_width=6)
+    assert value(first).numel() == 1
+
+
 def test_feature_version_fifteen_counts_public_occupancy_without_card_identity():
     vocabulary = CardVocabulary((10, 20))
     original = view()
@@ -1697,6 +1716,29 @@ def test_v28_counter_amounts_are_distinct_and_v23_warm_start_preserves_logits(tm
     assert torch.allclose(actual, expected, atol=1e-6)
     assert torch.allclose(batched[0, mask[0]], actual, atol=1e-6)
     assert torch.allclose(batched[1, mask[1]], child(new), atol=1e-6)
+
+
+def test_v29_warm_start_preserves_v23_logits_and_zeros_age_weight(tmp_path):
+    vocabulary = CardVocabulary((10, 20), ((10, 0, 1000), (20, 0, 2000)))
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    path = tmp_path / "parent.pt"
+    torch.save({"schema_version": 1, "model_state": parent.state_dict(),
+                "vocabulary_codes": vocabulary.codes,
+                "vocabulary_card_properties": vocabulary.card_properties,
+                "width": 8, "feature_version": 23,
+                "trajectory_sha256": {"training.json": "a" * 64},
+                "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                                    "main_deck_composition_sha256": ("c", "d")}]}, path)
+    child = LegalActionPolicy(vocabulary.size, width=8, feature_version=29)
+    load_parent_checkpoint(path, child, vocabulary, allow_v23_to_v29=True)
+    assert torch.count_nonzero(child.card_numbers[0].weight[:, -1]) == 0
+    visible = replace(view(), field=(CardView(
+        0, "monster", "faceup", 20, 0, "attack", 1900, 1000,
+        faceup_turns=2),))
+    with torch.no_grad():
+        expected = parent(encode_decision(visible, actions(), vocabulary, 23))
+        actual = child(encode_decision(visible, actions(), vocabulary, 29))
+    assert torch.allclose(actual, expected, atol=1e-6)
 
 
 def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):

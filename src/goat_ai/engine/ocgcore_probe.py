@@ -409,6 +409,7 @@ class OcgcoreProbe:
         self._public_history: list[str] = []
         self._pending_summon: PendingSummonView | None = None
         self._known_facedown: dict[tuple[int, int, int], int] = {}
+        self._faceup_since: dict[tuple[int, int, int], int] = {}
         self._known_hand: dict[int, list[int]] = {0: [], 1: []}
         self._restriction_hints: dict[tuple[int, int], int] = {}
         self._public_reveals: list[PublicRevealView] = []
@@ -862,6 +863,17 @@ class OcgcoreProbe:
                            struct.unpack_from("<I", message, 7)[0])
                 new_key = (new_controller, new_location,
                            struct.unpack_from("<I", message, 17)[0])
+                old_since = self._faceup_since.pop(old_key, None)
+                self._faceup_since.pop(new_key, None)
+                if (new_controller in (0, 1)
+                        and new_location in (LOCATION_MZONE, LOCATION_SZONE)
+                        and struct.unpack_from("<I", message, 21)[0] & 0x5):
+                    old_faceup_field = (old_controller in (0, 1)
+                                        and old_location in (LOCATION_MZONE, LOCATION_SZONE)
+                                        and struct.unpack_from("<I", message, 11)[0] & 0x5)
+                    self._faceup_since[new_key] = (
+                        old_since if old_faceup_field and old_since is not None
+                        else self._turn)
                 pending_summon = getattr(self, "_pending_summon", None)
                 if (pending_summon is not None
                         and old_key == (pending_summon.controller,
@@ -924,6 +936,12 @@ class OcgcoreProbe:
                 if len(message) != 10:
                     raise ValueError("invalid MSG_POS_CHANGE length")
                 key = (message[5], message[6], message[7])
+                old_since = self._faceup_since.pop(key, None)
+                if (key[0] in (0, 1) and key[1] in (LOCATION_MZONE, LOCATION_SZONE)
+                        and message[9] & 0x5):
+                    self._faceup_since[key] = (
+                        old_since if message[8] & 0x5 and old_since is not None
+                        else self._turn)
                 self._known_facedown.pop(key, None)
                 if (key[0] in (0, 1) and key[1] in (LOCATION_MZONE, LOCATION_SZONE)
                         and message[8] & 0x5 and message[9] & 0xA):
@@ -933,6 +951,7 @@ class OcgcoreProbe:
                 if len(message) != 15:
                     raise ValueError("invalid MSG_SET length")
                 key = (message[5], message[6], struct.unpack_from("<I", message, 7)[0])
+                self._faceup_since.pop(key, None)
                 self._known_facedown.pop(key, None)
             elif message[0] == MSG_SWAP:
                 if len(message) != 29:
@@ -941,6 +960,12 @@ class OcgcoreProbe:
                              struct.unpack_from("<I", message, 7)[0])
                 second_key = (message[19], message[20],
                               struct.unpack_from("<I", message, 21)[0])
+                first_since = self._faceup_since.pop(first_key, None)
+                second_since = self._faceup_since.pop(second_key, None)
+                if first_since is not None:
+                    self._faceup_since[second_key] = first_since
+                if second_since is not None:
+                    self._faceup_since[first_key] = second_since
                 if (first_key[0] not in (0, 1) or second_key[0] not in (0, 1)
                         or first_key[0] == second_key[0]
                         or first_key[1] not in (LOCATION_MZONE, LOCATION_SZONE)
@@ -1036,12 +1061,14 @@ class OcgcoreProbe:
             if message[0] in (MSG_SUMMONING, MSG_SPSUMMONING, MSG_FLIPSUMMONING):
                 if len(message) != 15:
                     raise ValueError("invalid summon announcement length")
-                code, controller, location, sequence, _position = struct.unpack_from(
+                code, controller, location, sequence, position = struct.unpack_from(
                     "<IBBII", message, 1)
                 if controller not in (0, 1) or location != LOCATION_MZONE or sequence >= 7:
                     raise ValueError("invalid summon announcement slot")
                 kind = {MSG_SUMMONING: "normal", MSG_SPSUMMONING: "special",
                         MSG_FLIPSUMMONING: "flip"}[message[0]]
+                if kind == "flip" and position & 0x5:
+                    self._faceup_since[(controller, location, sequence)] = self._turn
                 self._pending_summon = PendingSummonView(
                     kind, controller, sequence, code or None)
             elif message[0] in (MSG_SUMMONED, MSG_SPSUMMONED, MSG_FLIPSUMMONED):
@@ -1212,7 +1239,17 @@ class OcgcoreProbe:
             lp = tuple(max(0, value if value < (1 << 31) else value - (1 << 32))
                        for value in lp)
 
-        field = tuple(_view_card(viewer, player, location, sequence, card)
+        def field_view(player, location, sequence, card):
+            view = _view_card(viewer, player, location, sequence, card)
+            if view.position != "faceup":
+                return view
+            key = (player, location, sequence)
+            since = self._faceup_since.get(key)
+            if since is None or since > self._turn:
+                raise RuntimeError(f"missing public face-up entry time for {key}")
+            return replace(view, faceup_turns=self._turn - since)
+
+        field = tuple(field_view(player, location, sequence, card)
                       for player in (0, 1) for location in (LOCATION_MZONE, LOCATION_SZONE)
                       for sequence, card in enumerate(locations[player, location]) if card is not None)
         graveyards = tuple(tuple(_view_card(viewer, player, LOCATION_GRAVE, sequence, card)

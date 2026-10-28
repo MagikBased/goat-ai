@@ -17,6 +17,7 @@ class CardView:
     equipped_to: tuple[int, int] | None = None  # Public target monster slot; card ID may be hidden.
     race: int | None = None  # Current Type mask of a face-up monster, including field effects.
     owner: int | None = None  # Original owner of a face-up field monster; public in a duel.
+    faceup_turns: int | None = None  # Turn boundaries since becoming face-up on the field.
 
 
 @dataclass(frozen=True)
@@ -188,6 +189,12 @@ class Observation:
                     or card.equipped_to[0] not in (0, 1)
                     or not 0 <= card.equipped_to[1] < 7):
                 raise ValueError("equip target requires a field Spell or Trap")
+            if card.faceup_turns is not None and (
+                    card.zone not in ("monster", "spell_trap")
+                    or card.position != "faceup"
+                    or type(card.faceup_turns) is not int
+                    or not 0 <= card.faceup_turns <= self.turn):
+                raise ValueError("face-up age requires a public field card")
         facedown_slots = {(card.controller, card.zone, card.sequence)
                           for card in self.field if card.controller != self.viewer
                           and card.position == "facedown"}

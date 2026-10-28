@@ -147,7 +147,9 @@ def main() -> None:
     for architecture in ("v1", "v2"):
         torch.manual_seed(args.seed)
         model = VisibleStateValue(agent.vocabulary.size, number_width,
-                                  width=args.width, architecture=architecture)
+                                  width=args.width, architecture=architecture,
+                                  card_number_width=(6 if agent.model.feature_version >= 29
+                                                     else 5))
         optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
         for _ in range(args.epochs):
             for records, target in train:

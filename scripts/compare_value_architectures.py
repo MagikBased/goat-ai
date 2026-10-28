@@ -246,7 +246,9 @@ def main() -> None:
         torch.manual_seed(args.seed)
         model = (VisibleResourceValue() if architecture == "resource" else
                  VisibleStateValue(agent.vocabulary.size, number_width,
-                                   width=args.width, architecture=architecture))
+                                   width=args.width, architecture=architecture,
+                                   card_number_width=(6 if agent.model.feature_version >= 29
+                                                      else 5)))
         optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
         training_losses = []
         for _ in range(args.epochs):

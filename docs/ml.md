@@ -553,3 +553,12 @@ The checkpoint stores the selected timing. Native tests confirm identical
 trajectories and updates across serial, worker, and batched-inference paths
 for both modes. The first held-out comparison did not establish a playing-
 strength gain; see [evaluation](evaluation.md#frozen-rollout-baseline-ablation-27-october-2026).
+
+Opt-in policy feature version 29 adds the public face-up field-card age from
+trajectory schema v26 as a sixth card number. It inherits v28's action inputs,
+so a feature-v23 checkpoint can be loaded with `--upgrade-feature-23-to-29`:
+the new age and counter-allocation weights start at zero and preserve the
+parent's logits before training. New behavioral-cloning data for this version
+must use schema v26; existing older checkpoints retain their original encoder.
+This only makes timing information available to the model. No competitive
+strength gain has been measured for v29.

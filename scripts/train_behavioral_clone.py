@@ -154,13 +154,14 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
                            allow_v23_to_v25: bool = False,
                            allow_v23_to_v26: bool = False,
                            allow_v23_to_v27: bool = False,
-                           allow_v23_to_v28: bool = False) -> dict:
+                           allow_v23_to_v28: bool = False,
+                           allow_v23_to_v29: bool = False) -> dict:
     """Continue a clone only when weights and held-out provenance are compatible."""
     parent = torch.load(path, map_location="cpu", weights_only=True)
     if not isinstance(parent, dict) or parent.get("schema_version") != 1:
         raise ValueError("unsupported parent policy checkpoint schema")
     if (allow_v23_to_v24 or allow_v23_to_v25 or allow_v23_to_v26
-            or allow_v23_to_v27 or allow_v23_to_v28) and parent.get(
+            or allow_v23_to_v27 or allow_v23_to_v28 or allow_v23_to_v29) and parent.get(
             "feature_version") != 23:
         raise ValueError("feature upgrade requires a feature-v23 parent")
     upgrade = (parent.get("feature_version") == 23
@@ -168,7 +169,8 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
                     or (allow_v23_to_v25 and model.feature_version == 25)
                     or (allow_v23_to_v26 and model.feature_version == 26)
                     or (allow_v23_to_v27 and model.feature_version == 27)
-                    or (allow_v23_to_v28 and model.feature_version == 28)))
+                    or (allow_v23_to_v28 and model.feature_version == 28)
+                    or (allow_v23_to_v29 and model.feature_version == 29)))
     if (parent.get("width") != model.card.embedding_dim
             or (parent.get("feature_version", 1) != model.feature_version and not upgrade)
             or tuple(parent.get("vocabulary_codes", ())) != vocabulary.codes
@@ -207,7 +209,7 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
         if model.feature_version == 27:
             for key in ("action_query.weight", "attended_card.weight"):
                 state[key] = model.state_dict()[key].clone()
-        if model.feature_version == 28:
+        if model.feature_version in (28, 29):
             for key, axis, growth in (("kind.weight", 0, 1),
                                       ("target_context.0.weight", 1, 1),
                                       ("action_numbers.0.weight", 1, 2)):
@@ -222,6 +224,14 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
                 else:
                     expanded[:, :original.shape[1]] = original
                 state[key] = expanded
+        if model.feature_version == 29:
+            key = "card_numbers.0.weight"
+            original = state[key]
+            expanded = torch.zeros_like(model.state_dict()[key])
+            if expanded.shape != (original.shape[0], original.shape[1] + 1):
+                raise ValueError("feature upgrade needs one new public age input")
+            expanded[:, :original.shape[1]] = original
+            state[key] = expanded
     model.load_state_dict(state, strict=True)
     return parent
 
@@ -260,6 +270,8 @@ def main() -> None:
                         help="load v23 weights and add zero-output action-to-card attention")
     parser.add_argument("--upgrade-feature-23-to-28", action="store_true",
                         help="load v23 weights and add counter-allocation action features")
+    parser.add_argument("--upgrade-feature-23-to-29", action="store_true",
+                        help="load v23 weights with counter choices and public face-up age")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=1,
                         help="decisions per optimizer update; combine forward passes with --batched-forward")
@@ -278,7 +290,7 @@ def main() -> None:
                         help="use optional orjson to decode input trajectories in the main "
                              "process and replay-verification workers")
     parser.add_argument("--width", type=int, default=64)
-    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 29)),
+    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 30)),
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
@@ -338,9 +350,12 @@ def main() -> None:
     if args.upgrade_feature_23_to_28 and (not args.init_checkpoint
                                          or args.feature_version != 28):
         parser.error("--upgrade-feature-23-to-28 requires a parent and feature v28")
+    if args.upgrade_feature_23_to_29 and (not args.init_checkpoint
+                                         or args.feature_version != 29):
+        parser.error("--upgrade-feature-23-to-29 requires a parent and feature v29")
     if sum((args.upgrade_feature_23_to_24, args.upgrade_feature_23_to_25,
             args.upgrade_feature_23_to_26, args.upgrade_feature_23_to_27,
-            args.upgrade_feature_23_to_28)) > 1:
+            args.upgrade_feature_23_to_28, args.upgrade_feature_23_to_29)) > 1:
         parser.error("select only one feature-upgrade path")
     if args.on_policy_teacher and (not args.init_checkpoint or args.annotation
                                    or args.annotation_for):
@@ -403,10 +418,10 @@ def main() -> None:
         trajectory = read_trajectory(path, fast_json=args.fast_trajectory_json)
         if hashlib.sha256(path.read_bytes()).digest() != hashlib.sha256(raw).digest():
             raise ValueError(f"{path}: trajectory changed while loading")
-        if trajectory.schema_version not in range(3, 26) or not trajectory.deck_sha256 or not (
+        if trajectory.schema_version not in range(3, 27) or not trajectory.deck_sha256 or not (
             trajectory.asset_sha256
         ):
-            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v25")
+            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v26")
         if args.feature_version >= 17 and trajectory.schema_version < 22:
             raise ValueError(f"{path}: feature version {args.feature_version} requires "
                              "schema v22 attack context")
@@ -416,6 +431,9 @@ def main() -> None:
         if args.feature_version >= 21 and trajectory.schema_version < 24:
             raise ValueError(f"{path}: feature version {args.feature_version} requires "
                              "schema v24 current monster Type")
+        if args.feature_version >= 29 and trajectory.schema_version < 26:
+            raise ValueError(f"{path}: feature version {args.feature_version} requires "
+                             "schema v26 public face-up age")
         if verified_results is None:
             verification_started = perf_counter()
             count = verify_trajectory(trajectory, engine_type(args.native_root))
@@ -495,7 +513,8 @@ def main() -> None:
         allow_v23_to_v25=args.upgrade_feature_23_to_25,
         allow_v23_to_v26=args.upgrade_feature_23_to_26,
         allow_v23_to_v27=args.upgrade_feature_23_to_27,
-        allow_v23_to_v28=args.upgrade_feature_23_to_28)
+        allow_v23_to_v28=args.upgrade_feature_23_to_28,
+        allow_v23_to_v29=args.upgrade_feature_23_to_29)
               if args.init_checkpoint else None)
     try:
         restrict_trainable_modules(model, args.trainable_module)
@@ -590,7 +609,8 @@ def main() -> None:
         "parent_checkpoint_sha256": (hashlib.sha256(
             args.init_checkpoint.read_bytes()).hexdigest()
             if args.init_checkpoint else None),
-        "parent_feature_upgrade": ("v23_to_v28" if args.upgrade_feature_23_to_28
+        "parent_feature_upgrade": ("v23_to_v29" if args.upgrade_feature_23_to_29
+                                   else "v23_to_v28" if args.upgrade_feature_23_to_28
                                    else "v23_to_v27" if args.upgrade_feature_23_to_27
                                    else "v23_to_v26" if args.upgrade_feature_23_to_26
                                    else "v23_to_v25" if args.upgrade_feature_23_to_25

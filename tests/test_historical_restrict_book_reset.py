@@ -56,7 +56,7 @@ def test_book_reset_respects_prior_actions(tmp_path, prior_action):
             else:
                 pytest.fail("Restrict / Book continuation exceeded 3000 decisions")
             trajectory = env.trajectory()
-            assert trajectory.schema_version == 25
+            assert trajectory.schema_version == 26
             path = tmp_path / f"restrict_book_reset_{prior_action}.json"
             write_trajectory(path, trajectory)
             assert verify_trajectory(read_trajectory(path),
@@ -194,6 +194,7 @@ def test_book_reset_respects_prior_actions(tmp_path, prior_action):
                 assert first_slot != second_slot
                 restrict = next(c for c in obs.field if c.code == RESTRICT)
                 assert restrict.position == "faceup"
+                assert restrict.faceup_turns == 0  # Book reset, then Flip Summon this turn.
                 assert any(c.zone == "spell_trap" and c.controller == 0
                            and c.equipped_to == (0, restrict.sequence) for c in obs.field)
                 assert sum(c.code in SHEEP_CODES for c in obs.field

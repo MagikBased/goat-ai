@@ -57,7 +57,10 @@ def main() -> None:
               1.0 if trajectory.winner == seat else -1.0)
     torch.manual_seed(27)
     width = agent.model.state_numbers[0].in_features
-    reference = VisibleStateValue(agent.vocabulary.size, width, architecture=args.architecture)
+    reference = VisibleStateValue(agent.vocabulary.size, width,
+                                  architecture=args.architecture,
+                                  card_number_width=(6 if agent.model.feature_version >= 29
+                                                     else 5))
     results = []
     for index in range(args.rounds):
         modes = ("scalar", "batched") if index % 2 == 0 else ("batched", "scalar")

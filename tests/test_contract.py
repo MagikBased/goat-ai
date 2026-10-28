@@ -116,6 +116,8 @@ def test_visible_schema_excludes_hidden_opponent_cards():
     with pytest.raises(ValueError, match="face-up monster"):
         replace(view(), field=(CardView(1, "monster", "facedown", None, 0,
                                         "defense", 1900, 1000),))
+    with pytest.raises(ValueError, match="face-up age"):
+        replace(view(), field=(replace(view().field[0], faceup_turns=1),))
 
 
 def test_schema_twelve_round_trips_visible_stats_and_legacy_reader_strips_them(tmp_path):
@@ -524,13 +526,13 @@ def test_replay_verifier_detects_changed_decision_and_outcome():
                           ContractEngine())
 
 
-def test_schema_twenty_five_terminal_observation_round_trip_and_verification(tmp_path):
+def test_schema_twenty_six_terminal_observation_round_trip_and_verification(tmp_path):
     with GoatEnvironment("a", "b", seed=42, engine=ContractEngine()) as env:
         env.reset()
         final = env.step(env.legal_actions()[0])
         assert env.is_terminal()
         trajectory = env.trajectory()
-    assert trajectory.schema_version == 25
+    assert trajectory.schema_version == 26
     assert trajectory.terminal_observation == final
     path = tmp_path / "terminal.json"
     write_trajectory(path, trajectory)
