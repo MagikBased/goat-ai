@@ -182,6 +182,17 @@ source-backed exclusion, one has a dated-booster inclusion, and four await a
 promotional-card or cross-territory check. One of the two community-only
 promotions remains open, and so does the wider release pool.
 
+A later [official Konami Central America WCQ FAQ](https://www.yugioh-card.com/en/events-item/2025-ca-wcq/)
+lists Yu-Jo Friendship among promos unavailable in Latin America and says
+SHONEN JUMP subscription promos were available to US or Canadian residents,
+with legal dates applying to sanctioned North American events. The FAQ calls
+it `JUMP-EN007`, while the [official card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5754&ope=2&request_locale=en)
+calls its 1 August 2006 graphic-novel printing `JMP-EN007`; the identifier
+disagrees. This reinforces the need for regional verification, but the 2025
+FAQ does **not** establish the card's North American tournament-legal date by
+20 April 2010. Keep its ledger status pending until a period legality list
+or sanctioned event record resolves that cutoff.
+
 An [archived official card-legality page captured 6 November
 2010](https://web.archive.org/web/20101106023610id_/http://www.yugioh-card.com/en/gameplay/cardlegality.html)
 identifies itself as updated 4 November 2010. It lists SHONEN JUMP promos
