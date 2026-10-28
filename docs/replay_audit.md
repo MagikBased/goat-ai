@@ -1,5 +1,39 @@
 # Early replay decision audit
 
+## High-margin policy disagreements for human review (28 October 2026)
+
+The [local high-margin queue](../.cache/goat-ai/high_margin_review_90500_90501/queue.html)
+contains **22** distinct decisions from eight previously recorded, replay-
+verified and visibility-audited parent-policy/Tactical-v14 duels on seeds
+90500–90501. The duels contain **3,819** verified decisions. The selector
+reproduced each recorded greedy policy choice, then retained disagreements
+where the raw model logit for its chosen action exceeded Tactical's suggested
+legal action by at least **2**. There were 121 qualifying candidates before
+prompt deduplication and the three-per-replay cap; all 22 selected items are
+disagreements, and two also have visible-state audit flags. Selected raw gaps
+range from **2.029** to **8.853**. Large gaps indicate a strong *model score*
+preference on these states, not calibrated confidence or proof that Tactical
+is correct. None of these prompts is a human label, and these replays have
+already been used for diagnostics, so use new seeds and deck families for
+any later competitive evaluation of a policy trained on their reviews.
+
+`./start_review_viewer.sh` opens this newest queue through the save-enabled
+local server. The current queue JSON SHA-256 is
+`a8d835639b6ea59a097760fe40bcdaab2de716c01cd3b46280ede46a473e4197`.
+Rebuild it with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/public_age_policy_90500_90501/matchup_*.json \
+  --rank-by logit --min-logit-margin 2 \
+  --limit 24 --per-replay 3 --render-viewers \
+  --output .cache/goat-ai/high_margin_review_90500_90501/queue.json
+```
+
+The older Swords-age queue remains available by passing its `queue.json`
+path to `./start_review_viewer.sh`.
+
 ## Swords public-age timing review (28 October 2026)
 
 The [local Swords queue](../.cache/goat-ai/swords_age_review_90500_90501/queue.html)

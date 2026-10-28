@@ -2114,3 +2114,10 @@ while unchanged choices had a 2.840 median margin. This does not explain the
 competitive plateau by itself, but it narrows the next M4 experiment toward
 independently sourced corrections of confidently wrong decisions, checked on
 new deck families and seeds. See [the diagnostic](evaluation.md#raw-action-margin-diagnostic-for-the-240-duel-ppo-child-28-october-2026).
+
+The review selector now offers an opt-in raw-logit margin threshold and ranking
+mode. A local queue from those same eight verified duels retains 22 distinct
+high-margin policy/Tactical disagreements for human review; the synthetic
+alternatives are not training labels. This targets the high-margin error
+hypothesis without claiming those 22 plays are mistakes. See the
+[review queue](replay_audit.md#high-margin-policy-disagreements-for-human-review-28-october-2026).

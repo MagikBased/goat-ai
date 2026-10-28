@@ -44,6 +44,20 @@ def test_review_queue_puts_visible_audit_before_confidence_margin():
     assert chosen[0]["decision_index"] == 2
 
 
+def test_review_queue_can_rank_raw_logit_gaps_without_changing_default():
+    candidates = [
+        {"trajectory": "a", "decision_index": 1, "probability_margin": 0.8,
+         "logit_margin": 0.3, "audit_flags": [], "_fingerprint": ("a",)},
+        {"trajectory": "b", "decision_index": 2, "probability_margin": 0.6,
+         "logit_margin": 3.0, "audit_flags": [], "_fingerprint": ("b",)},
+    ]
+    assert select_diverse_candidates(candidates, 1, 1)[0]["decision_index"] == 1
+    assert select_diverse_candidates(candidates, 1, 1, rank_by="logit")[0][
+        "decision_index"] == 2
+    with pytest.raises(ValueError, match="positive"):
+        select_diverse_candidates(candidates, 1, 1, rank_by="unknown")
+
+
 def test_review_index_separates_player_label_and_hidden_reveal_views(tmp_path):
     queue = tmp_path / "review/queue.json"
     queue.parent.mkdir()

@@ -8,6 +8,7 @@ import argparse
 import json
 from collections import Counter
 from html import escape
+from math import isfinite
 from pathlib import Path
 from urllib.parse import quote
 
@@ -31,15 +32,17 @@ from scripts.render_replay import _card_names, render_replay
 
 
 def select_diverse_candidates(candidates: list[dict], limit: int,
-                              per_replay: int) -> list[dict]:
+                              per_replay: int, *, rank_by: str = "probability"
+                              ) -> list[dict]:
     """Take confident disagreements without letting one prompt dominate."""
-    if limit < 1 or per_replay < 1:
+    if limit < 1 or per_replay < 1 or rank_by not in ("probability", "logit"):
         raise ValueError("review limits must be positive")
+    score_key = "probability_margin" if rank_by == "probability" else "logit_margin"
     chosen = []
     fingerprints = set()
     replay_counts: Counter[str] = Counter()
     for candidate in sorted(candidates, key=lambda item: (
-            not item["audit_flags"], -item["probability_margin"],
+            not item["audit_flags"], -item[score_key],
             item["trajectory"], item["decision_index"])):
         fingerprint = candidate["_fingerprint"]
         replay = candidate["trajectory"]
@@ -288,6 +291,12 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--per-replay", type=int, default=2)
+    parser.add_argument("--rank-by", choices=("probability", "logit"),
+                        default="probability",
+                        help="rank disagreements by probability or raw AI-to-Tactical score gap")
+    parser.add_argument("--min-logit-margin", type=float, default=0.0,
+                        help="keep only disagreements where the raw model favors its action "
+                             "over Tactical by at least this score gap")
     parser.add_argument("--visible-faceup-card", type=int,
                         help="review decisions while this known face-up card is on the field")
     parser.add_argument("--min-faceup-turns", type=int, default=1,
@@ -296,7 +305,8 @@ def main() -> None:
     parser.add_argument("--render-viewers", action="store_true",
                         help="write offline HTML for replays represented in the queue")
     args = parser.parse_args()
-    if args.limit < 1 or args.per_replay < 1:
+    if (args.limit < 1 or args.per_replay < 1
+            or not isfinite(args.min_logit_margin) or args.min_logit_margin < 0):
         parser.error("review limits must be positive")
     if ((args.visible_faceup_card is not None and args.visible_faceup_card <= 0)
             or args.min_faceup_turns < 0
@@ -376,6 +386,10 @@ def main() -> None:
             disagreements += disagreed
             teacher_index = legal.index(alternative)
             margin = float(probabilities[policy_index] - probabilities[teacher_index])
+            logit_margin = float(logits[policy_index] - logits[teacher_index])
+            if args.min_logit_margin and (not disagreed
+                                          or logit_margin < args.min_logit_margin):
+                continue
             candidates.append({
                 "trajectory": str(path.resolve()),
                 "trajectory_sha256": source_hash,
@@ -390,6 +404,7 @@ def main() -> None:
                 "policy_probability": round(float(probabilities[policy_index]), 6),
                 "teacher_probability": round(float(probabilities[teacher_index]), 6),
                 "probability_margin": round(margin, 6),
+                "logit_margin": round(logit_margin, 6),
                 "audit_flags": audit_flags,
                 "teacher_disagrees": disagreed,
                 **({"visible_faceup_card": args.visible_faceup_card,
@@ -409,7 +424,8 @@ def main() -> None:
                               "verified_decisions": verified,
                               "policy_choices": policy_choices,
                               "disagreements": disagreements})
-    selected = select_diverse_candidates(candidates, args.limit, args.per_replay)
+    selected = select_diverse_candidates(candidates, args.limit, args.per_replay,
+                                         rank_by=args.rank_by)
     if args.render_viewers:
         viewer_dir = args.output.parent / (args.output.stem + "_viewers")
         for path in sorted({item["trajectory"] for item in selected}):
@@ -429,6 +445,8 @@ def main() -> None:
               "purpose": "human_review_candidates_not_training_labels",
               "checkpoint_sha256": checkpoint_hash,
               "teacher": "TacticalHeuristicAgent_v14",
+              "rank_by": args.rank_by,
+              "min_logit_margin": args.min_logit_margin,
               "selection": ("public_faceup_age_then_model_margin_distinct_prompt"
                             if args.visible_faceup_card is not None else
                             "visible_audit_then_model_margin_distinct_prompt_max_per_replay"),
