@@ -9529,3 +9529,33 @@ with `scripts/audit_selfplay_replays.py`, then evaluate with
 --workers 4 --seeds 16` on the named holdouts and seed blocks. Compare the
 two Tactical reports with `scripts/compare_tournament_reports.py
 --require-unseen-main-decks`.
+
+## Additional distinct-opponent GOAT protocol sweep (27 October 2026)
+
+On project commit `55f0df3` and the pinned native assets, RandomAgent completed
+50/50 further GOAT-whitelist duels on seeds 10456–10505, each against an
+independently generated legal 40-card opponent deck. No duel hit the
+3,000-decision cap or raised an adapter error; the longest took 1,497
+decisions. Fresh-engine replay verification and the player-visible audit
+passed for all 48,741 decisions, including 412 hidden-field choices and 24
+opponent-hand choices. The run loaded 1,182 native assets and offered 3,967
+card-source/action-kind pairs. Compared with the prior local 100-duel
+whitelist report for seeds 10356–10455, it loaded ten previously unobserved
+official card scripts, including D.D. Designator and Mystic Swordsman LV6.
+
+The ignored report is
+`.cache/goat-ai/whitelist_distinct_10456_10505/report.json` (SHA-256
+`42ebe730b011d3c9e44e63cccef0046f434c85a39d043352fac44d7d157ccbaa`).
+It records every generated Deck hash, the GOAT rules profile, core/database
+hashes, and each loaded script hash. Reproduce after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_distinct_10456_10505 \
+  --seed 10456 --seeds 50 --max-decisions 3000 \
+  --verify-replays --distinct-opponents --count-card-actions
+```
+
+This extends M1 protocol evidence only. Random decks and random decisions do
+not validate each card's historical ruling or establish playing strength.
