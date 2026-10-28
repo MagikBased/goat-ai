@@ -1,5 +1,35 @@
 # Early replay decision audit
 
+## Effect-choice review queue (28 October 2026)
+
+The [local option queue](../.cache/goat-ai/option_prompt_review_96200_96215/queue.html)
+contains all **five** learner-seat multi-option effect decisions found in 32
+policy-versus-Tactical-v14 games on Warrior/Beastdown decks, seeds 96200–96215.
+All **11,563** decisions in those complete games replay-verified and passed
+the visibility audit. Three queued choices are Enemy Controller and two are
+Don Zaloog. Both agents selected the first mode in each case. Agreement is
+not approval; each prompt still needs independent review in its visible board
+state. The local save server currently reports **0 of 5 labeled**.
+
+Open the queue with:
+
+```bash
+./start_review_viewer.sh \
+  .cache/goat-ai/option_prompt_review_96200_96215/queue.json
+```
+
+The review cards name the public chain-source card and effect mode. To label
+the second mode, choose **Open label view**, then **Choose a different action**
+and select the other legal effect. Reviewer-only reveals remain diagnostic and
+cannot be labeled. The queue JSON SHA-256 is
+`e048e951ad8799a6f567ca88f2ac3c8994dc3abc4e7512d2316bc4015e71fd0e`.
+Regenerate the ignored queue with `scripts/shortlist_policy_disagreements.py`
+using the selected v23 checkpoint, all 32 `matchup_*.json` replays under
+`.cache/goat-ai/option_train_policy_warrior_beast_96200_96215`, and
+`--review-option-prompts --limit 32 --per-replay 10 --render-viewers` with
+the queue path above as `--output`. This is a feedback queue, not a labeled
+demonstration set or evidence that v30 improves competitive play.
+
 ## Refreshing older review queues (28 October 2026)
 
 The player-visible pages for all 12 locally available review and recheck

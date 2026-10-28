@@ -114,6 +114,28 @@ def test_review_index_names_comparison_policy_instead_of_tactical(tmp_path):
     assert "Tactical suggests:" not in html
 
 
+def test_review_index_names_public_effect_options(tmp_path, monkeypatch):
+    from scripts import shortlist_policy_disagreements as shortlist
+
+    queue = tmp_path / "queue.json"
+    viewer = tmp_path / "game.html"
+    viewer.write_text("player view")
+    card = 98045062
+    first = (card << 20) | 1
+    monkeypatch.setattr(shortlist, "_card_names", lambda codes, root: {
+        card: "Enemy Controller"})
+    monkeypatch.setattr(shortlist, "_option_texts", lambda codes, root: {
+        first: "Change the battle position of an opponent's monster"})
+    action = {"kind": "select_option", "parameters": {"prompt_id": first}}
+    selected = [{"viewer": f"{viewer}#decision=4", "turn": 2,
+                 "phase": "main1", "viewer_frame": 4,
+                 "policy_action": action, "teacher_action": action,
+                 "option_source_card": card, "audit_flags": []}]
+    html = write_review_index(selected, queue, tmp_path / "native").read_text()
+    assert "Review Enemy Controller effect choice" in html
+    assert "Change the battle position of an opponent&#x27;s monster" in html
+
+
 def test_refresh_rejects_changed_trajectory(tmp_path):
     queue = tmp_path / "queue.json"
     replay = tmp_path / "replay.json"

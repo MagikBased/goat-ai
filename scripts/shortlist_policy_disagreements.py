@@ -28,7 +28,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION, encode_decision
-from scripts.render_replay import _card_names, render_replay
+from scripts.render_replay import _card_names, _option_texts, render_replay
 
 
 def select_diverse_candidates(candidates: list[dict], limit: int,
@@ -93,10 +93,16 @@ def write_review_index(selected: list[dict], output: Path,
              for item in selected for action in (
                  item["policy_action"], item["teacher_action"])}
     codes.update(item.get("visible_faceup_card") for item in selected)
+    codes.update(item.get("option_source_card") for item in selected)
     names = _card_names({code for code in codes if type(code) is int and code > 0},
                         native_root)
+    option_texts = _option_texts({code for code in codes if type(code) is int and code > 0},
+                                 native_root)
 
     def action_label(action: dict) -> str:
+        prompt_id = action["parameters"].get("prompt_id")
+        if action["kind"] == "select_option" and type(prompt_id) is int:
+            return escape(option_texts.get(prompt_id, "Select effect option"))
         code = action["parameters"].get("code")
         name = names.get(code, f"Card {code}") if code else ""
         return escape(f"{action['kind'].replace('_', ' ')} {name}".strip())
@@ -121,9 +127,13 @@ def write_review_index(selected: list[dict], output: Path,
         age_note = (f"{names.get(age_code, f'Card {age_code}')} face-up for "
                     f"{item['visible_faceup_turns']} turn boundaries"
                     if age_code is not None else "")
+        option_code = item.get("option_source_card")
+        option_note = (f"Review {names.get(option_code, f'Card {option_code}')} effect choice"
+                       if option_code is not None else "")
         reason = (", ".join(flag.replace("_", " ") for flag in item["audit_flags"])
                   if item["audit_flags"] else age_note
-                  if age_note else f"{comparison_label} suggests another play")
+                  if age_note else option_note
+                  if option_note else f"{comparison_label} suggests another play")
         choices = (f'<p><strong>Both agents played:</strong> '
                    f'{action_label(item["policy_action"])}</p>'
                   if teacher_agrees else
@@ -350,6 +360,9 @@ def main() -> None:
                              "over Tactical by at least this score gap")
     parser.add_argument("--visible-faceup-card", type=int,
                         help="review decisions while this known face-up card is on the field")
+    parser.add_argument("--review-option-prompts", action="store_true",
+                        help="review every learner-seat multi-choice effect menu, "
+                             "including choices the comparison agent agrees with")
     parser.add_argument("--min-faceup-turns", type=int, default=1,
                         help="minimum public turn boundaries since that card became face-up")
     parser.add_argument("--output", type=Path, required=True)
@@ -363,6 +376,8 @@ def main() -> None:
             or args.min_faceup_turns < 0
             or args.visible_faceup_card is None and args.min_faceup_turns != 1):
         parser.error("face-up age filter needs a positive card ID and nonnegative age")
+    if args.review_option_prompts and args.visible_faceup_card is not None:
+        parser.error("choose either option-prompt or face-up-age review")
     if len({path.resolve() for path in args.replays}) != len(args.replays):
         parser.error("duplicate replay path")
     checkpoint_hash = sha256_file(args.checkpoint)
@@ -432,6 +447,9 @@ def main() -> None:
                 raise ValueError(f"{path}: greedy policy choice differs at {index}")
             if len(legal) == 1:
                 continue
+            if args.review_option_prompts and not all(
+                    action.kind == "select_option" for action in legal):
+                continue
             age = (visible_faceup_age(record.observation, args.visible_faceup_card,
                                       args.min_faceup_turns)
                    if args.visible_faceup_card is not None else None)
@@ -450,7 +468,8 @@ def main() -> None:
                 raise ValueError(f"{path}: teacher choice is illegal at {index}")
             disagreed = alternative != record.selected_action
             audit_flags = audit_by_index.get(index, [])
-            if not disagreed and not audit_flags and age is None:
+            if not disagreed and not audit_flags and age is None \
+                    and not args.review_option_prompts:
                 continue
             disagreements += disagreed
             teacher_index = legal.index(alternative)
@@ -476,9 +495,13 @@ def main() -> None:
                 "logit_margin": round(logit_margin, 6),
                 "audit_flags": audit_flags,
                 "teacher_disagrees": disagreed,
+                **({"option_source_card": record.observation.chain[-1].card_code}
+                   if args.review_option_prompts and record.observation.chain else {}),
                 **({"visible_faceup_card": args.visible_faceup_card,
                     "visible_faceup_turns": age} if age is not None else {}),
-                "_fingerprint": (("audit", tuple(audit_flags),
+                "_fingerprint": (("option", str(path.resolve()), index)
+                                 if args.review_option_prompts else
+                                 ("audit", tuple(audit_flags),
                                   record.selected_action.kind,
                                   record.selected_action.parameters.get("code"))
                                  if audit_flags else
@@ -519,9 +542,12 @@ def main() -> None:
                  if comparison_hash else {}),
               "rank_by": args.rank_by,
               "min_logit_margin": args.min_logit_margin,
-              "selection": ("public_faceup_age_then_model_margin_distinct_prompt"
+              "selection": ("learner_select_option_prompts"
+                            if args.review_option_prompts else
+                            "public_faceup_age_then_model_margin_distinct_prompt"
                             if args.visible_faceup_card is not None else
                             "visible_audit_then_model_margin_distinct_prompt_max_per_replay"),
+              **({"review_option_prompts": True} if args.review_option_prompts else {}),
               **({"visible_faceup_card": args.visible_faceup_card,
                   "min_faceup_turns": args.min_faceup_turns}
                  if args.visible_faceup_card is not None else {}),
