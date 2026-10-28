@@ -52,6 +52,7 @@ MR1_SYNCHRO_CARDS = frozenset({
     9748752,   # Caius the Shadow Monarch
     59197169,  # Yami; period Field Spell replacement probe
     22702055,  # Umi; period Field Spell replacement probe
+    21502796,  # Ryko; pre-errata activation-time target below
 })
 MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094, 7391448, 50321796})
 UPSTREAM_GOYO_SHA256 = "b1f8f68c428302b537a1bf4b660ef33ae800afd4a1716cd962f3908b2f24302b"
@@ -63,6 +64,8 @@ GOYO_TUNER_REQUIREMENT_2010 = (
     b"Synchro.AddProcedure(c,nil,1,1,Synchro.NonTuner(nil),1,99)"
 )
 UPSTREAM_BRIONAC_SHA256 = "05debfa028436a9ad386dbd950dff76915c0fccdf4f87b2bc0af7c782f89eb39"
+UPSTREAM_RYKO_SHA256 = "950e55e055ce5f2293437c3ec9de4f8b0f21347da5cb055c66660c01bad89458"
+PRE_ERRATA_RYKO_SHA256 = "72a23c4440817ce2bf5c39fc2272fa7d0a8598a5bafa6b880f0d4921f282bf0b"
 BRIONAC_COUNT_LIMIT_CURRENT = b"\te1:SetCountLimit(1,id)\n"
 BRIONAC_OPPONENT_FIELD_CURRENT = b"tp,0,LOCATION_ONFIELD"
 BRIONAC_BOTH_FIELDS_2010 = b"tp,LOCATION_ONFIELD,LOCATION_ONFIELD"
@@ -726,6 +729,13 @@ class OcgcoreProbe:
             contents = (contents.replace(BRIONAC_COUNT_LIMIT_CURRENT, b"")
                         .replace(BRIONAC_OPPONENT_FIELD_CURRENT,
                                  BRIONAC_BOTH_FIELDS_2010))
+        if relative_path == "official/c21502796.lua" and self.mode == "mr1_synchro_probe":
+            period_script = (self.scripts / "pre-errata/c511003007.lua").read_bytes()
+            if (hashlib.sha256(contents).hexdigest() != UPSTREAM_RYKO_SHA256
+                    or hashlib.sha256(period_script).hexdigest() != PRE_ERRATA_RYKO_SHA256):
+                self.errors.append("pinned Ryko scripts changed; 2010 targeting correction not applied")
+                return 0
+            contents = period_script
         self.loaded_script_sha256[relative_path] = (
             hashlib.sha256(contents).hexdigest()
         )

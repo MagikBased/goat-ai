@@ -731,10 +731,20 @@ describes a player chaining Dust Tornado to the card targeted by a flipped
 Ryko, Lightsworn Hunter. This is evidence that the destruction choice was
 made when Ryko's effect was placed on the Chain. The pinned current
 `official/c21502796.lua` instead selects a card during resolution. The pinned
-`pre-errata/c511003007.lua` selects a target before resolution, but its other
-behavior and compatibility with the current core still need a seeded native
-duel test. Until that test, the MR1 probe does not allow Ryko, and no Edison
-correctness claim is made for this card.
+`pre-errata/c511003007.lua` selects a target before resolution. The isolated
+MR1 probe now loads that exact pinned pre-errata script for Ryko, with source
+and replacement SHA-256 checks. In seed 0, a Set Ryko is Flip Summoned,
+chooses the opponent's face-up monster while its Chain Link is pending,
+destroys that monster on resolution, and sends three cards from its
+controller's Deck to the Graveyard. The resulting duel reaches terminal,
+replay-verifies, and passes the visibility audit. This checks the targeted
+branch and native script compatibility; it does not establish every Ryko
+interaction or a complete Edison ruleset. Reproduce with:
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_ryko_probe.py
+```
 
 ## Validation gates before an Edison duel can be claimed
 
