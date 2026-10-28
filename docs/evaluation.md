@@ -9476,6 +9476,56 @@ with `--seeds 16`, and respectively `--opponent-checkpoint` or
 `--opponent tactical`. Compare the matched Tactical reports with
 `scripts/compare_tournament_reports.py --require-unseen-main-decks`.
 
+## On-policy Tactical labels on mixed tournament cards (28 October 2026)
+
+To address the distribution mismatch of the four-duel off-policy imitation
+trial, a new collection let the selected feature-v23 policy play Tactical-v14
+on eight independently generated, legal tournament-card deck pairs (source
+deck seeds 11020–11027). Duel seeds 61000–61001 and both policy seats produced
+**32 complete, native replay-verified and visibility-audited duels with 16,708
+decisions**. The ignored manifest is
+`.cache/goat-ai/on_policy_mix_11020_11027_61000_61001/manifest.json` (SHA-256
+`c5c71389359aac1664d4392780506351d1b375cea70ebb0a50e661af7958d001`).
+The policy-visited states were labeled by the synthetic Tactical-v14 teacher,
+not by a human. The cloning trainer replay-verified them again and fit **3,018
+multi-option teacher decisions** for one epoch (feature v23, width 32,
+batch 16, learning rate 0.0001, seed 61000). The experimental checkpoint is
+`.cache/goat-ai/fv23_on_policy_mix_61000_61001.pt` (SHA-256
+`988c1b409462be6a514223e772932307c2d125671ed6d00678e5dbf60a04cfa7`).
+
+A separate set of ten generated deck pairs (source seeds 11010–11019) had
+**20 distinct Main Deck compositions absent from both checkpoints' training
+provenance**. Across both deck assignments, both seats, and duel seeds
+62000–62001, the child scored **36–44** directly against its frozen parent
+(paired score interval **33.8–56.3%**). On matched duel seeds 62002–62003,
+the child scored **21–59** against Tactical and the parent **17–63**. The
+validated paired child-minus-parent Tactical score difference was **+5.0
+percentage points**, 95% interval **−5.0 to +15.0 points**. Neither check
+establishes a gain; the child is not promoted. More synthetic teacher labels
+on policy-visited states alone have not closed M4's strength gate.
+
+The ignored direct, child-versus-Tactical, and parent-versus-Tactical reports
+are respectively
+`.cache/goat-ai/fv23_on_policy_mix_direct_62000_62001.json` (SHA-256
+`99b82522b072fd7db6399509f9dbda69eb531654b59fed45dfdbeeef189a7c38`),
+`.cache/goat-ai/fv23_on_policy_mix_child_tactical_62002_62003.json` (SHA-256
+`01c4896c74c934f9271e00694f6eab34c17af4d3af828e6409916d908cd687b9`),
+and `.cache/goat-ai/fv23_on_policy_mix_parent_tactical_62002_62003.json`
+(SHA-256 `53a88f8fbd67a903fae19c696eb9283d2109ba54f84eb079bef3a51994891c45`).
+Collection used `scripts/collect_policy_matches.py --opponent tactical
+--seed 61000 --seeds 2 --workers 4 --max-decisions 3000` with eight
+`--matchup` pairs from the isolated probe and the selected v23 checkpoint.
+Training used `scripts/train_behavioral_clone.py` on those 32 trajectory
+files with `--engine experimental --on-policy-teacher tactical_v14
+--init-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt
+--feature-version 23 --width 32 --epochs 1 --batch-size 16 --batched-forward
+--skip-forced-training --verification-workers 4 --learning-rate 0.0001
+--seed 61000`. Evaluation used `scripts/evaluate_policy.py --engine
+experimental --both-deck-assignments --require-unseen-main-decks --seeds 2
+--workers 4 --max-decisions 3000` with the ten held-out `--matchup` pairs
+above, followed by `scripts/compare_tournament_reports.py
+--require-unseen-main-decks` for the matched Tactical arms.
+
 ### Half-Tactical PPO continuation from the current-core child (27 October 2026)
 
 A new clipped-PPO trial began from the current-core Tactical-imitation child,

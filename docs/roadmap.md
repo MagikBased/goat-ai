@@ -661,6 +661,13 @@ scored 24–55–1 against Tactical-v14 and that child scored 23–57 on the sam
 more small off-policy Tactical imitation is not yet a demonstrated path to
 M4's strength gate. See the [broader holdout](evaluation.md#neural-policy-on-unseen-tournament-card-mixes-28-october-2026).
 
+A larger, 32-duel on-policy Tactical-v14 label collection on eight new mixed
+deck pairings fit 3,018 policy-visited choices. On ten separate, training-unseen
+deck pairs, the child scored 36–44 directly against its parent; its matched
+Tactical score improved by five points with a paired interval including no
+gain. This does not justify promotion or satisfy the separate self-play gate;
+see the [on-policy experiment](evaluation.md#on-policy-tactical-labels-on-mixed-tournament-cards-28-october-2026).
+
 The current-core feature-v23 reference scored 25–39 versus Tactical-v14 on
 two independent 2005 deck pairings. A matched Tactical mirror showed a
 10.9-point policy score deficit with a paired 95% interval from −20.3 to
