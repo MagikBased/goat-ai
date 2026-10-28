@@ -1,5 +1,35 @@
 # Baseline evaluation log
 
+## Selected-policy Thunder Dragon training-label audit (28 October 2026)
+
+The selected feature-v23 checkpoint records SHA-256 provenance for 144
+Tactical trajectories. `scripts/audit_thunder_search_labels.py` checked every
+file against that provenance and inspected only decisions where the acting
+teacher controlled a resolving Thunder Dragon and a Deck copy was a legal
+visible choice. Among 25 such opportunities, Tactical-v14 took two copies
+19 times and took zero six times; Tactical-v7 supplied none of these prompts.
+The six zero-copy viewer frames are in the ignored JSON report. These are
+legal choices under the [historical TCG Netrep ruling](https://www.goatformat.com/rulings7.html),
+but six inconsistent teacher labels are a plausible source of weak imitation.
+This audit checks exact training-file identity and label content; it does not
+rerun native replay verification or establish that every two-copy choice was
+strategically optimal.
+
+On two separate replay-verified seed-94000 states (viewer frames 24 and 37),
+the selected parent scores the empty `select_cards` finish at 3.253 and 3.301,
+versus 0.657 and 0.696 for the legal Deck-copy `select_card`. Thus the
+policy's empty search is present in its raw action scores, not merely caused
+by an inference wrapper. The action encoder represents the choices distinctly.
+Correcting this training signal and proving a held-out competitive gain remain
+open; the opt-in Tactical search change below did not win its direct ablation.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/audit_thunder_search_labels.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --output .cache/goat-ai/thunder_search_label_audit_v23.json
+```
+
 ## Staged Thunder Dragon search Tactical ablation (28 October 2026)
 
 [Historical TCG Netrep rulings](https://www.goatformat.com/rulings7.html) permit
