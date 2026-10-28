@@ -8,6 +8,8 @@ import pytest
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_decision_visibility
+from goat_ai.replay import DecisionRecord
 
 FRUITS = 49998907
 
@@ -41,6 +43,8 @@ def test_fruits_sort_choice_changes_own_deck_top_without_public_reveal(tmp_path)
                 reverse = next(action for action in actions
                                if [card["code"] for card in action.parameters["cards"]]
                                == list(reversed(original)))
+                assert audit_decision_visibility(DecisionRecord(
+                    observation, actions, reverse)) == {}
                 observation = env.step(reverse)
                 # Native Deck query is used only by this regression, never by an agent.
                 deck_after = [card.code for card in env.engine.probe._query_location(0, 1)]

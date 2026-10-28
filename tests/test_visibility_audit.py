@@ -66,6 +66,28 @@ def test_audit_rejects_choice_identity_leaks(parameters, reason):
         audit_decision_visibility(_record(_observation(), parameters))
 
 
+@pytest.mark.parametrize("kind,parameters", [
+    ("select_card", {"controller": 0, "location": 1, "sequence": 17, "code": 123}),
+    ("select_card", {"controller": 0, "location": 64, "sequence": 2, "code": 123}),
+    ("special_summon", {"controller": 0, "location": 64, "sequence": 2, "code": 123}),
+    ("unselect_card", {"controller": 0, "location": 1, "sequence": 17,
+                       "code": 123}),
+    ("select_cards", {"cards": [
+        {"controller": 0, "location": 1, "sequence": 17, "code": 123}]}),
+    ("sort_cards", {"cards": [
+        {"controller": 0, "location": 1, "sequence": 17, "code": 123}]}),
+])
+def test_audit_rejects_physical_deck_slots(kind, parameters):
+    with pytest.raises(VisibilityViolation, match="Deck choice exposes native slot"):
+        audit_decision_visibility(_record(_observation(), parameters, kind))
+
+
+def test_audit_accepts_visible_deck_card_without_physical_slot():
+    record = _record(_observation(), {"controller": 0, "location": 1,
+                                      "code": 123})
+    assert audit_decision_visibility(record) == {}
+
+
 def test_audit_checks_multi_card_choices_and_decision_viewer():
     observation = _observation()
     multi = _record(observation, {"cards": [

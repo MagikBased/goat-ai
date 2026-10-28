@@ -12,7 +12,7 @@ class VisibilityViolation(ValueError):
 
 
 def _choice_cards(action: Action) -> Iterable[dict]:
-    if action.kind in ("select_card", "tribute"):
+    if action.kind in ("select_card", "unselect_card", "tribute"):
         yield action.parameters
     if action.kind in ("select_card", "select_cards", "finish_selection",
                        "tribute_cards", "sort_cards", "select_counters"):
@@ -31,6 +31,8 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
     for action in record.legal_actions:
         if action.actor != observation.acting_player:
             raise VisibilityViolation("legal action actor differs from acting player")
+        if action.parameters.get("location") in (1, 64) and "sequence" in action.parameters:
+            raise VisibilityViolation("Deck choice exposes native slot")
         if action.kind == "select_counters":
             cards = action.parameters.get("cards", ())
             counter_type = action.parameters.get("counter_type")
@@ -70,6 +72,8 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
         for choice in _choice_cards(action):
             controller = choice.get("controller")
             location = choice.get("location")
+            if location in (1, 64) and "sequence" in choice:
+                raise VisibilityViolation("Deck choice exposes native slot")
             if controller == observation.viewer:
                 continue
             if location in (4, 8):
