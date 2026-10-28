@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -80,7 +81,7 @@ def test_game_creator_generates_verified_reviewer_replay(tmp_path, agent1, sourc
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_policy_game_review_queue_separates_visible_labels_from_reveals(tmp_path):
+def test_policy_game_review_queue_separates_visible_labels_from_reveals(tmp_path, monkeypatch):
     creator = _creator(tmp_path, Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve())
     result = creator.create({"deck1": DECK1, "deck2": DECK2,
                              "agent1": "policy", "agent2": "tactical", "seed": 6804})
@@ -101,3 +102,9 @@ def test_policy_game_review_queue_separates_visible_labels_from_reveals(tmp_path
     assert list(sources) == [sha256_file(source)]
     verify_queue_items(read_trajectory(source), sources[sha256_file(source)][1],
                        report["checkpoint_sha256"])
+    with monkeypatch.context() as patch:
+        patch.setattr("scripts.create_viewer_game.load_policy_agent", lambda _: SimpleNamespace(
+            model=SimpleNamespace(feature_version=23),
+            select_action=lambda _observation, _actions: object()))
+        with pytest.raises(ValueError, match="recorded policy choice differs"):
+            creator.review_queue(result["id"])

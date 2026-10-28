@@ -128,8 +128,9 @@ If a selected-policy game has flagged policy decisions, **Review policy
 choices** opens a separate save-enabled queue. Its label view shows only what
 the AI could see at that moment; **Reveal all cards** remains a distinct
 inspection view with labeling disabled. Saved choices are kept in the local
-review-label folder and require replay and visibility validation before use
-for training.
+review-label folder. Queue creation replays the duel, audits player visibility,
+and reproduces the recorded policy choices from the pinned checkpoint. Saved
+choices require replay and visibility validation before use for training.
 
 Live browser play against an AI is a later step. The terminal human-versus-AI
 workflow above already uses the same observation and legal-action interface;

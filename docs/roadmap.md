@@ -2375,6 +2375,10 @@ human `self_recorded` demonstrations. Queue generation verifies the native
 replay, writes a player-visible label page, and keeps full-information
 reveals separate. The heuristic flag and Tactical alternative are prompts,
 not endorsed training labels; a person must select a legal alternative.
+Before serving a generated policy queue, the creator now independently
+reproduces every recorded choice by the named policy checkpoint, in addition
+to native replay and visibility verification. The check runs even when the
+queue already exists, so a saved queue cannot bypass policy provenance.
 
 An [action-encoding audit](evaluation.md#legal-action-representation-collision-audit-28-october-2026)
 found no collision in the current 22 shortlisted review comparisons, but did

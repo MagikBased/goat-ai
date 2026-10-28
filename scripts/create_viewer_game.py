@@ -78,7 +78,9 @@ class GameCreator:
         seat = metadata.get("demonstrator_seat")
         checkpoint_hash = metadata.get("policy_checkpoint_sha256")
         if (trajectory.source != "policy_evaluation" or seat not in (0, 1)
-                or checkpoint_hash != sha256_file(self.checkpoint)):
+                or checkpoint_hash != sha256_file(self.checkpoint)
+                or metadata.get("policy_inference") != "greedy"
+                or metadata.get("policy_inference_version") != POLICY_INFERENCE_VERSION):
             raise ValueError("game is not attributed to the selected policy checkpoint")
         flags = [flag for flag in report["flags"] if flag["acting_player"] == seat]
         if not flags:
@@ -86,6 +88,17 @@ class GameCreator:
         queue_dir = self.output_dir / f"{identifier}_review"
         queue = queue_dir / "queue.json"
         source_hash = sha256_file(source)
+        verify_trajectory(trajectory, ExperimentalOcgcoreEngine(self.native_root))
+        audit_trajectory_visibility(trajectory)
+        policy = load_policy_agent(self.checkpoint)
+        if metadata.get("policy_feature_version") != policy.model.feature_version:
+            raise ValueError("recorded policy feature version differs from the checkpoint")
+        for index, record in enumerate(trajectory.decisions):
+            if record.observation.acting_player != seat:
+                continue
+            if policy.select_action(record.observation,
+                                    record.legal_actions) != record.selected_action:
+                raise ValueError(f"recorded policy choice differs at decision {index}")
         if queue.is_file():
             saved = json.loads(queue.read_text(encoding="utf-8"))
             if (saved.get("checkpoint_sha256") != checkpoint_hash
@@ -93,8 +106,6 @@ class GameCreator:
                            for item in saved.get("selected", []))):
                 raise ValueError("existing game review queue differs from its replay")
             return queue
-        verify_trajectory(trajectory, ExperimentalOcgcoreEngine(self.native_root))
-        audit_trajectory_visibility(trajectory)
         queue_dir.mkdir(parents=True, exist_ok=True)
         visible = queue_dir / "visible.html"
         render_replay(source, visible, self.native_root)
