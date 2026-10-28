@@ -200,27 +200,34 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
                          "audit_flags": []})
     index = write_review_index(selected, queue, tmp_path / "native")
     probe = """<script>
+      (async () => {
       document.querySelector('.review-card .primary').click();
+      await new Promise(resolve => setTimeout(resolve, 0));
       const first = document.getElementById('item-position').textContent;
       const replayFrameProbe = document.getElementById('stage-frame');
       window.dispatchEvent(new MessageEvent('message', {source: replayFrameProbe.contentWindow,
         data: {type: 'goat-ai-review-label-state', pending: true}}));
       window.confirm = () => false;
       document.getElementById('next-item').click();
+      await new Promise(resolve => setTimeout(resolve, 0));
       const protectedItem = document.getElementById('item-position').textContent;
       window.confirm = () => true;
       document.getElementById('next-item').click();
+      await new Promise(resolve => setTimeout(resolve, 0));
       const second = document.getElementById('item-position').textContent;
       document.getElementById('toggle-reveal').click();
+      await new Promise(resolve => setTimeout(resolve, 0));
       const reveal = document.getElementById('stage-frame').src.includes('.review.html');
       document.getElementById('back-to-queue').click();
       labels.set(bookmarkKey(items[1]), 0); progressMode = true; updateProgress();
       openItem(0);
+      await new Promise(resolve => setTimeout(resolve, 0));
       const skipped = document.getElementById('next-item').disabled;
       document.getElementById('show-labeled').click();
       const restored = !document.getElementById('next-item').disabled;
       document.body.dataset.queueProbe = [first, protectedItem, second, reveal,
         skipped, restored].join('|');
+      })();
     </script>"""
     index.write_text(index.read_text().replace("</html>", probe + "</html>"))
     result = subprocess.run([

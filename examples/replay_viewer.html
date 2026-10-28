@@ -284,6 +284,7 @@
     let localReviewMode = false;
     let localReviewableFrames = null;
     let localReviewLoading = false;
+    let localReviewUnavailable = false;
     let saveRevision = 0;
     let saveQueue = Promise.resolve();
     let saveError = false;
@@ -317,7 +318,8 @@
     }
     function canAnnotateFrame(observation) {
       const authorization = annotationAuthorization();
-      return !reviewerData && !localReviewLoading && authorization && observation &&
+      return !reviewerData && !localReviewLoading && !localReviewUnavailable &&
+        authorization && observation &&
         (!localReviewMode || !localReviewableFrames || localReviewableFrames.has(index)) &&
         (authorization === "policy_review"
           ? observation.acting_player === replay.skill_metadata.demonstrator_seat
@@ -1278,10 +1280,9 @@
         if (!response.ok) throw new Error("local review endpoint unavailable");
         const data = await response.json();
         if (sourceSha256 !== hash) return;
-        if (data.offered != null &&
-            (!Array.isArray(data.offered) || !data.offered.every(Number.isInteger)))
-          throw new Error("review server returned invalid queue decisions");
-        localReviewableFrames = data.offered == null ? null : new Set(data.offered);
+        if (!Array.isArray(data.offered) || !data.offered.every(Number.isInteger))
+          throw new Error("review server is outdated; restart this queue with ./start_review_viewer.sh");
+        localReviewableFrames = new Set(data.offered);
         annotations = new Map(data.choices.map(choice => [choice.decision_index,
                                                             choice.action_index]));
         try {
@@ -1298,7 +1299,12 @@
         localReviewMode = true; labelsExported = true; saveError = false;
         byId("manual-review-export").hidden = true;
       byId("review-instructions").textContent = "Choose an alternative action from All legal actions, or use Approve AI-played action to label the recorded play. Your choice saves automatically on this computer; no name or download is needed.";
-      } catch (_) { /* File viewers and ordinary static servers use offline export. */ }
+      } catch (error) {
+        if (sourceSha256 === hash) {
+          localReviewUnavailable = true;
+          byId("review-instructions").textContent = `${error.message}. Choices are disabled here to prevent unsaved labels. Reopen this queue using ./start_review_viewer.sh.`;
+        }
+      }
       finally {
         if (sourceSha256 === hash) { localReviewLoading = false; notifyLabelState(); render(); }
       }
@@ -1307,6 +1313,7 @@
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
       stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map(); labelsExported = false;
       localReviewMode = false; localReviewableFrames = null; saveError = false;
+      localReviewUnavailable = false;
       reviewNotes = new Map(); reviewNotesAvailable = false; noteFrame = -1;
       noteDirty = false; noteSaving = false; noteError = false;
       localReviewLoading = location.protocol === "http:" &&
