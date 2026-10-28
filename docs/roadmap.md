@@ -712,6 +712,15 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+The [new 2005 New Jersey review queue](replay_audit.md#selected-policy-on-new-2005-new-jersey-decks-28-october-2026)
+adds 24 fresh human-review prompts from eight replay-verified, both-agent
+reproduced policy/Tactical duels. A staged Thunder Dragon search correction
+is available as an [opt-in Tactical ablation](evaluation.md#staged-thunder-dragon-search-tactical-ablation-28-october-2026):
+it fixes two recorded empty-search decisions but scored 26–38 against the
+unchanged Tactical-v14 baseline on 64 fresh direct games, with an interval
+including 50%. Neither the review prompts nor this teacher variant closes
+the learned-policy strength gate.
+
 Two [published 2005 New Jersey Top 8 Main and Fusion Decks](evaluation.md#preference-child-on-two-new-2005-new-jersey-top-8-lists-28-october-2026)
 now provide strict, training-unseen compositions for another seat-swapped
 holdout. The 200-step human-preference child scored 26–37–1 against its

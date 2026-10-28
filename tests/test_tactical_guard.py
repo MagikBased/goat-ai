@@ -287,6 +287,29 @@ def test_v8_thunder_search_takes_available_copies():
         snapshot, (cancel, empty, two)) == cancel
 
 
+def test_opt_in_thunder_search_handles_staged_native_deck_choice(monkeypatch, tmp_path):
+    thunder = 504700054
+    snapshot = board(chain=(ChainLinkView(1, thunder, 0, 2, 0),))
+    cancel = Action("cancel", "cancel", 0)
+    copy = Action("copy", "select_card", 0,
+                  {"code": thunder, "location": 1, "controller": 0})
+    empty = Action("empty", "select_cards", 0)
+    choices = (cancel, copy, empty)
+    assert TacticalHeuristicAgent().select_action(snapshot, choices) == empty
+    assert TacticalHeuristicAgent(thunder_search_guard=True).select_action(
+        snapshot, choices) == copy
+    wrong_zone = replace(copy, parameters={"code": thunder, "location": 2,
+                                           "controller": 0})
+    assert TacticalHeuristicAgent(thunder_search_guard=True).select_action(
+        snapshot, (cancel, wrong_zone, empty)) == empty
+    monkeypatch.setattr("scripts.evaluate_native.flip_monster_codes", lambda _: frozenset())
+    monkeypatch.setattr("scripts.evaluate_native.load_card_races", lambda _: {})
+    monkeypatch.setattr("scripts.evaluate_native.load_card_facts", lambda _: {})
+    variant = agent_factory("tactical_thunder_search", tmp_path)(0)
+    assert variant.thunder_search_guard is True
+    assert agent_version("tactical_thunder_search") == agent_version("tactical") == 14
+
+
 def test_v8_nobleman_defers_own_only_target_and_prefers_enemy_slot():
     nobleman = 504700116
     own_set = CardView(0, "monster", "facedown", 511000818, 0, "defense")

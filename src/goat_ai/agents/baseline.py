@@ -170,7 +170,8 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                  v13_guards: bool | None = None,
                  v14_guards: bool | None = None,
                  reaper_set_guard: bool = False,
-                 card_advantage_guard: bool = False) -> None:
+                 card_advantage_guard: bool = False,
+                 thunder_search_guard: bool = False) -> None:
         super().__init__(flip_monster_codes)
         self.card_races = dict(card_races or {})
         self.card_facts = dict(card_facts or {})
@@ -183,6 +184,7 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
         self.v14_guards = self.v13_guards if v14_guards is None else v14_guards
         self.reaper_set_guard = reaper_set_guard
         self.card_advantage_guard = card_advantage_guard
+        self.thunder_search_guard = thunder_search_guard
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
@@ -255,6 +257,15 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                     return serpent
             if (source.card_code == 504700054
                     and source.controller == observation.viewer):
+                if self.thunder_search_guard:
+                    deck_copy = next((action for action in legal_actions
+                                      if action.kind == "select_card"
+                                      and action.parameters.get("code") == 504700054
+                                      and action.parameters.get("location") == 1
+                                      and action.parameters.get("controller")
+                                      == observation.viewer), None)
+                    if deck_copy is not None:
+                        return deck_copy
                 searches = [action for action in legal_actions
                             if action.kind == "select_cards"]
                 if searches:

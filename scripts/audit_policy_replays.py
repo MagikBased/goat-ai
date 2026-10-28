@@ -25,6 +25,19 @@ from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION
 
 
+def tactical_agent(version: int, native_root: Path, card_races):
+    """Rebuild a recorded Tactical version without changing earlier guards."""
+    if type(version) is not int or version not in (7, 8, 9, 10, 11, 12, 13, 14):
+        raise ValueError(f"unsupported tactical teacher version: {version!r}")
+    return TacticalHeuristicAgent(
+        load_flip_monster_codes(native_root), card_races,
+        card_facts=(load_card_facts(native_root) if version >= 9 else None),
+        v8_guards=version >= 8, v9_guards=version >= 9,
+        v10_guards=version >= 10, v11_guards=version >= 11,
+        v12_guards=version >= 12, v13_guards=version >= 13,
+        v14_guards=version >= 14)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("replays", nargs="+", type=Path,
@@ -38,7 +51,7 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--include-opponent", action="store_true",
                         help="also shortlist the evaluation opponent's visible decisions; "
-                             "agent choices are reproduced with --opponent-checkpoint")
+                             "reproduce Tactical choices or use --opponent-checkpoint")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.compare_parent_greedy and args.checkpoint is None:
@@ -120,28 +133,31 @@ def main() -> None:
                     opponent_choices += 1
                 provenance["opponent_checkpoint_sha256"] = opponent_sha256
                 provenance["verified_opponent_choices"] = opponent_choices
+            elif args.include_opponent and metadata.get("opponent") == "TacticalHeuristicAgent":
+                opponent_teacher = tactical_agent(metadata.get("opponent_version"),
+                                                  args.native_root, card_races)
+                opponent_choices = 0
+                for index, decision in enumerate(trajectory.decisions):
+                    if decision.observation.acting_player == policy_seat:
+                        continue
+                    chosen = opponent_teacher.select_action(decision.observation,
+                                                            decision.legal_actions)
+                    if chosen != decision.selected_action:
+                        raise ValueError(f"{path}: tactical opponent choice differs at "
+                                         f"decision {index}")
+                    opponent_choices += 1
+                provenance["verified_opponent_choices"] = opponent_choices
         elif trajectory.source == "tactical":
             if opponent_sha256 is not None:
                 raise ValueError("--opponent-checkpoint requires a policy_evaluation replay")
             metadata = trajectory.skill_metadata or {}
             version = metadata.get("teacher_version")
-            if (metadata.get("teacher") != "TacticalHeuristicAgent"
-                    or type(version) is not int or version not in (7, 8, 9, 10, 11, 12, 13, 14)):
+            if metadata.get("teacher") != "TacticalHeuristicAgent":
                 raise ValueError(f"{path}: unsupported tactical teacher version")
             teacher_seat = metadata.get("demonstrator_seat")
             if type(teacher_seat) is not int or teacher_seat not in (0, 1):
                 raise ValueError(f"{path}: tactical replay lacks a valid teacher seat")
-            teacher = TacticalHeuristicAgent(load_flip_monster_codes(args.native_root),
-                                             card_races,
-                                             card_facts=(load_card_facts(args.native_root)
-                                                         if version >= 9 else None),
-                                             v8_guards=version >= 8,
-                                             v9_guards=version >= 9,
-                                             v10_guards=version >= 10,
-                                             v11_guards=version >= 11,
-                                             v12_guards=version >= 12,
-                                             v13_guards=version >= 13,
-                                             v14_guards=version >= 14)
+            teacher = tactical_agent(version, args.native_root, card_races)
             teacher_choices = 0
             for index, decision in enumerate(trajectory.decisions):
                 if decision.observation.acting_player != teacher_seat:
@@ -177,6 +193,8 @@ def main() -> None:
                 "agent": metadata.get("opponent"),
                 "agent_version": metadata.get("opponent_version"),
                 "choice_verification": ("reproduced_greedy" if opponent_sha256 is not None
+                                        else "reproduced_tactical_teacher"
+                                        if "verified_opponent_choices" in provenance
                                         else "native_replay_only_not_agent_reproduced"),
                 "category_counts": category_counts(other_candidates),
                 "candidates": [candidate.to_dict() for candidate in other_candidates],

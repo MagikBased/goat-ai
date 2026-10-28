@@ -1,5 +1,72 @@
 # Early replay decision audit
 
+## Selected policy on new 2005 New Jersey decks (28 October 2026)
+
+The [local review queue](../.cache/goat-ai/new_jersey_parent_review_96000_96001/queue.html)
+contains 24 prompts from eight complete selected-policy versus Tactical-v14
+duels on the new Ryan Hayakawa and Theeresak Poonsombat 2005 lists. Both
+deck assignments, both policy seats, and seeds 96000–96001 are represented.
+All 4,365 decisions replay-verified and passed the visibility audit. The
+provenance audit reproduced 2,158 selected-policy choices and 2,207 Tactical
+opponent choices. Tactical won seven of the eight duels; the sample is too
+small to estimate a match win rate. There were 176 policy/Tactical
+disagreements, and one conservative own-only Nobleman audit flag. The queue
+keeps at most three prompts per replay. None is a human label, and Tactical's
+suggestions are not assumed correct. The queue JSON SHA-256 is
+`89d8abbe9abe313ed8426cb2d7adaef6ffd696c59c5b60f60bbdacf0a09fcfdb`.
+
+`./start_review_viewer.sh` opens this queue through the save-enabled local
+server. For a specific queue path:
+
+```bash
+./start_review_viewer.sh \
+  .cache/goat-ai/new_jersey_parent_review_96000_96001/queue.json
+```
+
+Record the eight `matchup_*.json` duels from the repository root with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python - <<'PY'
+import subprocess
+import sys
+from pathlib import Path
+
+folder = Path('.cache/goat-ai/new_jersey_parent_review_96000_96001')
+folder.mkdir(parents=True, exist_ok=True)
+decks = (
+    'examples/decks/goat_control_ryan_hayakawa_new_jersey_2005.ydk',
+    'examples/decks/goat_control_theeresak_poonsombat_new_jersey_2005.ydk',
+)
+for assignment, pair in enumerate((decks, decks[::-1])):
+    for seed in (96000, 96001):
+        for seat in (0, 1):
+            subprocess.run([
+                sys.executable, 'scripts/record_policy_match.py',
+                '.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt',
+                '--deck1', pair[0], '--deck2', pair[1],
+                '--opponent', 'tactical', '--seed', str(seed),
+                '--policy-seat', str(seat), '--native-root', '.cache/goat-ai',
+                '--output', str(folder / f'matchup_{assignment}_seed_{seed}_seat_{seat}.json'),
+            ], check=True)
+PY
+```
+
+Rebuild the audit and shortlist with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_replays.py \
+  .cache/goat-ai/new_jersey_parent_review_96000_96001/matchup_*.json \
+  --checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --native-root .cache/goat-ai --include-opponent \
+  --output .cache/goat-ai/new_jersey_parent_review_96000_96001/audit.json
+
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/new_jersey_parent_review_96000_96001/matchup_*.json \
+  --native-root .cache/goat-ai --limit 24 --per-replay 3 --render-viewers \
+  --output .cache/goat-ai/new_jersey_parent_review_96000_96001/queue.json
+```
+
 ## Child-versus-parent replay diagnostic (28 October 2026)
 
 The held-out Beastdown versus Dimension Fusion result in

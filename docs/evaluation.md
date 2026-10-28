@@ -1,5 +1,42 @@
 # Baseline evaluation log
 
+## Staged Thunder Dragon search Tactical ablation (28 October 2026)
+
+[Historical TCG Netrep rulings](https://www.goatformat.com/rulings7.html) permit
+Thunder Dragon to search for zero copies. That legal option can still be a
+poor choice when copies are offered. Tactical-v14 ranked complete
+`select_cards` options by number taken but missed the native engine's staged
+`select_card` deck-copy action. On two exact, replay-verified decision states
+from seed 94000 (viewer frames 24 and 37), v14 chose the empty finish action;
+the opt-in `tactical_thunder_search` variant chose the offered deck copy.
+The variant changes only this staged prompt and preserves the v14 baseline
+and its old replay provenance.
+
+On 16 fresh seeds 97000–97015, with both policy seats and both deck
+assignments for three-Thunder Dragon Chaos Turbo and Dimension Fusion lists,
+the variant scored **26–38** directly against unchanged Tactical-v14 in 64
+terminal native duels (40.6% of points; paired-seed bootstrap 95% interval
+26.6%–54.7%). Its assigned-deck splits were both 13–19. An identical
+v14-versus-v14 control on the same schedule split 32–32; 16 of the 64
+individual outcomes differed from that control when the variant was used.
+The variant tournament contained 30,674 decisions and took 5.21 seconds
+with four workers on this machine. The ignored result SHA-256 is
+`1f448a6c6dcaf4ae31ab136cfb0228338b080170669a65458d6b01f128ad655d`.
+This is a corrected preference on the observed staged search states, but
+there is no measured strength gain. Keep it opt-in rather than promoting it
+as the default Tactical teacher.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_native.py \
+  --native-root .cache/goat-ai --engine experimental \
+  --matchup examples/decks/chaos_turbo_riclar_2020.ydk \
+            examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk \
+  --both-deck-assignments --agent-a tactical_thunder_search \
+  --agent-b tactical --seed 97000 --seeds 16 --workers 4 \
+  --max-decisions 3000 \
+  --output .cache/goat-ai/tactical_thunder_search_ablation/chaos_df_97000_97015.json
+```
+
 ## Preference child on two new 2005 New Jersey Top 8 lists (28 October 2026)
 
 [Archived 2005 SJC New Jersey Top 8 decklists](https://www.goatformat.com/home/top-8-decklists)
