@@ -1419,6 +1419,12 @@ Brionac twice, first against an opponent's monster and then against itself;
 the 1,111-decision trajectory replay-verifies and passes visibility checks.
 This tests a material errata boundary, not the full Edison rules profile; see
 the [Brionac audit](edison_research.md#brionacs-2010-effect-versus-the-pinned-current-script).
+The MR1 Ryko fixture loads its checksum-pinned pre-errata script and chooses
+an opposing target while the Flip Effect chain link is pending. Paired
+complete-duel branches cover face-up and Set targets, three-card milling,
+hidden target redaction, replay verification, and visibility. Other Ryko
+responses and the wider Edison card audit remain open; see the
+[Ryko audit](edison_research.md#rykos-historical-targeting-in-the-mr1-probe).
 The separate MR1 protocol also checks the 2009 one-active-Field-Spell rule:
 player 1's Umi replaces player 0's Yami in a complete, replay-verified,
 visibility-audited duel. This narrows one historical mechanics gap without

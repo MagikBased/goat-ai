@@ -15,8 +15,10 @@ from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 
+@pytest.mark.parametrize("set_opponent_monster", [False, True])
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_ryko_targets_before_chain_resolution_and_mills_three(tmp_path):
+def test_ryko_targets_before_chain_resolution_and_mills_three(
+        tmp_path, set_opponent_monster):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     official = root / f"scripts/official/c{RYKO}.lua"
     period = root / "scripts/pre-errata/c511003007.lua"
@@ -33,7 +35,8 @@ def test_ryko_targets_before_chain_resolution_and_mills_three(tmp_path):
     with GoatEnvironment(str(attacker), str(defender), seed=0,
                          engine=Mr1SynchroProbeEngine(root)) as env:
         view = env.reset()
-        targeted_code = None
+        opponent_code = None
+        target_selected = False
         target_deck_count = None
         resolution_seen = False
         for _ in range(80):
@@ -47,7 +50,10 @@ def test_ryko_targets_before_chain_resolution_and_mills_three(tmp_path):
             if view.turn == 1 and view.acting_player == 0:
                 action = choose("set_monster", RYKO)
             elif view.turn == 2 and view.acting_player == 1:
-                action = next((a for a in actions if a.kind == "normal_summon"), None)
+                action = next((a for a in actions if a.kind == (
+                    "set_monster" if set_opponent_monster else "normal_summon")), None)
+                if action is not None:
+                    opponent_code = action.parameters["code"]
             elif view.turn == 3 and view.acting_player == 0:
                 action = choose("flip_summon", RYKO) or choose("yes")
                 if action is None and view.chain:
@@ -58,13 +64,21 @@ def test_ryko_targets_before_chain_resolution_and_mills_three(tmp_path):
                         # This selection happens while Ryko's Chain Link is
                         # pending, before either player passes to resolution.
                         assert view.chain[0].card_code == RYKO
-                        targeted_code = action.parameters["code"]
+                        field_card = next(card for card in view.field
+                                          if card.controller == 1 and card.zone == "monster")
+                        if set_opponent_monster:
+                            assert field_card.code is None
+                            assert "code" not in action.parameters
+                        else:
+                            assert field_card.code == opponent_code
+                            assert action.parameters["code"] == opponent_code
+                        target_selected = True
                         target_deck_count = view.deck_counts[0]
             action = action or choose("place") or choose("end_phase") or choose("pass")
             assert action is not None
             view = env.step(action)
-            if (targeted_code is not None and not view.chain
-                    and any(card.code == targeted_code for card in view.graveyards[1])):
+            if (target_selected and not view.chain
+                    and any(card.code == opponent_code for card in view.graveyards[1])):
                 assert view.deck_counts[0] == target_deck_count - 3
                 resolution_seen = True
                 break

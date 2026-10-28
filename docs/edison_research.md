@@ -724,7 +724,7 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_field_spells.py
 ```
 
-## Ryko's historical targeting needs a native fixture
+## Ryko's historical targeting in the MR1 probe
 
 An [April 2010 Konami feature match](https://yugiohblog.konami.com/2010/sjc/10-04-75thsjc/round-11-feature-match-nik-ristoski-vs-luis-zambrana/)
 describes a player chaining Dust Tornado to the card targeted by a flipped
@@ -736,9 +736,11 @@ MR1 probe now loads that exact pinned pre-errata script for Ryko, with source
 and replacement SHA-256 checks. In seed 0, a Set Ryko is Flip Summoned,
 chooses the opponent's face-up monster while its Chain Link is pending,
 destroys that monster on resolution, and sends three cards from its
-controller's Deck to the Graveyard. The resulting duel reaches terminal,
-replay-verifies, and passes the visibility audit. This checks the targeted
-branch and native script compatibility; it does not establish every Ryko
+controller's Deck to the Graveyard. A paired branch targets an opposing Set
+monster; the acting player's observation and `select_card` action omit its
+identity until destruction publicly reveals it. Both resulting duels reach
+terminal, replay-verify, and pass the visibility audit. This checks the
+targeted branch and native script compatibility; it does not establish every Ryko
 interaction or a complete Edison ruleset. Reproduce with:
 
 ```sh
