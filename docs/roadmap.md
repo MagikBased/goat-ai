@@ -712,6 +712,13 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+Two [published 2005 New Jersey Top 8 Main and Fusion Decks](evaluation.md#preference-child-on-two-new-2005-new-jersey-top-8-lists-28-october-2026)
+now provide strict, training-unseen compositions for another seat-swapped
+holdout. The 200-step human-preference child scored 26–37–1 against its
+unchanged parent on 64 duels, with both assigned-deck splits below 50%.
+This reinforces the decision to keep the child experimental; M4's measured
+cross-deck strength and self-play gain gates remain open.
+
 A new [source-backed 2005 New Jersey Beastdown Main Deck](../examples/decks/beastdown_ramon_ciriano_new_jersey_2005.ydk)
 is distinct from the selected policy's training compositions and gives M4
 another aggressive evaluation family. Two seat-swapped native random duels

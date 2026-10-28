@@ -1,5 +1,49 @@
 # Baseline evaluation log
 
+## Preference child on two new 2005 New Jersey Top 8 lists (28 October 2026)
+
+[Archived 2005 SJC New Jersey Top 8 decklists](https://www.goatformat.com/home/top-8-decklists)
+publish complete 40-card Main Decks for Ryan Hayakawa and Theeresak
+Poonsombat, plus 27- and 25-card Fusion Decks respectively. The new
+[`Ryan Hayakawa`](../examples/decks/goat_control_ryan_hayakawa_new_jersey_2005.ydk)
+and [`Theeresak Poonsombat`](../examples/decks/goat_control_theeresak_poonsombat_new_jersey_2005.ydk)
+YDK files transcribe those Main and Fusion quantities using pinned GOAT IDs;
+Side Decks are omitted for single-duel evaluation. Exact printed card-name
+multisets and pinned deck legality pass native tests. Two seat-swapped seeded
+RandomAgent duels reached terminal below 3,000 decisions, replay-verified,
+and passed the visibility audit. This validates the transcription and a small
+protocol sample, not every card ruling in the lists.
+
+The same 200-step human-preference child tested in the preceding Beastdown
+experiment then played its unchanged feature-v23 parent on these two new
+lists. `--require-unseen-main-decks` accepted both compositions for both
+checkpoints, so neither was in either recorded training provenance. On seeds
+95000–95015 with both deck assignments and both policy seats, all **64** duels
+terminated: **26 child wins, 37 losses, one draw** (41.4% of points;
+paired-seed bootstrap 95% interval **33.6%–50.0%**). The child scored
+14–17–1 with Ryan's deck and 12–20 with Theeresak's. The report contains
+44,020 decisions; its four-worker tournament took 14.25 seconds on this
+machine. Its ignored JSON SHA-256 is
+`df19ed108d61df479120bb4909e3a8afe625c529ba42232312ade3055831d5e4`.
+This second independent 2005 pairing adds evidence against promoting the
+child. It does not isolate which individual play caused the losses or prove
+that the parent is competitively strong.
+
+Reproduce the strict comparison after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/human11_pref_200step_kl05_seed174.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --matchup examples/decks/goat_control_ryan_hayakawa_new_jersey_2005.ydk \
+            examples/decks/goat_control_theeresak_poonsombat_new_jersey_2005.ydk \
+  --both-deck-assignments \
+  --opponent-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --require-unseen-main-decks --seed 95000 --seeds 16 --workers 4 \
+  --max-decisions 3000 \
+  --output .cache/goat-ai/human11_pref200_vs_parent_new_jersey_95000_95015.json
+```
+
 ## Stronger local-review preference fit on a new Beastdown holdout (28 October 2026)
 
 The [archived 2005 New Jersey Ramon Ciriano deck profile](https://www.goatformat.com/home/deck-profile-ramon-ciriano)
