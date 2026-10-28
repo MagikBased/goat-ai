@@ -861,6 +861,22 @@ The same [archived FAQ](https://www.goatformat.com/rulings7.html) says Skill Dra
 
 **Des Koala's Flip damage and hidden opponent hand:** Cas Stomphorst's [published Indianapolis 2005 list](https://www.goatformat.com/home/top-8-decklists7022761) contains two Des Koala. [Konami's card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5661&ope=2&request_locale=en) specifies 400 damage for each card in the opponent's hand. In seed-11 native fixtures, Koala is Set on turn one and Flip Summoned on turn three. The opponent either keeps six cards in hand or Sets one Book of Moon to leave five. Koala deals 2,400 or 2,000 damage respectively, while its controller's observation knows the opponent's hand count but no card identities. A third branch chains the Set Book to Koala's Flip Effect: Book sets Koala face-down, but the already activated effect still deals 2,000 damage. This follows the [historical Book of Moon Flip Effect ruling](https://www.goatformat.com/rulings1.html). A fourth branch Sets Jar of Greed, leaving five cards in hand, then chains its [one-card draw](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5210&ope=2&request_locale=en) to Koala's Flip Effect. Jar resolves first, so Koala sees six cards and deals 2,400 damage. The timing conclusion is inferred from the card texts and chain order, then checked against the pinned native scripts. All four complete duels serialize, replay-verify, pass the visibility audit, and load the pinned official Koala script. Effect negation and battle-triggered flips remain untested.
 
+**D.D. Survivor's End Phase return depends on where it was banished:**
+[Konami's card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6332&ope=2&request_locale=en)
+requires Survivor to have been banished while face-up on its controller's
+field; the [archived individual FAQ](https://www.goatformat.com/rulings2.html)
+places its effect activation in the End Phase, rather than at the banishment
+event. In paired seed-11 native fixtures, Bottomless Trap Hole banishes a
+face-up Normal Summoned Survivor on turn two, and its owner receives a chain
+action from the banished zone during that End Phase. Survivor returns face-up
+before turn three. In the other branch, Nobleman of Crossout targets a Set
+Survivor by field slot without exposing its identity in the target action;
+Survivor is publicly banished but receives no End Phase return and remains
+banished on turn three. Both complete duels serialize, replay-verify, and
+pass the player-visibility audit. This checks the pinned official Survivor
+script with GOAT Bottomless and Nobleman; full Monster Zones, effect negation,
+and other banish routes remain separate cases.
+
 **Call of the Haunted Summon inside a resolving chain:** The archived
 [Bottomless Trap Hole individual FAQ](https://www.goatformat.com/rulings1.html)
 distinguishes a monster Summoned by Call at Chain Link 2 from a later monster

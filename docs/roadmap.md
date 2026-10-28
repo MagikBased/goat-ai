@@ -401,6 +401,13 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired D.D. Survivor fixture now distinguishes a face-up field banishment
+by Bottomless Trap Hole, which produces an End Phase return, from a Set card
+banished by Nobleman of Crossout, which does not. Both full duels replay-verify
+and pass the visibility audit; see [GOAT rules](goat_rules.md). This extends
+coverage to a card in a published 2005 Seattle Top 8 Deck without certifying
+every banishment route or the full historical ruleset.
+
 A paired Call of the Haunted/Solemn Judgment fixture checks activation
 negation before Call revives its targeted monster. Both branches complete,
 replay-verify, and pass visibility audits. This extends a common Trap-response
