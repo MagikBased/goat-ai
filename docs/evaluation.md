@@ -11318,3 +11318,35 @@ path is `.cache/goat-ai/indianapolis_visibility_23100_23109/report.json`,
 SHA-256 `9234e39984d24478fe3e0f82ee98d1fde0427002e6dd34f7c0669a4ab17970f4`.
 This extends native protocol coverage to a 2005-sourced card mix; the M1
 information-flow and M2 card-ruling gates remain open.
+
+## Native option feature-alias audit (28 October 2026)
+
+`scripts/audit_policy_action_aliases.py` replays every input duel against the
+pinned native engine, audits player-visible information, and compares complete
+action-feature rows within each legal list. It ignores action IDs and treats
+two actions with the same public kind and parameters as equivalent. On the
+eight New Jersey parent/Tactical-v14 review replays at seeds 96000–96001,
+all **4,365 decisions** replay-verified. Among **1,426** decisions with more
+than one legal action, feature v23 had **six** distinct-action aliases, all
+`select_option` pairs. Feature v30 had **zero** on the same replays. The
+ignored JSON reports are `.cache/goat-ai/option_alias_v23_96000_96001.json`
+(SHA-256 `bb1dca03279eb56d50a869dcbc2021c91f530ad101741acd4e230a9b9089949b`)
+and `.cache/goat-ai/option_alias_v30_96000_96001.json` (SHA-256
+`fe3238e609ed28342d0a721069d36333397575efb0ef141f3d146690563fd610`).
+
+Reproduce each report from the repository root, replacing `VERSION` with
+`23` or `30`:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/audit_policy_action_aliases.py \
+  .cache/goat-ai/new_jersey_parent_review_96000_96001/matchup_*.json \
+  --feature-version VERSION \
+  --output .cache/goat-ai/option_alias_vVERSION_96000_96001.json
+```
+
+The audit checks input equality, not whether the neural network learns a
+better preference, and only covers these eight replays. Feature v30 remains
+opt-in pending held-out competitive evaluation. The separate verified
+Tactical demonstration sets have only two multi-option prompts each, which
+is too little to support a meaningful option-specific transfer claim.

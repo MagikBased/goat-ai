@@ -1743,6 +1743,8 @@ def test_v29_warm_start_preserves_v23_logits_and_zeros_age_weight(tmp_path):
 
 
 def test_v30_distinguishes_adjacent_native_option_ids_and_warm_starts(tmp_path):
+    from scripts.audit_policy_action_aliases import feature_aliases
+
     vocabulary = CardVocabulary((10, 20), ((10, 0, 1000), (20, 0, 2000)))
     choices = (Action("0", "select_option", 0, {"prompt_id": 102807698931713}),
                Action("1", "select_option", 0, {"prompt_id": 102807698931714}))
@@ -1751,6 +1753,8 @@ def test_v30_distinguishes_adjacent_native_option_ids_and_warm_starts(tmp_path):
     assert torch.equal(old.action_numbers[0], old.action_numbers[1])
     assert not torch.equal(new.action_numbers[0], new.action_numbers[1])
     assert new.action_numbers[:, -1].tolist() == [0.0, 1 / 16]
+    assert feature_aliases(old, choices) == [(0, 1)]
+    assert feature_aliases(new, choices) == []
 
     torch.manual_seed(30)
     parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
