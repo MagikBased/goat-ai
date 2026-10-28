@@ -9434,3 +9434,44 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
   --seed 30250 --seeds 100 --max-decisions 3000 \
   --verify-replays --distinct-opponents --count-card-actions
 ```
+
+### Current-core imitation child on a different 2005 holdout (27 October 2026)
+
+The current-core feature-v23 Tactical imitation child from seeds 33000–33031
+was compared with its unchanged parent on a different 2005 deck family:
+Rhymus Lizo's New Jersey Goat Control Main Deck versus Jae Kim's Charlotte
+Zombie Main Deck. Both Main Deck compositions were excluded from both
+checkpoints' training provenance. The direct tournament used both deck
+assignments and policy seats, seeds 56000–56015, four workers, and the pinned
+experimental core. All 64 games reached terminal below 3,000 decisions.
+The child scored **33–29–2** against its parent, a 53.1% score with paired
+95% interval **40.6–64.8%**. Its assigned-deck split was 20–10–2 on Rhymus
+and 13–19 on Zombie. The direct interval includes 50%, so this is not a
+demonstrated direct strength gain.
+
+On separate matched seeds 56016–56031 against Tactical-v14, the child scored
+**29–35** and the parent **22–42** over 64 games each. The paired child-minus-
+parent score difference was **+10.9 percentage points**, with 95% interval
+**−4.7 to +28.1 points**. The report comparator checked identical native
+assets, card scripts, source code, opponent, seeds, local deck hashes, and
+unseen Main Deck compositions. The child improved from 18–14 to 22–10 on
+Rhymus and from 4–28 to 7–25 on Zombie, but the paired interval still
+includes zero. Together with the earlier Phoenix/Dimension Fusion results,
+this supports further evaluation of the imitation child; it does not close
+M4's cross-family direct or self-play gain gates. The selected reference is
+unchanged.
+
+The three ignored reports are
+`.cache/goat-ai/current_child_vs_parent_rhymus_zombie_56000_56015.json`,
+`.cache/goat-ai/current_child_vs_tactical_rhymus_zombie_56016_56031.json`,
+and `.cache/goat-ai/current_parent_vs_tactical_rhymus_zombie_56016_56031.json`.
+Their SHA-256 values are respectively
+`fb8c07c3685259277c0b74f91d8a08a37d28967750bbeb870d40da214ad1d8e1`,
+`8d503100fe0f13ca5ed51dd47bdfe08690d3bf7470e6f6b5b33c18cab1ec46e5`,
+and `1384482cc878cde617a73acb28bf89ef81e3f78e8927a057b657f240de5d81e5`.
+Reproduce with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --workers 4
+--max-decisions 3000`, the named checkpoints and matchup, seeds 56000/56016
+with `--seeds 16`, and respectively `--opponent-checkpoint` or
+`--opponent tactical`. Compare the matched Tactical reports with
+`scripts/compare_tournament_reports.py --require-unseen-main-decks`.
