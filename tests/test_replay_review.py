@@ -12,6 +12,7 @@ from goat_ai.evaluation.replay_review import (
 )
 from goat_ai.observations import CardView, ChainLinkView, Observation, PendingSummonView
 from goat_ai.replay import DecisionRecord, Trajectory
+from scripts.shortlist_policy_disagreements import visible_faceup_age
 
 
 def view(*cards, phase="main1", turn=1, player=0, turn_player=0):
@@ -35,6 +36,17 @@ def policy(*decisions):
         skill_metadata={"demonstrator_seat": 0,
                         "policy_checkpoint_sha256": "a" * 64},
     )
+
+
+def test_visible_faceup_age_review_filter_uses_only_public_field_cards():
+    swords = CardView(1, "spell_trap", "faceup", 72302403, 0,
+                      faceup_turns=3)
+    hidden = CardView(1, "spell_trap", "facedown", None, 1)
+    observation = view(swords, hidden, turn=5)
+    assert visible_faceup_age(observation, 72302403, 1) == 3
+    assert visible_faceup_age(observation, 72302403, 4) is None
+    assert visible_faceup_age(observation, 12345, 0) is None
+    assert visible_faceup_age(view(hidden, turn=5), 72302403, 0) is None
 
 
 def test_sampled_self_play_provenance_cannot_be_mistaken_for_greedy_choices():

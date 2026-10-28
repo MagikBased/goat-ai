@@ -2012,3 +2012,13 @@ comparisons split **13–19** on Rhymus/Zombie and **19–13** on Phoenix/Dimens
 Fusion, each with a paired interval reaching 50%. The attention branch is not
 promoted; this small synthetic-label experiment does not close M4's
 cross-family strength gate. See [evaluation](evaluation.md#action-conditioned-visible-card-attention-feature-v27-27-october-2026).
+
+The schema-v26 public-age input has now been exercised in a controlled
+feature-v28/v29 pilot. Eight current-core, verified policy duels supplied 710
+Tactical-v14 synthetic choices. On 32 held-out, unseen-Main-Deck games against
+the selected v23 parent, both children scored 16–16 with identical individual
+game outcomes; direct v29 versus v28 also split 16–16. The new age input was
+nonzero after fitting but changed no greedy choice on 185 aged-Swords training
+states. This does not close M4's competitive-gain gate. Keep v23 selected and
+seek independent timing labels before a larger age-specific run; see the
+[measured pilot](evaluation.md#public-face-up-age-v29-controlled-pilot-28-october-2026).

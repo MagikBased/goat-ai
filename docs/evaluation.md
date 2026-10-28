@@ -10319,3 +10319,56 @@ schedule, and unseen Main Deck compositions. Reproduce training with
 --require-unseen-main-decks --seeds 8 --workers 4 --max-decisions 3000`
 on the two named holdout pairings using seed 90400 for the direct checkpoint
 match and 90408 for both Tactical arms.
+
+## Public face-up age v29 controlled pilot (28 October 2026)
+
+Schema v26 makes each face-up field card's public age available to agents.
+To check whether the new policy feature immediately helps, the selected v23
+checkpoint recorded eight terminal games against Tactical-v14 on seeds
+90500–90501. The two training pairings were Jesse Twohig 2005 Goat Control
+versus Insids Chaos Control, and Cas Stomphorst Flip Control versus Daryl
+Gessler Gravekeeper. Both policy seats were used. All **3,819 decisions**
+passed exact native replay verification and the player-visibility audit.
+Swords of Revealing Light was face-up in **540** decisions, including **220**
+with multiple legal actions. Its public age was greater than zero in **185**
+of those multi-option decisions. The ignored local manifest is
+`.cache/goat-ai/public_age_policy_90500_90501/manifest.json` (SHA-256
+`8d66cd8cecf47a9d619cc3b8eb21d809d81d2978353ff32773bd6cbd09add175`).
+
+Two one-epoch clones used the same 710 multi-option Tactical-v14 synthetic
+labels from those verified policy-visited states, the same v23 parent, width
+32, seed 90500, batch 16, learning rate 0.00001, and batched forward with
+forced choices omitted. The controlled v28 branch added counter-allocation
+inputs; v29 added the public age input on top of v28. The new age input was
+zero at warm start and had weight norm **0.000667** after fitting. Checkpoint
+SHA-256 values are `d81936ca71316ca8a6b8a663e724c4c172d2640f0d3f8ebfe1bb730ee42b92d9`
+for v28 and `70bf7e11defe308db2d5af61774f5a266686f73618e2096a31fe70aef9185d7b`
+for v29. These labels are a heuristic's choices, not human expertise.
+
+Held-out evaluation used Roberto Martinez Phoenix Control versus Jae Kim
+Zombie and Rhymus Lizo Goat Control versus the WikiFormat Dimension Fusion
+list. Both deck assignments and policy seats were tested on seeds
+90600–90603, with the evaluator rejecting every Main Deck composition found
+in either checkpoint's training provenance. Against the unchanged selected
+v23 parent, **both v28 and v29 went 16–16** over 32 games, and all 32 paired
+games had identical outcomes and decision counts. Direct v29-versus-v28 play
+also split **16–16** over 32 games. At the 185 aged-Swords multi-option
+training states, the two children chose the same greedy action in every case;
+their maximum absolute action-logit difference was below **0.0001**. This
+pilot does **not** show a competitive benefit from v29. The Tactical teacher
+does not use the new age value, the sample is small, and the held-out matchup
+has strong deck-assignment effects. Keep the selected v23 checkpoint.
+
+The v29-versus-parent, v28-versus-parent, and v29-versus-v28 tournament
+reports are ignored local artifacts at
+`.cache/goat-ai/age_v29_vs_parent_90600_90603.json`,
+`.cache/goat-ai/age_v28_vs_parent_90600_90603.json`, and
+`.cache/goat-ai/age_v29_vs_v28_90600_90603.json`, with SHA-256 values
+`0c35d055b4b6f8a6f5a7f43b472ad701f3db1ed5a6064405d0910b9913549c8b`,
+`0574d34318923cabcc394e4f3286b90704aeb7f7bb5e9f0a8b68260fc33c3a24`,
+and `8ff0dc041cf34d1f515c20caad536db8755a0b3e827f63844d008103c218d832`.
+The report comparator checked matching native assets, source code, opponent,
+schedule, and unseen Main Decks and found a paired v29-minus-v28 score
+difference of zero on the parent-opponent arms. A future age-specific
+experiment needs independently reviewed timing decisions or another label
+source that actually reasons about Swords duration.

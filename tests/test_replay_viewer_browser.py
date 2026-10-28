@@ -292,3 +292,29 @@ def test_perspective_change_does_not_animate_hidden_card_disclosure(tmp_path):
     match = re.search(r'data-view-animation-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
     assert match.group(1) == "1:0:0:0|2|1"
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_public_faceup_age_appears_on_card_hover(tmp_path):
+    observation = _observation()
+    observation["field"][0]["faceup_turns"] = 3
+    action = {"id": "0", "kind": "pass", "actor": 0, "parameters": {}}
+    replay = {"seed": 1, "source": "test", "winner": 0, "decisions": [
+        {"observation": observation, "selected_action": action,
+         "legal_actions": [action]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {1: "Attacker", 2: "Target"}, {}, {})
+    probe = """<script>
+      const card = document.querySelector('.card[data-field-key="0:monster:0"]');
+      document.body.dataset.ageProbe = card?.title.includes('Face-up for 3 turn boundaries')
+        ? 'visible' : 'missing';
+    </script></body>"""
+    path = tmp_path / "public_age.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=300", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-age-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "visible"

@@ -547,7 +547,10 @@
       const code = visibleCode(observation, card, known);
       const element = node("div", `card ${card.zone} ${card.position === "facedown" ? "facedown" : ""} ${card.orientation === "defense" ? "defense" : ""} ${card.code == null && code != null ? "known" : ""}`);
       const reviewerCode = reviewerData?.frames[index]?.field[fieldKey(card)];
-      element.title = reviewerCode != null ? nameOf(reviewerCode) : cardLabel(observation, card, known);
+      const publicAge = card.faceup_turns == null ? "" :
+        ` · Face-up for ${card.faceup_turns} turn boundaries`;
+      element.title = (reviewerCode != null ? nameOf(reviewerCode) :
+        cardLabel(observation, card, known)) + publicAge;
       element.dataset.fieldKey = fieldKey(card);
       addCardVisual(element, card.code, card.position === "facedown",
                     card.controller !== boardBottomPlayer);
@@ -561,7 +564,7 @@
       const stats = card.attack == null ? "" : ` · ${card.attack}/${card.defense}`;
       const counters = (card.counters || []).map(([type, count]) =>
         `${count}× ${type === 1 ? "Spell Counter" : `counter ${type}`}`).join(", ");
-      element.append(node("small", "", `${status}${card.orientation ? ` · ${card.orientation.toUpperCase()}` : ""}${stats}${counters ? ` · ${counters}` : ""}`));
+      element.append(node("small", "", `${status}${card.orientation ? ` · ${card.orientation.toUpperCase()}` : ""}${stats}${counters ? ` · ${counters}` : ""}${publicAge}`));
       return element;
     }
     function zoneRow(observation, player, zone, known) {

@@ -59,6 +59,14 @@ def action_summary(action) -> dict:
     return {"kind": action.kind, "parameters": action.parameters}
 
 
+def visible_faceup_age(observation, code: int, minimum: int) -> int | None:
+    """Match only field cards whose identity and age are public to this player."""
+    ages = [card.faceup_turns for card in observation.field
+            if card.position == "faceup" and card.code == code
+            and card.faceup_turns is not None and card.faceup_turns >= minimum]
+    return max(ages, default=None)
+
+
 def disagreement_fingerprint(record, teacher_action) -> tuple:
     selected = record.selected_action
     # A response card such as Ring can be offered on many chains. Keep one
@@ -81,6 +89,7 @@ def write_review_index(selected: list[dict], output: Path,
     codes = {action["parameters"].get("code")
              for item in selected for action in (
                  item["policy_action"], item["teacher_action"])}
+    codes.update(item.get("visible_faceup_card") for item in selected)
     names = _card_names({code for code in codes if type(code) is int and code > 0},
                         native_root)
 
@@ -104,18 +113,23 @@ def write_review_index(selected: list[dict], output: Path,
                        if reveal_path.is_file() else None)
         reveal = (f'<a href="{escape(reveal_href, quote=True)}">Reveal all cards</a>'
                   if reveal_path.is_file() else "")
-        reason = (", ".join(flag.replace("_", " ") for flag in item["audit_flags"])
-                  if item["audit_flags"] else "Tactical agent suggests another play")
         teacher_agrees = item["policy_action"] == item["teacher_action"]
+        age_code = item.get("visible_faceup_card")
+        age_note = (f"{names.get(age_code, f'Card {age_code}')} face-up for "
+                    f"{item['visible_faceup_turns']} turn boundaries"
+                    if age_code is not None else "")
+        reason = (", ".join(flag.replace("_", " ") for flag in item["audit_flags"])
+                  if item["audit_flags"] else age_note
+                  if age_note else "Tactical agent suggests another play")
         choices = (f'<p><strong>Both agents played:</strong> '
                    f'{action_label(item["policy_action"])}</p>'
-                   if teacher_agrees else
+                  if teacher_agrees else
                    f'<p><strong>AI played:</strong> {action_label(item["policy_action"])}<br>'
                    f'<strong>Tactical suggests:</strong> {action_label(item["teacher_action"])}</p>')
         card = (
             f'<article class="review-card" id="item-{number}" data-queue-index="{number - 1}">'
             f'<div class="card-top"><span class="badge">#{number} · '
-            f'{"Flagged play" if item["audit_flags"] else "Alternative"}</span>'
+            f'{"Flagged play" if item["audit_flags"] else "Alternative" if not teacher_agrees else "Review"}</span>'
             f'<span>Turn {item["turn"]} · {escape(item["phase"].replace("_", " "))}'
             f' · decision {item["viewer_frame"]}</span></div>'
             f'<h3>{escape(reason)}</h3>'
@@ -274,12 +288,20 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--per-replay", type=int, default=2)
+    parser.add_argument("--visible-faceup-card", type=int,
+                        help="review decisions while this known face-up card is on the field")
+    parser.add_argument("--min-faceup-turns", type=int, default=1,
+                        help="minimum public turn boundaries since that card became face-up")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--render-viewers", action="store_true",
                         help="write offline HTML for replays represented in the queue")
     args = parser.parse_args()
     if args.limit < 1 or args.per_replay < 1:
         parser.error("review limits must be positive")
+    if ((args.visible_faceup_card is not None and args.visible_faceup_card <= 0)
+            or args.min_faceup_turns < 0
+            or args.visible_faceup_card is None and args.min_faceup_turns != 1):
+        parser.error("face-up age filter needs a positive card ID and nonnegative age")
     if len({path.resolve() for path in args.replays}) != len(args.replays):
         parser.error("duplicate replay path")
     checkpoint_hash = sha256_file(args.checkpoint)
@@ -333,6 +355,11 @@ def main() -> None:
                 raise ValueError(f"{path}: greedy policy choice differs at {index}")
             if len(legal) == 1:
                 continue
+            age = (visible_faceup_age(record.observation, args.visible_faceup_card,
+                                      args.min_faceup_turns)
+                   if args.visible_faceup_card is not None else None)
+            if args.visible_faceup_card is not None and age is None:
+                continue
             features = encode_decision(record.observation, legal, agent.vocabulary,
                                        model.feature_version)
             with torch.inference_mode():
@@ -344,7 +371,7 @@ def main() -> None:
                 raise ValueError(f"{path}: teacher choice is illegal at {index}")
             disagreed = alternative != record.selected_action
             audit_flags = audit_by_index.get(index, [])
-            if not disagreed and not audit_flags:
+            if not disagreed and not audit_flags and age is None:
                 continue
             disagreements += disagreed
             teacher_index = legal.index(alternative)
@@ -365,11 +392,17 @@ def main() -> None:
                 "probability_margin": round(margin, 6),
                 "audit_flags": audit_flags,
                 "teacher_disagrees": disagreed,
+                **({"visible_faceup_card": args.visible_faceup_card,
+                    "visible_faceup_turns": age} if age is not None else {}),
                 "_fingerprint": (("audit", tuple(audit_flags),
                                   record.selected_action.kind,
                                   record.selected_action.parameters.get("code"))
                                  if audit_flags else
-                                 disagreement_fingerprint(record, alternative)),
+                                 disagreement_fingerprint(record, alternative)
+                                 if disagreed else
+                                 ("timed", args.visible_faceup_card, age,
+                                  record.observation.phase, record.selected_action.kind,
+                                  record.selected_action.parameters.get("code"))),
             })
         replay_report.append({"trajectory": str(path.resolve()),
                               "trajectory_sha256": source_hash,
@@ -396,7 +429,12 @@ def main() -> None:
               "purpose": "human_review_candidates_not_training_labels",
               "checkpoint_sha256": checkpoint_hash,
               "teacher": "TacticalHeuristicAgent_v14",
-              "selection": "visible_audit_then_model_margin_distinct_prompt_max_per_replay",
+              "selection": ("public_faceup_age_then_model_margin_distinct_prompt"
+                            if args.visible_faceup_card is not None else
+                            "visible_audit_then_model_margin_distinct_prompt_max_per_replay"),
+              **({"visible_faceup_card": args.visible_faceup_card,
+                  "min_faceup_turns": args.min_faceup_turns}
+                 if args.visible_faceup_card is not None else {}),
               "replays": replay_report,
               "candidate_count": len(candidates),
               "selected": selected}

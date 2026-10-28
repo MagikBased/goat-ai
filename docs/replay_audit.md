@@ -1,5 +1,31 @@
 # Early replay decision audit
 
+## Swords public-age timing review (28 October 2026)
+
+The [local Swords queue](../.cache/goat-ai/swords_age_review_90500_90501/queue.html)
+selects **12 decisions** from four replay-verified policy duels where Swords
+of Revealing Light had been face-up for one to four public turn boundaries.
+The eight source duels contain 3,819 verified, visibility-audited decisions;
+92 policy-seat choices met the public-age filter, and the queue caps each
+replay at three prompts. The Tactical-v14 baseline disagreed on eight of the
+selected choices; four are included despite agreement so timing can be
+reviewed independently. The card hover shows its public age. These are
+review prompts, not human labels or proven superior plays. No choices from
+this queue have been used for training.
+
+`./start_review_viewer.sh` now opens this newest queue. The queue JSON SHA-256
+is `53711eb3e4a6d43287ee88e4f82869196d80f39c50d4fb1cf439da90f66d13e0`.
+Rebuild it from the ignored source replays with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/public_age_policy_90500_90501/matchup_*.json \
+  --visible-faceup-card 72302403 --min-faceup-turns 1 \
+  --limit 16 --per-replay 3 --render-viewers \
+  --output .cache/goat-ai/swords_age_review_90500_90501/queue.json
+```
+
 ## On-policy tournament-card review queue (28 October 2026)
 
 The [local queue](../.cache/goat-ai/on_policy_mix_review_65000_65001/queue.html)
