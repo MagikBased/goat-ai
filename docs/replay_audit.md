@@ -100,7 +100,24 @@ Eight fresh, complete policy-versus-Tactical duels on development seeds
 decisions. The queue selects 24 of 122 candidates, 12 from each policy seat
 and three per duel. Own-only Nobleman and negative Heavy Storm are flagged
 once each; one of those flagged plays was also chosen by Tactical. Every
-other card is a disagreement prompt. None is a human label yet.
+other card is a disagreement prompt. At collection time, none was a human label.
+
+On 28 October 2026, the local reviewer saved 24 choices across the eight
+replays: 11 alternatives to the recorded policy play and 13 approvals of it.
+All 24 passed `validate_review_queue_labels.py`, including exact native replay,
+visibility, queue membership, and legal-action checks. The replays fingerprint
+the native library as SHA-256
+`df1774ae5d2f23e52ec2290bcd23e20713d908404539dfffc8f34e1c853e9a00`.
+That earlier binary was reproduced from the first GOAT processor patch in the
+original Meson build location and copied into the ignored
+`.cache/goat-ai/legacy_review_native` root for verification. The current
+native source and binary were restored afterward. The validation manifest is
+`.cache/goat-ai/current_2005_development_review_49600_49601/validated_local_labels.json`.
+The selected feature-v23 checkpoint's top action agrees with 13 of the 24
+saved choices. None of the eight exact replays or their seeds appears in that
+checkpoint's recorded training provenance. These 24 labels are feedback on
+individual choices, not a competitive-strength estimate; they have not been
+used to train a new checkpoint.
 
 For automatic saving, run from the repository root:
 
