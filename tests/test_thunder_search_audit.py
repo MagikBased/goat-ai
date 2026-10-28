@@ -5,6 +5,7 @@ from dataclasses import replace
 from goat_ai.actions import Action
 from goat_ai.evaluation.thunder_search_audit import (
     THUNDER_DRAGON,
+    correct_staged_thunder_search,
     thunder_search_choice,
 )
 from goat_ai.observations import ChainLinkView, Observation
@@ -31,3 +32,12 @@ def test_thunder_search_audit_counts_staged_and_bulk_choices():
     assert thunder_search_choice(DecisionRecord(replace(view, chain=()), legal, zero),
                                  0) is None
     assert thunder_search_choice(DecisionRecord(view, legal, zero), 1) is None
+    original = (DecisionRecord(view, legal, zero),
+                DecisionRecord(view, legal, two),
+                DecisionRecord(replace(view, chain=()), legal, zero))
+    corrected, count = correct_staged_thunder_search(original, 0)
+    assert count == 1
+    assert corrected[0].selected_action == copy
+    assert corrected[0].observation == original[0].observation
+    assert corrected[0].legal_actions == original[0].legal_actions
+    assert corrected[1:] == original[1:]

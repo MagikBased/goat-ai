@@ -23,6 +23,7 @@ from goat_ai.agents import (
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
+from goat_ai.evaluation.thunder_search_audit import correct_staged_thunder_search
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import (
     demonstrator_records,
@@ -255,6 +256,9 @@ def main() -> None:
                         help="train only decisions offering activation of a --focus-card")
     parser.add_argument("--on-policy-disagreement-weight", type=float, default=1.0,
                         help="relative sampling weight for policy/teacher disagreements")
+    parser.add_argument("--synthetic-thunder-search-correction", action="store_true",
+                        help="opt-in Tactical-v14 relabeling: take an offered Deck copy "
+                             "instead of a zero-copy Thunder Dragon search")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--output", type=Path, required=True)
@@ -360,6 +364,9 @@ def main() -> None:
     if args.on_policy_teacher and (not args.init_checkpoint or args.annotation
                                    or args.annotation_for):
         parser.error("--on-policy-teacher requires --init-checkpoint and no annotations")
+    if args.synthetic_thunder_search_correction and (
+            args.on_policy_teacher or args.annotation or args.annotation_for):
+        parser.error("synthetic Thunder correction requires raw Tactical trajectories")
     if args.on_policy_teacher_activation_focus_only and (
             not args.on_policy_teacher or not args.focus_card):
         parser.error("activation focus requires --on-policy-teacher and --focus-card")
@@ -403,6 +410,7 @@ def main() -> None:
     sources: Counter[str] = Counter()
     trajectory_hashes = {}
     training_games = []
+    thunder_corrections = 0
     verification_seconds = 0.0
     verified_results = None
     if args.verification_workers > 1:
@@ -461,6 +469,19 @@ def main() -> None:
                 label_path, hashlib.sha256(raw).hexdigest(), trajectory)
         else:
             selected = training_demonstrator_records(trajectory)
+        corrections = 0
+        if args.synthetic_thunder_search_correction:
+            info = trajectory.skill_metadata or {}
+            seat = info.get("demonstrator_seat")
+            if (trajectory.source != "tactical"
+                    or info.get("teacher") != "TacticalHeuristicAgent"
+                    or type(info.get("teacher_version")) is not int
+                    or info["teacher_version"] != 14
+                    or type(seat) is not int or seat not in (0, 1)):
+                raise ValueError(f"{path}: synthetic Thunder correction requires "
+                                 "Tactical-v14 demonstrator provenance")
+            selected, corrections = correct_staged_thunder_search(selected, seat)
+            thunder_corrections += corrections
         if teacher is not None:
             source = f"automated_teacher_{args.on_policy_teacher}"
         elif annotation is not None:
@@ -469,7 +490,8 @@ def main() -> None:
                       "policy_review": "policy_review_annotation",
                       "self_play_review": "self_play_review_annotation"}[annotation.authorization]
         else:
-            source = trajectory.source
+            source = ("synthetic_tactical_thunder_search"
+                      if args.synthetic_thunder_search_correction else trajectory.source)
         records.extend(selected)
         record_sources.extend([source] * len(selected))
         record_disagreements.extend(
@@ -501,6 +523,8 @@ def main() -> None:
                                "opponent": (trajectory.skill_metadata or {}).get("opponent"),
                                "verified_decisions": count,
                                "selected_decisions": len(selected)})
+        if args.synthetic_thunder_search_correction:
+            training_games[-1]["synthetic_thunder_search_corrections"] = corrections
     vocabulary = CardVocabulary.from_goat_whitelist(
         args.native_root / "banlist/GOAT.lflist.conf",
         native_root=args.native_root if args.feature_version >= 22 else None)
@@ -606,6 +630,9 @@ def main() -> None:
         "training_games": [*(parent["training_games"] if parent else ()),
                            *training_games],
         "new_training_games": len(training_games),
+        **({"synthetic_thunder_search_corrections": thunder_corrections,
+            "synthetic_thunder_search_rule": "take_offered_copy_v1"}
+           if args.synthetic_thunder_search_correction else {}),
         "parent_checkpoint_sha256": (hashlib.sha256(
             args.init_checkpoint.read_bytes()).hexdigest()
             if args.init_checkpoint else None),
@@ -644,6 +671,8 @@ def main() -> None:
     summary = {"output": str(args.output), "decisions": len(records),
                "sources": sources, "focus_opportunity_decisions": focus_count}
     summary["fit_decisions"] = checkpoint["fit_decisions"]
+    if args.synthetic_thunder_search_correction:
+        summary["synthetic_thunder_search_corrections"] = thunder_corrections
     if preservation_metadata:
         summary.update({"training_method": "parent_kl",
                         "final_labeled_loss": losses[-1],

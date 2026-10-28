@@ -1,5 +1,57 @@
 # Baseline evaluation log
 
+## Synthetic Thunder Dragon relabeling ablation (28 October 2026)
+
+An opt-in clone-training flag now substitutes a legal Deck-copy `select_card`
+for Tactical-v14's zero-copy finish only at the staged Thunder Dragon prompts
+identified by the audit below. It requires Tactical-v14 provenance, verifies
+the entire original native trajectory and visibility before fitting, keeps the
+source files unchanged, and records the synthetic rule and correction count in
+the child checkpoint. This is a synthetic teacher preference, not human play
+or a GOAT legality correction.
+
+Starting from the same parent as the selected feature-v23 policy, an otherwise
+matching two-epoch fit on the same 64 exact source replays changed **6 of
+21,815** training labels. The original replay binary is available at
+`.cache/goat-ai/legacy_review_native`; the current core cannot replay-verify
+those recordings because its library hash differs. All 64 source trajectories
+verified against the older pinned binary, and the fit took **56.78 s** (15.37 s
+verification, 22.06 s fitting). Epoch losses were 0.171378 and 0.144404.
+The ignored child checkpoint SHA-256 is
+`1d8878fcf695dfd25a90ab7aeee5a501c26d644545ff2f4513eeadb136d73b47`.
+In the two separately replay-verified seed-94000 prompts, the child now ranks
+the Deck copy above the empty finish: 1.523 versus 1.381 at frame 24 and
+1.562 versus 1.408 at frame 37.
+
+On unseen Phoenix Control versus two Dimension Fusion Turbo Main Decks,
+seeds 97200–97207 with both deck assignments and policy seats, the child
+scored **32–31–1** directly against the selected parent over 64 terminal
+current-core duels (50.8% of points; paired 95% interval 41.4%–60.9%). On
+matched seeds 97208–97215 against Tactical-v14, the child scored **22–42**
+and the parent **25–39**. The strict report comparator accepted their shared
+opponent, seed schedule, native assets, card scripts, source, local decks,
+and training-unseen Main Deck compositions. Child-minus-parent score was
+**−4.69 percentage points**, paired 95% interval **−14.06 to +4.69**. The
+child fixes a specific ranking but has no demonstrated competitive gain; keep
+the selected v23 checkpoint unchanged. The three ignored tournament-report
+SHA-256 values are `acbf25a9244861c4c5721dfc2043dc676326d8fb610c0014861952bed58b3f14`,
+`d49ff81b0233ca115969aa842965fbec655d8e04988b088acd2506a65eca8fa4`,
+and `7c6d7d490a55de46fa4a4c36eae646a3c9eb8edbd13303187839569c5e3e6d2e`.
+
+Reproduce the fit with `scripts/train_behavioral_clone.py` and the 64
+`current_tactical_chaos_bazoo_33000_33015` and
+`current_tactical_goat_mirror_33016_33031` replays, using
+`--native-root .cache/goat-ai/legacy_review_native --engine experimental
+--init-checkpoint .cache/goat-ai/fv23_tactical_v14_unseen_fourdeck_continuation.pt
+--feature-version 23 --width 32 --epochs 2 --batch-size 16 --batched-forward
+--omit-forced-forward --verification-workers 4 --learning-rate 0.0002
+--seed 55 --synthetic-thunder-search-correction`. Use `scripts/evaluate_policy.py`
+with the deck pairs and seeds above, `--native-root .cache/goat-ai`,
+`--both-deck-assignments --require-unseen-main-decks --workers 4`, then
+`scripts/compare_tournament_reports.py --require-unseen-main-decks` for the
+matched Tactical comparison. The experiment changes only six local labels;
+broader decision quality and outcome-driven improvement remain open.
+
 ## Selected-policy Thunder Dragon training-label audit (28 October 2026)
 
 The selected feature-v23 checkpoint records SHA-256 provenance for 144
