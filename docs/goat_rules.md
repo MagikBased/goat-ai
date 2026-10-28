@@ -848,3 +848,19 @@ The same [archived FAQ](https://www.goatformat.com/rulings7.html) says Skill Dra
 **Book of Moon on an attacking Airknight Parshath:** The [historical Book of Moon FAQ](https://www.goatformat.com/rulings1.html) explicitly says that setting the attacker during the Battle Step stops the attack without a replay and that the attacker cannot Flip Summon in Main Phase 2 because it declared an attack. [Airknight's historical FAQ](https://www.goatformat.com/rulings1.html) requires inflicted battle damage for its draw. In paired seed-100 native fixtures, Airknight is revived with Premature Burial and attacks directly into a previously Set Book. Passing Book deals 1,900 battle damage and draws one card. Activating Book on Airknight ends the attack with no damage or draw; Airknight remains face-down and has no Flip Summon action in Main Phase 2. The Book branch leaves LP at 7,200/8,000 after Premature Burial's cost. Both complete duels serialize, replay-verify, and pass the player-visible trajectory audit. This checks the pinned scripts for one attack declaration and target; other responses and attacks on a defending monster remain separate cases.
 
 **Des Koala's Flip damage and hidden opponent hand:** Cas Stomphorst's [published Indianapolis 2005 list](https://www.goatformat.com/home/top-8-decklists7022761) contains two Des Koala. [Konami's card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5661&ope=2&request_locale=en) specifies 400 damage for each card in the opponent's hand. In seed-11 native fixtures, Koala is Set on turn one and Flip Summoned on turn three. The opponent either keeps six cards in hand or Sets one Book of Moon to leave five. Koala deals 2,400 or 2,000 damage respectively, while its controller's observation knows the opponent's hand count but no card identities. A third branch chains the Set Book to Koala's Flip Effect: Book sets Koala face-down, but the already activated effect still deals 2,000 damage. This follows the [historical Book of Moon Flip Effect ruling](https://www.goatformat.com/rulings1.html). A fourth branch Sets Jar of Greed, leaving five cards in hand, then chains its [one-card draw](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5210&ope=2&request_locale=en) to Koala's Flip Effect. Jar resolves first, so Koala sees six cards and deals 2,400 damage. The timing conclusion is inferred from the card texts and chain order, then checked against the pinned native scripts. All four complete duels serialize, replay-verify, pass the visibility audit, and load the pinned official Koala script. Effect negation and battle-triggered flips remain untested.
+
+**Call of the Haunted Summon inside a resolving chain:** The archived
+[Bottomless Trap Hole individual FAQ](https://www.goatformat.com/rulings1.html)
+distinguishes a monster Summoned by Call at Chain Link 2 from a later monster
+Summoned by Monster Reborn at Chain Link 1: after resolution, Bottomless can
+remove only the latter. A paired seed-100 native fixture checks this timing
+with GOAT Bottomless Set opposite Call. Graceful Charity puts 1900-ATK Gemini
+Elf in the Graveyard. When Call activates alone at Chain Link 1, Bottomless
+is offered after the Summon and banishes Gemini Elf. When Call chains to
+Upstart Goblin at Chain Link 2, Gemini Elf is Summoned before Upstart
+resolves, Bottomless is not offered after the chain, and Gemini Elf remains
+on the field at that checkpoint. Upstart then draws and grants the opponent
+1,000 LP. Both branches finish as complete duels, serialize, replay-verify,
+and pass the player-visibility audit. This verifies one midchain Summon and
+one ordinary Call Summon; it does not imply that every Call at Chain Link 2
+avoids a Summon response regardless of what the remaining links do.

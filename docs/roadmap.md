@@ -369,6 +369,13 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+The Call of the Haunted timing probe now distinguishes an ordinary Chain
+Link 1 Summon, which opens a GOAT Bottomless Trap Hole response, from a
+midchain Call Summon at Chain Link 2 before Upstart Goblin resolves, which
+does not. Both seeded duels reach terminal state, replay-verify, and pass
+visibility audits. This is one source-backed chain-window regression, not a
+general proof for all chain endings; see [GOAT rules](goat_rules.md).
+
 A paired Nobleman of Extermination fixture now distinguishes a hidden Set
 Trap from a Set Spell. It checks the GOAT-variant script, same visible target
 choice, Trap-only matching-copy banishment and recipient-scoped Deck reveals,
