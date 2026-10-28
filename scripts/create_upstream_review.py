@@ -16,6 +16,37 @@ from scripts.shortlist_policy_disagreements import action_summary, write_review_
 from scripts.validate_review_queue_labels import queue_sources, verify_queue_items
 
 
+def upstream_candidate(trajectory, item: dict, digest: str, replay_path: Path,
+                       queue_path: Path, upstream_index: int) -> dict:
+    """Describe an earlier optional action without asserting that pass is best."""
+    if (type(upstream_index) is not int or upstream_index < 0
+            or upstream_index >= item["decision_index"]):
+        raise ValueError("upstream decision must precede the reviewed prompt")
+    prior = trajectory.decisions[upstream_index]
+    target = trajectory.decisions[item["decision_index"]]
+    if prior.observation.acting_player != target.observation.acting_player:
+        raise ValueError("upstream and target decisions belong to different players")
+    passes = [action for action in prior.legal_actions if action.kind == "pass"]
+    if len(passes) != 1 or prior.selected_action.kind == "pass":
+        raise ValueError("upstream decision must have a distinct legal pass")
+    viewer_path, _ = item["viewer"].split("#", 1)
+    viewer = Path(viewer_path).resolve()
+    if not viewer.is_file() or not viewer.is_relative_to(queue_path.parent):
+        raise ValueError("source viewer is missing or outside the queue directory")
+    return {
+        "trajectory": str(replay_path), "trajectory_sha256": digest,
+        "decision_index": upstream_index, "viewer_frame": upstream_index + 1,
+        "seat": prior.observation.acting_player,
+        "turn": prior.observation.turn, "phase": prior.observation.phase,
+        "legal_action_count": len(prior.legal_actions),
+        "policy_action": action_summary(prior.selected_action),
+        "teacher_action": action_summary(passes[0]),
+        "teacher_disagrees": True,
+        "audit_flags": ["review_upstream_activation"],
+        "viewer": f"{viewer}#decision={upstream_index + 1}",
+    }
+
+
 def create_upstream_review(queue_path: Path, item_number: int, upstream_index: int,
                            output: Path, native_root: Path) -> Path:
     """Offer an earlier legal pass as a human-review candidate, not a label."""
@@ -38,32 +69,8 @@ def create_upstream_review(queue_path: Path, item_number: int, upstream_index: i
     verify_queue_items(trajectory, offered, queue["checkpoint_sha256"])
     verify_trajectory(trajectory, ExperimentalOcgcoreEngine(native_root))
     audit_trajectory_visibility(trajectory)
-    if (type(upstream_index) is not int or upstream_index < 0
-            or upstream_index >= item["decision_index"]):
-        raise ValueError("upstream decision must precede the reviewed prompt")
-    prior = trajectory.decisions[upstream_index]
-    target = trajectory.decisions[item["decision_index"]]
-    if prior.observation.acting_player != target.observation.acting_player:
-        raise ValueError("upstream and target decisions belong to different players")
-    passes = [action for action in prior.legal_actions if action.kind == "pass"]
-    if len(passes) != 1 or prior.selected_action.kind == "pass":
-        raise ValueError("upstream decision must have a distinct legal pass")
-    viewer_path, _ = item["viewer"].split("#", 1)
-    viewer = Path(viewer_path).resolve()
-    if not viewer.is_file() or not viewer.is_relative_to(queue_path.parent):
-        raise ValueError("source viewer is missing or outside the queue directory")
-    candidate = {
-        "trajectory": str(replay_path), "trajectory_sha256": digest,
-        "decision_index": upstream_index, "viewer_frame": upstream_index + 1,
-        "seat": prior.observation.acting_player,
-        "turn": prior.observation.turn, "phase": prior.observation.phase,
-        "legal_action_count": len(prior.legal_actions),
-        "policy_action": action_summary(prior.selected_action),
-        "teacher_action": action_summary(passes[0]),
-        "teacher_disagrees": True,
-        "audit_flags": ["review_upstream_activation"],
-        "viewer": f"{viewer}#decision={upstream_index + 1}",
-    }
+    candidate = upstream_candidate(trajectory, item, digest, replay_path,
+                                   queue_path, upstream_index)
     result = {
         "schema_version": 1,
         "purpose": "human_review_candidates_not_training_labels",

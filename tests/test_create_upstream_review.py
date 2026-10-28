@@ -8,7 +8,7 @@ from goat_ai.actions import Action
 from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
-from scripts import create_upstream_review
+from scripts import create_noted_upstream_queue, create_upstream_review
 from scripts.serve_review_queue import ReviewStore
 
 
@@ -96,3 +96,36 @@ def test_upstream_review_rejects_invalid_index_and_original_output(tmp_path,
         create_upstream_review.create_upstream_review(
             queue, 1, 0, output, tmp_path / "native")
     assert output.read_text() == '{"saved":"other review"}'
+
+
+def test_saved_upstream_note_builds_separate_unlabeled_queue(tmp_path, monkeypatch):
+    queue, _, digest, _ = _source_queue(tmp_path)
+    labels = tmp_path / "source_labels"
+    source_store = ReviewStore(queue, labels)
+    source_store.save_note(digest, 1, "upstream_mistake",
+                           "MST should have stayed unactivated")
+    monkeypatch.setattr(create_noted_upstream_queue, "ExperimentalOcgcoreEngine",
+                        lambda root: None)
+    monkeypatch.setattr(create_noted_upstream_queue, "verify_trajectory", lambda *a: 2)
+    monkeypatch.setattr(create_noted_upstream_queue, "audit_trajectory_visibility",
+                        lambda *a: {"decisions": 2})
+    output = tmp_path / "noted_upstream.json"
+    path, unmatched = create_noted_upstream_queue.create_noted_upstream_queue(
+        queue, output, tmp_path / "native", labels_dir=labels)
+    assert path == output and unmatched == 0
+    result = json.loads(output.read_text())
+    assert result["purpose"] == "human_review_candidates_not_training_labels"
+    assert result["source_queue_sha256"] == sha256_file(queue)
+    assert result["selected"][0]["decision_index"] == 0
+    assert result["selected"][0]["teacher_action"]["kind"] == "pass"
+    assert "MST should have stayed unactivated" in output.with_suffix(".html").read_text()
+    assert source_store.progress()["choices"] == []
+    assert ReviewStore(output, tmp_path / "upstream_labels").progress()["choices"] == []
+
+
+def test_noted_upstream_queue_requires_a_saved_note(tmp_path):
+    queue, _, _, _ = _source_queue(tmp_path)
+    with pytest.raises(ValueError, match="no earlier optional activations"):
+        create_noted_upstream_queue.create_noted_upstream_queue(
+            queue, tmp_path / "noted_upstream.json", tmp_path / "native",
+            labels_dir=tmp_path / "empty")

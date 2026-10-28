@@ -162,6 +162,25 @@ note without approving any current legal action. Notes live under the ignored
 carry forward only when the exact replay and decision remain in a rebuilt
 queue. The queue keeps note-only items unlabeled so they can still be reviewed.
 
+After saving one or more **earlier action was the mistake** notes, build a
+separate queue of nearby earlier activations from the same replay, turn, and
+acting player:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/create_noted_upstream_queue.py \
+  .cache/goat-ai/new_jersey_parent_review_96000_96001/queue.json
+./start_review_viewer.sh \
+  .cache/goat-ai/new_jersey_parent_review_96000_96001/noted_upstream.json
+```
+
+The script verifies each source replay against the native engine and checks
+visibility before offering up to three earlier optional activations per note.
+Its suggested pass is only a candidate; choose the best legal action in the
+new queue after inspecting the earlier state. Source labels and notes remain
+unchanged. If no such activation exists in the same turn, the script reports
+that it could not connect the note rather than inventing a label. Rebuilding
+with different notes requires a new output filename to preserve old reviews.
+
 Record the eight `matchup_*.json` duels from the repository root with:
 
 ```bash
