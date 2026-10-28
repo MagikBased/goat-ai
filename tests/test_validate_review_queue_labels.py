@@ -9,6 +9,7 @@ from goat_ai.actions import Action
 from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
+from scripts import create_review_recheck_queue as recheck
 from scripts import merge_review_queue_labels as merger
 from scripts import validate_review_queue_labels as validator
 
@@ -65,6 +66,33 @@ def test_queue_label_validation_binds_replay_and_shortlisted_choice(tmp_path, mo
     labels.write_text(json.dumps(data))
     with pytest.raises(ValueError, match="outside shortlisted"):
         validator.validate_labels(queue, [labels], tmp_path)
+
+
+def test_ambiguous_review_recheck_starts_with_fresh_choices(tmp_path, monkeypatch):
+    queue, labels, _ = review_files(tmp_path)
+    source = json.loads(queue.read_text())
+    second = {**source["selected"][0], "decision_index": 1, "viewer_frame": 2}
+    source["selected"].append(second)
+    queue.write_text(json.dumps(source))
+    label_dir = tmp_path / "old_labels"
+    label_dir.mkdir()
+    labels.rename(label_dir / labels.name)
+    monkeypatch.setattr(validator, "verify_trajectory", lambda *_: 2)
+    monkeypatch.setattr(validator, "audit_trajectory_visibility", lambda *_: None)
+    output = tmp_path / "fresh" / "recheck.json"
+
+    assert recheck.create_recheck_queue(queue, label_dir, output, tmp_path,
+                                        refresh=False) == 1
+    fresh = json.loads(output.read_text())
+    assert len(fresh["selected"]) == 1
+    assert fresh["selected"][0]["decision_index"] == 0
+    assert "action_index" not in output.read_text()
+    assert Path(fresh["selected"][0]["viewer"].split("#")[0]).is_relative_to(
+        output.parent)
+    assert recheck.create_recheck_queue(queue, label_dir, output, tmp_path,
+                                        refresh=False) == 1
+    assert json.loads((label_dir / labels.name).read_text())["choices"] == [
+        {"decision_index": 0, "action_index": 1}]
 
 
 def test_queue_label_validation_rejects_wrong_replay_or_duplicate_export(tmp_path, monkeypatch):

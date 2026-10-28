@@ -49,6 +49,23 @@ and the local server saved that different index (0 versus the recorded 1).
 This confirms the current viewer/server path for that frame; it does not
 explain how the earlier twelve selections became recorded-action labels.
 
+Those twelve frames now have a [separate local recheck queue](../.cache/goat-ai/ambiguous_review_recheck/recheck.html).
+Open it with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/ambiguous_review_recheck/recheck.json
+```
+
+The old 11 label files select the frames only. The recheck queue has no
+preselected actions and saves new choices under its own queue hash. Use
+**Approve AI-played action** if the recorded play was your intended choice;
+otherwise choose the legal alternative you intended. **Reveal all cards** is
+available for diagnosis, but action labels belong in **Open label view**.
+The ignored recheck queue can be rebuilt from the exact old replay bytes and
+labels with `scripts/create_review_recheck_queue.py`. Its source replays,
+queue metadata, and old legal choices are validated before it is written.
+Neither old nor new selections enter training automatically.
+
 ## Book of Moon under Torrential Tribute (27 October 2026)
 
 The player-visible audit now flags a Book of Moon target choice made while
