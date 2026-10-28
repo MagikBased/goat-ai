@@ -161,6 +161,10 @@ The [local review queue](../.cache/goat-ai/new_jersey_parent_review_96000_96001/
 contains 24 prompts from eight complete selected-policy versus Tactical-v14
 duels on the new Ryan Hayakawa and Theeresak Poonsombat 2005 lists. Both
 deck assignments, both policy seats, and seeds 96000–96001 are represented.
+As of the 28 October overlap audit, its 14 saved choices were already among
+the high-margin queue's 21 choices; the remaining 10 parent-queue prompts
+were unlabeled and distinct from those saved high-margin decisions. The
+queue's own progress indicator remains the live source for later reviews.
 All 4,365 decisions replay-verified and passed the visibility audit. The
 provenance audit reproduced 2,158 selected-policy choices and 2,207 Tactical
 opponent choices. Tactical won seven of the eight duels; the sample is too

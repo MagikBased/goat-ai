@@ -250,6 +250,8 @@ def test_reviews_from_two_queues_form_one_replay_preference_file(tmp_path,
          (duplicate_queue, duplicate_labels)], tmp_path,
         tmp_path / "combined")
     assert report["reviewed_decisions"] == 2
+    assert report["input_reviewed_decisions"] == 3
+    assert report["duplicate_review_decisions"] == 1
     assert report["changed_preferences"] == 2
     assert len(report["cases"]) == 1
     path = Path(report["cases"][0]["preferences"])

@@ -1,5 +1,19 @@
 # Baseline evaluation log
 
+## New Jersey multi-queue overlap audit (28 October 2026)
+
+The local parent queue currently has 14 saved choices, all on decision keys
+already labeled in the high-margin queue. A snapshot of both queues' 35 input
+choices passed the queue-bound native replay and visibility validation. The
+multi-queue converter found 14 agreeing duplicates and 21 distinct reviewed
+decisions, of which 14 differ from the policy's recorded action. This is the
+same preference count as the earlier high-margin experiment, so a combined
+training run would reuse its human signal. The parent queue has 10 still
+unlabeled prompts that are distinct from the high-margin labels. The ignored
+snapshot is `.cache/goat-ai/new_jersey_combined_review_20261028/snapshot.json`;
+live queue edits cannot change that audit. No new checkpoint or playing-strength
+claim follows from the overlap check.
+
 ## Nine New Jersey parent-review preferences pilot (28 October 2026)
 
 An ignored snapshot of the active [New Jersey parent review queue](replay_audit.md#selected-policy-on-new-2005-new-jersey-decks-28-october-2026) contained **14 saved choices** from seven exact replay files. Nine differed from the selected v23 policy's recorded action; five matched and were not converted to pairwise preferences. The queue-bound converter independently replay-verified and visibility-audited each labeled duel. Its manifest records every source label and replay hash; the ignored snapshot manifest is `.cache/goat-ai/new_jersey_review_snapshot_20261028/snapshot.json` (SHA-256 `a64647b1f90a8299ce84bd8ea7b3dd3fba020a36544564f83a38c22002b86399`) and preference manifest SHA-256 is `dca6eb5372f945ce6b7bc826e30300ca393e16d97f259b33510f75d23066de12`. These are reviewer choices, not proof that every alternative is optimal. Later queue edits do not change this experiment's snapshot.

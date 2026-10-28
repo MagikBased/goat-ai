@@ -30,6 +30,8 @@ def convert_pairs(pairs: list[tuple[Path, Path]], native_root: Path,
     reviewers: dict[str, set[str]] = defaultdict(set)
     inputs: dict[str, list[dict]] = defaultdict(list)
     queue_hashes = {}
+    input_reviewed_decisions = 0
+    duplicate_review_decisions = 0
     for queue, label in pairs:
         queue_hash = sha256_file(queue)
         report = validate_labels(queue, [label], native_root)
@@ -54,10 +56,13 @@ def convert_pairs(pairs: list[tuple[Path, Path]], native_root: Path,
         seats[digest] = seat
         reviewers[digest].add(annotation.reviewer)
         for index, action in annotation.choices:
+            input_reviewed_decisions += 1
             prior = decisions[digest].get(index)
             if prior is not None and prior[0] != action:
                 raise ValueError(f"conflicting review choices for replay {digest} "
                                  f"decision {index}")
+            if prior is not None:
+                duplicate_review_decisions += 1
             decisions[digest][index] = (action, annotation.reviewer)
         input_record = {"queue": str(queue.resolve()),
                         "queue_sha256": queue_hash,
@@ -115,6 +120,8 @@ def convert_pairs(pairs: list[tuple[Path, Path]], native_root: Path,
                 "authorization": "policy_review",
                 "queue_sha256": queue_hashes,
                 "cases": cases,
+                "input_reviewed_decisions": input_reviewed_decisions,
+                "duplicate_review_decisions": duplicate_review_decisions,
                 "reviewed_decisions": sum(item["reviewed_decisions"] for item in cases),
                 "changed_preferences": sum(item["changed_preferences"] for item in cases)}
     (output_dir / "manifest.json").write_text(
@@ -132,6 +139,8 @@ def main() -> None:
     manifest = convert_pairs([(Path(queue), Path(label)) for queue, label in args.case],
                              args.native_root, args.output_dir)
     print(json.dumps({"reviewed_decisions": manifest["reviewed_decisions"],
+                      "input_reviewed_decisions": manifest["input_reviewed_decisions"],
+                      "duplicate_review_decisions": manifest["duplicate_review_decisions"],
                       "changed_preferences": manifest["changed_preferences"],
                       "output_dir": str(args.output_dir)}))
 
