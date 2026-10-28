@@ -10782,3 +10782,58 @@ The ignored JSON report has SHA-256
 `33c2159c53a911bfdad8e062c4591168eae1d71dce56a80c92cacd336ddef951`;
 it records the eight exact replay hashes and verified decision counts. The
 diagnostic is off-policy and is not a tournament result.
+## Winner-only imitation continuation of the 240-duel PPO sample (28 October 2026)
+
+A separate feature-v23 experiment used only the **78 terminal wins** by the
+learner from the verified 240-duel mixed-deck PPO rollout above. This selection
+excludes its 159 losses and three draws, but does not make the winners expert
+demonstrations: they came from the same policy against a Tactical/historical-
+snapshot mixture and may contain poor individual moves. The ignored path list
+`.cache/goat-ai/ppo_mixed_240_winning_paths.txt` has SHA-256
+`31406a0bcb2c196af44b27f6ed3e54eab40c46e5f94d1e9e5bbeb1f80faadef4`.
+The 78 replays were previously independently native-replay-verified and
+visibility-audited as part of the full 240-game collection. The behavioral
+clone trainer reverified them and selected **20,312** learner decisions, of
+which **7,376** had more than one legal action. One batched epoch at learning
+rate `0.00001`, batch size 32, and seed 91850 took **35.96 seconds** on this
+machine. The child checkpoint
+`.cache/goat-ai/winner_bc_mixed_78_91000_91239.pt` has SHA-256
+`597cfae7b1d3edaf2c206fe27e7b9635a507f8dc964e39e727bc920377e603e2`.
+
+On unseen Main Deck compositions (Roberto Martinez Phoenix Control/Jae Kim
+Zombie and Rhymus Lizo Goat Control/WikiFormat Dimension Fusion), both deck
+assignments and policy seats on seeds 91860–91867, the child scored **30–34**
+directly against its frozen v23 parent over 64 games. Its score was **46.88%**,
+with a paired 95% interval of **42.19–50.00%**. The child was 20–12 in the
+first seat and 10–22 in the second. On a separate matched Tactical-v14 block,
+seeds 91868–91875 and the same deck schedule, the child scored **20–42–2**
+and the parent **22–41–1** over 64 games each. The strict report comparator
+verified the shared opponent, deck files and compositions, seeds, native
+assets, card scripts, source code, and unseen Main Decks. Child-minus-parent
+score was **−2.34 percentage points**, paired 95% interval **−7.81 to +3.13
+points**. Neither test supports promotion or the M4 held-out strength gate.
+The selected checkpoint remains the frozen v23 parent.
+
+The ignored direct, child-versus-Tactical, and parent-versus-Tactical reports
+are `.cache/goat-ai/winner_bc_mixed_vs_parent_91860_91867.json`,
+`.cache/goat-ai/winner_bc_mixed_vs_tactical_91868_91875.json`, and
+`.cache/goat-ai/winner_bc_parent_vs_tactical_91868_91875.json`, respectively.
+Their SHA-256 values are `47e20d7e8362c8ced193c6b865b6e07e760d7c9f55c15acc98afc060f4ecffa9`,
+`09f20a89b29e1e9b48a2501f1245feb0b126cfb8e007836be8d92f2bc441da2a`,
+and `ae15367ebe73ea7c0a7cf2506cb140fae0f20acf59319c4c31b310b65c815740`.
+To reproduce the continuation from the selected v23 parent, load the 78
+newline-delimited paths using `mapfile -t winner_replays <
+.cache/goat-ai/ppo_mixed_240_winning_paths.txt` and run
+`scripts/train_behavioral_clone.py "${winner_replays[@]}" --native-root
+.cache/goat-ai --engine experimental --init-checkpoint
+.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt
+--feature-version 23 --width 32 --epochs 1 --learning-rate 0.00001
+--batch-size 32 --batched-forward --skip-forced-training
+--verification-workers 4 --fast-trajectory-json --seed 91850 --output
+.cache/goat-ai/winner_bc_mixed_78_91000_91239.pt`. Evaluate with
+`scripts/evaluate_policy.py --engine experimental --both-deck-assignments
+--require-unseen-main-decks --workers 4 --max-decisions 3000`, the named
+pairings, seed blocks, and either the parent checkpoint or `--opponent
+tactical`. This is a single small-rate continuation and does not isolate
+selection bias, demonstrate generalization to all GOAT decks, or measure
+performance against human players.
