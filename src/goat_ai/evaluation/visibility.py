@@ -15,7 +15,7 @@ def _choice_cards(action: Action) -> Iterable[dict]:
     if action.kind in ("select_card", "tribute"):
         yield action.parameters
     if action.kind in ("select_card", "select_cards", "finish_selection",
-                       "tribute_cards"):
+                       "tribute_cards", "sort_cards"):
         yield from action.parameters.get("cards", ())
 
 

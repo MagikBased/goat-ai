@@ -291,11 +291,11 @@ def decode_decision(message: bytes,
         return NativeDecision(player, tuple(
             NativeChoice("announce_card", code, announced_card=code)
             for code in announcement_codes))
-    if kind == 25:  # MSG_SORT_CARD
+    if kind in (21, 25):  # MSG_SORT_CHAIN / MSG_SORT_CARD
         player = reader.integer(1)
         count = reader.integer(4)
         if player not in (0, 1) or not 1 <= count <= 6 or factorial(count) > 2048:
-            raise NotImplementedError("card sorting bounds are not supported")
+            raise NotImplementedError("card or chain sorting bounds are not supported")
         cards = tuple((reader.integer(4), reader.integer(1), reader.integer(4),
                        reader.integer(4)) for _ in range(count))
         reader.finish()

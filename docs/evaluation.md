@@ -9559,3 +9559,34 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
 
 This extends M1 protocol evidence only. Random decks and random decisions do
 not validate each card's historical ruling or establish playing strength.
+
+## Chain-order native protocol sweep (27 October 2026)
+
+A fresh 50-duel GOAT-whitelist sweep on seeds 10506–10555 initially stopped at
+seed 10527 after 606 decisions. The pinned core emitted `MSG_SORT_CHAIN` (21)
+for a two-way ordering of Dark Elf and Toll effects after an attack declaration;
+the adapter had decoded `MSG_SORT_CARD` (25) but not this same-layout chain
+ordering request. The native decoder now exposes both orders as structured
+`sort_cards` actions, and the visibility audit checks any opponent cards in
+those ordered choices. Both order choices reach terminal in a focused
+seed-10527 fixture; their full trajectories replay-verify and pass the
+player-visible audit. This is protocol support, not a historical ruling claim
+about every simultaneous trigger.
+
+After the change, **50/50** duels reached native terminal outcomes without
+errors or the 3,000-decision cap. All **50,084** decisions replay-verified and
+passed the visibility audit, including 528 hidden-field choices and 28
+opponent-hand choices. The longest duel took 1,463 decisions; seed 10527
+completed in 715. The report records 1,201 loaded native assets and 4,100
+card-source/action-kind pairs. The ignored report is
+`.cache/goat-ai/whitelist_distinct_10506_10555_sort_fixed/report.json` (SHA-256
+`fb7b6142f90745606afc34cfc1c3e856762964a48f485bfe23adb5442d44dd31`).
+Reproduce after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_distinct_10506_10555_sort_fixed \
+  --seed 10506 --seeds 50 --max-decisions 3000 \
+  --verify-replays --distinct-opponents --count-card-actions
+```
