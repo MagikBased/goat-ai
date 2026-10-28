@@ -250,6 +250,13 @@ This expands sampled M1 protocol coverage; no sampled sweep can certify
 arbitrary-card completeness or M2 rulings. See
 [the report](evaluation.md#additional-distinct-whitelist-protocol-sweep-27-october-2026).
 
+A fresh independent full-whitelist sweep on seeds 30250–30349 reached
+**100/100 terminal** with **106,181/106,181** decisions replay-verified and
+visibility-audited. Its 200 Main Decks had distinct hashes and covered 1,624
+card IDs; 15 scripts were loaded that the preceding 100-pair sweep had not
+loaded. This broadens sampled protocol coverage without closing arbitrary-deck
+or historical-ruling correctness; see [the report](evaluation.md#further-distinct-whitelist-protocol-sweep-27-october-2026).
+
 ## M2 — Historical correctness gate
 
 A source-backed Card Destruction/Banisher of the Light fixture now confirms

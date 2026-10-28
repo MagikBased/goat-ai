@@ -9360,3 +9360,35 @@ for Rhymus Tactical, and
 `c5dd5a07e5cf90df09e54d685f75411a5de4796705c6e98535e8740e9b2b528e` /
 `c1d6cde278c953b21d467b5572411089b08eb4e5be01b936f76f2d7bc146ca4b`
 for Phoenix Tactical.
+
+### Further distinct-whitelist protocol sweep (27 October 2026)
+
+Starting from project commit `f1814a3`, a new full GOAT-whitelist sample used
+100 independent Main Deck pairs on seeds 30250–30349. All **100/100** native
+duels reached terminal below the 3,000-decision cap, with a maximum of 1,873
+decisions. Every one of the **106,181** decisions replay-verified against a
+fresh engine; the player-visible action audit checked all 100 games, including
+868 hidden-field, 4,782 opponent-field, and 118 opponent-hand choice contexts.
+The 200 generated Main Decks had distinct hashes and covered 1,624 distinct
+card IDs. The report records 1,309 loaded native assets. Relative to the
+immediately preceding seeds 30150–30249 report, 15 official card scripts
+were newly loaded, including Dark Mirror Force, Fusion Gate, Good Goblin
+Housekeeping, and The Creator. Loading a script is not proof that its effects
+or historical rulings were exercised correctly.
+
+The ignored report is
+`.cache/goat-ai/whitelist_distinct_30250_30349/report.json` (SHA-256
+`305f592678684f329cb460c35be5f4bbddf585a603fe92587f96cd6d5cf51135`).
+Its deck, asset, rules-profile, action-count, and per-game outcome fields
+support reproduction with the pinned native setup. The probe script SHA-256
+was `cf66160dfc23d00c75de3b55f8b4f278c49d80141d35d4aa138a3934539dd044`.
+This is sampled M1 protocol evidence, not a certificate of arbitrary-deck
+completeness, GOAT card-ruling correctness, or agent strength.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_distinct_30250_30349 \
+  --seed 30250 --seeds 100 --max-decisions 3000 \
+  --verify-replays --distinct-opponents --count-card-actions
+```
