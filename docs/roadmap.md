@@ -252,6 +252,11 @@ arbitrary-card completeness or M2 rulings. See
 
 ## M2 — Historical correctness gate
 
+A source-backed Card Destruction/Banisher of the Light fixture now confirms
+that both players draw their full discarded counts even though Banisher sends
+those discarded cards to banishment. The complete seeded duel replay-verifies
+and passes the visibility audit; see [GOAT rules](goat_rules.md).
+
 A seed-28 Exchange/Thunder Dragon fixture now checks the period ruling that
 an opponent-owned Thunder Dragon taken with Exchange can be discarded to
 search the new controller's own Deck. It verifies both Deck counts, the

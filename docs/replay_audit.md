@@ -43,6 +43,10 @@ their source replays, but all twelve stored the recorded AI action. The
 reviewer recalls choosing alternatives for some of them. The files are kept
 locally and **excluded from training** pending re-review of the affected
 frames; their present bytes do not establish the intended alternatives.
+A temporary Chromium check on queue item #1 selected a different legal action
+and the local server saved that different index (0 versus the recorded 1).
+This confirms the current viewer/server path for that frame; it does not
+explain how the earlier twelve selections became recorded-action labels.
 
 ## Breaker targeting only friendly backrow (27 October 2026)
 
