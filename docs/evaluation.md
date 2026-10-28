@@ -9243,3 +9243,55 @@ The ignored report SHA-256 values, in worker-count order, are
 `5008ead844418a40da0197e1b829dc167187486363072fafa158da2109e09ac6`,
 `cffec29a48b0c911fca20f6eb7e63d0b12d2b375dd2c35d918b5d127cbda3cdb`,
 and `2d21a57a4e7f0467579a04f0191595be3fc937c40349e2e2fc393587986790a4`.
+### Four versus eight cloning verification workers (27 October 2026)
+
+The [native duel scaling pilot](#native-worker-scaling-on-sourced-decks-27-october-2026)
+measured pure RandomAgent simulation. This check measures the **actual cloning
+command** on eight replay-verified current-core self-play trajectories from
+seeds 34000–34007 (2,023 fit decisions). Each arm started from the same
+feature-v23 checkpoint, used one epoch, width 32, batch size 16, batched
+forward, omitted forced forwards, learning rate 0.0002, seed 58, and one
+Torch thread. Four runs were ordered 4, 8, 8, 4 verification workers to
+reduce simple order bias. Source replays and their labels were unchanged.
+
+| Run | Verification workers | External wall time | CLI verification time | CLI fitting time |
+|---:|---:|---:|---:|---:|
+| 1 | 4 | 7.031 s | 2.552 s | 1.775 s |
+| 2 | 8 | 7.143 s | 2.791 s | 1.591 s |
+| 3 | 8 | 7.047 s | 2.724 s | 1.572 s |
+| 4 | 4 | 6.913 s | 2.611 s | 1.571 s |
+
+The two 4-worker runs averaged **6.972 s** externally; the 8-worker runs
+averaged **7.095 s**. Verification itself averaged 2.582 versus 2.758 s.
+The observed 0.123-second external difference is small and from two runs
+per arm, so it is a workload-specific point result, not a general scaling
+law. All four checkpoints recorded the same `0.14908188252774301` epoch
+loss, identical source hashes, and byte-equal values for all 38 model-state
+tensors. More verification workers did not change the policy. Four remains
+the measured choice for this eight-replay job; a larger corpus might have
+a different optimum. This check does not measure playing strength.
+
+The ignored logs and checkpoints are in
+`.cache/goat-ai/verify_workers_34000_34007/`. Reproduce each arm from the
+pinned native setup with the eight
+`current_broader_ppo_34000_34063_replays/episode_0000[0-7]_seed_*.json`
+files and:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/train_behavioral_clone.py \
+  .cache/goat-ai/current_broader_ppo_34000_34063_replays/episode_0000[0-7]_seed_*.json \
+  --engine experimental \
+  --init-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --epochs 1 --batch-size 16 --batched-forward --omit-forced-forward \
+  --verification-workers 4 --width 32 --feature-version 23 \
+  --learning-rate 0.0002 --seed 58 \
+  --output .cache/goat-ai/verify_workers_34000_34007/reproduction.pt
+```
+
+Change only `--verification-workers` and the output path for the other arm.
+The four saved log SHA-256 values, in run order, are
+`70349e2183af9dd5077725a904fdba339701bc9534930543d954d9613bfa5257`,
+`94adf784254eb1e470efcb974c96dfd3f53393bb46cb09233f6a0df4d27f7686`,
+`ab3a92f193dc9691f3f793d0c86d022828afbad6b19a20c5873d840ad982e1b0`,
+and `b46bf5a7fbc7223de91065096df8a59dbdf82b0892e871a49bbd89a918b8ae3a`.
