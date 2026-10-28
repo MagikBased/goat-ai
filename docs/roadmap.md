@@ -641,9 +641,12 @@ training license, so it remains an ignored read-only sample. See [research](rese
 The structural reader now retains the three legacy duel settings required
 to recreate startup. A separate private-safe setup screen compares the
 embedded legacy replay, when present, with this project's two-player,
-8000-LP, five-card, one-draw, exact-`DUEL_MODE_GOAT` profile. All five real
-modern samples fail; four differ in rule flags, and one also differs in LP
-and opening hand size. A match remains only a reconstruction candidate, not
+8000-LP, five-card, one-draw, exact-`DUEL_MODE_GOAT` profile, its recorded
+RNG words, replay mode, and custom-rule-card count. It also checks agreement
+between a `yrpX` wrapper and its embedded legacy replay. All five real modern
+samples fail; all five differ in rule flags, four lack recorded RNG words,
+three also use an unsupported legacy replay mode, and one differs in LP and
+opening hand size. A match remains only a reconstruction candidate, not
 permission to train or evidence of historical correctness.
 The native probe can now start from the four recorded EDOPro RNG words and
 preordered Main/Extra Deck entries, matching the pinned old-replay startup

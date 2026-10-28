@@ -104,11 +104,14 @@ PYTHONPATH=src:. .venv/bin/python scripts/inspect_edopro_replay.py \
 
 The reader now retains the three `yrp1` duel settings that the pinned upstream
 `Replay::ParseParams` reads: starting LP, opening hand size, and cards drawn
-per turn. The inspection CLI screens those settings, two-player count, and
-the exact native `DUEL_MODE_GOAT` flag value supported by this project. It
-uses the embedded `yrp1` settings for `yrpX` when available. All five real
-modern samples fail this setup screen: four differ in duel flags alone; the
-2023 sample also differs in starting LP and opening hand size. A passing
+per turn. The inspection CLI screens those settings, two-player count, the
+exact native `DUEL_MODE_GOAT` flag value, recorded RNG words, unsupported
+replay modes, custom rule cards, and agreement between a `yrpX` wrapper and
+its embedded legacy startup. It uses the embedded `yrp1` settings for `yrpX`
+when available. All five real modern samples fail this setup screen: all five
+differ in duel flags; four lack the four-word RNG state, three also use an
+unsupported legacy replay mode, and the 2023 sample differs in starting LP
+and opening hand size. The standalone 2012 sample also lacks RNG words. A passing
 screen is only a setup candidate. It does not prove a historical ruling,
 card legality, the matching core/script revision, player-visible knowledge,
 or reconstructible decisions. The CLI still omits player names, Deck IDs,

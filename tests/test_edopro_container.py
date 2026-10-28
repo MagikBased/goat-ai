@@ -269,7 +269,7 @@ def test_goat_rules_screen_rejects_wrong_setup_without_private_values():
     assert goat_rules_screen(replay) == {
         "goat_rules_screen": "unsupported_setup",
         "goat_rules_mismatches": ["duel_flags", "starting_life_points",
-                                  "opening_hand_size", "draw_count"],
+                                  "opening_hand_size", "draw_count", "rng_seed"],
     }
 
 
@@ -277,12 +277,46 @@ def test_goat_rules_screen_checks_embedded_legacy_settings():
     from scripts.inspect_edopro_replay import goat_rules_screen
 
     payload = _prefix(YRP1) + struct.pack("<I", 0) * 5
-    legacy = _container(YRP1, payload)
+    legacy = _container(YRP1, payload, extended=True)
     packet = bytes((231,)) + struct.pack("<I", len(legacy)) + legacy
-    replay = parse_edopro_container(_container(YRPX, _prefix(YRPX) + packet))
+    replay = parse_edopro_container(_container(YRPX, _prefix(YRPX) + packet,
+                                                extended=True))
     assert goat_rules_screen(replay) == {
         "goat_rules_screen": "setup_candidate_only", "goat_rules_mismatches": [],
     }
+
+
+def test_goat_rules_screen_rejects_missing_seed_and_custom_rule_cards():
+    from scripts.inspect_edopro_replay import goat_rules_screen
+
+    payload = _prefix(YRP1) + struct.pack("<I", 0) * 4
+    payload += struct.pack("<II", 1, 12345678) + b"\x00"
+    replay = parse_edopro_container(_container(YRP1, payload))
+    assert goat_rules_screen(replay) == {
+        "goat_rules_screen": "unsupported_setup",
+        "goat_rules_mismatches": ["rng_seed", "custom_rule_cards"],
+    }
+    assert "12345678" not in str(goat_rules_screen(replay))
+
+
+def test_goat_rules_screen_rejects_disagreeing_yrpx_wrapper():
+    from scripts.inspect_edopro_replay import goat_rules_screen
+
+    payload = _prefix(YRP1) + struct.pack("<I", 0) * 5
+    legacy = _container(YRP1, payload, extended=True)
+    packet = bytes((231,)) + struct.pack("<I", len(legacy)) + legacy
+    wrapper = _container(YRPX, _prefix(YRPX, duel_flags=0) + packet,
+                         extended=True)
+    replay = parse_edopro_container(wrapper)
+    assert goat_rules_screen(replay) == {
+        "goat_rules_screen": "unsupported_setup",
+        "goat_rules_mismatches": ["wrapper_duel_flags"],
+    }
+    altered_seed = bytearray(wrapper)
+    altered_seed[40:48] = (99).to_bytes(8, "little")
+    replay = parse_edopro_container(bytes(altered_seed))
+    assert goat_rules_screen(replay)["goat_rules_mismatches"] == [
+        "wrapper_duel_flags", "wrapper_rng_seed"]
 
 
 @pytest.mark.parametrize("damage", (

@@ -10,6 +10,7 @@ from pathlib import Path
 from goat_ai.engine.decks import Decklist, read_goat_whitelist, validate_goat_deck
 from goat_ai.engine.ocgcore_probe import GOAT_FLAGS
 from goat_ai.replay import ReplayContainerError, read_edopro_container
+from goat_ai.replay.edopro_container import HAND_TEST, SINGLE_MODE, TAG
 from goat_ai.replay.edopro_reconstruct import (
     ReplayReconstructionError,
     reconstruct_legacy_responses,
@@ -17,7 +18,7 @@ from goat_ai.replay.edopro_reconstruct import (
 
 
 def goat_rules_screen(replay) -> dict:
-    """Check replay setup against the one native rules profile we currently run."""
+    """Screen the complete recorded startup against the supported native path."""
     deck_replay = replay.embedded_legacy_replay() or replay
     settings = deck_replay.settings
     if settings is None:
@@ -33,6 +34,20 @@ def goat_rules_screen(replay) -> dict:
         mismatches.append("opening_hand_size")
     if settings.draw_count != 1:
         mismatches.append("draw_count")
+    if deck_replay.header.flags & (TAG | SINGLE_MODE | HAND_TEST):
+        mismatches.append("legacy_replay_mode")
+    if deck_replay.header.seed_words is None or not any(deck_replay.header.seed_words):
+        mismatches.append("rng_seed")
+    if deck_replay.rule_cards:
+        mismatches.append("custom_rule_cards")
+    if replay is not deck_replay:
+        if replay.player_count != deck_replay.player_count:
+            mismatches.append("wrapper_player_count")
+        if replay.duel_flags != deck_replay.duel_flags:
+            mismatches.append("wrapper_duel_flags")
+        if (replay.header.seed_words is not None
+                and replay.header.seed_words != deck_replay.header.seed_words):
+            mismatches.append("wrapper_rng_seed")
     return {
         "goat_rules_screen": ("setup_candidate_only" if not mismatches
                               else "unsupported_setup"),
