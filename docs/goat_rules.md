@@ -449,6 +449,23 @@ Jar before resolution remains untested for this pair.
 
 **Zombyra the Dark:** GOAT-variant Zombyra appears in the [sourced Warrior Main Deck](../examples/decks/warrior_montague_clash.ydk) and had 40 selected source actions in the [seeded random-agent sample](competitive_action_coverage.md); that count measures protocol exposure, not tournament usage. [Historical rulings](https://www.goatformat.com/rulings8.html) say Zombyra cannot attack directly, loses 200 ATK immediately after destroying a monster by battle, and resets to 2100 ATK when turned face-down. Paired seeded native fixtures Normal Summon Zombyra, destroy a face-up Mystical Elf in battle for 1300 damage, and verify its ATK falls from 2100 to 1900. With no opposing monster on the next turn, neither branch offers a direct attack. In the Book of Moon branch, Zombyra is turned face-down after that battle and Flip Summoned on the following turn, restoring 2100 ATK; the control branch remains at 1900. Both complete duels serialize and replay-verify with the dedicated GOAT script. Additional battle modifiers and multiple reductions remain untested.
 
+**Skull Lair's Graveyard cost and face-up Level check:** Skull Lair appears in
+the sourced [Bazoo Return Main Deck](../examples/decks/bazoo_return_weirdchamp_worlds.ydk).
+Its [official TCG card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5264&ope=2&request_locale=en)
+uses Graveyard monsters and a face-up monster with Level equal to the number
+banished; [Skull Servant's official record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4030&ope=2&request_locale=en)
+identifies it as Level 1. The [historical 2003 tournament ruling](https://ms.yugipedia.com/a/a1/2003_tournament_rulings.pdf)
+also says Skull Lair cannot destroy a face-down monster or be used during the
+Damage Step, and permits repeated effect uses when the cost can be paid. A
+paired seed-18 native fixture discards a monster with Graceful Charity and
+Sets Skull Lair. When the opponent Normal Summons a face-up Skull Servant,
+Skull Lair banishes one Graveyard monster as cost and destroys that Level 1
+target. When the same monster is Set instead, the active Skull Lair offers no
+destruction effect and the Graveyard monster remains. Both full duels
+serialize, replay-verify, and pass the visibility audit. Repeated uses,
+Damage Step timing, and cost interactions with replacement effects remain
+untested.
+
 **Tribe-Infecting Virus versus Sheep Tokens:** [Historical Tribe rulings](https://www.goatformat.com/rulings7.html) require a currently represented face-up Type at activation and destroy face-up monsters of the declared Type. [Scapegoat's card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4818&ope=2&request_locale=en) identifies its Sheep Tokens as Beast; [GOAT tournament coverage](https://www.goatformat.com/home/round-nine-jonathan-labounty-vs-ryan-hayakawa) records a Beast declaration clearing Sheep Tokens. Paired seeded native fixtures Normal Summon Tribe and activate GOAT Scapegoat on the opposing side. Tribe discards pre-errata Sinister Serpent as its activation cost; the only Type choices are Aqua and Beast. Choosing Beast destroys all four Tokens, which enter neither Graveyard, while Tribe survives. Choosing Aqua destroys Tribe and leaves all four Tokens. Both outcomes preserve Life Points and verify the pinned Tribe, Serpent, and Scapegoat scripts loaded. Chained Type changes and partial Token removal remain untested.
 
 **Tribe-Infecting Virus priority versus Torrential Tribute:** [GoatFormat's basic mechanics guide](https://www.goatformat.com/basics.html) explicitly allows Tribe to activate its Ignition Effect after its Normal Summon before the opponent can use Book of Moon, and gives a separate example of Torrential Tribute responding after an Ignition Effect is activated. Combining those timing rules, a paired seeded native fixture has the opponent control four Sheep Tokens and Set Torrential, then Normal Summons Tribe. If the turn player uses priority, Tribe discards Sinister Serpent and declares Beast before Torrential chains; Torrential destroys Tribe and all four Tokens first, leaving Tribe's already activated effect with no face-up Beast to destroy. If the turn player passes priority, Torrential activates before Tribe's effect, and Serpent remains in hand. The exact Tribe/Torrential pairing is an inference from the two guide examples; the fixture verifies the pinned native behavior for both branches. Other summon-response chains and effect-negation responses remain untested.
