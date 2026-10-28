@@ -11556,3 +11556,41 @@ throughput claim. The ignored report is
 This narrow sample shows no competitive gain. The variant remains opt-in,
 and the next policy work should target reviewed timing and resource-use
 decisions across held-out decks.
+
+### Canonical whitelist coverage suite (28 October 2026)
+
+`scripts/probe_whitelist_coverage.py` deterministically selects one legal
+card ID per printed alias, excludes generated Tokens, partitions all 1,624
+canonical Main Deck IDs into 41 validated 40-card decks, and distributes all
+52 canonical Fusion IDs into Extra Decks. Each adjacent deck pair is played
+by seeded RandomAgents in a separate native process; the final odd deck is
+paired with the first. A worker failure remains visible in the report rather
+than terminating the entire sweep. Generated decks, trajectories, and the
+report stay in the ignored cache.
+
+With native seed 120000, a 3,000-decision limit, and four workers, **21/21
+duels reached terminal** in **13.32 measured wall seconds**. All **20,575**
+decisions replay-verified against the pinned native core, and all trajectories
+passed the player-visibility audit. The smallest and largest duel took 403
+and 1,533 decisions. Legal action lists mentioned 1,750 distinct card codes
+(including generated or alternate IDs), while selected action parameters
+mentioned 997. These are counts of protocol exposure, not counts of card
+effects that resolved. The ignored report is
+`.cache/goat-ai/whitelist_coverage_120000/report.json`, SHA-256
+`ae2948e634b5f7b9251e64fe6cce03b4ad3af293841d7f505bbad16cd844744f`.
+It records deck, native asset, card script, and probe-script hashes. No
+historical-ruling or competitive-strength conclusion follows from this
+random-agent sweep.
+
+Reproduce after [native setup](native_setup.md):
+
+```bash
+PYTHONPATH=src:. GOAT_AI_NATIVE_ROOT=.cache/goat-ai .venv/bin/python \
+  scripts/probe_whitelist_coverage.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_coverage_120000_reproduced \
+  --seed 120000 --max-decisions 3000 --workers 4
+```
+
+The next coverage step is to select cards whose effects or unusual prompts
+were not exercised and create forced-action native fixtures for them.

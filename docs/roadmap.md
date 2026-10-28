@@ -21,6 +21,16 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+A deterministic coverage suite now partitions every one of the **1,624**
+canonical legal Main Deck IDs into 41 valid decks and distributes all **52**
+canonical legal Fusion IDs into their Extra Decks. Pairing those decks ran
+21 isolated random-agent duels; all reached terminal state, all 20,575
+decisions replay-verified, and the visibility audit passed. This proves
+deck construction and sampled headless protocol operation across a complete
+static catalog partition. Many cards were never drawn or activated, so it
+does not prove every effect or arbitrary-deck correctness. See the
+[evaluation report](evaluation.md#canonical-whitelist-coverage-suite-28-october-2026).
+
 A tactical-agent Fusion stress sweep now adds 20 complete seeded duels on 40
 independently generated legal Main Decks with Scapegoat, Metamorphosis, and
 sampled Extra Decks containing Thousand-Eyes Restrict. All 12,385 decisions
