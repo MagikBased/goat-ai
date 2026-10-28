@@ -587,6 +587,14 @@ audit; the [ruling log](goat_rules.md) records the sources and limits.
 
 ## M3 — Evaluation and data
 
+Human choices from separate review queues over one verified replay can now be
+validated queue by queue and converted into a single replay-bound preference
+file. This lets an upstream activation correction coexist with target-choice
+reviews without changing either queue or silently counting a forced target as
+approval of the activation. Conflicting labels are rejected; only changed
+choices become pairwise preferences. Human data volume and independent review
+quality remain the M3/M4 bottlenecks.
+
 A new `examples/play_goat.py` path records a local human seat on arbitrary
 validated GOAT YDK Decks against a Random, Tactical, or saved policy opponent.
 It prints player-visible card names and field state, accepts only enumerated

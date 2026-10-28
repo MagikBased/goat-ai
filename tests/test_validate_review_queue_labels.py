@@ -11,6 +11,7 @@ from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, read_trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from scripts import convert_review_labels_to_preferences as converter
+from scripts import convert_multi_queue_reviews as multi_converter
 from scripts import create_review_recheck_queue as recheck
 from scripts import merge_review_queue_labels as merger
 from scripts import validate_review_queue_labels as validator
@@ -223,3 +224,54 @@ def test_merge_rejects_same_reviewer_contradiction(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="contradicted their choice"):
         merger.merge_labels(queue, [first, second], tmp_path, tmp_path / "merged")
     assert not (tmp_path / "merged").exists()
+
+
+def test_reviews_from_two_queues_form_one_replay_preference_file(tmp_path,
+                                                                  monkeypatch):
+    queue, labels, replay = review_files(tmp_path)
+    second_queue = tmp_path / "upstream.json"
+    queue_data = json.loads(queue.read_text())
+    queue_data["selected"][0]["decision_index"] = 1
+    queue_data["selected"][0]["viewer_frame"] = 2
+    second_queue.write_text(json.dumps(queue_data))
+    second_labels = tmp_path / "upstream_labels.json"
+    labels_data = json.loads(labels.read_text())
+    labels_data["choices"][0]["decision_index"] = 1
+    second_labels.write_text(json.dumps(labels_data))
+    duplicate_queue = tmp_path / "duplicate_queue.json"
+    duplicate_queue.write_bytes(queue.read_bytes())
+    duplicate_labels = tmp_path / "duplicate_labels.json"
+    duplicate_labels.write_bytes(labels.read_bytes())
+    monkeypatch.setattr(validator, "verify_trajectory", lambda *_: 2)
+    monkeypatch.setattr(validator, "audit_trajectory_visibility", lambda *_: None)
+
+    report = multi_converter.convert_pairs(
+        [(queue, labels), (second_queue, second_labels),
+         (duplicate_queue, duplicate_labels)], tmp_path,
+        tmp_path / "combined")
+    assert report["reviewed_decisions"] == 2
+    assert report["changed_preferences"] == 2
+    assert len(report["cases"]) == 1
+    path = Path(report["cases"][0]["preferences"])
+    payload = json.loads(path.read_text())
+    assert [item["decision_index"] for item in payload["preferences"]] == [0, 1]
+    assert len(payload["source_review_inputs"]) == 3
+    assert payload["source_trajectory_sha256"] == sha256_file(replay)
+
+
+def test_cross_queue_conflicting_choice_rejected_before_writing(tmp_path,
+                                                                  monkeypatch):
+    queue, labels, _ = review_files(tmp_path)
+    second_queue = tmp_path / "second_queue.json"
+    second_queue.write_bytes(queue.read_bytes())
+    second_labels = tmp_path / "second_labels.json"
+    raw = json.loads(labels.read_text())
+    raw["choices"][0]["action_index"] = 0
+    second_labels.write_text(json.dumps(raw))
+    monkeypatch.setattr(validator, "verify_trajectory", lambda *_: 2)
+    monkeypatch.setattr(validator, "audit_trajectory_visibility", lambda *_: None)
+    output = tmp_path / "combined"
+    with pytest.raises(ValueError, match="conflicting review choices"):
+        multi_converter.convert_pairs(
+            [(queue, labels), (second_queue, second_labels)], tmp_path, output)
+    assert not output.exists()

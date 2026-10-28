@@ -87,6 +87,15 @@ PYTHONPATH=src:. .venv/bin/python scripts/create_upstream_review.py \
   --native-root .cache/goat-ai
 ```
 
+After an upstream choice is saved, both queues' labels for the same replay can
+be validated and converted into **one** preference file with
+`scripts/convert_multi_queue_reviews.py --case ORIGINAL_QUEUE ORIGINAL_LABEL
+--case UPSTREAM_QUEUE UPSTREAM_LABEL --native-root .cache/goat-ai --output-dir
+OUTPUT_DIR`. The converter rejects contradictory choices for one decision,
+deduplicates matching choices, and emits a preference only where a reviewer
+selected a legal action different from the replayed AI action. The original
+queue's labels and the upstream queue's labels remain separate on disk.
+
 The [local queue](../.cache/goat-ai/new_jersey_high_margin_review_96000_96001/queue.html)
 uses the same eight independently sourced 2005 New Jersey duels described
 below. It retains **22** distinct policy/Tactical-v14 disagreements from
