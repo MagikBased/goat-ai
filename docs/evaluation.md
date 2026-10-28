@@ -9608,3 +9608,30 @@ lint command passed. The 66 tests covering the touched files and related
 scripts passed in 58.66 seconds with the pinned native assets. The full
 1,296-test suite was not repeated after these lint-only edits; this section
 keeps the two verification scopes distinct.
+
+## Further distinct-whitelist protocol sweep (27 October 2026)
+
+On the current adapter, seeds 10556–10605 paired 50 independently generated,
+whitelist-legal 40-card Main Decks with 50 different opponent decks. All
+**50/50** games reached native terminal outcomes without an adapter error or
+the 3,000-decision cap. All **56,827** decisions replay-verified against fresh
+pinned engines and passed the player-visible information audit. The longest
+duel took 1,731 decisions. The audit observed 579 hidden-field choices, 2,814
+opponent-field choices, and 14 opponent-hand choices. The report records 1,198
+loaded native assets, 4,282 card-source/action-kind pairs, and 35 selected
+chain-response pairs. Its ignored artifact is
+`.cache/goat-ai/whitelist_distinct_10556_10605/report.json` (SHA-256
+`ce1afbd533b67ec634d5a152eaa637727ee51a427ee3633d2e19332afd1cc7c9`).
+Reproduce after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_distinct_10556_10605 \
+  --seed 10556 --seeds 50 --max-decisions 3000 \
+  --verify-replays --distinct-opponents --count-card-actions
+```
+
+This is additional M1 protocol and observation evidence from random decks and
+random decisions. It does not validate every sampled card's historical ruling
+or measure competitive playing strength.
