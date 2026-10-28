@@ -86,9 +86,9 @@
     .phase-chip.active { border-color: #faf4b1; background: radial-gradient(circle, #d80d58, #830526); color: #fff; box-shadow: 0 0 15px #fb2c77; animation: phase-glow 1.6s ease-in-out infinite alternate; }
     .phase-turn { width: 39px; padding: 4px 2px; border-radius: 6px; background: #133342; font-size: .72rem; line-height: 1.1; text-align: center; }
     .phase-turn span { display: block; }
-    .chain-link-badge { position: relative; width: 43px; height: 43px; flex: 0 0 43px; display: grid; place-items: center; border: 3px solid #f0cf76; border-radius: 50%; background: radial-gradient(circle, #564224, #18232b); color: #fff5d0; box-shadow: 0 0 10px #d4a84d88; }
-    .chain-link-badge svg { position: absolute; inset: 5px; width: 27px; height: 27px; opacity: .64; stroke: currentColor; fill: none; stroke-width: 2.8; }
-    .chain-link-badge strong { position: relative; z-index: 1; padding: 0 3px; border-radius: 6px; background: #112129d9; font-size: .86rem; line-height: 1.1; }
+    .chain-link-badge { width: 46px; height: 46px; flex: 0 0 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 3px solid #f0cf76; border-radius: 50%; background: radial-gradient(circle, #564224, #18232b); color: #fff5d0; box-shadow: 0 0 10px #d4a84d88; }
+    .chain-link-badge svg { width: 22px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+    .chain-link-badge strong { font-size: .85rem; line-height: 1; text-shadow: 0 1px 3px #000; }
     .hand { flex: 0 0 48px; min-width: 0; display: flex; align-items: flex-start; gap: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
     .hand-row { flex: 0 0 48px; height: 48px; min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(60px, 10%) minmax(0, 1fr) minmax(60px, 10%); gap: 6px; overflow: hidden; }
     .hand-row .hand { justify-content: safe center; }
@@ -779,16 +779,11 @@
         badge.setAttribute("aria-label", `Chain Link ${number}`);
         badge.title = `Current chain: Chain Link ${number}`;
         const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        icon.setAttribute("viewBox", "0 0 32 32");
+        icon.setAttribute("viewBox", "0 0 24 24");
         icon.setAttribute("aria-hidden", "true");
-        for (const [x, y, rotation] of [[11, 11, -42], [21, 21, -42]]) {
-          const link = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-          link.setAttribute("x", String(x - 7)); link.setAttribute("y", String(y - 4));
-          link.setAttribute("width", "14"); link.setAttribute("height", "8");
-          link.setAttribute("rx", "4");
-          link.setAttribute("transform", `rotate(${rotation} ${x} ${y})`);
-          icon.append(link);
-        }
+        const links = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        links.setAttribute("d", "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71");
+        icon.append(links);
         badge.append(icon, node("strong", "", String(number)));
         rail.append(badge);
       }

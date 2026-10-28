@@ -109,7 +109,8 @@ def test_skip_passes_keeps_newly_chained_trap_face_up(tmp_path):
       document.body.dataset.chainProbe = [index, trap?.classList.contains('facedown'),
         trap?.title, document.querySelectorAll('.card-flip').length,
         document.querySelector('.chain-link-badge')?.getAttribute('aria-label'),
-        document.querySelector('.chain-link-badge strong')?.textContent].join('|');
+        document.querySelector('.chain-link-badge strong')?.textContent,
+        Boolean(document.querySelector('.chain-link-badge svg path'))].join('|');
     </script></body>"""
     path = tmp_path / "chained_trap.html"
     path.write_text(html.replace("</body>", probe), encoding="utf-8")
@@ -120,7 +121,7 @@ def test_skip_passes_keeps_newly_chained_trap_face_up(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-chain-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "2|false|Second Trap|1|Chain Link 2|2"
+    assert match.group(1) == "2|false|Second Trap|1|Chain Link 2|2|true"
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
