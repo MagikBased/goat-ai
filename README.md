@@ -120,7 +120,7 @@ start the [local review server](docs/replay_audit.md) from the repository root:
 ./start_review_viewer.sh
 ```
 
-This opens the newest local review queue in your browser. To open a specific
+This opens the newest local review queue or recheck queue in your browser. To open a specific
 queue, pass its `queue.json` path as an argument. The launcher reuses a running
 server for that queue and writes startup logs to
 `.cache/goat-ai/review_server.log`. On Cinnamon/Linux Mint, run

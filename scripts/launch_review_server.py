@@ -18,7 +18,8 @@ LOG = ROOT / ".cache/goat-ai/review_server.log"
 
 def latest_queue() -> Path | None:
     queues = (path for directory in SEARCH_DIRS if directory.exists()
-              for path in directory.glob("*/queue.json")
+              for name in ("queue.json", "recheck.json")
+              for path in directory.glob(f"*/{name}")
               if path.with_suffix(".html").is_file())
     return max(queues, key=lambda path: (path.stat().st_mtime_ns, str(path)),
                default=None)
@@ -63,7 +64,7 @@ def launch(queue: Path, *, open_browser: bool = True) -> str:
     if not queue.is_file() or not queue.is_relative_to(ROOT):
         raise ValueError("queue must be an existing file inside the goat-ai repository")
     if not queue.with_suffix(".html").is_file():
-        raise ValueError("queue.html is missing; refresh this queue first")
+        raise ValueError(f"{queue.stem}.html is missing; refresh this queue first")
     route = "/" + queue.with_suffix(".html").relative_to(ROOT).as_posix()
     for port in range(8765, 8785):
         existing = server_queue(port)
@@ -102,7 +103,7 @@ def launch(queue: Path, *, open_browser: bool = True) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("queue", nargs="?", type=Path,
-                        help="queue.json to open; defaults to the newest local queue")
+                        help="queue or recheck JSON to open; defaults to the newest local queue")
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
     queue = args.queue or latest_queue()
