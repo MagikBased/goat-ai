@@ -9560,6 +9560,39 @@ pairs, both assignments and seats, and the fresh seeds above. The matched
 Tactical reports passed `scripts/compare_tournament_reports.py
 --require-unseen-main-decks`.
 
+### Longer fit on the same on-policy Tactical labels (28 October 2026)
+
+To test whether the one-epoch result was simply underfit, feature v23 was
+retrained from the same selected parent and the same 32 verified policy-visited
+duels for **three epochs**. The 3,018 multi-option synthetic Tactical-v14
+labels and all other training settings were unchanged. Epoch losses were
+**0.5783, 0.4796, and 0.4480**. The experimental checkpoint is ignored local
+data at `.cache/goat-ai/fv23_on_policy_mix_3epoch_61000_61001.pt` (SHA-256
+`5ace8a82f250c42a00de858032cb2e34287648b72a967cb65282c9364c393991`).
+
+On the same 20 Main Deck compositions absent from both checkpoints' training
+provenance, but fresh duel seeds 64000–64001, the three-epoch child scored
+**42–38** directly against the selected parent over 80 games (paired score
+interval **45.0–58.75%**). On a separate matched Tactical-v14 schedule with
+seeds 64002–64003, the child scored **24–55–1** and the parent **27–53**.
+`compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks` validated the schedule and reported a paired
+child-minus-parent score difference of **−3.125 percentage points**, 95%
+interval **−12.5 to +5.625 points**. Lower teacher-label loss did not
+establish a competitive improvement; the selected parent stays unchanged.
+
+The ignored direct, child-versus-Tactical, and parent-versus-Tactical reports
+have SHA-256 values `44710600aaa6043f5f0ebc1c170fe345f865e13e3144e5c13951f89e510ae952`,
+`6628ec161e92a33c41f09fe4d4401e0851318f2f0e62bcea1f7cdd4583dbb83f`, and
+`093dd23092c967dc95e448d208b2337183a72effc784610b335d4e0df96955b4`
+respectively. To reproduce the fit, use the preceding on-policy cloning
+command with `--epochs 3`, the same 32 trajectory files, and the checkpoint
+path above. Evaluate the ten generated deck pairs from source seeds
+11010–11019 with both deck assignments and seats, two duel seeds per pair,
+and `--require-unseen-main-decks`; use seeds 64000–64001 for the direct parent
+match and 64002–64003 for both Tactical arms. This remains an automated
+teacher experiment, not human imitation data.
+
 ### Half-Tactical PPO continuation from the current-core child (27 October 2026)
 
 A new clipped-PPO trial began from the current-core Tactical-imitation child,

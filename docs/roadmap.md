@@ -651,6 +651,14 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+Extending the verified on-policy Tactical-v14 imitation fit from one to three
+epochs reduced teacher-label loss, but the child scored 24–55–1 versus
+Tactical on fresh held-out mixed decks, compared with the selected parent's
+27–53 on the same schedule. The paired interval crosses zero; see the
+[three-epoch check](evaluation.md#longer-fit-on-the-same-on-policy-tactical-labels-28-october-2026).
+The parent remains selected. More epochs on these synthetic labels have not
+closed the competitive gain gate.
+
 A four-duel Tactical imitation continuation on previously unseen Rhymus/Zombie
 2005 decks scored 35–28–1 against its parent on an independent Phoenix/Dimension
 Fusion pairing. The paired interval includes 50%, and its matched Tactical
