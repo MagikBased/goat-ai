@@ -13,7 +13,13 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from goat_ai.agents import RandomAgent
+from goat_ai.agents import (
+    RandomAgent,
+    TacticalHeuristicAgent,
+    load_card_facts,
+    load_card_races,
+    load_flip_monster_codes,
+)
 from goat_ai.engine.decks import (
     Decklist,
     read_goat_whitelist,
@@ -142,9 +148,12 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
           count_card_actions: bool = False,
           repeat_seeds: bool = False,
           random_extra: bool = False,
-          fusion_stress: bool = False) -> dict:
+          fusion_stress: bool = False,
+          agent_name: str = "random") -> dict:
     if card_pool not in ("whitelist", "tournament"):
         raise ValueError("unknown card pool")
+    if agent_name not in ("random", "tactical"):
+        raise ValueError("unknown probe agent")
     if random_extra and card_pool != "whitelist":
         raise ValueError("random Extra Decks require the whitelist card pool")
     if fusion_stress and not random_extra:
@@ -160,6 +169,17 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
     repeated_decisions = 0
     loaded_assets: dict[str, str] = {}
     rules_profile = None
+    tactical_metadata = ((load_flip_monster_codes(root), load_card_races(root),
+                          load_card_facts(root)) if agent_name == "tactical" else None)
+
+    def agents_for(seed: int):
+        if tactical_metadata is None:
+            agent = RandomAgent(seed)
+            return agent, agent
+        flips, races, facts = tactical_metadata
+        return (TacticalHeuristicAgent(flips, races, card_facts=facts),
+                TacticalHeuristicAgent(flips, races, card_facts=facts))
+
     for seed in range(first_seed, first_seed + seeds):
         generator = (lambda deck_seed: generate_deck(
             root, deck_seed, include_random_extra=random_extra,
@@ -179,11 +199,12 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
             with GoatEnvironment(str(path), str(opponent_path), seed,
                                  ExperimentalOcgcoreEngine(root)) as env:
                 observation = env.reset()
-                agent = RandomAgent(seed)
+                agents = agents_for(seed)
                 while not env.is_terminal() and decisions < max_decisions:
                     actions = env.legal_actions()
                     kinds.update(action.kind for action in actions)
-                    observation = env.step(agent.select_action(observation, actions))
+                    observation = env.step(agents[observation.acting_player].select_action(
+                        observation, actions))
                     decisions += 1
                 terminal = env.is_terminal()
                 winner = env.result() if terminal else None
@@ -218,14 +239,14 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
                 with GoatEnvironment(str(path), str(opponent_path), seed,
                                      ExperimentalOcgcoreEngine(root)) as repeated:
                     repeated_observation = repeated.reset()
-                    repeated_agent = RandomAgent(seed)
+                    repeated_agents = agents_for(seed)
                     for _ in range(decisions):
                         if repeated.is_terminal():
                             raise RuntimeError("seeded repeat ended before the original duel")
                         repeated_actions = repeated.legal_actions()
                         repeated_observation = repeated.step(
-                            repeated_agent.select_action(repeated_observation,
-                                                         repeated_actions))
+                            repeated_agents[repeated_observation.acting_player].select_action(
+                                repeated_observation, repeated_actions))
                     repeated_trajectory = repeated.trajectory() if repeated.is_terminal() else None
                     if (repeated_trajectory is None
                             or repeated_trajectory.decisions != trajectory.decisions
@@ -251,6 +272,9 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
             game["deterministic_repeat"] = error is None
         games.append(game)
     report = {"max_decisions": max_decisions, "games": games}
+    if agent_name != "random":
+        report["agent"] = agent_name
+        report["agent_version"] = TacticalHeuristicAgent.teacher_version
     if card_pool != "whitelist":
         report["card_pool"] = card_pool
     if distinct_opponents:
@@ -317,8 +341,11 @@ def probe_isolated(root: Path, output: Path, first_seed: int, seeds: int,
                    count_card_actions: bool = False,
                    repeat_seeds: bool = False,
                    random_extra: bool = False,
-                   fusion_stress: bool = False) -> dict:
+                   fusion_stress: bool = False,
+                   agent_name: str = "random") -> dict:
     """Run each native duel in a child process so one crash does not erase the sweep."""
+    if agent_name not in ("random", "tactical"):
+        raise ValueError("unknown probe agent")
     if output.exists() and any(output.iterdir()):
         raise ValueError("isolated probe output must be empty")
     output.mkdir(parents=True, exist_ok=True)
@@ -330,6 +357,8 @@ def probe_isolated(root: Path, output: Path, first_seed: int, seeds: int,
                    "--native-root", str(root.resolve()), "--output", str(directory.resolve()),
                    "--seed", str(seed), "--seeds", "1", "--max-decisions", str(max_decisions),
                    "--card-pool", card_pool]
+        if agent_name != "random":
+            command.extend(("--agent", agent_name))
         for enabled, flag in ((verify_replays, "--verify-replays"),
                               (distinct_opponents, "--distinct-opponents"),
                               (count_card_actions, "--count-card-actions"),
@@ -372,6 +401,13 @@ def probe_isolated(root: Path, output: Path, first_seed: int, seeds: int,
                         ("random_extra", random_extra), ("fusion_stress", fusion_stress)):
         if value:
             merged[flag] = value
+    if agent_name != "random":
+        merged["agent"] = agent_name
+        merged["agent_version"] = TacticalHeuristicAgent.teacher_version
+    if any((report.get("agent", "random") != agent_name
+            or agent_name == "tactical" and report.get("agent_version")
+            != TacticalHeuristicAgent.teacher_version) for report in reports):
+        raise ValueError("isolated worker used a different probe agent")
     if distinct_opponents:
         merged["opponent_seed_offset"] = 1_000_000
     if random_extra:
@@ -439,6 +475,8 @@ def main() -> None:
     parser.add_argument("--max-decisions", type=int, default=500)
     parser.add_argument("--card-pool", choices=("whitelist", "tournament"),
                         default="whitelist")
+    parser.add_argument("--agent", choices=("random", "tactical"), default="random",
+                        help="visible-observation agent used by both seats")
     parser.add_argument("--verify-replays", action="store_true")
     parser.add_argument("--distinct-opponents", action="store_true",
                         help="generate an independent legal opponent deck per seed")
@@ -459,7 +497,8 @@ def main() -> None:
     report = runner(args.native_root, args.output, args.seed, args.seeds,
                     args.max_decisions, args.card_pool, args.verify_replays,
                     args.distinct_opponents, args.count_card_actions,
-                    args.repeat_seeds, args.random_extra, args.fusion_stress)
+                    args.repeat_seeds, args.random_extra, args.fusion_stress,
+                    args.agent)
     for game in report["games"]:
         status = "error" if game["error"] else "terminal" if game["terminal"] else "limit"
         suffix = f" error={game['error']}" if game["error"] else ""

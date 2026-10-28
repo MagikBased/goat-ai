@@ -9931,3 +9931,37 @@ Reproduce with the [tournament-card probe command above](#tournament-card-mix-pr
 using a fresh output directory, `--seed 10800 --seeds 4 --isolate-games`.
 Process isolation makes failure triage possible; it does not repair a native
 crash or certify historical card behavior.
+
+## Tactical-agent tournament-card protocol sweep (28 October 2026)
+
+The isolated random-deck probe now accepts `--agent tactical` as well as its
+original RandomAgent default. Tactical-v14 receives the same player-visible
+observation and legal actions as the policy; its card metadata is loaded from
+the pinned databases. Each seat has its own agent instance. A seeded fixture
+repeats a Tactical duel and checks identical decisions and outcome, then
+checks that an isolated worker records the same result and agent version.
+
+On seeds 10990–11029, independently generated legal tournament-card Main
+Decks faced distinct independently generated opponents. All **40/40 Tactical
+duels reached terminal**; all **17,819 decisions** replay-verified and passed
+the visibility audit. The run loaded 103 native assets and selected 1,910
+source-card actions, including 359 attacks and 35 position changes. The
+ignored report is
+`.cache/goat-ai/tactical_tournament_isolated_10990_11029/report.json`
+(SHA-256 `e6f17f03a05ba8f86cfec90c420e62295690ef077ceb779bf0a39944e3c35867`).
+
+A matched RandomAgent protocol run used exactly the same 40 seed/deck pairs:
+**40/40 terminal**, **36,830/36,830 replay-verified and visibility-audited
+decisions**, with 337 attacks and 1,056 position changes. Its ignored report
+is `.cache/goat-ai/random_tournament_isolated_10990_11029/report.json`
+(SHA-256 `d7f8ac02237cf2180ba8d4efbd8bb5692088b3b9d8be0415583fde6bd5cc2727`).
+The deck hashes match pairwise, while all 40 decision counts and 20 winners
+differ. These are **separate self-play protocol probes**, with each agent
+controlling both seats; their action counts and outcomes are not a competitive
+head-to-head comparison or a historical-correctness validation.
+
+Reproduce either run with `scripts/probe_random_decks.py --native-root
+.cache/goat-ai --card-pool tournament --seed 10990 --seeds 40
+--max-decisions 3000 --distinct-opponents --verify-replays
+--count-card-actions --isolate-games --agent AGENT --output OUTPUT`, setting
+`AGENT` to `tactical` or `random` and using a fresh output directory.

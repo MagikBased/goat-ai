@@ -192,3 +192,25 @@ def test_isolated_probe_keeps_later_verified_game_after_worker_crash(tmp_path, m
     assert report["visibility_audit"]["decisions"] == passed["decisions"]
     assert report["card_actions"]
     assert json.loads((tmp_path / "isolated" / "report.json").read_text()) == report
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_tactical_tournament_probe_is_reproducible_in_isolated_mode(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    options = {"card_pool": "tournament", "verify_replays": True,
+               "distinct_opponents": True, "repeat_seeds": True,
+               "agent_name": "tactical"}
+    direct = probe(root, tmp_path / "direct", 18650, 1, 3000, **options)
+    isolated = probe_isolated(root, tmp_path / "isolated", 18650, 1, 3000, **options)
+    for report in (direct, isolated):
+        assert report["agent"] == "tactical"
+        assert report["games"][0]["terminal"] and report["games"][0]["error"] is None
+        assert report["games"][0]["deterministic_repeat"] is True
+        assert report["replay_verification"]["verified_decisions"] == (
+            report["games"][0]["decisions"])
+        assert report["visibility_audit"]["decisions"] == report["games"][0]["decisions"]
+    assert direct["games"][0]["decisions"] == isolated["games"][0]["decisions"]
+    assert direct["games"][0]["winner"] == isolated["games"][0]["winner"]
+    assert direct["games"][0]["deck_sha256"] == isolated["games"][0]["deck_sha256"]
+    child = json.loads(Path(isolated["worker_reports"][0]).read_text())
+    assert child["agent"] == "tactical" and child["agent_version"] == 14

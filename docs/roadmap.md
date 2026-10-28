@@ -286,6 +286,12 @@ and later seeds continue. Four tournament-card duels reproduced the matching
 single-process outcomes and replay-verified 3,330 decisions; see the
 [isolation check](evaluation.md#isolated-native-deck-probe-28-october-2026).
 
+The same isolated probe can now run Tactical-v14 through the player-visible
+agent API. Forty legal, distinct-opponent tournament-card duels completed with
+17,819 verified decisions, while a matched RandomAgent run completed 40 duels
+with 36,830 verified decisions. This expands realistic protocol coverage but
+does not compare their playing strength; see the [matched probe](evaluation.md#tactical-agent-tournament-card-protocol-sweep-28-october-2026).
+
 The native adapter now decodes bounded `MSG_SELECT_COUNTER` prompts as
 `select_counters` actions with explicit per-card amounts. It sends the core's
 ordered 16-bit allocation response and checks that each offered amount is
