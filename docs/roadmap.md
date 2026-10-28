@@ -396,6 +396,8 @@ Solemn is legal before Jinzo's continuous Trap suppression applies, but is
 unavailable after a successful Summon. Both full duels replay-verify and pass
 visibility checks; see [the ruling note](goat_rules.md#solemn-judgment-against-jinzos-tribute-summon).
 
+A paired Premature Burial/Giant Trunade versus Heavy Storm fixture now checks the 2003 return-versus-destruction ruling, public returned-hand memory, and same-turn reuse of Premature for a second revival. Both full duels replay-verify and pass visibility checks; see [GOAT rules](goat_rules.md#premature-burial-returned-by-giant-trunade).
+
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
 
 A focused native first-turn draw fixture now checks both players' initial hand
