@@ -48,6 +48,50 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
   --output .cache/goat-ai/current_2005_development_review_49600_49601/fv23_human24_vs_parent_df_92100_92115.json
 ```
 
+### Pairwise preference check on changed choices
+
+A separate exploratory update interpreted only the **11 changed choices** as
+pairwise preferences over the policy's recorded action. The 13 matching
+choices made no preference claim; unselected legal actions were not marked
+bad. `scripts/convert_review_labels_to_preferences.py` validates the exact
+queue, replay, visible decisions, and labels before writing this conversion.
+The update used 60 optimization steps at learning rate `0.0001`, seed 173,
+parent-KL weight 1.0, and 96 verified preservation states sampled from four
+parent-training replays on the same first-patch native binary.
+
+On the 11 **training** preferences, the unchanged parent ranked the selected
+alternative first in 0 cases, and the child did so in 3. Mean selected-minus-
+recorded logit margin moved from −2.736 to −0.781. On the **current** native
+core, the child then played the unchanged parent on the two independent
+Dimension Fusion Main Decks, seeds 93100–93115, both deck assignments, and
+both seats. It scored **29 wins and 35 losses** across 64 terminal games
+(45.3%; paired-seed bootstrap 95% interval 35.9%–54.7%). By assigned deck,
+it went 21–11 with the guide list and 8–24 with the reference list. This
+does not show a competitive gain, so the child was not promoted.
+
+The ignored child checkpoint SHA-256 is
+`5b4216e9a0d5fc76fd126c34fadc656128f5eff3041910783da428cfd86e7e6c`;
+the ignored tournament report SHA-256 is
+`642fde7518881e94bb5cccff07b05aa12bd97e85487ee87094a3433796c31df9`.
+The converted preferences and input hashes are in
+`.cache/goat-ai/current_2005_development_review_49600_49601/changed_preferences/manifest.json`.
+Reproduce the conversion after [building the first-patch native root](native_setup.md):
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/convert_review_labels_to_preferences.py \
+  .cache/goat-ai/current_2005_development_review_49600_49601/queue.json \
+  .cache/goat-ai/review_labels/3abe11ebfb60/*.json \
+  --native-root .cache/goat-ai/first_patch_review_native \
+  --output-dir .cache/goat-ai/current_2005_development_review_49600_49601/changed_preferences_rebuild
+```
+
+The run used `scripts/train_review_preferences.py` with the six replay and
+preference paths in that manifest, plus the four parent-provenance replays
+`seed_33016_seat_{0,1}.json` and `seed_33030_seat_{0,1}.json` under
+`.cache/goat-ai/current_tactical_goat_mirror_33016_33031/` as
+`--preserve-trajectory` inputs. It used the first-patch root during training
+and `.cache/goat-ai` for current-core evaluation.
+
 ## Full local native regression (28 October 2026)
 
 On commit `5edecd98f82f7344a3eb792055cc13f74fad2801`, with the pinned

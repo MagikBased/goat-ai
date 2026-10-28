@@ -1,14 +1,16 @@
 """Downloaded review labels must match the shortlisted visible decisions."""
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from goat_ai.actions import Action
 from goat_ai.observations import Observation
-from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
+from goat_ai.replay import DecisionRecord, Trajectory, read_trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
+from scripts import convert_review_labels_to_preferences as converter
 from scripts import create_review_recheck_queue as recheck
 from scripts import merge_review_queue_labels as merger
 from scripts import validate_review_queue_labels as validator
@@ -66,6 +68,40 @@ def test_queue_label_validation_binds_replay_and_shortlisted_choice(tmp_path, mo
     labels.write_text(json.dumps(data))
     with pytest.raises(ValueError, match="outside shortlisted"):
         validator.validate_labels(queue, [labels], tmp_path)
+
+
+def test_changed_review_choice_becomes_only_recorded_pairwise_preference(
+    tmp_path, monkeypatch,
+):
+    queue, labels, replay = review_files(tmp_path)
+    trajectory = read_trajectory(replay)
+    third = Action("c", "set_spell_trap", 0)
+    trajectory = replace(trajectory, decisions=tuple(
+        replace(record, legal_actions=(*record.legal_actions, third))
+        for record in trajectory.decisions))
+    write_trajectory(replay, trajectory)
+    digest = sha256_file(replay)
+    offered = json.loads(queue.read_text())
+    offered["selected"][0]["trajectory_sha256"] = digest
+    offered["selected"][0]["legal_action_count"] = 3
+    offered["selected"].append({**offered["selected"][0],
+                                "decision_index": 1, "viewer_frame": 2})
+    queue.write_text(json.dumps(offered))
+    raw = json.loads(labels.read_text())
+    raw["source_trajectory_sha256"] = digest
+    raw["choices"].append({"decision_index": 1, "action_index": 0})
+    labels.write_text(json.dumps(raw))
+    monkeypatch.setattr(validator, "verify_trajectory", lambda *_: 2)
+    monkeypatch.setattr(validator, "audit_trajectory_visibility", lambda *_: None)
+
+    manifest = converter.convert(queue, [labels], tmp_path, tmp_path / "preferences")
+    assert manifest["reviewed_decisions"] == 2
+    assert manifest["changed_preferences"] == 1
+    item = json.loads(Path(manifest["cases"][0]["preferences"]).read_text())
+    assert item["source_trajectory_sha256"] == sha256_file(replay)
+    assert item["preferences"] == [{"decision_index": 0,
+                                    "preferred_action_indices": [1],
+                                    "disfavored_action_indices": [0]}]
 
 
 def test_ambiguous_review_recheck_starts_with_fresh_choices(tmp_path, monkeypatch):

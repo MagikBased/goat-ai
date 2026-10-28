@@ -122,6 +122,10 @@ checkpoint's recorded training provenance. These 24 labels are feedback on
 individual choices, not a competitive-strength estimate. A local exploratory
 checkpoint has since been trained on them; it was not promoted after held-out
 evaluation. See [the evaluation log](evaluation.md#local-human-review-label-update-28-october-2026).
+Only the 11 changed choices were also converted into pairwise preferences
+against the AI's recorded action. That separate update likewise failed to
+show a held-out gain; see the
+[preference check](evaluation.md#pairwise-preference-check-on-changed-choices).
 
 For automatic saving, run from the repository root:
 
