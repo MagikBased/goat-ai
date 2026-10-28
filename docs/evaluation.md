@@ -9361,6 +9361,48 @@ for Rhymus Tactical, and
 `c1d6cde278c953b21d467b5572411089b08eb4e5be01b936f76f2d7bc146ca4b`
 for Phoenix Tactical.
 
+### Strict Heavy Storm card-advantage ablation (27 October 2026)
+
+The existing opt-in `tactical_card_advantage` variant filters Heavy Storm when
+its visible opposing backrow count does not exceed the friendly cards it
+would destroy. Its other decisions use Tactical v14. On the 64 previously
+replay-verified current-core policy duels at
+`.cache/goat-ai/fixed_policy_value_44000_44015/`, Heavy Storm was a legal
+activation in 311 of 31,729 recorded decisions; the strict guard changed
+Tactical's selected action in 48 decisions across 16 duels. This is an
+offline disagreement count on policy-visited states, not a win-rate result.
+
+In a predeclared head-to-head evaluation against unchanged Tactical v14, the
+variant scored **119 wins, 119 losses, and 2 draws** over 240 terminal games:
+all 15 pairings of six sourced tournament Main Decks, both deck assignments,
+both seats, and seeds 55000–55003. Its score was **50.0%**, with a paired
+bootstrap 95% interval of **48.75–51.25%**. First-seat score was 58.75%; the
+second-seat score was 41.25%, illustrating the seat effect rather than a
+guard advantage. There were 100,780 decisions, maximum 1,425 in one game.
+The four-worker tournament took a measured 15.687 seconds on the logged
+Linux x86_64 host. These sampled experimental-core games do not establish a
+playing-strength gain or historical-ruling correctness. Keep the guard
+opt-in and do not promote it as the demonstration teacher.
+
+The evaluator initially mislabeled the named Tactical variant as teacher
+version 1. Its report metadata now records both sides as base Tactical v14;
+the variant name distinguishes the extra guard. Rerunning after that fix
+produced exactly the same 240 game records. The corrected ignored report is
+`.cache/goat-ai/card_advantage_vs_tactical_55000_55003_corrected.json`
+(SHA-256 `5cc7f681af3e90ee307977925c3cae3711652de989ab055a92f90a579fd082da`).
+It includes the source, native asset, script-tree, deck, and schedule hashes.
+Reproduce from the pinned native setup with:
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai OMP_NUM_THREADS=1 PYTHONPATH=src:. \
+  .venv/bin/python scripts/evaluate_native.py \
+  --native-root .cache/goat-ai --engine experimental \
+  --tournament-corpus --both-deck-assignments \
+  --agent-a tactical_card_advantage --agent-b tactical \
+  --seed 55000 --seeds 4 --workers 4 --max-decisions 3000 \
+  --output .cache/goat-ai/card_advantage_vs_tactical_55000_55003_corrected.json
+```
+
 ### Further distinct-whitelist protocol sweep (27 October 2026)
 
 Starting from project commit `f1814a3`, a new full GOAT-whitelist sample used

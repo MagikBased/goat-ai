@@ -1130,6 +1130,13 @@ review queue also persisted. Keep the child experimental and prioritize
 independently reviewed decision feedback and outcome learning; see
 [evaluation](evaluation.md#additional-tactical-imitation-and-cross-family-holdout-27-october-2026).
 
+The opt-in strict Heavy Storm card-advantage guard changed 48 Tactical-v14
+choices across 16 of 64 previously verified policy duels, but scored
+119–119–2 against unchanged Tactical v14 over a balanced 240-game sourced-deck
+tournament. Keep it opt-in; the result does not improve the provisional
+teacher or M4's learned-policy gate. The evaluator now records the correct
+base teacher version for named Tactical variants; see [evaluation](evaluation.md#strict-heavy-storm-card-advantage-ablation-27-october-2026).
+
 ## M5 — Search and other formats
 
 

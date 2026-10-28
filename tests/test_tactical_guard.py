@@ -11,7 +11,7 @@ from goat_ai.agents.tactical_guard import (
     weak_flip_set_substitute,
 )
 from goat_ai.observations import CardView, ChainLinkView, Observation, TargetSlotView
-from scripts.evaluate_native import agent_factory
+from scripts.evaluate_native import agent_factory, agent_version
 
 
 def board(*cards, phase="main1", turn=1, viewer=0, chain=(), turn_player=None):
@@ -117,6 +117,8 @@ def test_card_advantage_candidate_inherits_every_v14_guard(monkeypatch, tmp_path
         assert getattr(candidate, name) is getattr(baseline, name) is True
     assert baseline.card_advantage_guard is False
     assert candidate.card_advantage_guard is True
+    assert agent_version("tactical") == agent_version("tactical_card_advantage") == 14
+    assert agent_version("tactical_reaper_set") == 14
 
 
 def test_scapegoat_waits_for_end_or_battle_and_can_answer_removal():

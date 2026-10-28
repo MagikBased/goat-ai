@@ -111,6 +111,24 @@ def agent_factory(name: str, native_root: Path):
     raise ValueError(f"unknown agent: {name}")
 
 
+def agent_version(name: str) -> int:
+    """Record the underlying teacher version; variant flags stay in the name."""
+    if name in ("tactical", "tactical_reaper_set", "tactical_card_advantage"):
+        return TacticalHeuristicAgent.teacher_version
+    if name in ("tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10",
+                "tactical_v9", "tactical_v8", "tactical_v7"):
+        return int(name.removeprefix("tactical_v"))
+    if name == "combat_heuristic":
+        return CombatHeuristicAgent.teacher_version
+    if name == "combat_flip":
+        return CombatFlipHeuristicAgent.teacher_version
+    if name in ("heuristic", "flip_heuristic"):
+        return HeuristicAgent.teacher_version
+    if name == "random":
+        return 1
+    raise ValueError(f"unknown agent: {name}")
+
+
 def make_heuristic(_seed: int) -> HeuristicAgent:
     return HeuristicAgent()
 
@@ -218,36 +236,8 @@ def main() -> None:
     }
     result = {
         "agent_a": args.agent_a, "agent_b": args.agent_b,
-        "agent_a_version": (TacticalHeuristicAgent.teacher_version
-                            if args.agent_a == "tactical"
-                            else 13 if args.agent_a == "tactical_v13"
-                            else 12 if args.agent_a == "tactical_v12"
-                            else 11 if args.agent_a == "tactical_v11"
-                            else 10 if args.agent_a == "tactical_v10"
-                            else 9 if args.agent_a == "tactical_v9"
-                            else 8 if args.agent_a == "tactical_v8"
-                            else 7 if args.agent_a == "tactical_v7"
-                            else CombatHeuristicAgent.teacher_version
-                            if args.agent_a == "combat_heuristic"
-                            else CombatFlipHeuristicAgent.teacher_version
-                            if args.agent_a == "combat_flip"
-                            else HeuristicAgent.teacher_version
-                            if args.agent_a in ("heuristic", "flip_heuristic") else 1),
-        "agent_b_version": (TacticalHeuristicAgent.teacher_version
-                            if args.agent_b == "tactical"
-                            else 13 if args.agent_b == "tactical_v13"
-                            else 12 if args.agent_b == "tactical_v12"
-                            else 11 if args.agent_b == "tactical_v11"
-                            else 10 if args.agent_b == "tactical_v10"
-                            else 9 if args.agent_b == "tactical_v9"
-                            else 8 if args.agent_b == "tactical_v8"
-                            else 7 if args.agent_b == "tactical_v7"
-                            else CombatHeuristicAgent.teacher_version
-                            if args.agent_b == "combat_heuristic"
-                            else CombatFlipHeuristicAgent.teacher_version
-                            if args.agent_b == "combat_flip"
-                            else HeuristicAgent.teacher_version
-                            if args.agent_b in ("heuristic", "flip_heuristic") else 1),
+        "agent_a_version": agent_version(args.agent_a),
+        "agent_b_version": agent_version(args.agent_b),
         "ruleset_scope": f"{args.engine} GOAT-mode native adapter",
         "core": "edo9300/ygopro-core baa3881d0bae48e9994f915f5c931be53c1ba8ef",
         "platform": platform.platform(), "cpu": platform.processor(),
