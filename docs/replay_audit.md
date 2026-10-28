@@ -472,6 +472,15 @@ Items are never deleted, and the replay stays open after you label it. The
 queue updates after the local save completes and when you return to the queue.
 The queue's Previous/Next buttons skip already labeled items while the
 unlabeled filter is active.
+The progress endpoint now verifies each source replay once per refresh while
+still checking its hash, queue membership, saved action legality, reviewer
+alias, and note structure. On the local 24-item New Jersey parent queue with
+eight source replays and 14 saved choices, three warm requests to the older
+running server took 3.669, 3.615, and 3.613 seconds; three requests to a
+new server running the revised code took 1.931, 1.949, and 1.957 seconds.
+These are local wall-clock
+measurements, not a general throughput claim. The already running server
+process must be restarted to use the revised endpoint.
 Bookmarks remain separate reminders and do not count as labels. Progress is
 specific to the queue's source replays and saved labels; a newly generated
 queue starts with its own count. If an older server is still running, launch

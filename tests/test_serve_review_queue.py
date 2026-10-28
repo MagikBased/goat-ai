@@ -146,6 +146,28 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
         thread.join(timeout=5)
 
 
+def test_progress_checks_each_source_once_per_refresh(tmp_path, monkeypatch):
+    queue, _, digest, _ = _queue(tmp_path)
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    store = serve_review_queue.ReviewStore(queue, tmp_path / "saved")
+    store.choose(digest, 0, 1)
+    store.save_note(digest, 0, "context", "Review later")
+    original = store._trajectory
+    checked = []
+
+    def counted(source):
+        checked.append(source)
+        return original(source)
+
+    monkeypatch.setattr(store, "_trajectory", counted)
+    assert store.progress() == {
+        "choices": [{"source": digest, "decision_index": 0, "action_index": 1}],
+        "notes": [{"source": digest, "decision_index": 0, "kind": "context"}],
+        "total": 1,
+    }
+    assert checked == [digest]
+
+
 def test_rebuilt_queue_carries_choices_once_without_resurrecting_cleared_label(
         tmp_path, monkeypatch):
     queue, _, digest, _ = _queue(tmp_path)

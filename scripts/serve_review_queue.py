@@ -267,12 +267,23 @@ class ReviewStore:
         """Report saved choices for this queue without exposing replay hidden state."""
         choices = []
         notes = []
-        for digest in sorted(self.sources):
-            for choice in self.state(digest)["choices"]:
-                choices.append({"source": digest, **choice})
-            for note in self.note_state(digest)["notes"]:
-                notes.append({"source": digest, "decision_index": note["decision_index"],
-                              "kind": note["kind"]})
+        with self.lock:
+            for digest in sorted(self.sources):
+                trajectory, offered = self._trajectory(digest)
+                path = self.label_path(digest)
+                if path.is_file():
+                    labels, _ = read_decision_annotations(path, digest, trajectory)
+                    if labels.reviewer != self.reviewer_alias:
+                        raise ValueError("saved labels belong to another reviewer alias")
+                    for decision, action in labels.choices:
+                        if decision not in offered:
+                            raise ValueError("saved label is outside this queue")
+                        choices.append({"source": digest, "decision_index": decision,
+                                        "action_index": action})
+                for note in self._read_notes(self.note_path(digest), digest, offered):
+                    notes.append({"source": digest,
+                                  "decision_index": note["decision_index"],
+                                  "kind": note["kind"]})
         return {"choices": choices,
                 "notes": notes,
                 "total": sum(len(offered) for _, offered in self.sources.values())}
