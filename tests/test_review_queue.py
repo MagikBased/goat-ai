@@ -97,6 +97,22 @@ def test_review_index_distinguishes_shared_flagged_play_from_disagreement(tmp_pa
     assert "A flagged play can be one both agents made." in html
 
 
+def test_review_index_names_comparison_policy_instead_of_tactical(tmp_path):
+    queue = tmp_path / "queue.json"
+    viewer = tmp_path / "game.html"
+    viewer.write_text("player view")
+    selected = [{"viewer": f"{viewer}#decision=4", "turn": 2,
+                 "phase": "main1", "viewer_frame": 4,
+                 "policy_action": {"kind": "normal_summon", "parameters": {}},
+                 "teacher_action": {"kind": "set_monster", "parameters": {}},
+                 "audit_flags": []}]
+    html = write_review_index(selected, queue, tmp_path / "native",
+                              comparison_label="Comparison policy").read_text()
+    assert "Comparison policy suggests:" in html
+    assert "Comparison policy suggests another play" in html
+    assert "Tactical suggests:" not in html
+
+
 def test_refresh_rejects_changed_trajectory(tmp_path):
     queue = tmp_path / "queue.json"
     replay = tmp_path / "replay.json"

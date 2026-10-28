@@ -38,6 +38,30 @@ now flags both and the preference derivation points to the legal deck-card
 selection. These are player-visible review prompts, not proof that one
 isolated choice caused the duel loss or that the child checkpoint is stronger.
 
+The comparison queue for seeds 94000–94001 uses the parent checkpoint as a
+second policy suggestion instead of Tactical. Both complete duels and all 562
+decisions replay-verify; the queue also reproduces 280 child and 282 parent
+greedy choices. It contains ten selected prompts from twelve candidates,
+including the shared empty-search mistake at frame 24 of seed 94000. Its
+suggestions are not human labels or optimal-action claims. Open it with:
+
+```bash
+./start_review_viewer.sh \
+  .cache/goat-ai/human11_pref200_diagnostic/parent_comparison_queue.json
+```
+
+Rebuild the ignored queue and viewer files with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/human11_pref_200step_kl05_seed174.pt \
+  .cache/goat-ai/human11_pref200_diagnostic/child_vs_parent_seed94000.json \
+  .cache/goat-ai/human11_pref200_diagnostic/child_vs_parent_seed94001.json \
+  --comparison-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --native-root .cache/goat-ai --limit 20 --per-replay 10 --render-viewers \
+  --output .cache/goat-ai/human11_pref200_diagnostic/parent_comparison_queue.json
+```
+
 ## High-margin policy disagreements for human review (28 October 2026)
 
 The [local high-margin queue](../.cache/goat-ai/high_margin_review_90500_90501/queue.html)

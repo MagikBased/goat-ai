@@ -87,7 +87,7 @@ def disagreement_fingerprint(record, teacher_action) -> tuple:
 
 
 def write_review_index(selected: list[dict], output: Path,
-                       native_root: Path) -> Path:
+                       native_root: Path, *, comparison_label: str = "Tactical") -> Path:
     """Link player-visible label frames and separate full-information review."""
     codes = {action["parameters"].get("code")
              for item in selected for action in (
@@ -123,12 +123,13 @@ def write_review_index(selected: list[dict], output: Path,
                     if age_code is not None else "")
         reason = (", ".join(flag.replace("_", " ") for flag in item["audit_flags"])
                   if item["audit_flags"] else age_note
-                  if age_note else "Tactical agent suggests another play")
+                  if age_note else f"{comparison_label} suggests another play")
         choices = (f'<p><strong>Both agents played:</strong> '
                    f'{action_label(item["policy_action"])}</p>'
                   if teacher_agrees else
                    f'<p><strong>AI played:</strong> {action_label(item["policy_action"])}<br>'
-                   f'<strong>Tactical suggests:</strong> {action_label(item["teacher_action"])}</p>')
+                   f'<strong>{escape(comparison_label)} suggests:</strong> '
+                   f'{action_label(item["teacher_action"])}</p>')
         card = (
             f'<article class="review-card" id="item-{number}" data-queue-index="{number - 1}">'
             f'<div class="card-top"><span class="badge">#{number} · '
@@ -177,7 +178,7 @@ def write_review_index(selected: list[dict], output: Path,
             "white-space:nowrap}#stage-frame{width:100%;height:100%;border:0}"
             "</style><section class=\"intro\"><h1>GOAT AI review queue</h1>"
             "<p>Each card opens a complete duel at one decision worth examining."
-            " Flags and Tactical suggestions are prompts, not confirmed mistakes."
+            f" Flags and {escape(comparison_label)} suggestions are prompts, not confirmed mistakes."
             " A flagged play can be one both agents made. For automatic saving,"
             " launch the local review server described in docs/replay_audit.md.</p>"
             "<ol><li>Choose <strong>Open label view</strong> to see exactly what the"
@@ -289,6 +290,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("checkpoint", type=Path)
     parser.add_argument("replays", nargs="+", type=Path)
+    parser.add_argument("--comparison-checkpoint", type=Path,
+                        help="compare with a second policy checkpoint instead of Tactical v14")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--per-replay", type=int, default=2)
@@ -318,6 +321,11 @@ def main() -> None:
     checkpoint_hash = sha256_file(args.checkpoint)
     agent = load_policy_agent(args.checkpoint)
     model = agent.model.eval()
+    comparison_hash = (sha256_file(args.comparison_checkpoint)
+                       if args.comparison_checkpoint else None)
+    comparison_agent = (load_policy_agent(args.comparison_checkpoint)
+                        if args.comparison_checkpoint else None)
+    comparison_label = "Comparison policy" if comparison_agent else "Tactical"
     flip_codes = load_flip_monster_codes(args.native_root)
     card_races = load_card_races(args.native_root)
     weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
@@ -350,6 +358,17 @@ def main() -> None:
         audit_trajectory_visibility(trajectory)
         if sha256_file(path) != source_hash:
             raise ValueError(f"{path}: replay changed during verification")
+        comparison_choices_verified = None
+        if (comparison_agent is not None
+                and metadata.get("opponent_checkpoint_sha256") == comparison_hash):
+            comparison_choices_verified = 0
+            for index, record in enumerate(trajectory.decisions):
+                if record.observation.acting_player == seat:
+                    continue
+                if comparison_agent.select_action(record.observation,
+                                                  record.legal_actions) != record.selected_action:
+                    raise ValueError(f"{path}: recorded comparison policy differs at {index}")
+                comparison_choices_verified += 1
         audit_by_index: dict[int, list[str]] = {}
         for finding in review_candidates(trajectory, card_races, weak_flip_attacks,
                                          card_facts=card_facts):
@@ -377,7 +396,9 @@ def main() -> None:
                 logits = model(features.to(next(model.parameters()).device))
                 probabilities = torch.softmax(logits, 0).cpu()
             policy_index = legal.index(record.selected_action)
-            alternative = fresh_teacher().select_action(record.observation, legal)
+            alternative = (comparison_agent.select_action(record.observation, legal)
+                           if comparison_agent else
+                           fresh_teacher().select_action(record.observation, legal))
             if alternative not in legal:
                 raise ValueError(f"{path}: teacher choice is illegal at {index}")
             disagreed = alternative != record.selected_action
@@ -424,7 +445,8 @@ def main() -> None:
                               "trajectory_sha256": source_hash,
                               "verified_decisions": verified,
                               "policy_choices": policy_choices,
-                              "disagreements": disagreements})
+                              "disagreements": disagreements,
+                              "comparison_choices_verified": comparison_choices_verified})
     selected = select_diverse_candidates(candidates, args.limit, args.per_replay,
                                          rank_by=args.rank_by)
     if args.render_viewers:
@@ -445,7 +467,9 @@ def main() -> None:
     report = {"schema_version": 1,
               "purpose": "human_review_candidates_not_training_labels",
               "checkpoint_sha256": checkpoint_hash,
-              "teacher": "TacticalHeuristicAgent_v14",
+              "teacher": ("PolicyAgent" if comparison_agent else "TacticalHeuristicAgent_v14"),
+              **({"comparison_checkpoint_sha256": comparison_hash}
+                 if comparison_hash else {}),
               "rank_by": args.rank_by,
               "min_logit_margin": args.min_logit_margin,
               "selection": ("public_faceup_age_then_model_margin_distinct_prompt"
@@ -461,7 +485,8 @@ def main() -> None:
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
                            encoding="utf-8")
     if args.render_viewers:
-        write_review_index(selected, args.output, args.native_root)
+        write_review_index(selected, args.output, args.native_root,
+                           comparison_label=comparison_label)
     print(json.dumps({"output": str(args.output), "replays": len(replay_report),
                       "candidate_count": len(candidates), "selected": len(selected),
                       "verified_decisions": sum(item["verified_decisions"]

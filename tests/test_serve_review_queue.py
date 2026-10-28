@@ -157,7 +157,7 @@ def test_browser_review_choice_autosaves_without_name_or_download(tmp_path, monk
         setTimeout(() => { document.body.dataset.localReviewProbe = [
           localReviewMode, byId('manual-review-export').hidden,
           byId('annotation-status').textContent.includes('Saved on this computer'),
-          byId('annotation-status').textContent.includes('differs from AI played'),
+          byId('annotation-status').textContent.includes('different from AI played'),
           annotations.get(0)].join('|'); }, 250);
       }, 200);
     </script></body>"""
