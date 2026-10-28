@@ -216,6 +216,33 @@ PYTHONPATH=src:. .venv/bin/python scripts/compare_edison_pool_candidates.py \
 The API may change after this cached comparison. Recheck all source hashes
 before treating reproduced counts as the same evidence.
 
+`scripts/adjudicate_edison_pool_disagreements.py` now checks that the 28-card
+DT01 exclusion table and six-card non-DT01 ledger cover the **exact** 34
+API-only named differences in the candidate comparison, with no duplicate or
+conflicting IDs. It rejects a DT01 exclusion if its first listed ordinary
+printing precedes the cutoff. Against the cached comparison above, it reports
+29 excluded IDs, one provisionally included ID (Restructer Revolution), four
+pending API-only promotions, and two pending community-only promotions. Its
+`complete_release_pool` field is always false: neither candidate source nor
+this reconciliation establishes every eligible North American card. The
+ignored local output is
+`.cache/goat-ai/edison_partial_adjudication_20261027.json`.
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/adjudicate_edison_pool_disagreements.py \
+  .cache/goat-ai/edison_pool_candidate_comparison_20261027.json \
+  configs/historical/edison_dt01_new_card_exclusions_2010_04_20.tsv \
+  configs/historical/edison_non_dt01_candidate_discrepancies_2010_04_20.tsv \
+  --output .cache/goat-ai/edison_partial_adjudication_20261027.json
+```
+
+The [archived official legality page from November 2010](https://web.archive.org/web/20101106023610id_/http://www.yugioh-card.com/en/gameplay/cardlegality.html)
+lists SHONEN JUMP promos through `JUMP-EN044` as North American legal then,
+but an archive-index check on 27 October 2026 found no earlier 2009–April
+2010 capture of that page.
+It corroborates later eligibility; it does not establish an April legal date
+for the outstanding promotional cards.
+
 ## Native engine assessment
 
 The [contemporary Yu-Gi-Oh! 5D's official rulebook](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
