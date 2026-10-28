@@ -148,6 +148,12 @@ viewer shows **Saved on this computer** when the server confirms the choice.
 If it shows **Save failed**, keep the current tab open and use **Download
 labels** as a backup before reloading.
 
+When this same queue JSON is rebuilt, the local server carries saved choices
+from its most recent tagged revision only if the source replay hash and offered
+decision still match. Earlier files remain in their original ignored folder.
+Clearing a choice in the current revision stays cleared after the next rebuild;
+untagged folders and different queue paths are not imported automatically.
+
 Record the eight `matchup_*.json` duels from the repository root with:
 
 ```bash

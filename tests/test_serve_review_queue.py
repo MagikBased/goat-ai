@@ -127,6 +127,55 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
         thread.join(timeout=5)
 
 
+def test_rebuilt_queue_carries_choices_once_without_resurrecting_cleared_label(
+        tmp_path, monkeypatch):
+    queue, _, digest, _ = _queue(tmp_path)
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    parent = tmp_path / "review_labels"
+    first = parent / sha256_file(queue)[:12]
+    assert serve_review_queue.prepare_review_labels(queue, first) == 0
+    serve_review_queue.ReviewStore(queue, first).choose(digest, 0, 1)
+
+    report = json.loads(queue.read_text())
+    report["revision_note"] = "new review prompt wording"
+    queue.write_text(json.dumps(report))
+    second = parent / sha256_file(queue)[:12]
+    assert serve_review_queue.prepare_review_labels(queue, second) == 1
+    assert serve_review_queue.ReviewStore(queue, second).state(digest)["choices"] == [
+        {"decision_index": 0, "action_index": 1}]
+    assert serve_review_queue.prepare_review_labels(queue, second) == 0
+    serve_review_queue.ReviewStore(queue, second).choose(digest, 0, None)
+
+    report["revision_note"] = "second revision"
+    queue.write_text(json.dumps(report))
+    third = parent / sha256_file(queue)[:12]
+    assert serve_review_queue.prepare_review_labels(queue, third) == 0
+    assert serve_review_queue.ReviewStore(queue, third).state(digest)["choices"] == []
+    assert (first / f"{digest}.json").is_file()
+
+
+def test_rebuilt_queue_does_not_import_untagged_or_other_queue_labels(tmp_path,
+                                                                       monkeypatch):
+    queue, _, digest, _ = _queue(tmp_path)
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    parent = tmp_path / "review_labels"
+    untagged = parent / "old_without_identity"
+    serve_review_queue.ReviewStore(queue, untagged).choose(digest, 0, 1)
+    current = parent / sha256_file(queue)[:12]
+    assert serve_review_queue.prepare_review_labels(queue, current) == 0
+    assert serve_review_queue.ReviewStore(queue, current).state(digest)["choices"] == []
+    other_queue = tmp_path / "another_queue.json"
+    other_queue.write_bytes(queue.read_bytes())
+    other_folder = parent / "other_queue"
+    assert serve_review_queue.prepare_review_labels(other_queue, other_folder) == 0
+    serve_review_queue.ReviewStore(other_queue, other_folder).choose(digest, 0, 1)
+    report = json.loads(queue.read_text())
+    report["revision_note"] = "new review"
+    queue.write_text(json.dumps(report))
+    revised = parent / sha256_file(queue)[:12]
+    assert serve_review_queue.prepare_review_labels(queue, revised) == 0
+
+
 def test_local_review_rejects_cross_origin_and_other_repo_files(tmp_path, monkeypatch):
     queue, _, digest, _ = _queue(tmp_path)
     monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)

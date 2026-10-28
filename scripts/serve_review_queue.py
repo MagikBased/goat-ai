@@ -21,6 +21,66 @@ ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
 
+def prepare_review_labels(queue: Path, output_dir: Path,
+                          reviewer_alias: str = "local-reviewer") -> int:
+    """Carry still-offered choices forward when this queue file is rebuilt.
+
+    Only earlier folders explicitly tagged with this exact queue path and
+    reviewer alias are considered. The earlier files remain untouched.
+    """
+    store = ReviewStore(queue, output_dir, reviewer_alias)
+    identity_path = store.output_dir / "_review_state" / "queue_identity.json"
+    identity = {"schema_version": 1,
+                "queue_path": str(store.queue_path.relative_to(ROOT.resolve())),
+                "queue_sha256": store.queue_sha256,
+                "reviewer": store.reviewer_alias}
+    if identity_path.is_file():
+        if json.loads(identity_path.read_text(encoding="utf-8")) != identity:
+            raise ValueError("review label folder belongs to another queue or reviewer")
+        return 0
+    # A preexisting untagged folder may contain hand-edited or older labels.
+    # Never infer its origin or silently merge it with other queue revisions.
+    if store.output_dir.exists() and any(store.output_dir.iterdir()):
+        identity_path.parent.mkdir(parents=True, exist_ok=True)
+        identity_path.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
+        return 0
+    prior_folders = []
+    for prior in sorted(store.output_dir.parent.iterdir()) if store.output_dir.parent.exists() else []:
+        if not prior.is_dir() or prior == store.output_dir:
+            continue
+        metadata = prior / "_review_state" / "queue_identity.json"
+        if not metadata.is_file():
+            continue
+        previous = json.loads(metadata.read_text(encoding="utf-8"))
+        if (previous.get("schema_version") != 1
+                or previous.get("queue_path") != identity["queue_path"]
+                or previous.get("reviewer") != store.reviewer_alias):
+            continue
+        prior_folders.append((metadata.stat().st_mtime_ns, prior))
+    # Use only the latest revision. A reviewer may deliberately clear a choice
+    # there; consulting older revisions would resurrect that rejected label.
+    previous_dir = max(prior_folders, default=(0, None))[1]
+    candidates: dict[tuple[str, int], int] = {}
+    for path in previous_dir.glob("*.json") if previous_dir else []:
+        digest = path.stem
+        if digest not in store.sources:
+            continue
+        trajectory, offered = store._trajectory(digest)
+        labels, _ = read_decision_annotations(path, digest, trajectory)
+        if labels.reviewer != store.reviewer_alias:
+            raise ValueError(f"{path}: reviewer differs from queue identity")
+        for decision, action in labels.choices:
+            if decision in offered:
+                candidates[(digest, decision)] = action
+    carried = 0
+    for (digest, decision), action in sorted(candidates.items()):
+        store.choose(digest, decision, action)
+        carried += 1
+    identity_path.parent.mkdir(parents=True, exist_ok=True)
+    identity_path.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
+    return carried
+
+
 class ReviewStore:
     """Keep one validated annotation file per source replay."""
 
@@ -288,11 +348,14 @@ def main() -> None:
     args = parser.parse_args()
     digest = sha256_file(args.queue)
     output = args.output_dir or ROOT / ".cache/goat-ai/review_labels" / digest[:12]
+    carried = prepare_review_labels(args.queue, output, args.reviewer_alias)
     server = make_server(args.queue, output, port=args.port,
                          reviewer_alias=args.reviewer_alias)
     path = args.queue.resolve().with_suffix(".html").relative_to(ROOT).as_posix()
     print(f"Open http://127.0.0.1:{server.server_port}/{path}", flush=True)
     print(f"Choices save in {output.resolve()}", flush=True)
+    if carried:
+        print(f"Carried {carried} matching choices from an earlier queue revision", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
