@@ -352,6 +352,12 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired Nobleman of Extermination fixture now distinguishes a hidden Set
+Trap from a Set Spell. It checks the GOAT-variant script, same visible target
+choice, Trap-only matching-copy banishment and recipient-scoped Deck reveals,
+then finishes and replay-verifies both duels with visibility audits. A chained
+activation of the targeted Trap remains open; see [GOAT rules](goat_rules.md).
+
 A source-backed Card Destruction/Banisher of the Light fixture now confirms
 that both players draw their full discarded counts even though Banisher sends
 those discarded cards to banishment. The complete seeded duel replay-verifies
