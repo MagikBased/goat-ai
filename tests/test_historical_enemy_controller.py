@@ -1,13 +1,17 @@
 """Enemy Controller's two modes and historical control-return timing."""
 
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 ENEMY_CONTROLLER = 98045062
 BOOK_OF_MOON = 14087893
@@ -25,6 +29,36 @@ def test_enemy_controller_modes_and_end_phase_return(tmp_path, mode):
 
     with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=18,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
+        def finish_and_verify(view):
+            agents = (RandomAgent(18), RandomAgent(19))
+            for _ in range(3000):
+                if env.is_terminal():
+                    break
+                view = env.step(agents[view.acting_player].select_action(
+                    view, env.legal_actions()))
+            assert env.is_terminal()
+            trajectory = replace(
+                env.trajectory(), source="scripted_effect_probe",
+                skill_metadata={"demonstrator_seat": 0,
+                                "teacher": "scripted_effect_probe"})
+            options = [record for record in trajectory.decisions
+                       if record.observation.chain
+                       and record.observation.chain[-1].card_code == ENEMY_CONTROLLER
+                       and len(record.legal_actions) == 2
+                       and all(action.kind == "select_option"
+                               for action in record.legal_actions)]
+            assert len(options) == 1
+            assert options[0].legal_actions.index(options[0].selected_action) == (
+                0 if mode == "position" else 1)
+            path = tmp_path / f"enemy_controller_{mode}.json"
+            write_trajectory(path, trajectory)
+            loaded = read_trajectory(path)
+            assert loaded == trajectory
+            assert verify_trajectory(loaded, ExperimentalOcgcoreEngine(root)) == len(
+                loaded.decisions)
+            assert audit_trajectory_visibility(loaded)["decisions"] == len(
+                loaded.decisions)
+
         observation = env.reset()
         set_card = own_summoned = opponent_summoned = activated = option_chosen = False
         own_code = target_code = None
@@ -85,6 +119,7 @@ def test_enemy_controller_modes_and_end_phase_return(tmp_path, mode):
                     assert any(c.code == own_code and c.controller == 0 for c in monsters)
                     assert own_code not in {c.code for c in observation.graveyards[0]}
                     assert "official/c98045062.lua" in env.engine.probe.loaded_script_sha256
+                    finish_and_verify(observation)
                     return
                 assert took_control
                 assert target.controller == 0 and target.position == "faceup"
@@ -96,6 +131,7 @@ def test_enemy_controller_modes_and_end_phase_return(tmp_path, mode):
                               and c.code == target_code)
                 assert target.controller == 1
                 assert "official/c98045062.lua" in env.engine.probe.loaded_script_sha256
+                finish_and_verify(observation)
                 return
     pytest.fail(f"Enemy Controller {mode} line did not finish")
 

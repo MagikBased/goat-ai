@@ -2,6 +2,14 @@
 
 ## Effect-choice review queue (28 October 2026)
 
+The scripted native Enemy Controller probe now records and replay-verifies a
+complete duel for each effect mode. The control-mode trajectory selects the
+second of two options; the position-mode trajectory selects the first. Both
+pass the player-visibility audit. A feature-v30 alias audit of these two
+trajectories measured 876 multi-action decisions, two effect-choice prompts
+(one per ordinal), and zero aliased action pairs. These scripted probes test
+representation coverage and are not human preference labels.
+
 The [local option queue](../.cache/goat-ai/option_prompt_review_96200_96215/queue.html)
 contains all **five** learner-seat multi-option effect decisions found in 32
 policy-versus-Tactical-v14 games on Warrior/Beastdown decks, seeds 96200–96215.
@@ -49,6 +57,19 @@ label views use the current layout. Regenerating a reveal still requires
 native assets matching its trajectory and full replay verification.
 
 ## New Jersey high-margin review queue (28 October 2026)
+
+Review item **#22** is a conditional MST target prompt (viewer frame 75).
+The policy had already chosen to chain MST at the immediately preceding
+decision (frame 74, zero-based decision index 73). At that earlier decision,
+`pass` was legal (action index 3); all four targets offered at frame 75 were
+the acting player's own Set cards. The strategic error to label is the
+activation decision, not a choice among those forced targets. Leave #22
+unlabeled or bookmark it as a reminder. A least harmful target can be useful
+as a separate conditional preference, but must not be treated as approval of
+the MST activation. The current queue only saves choices for shortlisted
+decisions, so navigating back to frame 74 in this queue cannot save `pass`.
+An upstream decision should be added to a separate review queue before
+collecting that label.
 
 The [local queue](../.cache/goat-ai/new_jersey_high_margin_review_96000_96001/queue.html)
 uses the same eight independently sourced 2005 New Jersey duels described
