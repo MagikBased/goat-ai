@@ -8,6 +8,8 @@ import argparse
 import json
 import random
 import sqlite3
+import subprocess
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -308,6 +310,126 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
     return report
 
 
+def probe_isolated(root: Path, output: Path, first_seed: int, seeds: int,
+                   max_decisions: int, card_pool: str = "whitelist",
+                   verify_replays: bool = False,
+                   distinct_opponents: bool = False,
+                   count_card_actions: bool = False,
+                   repeat_seeds: bool = False,
+                   random_extra: bool = False,
+                   fusion_stress: bool = False) -> dict:
+    """Run each native duel in a child process so one crash does not erase the sweep."""
+    if output.exists() and any(output.iterdir()):
+        raise ValueError("isolated probe output must be empty")
+    output.mkdir(parents=True, exist_ok=True)
+    reports = []
+    games = []
+    for seed in range(first_seed, first_seed + seeds):
+        directory = output / "isolated" / f"seed_{seed}"
+        command = [sys.executable, str(Path(__file__).resolve()),
+                   "--native-root", str(root.resolve()), "--output", str(directory.resolve()),
+                   "--seed", str(seed), "--seeds", "1", "--max-decisions", str(max_decisions),
+                   "--card-pool", card_pool]
+        for enabled, flag in ((verify_replays, "--verify-replays"),
+                              (distinct_opponents, "--distinct-opponents"),
+                              (count_card_actions, "--count-card-actions"),
+                              (repeat_seeds, "--repeat-seeds"),
+                              (random_extra, "--random-extra"),
+                              (fusion_stress, "--fusion-stress")):
+            if enabled:
+                command.append(flag)
+        completed = subprocess.run(command, capture_output=True, text=True,
+                                   check=False)
+        report_path = directory / "report.json"
+        if completed.returncode in (0, 1) and report_path.is_file():
+            report = json.loads(report_path.read_text())
+            if len(report.get("games", ())) != 1 or report["games"][0]["seed"] != seed:
+                raise ValueError(f"isolated worker returned the wrong seed: {seed}")
+            reports.append(report)
+            games.extend(report["games"])
+        else:
+            deck = directory / f"seed_{seed}.ydk"
+            opponent = directory / f"seed_{seed}_opponent.ydk"
+            game = {"seed": seed, "deck": str(deck),
+                    "deck_sha256": sha256_file(deck) if deck.is_file() else None,
+                    "decisions": 0, "terminal": False, "winner": None,
+                    "action_kinds": [],
+                    "error": f"isolated worker exited {completed.returncode}"}
+            if distinct_opponents:
+                game["opponent_deck"] = str(opponent)
+                game["opponent_deck_sha256"] = (sha256_file(opponent)
+                                                 if opponent.is_file() else None)
+            if verify_replays:
+                game["replay_verified_decisions"] = None
+            if repeat_seeds:
+                game["deterministic_repeat"] = False
+            games.append(game)
+    merged = {"max_decisions": max_decisions, "games": games, "isolated_games": True,
+              "worker_reports": [str(output / "isolated" / f"seed_{seed}" / "report.json")
+                                 for seed in range(first_seed, first_seed + seeds)]}
+    for flag, value in (("card_pool", card_pool if card_pool != "whitelist" else None),
+                        ("distinct_opponents", distinct_opponents),
+                        ("random_extra", random_extra), ("fusion_stress", fusion_stress)):
+        if value:
+            merged[flag] = value
+    if distinct_opponents:
+        merged["opponent_seed_offset"] = 1_000_000
+    if random_extra:
+        merged["extra_seed_offset"] = 2_000_000
+    if reports:
+        for field in ("rules_profile", "asset_sha256", "source_deck_sha256"):
+            values = [report[field] for report in reports
+                      if field in report and report[field] is not None]
+            if values:
+                if any(value != values[0] for value in values[1:]):
+                    raise ValueError(f"isolated worker {field} changed within sweep")
+                merged[field] = values[0]
+        loaded = {}
+        for report in reports:
+            for asset, digest in report.get("loaded_asset_sha256", {}).items():
+                if asset in loaded and loaded[asset] != digest:
+                    raise ValueError(f"isolated worker changed native asset: {asset}")
+                loaded[asset] = digest
+        if loaded:
+            merged["loaded_asset_sha256"] = dict(sorted(loaded.items()))
+    if verify_replays:
+        merged["replay_verification"] = {
+            "verified_games": sum(r["replay_verification"]["verified_games"] for r in reports),
+            "verified_decisions": sum(r["replay_verification"]["verified_decisions"]
+                                      for r in reports)}
+        counts: Counter[str] = Counter()
+        for report in reports:
+            counts.update(report["visibility_audit"])
+        merged["visibility_audit"] = dict(sorted(counts.items()))
+    if repeat_seeds:
+        merged["determinism"] = {
+            "repeated_games": sum(r["determinism"]["repeated_games"] for r in reports),
+            "identical_decisions": sum(r["determinism"]["identical_decisions"]
+                                       for r in reports)}
+    if count_card_actions:
+        actions: dict[tuple[int, str], list[int]] = {}
+        responses: Counter[tuple[int, int]] = Counter()
+        for report in reports:
+            for row in report["card_actions"]:
+                item = actions.setdefault((row["code"], row["kind"]), [0, 0])
+                item[0] += row["offered_decisions"]
+                item[1] += row["selected_decisions"]
+            for row in report["chain_responses"]:
+                responses[row["responder_code"], row["preceding_link_code"]] += (
+                    row["selected_decisions"])
+        merged["card_actions"] = [
+            {"code": code, "kind": kind, "offered_decisions": values[0],
+             "selected_decisions": values[1]}
+            for (code, kind), values in sorted(actions.items())]
+        merged["chain_responses"] = [
+            {"responder_code": responder, "preceding_link_code": preceding,
+             "selected_decisions": count}
+            for (responder, preceding), count in sorted(
+                responses.items(), key=lambda item: (-item[1], item[0]))]
+    (output / "report.json").write_text(json.dumps(merged, indent=2) + "\n")
+    return merged
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
@@ -328,13 +450,16 @@ def main() -> None:
                         help="add 15 random whitelist-legal Fusion cards to each generated Extra Deck")
     parser.add_argument("--fusion-stress", action="store_true",
                         help="with --random-extra, add three Scapegoat/Metamorphosis copies and Thousand-Eyes Restrict")
+    parser.add_argument("--isolate-games", action="store_true",
+                        help="run each seed in a separate process and keep going after a native crash")
     args = parser.parse_args()
     if args.seeds < 1 or args.max_decisions < 1:
         parser.error("--seeds and --max-decisions must be positive")
-    report = probe(args.native_root, args.output, args.seed, args.seeds,
-                   args.max_decisions, args.card_pool, args.verify_replays,
-                   args.distinct_opponents, args.count_card_actions,
-                   args.repeat_seeds, args.random_extra, args.fusion_stress)
+    runner = probe_isolated if args.isolate_games else probe
+    report = runner(args.native_root, args.output, args.seed, args.seeds,
+                    args.max_decisions, args.card_pool, args.verify_replays,
+                    args.distinct_opponents, args.count_card_actions,
+                    args.repeat_seeds, args.random_extra, args.fusion_stress)
     for game in report["games"]:
         status = "error" if game["error"] else "terminal" if game["terminal"] else "limit"
         suffix = f" error={game['error']}" if game["error"] else ""

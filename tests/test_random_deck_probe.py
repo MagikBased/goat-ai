@@ -11,6 +11,7 @@ import pytest
 
 from goat_ai.engine.decks import read_goat_whitelist, read_ydk, validate_goat_deck
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
+from goat_ai.replay.fingerprint import sha256_file
 from scripts.probe_random_decks import (
     METAMORPHOSIS,
     SCAPEGOAT,
@@ -18,6 +19,7 @@ from scripts.probe_random_decks import (
     generate_deck,
     generate_tournament_mix,
     probe,
+    probe_isolated,
 )
 
 
@@ -158,3 +160,35 @@ def test_probe_reports_initialization_failure_with_replay_verification(tmp_path,
     assert game["error"] == "OSError: native library unavailable"
     assert game["terminal"] is False
     assert game["replay_verified_decisions"] is None
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_isolated_probe_keeps_later_verified_game_after_worker_crash(tmp_path, monkeypatch):
+    original_run = subprocess.run
+
+    def crash_first(command, **kwargs):
+        if command[command.index("--seed") + 1] == "18650":
+            directory = Path(command[command.index("--output") + 1])
+            directory.mkdir(parents=True)
+            (directory / "seed_18650.ydk").write_text("generated first deck\n")
+            (directory / "seed_18650_opponent.ydk").write_text("generated opponent\n")
+            return subprocess.CompletedProcess(command, -11, "", "")
+        return original_run(command, **kwargs)
+
+    monkeypatch.setattr("scripts.probe_random_decks.subprocess.run", crash_first)
+    report = probe_isolated(Path(os.environ["GOAT_AI_NATIVE_ROOT"]),
+                            tmp_path / "isolated", 18650, 2, 3000,
+                            card_pool="tournament", verify_replays=True,
+                            distinct_opponents=True, count_card_actions=True)
+    failed, passed = report["games"]
+    assert failed["error"] == "isolated worker exited -11"
+    assert failed["replay_verified_decisions"] is None
+    assert failed["deck_sha256"] == sha256_file(Path(failed["deck"]))
+    assert failed["opponent_deck_sha256"] == sha256_file(Path(failed["opponent_deck"]))
+    assert passed["seed"] == 18651 and passed["terminal"]
+    assert passed["replay_verified_decisions"] == passed["decisions"]
+    assert report["replay_verification"] == {
+        "verified_games": 1, "verified_decisions": passed["decisions"]}
+    assert report["visibility_audit"]["decisions"] == passed["decisions"]
+    assert report["card_actions"]
+    assert json.loads((tmp_path / "isolated" / "report.json").read_text()) == report

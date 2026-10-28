@@ -9906,3 +9906,28 @@ the clone with `scripts/train_behavioral_clone.py` and the four
 --feature-version 23 --width 32 --epochs 1 --batch-size 16 --batched-forward
 --skip-forced-training --learning-rate 0.0001 --seed 10902`, writing to a new
 ignored checkpoint path.
+
+## Isolated native deck probe (28 October 2026)
+
+The random-deck probe now has opt-in `--isolate-games`. Each seed runs in a
+separate Python process. A native crash is recorded as a failed game with its
+worker exit code and any generated decklist hashes, while later seeds still
+run. Successful child reports contribute their replay, visibility, card-action,
+and loaded-asset counts to one top-level report; each child report remains
+under `OUTPUT/isolated/seed_N/report.json`. The output directory must be empty
+before starting, which prevents a stale child report from being mistaken for
+the current run. The CLI still exits nonzero if any game failed.
+
+A regression simulates a worker exit of `-11` after writing both decklists,
+checks their retained hashes, and confirms the next seed reaches terminal and
+replay-verifies. A real four-seed tournament-card run on seeds 10800–10803
+completed **4/4 terminal**, **3,330/3,330 replay-verified and visibility-audited
+decisions**. Seed, deck hashes, decision count, terminal result, action kinds,
+error, and verified-decision count match the corresponding four games from
+the earlier single-process 40-seed sweep. The ignored combined report is
+`.cache/goat-ai/tournament_mix_isolated_10800_10803/report.json` (SHA-256
+`eb6cc6b0c6a4fd6a91f421a3d4d3eb79daa85e26b901682cf98de422fbb24f5b`).
+Reproduce with the [tournament-card probe command above](#tournament-card-mix-protocol-sweep-28-october-2026),
+using a fresh output directory, `--seed 10800 --seeds 4 --isolate-games`.
+Process isolation makes failure triage possible; it does not repair a native
+crash or certify historical card behavior.

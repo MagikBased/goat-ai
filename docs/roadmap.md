@@ -280,6 +280,12 @@ duels replay-verify and pass the visibility audit. These are protocol and
 specific-ruling samples, not arbitrary-deck completeness. See [the Fusion
 stress report](evaluation.md#random-fusion-deck-protocol-sweep-27-october-2026).
 
+The deck probe also supports opt-in per-seed process isolation. A failed native
+worker leaves its generated deck hashes and exit code in the combined report,
+and later seeds continue. Four tournament-card duels reproduced the matching
+single-process outcomes and replay-verified 3,330 decisions; see the
+[isolation check](evaluation.md#isolated-native-deck-probe-28-october-2026).
+
 The native adapter now decodes bounded `MSG_SELECT_COUNTER` prompts as
 `select_counters` actions with explicit per-card amounts. It sends the core's
 ordered 16-bit allocation response and checks that each offered amount is
