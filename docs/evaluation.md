@@ -10822,7 +10822,15 @@ Their SHA-256 values are `47e20d7e8362c8ced193c6b865b6e07e760d7c9f55c15acc98afc0
 `09f20a89b29e1e9b48a2501f1245feb0b126cfb8e007836be8d92f2bc441da2a`,
 and `ae15367ebe73ea7c0a7cf2506cb140fae0f20acf59319c4c31b310b65c815740`.
 To reproduce the continuation from the selected v23 parent, load the 78
-newline-delimited paths using `mapfile -t winner_replays <
+newline-delimited paths. Regenerate that list from the full 240-game replay
+collection with `PYTHONPATH=src:. .venv/bin/python
+scripts/select_selfplay_replays.py
+.cache/goat-ai/ppo_mixed_240_91000_91239_replays --outcome win
+--expected-games 240 --fast-trajectory-json --output
+.cache/goat-ai/ppo_mixed_240_winning_paths.txt`, then confirm the list SHA-256
+above. This checks learner-seat and unique contiguous episode provenance;
+native replay and visibility verification still belong to the trainer.
+Load the paths using `mapfile -t winner_replays <
 .cache/goat-ai/ppo_mixed_240_winning_paths.txt` and run
 `scripts/train_behavioral_clone.py "${winner_replays[@]}" --native-root
 .cache/goat-ai --engine experimental --init-checkpoint
