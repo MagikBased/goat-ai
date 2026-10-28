@@ -13,7 +13,7 @@ class CardView:
     orientation: str | None = None  # attack/defense for monsters on the field.
     attack: int | None = None  # Current visible ATK; never set for face-down cards.
     defense: int | None = None  # Current visible DEF.
-    counters: tuple[tuple[int, int], ...] = ()  # (counter type, count) on face-up monsters.
+    counters: tuple[tuple[int, int], ...] = ()  # (type, count) on face-up field cards.
     equipped_to: tuple[int, int] | None = None  # Public target monster slot; card ID may be hidden.
     race: int | None = None  # Current Type mask of a face-up monster, including field effects.
     owner: int | None = None  # Original owner of a face-up field monster; public in a duel.
@@ -169,8 +169,11 @@ class Observation:
                      *self.banished[0], *self.banished[1], *self.own_extra_deck):
             if (card.zone != "monster" or card.position != "faceup") and (
                     card.attack is not None or card.defense is not None
-                    or card.counters or card.race is not None or card.owner is not None):
+                    or card.race is not None or card.owner is not None):
                 raise ValueError("dynamic monster data require a face-up monster")
+            if card.counters and (card.zone not in ("monster", "spell_trap")
+                                  or card.position != "faceup"):
+                raise ValueError("counters require a face-up field card")
             if ((card.attack is None) != (card.defense is None)
                     or (card.race is not None and (type(card.race) is not int
                                                    or not 0 < card.race < 1 << 64))

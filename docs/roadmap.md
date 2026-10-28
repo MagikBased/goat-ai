@@ -269,8 +269,12 @@ The native adapter now decodes bounded `MSG_SELECT_COUNTER` prompts as
 `select_counters` actions with explicit per-card amounts. It sends the core's
 ordered 16-bit allocation response and checks that each offered amount is
 supported by the acting player's visible face-up field. Synthetic protocol,
-adapter, visibility, and trajectory-serialization tests pass; no historical
-card fixture has yet exercised this prompt end to end. Prompts with more than
+adapter, visibility, and trajectory-serialization tests pass. A complete
+Pitch-Black Power Stone / Anti-Spell native fixture now exercises all three
+ways to remove two counters from two face-up cards; each branch serializes,
+replay-verifies, and passes the visibility audit. The fixture also corrected
+the observation query so face-up Spell/Trap counters are visible to both
+players. See [GOAT rules](goat_rules.md). Prompts with more than
 4,096 legal allocations still fail explicitly, pending a staged action design.
 Existing policy feature versions do not encode per-card counter amounts; a
 versioned action representation is required before learning from these prompts.
