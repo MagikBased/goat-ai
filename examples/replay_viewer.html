@@ -950,10 +950,11 @@
     }
     function markFaceupEffect(board, observation, action) {
       const source = action?.parameters;
-      if (!["activate", "chain"].includes(action?.kind) || source?.location !== 4)
+      if (!["activate", "chain"].includes(action?.kind) || ![4, 8].includes(source?.location))
         return;
+      const sourceZone = source.location === 4 ? "monster" : "spell_trap";
       const card = observation.field.find(item =>
-        item.controller === source.controller && item.zone === "monster" &&
+        item.controller === source.controller && item.zone === sourceZone &&
         item.sequence === source.sequence && item.position === "faceup" &&
         (source.code == null || source.code === item.code));
       const slot = card && findFieldCard(board, card)?.closest(".slot");

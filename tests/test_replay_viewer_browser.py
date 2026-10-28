@@ -46,6 +46,35 @@ def test_faceup_monster_effect_has_burst_without_replaying_on_same_frame(tmp_pat
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_faceup_spell_trap_effect_has_burst(tmp_path):
+    observation = _observation()
+    observation["field"].append({"controller": 0, "zone": "spell_trap",
+                                 "sequence": 0, "code": 3, "position": "faceup"})
+    effect = {"id": "effect", "kind": "activate", "actor": 0,
+              "parameters": {"controller": 0, "location": 8,
+                             "sequence": 0, "code": 3}}
+    replay = {"seed": 1, "source": "test", "winner": 0, "decisions": [
+        {"observation": observation, "selected_action": effect,
+         "legal_actions": [effect]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {3: "Continuous Spell"}, {}, {})
+    probe = """<script>
+      document.body.dataset.effectProbe =
+        document.querySelectorAll('#board .effect-burst').length;
+    </script></body>"""
+    path = tmp_path / "spell_effect_burst.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-effect-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "1"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_reviewer_deck_popup_shows_remaining_cards_top_first(tmp_path):
     observation = _observation()
     observation["deck_counts"] = [3, 2]
