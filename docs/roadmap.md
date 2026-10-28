@@ -52,6 +52,11 @@ deck construction and sampled headless protocol operation across a complete
 static catalog partition. Many cards were never drawn or activated, so it
 does not prove every effect or arbitrary-deck correctness. See the
 [evaluation report](evaluation.md#canonical-whitelist-coverage-suite-28-october-2026).
+The rerun now separates any card action from manual effect activation:
+308 distinct IDs were offered an `activate` or `chain` action and 281 were
+selected at least once. Per-duel ID lists identify unexercised cards for
+forced fixtures. Automatic triggers and successful effect resolution remain
+outside this count; see the [refined coverage report](evaluation.md#whitelist-activation-coverage-refinement-28-october-2026).
 
 A tactical-agent Fusion stress sweep now adds 20 complete seeded duels on 40
 independently generated legal Main Decks with Scapegoat, Metamorphosis, and

@@ -11848,3 +11848,39 @@ This establishes a learnable representation for card-announcement labels,
 not that such labels exist or that v31 plays better. Feature v23 remains the
 selected competitive checkpoint. V31 needs independent reviewed decisions,
 training, and held-out competitive evaluation before promotion.
+
+## Whitelist activation coverage refinement (28 October 2026)
+
+The canonical-whitelist suite now records which printed card IDs appeared in
+legal `activate` or `chain` actions, and which were selected. The existing
+`offered_card_codes` and `selected_card_codes` counts include summons,
+placements, and other choices, so they cannot establish effect use. On the
+same seed-120000 generated-deck partition, all 21 random-agent duels completed,
+and all 20,575 decisions replay-verified and passed the visibility audit.
+There were 1,750 IDs in any offered action and 997 in any selected action,
+but only **308** IDs appeared in an offered manual activation/chain action
+and **281** were selected for one. The report retains sorted per-duel IDs so
+future work can identify specific missing interactions without scanning every
+trajectory. The ignored report is
+`.cache/goat-ai/whitelist_coverage_activation_final_120000/report.json`.
+Its SHA-256 is `ed6a4aa41a7cea22e1c679e5c0f2ae474f0a541e469d81ed6e0b31aa09c6dfb1`.
+
+These counts exclude automatic triggers, selected effect choices without a
+card code, and whether an activated effect resolved successfully. A card that
+is absent from the activation list can still have been drawn, Summoned, or
+affected by another card. For example, Delinquent Duo, Tribe-Infecting Virus,
+Torrential Tribute, and Metamorphosis appear in most of the twelve local
+Indianapolis/New Jersey 2005 Main Decks inspected here, but none had a manual
+activation prompt in this synthetic suite. Their separate forced native
+fixtures therefore remain more relevant historical evidence. No new card
+ruling or competitive strength is claimed by this reporting change.
+
+Reproduce after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/probe_whitelist_coverage.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_coverage_activation_final_120000 \
+  --seed 120000 --max-decisions 3000 --workers 4
+```

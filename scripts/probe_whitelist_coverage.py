@@ -17,7 +17,9 @@ from time import perf_counter
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.decks import (
-    Decklist, read_goat_whitelist, validate_goat_deck,
+    Decklist,
+    read_goat_whitelist,
+    validate_goat_deck,
 )
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
@@ -96,14 +98,21 @@ def run_duel(root: Path, deck_a: Path, deck_b: Path, seed: int,
         decisions = 0
         offered_codes: set[int] = set()
         selected_codes: set[int] = set()
+        offered_activations: set[int] = set()
+        selected_activations: set[int] = set()
         while not env.is_terminal() and decisions < max_decisions:
             actions = env.legal_actions()
             offered_codes.update(action.parameters["code"] for action in actions
                                  if type(action.parameters.get("code")) is int)
+            offered_activations.update(action.parameters["code"] for action in actions
+                                       if action.kind in ("activate", "chain")
+                                       and type(action.parameters.get("code")) is int)
             selected = agents[observation.acting_player].select_action(
                 observation, actions)
             if type(selected.parameters.get("code")) is int:
                 selected_codes.add(selected.parameters["code"])
+                if selected.kind in ("activate", "chain"):
+                    selected_activations.add(selected.parameters["code"])
             observation = env.step(selected)
             decisions += 1
         if not env.is_terminal():
@@ -120,6 +129,8 @@ def run_duel(root: Path, deck_a: Path, deck_b: Path, seed: int,
                 "trajectory_sha256": sha256_file(trajectory_path),
                 "offered_card_codes": sorted(offered_codes),
                 "selected_card_codes": sorted(selected_codes),
+                "offered_activation_codes": sorted(offered_activations),
+                "selected_activation_codes": sorted(selected_activations),
                 "seconds": perf_counter() - started, "error": None}
 
 
@@ -148,7 +159,7 @@ def run_suite(root: Path, output: Path, seed: int, max_decisions: int,
                    "--deck-b", str(output / f"deck_{right:02d}.ydk"),
                    "--seed", str(duel_seed), "--max-decisions", str(max_decisions),
                    "--trajectory", str(trajectory)]
-        completed = subprocess.run(command, cwd=REPO, env=environment,
+        completed = subprocess.run(command, check=False, cwd=REPO, env=environment,
                                    capture_output=True, text=True)
         if completed.returncode == 0:
             result = json.loads(completed.stdout)
@@ -160,6 +171,7 @@ def run_suite(root: Path, output: Path, seed: int, max_decisions: int,
                 "replay_verified_decisions": None,
                 "trajectory_sha256": None, "offered_card_codes": [],
                 "selected_card_codes": [], "seconds": None,
+                "offered_activation_codes": [], "selected_activation_codes": [],
                 "error": f"worker exit {completed.returncode}: "
                          f"{completed.stderr[-1000:]}"}
 
@@ -179,6 +191,10 @@ def run_suite(root: Path, output: Path, seed: int, max_decisions: int,
                                          for code in game["offered_card_codes"]}),
               "selected_card_codes": len({code for game in games
                                           for code in game["selected_card_codes"]}),
+              "offered_activation_codes": len({code for game in games
+                                                for code in game["offered_activation_codes"]}),
+              "selected_activation_codes": len({code for game in games
+                                                 for code in game["selected_activation_codes"]}),
               "deck_sha256": {f"deck_{index:02d}.ydk": sha256_file(
                   output / f"deck_{index:02d}.ydk") for index in range(len(decks))},
               "asset_sha256": {name: sha256_file(root / relative)
@@ -223,7 +239,9 @@ def main() -> None:
                            args.max_decisions, args.workers)
         print(json.dumps({key: result[key] for key in (
             "decks", "duels", "complete_duels", "verified_decisions",
-            "offered_card_codes", "selected_card_codes", "wall_seconds")}))
+            "offered_card_codes", "selected_card_codes",
+            "offered_activation_codes", "selected_activation_codes",
+            "wall_seconds")}))
 
 
 if __name__ == "__main__":
