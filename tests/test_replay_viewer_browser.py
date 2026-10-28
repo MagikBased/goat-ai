@@ -107,7 +107,10 @@ def test_outdated_local_review_server_disables_unsavable_choices(tmp_path):
     ]}
     html = _embed_viewer(replay, "0" * 64, {}, {}, {})
     probe = """<script>
-      window.fetch = async () => ({ok: true, json: async () => ({choices: []})});
+      // This server can return review state but predates the save protocol.
+      window.fetch = async path => ({ok: true, json: async () =>
+        path === '/api/review/version' ? {api_version: 1} :
+        {choices: [], offered: [0], saved: true}});
       loadLocalReview('0'.repeat(64)).then(() => {
         document.body.dataset.outdatedProbe = [localReviewUnavailable,
           byId('choose-alternative').hidden,

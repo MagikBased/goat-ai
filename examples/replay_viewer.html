@@ -1283,6 +1283,9 @@
     }
     async function loadLocalReview(hash) {
       try {
+        const versionResponse = await fetch("/api/review/version");
+        if (!versionResponse.ok || (await versionResponse.json()).api_version !== 2)
+          throw new Error("Review server is outdated; reopen this queue with ./start_review_viewer.sh");
         const response = await fetch(`/api/review/state?source=${encodeURIComponent(hash)}`);
         if (!response.ok) throw new Error("local review endpoint unavailable");
         const data = await response.json();
