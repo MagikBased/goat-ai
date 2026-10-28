@@ -1,6 +1,8 @@
 """A partial source ledger cannot silently become Edison legality."""
 
+import csv
 import json
+from pathlib import Path
 
 import pytest
 
@@ -22,7 +24,10 @@ def _inputs(tmp_path):
     other.write_text("card_id\tassessment\n"
                      "2\tinclude_pre_cutoff_booster\n"
                      "3\tpending_north_america_promo\n")
-    return report, dt01, other
+    community = tmp_path / "community.tsv"
+    community.write_text("card_id\tassessment\n"
+                         "4\tpending_north_america_subscription_promo\n")
+    return report, dt01, other, community
 
 
 def test_adjudication_keeps_unresolved_cards_and_refuses_whitelist(tmp_path):
@@ -36,25 +41,47 @@ def test_adjudication_keeps_unresolved_cards_and_refuses_whitelist(tmp_path):
 
 
 def test_adjudication_rejects_missing_or_conflicting_evidence(tmp_path):
-    report, dt01, other = _inputs(tmp_path)
+    report, dt01, other, community = _inputs(tmp_path)
     other.write_text("card_id\tassessment\n2\tinclude_pre_cutoff_booster\n")
     with pytest.raises(ValueError, match="exactly cover"):
-        adjudicate(report, dt01, other)
+        adjudicate(report, dt01, other, community)
     other.write_text("card_id\tassessment\n1\texclude_north_america\n"
                      "2\tinclude_pre_cutoff_booster\n3\tpending_north_america_promo\n")
     with pytest.raises(ValueError, match="exactly cover"):
-        adjudicate(report, dt01, other)
+        adjudicate(report, dt01, other, community)
     other.write_text("card_id\tassessment\n2\tinclude_pre_cutoff_booster\n"
                      "3\tpending_north_america_promo\n")
     dt01.write_text("card_id\tdt01_set_code\tfirst_non_dt_date\tfirst_non_dt_set_code\n"
                     "1\tDT01-EN001\t2010-04-01\tTSHD-EN001\n")
     with pytest.raises(ValueError, match="pre-cutoff"):
-        adjudicate(report, dt01, other)
+        adjudicate(report, dt01, other, community)
 
 
 def test_adjudication_rejects_unrecognized_assessment(tmp_path):
-    report, dt01, other = _inputs(tmp_path)
+    report, dt01, other, community = _inputs(tmp_path)
     other.write_text("card_id\tassessment\n2\tlegal_because_api_says_so\n"
                      "3\tpending_north_america_promo\n")
     with pytest.raises(ValueError, match="unknown evidence assessment"):
-        adjudicate(report, dt01, other)
+        adjudicate(report, dt01, other, community)
+
+
+def test_adjudication_requires_community_evidence(tmp_path):
+    report, dt01, other, community = _inputs(tmp_path)
+    community.write_text("card_id\tassessment\n5\tpending_north_america_subscription_promo\n")
+    with pytest.raises(ValueError, match="community evidence does not exactly cover"):
+        adjudicate(report, dt01, other, community)
+
+
+def test_community_only_ledger_preserves_promotional_provenance():
+    path = (Path(__file__).resolve().parents[1] / "configs/historical"
+            / "edison_community_only_candidate_discrepancies_2010_04_20.tsv")
+    with path.open(encoding="utf-8", newline="") as stream:
+        rows = {int(row["card_id"]): row for row in csv.DictReader(stream, delimiter="\t")}
+    assert set(rows) == {13893596, 31038159}
+    assert rows[13893596]["pre_cutoff_record"].startswith("JUMP-EN025 (May 2008")
+    assert rows[31038159]["pre_cutoff_record"].startswith("JUMP-EN034 (March 2010")
+    assert all(row["assessment"] == "pending_north_america_subscription_promo"
+               for row in rows.values())
+    assert all(row["primary_evidence"].startswith(
+        "https://www.db.yugioh-card.com/yugiohdb/card_search.action?")
+        for row in rows.values())

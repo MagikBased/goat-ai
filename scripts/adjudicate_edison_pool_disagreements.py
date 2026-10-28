@@ -34,7 +34,7 @@ def _rows(path: Path) -> list[dict[str, str]]:
 
 
 def adjudicate(report_path: Path, dt01_path: Path,
-               non_dt01_path: Path) -> dict[str, object]:
+               non_dt01_path: Path, community_path: Path) -> dict[str, object]:
     report = json.loads(report_path.read_text(encoding="utf-8"))
     if report.get("purpose") != "candidate_disagreement_not_edison_legality":
         raise ValueError("input is not an Edison candidate comparison")
@@ -42,6 +42,7 @@ def adjudicate(report_path: Path, dt01_path: Path,
     dt01_candidates = set(report["api_only_unresolved_with_duel_terminal_1_print_ids"])
     dt01_rows = _rows(dt01_path)
     other_rows = _rows(non_dt01_path)
+    community_rows = _rows(community_path)
     dt01_ids = {int(row["card_id"]) for row in dt01_rows}
     other_ids = {int(row["card_id"]) for row in other_rows}
     if dt01_ids != dt01_candidates:
@@ -69,20 +70,31 @@ def adjudicate(report_path: Path, dt01_path: Path,
         decisions[category].add(int(row["card_id"]))
 
     community_only = set(report["community_only_ids"])
+    community_evidence_ids = {int(row["card_id"]) for row in community_rows}
+    if community_evidence_ids != community_only:
+        raise ValueError("community evidence does not exactly cover community-only differences")
     if api_only & community_only:
         raise ValueError("candidate-only sets overlap")
     if set.union(*decisions.values()) != api_only:
         raise ValueError("evidence decisions do not partition API-only differences")
+    community_decisions = {"exclude": set(), "include": set(), "pending": set()}
+    for row in community_rows:
+        if row["assessment"] != "pending_north_america_subscription_promo":
+            raise ValueError(f"unknown community assessment: {row['assessment']}")
+        community_decisions["pending"].add(int(row["card_id"]))
     return {
         "purpose": "partial_edison_candidate_disagreement_adjudication_not_whitelist",
         "cutoff": CUTOFF.isoformat(),
         "candidate_comparison_sha256": sha256_file(report_path),
         "dt01_evidence_sha256": sha256_file(dt01_path),
         "other_evidence_sha256": sha256_file(non_dt01_path),
+        "community_evidence_sha256": sha256_file(community_path),
         "api_only_excluded_ids": sorted(decisions["exclude"]),
         "api_only_included_ids": sorted(decisions["include"]),
         "api_only_pending_ids": sorted(decisions["pending"]),
-        "community_only_pending_ids": sorted(community_only),
+        "community_only_excluded_ids": sorted(community_decisions["exclude"]),
+        "community_only_included_ids": sorted(community_decisions["include"]),
+        "community_only_pending_ids": sorted(community_decisions["pending"]),
         "complete_release_pool": False,
     }
 
@@ -92,10 +104,11 @@ def main() -> None:
     parser.add_argument("comparison", type=Path)
     parser.add_argument("dt01_evidence", type=Path)
     parser.add_argument("non_dt01_evidence", type=Path)
+    parser.add_argument("community_evidence", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     result = adjudicate(args.comparison, args.dt01_evidence,
-                        args.non_dt01_evidence)
+                        args.non_dt01_evidence, args.community_evidence)
     body = json.dumps(result, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
