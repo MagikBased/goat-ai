@@ -17,12 +17,7 @@ SKULL_LAIR = 6733059
 SKULL_SERVANT = 32274490
 
 
-@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("faceup", [False, True])
-def test_skull_lair_only_destroys_matching_faceup_level(tmp_path, faceup):
-    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    for code in (GRACEFUL, SKULL_LAIR):
-        assert (root / f"scripts/official/c{code}.lua").is_file()
+def _decks(tmp_path):
     own = tmp_path / "skull_lair.ydk"
     own.write_text("#main\n" + "\n".join(map(str, (
         GRACEFUL, *[SKULL_LAIR] * 3, *[SKULL_SERVANT] * 3,
@@ -30,6 +25,16 @@ def test_skull_lair_only_destroys_matching_faceup_level(tmp_path, faceup):
     opponent = tmp_path / "skull_servant.ydk"
     opponent.write_text("#main\n" + "\n".join(map(str, (
         *[SKULL_SERVANT] * 3, *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    return own, opponent
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("faceup", [False, True])
+def test_skull_lair_only_destroys_matching_faceup_level(tmp_path, faceup):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (GRACEFUL, SKULL_LAIR):
+        assert (root / f"scripts/official/c{code}.lua").is_file()
+    own, opponent = _decks(tmp_path)
 
     with GoatEnvironment(str(own), str(opponent), 18,
                          ExperimentalOcgcoreEngine(root)) as env:
@@ -112,6 +117,168 @@ def test_skull_lair_only_destroys_matching_faceup_level(tmp_path, faceup):
                 assert not opposing
         assert checked and env.is_terminal()
         path = tmp_path / f"skull_lair_{faceup}.json"
+        write_trajectory(path, env.trajectory())
+        replay = read_trajectory(path)
+        assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) == len(replay.decisions)
+        assert audit_trajectory_visibility(replay)["decisions"] == len(replay.decisions)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_skull_lair_effect_unavailable_during_damage_step(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    own, opponent = _decks(tmp_path)
+
+    with GoatEnvironment(str(own), str(opponent), 18,
+                         ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        graceful = discarded = lair_set = summoned = lair_faceup = attacked = False
+        battle_window = damage_window = False
+        agents = (RandomAgent(18), RandomAgent(19))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            actions = env.legal_actions()
+
+            def choice(kind, code=None, choices=actions):
+                return next((a for a in choices if a.kind == kind
+                             and (code is None or a.parameters.get("code") == code)), None)
+
+            action = None
+            if not damage_window and obs.turn == 1 and obs.acting_player == 0:
+                if not graceful:
+                    action = choice("activate", GRACEFUL)
+                    graceful |= action is not None
+                if graceful and not discarded and actions[0].kind == "select_cards":
+                    action = next((a for a in actions if any(
+                        card.get("code") == SKULL_SERVANT
+                        for card in a.parameters["cards"])), None)
+                    assert action is not None
+                    discarded = True
+                if discarded and not lair_set and action is None:
+                    action = choice("set_spell_trap", SKULL_LAIR)
+                    lair_set |= action is not None
+            if not damage_window and obs.turn == 2 and obs.acting_player == 1:
+                if not summoned:
+                    action = choice("normal_summon", SKULL_SERVANT)
+                    summoned |= action is not None
+                elif lair_faceup and not attacked:
+                    action = choice("battle_phase") or choice("attack")
+                    attacked |= action is not None and action.kind == "attack"
+            if summoned and not lair_faceup and obs.acting_player == 0:
+                action = choice("chain", SKULL_LAIR) or choice("activate", SKULL_LAIR)
+                lair_faceup |= action is not None
+            active = any(card.code == SKULL_LAIR and card.position == "faceup"
+                         for card in obs.field)
+            effect = (choice("chain", SKULL_LAIR) or choice("activate", SKULL_LAIR)
+                      if active else None)
+            if attacked and not damage_window and obs.acting_player == 0 \
+                    and obs.phase == "battle_step":
+                assert effect is not None
+                battle_window = True
+            if attacked and not damage_window and obs.acting_player == 0 \
+                    and obs.phase == "damage_step":
+                assert active and battle_window
+                assert effect is None
+                damage_window = True
+            if action is None:
+                action = (choice("pass") or choice("end_phase") or choice("place")
+                          or actions[0] if not damage_window else
+                          agents[obs.acting_player].select_action(obs, actions))
+            obs = env.step(action)
+        assert graceful and discarded and lair_set and summoned and attacked
+        assert battle_window and damage_window and env.is_terminal()
+        path = tmp_path / "skull_lair_damage_step.json"
+        write_trajectory(path, env.trajectory())
+        replay = read_trajectory(path)
+        assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) == len(replay.decisions)
+        assert audit_trajectory_visibility(replay)["decisions"] == len(replay.decisions)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_skull_lair_can_use_effect_twice_in_one_turn(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    own, opponent = _decks(tmp_path)
+
+    with GoatEnvironment(str(own), str(opponent), 18,
+                         ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {GRACEFUL, SKULL_LAIR, SKULL_SERVANT} <= {c.code for c in obs.hand}
+        assert SKULL_SERVANT in {c.code for c in env.engine.probe.observation(1).hand}
+        graceful = discarded = lair_set = lair_faceup = False
+        own_summoned = opponent_summoned = False
+        activations = costs = targets = resolved = 0
+        agents = (RandomAgent(18), RandomAgent(19))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            actions = env.legal_actions()
+
+            def choice(kind, code=None, choices=actions):
+                return next((a for a in choices if a.kind == kind
+                             and (code is None or a.parameters.get("code") == code)), None)
+
+            action = None
+            if resolved < 2 and obs.turn == 1 and obs.acting_player == 0:
+                if not graceful:
+                    action = choice("activate", GRACEFUL)
+                    graceful |= action is not None
+                if graceful and not discarded and actions[0].kind == "select_cards":
+                    action = next((a for a in actions if len(a.parameters["cards"]) == 2
+                                   and all(card.get("code") != SKULL_SERVANT
+                                           for card in a.parameters["cards"])), None)
+                    assert action is not None
+                    discarded = True
+                if discarded and not lair_set and action is None:
+                    action = choice("set_spell_trap", SKULL_LAIR)
+                    lair_set |= action is not None
+                if discarded and lair_set and not own_summoned and action is None:
+                    action = choice("normal_summon", SKULL_SERVANT)
+                    own_summoned |= action is not None
+            if resolved < 2 and obs.acting_player == 1 and obs.turn == 2 \
+                    and not opponent_summoned:
+                action = choice("normal_summon", SKULL_SERVANT)
+                opponent_summoned |= action is not None
+            if opponent_summoned and not lair_faceup and obs.acting_player == 0:
+                action = choice("chain", SKULL_LAIR) or choice("activate", SKULL_LAIR)
+                lair_faceup |= action is not None
+            if lair_faceup and activations < 2 and obs.acting_player == 0 \
+                    and obs.chain == () and any(
+                        c.code == SKULL_LAIR and c.position == "faceup" for c in obs.field):
+                action = choice("chain", SKULL_LAIR) or choice("activate", SKULL_LAIR)
+                if action is not None:
+                    activations += 1
+            if activations > costs and actions[0].kind in (
+                    "select_card", "select_cards", "select_unselect_card"):
+                grave = {card.code for card in obs.graveyards[0]}
+                action = next((a for a in actions if a.parameters.get("location") == 16
+                               and a.parameters.get("code") in grave), None)
+                if action is not None:
+                    costs += 1
+            if costs > targets and actions[0].kind == "select_card":
+                controller = 0 if targets == 0 else 1
+                action = next((a for a in actions if a.parameters.get("location") == 4
+                               and a.parameters.get("controller") == controller
+                               and a.parameters.get("code") == SKULL_SERVANT), None)
+                if action is not None:
+                    targets += 1
+            if action is None:
+                action = (choice("pass") or choice("end_phase") or choice("place")
+                          or actions[0] if resolved < 2 else
+                          agents[obs.acting_player].select_action(obs, actions))
+            obs = env.step(action)
+            if costs > resolved and obs.chain == ():
+                resolved += 1
+                assert obs.turn == 2
+                assert len(obs.banished[0]) == resolved
+                remaining = [card.controller for card in obs.field
+                             if card.code == SKULL_SERVANT and card.zone == "monster"]
+                assert remaining == ([1] if resolved == 1 else [])
+                assert SKULL_LAIR in {card.code for card in obs.field}
+        assert graceful and discarded and lair_set and lair_faceup
+        assert own_summoned and opponent_summoned
+        assert (activations, costs, targets, resolved) == (2, 2, 2, 2)
+        assert env.is_terminal()
+        path = tmp_path / "skull_lair_twice_same_turn.json"
         write_trajectory(path, env.trajectory())
         replay = read_trajectory(path)
         assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) == len(replay.decisions)

@@ -397,10 +397,10 @@ Three Mystik Wok fixtures with Breaker verify Tribute as an activation cost, the
 
 Paired Zombyra the Dark fixtures cover its post-battle 200 ATK loss, direct-attack prohibition, and recovery to 2100 ATK after Book of Moon Sets it for a later Flip Summon. Zombyra appears in the sourced Warrior Main Deck and was selected in the competitive-deck protocol sample. Both full duels replay-verify; see [GOAT rules](goat_rules.md).
 
-Paired Skull Lair fixtures now check a Graveyard-monster banish cost against a
-face-up Level 1 monster and the lack of a destruction choice against the same
-face-down monster. Both seeded full duels replay-verify and pass the visibility
-audit. Repeated activations and Damage Step timing remain untested; see
+Four Skull Lair fixtures check its Graveyard-monster banish cost, face-up
+Level 1 requirement, absent effect choice during the Damage Step, and two
+cost-paid activations on separate chains in one turn. All four seeded full
+duels replay-verify and pass the visibility audit; see
 [GOAT rules](goat_rules.md).
 
 Four Morphing Jar deck-out fixtures verify the historical five-card draw boundary for either player: with four Deck cards the effect ends the duel, while with five it resolves and the next required draw ends the duel. Four more native fixtures check both players near empty: 3/4, 4/4, and 4/3 cards remaining each give a draw, while five each resolves and the next required draw determines the loser. All eight terminal trajectories replay-verify. A contemporaneous 2005 TCG source for the simultaneous failed-draw outcome remains to be located, so that historical interpretation is provisional. See [GOAT rules](goat_rules.md).

@@ -461,10 +461,15 @@ paired seed-18 native fixture discards a monster with Graceful Charity and
 Sets Skull Lair. When the opponent Normal Summons a face-up Skull Servant,
 Skull Lair banishes one Graveyard monster as cost and destroys that Level 1
 target. When the same monster is Set instead, the active Skull Lair offers no
-destruction effect and the Graveyard monster remains. Both full duels
-serialize, replay-verify, and pass the visibility audit. Repeated uses,
-Damage Step timing, and cost interactions with replacement effects remain
-untested.
+destruction effect and the Graveyard monster remains. A third native duel
+keeps Skull Lair face-up through a direct attack: its effect is offered in the
+Battle Step response, but absent from the acting player's Damage Step
+choices. A fourth duel discards two monsters, then uses Skull Lair twice in
+turn 2 on separate chains, first destroying its controller's own face-up
+Skull Servant and then the opposing one. Each activation banishes one of the
+two Graveyard monsters as cost. All four complete duels serialize,
+replay-verify, and pass the visibility audit. Cost interactions with
+replacement effects and other Damage Step windows remain untested.
 
 **Tribe-Infecting Virus versus Sheep Tokens:** [Historical Tribe rulings](https://www.goatformat.com/rulings7.html) require a currently represented face-up Type at activation and destroy face-up monsters of the declared Type. [Scapegoat's card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4818&ope=2&request_locale=en) identifies its Sheep Tokens as Beast; [GOAT tournament coverage](https://www.goatformat.com/home/round-nine-jonathan-labounty-vs-ryan-hayakawa) records a Beast declaration clearing Sheep Tokens. Paired seeded native fixtures Normal Summon Tribe and activate GOAT Scapegoat on the opposing side. Tribe discards pre-errata Sinister Serpent as its activation cost; the only Type choices are Aqua and Beast. Choosing Beast destroys all four Tokens, which enter neither Graveyard, while Tribe survives. Choosing Aqua destroys Tribe and leaves all four Tokens. Both outcomes preserve Life Points and verify the pinned Tribe, Serpent, and Scapegoat scripts loaded. Chained Type changes and partial Token removal remain untested.
 
