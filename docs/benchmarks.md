@@ -1256,6 +1256,53 @@ setting, pending stronger held-out playing-strength evidence. The generated
 checkpoints, replays, and JSON reports use `ppo_batch{16,32}_28000_*` names
 under ignored `.cache/goat-ai/`.
 
+## Sixteen versus thirty-two native workers (2026-10-28)
+
+At commit `584b819`, 64 RandomAgent duels paired Matt Peddle's 2005 Goat
+Control Main Deck with Riclar's 2020 Chaos Turbo Main Deck, both seat orders,
+seeds 50000–50031. The same pinned assets and inputs were used in four
+sequential runs, ordered 16, 32, 32, then 16 spawned workers, with
+`OMP_NUM_THREADS=1`. All 64 games reached terminal in each run. The ordered
+seed, seat, winner, and decision-count records matched exactly across runs;
+each run processed **67,478** decisions. Deck and listed native-asset SHA-256
+maps matched across reports.
+
+| Run | Workers observed | Wall including spawn | Duels/s | Decisions/s | Mean reset | Sum worker peak RSS |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A1 | 16 | 5.802 s | 11.03 | 11,630 | 111.2 ms | 970,688 KiB |
+| A2 | 32 | 6.081 s | 10.53 | 11,097 | 232.3 ms | 1,868,692 KiB |
+| B1 | 32 | 6.385 s | 10.02 | 10,567 | 227.2 ms | 1,864,324 KiB |
+| B2 | 16 | 6.263 s | 10.22 | 10,775 | 113.7 ms | 969,088 KiB |
+
+Thirty-two workers were **2–5% slower** than sixteen in the two paired
+orderings and used about 1.92 times the sum of per-process high-water RSS.
+The RSS sum is not an instantaneous machine-wide peak. On this 16-logical-CPU
+host and pure-simulation schedule, 32 workers are not a throughput upgrade.
+These short runs exclude neural inference, trajectory writing, and replay
+verification; they do not establish the best worker count for training.
+
+Reproduce with:
+
+```bash
+for specification in 16:a1 32:a2 32:b1 16:b2; do
+  workers=${specification%%:*}
+  run=${specification##*:}
+  OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+    scripts/benchmark_parallel_native.py \
+    --deck-a examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+    --deck-b examples/decks/chaos_turbo_riclar_2020.ydk \
+    --seed 50000 --games 64 --workers "$workers" \
+    --output ".cache/goat-ai/parallel_16_32_50000/${workers}w_${run}.json"
+done
+```
+
+The ignored reports are in
+`.cache/goat-ai/parallel_16_32_50000/`; SHA-256 values for A1, A2, B1, B2
+are `6f3c68953d2b8db068ef6b07dcce5db93732853e6804f960cb90511cd9ba4acf`,
+`01ea87c5c2945f3f1a33184f431a535c261e04812deb2e565268ef19402d6629`,
+`849b509ee616a8e65456dd5102bfe3220a406c1df90a8936ff1f9487877facab`,
+and `e2db74fe9f115e8179aeab3ddacb4fee77871cd24d406cda713d3a1d4771268b`.
+
 ## Eight versus sixteen native workers (2026-10-27)
 
 At commit `500abdb`, 32 RandomAgent duels paired Matt Peddle's 2005 Goat

@@ -641,6 +641,12 @@ measures eight and sixteen workers in reversed order on the same sourced
 pairing. All outcomes and decision counts matched, and sixteen workers had
 1.18–1.25× throughput with nearly twice the summed worker high-water RSS. Neural
 inference scaling and instantaneous total memory remain unmeasured.
+A [64-duel follow-up](benchmarks.md#sixteen-versus-thirty-two-native-workers-2026-10-28)
+compares sixteen and thirty-two workers in reversed order: all 67,478
+decisions and ordered outcomes matched, while thirty-two workers were 2–5%
+slower and used about 1.92× summed worker high-water RSS. This supports
+stopping pure-simulation worker scaling at sixteen on the measured host;
+neural inference and training throughput still need their own measurements.
 
 **Status: in progress.** Seeded tournament runners swap seats for each deck matchup, record individual outcomes, report seat and matchup splits, and give paired score and Wilson intervals. A spawned-process runner reproduces the sequential results on a native fixture and has a measured two-worker throughput example. A restricted-fixture baseline report is in [the evaluation log](evaluation.md). Schema v18 trajectories add a final player-visible terminal observation to the v17 decision records, which record face-up monster ATK, DEF, and counters alongside bounded public events, field-slot known-card memory, conservative opponent-hand knowledge from public returns and addressed hand reveals, a public Scapegoat restriction, public Deck-top reveals, active disabled zones, recipient-scoped private reveals, and the player's initial Main Deck composition; they can be replayed against the native engine with exact observation, legal-action, result, deck-content, rules-profile, and loaded-asset comparisons. An offline browser viewer renders these player-visible decisions with optional locally cached card art. It interpolates attack arrows, target markers, Life Point fill and numbers, and field-to-Graveyard or banished-pile movement between recorded decision snapshots; it does not reconstruct every native event. The new GOAT-only native core patch changes the binary fingerprint, so older recordings require re-recording for exact verification on the current setup. Broader deck families, held-out opponents, authorized human replay reconstruction, training/evaluation separation, and memory scaling beyond eight workers remain outstanding.
 
