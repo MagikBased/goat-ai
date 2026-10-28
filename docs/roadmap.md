@@ -1465,6 +1465,13 @@ is still banished. Both complete duels replay-verify and pass visibility
 checks. This closes one staple multi-Summon branch, not general GOAT card
 correctness; see [GOAT rules](goat_rules.md#bottomless-against-two-simultaneous-dimension-fusion-monsters).
 
+A paired Cyber Jar/Bottomless fixture now checks the response after both
+players place five revealed Normal Monsters in Main Phase. Bottomless removes
+the five eligible face-up opposing Summons while leaving its controller's
+face-down Summons. The pass branch leaves all ten. Both full duels
+replay-verify and pass visibility checks; the Damage Step exclusion remains
+open. See [GOAT rules](goat_rules.md#cyber-jar-followed-by-bottomless-trap-hole).
+
 A Metamorphosis fixture now checks the historical option to Tribute the
 player's own face-down Level 1 Dark Mimic for Thousand-Eyes Restrict, without
 triggering Mimic's Flip draw. With no matching Fusion in the Extra Deck,
