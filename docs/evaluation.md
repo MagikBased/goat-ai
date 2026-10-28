@@ -11260,3 +11260,35 @@ Reproduce training with the preceding section's command, changing
 `scripts/evaluate_policy.py` with the same matchups and flags and the stated
 seed blocks. This one fit-length comparison is not evidence that all
 winner-only or longer-fit approaches fail.
+
+## Post-Deck-slot-audit tournament-mix replay sweep (28 October 2026)
+
+The widened action-visibility audit was exercised on ten new native duels
+using random legal 40-card mixes from the six sourced tournament Main Decks
+in `TOURNAMENT_MAIN_DECKS`. Each seed used a distinct generated opponent
+mix. This samples the cards in those lists; it is neither a 2005 metagame
+sample nor a historical ruling certification for every chosen card.
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --card-pool tournament --verify-replays --distinct-opponents \
+  --count-card-actions --seed 23000 --seeds 10 --max-decisions 3000 \
+  --output .cache/goat-ai/tournament_visibility_23000_23009
+```
+
+All ten games reached native terminal outcomes in 483–1,210 decisions,
+9,244 decisions total. All 9,244 decisions replay-verified and passed the
+visibility audit, which counted 116 hidden-field choices, 522 opponent-field
+choices, and 40 opponent-hand choices. The report records 26 offered action
+kinds, the `tcg-goat-2005-08-17` rules profile, source Deck hashes, generated
+Deck hashes, and 103 loaded asset hashes. The ignored report is
+`.cache/goat-ai/tournament_visibility_23000_23009/report.json`, SHA-256
+`578c296e36e90f0bbcfc492d2d022bc6a62de16a0c30a248b4a47b65d6080d69`.
+
+The same command with `--repeat-seeds` and output
+`.cache/goat-ai/tournament_visibility_23000_23009_repeat` replayed each game
+from its seed and matched all 9,244 ordered decisions, terminal states, and
+outcomes. A separate run with the same seeds produced identical game-level
+decision counts, winners, generated Deck hashes, offered action kinds,
+visibility counts, and loaded asset hashes. The broader M1 information-flow
+and M2 historical-ruling gates remain open.
