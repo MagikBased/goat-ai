@@ -10678,3 +10678,64 @@ with `scripts/audit_selfplay_replays.py`. Evaluate with
 `scripts/evaluate_policy.py --engine experimental --both-deck-assignments
 --require-unseen-main-decks --workers 4 --max-decisions 3000` and the named
 pairing, opponent checkpoints, and seed blocks.
+
+## Independent whitelist Fusion and Tactical protocol sweeps (28 October 2026)
+
+Two isolated native sweeps used the current GOAT profile and core-library
+SHA-256 `48763d36b1beba3ce37782d7d41cbee58fefe8f65573ab53090e319674bc5358`.
+Each duel ran in its own process so one native crash could be attributed to
+its seed without erasing later results. Both sweeps required terminal outcomes
+below 3,000 decisions, independently replay-verified each saved trajectory,
+and audited player-visible decisions and legal actions.
+
+The broad whitelist run paired independently generated legal 40-card Main
+Decks, each with 15 sampled Fusion cards. It forced three Scapegoats and
+three Metamorphoses into each Main Deck and Thousand-Eyes Restrict into each
+Extra Deck. On seeds **11300–11399**, **100/100** duels reached terminal;
+all **108,360/108,360** decisions replay-verified and passed the visibility
+audit. The audit counted 906 hidden-field, 6,619 opponent-field, and 81
+opponent-hand legal choices. The run loaded **1,349** distinct native assets,
+including **241** absent from the previous 40-seed Fusion-stress sweep; it
+exercised **32** action kinds. Its ignored report is
+`.cache/goat-ai/whitelist_fusion_stress_11300_11399/report.json` (SHA-256
+`2324707f2e4139fd7c9823703a8347ed1fbef7ba1e17438ce77a7ed7dc21ebfe`).
+An independent repeat of seeds **11300–11301** reproduced **1,467**
+decisions, terminal outcomes, and both deck hashes, while replay-verifying
+those decisions again. The repeat report SHA-256 is
+`128c56feed0301977d8b758854db4f2b65a4165ac32c552263e5cada2ef35305`.
+
+The second sweep generated independent legal decks from the six sourced
+tournament Main Decks and used Tactical-v14 for both seats. On seeds
+**11400–11449**, **50/50** duels reached terminal; all **24,009/24,009**
+decisions replay-verified and passed the visibility audit. It loaded 103
+native assets and exercised 26 action kinds. It selected 86 distinct
+responder/preceding-link card pairs, **62** of which were not selected in
+the earlier 40-duel random-agent tournament-card sweep; this is a coverage
+comparison across different seeds and decks, not a performance measure.
+The ignored report is `.cache/goat-ai/tournament_tactical_11400_11449/report.json`
+(SHA-256 `40b2370ccabd0e2888ade90e04e6e87ad242682d2915de075908cf10f6b12f86`).
+Repeating seeds **11400–11401** reproduced **816** decisions, outcomes, and
+deck hashes and passed replay verification. The repeat report SHA-256 is
+`fc104effc06330fcdb16d1a19510eb01f915f2c7919632be9e304edc64759318`.
+
+The native probe regression suite passed **9/9** with
+`GOAT_AI_NATIVE_ROOT=.cache/goat-ai`. These results widen M1 protocol and
+visibility evidence, especially for Fusion and chosen chain responses. They
+do not prove that all GOAT card effects or 2005 rulings are correct, and
+random or Tactical play does not establish competitive policy strength.
+Reproduce the broad sweep with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_fusion_stress_11300_11399 \
+  --seed 11300 --seeds 100 --max-decisions 3000 \
+  --random-extra --fusion-stress --distinct-opponents \
+  --isolate-games --verify-replays --count-card-actions
+```
+
+For the Tactical sweep use the same command with output
+`.cache/goat-ai/tournament_tactical_11400_11449`, seeds 11400–11449,
+`--card-pool tournament --agent tactical`, and omit `--random-extra
+--fusion-stress`. For the two-seed repeats, change `--seeds` to 2, choose
+new empty output directories, and add `--repeat-seeds`.

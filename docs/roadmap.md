@@ -339,6 +339,17 @@ observed 1,316 native assets and 5,748 card-source/action-kind pairs. This
 extends protocol coverage without validating all historical card rulings;
 see [evaluation](evaluation.md#third-consecutive-distinct-whitelist-protocol-sweep-27-october-2026).
 
+A fresh isolated whitelist/Fusion sweep reached **100/100 terminal duels**
+and replay-verified, visibility-audited all **108,360** decisions. It loaded
+1,349 native assets, 241 absent from the earlier 40-seed Fusion sweep. A
+separate Tactical-v14 tournament-card sweep reached **50/50 terminal** and
+verified all **24,009** decisions, selecting 62 chain-response card pairs
+absent from the earlier random-agent tournament sweep. Two seeds from each
+schedule reproduced their full decisions and outcomes. These results widen
+protocol coverage and leave historical correctness and arbitrary-deck
+completeness unproven; see
+[evaluation](evaluation.md#independent-whitelist-fusion-and-tactical-protocol-sweeps-28-october-2026).
+
 ## M2 — Historical correctness gate
 
 A source-backed Card Destruction/Banisher of the Light fixture now confirms
