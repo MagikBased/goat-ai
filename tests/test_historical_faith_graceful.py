@@ -6,9 +6,12 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import verify_trajectory
 
 GRACEFUL = 79571449
 FAITH = 31560081
@@ -33,10 +36,20 @@ def test_faith_recovers_graceful_and_second_use_draws_then_discards(tmp_path):
         second_hand_before = second_deck_before = None
         second_discard_codes = None
         grave_before_second = Counter()
-        for _ in range(70):
+        checked = False
+        agents = (RandomAgent(18), RandomAgent(19))
+        for _ in range(3000):
+            if env.is_terminal():
+                assert checked
+                trajectory = env.trajectory()
+                assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
+                assert audit_trajectory_visibility(trajectory)["decisions"] == len(
+                    trajectory.decisions)
+                return
             actions = env.legal_actions()
             action = None
-            if obs.turn == 1 and obs.acting_player == 0:
+            if not checked and obs.turn == 1 and obs.acting_player == 0:
                 if uses == 0:
                     action = next((a for a in actions if a.kind == "activate"
                                    and a.parameters.get("code") == GRACEFUL), None)
@@ -49,7 +62,7 @@ def test_faith_recovers_graceful_and_second_use_draws_then_discards(tmp_path):
                     action = next((a for a in actions if a.kind == "set_monster"
                                    and a.parameters.get("code") == FAITH), None)
                     faith_set |= action is not None
-            if obs.turn == 3 and obs.acting_player == 0:
+            if not checked and obs.turn == 3 and obs.acting_player == 0:
                 if faith_set and not faith_flipped:
                     action = next((a for a in actions if a.kind == "flip_summon"
                                    and a.parameters.get("code") == FAITH), None)
@@ -78,10 +91,11 @@ def test_faith_recovers_graceful_and_second_use_draws_then_discards(tmp_path):
                     assert len(second_discard_codes) == 2
                     discards += 1
             if action is None:
-                action = next((a for a in actions if a.kind in (
-                    "place", "select_position", "pass", "end_phase")), actions[0])
+                action = (agents[obs.acting_player].select_action(obs, actions) if checked
+                          else next((a for a in actions if a.kind in (
+                              "place", "select_position", "pass", "end_phase")), actions[0]))
             obs = env.step(action)
-            if uses == discards == 2 and not obs.chain \
+            if not checked and uses == discards == 2 and not obs.chain \
                     and GRACEFUL in {c.code for c in obs.graveyards[0]}:
                 own = env.engine.probe.observation(0)
                 opponent = env.engine.probe.observation(1)
@@ -96,6 +110,6 @@ def test_faith_recovers_graceful_and_second_use_draws_then_discards(tmp_path):
                         for reveal in opponent.private_reveals] == [[GRACEFUL]]
                 assert not own.private_reveals
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
-                return
+                checked = True
     pytest.fail(f"Faith/Graceful line stalled: uses={uses} discards={discards} "
                 f"Faith={faith_set}/{faith_flipped}/{recovered} turn={obs.turn}")
