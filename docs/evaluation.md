@@ -1,5 +1,43 @@
 # Baseline evaluation log
 
+## Self-play continuation of the 25-preference child (28 October 2026)
+
+To test the next M4 step, `scripts/train_self_play.py` continued the experimental
+25-preference child for **64 terminal GOAT duels** on seeds 99000–99063. The
+training pairings were Jesse Twohig Goat Control/Montague Warrior and DingoSig
+Chaos Return/Weirdchamp Bazoo Return, with both learner seats and decks. The
+clipped-PPO configuration used four-game frozen rollouts, four workers, two
+epochs, batch size 32, per-episode weighting, learner-deck return baseline,
+learning rate 0.00005, parent KL weight 0.5, independent opponent sampling,
+and a 50% historical-snapshot probability with Tactical-v14 otherwise. The
+sampled learner scored **24–37–3** against that training mixture. Training
+took **21.36 seconds**, recorded 3,954 learner decisions, and had no capped or
+unsupported games. This is training evidence, not a strength evaluation.
+
+The ignored checkpoint `.cache/goat-ai/human25_ppo_mixed_64_99000_99063.pt`
+has SHA-256 `e730c8789977ea6c75c4e9fa8bd9a6a5ff2d6d5a65f9d20b5a3ff95a913cbfd8`.
+All 64 saved trajectories and **25,302 decisions** passed exact native replay
+verification and player-visibility auditing. The ignored audit report SHA-256
+is `31a5dc4f4c2a17509f965e271268dd4f567c9b6e3db66ac67438aa3da7411763`.
+On the 25 reviewed training decisions, PPO retained the starting child's
+**7/25** top-ranked alternatives and **9/25** positive preference margins;
+the score report SHA-256 is
+`bff59f516d13856497f8ab49b638a6f1257d9f3506a547f8a4674e23fc5d67f1`.
+
+Held-out evaluation used Rhymus Goat Control/Guide Dimension Fusion and the
+newly transcribed 2005 Seattle Theeresak/Christian decks, both deck
+assignments and policy seats. The unseen-Main-Deck gate accepted all four
+compositions for both compared checkpoints. On fresh seeds 99100–99107, the
+PPO child scored **31–33** directly against its 25-preference parent in 64
+terminal duels (48.4%; paired 95% interval **42.2%–54.7%**). On separate
+fresh seeds 99108–99115, it scored **28–34–2** against the selected v23
+reference (45.3% of points; paired interval **31.3%–59.4%**). The two ignored
+report SHA-256 values are
+`ab751a2e4d406ddca7b2dc7f97a784d2348321ff3fd846605ce1dbaf9ddbfc6e`
+and `42faa3aaed48913253129b2131710373f8caab47331a719999c2af533115f73d`.
+This continuation does not establish a competitive gain. Keep the v23
+reference selected and the M4 self-play improvement gate open.
+
 ## Broader-deck human-review preference pilot (28 October 2026)
 
 The broader v23-parent review queue reached **14/14 saved choices**. An ignored
