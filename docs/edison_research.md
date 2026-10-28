@@ -265,12 +265,20 @@ date on or before the cutoff and the `north_america` region for any
 sanctioned-play inclusion. These checks guard the structured evidence fields;
 they do not independently authenticate the linked event report.
 
-The [archived official legality page from November 2010](https://web.archive.org/web/20101106023610id_/http://www.yugioh-card.com/en/gameplay/cardlegality.html)
-lists SHONEN JUMP promos through `JUMP-EN044` as North American legal then,
-but an archive-index check on 27 October 2026 found no earlier 2009–April
-2010 capture of that page.
-It corroborates later eligibility; it does not establish an April legal date
-for the outstanding promotional cards.
+**Exodius subscription-promo follow-up (28 October 2026):** [Konami's card
+database](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7392&ope=2&request_locale=en)
+confirms `JUMP-EN025` in the May 2008 subscription promotion, and [Konami's
+2024 event FAQ](https://www.yugioh-card.com/en/events-item/2024-ycs-colombia/)
+states that SHONEN JUMP subscription promotions were available to US/Canadian
+residents and that tournament-legal dates applied to sanctioned North American
+events. The latter is retrospective regional context, **not** evidence of the
+rule or exact legal date on 20 April 2010. The [6 November 2010 archive of
+Konami's card-legality page](https://web.archive.org/web/20101106023610id_/http://www.yugioh-card.com/en/gameplay/cardlegality.html)
+lists JUMP promotions through `JUMP-EN044` as legal, but also postdates the
+cutoff. A Wayback CDX check found that archive as the only successful 2010
+capture of this page, so it cannot prove the April status. The candidate
+remains pending until a period North American legality page, policy, or
+sanctioned-play record establishes it. Its 2010 tin reprint is too late.
 
 ## Native engine assessment
 
