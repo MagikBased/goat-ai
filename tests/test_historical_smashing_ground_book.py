@@ -20,15 +20,19 @@ SMASHING_GROUND = 97169186
 BOOK_OF_MOON = 14087893
 GEMINI_ELF = 69140098  # 900 DEF
 MYSTICAL_ELF = 15025844  # 2000 DEF
+THIRTEENTH_GRAVE = 32864  # 900 DEF
 
 
-def _decks(tmp_path):
+def _decks(tmp_path, *, tie=False):
     attacker = list(VANILLA_DECK)
     attacker[0] = SMASHING_GROUND
     defender = list(VANILLA_DECK)
     defender[0], defender[6] = defender[6], defender[0]
     defender[1], defender[6] = defender[6], defender[1]
     defender[4] = BOOK_OF_MOON
+    if tie:
+        defender = [THIRTEENTH_GRAVE if code == MYSTICAL_ELF else code
+                    for code in defender]
     paths = (tmp_path / "smashing.ydk", tmp_path / "book.ydk")
     for path, cards in zip(paths, (attacker, defender)):
         path.write_text("#main\n" + "\n".join(map(str, cards)) +
@@ -134,3 +138,78 @@ def test_smashing_rechecks_highest_faceup_def_after_book(tmp_path, book_response
                                                actions[0]))
             obs = env.step(action)
     pytest.fail("Smashing Ground fixture did not reach a verified terminal duel")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
+                    reason="native assets not installed")
+@pytest.mark.parametrize("destroyed", [GEMINI_ELF, THIRTEENTH_GRAVE])
+def test_smashing_ground_tied_highest_def_offers_both_choices(tmp_path, destroyed):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{SMASHING_GROUND}.lua").is_file():
+        pytest.skip("Smashing Ground script not installed")
+    own, other = _decks(tmp_path, tie=True)
+    with GoatEnvironment(own, other, seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        book_set = gemini_summoned = grave_summoned = smashing_used = False
+        selected = checked = False
+        agents = (RandomAgent(200), RandomAgent(201))
+        for _ in range(3000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / f"smashing_tie_{destroyed}.json"
+                write_trajectory(path, env.trajectory())
+                replay = read_trajectory(path)
+                assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) == len(
+                    replay.decisions)
+                audit_trajectory_visibility(replay)
+                assert f"official/c{SMASHING_GROUND}.lua" in \
+                    env.engine.probe.loaded_script_sha256
+                return
+            actions = env.legal_actions()
+            action = None
+
+            def choose(kind, code=None):
+                return next((candidate for candidate in actions
+                             if candidate.kind == kind and (code is None or
+                                candidate.parameters.get("code") == code)), None)
+
+            if not checked and obs.turn == 2 and obs.acting_player == 1:
+                if not book_set:
+                    action = choose("set_spell_trap", BOOK_OF_MOON)
+                    book_set |= action is not None
+                if book_set and not gemini_summoned and action is None:
+                    action = choose("normal_summon", GEMINI_ELF)
+                    gemini_summoned |= action is not None
+            if not checked and obs.turn == 4 and obs.acting_player == 1 \
+                    and not grave_summoned:
+                action = choose("normal_summon", THIRTEENTH_GRAVE)
+                grave_summoned |= action is not None
+            if not checked and obs.turn == 5 and obs.acting_player == 0 \
+                    and not smashing_used:
+                action = choose("activate", SMASHING_GROUND)
+                smashing_used |= action is not None
+            if smashing_used and not checked and choose("select_card"):
+                assert {candidate.parameters.get("code") for candidate in actions
+                        if candidate.kind == "select_card"} == {
+                            GEMINI_ELF, THIRTEENTH_GRAVE}
+                assert all(candidate.parameters.get("controller") == 1
+                           for candidate in actions if candidate.kind == "select_card")
+                action = choose("select_card", destroyed)
+                selected = True
+            if smashing_used and selected and not checked and \
+                    SMASHING_GROUND in {card.code for card in obs.graveyards[0]}:
+                assert destroyed in {card.code for card in obs.graveyards[1]}
+                survivor = ({GEMINI_ELF, THIRTEENTH_GRAVE} - {destroyed}).pop()
+                assert any(card.code == survivor and card.position == "faceup"
+                           for card in obs.field)
+                assert obs.life_points == (8000, 8000)
+                checked = True
+            if action is None:
+                action = (agents[obs.acting_player].select_action(obs, actions)
+                          if checked else next((candidate for candidate in actions
+                                                if candidate.kind in (
+                                                    "place", "pass", "end_phase")),
+                                               actions[0]))
+            obs = env.step(action)
+    pytest.fail("Smashing Ground tie fixture did not reach a verified terminal duel")
