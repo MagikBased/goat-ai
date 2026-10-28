@@ -40,6 +40,7 @@ class RestrictedOcgcoreEngine:
         self._actions: tuple[Action, ...] = ()
         self._last_observation = None
         self._selection_indices: tuple[int, ...] | None = None
+        self._counter_prefix: tuple[int, ...] | None = None
 
     def _load_deck(self, path: str) -> Decklist:
         deck = read_ydk(path)
@@ -99,7 +100,23 @@ class RestrictedOcgcoreEngine:
             native = self.probe.decode_pending()
         except NotImplementedError as exc:
             raise SimulatorUnavailable(f"native request unsupported by restricted adapter: {exc}") from exc
-        if native.sum_selection is not None:
+        if native.counter_selection is not None:
+            selection = native.counter_selection
+            if self._counter_prefix is None:
+                self._counter_prefix = ()
+            prefix = self._counter_prefix
+            index = len(prefix)
+            choices = tuple(NativeChoice(
+                "select_counters", amount, cards=selection.cards[:index + 1],
+                counter_type=selection.counter_type, counter_total=selection.total,
+                counter_allocations=(*prefix, amount))
+                for amount in selection.feasible_amounts(prefix))
+            if not choices:
+                raise SimulatorUnavailable("staged counter selection has no legal continuation")
+            native = replace(native, choices=choices)
+            self._selection_indices = None
+        elif native.sum_selection is not None:
+            self._counter_prefix = None
             selection = native.sum_selection
             if self._selection_indices is None:
                 self._selection_indices = ()
@@ -118,6 +135,7 @@ class RestrictedOcgcoreEngine:
                 raise SimulatorUnavailable("staged sum selection has no legal continuation")
             native = replace(native, choices=tuple(choices))
         elif native.card_selection is not None:
+            self._counter_prefix = None
             selection = native.card_selection
             if self._selection_indices is None:
                 self._selection_indices = ()
@@ -134,6 +152,7 @@ class RestrictedOcgcoreEngine:
                 choices.append(NativeChoice("cancel", -1))
             native = replace(native, choices=tuple(choices))
         elif native.zone_selection is not None:
+            self._counter_prefix = None
             selection = native.zone_selection
             if self._selection_indices is None:
                 self._selection_indices = ()
@@ -145,6 +164,7 @@ class RestrictedOcgcoreEngine:
             native = replace(native, choices=choices)
         else:
             self._selection_indices = None
+            self._counter_prefix = None
         # Staged card picks only edit the adapter's selection prefix. Until a
         # response is submitted, ocgcore has not advanced and its visible
         # state is identical to the preceding decision.
@@ -245,6 +265,12 @@ class RestrictedOcgcoreEngine:
                 parameters["counter_type"] = choice.counter_type
             if choice.counter_total is not None:
                 parameters["counter_total"] = choice.counter_total
+            if native.counter_selection is not None:
+                parameters["counter_stage"] = True
+                parameters["counter_index"] = len(self._counter_prefix)
+                parameters["counter_card_count"] = len(native.counter_selection.cards)
+                parameters["counter_remaining"] = (
+                    native.counter_selection.total - sum(choice.counter_allocations))
             if choice.zones:
                 parameters["zones"] = [
                     {"controller": controller, "location": location, "sequence": sequence}
@@ -315,7 +341,20 @@ class RestrictedOcgcoreEngine:
         index = self._actions.index(action)
         try:
             choice = self._choices[index]
-            if self._selection_indices is not None and choice.kind in (
+            if self._counter_prefix is not None and choice.kind == "select_counters" \
+                    and isinstance(choice.response, int):
+                native = self.probe.decode_pending()
+                selection = native.counter_selection
+                if selection is None:
+                    raise RuntimeError("staged counter selection lost its native prompt")
+                prefix = (*self._counter_prefix, choice.response)
+                if len(prefix) < len(selection.cards):
+                    self._counter_prefix = prefix
+                    return self._decision(reuse_observation=True)
+                response = struct.pack(f"<{len(prefix)}h", *prefix)
+                if not selection.accepts(response):
+                    raise RuntimeError("staged counter selection produced invalid allocation")
+            elif self._selection_indices is not None and choice.kind in (
                     "place_zones", "disable_zones") and isinstance(choice.response, int):
                 native = self.probe.decode_pending()
                 selection = native.zone_selection
@@ -345,6 +384,7 @@ class RestrictedOcgcoreEngine:
             else:
                 response = choice.response
             self._selection_indices = None
+            self._counter_prefix = None
             transition = self.probe.respond(response)
             if transition.terminal:
                 self._choices = ()
@@ -367,6 +407,7 @@ class RestrictedOcgcoreEngine:
         self._choices = ()
         self._actions = ()
         self._selection_indices = None
+        self._counter_prefix = None
 
     def replay_manifest(self) -> dict[str, str]:
         """Hash native files and every script loaded during the current duel."""

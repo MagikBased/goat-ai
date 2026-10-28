@@ -825,6 +825,8 @@
       }
       if (parameters.counter_type != null)
         parts.push(`${parameters.counter_total} counter${parameters.counter_total === 1 ? "" : "s"} (type ${parameters.counter_type})`);
+      if (parameters.counter_stage === true)
+        parts.push(`Card ${parameters.counter_index + 1}/${parameters.counter_card_count}, ${parameters.counter_remaining} left after choice`);
       if (parameters.zones) parts.push(parameters.zones.map(zone =>
         `P${zone.controller + 1} ${locationName(zone.location)} ${zone.sequence + 1}`).join(", "));
       if (parameters.position != null) parts.push(positionName(parameters.position));

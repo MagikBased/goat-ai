@@ -196,12 +196,38 @@ class NativeZoneSelection:
 
 
 @dataclass(frozen=True)
+class NativeCounterSelection:
+    cards: tuple[tuple[int, int, int, int], ...]
+    available: tuple[int, ...]
+    total: int
+    counter_type: int
+
+    def accepts(self, response: int | bytes) -> bool:
+        if not isinstance(response, bytes) or len(response) != 2 * len(self.cards):
+            return False
+        amounts = struct.unpack(f"<{len(self.cards)}h", response)
+        return sum(amounts) == self.total and all(
+            0 <= amount <= available for amount, available in
+            zip(amounts, self.available, strict=True))
+
+    def feasible_amounts(self, prefix: tuple[int, ...]) -> range:
+        index = len(prefix)
+        if index >= len(self.cards):
+            return range(0)
+        remaining = self.total - sum(prefix)
+        lower = max(0, remaining - sum(self.available[index + 1:]))
+        upper = min(self.available[index], remaining)
+        return range(lower, upper + 1)
+
+
+@dataclass(frozen=True)
 class NativeDecision:
     player: int
     choices: tuple[NativeChoice, ...]
     card_selection: NativeCardSelection | None = None
     sum_selection: NativeSumSelection | None = None
     zone_selection: NativeZoneSelection | None = None
+    counter_selection: NativeCounterSelection | None = None
 
 
 class _Reader:
@@ -541,13 +567,17 @@ def decode_decision(message: bytes,
                 or sum(available) < total:
             raise ValueError("counter selection has no valid allocation")
         choices = []
+        selection = NativeCounterSelection(tuple(cards), tuple(available), total, counter_type)
+        overflow = False
 
         def enumerate_allocations(index: int, remaining: int,
                                   prefix: tuple[int, ...]) -> None:
+            nonlocal overflow
             if index == count:
                 if remaining == 0:
                     if len(choices) >= MAX_COUNTER_SELECTION_COMBINATIONS:
-                        raise NotImplementedError("counter selection has too many allocations")
+                        overflow = True
+                        return
                     picked = tuple(card for card, amount in zip(cards, prefix, strict=True)
                                    if amount)
                     amounts = tuple(amount for amount in prefix if amount)
@@ -556,11 +586,16 @@ def decode_decision(message: bytes,
                         cards=picked, counter_type=counter_type, counter_total=total,
                         counter_allocations=amounts))
                 return
-            for amount in range(min(available[index], remaining) + 1):
+            lower = max(0, remaining - sum(available[index + 1:]))
+            for amount in range(lower, min(available[index], remaining) + 1):
                 enumerate_allocations(index + 1, remaining - amount,
                                       (*prefix, amount))
+                if overflow:
+                    return
 
         enumerate_allocations(0, total, ())
+        if overflow:
+            return NativeDecision(player, (), counter_selection=selection)
         if not choices:
             raise ValueError("counter selection has no valid allocation")
         return NativeDecision(player, tuple(choices))

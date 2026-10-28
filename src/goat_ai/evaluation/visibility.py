@@ -35,10 +35,26 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
             cards = action.parameters.get("cards", ())
             counter_type = action.parameters.get("counter_type")
             total = action.parameters.get("counter_total")
+            staged = action.parameters.get("counter_stage") is True
             slots = set()
             if (type(counter_type) is not int or type(total) is not int
                     or total <= 0 or not isinstance(cards, (list, tuple))
-                    or not cards or sum(card.get("amount", 0) for card in cards) != total):
+                    or not cards or not all(isinstance(card, dict) for card in cards)):
+                raise VisibilityViolation("counter selection has invalid public allocation")
+            amounts = tuple(card.get("amount") for card in cards)
+            if any(type(amount) is not int for amount in amounts):
+                raise VisibilityViolation("counter selection has invalid public allocation")
+            paid = sum(amounts)
+            if staged:
+                index = action.parameters.get("counter_index")
+                count = action.parameters.get("counter_card_count")
+                remaining = action.parameters.get("counter_remaining")
+                if (type(index) is not int or type(count) is not int
+                        or type(remaining) is not int or not 0 <= index < count <= 22
+                        or len(cards) != index + 1 or paid + remaining != total
+                        or remaining < 0):
+                    raise VisibilityViolation("counter stage has invalid public progress")
+            elif paid != total:
                 raise VisibilityViolation("counter selection has invalid public allocation")
             for choice in cards:
                 zone = {4: "monster", 8: "spell_trap"}.get(choice.get("location"))
@@ -46,7 +62,7 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
                 card = field.get(slot)
                 amount = choice.get("amount")
                 if (card is None or card.position != "faceup" or slot in slots
-                        or type(amount) is not int or amount <= 0
+                        or type(amount) is not int or amount < (0 if staged else 1)
                         or amount > dict(card.counters).get(counter_type, 0)):
                     raise VisibilityViolation("counter selection exceeds visible field counters")
                 slots.add(slot)

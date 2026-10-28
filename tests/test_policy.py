@@ -1659,6 +1659,18 @@ def test_v28_counter_amounts_are_distinct_and_v23_warm_start_preserves_logits(tm
     assert new.action_kinds.tolist() == [new.action_kinds[0].item()] * 2
     assert new.action_kinds[0] > 0
 
+    staged = (Action("zero", "select_counters", 0, {
+        "cards": [{**first, "amount": 0}], "counter_type": 1,
+        "counter_total": 3, "counter_stage": True, "counter_index": 0,
+        "counter_card_count": 2, "counter_remaining": 3}),
+        Action("one", "select_counters", 0, {
+            "cards": [{**first, "amount": 1}], "counter_type": 1,
+            "counter_total": 3, "counter_stage": True, "counter_index": 0,
+            "counter_card_count": 2, "counter_remaining": 2}))
+    staged_features = encode_decision(observation, staged, vocabulary, 28)
+    assert staged_features.action_target_context[0, 0, -1] == 0
+    assert staged_features.action_target_context[1, 0, -1] > 0
+
     parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
     checkpoint = {"schema_version": 1, "model_state": parent.state_dict(),
                   "vocabulary_codes": vocabulary.codes,

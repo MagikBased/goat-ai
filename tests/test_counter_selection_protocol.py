@@ -64,7 +64,7 @@ def test_native_counter_prompt_maps_allocations_to_visible_actions(tmp_path):
     assert read_trajectory(replay_path) == trajectory
 
 
-def test_counter_prompt_rejects_invalid_and_unbounded_allocations(monkeypatch):
+def test_counter_prompt_rejects_invalid_and_stages_large_allocations(monkeypatch):
     same_targets = native_messages.decode_decision(
         _prompt(total=3, available=(2, 2)))
     assert [choice.counter_allocations for choice in same_targets.choices] == [
@@ -75,8 +75,64 @@ def test_counter_prompt_rejects_invalid_and_unbounded_allocations(monkeypatch):
     with pytest.raises(ValueError, match="no valid allocation"):
         native_messages.decode_decision(_prompt(total=4))
     monkeypatch.setattr(native_messages, "MAX_COUNTER_SELECTION_COMBINATIONS", 1)
-    with pytest.raises(NotImplementedError, match="too many allocations"):
-        native_messages.decode_decision(_prompt())
+    staged = native_messages.decode_decision(_prompt())
+    assert staged.choices == ()
+    assert staged.counter_selection is not None
+    assert list(staged.counter_selection.feasible_amounts(())) == [1, 2]
+    assert staged.counter_selection.accepts(struct.pack("<2h", 1, 1))
+    assert not staged.counter_selection.accepts(struct.pack("<2h", 0, 2))
+
+
+def test_large_counter_prompt_stages_public_amounts_and_sends_one_response(tmp_path):
+    cards = tuple((100 + index, index // 5, 4, index % 5) for index in range(10))
+    prompt = (struct.pack("<BBHHI", 22, 0, 1, 10, len(cards))
+              + b"".join(struct.pack("<IBBBH", code, controller, location,
+                                      sequence, 5)
+                         for code, controller, location, sequence in cards))
+    native = native_messages.decode_decision(prompt)
+    selection = native.counter_selection
+    assert selection is not None and native.choices == ()
+    assert selection.accepts(struct.pack("<10h", *([1] * 10)))
+    assert not selection.accepts(struct.pack("<10h", *([2] * 10)))
+    observation = replace(_observation(), field=tuple(
+        CardView(controller, "monster", "faceup", code, sequence, counters=((1, 5),))
+        for code, controller, _, sequence in cards))
+    responses = []
+    engine = ExperimentalOcgcoreEngine(tmp_path)
+    engine.probe = SimpleNamespace(
+        _pending_message=prompt,
+        decode_pending=lambda: native,
+        observation=lambda _player, terminal=False: observation,
+        respond=lambda response: (responses.append(response)
+                                  or SimpleNamespace(terminal=True, winner=0)),
+        close=lambda: None)
+    decision = engine._decision()
+    records = []
+    for index in range(10):
+        assert not decision.terminal
+        assert decision.observation == observation
+        assert 1 <= len(decision.legal_actions) <= 6
+        assert all(action.kind == "select_counters" and
+                   action.parameters["counter_stage"] is True and
+                   action.parameters["counter_index"] == index and
+                   action.parameters["counter_card_count"] == 10
+                   for action in decision.legal_actions)
+        selected = next(action for action in decision.legal_actions
+                        if action.parameters["cards"][-1]["amount"] == 1)
+        record = DecisionRecord(observation, decision.legal_actions, selected)
+        audit_decision_visibility(record)
+        records.append(record)
+        assert engine.action_for_selection_index(1) == selected
+        with pytest.raises(ValueError, match="recorded response"):
+            engine.action_for_recorded_response(struct.pack("<10h", *([1] * 10)))
+        decision = engine.step(selected)
+        assert len(responses) == (1 if index == 9 else 0)
+    assert decision.terminal and decision.winner == 0
+    assert responses == [struct.pack("<10h", *([1] * 10))]
+    trajectory = Trajectory("goat", ("one", "two"), 42, tuple(records), 0)
+    path = tmp_path / "staged_counter_choices.json"
+    write_trajectory(path, trajectory)
+    assert read_trajectory(path) == trajectory
 
 
 def test_counter_audit_rejects_hidden_or_excess_allocations():
@@ -96,3 +152,10 @@ def test_counter_audit_rejects_hidden_or_excess_allocations():
                                          CardView(1, "monster", "facedown", None, 1)))
     with pytest.raises(VisibilityViolation, match="exceeds visible"):
         check(action, hidden)
+    staged = {"cards": [{"controller": 1, "location": 4, "sequence": 1,
+                          "code": 200, "amount": 0}],
+              "counter_type": 1, "counter_total": 2, "counter_stage": True,
+              "counter_index": 0, "counter_card_count": 2, "counter_remaining": 2}
+    assert check(staged) == {"opponent_field_choices": 1}
+    with pytest.raises(VisibilityViolation, match="invalid public progress"):
+        check({**staged, "counter_remaining": 1})

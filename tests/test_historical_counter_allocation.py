@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from goat_ai.agents import RandomAgent
+from goat_ai.engine import native_messages
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
@@ -19,9 +20,13 @@ POT = 55144522
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("allocation", [(2, 0), (1, 1), (0, 2)])
-def test_native_counter_allocation_negates_pot_and_completes_duel(tmp_path, allocation):
+@pytest.mark.parametrize("allocation, staged", [
+    ((2, 0), False), ((1, 1), False), ((0, 2), False), ((1, 1), True)])
+def test_native_counter_allocation_negates_pot_and_completes_duel(
+        tmp_path, allocation, staged, monkeypatch):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if staged:
+        monkeypatch.setattr(native_messages, "MAX_COUNTER_SELECTION_COMBINATIONS", 1)
     for code in (STONE, ANTI_SPELL, POT):
         assert (root / f"scripts/official/c{code}.lua").is_file()
     counter_deck = tmp_path / "counter_stones.ydk"
@@ -80,12 +85,26 @@ def test_native_counter_allocation_negates_pot_and_completes_duel(tmp_path, allo
                 assert [card.counters for card in sorted(
                     (card for card in opponent_view.field if card.code == STONE),
                     key=lambda card: card.sequence)] == [((1, 3),), ((1, 3),)]
-                assert len(actions) == 3
-                offered = {tuple(next((card["amount"] for card in candidate.parameters["cards"]
-                                       if card["sequence"] == sequence), 0)
-                                 for sequence in (0, 1)) for candidate in actions}
-                assert offered == {(2, 0), (1, 1), (0, 2)}
-                if allocation == (1, 1) and find_spec("torch") is not None:
+                if staged:
+                    index = actions[0].parameters["counter_index"]
+                    assert len(actions) == (3 if index == 0 else 1)
+                    action = next(candidate for candidate in actions if
+                                  candidate.parameters["cards"][-1]["amount"]
+                                  == allocation[index])
+                    counter_selected = index == 1
+                else:
+                    assert len(actions) == 3
+                    offered = {tuple(next((card["amount"]
+                                           for card in candidate.parameters["cards"]
+                                           if card["sequence"] == sequence), 0)
+                                     for sequence in (0, 1)) for candidate in actions}
+                    assert offered == {(2, 0), (1, 1), (0, 2)}
+                    action = next(candidate for candidate in actions if tuple(
+                        next((card["amount"] for card in candidate.parameters["cards"]
+                              if card["sequence"] == sequence), 0)
+                        for sequence in (0, 1)) == allocation)
+                    counter_selected = True
+                if not staged and allocation == (1, 1) and find_spec("torch") is not None:
                     import torch
 
                     from goat_ai.training import CardVocabulary, LegalActionPolicy, encode_decision
@@ -101,18 +120,13 @@ def test_native_counter_allocation_negates_pot_and_completes_duel(tmp_path, allo
                                                feature_version=28)(features)
                     assert logits.shape == (3,)
                     assert torch.isfinite(logits).all()
-                action = next(candidate for candidate in actions if tuple(
-                    next((card["amount"] for card in candidate.parameters["cards"]
-                          if card["sequence"] == sequence), 0)
-                    for sequence in (0, 1)) == allocation)
-                counter_selected = True
             if action is None:
                 action = (next((candidate for candidate in actions
                                 if candidate.kind in ("pass", "end_phase")), actions[0])
                           if not cost_resolved else
                           random_agent.select_action(observation, actions))
             observation = env.step(action)
-            if action.kind == "select_counters":
+            if action.kind == "select_counters" and counter_selected:
                 stones = sorted((card for card in observation.field if card.code == STONE),
                                 key=lambda card: card.sequence)
                 assert [card.counters for card in stones] == [

@@ -50,20 +50,22 @@ class ExperimentalOcgcoreEngine(RestrictedOcgcoreEngine):
     def action_for_recorded_response(self, response: bytes) -> Action:
         """Find the unique public action that emits one saved native response."""
         matches = [action for choice, action in zip(self._choices, self._actions, strict=True)
-                   if (struct.pack("<I", choice.response & 0xffffffff)
+                   if self._counter_prefix is None
+                   and (struct.pack("<I", choice.response & 0xffffffff)
                        if isinstance(choice.response, int) else choice.response) == response]
         if len(matches) != 1:
             raise ValueError("recorded response has no unique public action")
         return matches[0]
 
     def action_for_selection_index(self, index: int) -> Action:
-        """Find one staged public pick by the native candidate index."""
+        """Find one staged public pick by native index or counter amount."""
         matches = [action for choice, action in zip(self._choices, self._actions, strict=True)
-                   if choice.kind in ("select_card", "place_zones", "disable_zones")
+                   if choice.kind in ("select_card", "place_zones", "disable_zones",
+                                      "select_counters")
                    and choice.response == index]
         if len(matches) != 1:
             raise ValueError("recorded selection index has no unique public action")
         return matches[0]
 
     def recorded_selection_in_progress(self) -> bool:
-        return self._selection_indices is not None
+        return self._selection_indices is not None or self._counter_prefix is not None

@@ -395,6 +395,86 @@ def test_reconstructs_saved_sum_choice_as_staged_visible_actions(tmp_path, monke
                for record in trace.decisions)
 
 
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_reconstructs_saved_counter_allocation_as_staged_visible_actions(tmp_path, monkeypatch):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    stone, anti_spell, pot = 34029630, 53112492, 55144522
+    own = tmp_path / "counter_stones.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        stone, stone, anti_spell, *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    opponent = tmp_path / "pot.ydk"
+    opponent.write_text("#main\n" + "\n".join(map(str, (
+        pot, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    responses = []
+    stone_sets = 0
+    pot_activated = counter_selected = False
+    with GoatEnvironment(str(own), str(opponent), 100,
+                         ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        agent = RandomAgent(100)
+        for _ in range(3000):
+            actions = env.legal_actions()
+            action = None
+            if not counter_selected and obs.turn == 1 and obs.acting_player == 0:
+                if stone_sets < 2:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == stone), None)
+                    stone_sets += action is not None
+                if stone_sets == 2 and action is None:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == anti_spell), None)
+            if not counter_selected and obs.turn == 2:
+                if obs.acting_player == 1 and not pot_activated:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == pot), None)
+                    pot_activated |= action is not None
+                elif obs.acting_player == 0:
+                    stones_up = sum(card.code == stone and card.position == "faceup"
+                                    for card in obs.field)
+                    code = stone if stones_up < 2 else anti_spell
+                    action = next((a for a in actions if a.kind == "chain"
+                                   and a.parameters.get("code") == code), None)
+            if actions[0].kind == "select_counters":
+                assert len(actions) == 3
+                action = next(a for a in actions if sorted(
+                    card["amount"] for card in a.parameters["cards"]) == [1, 1])
+                counter_selected = True
+            if action is None:
+                action = (next((a for a in actions if a.kind in ("pass", "end_phase")),
+                               actions[0]) if not counter_selected else
+                          agent.select_action(obs, actions))
+            choice = env.engine._choices[actions.index(action)]
+            value = choice.response
+            responses.append(struct.pack("<I", value & 0xffffffff)
+                             if isinstance(value, int) else value)
+            obs = env.step(action)
+            if env.is_terminal():
+                break
+        else:
+            pytest.fail("counter source duel did not reach terminal")
+    assert counter_selected
+    ordered = []
+    for team, path in enumerate((own, opponent)):
+        cards = list(read_ydk(path).main)
+        random.Random(100 * 2 + team).shuffle(cards)
+        ordered.append(tuple(cards))
+    replay = _legacy_replay(responses, decks=tuple(ordered),
+                            seed_words=(101, 102, 103, 104))
+    monkeypatch.setattr(native_messages, "MAX_COUNTER_SELECTION_COMBINATIONS", 1)
+    trace = reconstruct_legacy_responses(replay, root)
+    assert trace.saved_response_count == len(responses)
+    assert len(trace.decisions) == len(responses) + 1
+    staged = [record for record in trace.decisions
+              if record.selected_action.parameters.get("counter_stage")]
+    assert len(staged) == 2
+    assert [record.selected_action.parameters["counter_index"]
+            for record in staged] == [0, 1]
+    assert [record.selected_action.parameters["counter_remaining"]
+            for record in staged] == [1, 0]
+    for record in trace.decisions:
+        audit_decision_visibility(record)
+
+
 def test_reconstruction_rejects_non_goat_or_unreproducible_startup():
     replay = _legacy_replay([b"\xff" * 4])
     bad = [

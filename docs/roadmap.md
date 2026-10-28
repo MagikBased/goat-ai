@@ -275,7 +275,13 @@ ways to remove two counters from two face-up cards; each branch serializes,
 replay-verifies, and passes the visibility audit. The fixture also corrected
 the observation query so face-up Spell/Trap counters are visible to both
 players. See [GOAT rules](goat_rules.md). Prompts with more than
-4,096 legal allocations still fail explicitly, pending a staged action design.
+4,096 complete allocations now expose feasible per-card amount choices;
+the adapter sends one validated response after the last amount. A synthetic
+ten-card prompt covers the large-allocation branch, and a forced-stage
+native Anti-Spell duel and saved-response reconstruction replay-verify the
+same response boundary. A naturally occurring large counter prompt remains
+untested. One per-card stage can still have up to 32,768 legal amounts, so
+its worst-case inference cost is unmeasured.
 Opt-in policy feature v28 now encodes each selected card's counter amount,
 counter type, and total cost. It can warm-start from a v23 checkpoint without
 changing logits on existing actions. This adds a learnable representation for

@@ -110,12 +110,15 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
             except ValueError as exc:
                 native = engine.probe.decode_pending()
                 selection = (native.card_selection or native.sum_selection
-                             or native.zone_selection)
+                             or native.zone_selection or native.counter_selection)
                 if selection is None or not selection.accepts(response):
                     raise ReplayReconstructionError(
                         f"response {index}: saved bytes do not map to one legal action",
                         code="illegal_saved_response", response_index=index) from exc
-                if native.zone_selection is not None:
+                if native.counter_selection is not None:
+                    indices = struct.unpack(
+                        f"<{len(native.counter_selection.cards)}h", response)
+                elif native.zone_selection is not None:
                     zones = native.zone_selection.zones
                     indices = tuple(zones.index(tuple(response[start:start + 3]))
                                     for start in range(0, len(response), 3))
