@@ -460,6 +460,12 @@ observable consequence. All three complete duels replay-verify and pass the
 visibility audit. Other continuous-effect permutations remain open. See
 [GOAT rules](goat_rules.md).
 
+A paired Relinquished fixture now checks the historical Book of Moon response
+to its equip effect on a Set monster: the target stays in its owner's Monster
+Zone when Book Sets Relinquished before resolution. The pass branch equips the
+Set monster, and both full duels replay-verify and pass visibility checks; see
+[GOAT rules](goat_rules.md#relinquisheds-equip-target-when-book-of-moon-is-chained).
+
 A paired Jinzo/Solemn Judgment fixture now checks the Tribute Summon window:
 Solemn is legal before Jinzo's continuous Trap suppression applies, but is
 unavailable after a successful Summon. Both full duels replay-verify and pass
