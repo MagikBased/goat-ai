@@ -379,6 +379,12 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired Call of the Haunted/Solemn Judgment fixture checks activation
+negation before Call revives its targeted monster. Both branches complete,
+replay-verify, and pass visibility audits. This extends a common Trap-response
+regression; the full historical correctness gate remains open. See
+[GOAT rules](goat_rules.md).
+
 The Call of the Haunted timing probe now distinguishes an ordinary Chain
 Link 1 Summon, which opens a GOAT Bottomless Trap Hole response, from a
 midchain Call Summon at Chain Link 2 before Upstart Goblin resolves, which
