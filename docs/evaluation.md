@@ -1,5 +1,53 @@
 # Baseline evaluation log
 
+## Local human-review label update (28 October 2026)
+
+The [current 2005-deck review queue](replay_audit.md#current-2005-deck-development-queue-27-october-2026)
+has 24 locally saved, replay-verified choices: 11 alternatives to the
+feature-v23 policy's recorded action and 13 approvals. The old queue replays
+were verified against their exact earlier native binary in the ignored
+`.cache/goat-ai/legacy_review_native` root; the current native source and
+library retain their later patch. Eight merged annotation files contain the
+24 choices. The parent policy ranked the saved action first on 13/24 choices.
+
+An exploratory child started from the unchanged feature-v23 reference
+checkpoint, used only those 24 annotated decisions, and fit for three epochs
+at learning rate `0.0003`, batch size one, seed 172, and feature version 23.
+Its three mean training losses were 1.435, 1.127, and 0.880. It ranked the
+saved action first on 15/24 **training** choices. These agreement counts do
+not measure playing strength.
+
+On the current native core, the child played its unchanged parent on two
+independent Dimension Fusion Main Deck compositions absent from both
+checkpoints' training provenance. Seeds 92100–92115, both deck assignments,
+and both player seats yielded **64 terminal games**: **31 child wins, 32
+losses, and 1 draw**, for a 49.2% score (paired-seed bootstrap 95% interval
+40.6%–57.8%). The child scored 20–11–1 with the guide list and 11–21 with
+the reference list, so deck assignment matters. This sample does not show a
+competitive gain; the child remains an experiment and the reference
+checkpoint is unchanged. Neither these evaluation seeds nor either Main Deck
+composition appears in the child's recorded training provenance.
+
+The ignored child checkpoint SHA-256 is
+`883b770655d719a29853611af4e15da25145053a2ec7e5bc9954aa0227bc0874`.
+The ignored 64-game report SHA-256 is
+`bf2938ad75e581edf83eba4cc604fa903bfc6508f6bd9077303be0f1da1011e4`.
+The validation manifest SHA-256 is
+`1bbe44bcb15df28f432f3dddb762ce675508c67e95b1beab9fbf0a3fd5e9f84f`.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/current_2005_development_review_49600_49601/fv23_human24_3epoch_lr3e4.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --matchup examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk \
+            examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+  --both-deck-assignments \
+  --opponent-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --require-unseen-main-decks --seed 92100 --seeds 16 --workers 4 \
+  --max-decisions 3000 \
+  --output .cache/goat-ai/current_2005_development_review_49600_49601/fv23_human24_vs_parent_df_92100_92115.json
+```
+
 ## Full local native regression (28 October 2026)
 
 On commit `5edecd98f82f7344a3eb792055cc13f74fad2801`, with the pinned

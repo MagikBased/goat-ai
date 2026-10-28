@@ -116,8 +116,9 @@ native source and binary were restored afterward. The validation manifest is
 The selected feature-v23 checkpoint's top action agrees with 13 of the 24
 saved choices. None of the eight exact replays or their seeds appears in that
 checkpoint's recorded training provenance. These 24 labels are feedback on
-individual choices, not a competitive-strength estimate; they have not been
-used to train a new checkpoint.
+individual choices, not a competitive-strength estimate. A local exploratory
+checkpoint has since been trained on them; it was not promoted after held-out
+evaluation. See [the evaluation log](evaluation.md#local-human-review-label-update-28-october-2026).
 
 For automatic saving, run from the repository root:
 
