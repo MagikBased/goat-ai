@@ -9803,3 +9803,33 @@ completeness or playing strength. A separate Morale Boost fixture checks the
 removes it, then replay-verifies the complete duel. The Last Turn fixture
 replay-verifies its forced-battle outcome; other rulings for both cards remain
 untested.
+
+## Tournament-card mix protocol sweep (28 October 2026)
+
+Forty distinct-opponent duels on seeds 10800–10839 used independently sampled,
+legal 40-card Main Decks assembled from the six sourced tournament lists.
+Their Extra Decks came from those lists. On the corrected native build, **40/40
+duels reached terminal**, and **38,452/38,452 decisions** replay-verified and
+passed the trajectory visibility audit. The audit included 536 hidden-field,
+2,002 opponent-field, and 204 opponent-hand choices. The sweep loaded 103
+distinct native assets. The ignored report is
+`.cache/goat-ai/tournament_mix_10800_10839/report.json` (SHA-256
+`de2f786ed9693fde93bc785e9f16f2776863cb52a8164c17a1956d40fc79b144`),
+using core library SHA-256
+`48763d36b1beba3ce37782d7d41cbee58fefe8f65573ab53090e319674bc5358`.
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/probe_random_decks.py --native-root .cache/goat-ai \
+  --output .cache/goat-ai/tournament_mix_10800_10839 \
+  --seed 10800 --seeds 40 --max-decisions 3000 \
+  --card-pool tournament --distinct-opponents \
+  --verify-replays --count-card-actions
+```
+
+This tests seeded native execution and replay/visibility integrity for mixed
+high-use cards under random decisions. It is neither a historical-rulings
+certification nor a playing-strength result. Probe initialization failures
+now retain a per-game error report even when replay verification was requested;
+the probe regression test exercises that failure path.

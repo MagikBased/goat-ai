@@ -144,3 +144,17 @@ def test_distinct_tournament_mixes_replay_verify(tmp_path):
                for row in report["card_actions"])
     assert all(row["selected_decisions"] > 0
                for row in report["chain_responses"])
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_probe_reports_initialization_failure_with_replay_verification(tmp_path, monkeypatch):
+    def fail_engine(_root):
+        raise OSError("native library unavailable")
+
+    monkeypatch.setattr("scripts.probe_random_decks.ExperimentalOcgcoreEngine", fail_engine)
+    report = probe(Path(os.environ["GOAT_AI_NATIVE_ROOT"]), tmp_path / "failed",
+                   18600, 1, 3000, card_pool="tournament", verify_replays=True)
+    game = report["games"][0]
+    assert game["error"] == "OSError: native library unavailable"
+    assert game["terminal"] is False
+    assert game["replay_verified_decisions"] is None

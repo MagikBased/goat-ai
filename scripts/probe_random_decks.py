@@ -171,6 +171,7 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
             opponent_path = output / f"seed_{seed}_opponent.ydk"
             write_deck(opponent_path, generator(seed + 1_000_000))
         decisions = 0
+        verified = None
         kinds = set()
         try:
             with GoatEnvironment(str(path), str(opponent_path), seed,
