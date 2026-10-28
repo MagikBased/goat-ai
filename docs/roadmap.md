@@ -46,6 +46,12 @@ A documented [competitive Warrior Main Deck](../examples/decks/warrior_montague_
 
 A further 60-duel random-agent sweep on seeds 21–30 covered all three pairings among the sourced Goat Control, Chaos Turbo, and Warrior lists in both seats. All reached terminal under a 3,000-decision cap, with 60,374 decisions total. Goat Control versus Warrior additionally has two complete seat-swapped trajectories that replay-verify. The measured two-worker runtime and limits are in [the evaluation log](evaluation.md). This widens M1 protocol coverage; M2 historical card correctness remains open.
 
+A further independent whitelist/Fusion sample on seeds 11200–11249 reached
+terminal in all 50 games and replay-verified all 51,755 decisions with the
+visibility audit. Two seeds reproduced all 2,208 decisions on a repeat run.
+This broadens M1 protocol evidence across distinct sampled decks, but does not
+certify historical card effects; see [the measured sweep](evaluation.md#independent-goat-whitelist-and-fusion-protocol-sweep-28-october-2026).
+
 The evaluator also runs all ten pairings of five executable Indianapolis 2005
 Top 8 Main Decks through `--indianapolis-2005`. On two seeds with both agent
 seats, all 40 RandomAgent duels reached terminal under the 3,000-decision

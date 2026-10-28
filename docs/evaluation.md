@@ -10372,3 +10372,44 @@ schedule, and unseen Main Decks and found a paired v29-minus-v28 score
 difference of zero on the parent-opponent arms. A future age-specific
 experiment needs independently reviewed timing decisions or another label
 source that actually reasons about Swords duration.
+
+## Independent GOAT whitelist and Fusion protocol sweep (28 October 2026)
+
+A new isolated RandomAgent probe paired 50 independently sampled,
+whitelist-legal 40-card Main Decks with 50 distinct opponent Main Decks on
+seeds 11200–11249. Each deck also received 15 randomly selected legal Fusion
+cards. All **50/50 duels** reached terminal within the 3,000-decision cap.
+All **51,755 decisions** replay-verified and passed the player-visibility
+audit, including 437 hidden-field, 2,548 opponent-field, and 43 opponent-hand
+choices. No native protocol or observation failure was found in this sample.
+The run loaded 1,269 pinned script paths, 439 absent from the earlier
+20-game independent whitelist sample; script loading alone does not prove
+that every effect branch was executed or historically correct.
+
+Seeds 11200–11201 were rerun with deterministic trace checking. Both repeat
+duels reproduced all **2,208 decisions**, reached the same terminal results,
+and passed replay and visibility checks. The ignored full report is
+`.cache/goat-ai/protocol_whitelist_11200_11249/report.json` (SHA-256
+`5efb6769cc2c639a583b4b1ead6275468fe34fa85daab536276a241957c781dc`).
+The repeat report is
+`.cache/goat-ai/protocol_whitelist_repeat_11200_11201/report.json` (SHA-256
+`956118b32ee1e2507e34a09cd5a4931e194769e217122090074305f971ca78f6`).
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/protocol_whitelist_11200_11249 \
+  --seed 11200 --seeds 50 --max-decisions 3000 --card-pool whitelist \
+  --distinct-opponents --random-extra --isolate-games --verify-replays
+
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/protocol_whitelist_repeat_11200_11201 \
+  --seed 11200 --seeds 2 --max-decisions 3000 --card-pool whitelist \
+  --distinct-opponents --random-extra --isolate-games --verify-replays \
+  --repeat-seeds
+```
+
+This is protocol and information-boundary coverage. Random play on sampled
+decks does not establish complete historical GOAT legality or playing strength.

@@ -57,21 +57,26 @@ def test_snatch_steal_upkeep_and_heavy_storm_return_control(tmp_path):
             if (snatched and observation.turn == 3 and monsters and snatch_on_field
                     and monsters[0].controller == 0):
                 assert monsters[0].owner == 1
+                assert monsters[0].faceup_turns == 1
                 assert observation.life_points == (8000, 8000)
                 snatch = next(card for card in observation.field
                               if card.code == SNATCH_STEAL)
                 assert snatch.equipped_to == (0, monsters[0].sequence)
                 opponent = env.engine.probe.observation(1)
                 assert next(card for card in opponent.field
+                            if card.code == stolen_code).faceup_turns == 1
+                assert next(card for card in opponent.field
                             if card.code == SNATCH_STEAL).equipped_to == snatch.equipped_to
             if observation.turn == 4 and observation.phase == "main1":
                 assert snatched
                 assert monsters and monsters[0].controller == 0
+                assert monsters[0].faceup_turns == 2
                 assert observation.life_points == (8000, 9000)
             if stormed and any(card.code == HEAVY_STORM
                                for card in observation.graveyards[0]):
                 assert monsters and monsters[0].controller == 1
                 assert monsters[0].owner == 1
+                assert monsters[0].faceup_turns == observation.turn - 2
                 assert not snatch_on_field
                 assert any(card.code == SNATCH_STEAL
                            for card in observation.graveyards[0])
