@@ -2049,3 +2049,13 @@ against its parent, with a paired interval spanning 50%, and 15–49 versus
 Tactical-v14 compared with the parent's matched 16–48. The checkpoint is not
 promoted: increasing self-play volume on this schedule did not satisfy M4's
 held-out strength gate. See [the experiment](evaluation.md#larger-mixed-deck-ppo-continuation-of-selected-v23-28-october-2026).
+
+The 240-duel child changed only 7 of 710 greedy choices on separately
+verified parent-policy states. A matched ablation lowering parent KL from
+0.5 to 0.05 changed 8 of 710, then scored 29–34–1 against the selected
+parent on unseen Main Decks. It improved its matched Tactical-v14 score
+from 15–49 to 20–44, but the paired interval still reaches zero and a fresh
+64-game direct match between the two children split 32–32. Neither is
+promoted. The next M4 experiment should improve the decision signal or
+credit assignment and test it on new deck families and seeds; larger volume
+or weaker KL alone has not met the exit. See [the ablation](evaluation.md#ppo-parent-kl-ablation-after-the-240-duel-plateau-28-october-2026).

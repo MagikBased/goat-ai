@@ -10475,3 +10475,61 @@ pairings, and the stated seed blocks. Verify all saved games with
 .cache/goat-ai/ppo_mixed_240_audit.json`. This experiment enlarges the training
 sample and adds a pairing; it does not isolate either change, and it does not
 measure performance against humans.
+
+## PPO parent-KL ablation after the 240-duel plateau (28 October 2026)
+
+To diagnose why the 240-game child above did not improve, the selected v23
+parent and that child were compared on eight separately recorded, replay-
+verified parent-policy-versus-Tactical duels from seeds 90500–90501. The
+original parent reproduced all **710/710** multi-option policy choices; the
+0.5-KL child matched **703/710**, changing only seven greedy decisions.
+These are off-policy, policy-visited states, not a competitive score or
+unseen-deck holdout. The ignored agreement report is
+`.cache/goat-ai/ppo_mixed_240_agreement_90500_90501.json`, SHA-256
+`b4c2d101962bc2d8c3aa04a2d861aa2d992fb0f90740b7fcdbdd860981f492e2`.
+
+A controlled continuation changed **only the parent KL weight from 0.5 to
+0.05** and repeated the same parent, three-pairing 240-game training schedule,
+seeds 91000–91239, and other PPO settings. All 240 duels reached terminal;
+the learner went 86–153–1 against 124 Tactical and 116 frozen-snapshot
+opponents. The trainer reported **93.78 seconds** and 20,735 learner
+decisions. All **124,104 decisions** in the 240 saved trajectories independently
+replay-verified and passed the visibility audit. The ignored checkpoint
+`.cache/goat-ai/ppo_mixed_240_kl005_91000_91239.pt` has SHA-256
+`db82c6f8398de5f2d1b1164c765d664e04187be3b801d35448079a1406586af9`.
+On the same eight diagnostic replays, the new child matched **702/710**
+multi-option choices, changing only eight; the three-policy agreement report
+is `.cache/goat-ai/ppo_mixed_240_kl_ablation_agreement_90500_90501.json`
+(SHA-256 `549fedb766a8b7d84954ebdbc69d449ab568d228191e95534e89615186a16038`).
+Lower KL alone did not substantially change greedy behavior on this sample.
+
+On the same unseen-Main-Deck, both-assignment, both-seat direct schedule as
+the 0.5-KL child, seeds 91300–91307, the 0.05-KL child scored **29–34–1**
+against the frozen parent: 46.1% score with a paired 95% interval of
+**39.1–53.9%**. On matched seeds 91308–91315 against Tactical-v14, it scored
+**20–44**, compared with **15–49** for the 0.5-KL child and **16–48** for
+the parent. The strict report comparator found a 0.05-minus-0.5 Tactical
+score difference of **+7.81 percentage points**, paired interval **0.0 to
++15.63 points**; versus the parent, **+6.25 points**, interval **−4.69 to
++15.63 points**. These intervals do not establish a gain. On a fresh
+unseen-Main-Deck direct schedule, seeds 91400–91407, the two experimental
+children split **32–32**, interval **40.6–57.8%** for the 0.05-KL child.
+Neither child is promoted. The near-stable greedy decisions on the sampled
+replays and weak, deck-dependent outcomes suggest that more training volume
+or lower KL alone is insufficient; better decision labels or credit assignment
+need separate experiments.
+
+The ignored direct-parent, Tactical, and child-head-to-head reports are
+`.cache/goat-ai/ppo_mixed_240_kl005_vs_parent_91300_91307.json`,
+`.cache/goat-ai/ppo_mixed_240_kl005_vs_tactical_91308_91315.json`, and
+`.cache/goat-ai/ppo_mixed_240_kl005_vs_kl05_91400_91407.json`. Their SHA-256
+values are `291cb2a6dd62d45940e6b66a6dbf9159af35fa805827bd80fb3dd3a0430a1a35`,
+`f2c52b187a9363c623e69dbc8ad7026f7438831997d35523da9572e7e393e239`,
+and `fb639333bdd1d34be18763b4789d0328dffb1876331e9042d9895cc736009382`
+respectively. Reproduce the ablation by repeating the training command in
+the previous section with output `ppo_mixed_240_kl005_91000_91239.pt` and
+`--parent-kl-weight 0.05`. Use `scripts/audit_policy_agreement.py` with
+both children, their common parent, and the eight
+`.cache/goat-ai/public_age_policy_90500_90501/matchup_*.json` trajectories
+for the fixed-state diagnostic. The tournament commands are the previous
+section's commands with the named checkpoints and seed blocks.
