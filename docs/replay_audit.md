@@ -68,8 +68,24 @@ unlabeled or bookmark it as a reminder. A least harmful target can be useful
 as a separate conditional preference, but must not be treated as approval of
 the MST activation. The current queue only saves choices for shortlisted
 decisions, so navigating back to frame 74 in this queue cannot save `pass`.
-An upstream decision should be added to a separate review queue before
-collecting that label.
+A separate, verified one-item [upstream review](../.cache/goat-ai/new_jersey_high_margin_review_96000_96001/upstream_22.html)
+offers frame 74 and preserves the original queue and its labels:
+
+```bash
+./start_review_viewer.sh \
+  .cache/goat-ai/new_jersey_high_margin_review_96000_96001/upstream_22.json
+```
+
+At that earlier frame, inspect the legal actions and choose **Pass** if you
+agree. This records a preference for the activation decision only; it does
+not imply any of frame 75's target choices were good. To rebuild this focused
+queue from the verified source replay, run:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/create_upstream_review.py \
+  .cache/goat-ai/new_jersey_high_margin_review_96000_96001/queue.json 22 73 \
+  --native-root .cache/goat-ai
+```
 
 The [local queue](../.cache/goat-ai/new_jersey_high_margin_review_96000_96001/queue.html)
 uses the same eight independently sourced 2005 New Jersey duels described
