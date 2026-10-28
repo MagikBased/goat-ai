@@ -294,6 +294,15 @@
     let noteDirty = false;
     let noteSaving = false;
     let noteError = false;
+    // The same-origin queue can inspect this synchronously before replacing
+    // the iframe. postMessage alone may arrive after a quick navigation click.
+    window.goatAiReviewNavigationState = () => ({
+      pending: annotations.size > 0 && !labelsExported || noteDirty,
+      saving: localReviewMode && annotations.size > 0 && !labelsExported && !saveError || noteSaving,
+      error: saveError ? "Action save failed; see the replay sidebar" :
+        noteError ? "Note save failed; see the replay sidebar" : "",
+      actionSave: saveQueue,
+    });
     function notifyLabelState() {
       if (window.parent !== window) window.parent.postMessage(
         {type: "goat-ai-review-label-state",

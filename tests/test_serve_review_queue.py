@@ -346,6 +346,61 @@ def test_browser_review_choice_autosaves_without_name_or_download(tmp_path, monk
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_queue_navigation_waits_for_alternative_choice_save(tmp_path, monkeypatch):
+    queue, replay, digest, _ = _queue(tmp_path)
+    viewer = tmp_path / "game.html"
+    render_replay(replay, viewer, tmp_path / "native")
+    item = json.loads(queue.read_text())["selected"][0]
+    item.update(viewer=f"{viewer.resolve()}#decision=1", audit_flags=[])
+    write_review_index([item], queue, tmp_path / "native")
+    probe = """<script>
+      let confirmations = 0;
+      window.confirm = () => { confirmations++; return false; };
+      document.querySelector('.review-card .primary').click();
+      let attempts = 0;
+      const timer = setInterval(() => {
+        const inner = frame.contentWindow;
+        if (!inner || !inner.document.querySelector('#legal button:not(.recorded)') ||
+            !inner.eval('localReviewMode')) {
+          if (++attempts > 60) { clearInterval(timer); document.body.dataset.queueProbe = 'load-timeout'; }
+          return;
+        }
+        clearInterval(timer);
+        inner.document.querySelector('#legal button:not(.recorded)').click();
+        document.getElementById('back-to-queue').click();
+        setTimeout(() => {
+          document.body.dataset.queueProbe = [stage.hidden, pendingLabels,
+            labelSaving, confirmations,
+            document.getElementById('review-progress').textContent.includes('1 of 1')].join('|');
+        }, 600);
+      }, 30);
+    </script></body>"""
+    queue.with_suffix(".html").write_text(
+        queue.with_suffix(".html").read_text().replace("</script></html>",
+            "</script>" + probe.replace("</body>", "") + "</html>"))
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    output = tmp_path / "saved"
+    server = serve_review_queue.make_server(queue, output, port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = subprocess.run([
+            shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+            "--disable-dev-shm-usage", "--virtual-time-budget=1800", "--dump-dom",
+            f"http://127.0.0.1:{server.server_port}/queue.html",
+        ], capture_output=True, text=True, timeout=20, check=True)
+        match = re.search(r'data-queue-probe="([^"]+)"', result.stdout)
+        assert match, result.stderr[-1000:]
+        assert match.group(1) == "true|false|false|0|true"
+        assert json.loads((output / f"{digest}.json").read_text())["choices"] == [
+            {"decision_index": 0, "action_index": 1}]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_browser_upstream_note_saves_without_creating_action_label(tmp_path, monkeypatch):
     queue, replay, digest, _ = _queue(tmp_path)
     viewer = tmp_path / "game.html"
