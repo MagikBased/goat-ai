@@ -2187,3 +2187,48 @@ checkpoint configuration and pinned source identify the mask, but its replay
 files should not be silently relabeled. Future collections use the explicit
 marker. The persistent Thunder and Nobleman cases are priorities for
 independent player review and broader action-value learning.
+
+## New Jersey seed 96000, seat 1: player timing notes
+
+The reviewed replay is
+`.cache/goat-ai/new_jersey_parent_review_96000_96001/matchup_0_seed_96000_seat_1.json`
+(SHA-256 `5be5038039a2db68cb27f3e29cc9d745d1f713b3213d6f5f711f9916ec7ce68e`).
+P2 is the feature-v23 neural policy; P1 is Tactical-v14. These player
+identities matter when attributing a mistake or building policy labels.
+
+At viewer frame **3**, P1 Set Magician of Faith while both Graveyards were
+empty. Set Sangan was a legal alternative in the same hand. The reviewer
+prefers Sangan because there was no Spell to recover and Magician of Faith
+could be attacked. This is a tactical-baseline issue and a contextual
+preference, not an automatic rule for every empty-Graveyard position.
+
+On P2's turn 2, it Set Mirror Force (frame **18**), Call of the Haunted
+(**22**), Smashing Ground (**26**), and Metamorphosis (**30**). The last two
+are Normal Spells, leaving four back-row cards exposed before ending the
+turn. Advancing to the Battle Phase was legal at both frames 26 and 30.
+The reviewer notes that setting all available Spells and Traps can produce
+large losses to Heavy Storm; keep both frames as review candidates because
+some cards and positions justify setting them.
+
+At frame **152**, on P1's turn 5 Main Phase 1, P2 activated Set Call of the
+Haunted to revive Don Zaloog immediately after Don entered the Graveyard.
+Passing was legal. The reviewer prefers keeping Call available until an
+attack, threatened removal, or the opponent's End Phase creates a reason to
+act. The visible record does not establish that passing would win the duel;
+the choice is a timing preference for review, not a proven optimal label.
+
+Historical [Call of the Haunted rulings](https://www.goatformat.com/rulings1.html)
+allow activation during either player's Battle Phase in response to an attack.
+The same archive's Bottomless Trap Hole ruling says that, when Call at Chain
+Link 2 Summons a monster before Monster Reborn at Chain Link 1 Summons
+another, Bottomless after resolution can remove only the latter. Thus a
+Summon *during* a resolving chain cannot receive an immediate new response,
+but a Summon that is the last event of chain resolution can still open a
+Summon-response window. The timing benefit is conditional; it must not
+be encoded as blanket immunity to Torrential Tribute or Trap Hole.
+
+The three P2 decisions are offered, without preset labels, in the ignored
+`new_jersey_parent_review_96000_96001/user_notes_96000.html` queue. Its
+recorded action and legal alternatives come from the native-verified,
+visibility-audited replay. The queue does not change the original replay or
+previous review choices.
