@@ -195,7 +195,69 @@ def test_skip_passes_keeps_newly_chained_trap_face_up(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-chain-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "2|false|Second Trap|1|Chain Link 2|2|true"
+    assert match.group(1) == "2|false|Second Trap|1|Chain Link 2: Second Trap|2|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_chain_links_follow_source_zones_and_piles_open_from_field(tmp_path):
+    observation = _observation()
+    observation["field"].append({"controller": 1, "zone": "spell_trap", "sequence": 0,
+                                 "code": 3, "position": "faceup"})
+    observation["chain"] = [
+        {"index": 1, "card_code": 1, "controller": 0, "location": 4,
+         "sequence": 0, "targets": []},
+        {"index": 2, "card_code": 3, "controller": 1, "location": 8,
+         "sequence": 0, "targets": []},
+        {"index": 3, "card_code": 4, "controller": 0, "location": 16,
+         "sequence": 0, "targets": []},
+        {"index": 4, "card_code": 5, "controller": 1, "location": 32,
+         "sequence": 0, "targets": []},
+        {"index": 5, "card_code": 6, "controller": 0, "location": 8,
+         "sequence": 5, "targets": []},
+        {"index": 6, "card_code": 1, "controller": 0, "location": 4,
+         "sequence": 0, "targets": []},
+    ]
+    action = {"id": "pass", "kind": "pass", "actor": 0, "parameters": {}}
+    replay = {"seed": 2, "source": "test", "winner": 0, "decisions": [
+        {"observation": observation, "selected_action": action,
+         "legal_actions": [action]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64,
+                         {1: "Monster", 3: "Trap", 4: "GY effect",
+                          5: "Banished effect", 6: "Field effect"}, {}, {})
+    probe = """<script>
+      const badges = [...document.querySelectorAll('.chain-link-badge')];
+      const locations = badges.sort((a, b) => Number(a.querySelector('strong').textContent) -
+        Number(b.querySelector('strong').textContent)).map(badge => {
+        const parent = badge.closest('.slot');
+        return parent?.dataset.zoneKind ?
+          `${parent.dataset.zonePlayer}:${parent.dataset.zoneKind}:${parent.dataset.zoneSequence}` :
+          parent?.dataset.graveyardPlayer != null ? `graveyard:${parent.dataset.graveyardPlayer}` :
+          parent?.dataset.banishedPlayer != null ? `banished:${parent.dataset.banishedPlayer}` : 'unknown';
+      });
+      document.querySelector('[data-graveyard-player="0"]').click();
+      const graveyardOpens = byId('pile-dialog').open && byId('pile-title').textContent.includes('Graveyard');
+      byId('pile-close').click();
+      document.querySelector('[data-deck-player="0"]').click();
+      const deckOpens = byId('pile-dialog').open && byId('pile-title').textContent.includes('Deck');
+      document.body.dataset.chainZones = [badges.length, locations.join(','),
+        Boolean(document.querySelector('.centerline .chain-link-badge')),
+        Boolean(byId('piles')), Boolean(byId('decklist')),
+        graveyardOpens, deckOpens].join('|');
+    </script></body>"""
+    path = tmp_path / "chain_zones.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-chain-zones="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == (
+        "6|0:monster:0,1:spell_trap:0,graveyard:0,banished:1,0:spell_trap:5,0:monster:0"
+        "|false|false|false|true|true"
+    )
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")

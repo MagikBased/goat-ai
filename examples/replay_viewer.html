@@ -86,10 +86,11 @@
     .phase-chip.active { border-color: #faf4b1; background: radial-gradient(circle, #d80d58, #830526); color: #fff; box-shadow: 0 0 15px #fb2c77; animation: phase-glow 1.6s ease-in-out infinite alternate; }
     .phase-turn { width: 39px; padding: 4px 2px; border-radius: 6px; background: #133342; font-size: .72rem; line-height: 1.1; text-align: center; }
     .phase-turn span { display: block; }
-    .chain-link-badge { width: 46px; height: 46px; flex: 0 0 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 3px solid #f0cf76; border-radius: 50%; background: radial-gradient(circle, #564224, #18232b); color: #fff5d0; box-shadow: 0 0 10px #d4a84d88; }
-    .chain-link-badge svg { width: 22px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-    .chain-link-badge strong { font-size: .85rem; line-height: 1; text-shadow: 0 1px 3px #000; }
-    .hand { flex: 0 0 48px; min-width: 0; display: flex; align-items: flex-start; gap: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+    .chain-badges { position: absolute; z-index: 9; top: 2px; right: 2px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px; max-width: 100%; pointer-events: none; }
+    .chain-link-badge { width: 36px; height: 36px; flex: 0 0 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid #f0cf76; border-radius: 50%; background: radial-gradient(circle, #564224, #18232b); color: #fff5d0; box-shadow: 0 0 10px #d4a84d88; }
+    .chain-link-badge svg { width: 17px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+    .chain-link-badge strong { font-size: .72rem; line-height: 1; text-shadow: 0 1px 3px #000; }
+    .hand { position: relative; flex: 0 0 48px; min-width: 0; display: flex; align-items: flex-start; gap: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
     .hand-row { flex: 0 0 48px; height: 48px; min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(60px, 10%) minmax(0, 1fr) minmax(60px, 10%); gap: 6px; overflow: hidden; }
     .hand-row .hand { justify-content: safe center; }
     .hand-zone { position: relative; min-width: 0; padding: 2px 4px; overflow: hidden; cursor: pointer; }
@@ -235,11 +236,6 @@
           <h2>Cards shown to this player</h2>
           <div id="private-reveals" class="muted"></div>
         </div>
-        <div class="panel">
-          <h2>Own starting Main Deck</h2>
-          <div id="decklist" class="muted"></div>
-        </div>
-        <div class="panel" id="piles"></div>
       </aside>
     </section>
   </main>
@@ -575,6 +571,9 @@
         const disabled = (observation.disabled_zones || []).some(item => item.player === player && item.zone === zone && item.sequence === slot);
         const holder = node("div", disabled ? "slot disabled" : "slot");
         holder.setAttribute("aria-label", `${zone === "monster" ? "Monster" : "Spell/Trap"} Zone ${slot + 1}`);
+        holder.dataset.zonePlayer = String(player);
+        holder.dataset.zoneKind = zone;
+        holder.dataset.zoneSequence = String(slot);
         const card = observation.field.find(item => item.controller === player && item.zone === zone && item.sequence === slot);
         if (card) holder.append(cardElement(observation, card, known));
         else if (disabled) holder.append(node("span", "muted", "Disabled"));
@@ -582,21 +581,15 @@
       }
       return row;
     }
-    function listZone(title, cards, player, zone) {
-      const box = node("div", "detail-box");
-      const open = node("button", "pile-trigger", `${title} (${cards.length}) · View cards`);
-      open.type = "button";
-      open.addEventListener("click", () => showPile(player, zone));
-      box.append(open);
-      if (cards.length) box.append(node("p", "muted", cards.map(card => card.code == null ? "Concealed" : nameOf(card.code)).join(" · ")));
-      return box;
-    }
     function zoneLine(observation, player, zone, known) {
       const line = node("div", "zone-line");
       if (zone === "monster") {
         const fieldZone = node("div", "slot field-zone");
         fieldZone.setAttribute("aria-label", `Player ${player + 1} Field Spell Zone`);
         fieldZone.title = "Field Spell Zone";
+        fieldZone.dataset.zonePlayer = String(player);
+        fieldZone.dataset.zoneKind = "spell_trap";
+        fieldZone.dataset.zoneSequence = "5";
         const fieldSpell = observation.field.find(card => card.controller === player && card.zone === "spell_trap" && card.sequence === 5);
         if (fieldSpell) fieldZone.append(cardElement(observation, fieldSpell, known));
         line.append(fieldZone);
@@ -626,6 +619,7 @@
         auxiliary.type = "button";
         auxiliary.setAttribute("aria-label", `View Player ${player + 1} Deck`);
         auxiliary.title = "Deck";
+        auxiliary.dataset.deckPlayer = String(player);
         auxiliary.addEventListener("click", () => showPile(player, "deck"));
         auxiliary.append(cardBack(player !== boardBottomPlayer));
         auxiliary.append(node("strong", "", observation.deck_counts[player]));
@@ -714,6 +708,7 @@
       extraButton.type = "button";
       extraButton.setAttribute("aria-label", `View Player ${player + 1} Extra Deck`);
       extraButton.title = "Extra Deck";
+      extraButton.dataset.extraPlayer = String(player);
       extraButton.addEventListener("click", () => showPile(player, "extra"));
       extraButton.append(cardBack(player !== boardBottomPlayer),
                          node("strong", "", observation.extra_deck_counts[player]));
@@ -734,6 +729,7 @@
       playerHeader.append(lifePill(observation, player));
       section.append(playerHeader);
       const hand = node("div", "hand");
+      hand.dataset.handPlayer = String(player);
       const revealedHand = reviewerData?.frames[index]?.hands[player];
       if (own || revealedHand) {
         const handCodes = revealedHand || observation.hand.map(card => card.code);
@@ -767,6 +763,38 @@
       if (bottom) section.append(handRow(observation, player, hand));
       return section;
     }
+    function chainSource(board, link) {
+      const player = link.controller;
+      const zone = link.location === 4 ? "monster" : link.location === 8 ? "spell_trap" : null;
+      if (zone) return board.querySelector(`[data-zone-player="${player}"][data-zone-kind="${zone}"][data-zone-sequence="${link.sequence}"]`);
+      const pile = {1: "deck", 16: "graveyard", 32: "banished", 64: "extra"}[link.location];
+      if (pile) return board.querySelector(`[data-${pile}-player="${player}"]`);
+      if (link.location === 2) return board.querySelector(`[data-hand-player="${player}"]`);
+      return null;
+    }
+    function placeChainBadges(board, observation) {
+      for (const link of observation.chain || []) {
+        const anchor = chainSource(board, link);
+        if (!anchor) continue;
+        let badges = anchor.querySelector(":scope > .chain-badges");
+        if (!badges) {
+          badges = node("span", "chain-badges");
+          anchor.append(badges);
+        }
+        const badge = node("span", "chain-link-badge");
+        badge.setAttribute("role", "status");
+        badge.setAttribute("aria-label", `Chain Link ${link.index}: ${nameOf(link.card_code)}`);
+        badge.title = `Chain Link ${link.index}: ${nameOf(link.card_code)} (P${link.controller + 1})`;
+        const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        icon.setAttribute("viewBox", "0 0 24 24");
+        icon.setAttribute("aria-hidden", "true");
+        const links = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        links.setAttribute("d", "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71");
+        icon.append(links);
+        badge.append(icon, node("strong", "", String(link.index)));
+        badges.append(badge);
+      }
+    }
     function phaseRail(observation, terminal) {
       const rail = node("div", "centerline");
       const turn = node("span", "phase-turn");
@@ -777,21 +805,6 @@
         ? "Turn player unavailable in this older replay; showing the acting player"
         : `Player ${observation.turn_player + 1}'s turn`;
       rail.append(turn);
-      if (!terminal && observation.chain?.length) {
-        const number = observation.chain.at(-1)?.index ?? observation.chain.length;
-        const badge = node("span", "chain-link-badge");
-        badge.setAttribute("role", "status");
-        badge.setAttribute("aria-label", `Chain Link ${number}`);
-        badge.title = `Current chain: Chain Link ${number}`;
-        const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        icon.setAttribute("viewBox", "0 0 24 24");
-        icon.setAttribute("aria-hidden", "true");
-        const links = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        links.setAttribute("d", "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71");
-        icon.append(links);
-        badge.append(icon, node("strong", "", String(number)));
-        rail.append(badge);
-      }
       const current = observation.phase === "draw" ? "DP"
         : observation.phase === "standby" ? "SP"
           : observation.phase === "main1" ? "M1"
@@ -997,6 +1010,7 @@
       field.append(playerBoard(observation, 1 - boardBottomPlayer, known),
                    playerBoard(observation, boardBottomPlayer, known));
       board.replaceChildren(field, phaseRail(observation, terminal));
+      if (!terminal) placeChainBadges(board, observation);
       byId("board-seat").textContent = `P${boardBottomPlayer + 1} at bottom · Switch sides`;
       const selected = record?.selected_action;
       if (selected?.kind === "attack") {
@@ -1030,13 +1044,6 @@
       previousHand = {viewer: observation.viewer, count: observation.hand.length};
       previousObservation = observation;
       animateNext = false;
-      byId("piles").replaceChildren(node("h2", "", "Graveyards and banished cards"),
-        listZone(`Player ${2 - boardBottomPlayer} Graveyard`, observation.graveyards[1 - boardBottomPlayer], 1 - boardBottomPlayer, "graveyard"),
-        listZone(`Player ${2 - boardBottomPlayer} Banished`, observation.banished[1 - boardBottomPlayer].map((card, i) =>
-          ({...card, code: reviewerData?.frames[index]?.banished[1 - boardBottomPlayer]?.[i] ?? card.code})), 1 - boardBottomPlayer, "banished"),
-        listZone(`Player ${boardBottomPlayer + 1} Graveyard`, observation.graveyards[boardBottomPlayer], boardBottomPlayer, "graveyard"),
-        listZone(`Player ${boardBottomPlayer + 1} Banished`, observation.banished[boardBottomPlayer].map((card, i) =>
-          ({...card, code: reviewerData?.frames[index]?.banished[boardBottomPlayer]?.[i] ?? card.code})), boardBottomPlayer, "banished"));
       byId("action").textContent = terminal ? "Duel ended" : actionLabel(
         observation, record.selected_action, known,
         record.legal_actions.findIndex(action => action.id === record.selected_action.id));
@@ -1110,11 +1117,6 @@
       byId("private-reveals").textContent = observation.private_reveals?.length
         ? observation.private_reveals.map(reveal => `Turn ${reveal.turn}: ${reveal.cards.map(card => `${nameOf(card.code)} (P${card.controller} ${locationName(card.location)})`).join(", ")}`).join(" · ")
         : "No recipient-scoped reveals recorded";
-      const composition = new Map();
-      for (const code of observation.own_main_deck || []) composition.set(code, (composition.get(code) || 0) + 1);
-      byId("decklist").textContent = composition.size
-        ? [...composition].map(([code, count]) => `${count}× ${nameOf(code)}`).join(" · ")
-        : "Deck composition not recorded in this trajectory";
       if (missingNames.size) {
         byId("notice").hidden = false;
         byId("notice").textContent = `${missingNames.size} card name${missingNames.size === 1 ? " is" : "s are"} unavailable in this viewer. Run python scripts/render_replay.py --catalog-viewer and open replays/goat_viewer.html to view GOAT replays with names.`;
