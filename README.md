@@ -94,8 +94,10 @@ PYTHONPATH=src:. .venv/bin/python examples/play_goat.py \
   --trajectory replays/my_goat_duel_42.json
 ```
 
-The command shows card names and the player-visible field, takes a numbered
-legal action at each decision, and saves only after the complete duel passes
+The command shows card names and the player-visible field. Enter a numbered
+legal action; use `n`/`p` to page through long lists, `/text` to search, or
+`/` to clear the search. Action numbers stay stable while filtering. It saves
+only after the complete duel passes
 native replay verification and the visibility audit. `--human-seat 1` plays
 the second Deck; `--opponent random` or `--opponent policy --checkpoint PATH`
 changes the opponent. The recording is marked `self_recorded` and stored in

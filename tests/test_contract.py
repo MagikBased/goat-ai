@@ -132,6 +132,24 @@ def test_human_display_uses_visible_card_names_only():
     assert "Secret opponent card" not in display
 
 
+def test_human_action_search_keeps_global_choice_indices():
+    output = []
+    responses = iter(("n", "/thunder", "77"))
+    actions = tuple(Action(str(index), "announce_card", 0, {"code": index})
+                    for index in range(85))
+    agent = HumanAgent(input_fn=lambda _: next(responses),
+                       output_fn=output.append,
+                       card_names={77: "Thunder Dragon"}, page_size=40)
+    assert agent.select_action(view(), actions) == actions[77]
+    display = "\n".join(output)
+    assert "Actions 1-40 of 85" in display
+    assert "Actions 41-80 of 85" in display
+    assert "Actions 1-1 of 1" in display
+    assert "77: announce_card Thunder Dragon" in display
+    with pytest.raises(ValueError, match="page size"):
+        HumanAgent(page_size=0)
+
+
 def test_schema_twelve_round_trips_visible_stats_and_legacy_reader_strips_them(tmp_path):
     observation = replace(view(), field=(CardView(
         0, "monster", "faceup", 71413901, 0, "attack", 1900, 1000, ((1, 1),)),))

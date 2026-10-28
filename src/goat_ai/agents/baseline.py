@@ -361,10 +361,14 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
 class HumanAgent:
     def __init__(self, input_fn: Callable[[str], str] = input,
                  output_fn: Callable[[str], None] = print,
-                 card_names: dict[int, str] | None = None) -> None:
+                 card_names: dict[int, str] | None = None,
+                 page_size: int = 40) -> None:
+        if page_size < 1:
+            raise ValueError("page size must be positive")
         self.input_fn = input_fn
         self.output_fn = output_fn
         self.card_names = card_names or {}
+        self.page_size = page_size
 
     def _name(self, code: int | None) -> str:
         return (self.card_names.get(code, f"Card #{code}")
@@ -386,17 +390,61 @@ class HumanAgent:
         self.output_fn(f"Opponent hand: {observation.opponent_hand_count}; "
                        f"Decks: {observation.deck_counts}; "
                        f"Graveyards: {tuple(map(len, observation.graveyards))}")
-        for index, action in enumerate(legal_actions):
+        if observation.known_opponent_hand_cards:
+            self.output_fn("Known opponent hand cards: " + ", ".join(
+                self._name(code) for code in observation.known_opponent_hand_cards))
+        if observation.chain:
+            self.output_fn("Chain: " + " -> ".join(
+                f"{index}: {self._name(link.card_code)}"
+                for index, link in enumerate(observation.chain, 1)))
+        labels = []
+        for action in legal_actions:
             code = action.parameters.get("code")
             label = f" {self._name(code)}" if isinstance(code, int) else ""
-            self.output_fn(f"{index}: {action.kind}{label} {action.parameters}")
+            labels.append(f"{action.kind}{label} {action.parameters}")
+        matching = list(range(len(legal_actions)))
+        offset = 0
+
+        def show_page() -> None:
+            end = min(offset + self.page_size, len(matching))
+            self.output_fn(f"Actions {offset + 1}-{end} of {len(matching)} "
+                           "(n next, p previous, /text search, / clear)")
+            for index in matching[offset:end]:
+                self.output_fn(f"{index}: {labels[index]}")
+
+        show_page()
         while True:
-            answer = self.input_fn("Action number: ")
+            answer = self.input_fn("Action number or command: ").strip()
+            if answer == "n":
+                if offset + self.page_size < len(matching):
+                    offset += self.page_size
+                    show_page()
+                else:
+                    self.output_fn("No next page.")
+                continue
+            if answer == "p":
+                if offset:
+                    offset = max(0, offset - self.page_size)
+                    show_page()
+                else:
+                    self.output_fn("No previous page.")
+                continue
+            if answer.startswith("/"):
+                term = answer[1:].casefold()
+                found = [index for index, label in enumerate(labels)
+                         if term in label.casefold()]
+                if not found:
+                    self.output_fn("No actions match that search.")
+                else:
+                    matching = found
+                    offset = 0
+                    show_page()
+                continue
             try:
                 index = int(answer)
                 if 0 <= index < len(legal_actions):
                     return legal_actions[index]
             except ValueError:
                 pass
-            self.output_fn("Choose a listed number.")
+            self.output_fn("Choose an action number or use n, p, or /text.")
 

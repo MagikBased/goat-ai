@@ -4,7 +4,8 @@
 
 `examples/play_goat.py` accepts two GOAT YDK Decks and records one CLI human
 seat against a RandomAgent, TacticalHeuristicAgent, or saved policy. It shows
-only the acting player's observation and numbered legal actions. A completed
+only the acting player's observation and numbered legal actions; long lists
+can be paged with `n`/`p` or searched with `/text`. A completed
 duel is written to an ignored local trajectory only after exact native replay
 verification and the player-visibility audit; a failed check removes the
 temporary file. The trajectory records `source=human_cli`,
