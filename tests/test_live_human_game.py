@@ -47,6 +47,11 @@ def test_live_game_completes_and_saves_human_only_demonstration(tmp_path):
     manager = _manager(tmp_path, Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve())
     state = manager.start({"deck1": DECK1, "deck2": DECK2, "human_seat": 0,
                            "opponent": "random", "seed": 4322})
+    repeated = manager.start({"deck1": DECK1, "deck2": DECK2, "human_seat": 0,
+                              "opponent": "random", "seed": 4322})
+    assert repeated["observation"] == state["observation"]
+    assert repeated["legal_actions"] == state["legal_actions"]
+    assert manager.close(repeated["id"]) == {"closed": True}
     assert not state["terminal"]
     assert state["observation"]["viewer"] == 0
     assert state["observation"]["acting_player"] == 0
@@ -64,6 +69,7 @@ def test_live_game_completes_and_saves_human_only_demonstration(tmp_path):
     assert state["terminal"]
     assert state["viewer"].endswith(".html")
     replay = manager.creator.output_dir / f"{state['id']}.json"
+    assert replay.with_suffix(".html").is_file()
     trajectory = read_trajectory(replay)
     assert trajectory.source == "human_web"
     assert trajectory.skill_metadata["authorization"] == "self_recorded"

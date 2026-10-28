@@ -114,6 +114,19 @@
     let busy = false;
     const cardName = code => code == null ? "Face-down card" :
       state?.card_names?.[String(code)] || `Card #${code}`;
+    const locationName = location => ({1:"Deck", 2:"Hand", 4:"Monster",
+      8:"Spell/Trap", 16:"Graveyard", 32:"Banished", 64:"Extra"})[location] || `zone ${location}`;
+    const positionName = position => ({1:"Face-up Attack", 2:"Face-down Attack",
+      4:"Face-up Defense", 8:"Face-down Defense"})[position] || `Position ${position}`;
+    function visibleCode(card) {
+      if (card.code != null) return card.code;
+      const o = state?.observation;
+      const zone = card.zone || ({4:"monster", 8:"spell_trap"})[card.location];
+      return o?.field.find(item => item.controller === card.controller &&
+        item.zone === zone && item.sequence === card.sequence)?.code ??
+        o?.known_opponent_field_cards.find(item => item.controller === card.controller &&
+          item.zone === zone && item.sequence === card.sequence)?.code ?? null;
+    }
     const fieldCard = (observation, player, zone, sequence) =>
       observation.field.find(card => card.controller === player && card.zone === zone && card.sequence === sequence);
     function cardElement(card, hidden = false) {
@@ -169,8 +182,25 @@
     }
     function actionLabel(action) {
       const params = action.parameters || {};
-      const name = Number.isInteger(params.code) ? ` · ${cardName(params.code)}` : "";
-      return `${action.kind.replaceAll("_", " ")}${name} · ${JSON.stringify(params)}`;
+      const parts = [action.kind.replaceAll("_", " ")];
+      const code = visibleCode(params);
+      if (code != null) parts.push(cardName(code));
+      if (params.controller != null && params.sequence != null)
+        parts.push(`P${params.controller + 1} ${locationName(params.location)}` +
+          ([4, 8].includes(params.location) ? ` ${params.sequence + 1}` : ""));
+      if (Array.isArray(params.cards)) parts.push(params.cards.map(card =>
+        `${card.amount != null ? `${card.amount}× ` : ""}${cardName(visibleCode(card))}`
+      ).join(", "));
+      if (Array.isArray(params.zones)) parts.push(params.zones.map(item =>
+        `P${item.controller + 1} ${locationName(item.location)} ${item.sequence + 1}`
+      ).join(", "));
+      if (params.position != null) parts.push(positionName(params.position));
+      if (params.number != null) parts.push(String(params.number));
+      if (params.race != null) parts.push(`Type ${params.race}`);
+      if (params.attribute != null) parts.push(`Attribute ${params.attribute}`);
+      if (params.counter_total != null) parts.push(`${params.counter_total} counters`);
+      if (parts.length === 1 && Object.keys(params).length) parts.push(JSON.stringify(params));
+      return parts.join(" · ");
     }
     function actions() {
       const list = byId("action-list"); list.replaceChildren();

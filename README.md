@@ -145,6 +145,9 @@ admitted as a raw demonstration. Unfinished games live in server memory and
 are discarded if the server stops; **Leave unfinished duel** releases one
 explicitly. The browser is an experimental local play interface, subject to
 the same unresolved GOAT ruling coverage as the native adapter.
+The board lists public Graveyard and banished cards, your Extra Deck and known
+opponent cards, and card names in the legal-action menu without exposing the
+opponent's private hand or Deck order.
 
 The offline [replay viewer](examples/replay_viewer.html) shows each recorded decision as a board snapshot from the acting player's visible view. Record and render a Scapegoat fixture duel:
 
