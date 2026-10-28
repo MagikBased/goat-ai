@@ -1,4 +1,4 @@
-"""A simultaneous attack response can request chain-link ordering."""
+"""A Dark Elf attack can require ordering its cost alongside Toll's."""
 
 import os
 from pathlib import Path
@@ -39,6 +39,8 @@ def test_random_whitelist_duel_orders_dark_elf_and_toll_chain(tmp_path, sort_cho
                 sort_decisions += 1
                 assert obs.turn == 39 and obs.phase == "battle_step"
                 assert obs.acting_player == 0
+                assert obs.life_points == (3300, 7500)
+                assert not obs.chain
                 assert len(actions) == 2
                 assert {tuple(card["code"] for card in a.parameters["cards"])
                         for a in actions} == {
@@ -49,6 +51,9 @@ def test_random_whitelist_duel_orders_dark_elf_and_toll_chain(tmp_path, sort_cho
             else:
                 action = agent.select_action(obs, actions)
             obs = env.step(action)
+            if action.kind == "sort_cards":
+                assert obs.life_points == (1800, 7500)
+                assert not obs.chain
         assert sort_decisions == 1
         assert env.is_terminal()
         trajectory = env.trajectory()

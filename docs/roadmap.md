@@ -263,7 +263,7 @@ complete duels replay-verify and pass the player-visibility audit. The native
 prompt has no mandatory cards, leaving that decoder path parser-tested only;
 see [GOAT rules](goat_rules.md).
 
-A fresh 50-pair whitelist sweep exposed `MSG_SORT_CHAIN` for simultaneous Dark Elf/Toll attack responses. The adapter now decodes that bounded ordering request, and both orders complete full replay-verified, visibility-audited duels. Rerunning the exact seeds produced 50/50 terminal games and 50,084 verified decisions; see [the protocol sweep](evaluation.md#chain-order-native-protocol-sweep-27-october-2026). This broadens native action coverage without certifying historical rulings for every sampled card.
+A fresh 50-pair whitelist sweep exposed `MSG_SORT_CHAIN` while ordering Dark Elf's and Toll's attack payments; the native message name does not mean chain links were present. The adapter now decodes that bounded ordering request, and both orders complete full replay-verified, visibility-audited duels. Rerunning the exact seeds produced 50/50 terminal games and 50,084 verified decisions; see [the protocol sweep](evaluation.md#chain-order-native-protocol-sweep-27-october-2026). This broadens native action coverage without certifying historical rulings for every sampled card.
 
 ## M2 — Historical correctness gate
 

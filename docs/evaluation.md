@@ -9564,14 +9564,15 @@ not validate each card's historical ruling or establish playing strength.
 
 A fresh 50-duel GOAT-whitelist sweep on seeds 10506–10555 initially stopped at
 seed 10527 after 606 decisions. The pinned core emitted `MSG_SORT_CHAIN` (21)
-for a two-way ordering of Dark Elf and Toll effects after an attack declaration;
-the adapter had decoded `MSG_SORT_CARD` (25) but not this same-layout chain
-ordering request. The native decoder now exposes both orders as structured
+for a two-way ordering of Dark Elf's and Toll's attack payments; no chain
+links were present at that decision. The adapter had decoded `MSG_SORT_CARD`
+(25) but not this same-layout ordering request. The native decoder now exposes both orders as structured
 `sort_cards` actions, and the visibility audit checks any opponent cards in
 those ordered choices. Both order choices reach terminal in a focused
 seed-10527 fixture; their full trajectories replay-verify and pass the
-player-visible audit. This is protocol support, not a historical ruling claim
-about every simultaneous trigger.
+player-visible audit. Both orders pay 1,500 LP in total, from 3,300 to 1,800.
+This is protocol support, not a historical ruling claim about every simultaneous
+cost or trigger.
 
 After the change, **50/50** duels reached native terminal outcomes without
 errors or the 3,000-decision cap. All **50,084** decisions replay-verified and

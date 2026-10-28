@@ -6,6 +6,8 @@ Sources: [GoatFormat mechanics](https://www.goatformat.com/basics.html), [card p
 
 The M0 native probe confirms that a pinned core configured with `DUEL_MODE_GOAT` performs an opening draw for the first player in its vanilla-monster fixture. This is one startup behavior check, not a complete historical rules validation.
 
+**Dark Elf and Toll attack payments:** [Dark Elf's official card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4557&ope=2&request_locale=en) requires 1,000 LP to attack, while [Toll's official text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4896&ope=2&request_locale=en) requires each attacker to pay 500 LP. [Historical Dark Elf rulings](https://www.goatformat.com/rulings2.html) classify its payment as an attack-declaration cost. A seeded native duel with both cards face-up reaches the core's `MSG_SORT_CHAIN` ordering prompt after Dark Elf declares an attack. Despite that message name, the player-visible chain is empty. Both offered orderings pay 1,500 LP total, moving the attacker from 3,300 to 1,800 LP; both complete duels replay-verify and pass the visibility audit. The individual costs have independent sources; the precise permission to choose their payment order is observed in the pinned native core but lacks a located 2005 ruling for this exact pairing.
+
 **First-turn draw:** [GoatFormat's mechanics guide](https://www.goatformat.com/basics.html)
 states that the first player draws at the start of their first Draw Phase. A
 focused native regression with two 40-card vanilla decks checks that player 0
