@@ -1,6 +1,7 @@
 """Contract checks for the optional PyTorch legal-action policy."""
 
 import copy
+import math
 import pickle
 import random
 from concurrent.futures import ProcessPoolExecutor
@@ -1629,6 +1630,61 @@ def test_v27_action_attention_preserves_parent_logits_and_batches(tmp_path):
         load_parent_checkpoint(path, LegalActionPolicy(vocabulary.size, width=8,
                                                       feature_version=27), vocabulary,
                                allow_v23_to_v27=True)
+
+
+def test_v28_counter_amounts_are_distinct_and_v23_warm_start_preserves_logits(tmp_path):
+    vocabulary = CardVocabulary((10, 20), ((10, 4, 0), (20, 33, 2000)))
+    observation = replace(view(), field=(
+        CardView(0, "spell_trap", "faceup", 10, 0, counters=((1, 3),)),
+        CardView(0, "spell_trap", "faceup", 10, 1, counters=((1, 3),)),
+    ))
+    first = {"controller": 0, "location": 8, "sequence": 0, "code": 10}
+    second = {**first, "sequence": 1}
+    choices = (Action("a", "select_counters", 0, {
+        "cards": [{**first, "amount": 1}, {**second, "amount": 2}],
+        "counter_type": 1, "counter_total": 3}),
+        Action("b", "select_counters", 0, {
+            "cards": [{**first, "amount": 2}, {**second, "amount": 1}],
+            "counter_type": 1, "counter_total": 3}))
+    old = encode_decision(observation, choices, vocabulary, 23)
+    new = encode_decision(observation, choices, vocabulary, 28)
+    assert torch.equal(old.action_target_context[0], old.action_target_context[1])
+    assert new.action_target_context.shape == (2, 2, 7)
+    assert new.action_target_context[0, :, -1].tolist() == pytest.approx([
+        math.log1p(1) / math.log1p(32767), math.log1p(2) / math.log1p(32767)])
+    assert not torch.equal(new.action_target_context[0], new.action_target_context[1])
+    assert new.action_numbers.shape == (2, 103)
+    assert new.action_numbers[0, -2:].tolist() == pytest.approx(
+        [1 / 65535, math.log1p(3) / math.log1p(32767)])
+    assert new.action_kinds.tolist() == [new.action_kinds[0].item()] * 2
+    assert new.action_kinds[0] > 0
+
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    checkpoint = {"schema_version": 1, "model_state": parent.state_dict(),
+                  "vocabulary_codes": vocabulary.codes,
+                  "vocabulary_card_properties": vocabulary.card_properties,
+                  "width": 8, "feature_version": 23,
+                  "trajectory_sha256": {"training.json": "a" * 64},
+                  "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                                      "main_deck_composition_sha256": ("c", "d")}]}
+    path = tmp_path / "parent.pt"
+    torch.save(checkpoint, path)
+    child = LegalActionPolicy(vocabulary.size, width=8, feature_version=28)
+    with pytest.raises(ValueError, match="architecture or vocabulary"):
+        load_parent_checkpoint(path, child, vocabulary)
+    load_parent_checkpoint(path, child, vocabulary, allow_v23_to_v28=True)
+    assert torch.count_nonzero(child.kind.weight[-1]) == 0
+    assert torch.count_nonzero(child.target_context[0].weight[:, -1]) == 0
+    assert torch.count_nonzero(child.action_numbers[0].weight[:, -2:]) == 0
+    old_ordinary = encode_decision(observation, actions(), vocabulary, 23)
+    new_ordinary = encode_decision(observation, actions(), vocabulary, 28)
+    with torch.no_grad():
+        expected = parent(old_ordinary)
+        actual = child(new_ordinary)
+        batched, mask = child.forward_batch((new_ordinary, new))
+    assert torch.allclose(actual, expected, atol=1e-6)
+    assert torch.allclose(batched[0, mask[0]], actual, atol=1e-6)
+    assert torch.allclose(batched[1, mask[1]], child(new), atol=1e-6)
 
 
 def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):

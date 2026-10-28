@@ -276,8 +276,10 @@ replay-verifies, and passes the visibility audit. The fixture also corrected
 the observation query so face-up Spell/Trap counters are visible to both
 players. See [GOAT rules](goat_rules.md). Prompts with more than
 4,096 legal allocations still fail explicitly, pending a staged action design.
-Existing policy feature versions do not encode per-card counter amounts; a
-versioned action representation is required before learning from these prompts.
+Opt-in policy feature v28 now encodes each selected card's counter amount,
+counter type, and total cost. It can warm-start from a v23 checkpoint without
+changing logits on existing actions. This adds a learnable representation for
+counter decisions; it has not been trained or evaluated for playing strength.
 
 ## M2 — Historical correctness gate
 

@@ -38,6 +38,7 @@ ACTION_KINDS = (
 ZONE_ACTION_KINDS = ("disable_zone", "disable_zones", "place_zones")
 ANNOUNCE_ACTION_KINDS = ("announce_attribute", "announce_number", "announce_card")
 SORT_ACTION_KINDS = ("sort_cards",)
+COUNTER_ACTION_KINDS = ("select_counters",)
 POLICY_INFERENCE_VERSION = 6  # unfinished card selection cannot toggle while adding is legal
 POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experiments
 # Version 16 branches from v12 so its combat relation can be tested without
@@ -60,6 +61,8 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # pools. The residual is zero-initialized for exact v23 checkpoint behavior.
 # Version 27 branches from v23 and lets each legal action attend to visible
 # cards before scoring. Its output is zero-initialized for exact v23 behavior.
+# Version 28 branches from v23 and encodes the amount removed from each
+# selected field card in a counter-allocation action.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 SPELL_TYPE = 0x2  # TYPE_SPELL in pinned ocgcore constant.lua
@@ -134,7 +137,7 @@ class DecisionFeatures:
     action_kinds: Tensor  # [A]
     action_cards: Tensor  # [A]
     action_targets: Tensor  # [A, T], zero-padded
-    action_target_context: Tensor  # [A, T, 5] through v6; v7 adds selected order
+    action_target_context: Tensor  # [A, T, 5] through v6; v7 adds order, v28 adds counter amount
     action_target_mask: Tensor  # [A, T]: target exists, even when its ID is hidden
     action_numbers: Tensor  # [A, 8] through v5, [A, 11] in v6
     deck_cards: Tensor  # [D]: sorted initial own Main Deck card IDs, or [0] before v5
@@ -158,7 +161,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 28):
+    if feature_version not in range(1, 29):
         raise ValueError("unsupported policy feature version")
     if feature_version >= 22 and not vocabulary.card_properties:
         raise ValueError("feature version 22 requires pinned printed card properties")
@@ -286,6 +289,8 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         kinds += ANNOUNCE_ACTION_KINDS
     if feature_version >= 7:
         kinds += SORT_ACTION_KINDS
+    if feature_version >= 28:
+        kinds += COUNTER_ACTION_KINDS
     kind_ids = {kind: index + 1 for index, kind in enumerate(kinds)}
 
     def field_slot(params: dict) -> tuple[int, int, int]:
@@ -320,6 +325,8 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
             + (((rank / max(1, len(selected) - 1)
                  if action.kind == "sort_cards" else 0.0),)
                if feature_version >= 7 else ())
+            + ((log1p(max(0, int(card.get("amount", 0)))) / log1p(32767),)
+               if feature_version >= 28 else ())
             for rank, card in enumerate(selected)
         ])
         prompt_id = int(params.get("prompt_id", 0))
@@ -407,6 +414,10 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                         min(visible_enemy_stats, default=0) / 8000,
                         float(bool(opponent_monsters) and
                               len(visible_enemy_stats) == len(opponent_monsters)))
+        if feature_version >= 28:
+            counter_total = int(params.get("counter_total", 0))
+            numeric += (int(params.get("counter_type", 0)) / 65535,
+                        log1p(max(0, counter_total)) / log1p(32767))
         if feature_version in (24, 25):
             trade = 0
             own_collateral = 0
@@ -428,7 +439,8 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         action_numbers.append(numeric)
     width = max(1, *(len(row) for row in targets))
     padded_targets = [row + [0] * (width - len(row)) for row in targets]
-    empty_context = (0.0,) * (6 if feature_version >= 7 else 5)
+    empty_context = (0.0,) * (7 if feature_version >= 28 else
+                              6 if feature_version >= 7 else 5)
     padded_context = [row + [empty_context] * (width - len(row))
                       for row in target_context]
     target_masks = [[1] * len(row) + [0] * (width - len(row)) for row in targets]
@@ -482,7 +494,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 28):
+        if feature_version not in range(1, 29):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -496,13 +508,15 @@ class LegalActionPolicy(nn.Module):
         kind_count = (len(ACTION_KINDS)
                       + (len(ZONE_ACTION_KINDS) if feature_version >= 4 else 0)
                       + (len(ANNOUNCE_ACTION_KINDS) if feature_version >= 6 else 0)
-                      + (len(SORT_ACTION_KINDS) if feature_version >= 7 else 0))
+                      + (len(SORT_ACTION_KINDS) if feature_version >= 7 else 0)
+                      + (len(COUNTER_ACTION_KINDS) if feature_version >= 28 else 0))
         self.kind = nn.Embedding(kind_count + 1, width, padding_idx=0)
         number_width = (44 if feature_version >= 19 else 54
                         if feature_version == 15 else 42 if feature_version >= 4 else 10)
         self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
                                            nn.Linear(width, width))
-        action_number_width = (104 if feature_version in (24, 25) else 101
+        action_number_width = (103 if feature_version >= 28 else
+                               104 if feature_version in (24, 25) else 101
                                if feature_version >= 23 else 93
                                if feature_version >= 22 else 85
                                if feature_version >= 21 else 81
@@ -514,6 +528,7 @@ class LegalActionPolicy(nn.Module):
                                             nn.Linear(width, width))
         if feature_version >= 2:
             self.target_context = nn.Sequential(nn.Linear(
+                width + 7 if feature_version >= 28 else
                 width + 6 if feature_version >= 7 else 5, width), nn.ReLU(),
                                                 nn.Linear(width, width))
         if feature_version >= 5:

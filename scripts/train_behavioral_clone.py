@@ -153,20 +153,22 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
                            allow_v23_to_v24: bool = False,
                            allow_v23_to_v25: bool = False,
                            allow_v23_to_v26: bool = False,
-                           allow_v23_to_v27: bool = False) -> dict:
+                           allow_v23_to_v27: bool = False,
+                           allow_v23_to_v28: bool = False) -> dict:
     """Continue a clone only when weights and held-out provenance are compatible."""
     parent = torch.load(path, map_location="cpu", weights_only=True)
     if not isinstance(parent, dict) or parent.get("schema_version") != 1:
         raise ValueError("unsupported parent policy checkpoint schema")
     if (allow_v23_to_v24 or allow_v23_to_v25 or allow_v23_to_v26
-            or allow_v23_to_v27) and parent.get(
+            or allow_v23_to_v27 or allow_v23_to_v28) and parent.get(
             "feature_version") != 23:
         raise ValueError("feature upgrade requires a feature-v23 parent")
     upgrade = (parent.get("feature_version") == 23
                and ((allow_v23_to_v24 and model.feature_version == 24)
                     or (allow_v23_to_v25 and model.feature_version == 25)
                     or (allow_v23_to_v26 and model.feature_version == 26)
-                    or (allow_v23_to_v27 and model.feature_version == 27)))
+                    or (allow_v23_to_v27 and model.feature_version == 27)
+                    or (allow_v23_to_v28 and model.feature_version == 28)))
     if (parent.get("width") != model.card.embedding_dim
             or (parent.get("feature_version", 1) != model.feature_version and not upgrade)
             or tuple(parent.get("vocabulary_codes", ())) != vocabulary.codes
@@ -205,6 +207,21 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
         if model.feature_version == 27:
             for key in ("action_query.weight", "attended_card.weight"):
                 state[key] = model.state_dict()[key].clone()
+        if model.feature_version == 28:
+            for key, axis, growth in (("kind.weight", 0, 1),
+                                      ("target_context.0.weight", 1, 1),
+                                      ("action_numbers.0.weight", 1, 2)):
+                original = state[key]
+                expanded = torch.zeros_like(model.state_dict()[key])
+                if (original.ndim != 2 or expanded.ndim != 2
+                        or expanded.shape[axis] != original.shape[axis] + growth
+                        or expanded.shape[1 - axis] != original.shape[1 - axis]):
+                    raise ValueError("feature upgrade needs one new counter action input")
+                if axis == 0:
+                    expanded[:original.shape[0]] = original
+                else:
+                    expanded[:, :original.shape[1]] = original
+                state[key] = expanded
     model.load_state_dict(state, strict=True)
     return parent
 
@@ -241,6 +258,8 @@ def main() -> None:
                         help="load v23 weights and add a zero-initialized owner pool")
     parser.add_argument("--upgrade-feature-23-to-27", action="store_true",
                         help="load v23 weights and add zero-output action-to-card attention")
+    parser.add_argument("--upgrade-feature-23-to-28", action="store_true",
+                        help="load v23 weights and add counter-allocation action features")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=1,
                         help="decisions per optimizer update; combine forward passes with --batched-forward")
@@ -259,7 +278,7 @@ def main() -> None:
                         help="use optional orjson to decode input trajectories in the main "
                              "process and replay-verification workers")
     parser.add_argument("--width", type=int, default=64)
-    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 28)),
+    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 29)),
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
@@ -316,8 +335,12 @@ def main() -> None:
     if args.upgrade_feature_23_to_27 and (not args.init_checkpoint
                                          or args.feature_version != 27):
         parser.error("--upgrade-feature-23-to-27 requires a parent and feature v27")
+    if args.upgrade_feature_23_to_28 and (not args.init_checkpoint
+                                         or args.feature_version != 28):
+        parser.error("--upgrade-feature-23-to-28 requires a parent and feature v28")
     if sum((args.upgrade_feature_23_to_24, args.upgrade_feature_23_to_25,
-            args.upgrade_feature_23_to_26, args.upgrade_feature_23_to_27)) > 1:
+            args.upgrade_feature_23_to_26, args.upgrade_feature_23_to_27,
+            args.upgrade_feature_23_to_28)) > 1:
         parser.error("select only one feature-upgrade path")
     if args.on_policy_teacher and (not args.init_checkpoint or args.annotation
                                    or args.annotation_for):
@@ -471,7 +494,8 @@ def main() -> None:
         allow_v23_to_v24=args.upgrade_feature_23_to_24,
         allow_v23_to_v25=args.upgrade_feature_23_to_25,
         allow_v23_to_v26=args.upgrade_feature_23_to_26,
-        allow_v23_to_v27=args.upgrade_feature_23_to_27)
+        allow_v23_to_v27=args.upgrade_feature_23_to_27,
+        allow_v23_to_v28=args.upgrade_feature_23_to_28)
               if args.init_checkpoint else None)
     try:
         restrict_trainable_modules(model, args.trainable_module)
@@ -566,7 +590,8 @@ def main() -> None:
         "parent_checkpoint_sha256": (hashlib.sha256(
             args.init_checkpoint.read_bytes()).hexdigest()
             if args.init_checkpoint else None),
-        "parent_feature_upgrade": ("v23_to_v27" if args.upgrade_feature_23_to_27
+        "parent_feature_upgrade": ("v23_to_v28" if args.upgrade_feature_23_to_28
+                                   else "v23_to_v27" if args.upgrade_feature_23_to_27
                                    else "v23_to_v26" if args.upgrade_feature_23_to_26
                                    else "v23_to_v25" if args.upgrade_feature_23_to_25
                                    else "v23_to_v24" if args.upgrade_feature_23_to_24
