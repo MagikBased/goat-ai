@@ -2230,7 +2230,7 @@ another, Bottomless after resolution can remove only the latter. Thus a
 Summon *during* a resolving chain cannot receive an immediate new response,
 but a Summon that is the last event of chain resolution can still open a
 Summon-response window. The timing benefit is conditional; it must not
-be encoded as blanket immunity to Torrential Tribute or Trap Hole.
+be encoded as blanket immunity to Torrential Tribute or Bottomless Trap Hole.
 
 The three P2 decisions are offered, without preset labels, in the ignored
 `new_jersey_parent_review_96000_96001/user_notes_96000.html` queue. Its
