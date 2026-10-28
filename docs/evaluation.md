@@ -1,5 +1,50 @@
 # Baseline evaluation log
 
+## Broader-deck human-review preference pilot (28 October 2026)
+
+The broader v23-parent review queue reached **14/14 saved choices**. An ignored
+snapshot of its six nonempty label files is
+`.cache/goat-ai/broad_parent_review_snapshot_20261028/snapshot.json` (SHA-256
+`16b181f67eb423afafb9b5e98a89d59495759e576fc4f2087ab9eaa5b546bdfe`).
+The queue-bound converter replay-verified and visibility-audited every labeled
+duel and found **11 choices different from the recorded policy action** and
+three matching choices. Its preference manifest SHA-256 is
+`81fc672d9d4c4d01e4937f7b517550ad225b1fa499e123073ae652a0b3f31c54`.
+The snapshot preserves the user's choices without treating matching choices as
+pairwise approvals or assuming the alternatives are optimal.
+
+An experimental 120-step child combined those 11 preferences with the earlier
+14 changed high-margin New Jersey reviews. It used the same selected v23 parent,
+four current-core Tactical preservation replays (64 states), parent-KL weight
+0.5, learning rate 0.0001, and seed 208. Preference loss fell from **4.0834**
+to **1.4892**; final sampled preservation KL was **0.01494**. The checkpoint
+`.cache/goat-ai/broad_parent_review_snapshot_20261028/human25_pref_120step_kl05_seed208.pt`
+has SHA-256 `e5ec6f2e9471d49cf646963745be1d2e89b6ddb61ce786fce65048cc206145c8`.
+Exact reviewed-decision scoring ranked the human alternative first at **7/25**
+for the child versus **0/25** for the parent; it gave the alternative a positive
+margin at **9/25** versus **0/25**. These are training decisions, so the scores
+measure fit rather than generalization.
+
+On fresh seeds 98800–98807 and training-unseen Rhymus Goat Control versus the
+GoatFormat Guide Dimension Fusion Turbo Main Deck, both deck assignments and
+policy seats, the child scored **13–19** directly against the parent in 32
+terminal duels (40.6%; paired 95% interval **28.1%–53.1%**). Against
+Tactical-v14 on matched fresh seeds 98808–98815, it scored **12–20** versus
+the parent's **8–24**. The strict report comparator verified matching native
+assets, scripts, source code, deck compositions, seeds, and opponent; the paired
+score difference was **+12.5 percentage points**, interval **−3.1 to +28.1**.
+Both intervals include no gain, and the direct result favors the parent. Keep
+the v23 parent selected. The next M4 experiment needs independently reviewed
+decisions from more deck families and fresh evaluation compositions.
+
+Ignored report SHA-256 values: parent and child reviewed-decision scores
+`b185c7a767e56774408be6e5a2515e67306a43f2dfdc7db2cc0a164cb3165e67`
+and `bddbef0f1fd502faba653c8423cb91d02c044f8f2c1c2b80798657a675ecac4b`;
+direct child/parent
+`7e00dd325975f904700783c39421b1bd11cc09b1c7da2dab2c908f25f9a041be`;
+child/Tactical `12107c896ffa1b245aba49444bad5732db9728cbd74e5c5e2a0653fff7ba60f3`;
+parent/Tactical `58eefb04b38c5618960a6ea3a830208b6edf3b3edffc0d0668fcef085f962d5a`.
+
 ## New Jersey multi-queue overlap audit (28 October 2026)
 
 The local parent queue currently has 14 saved choices, all on decision keys
