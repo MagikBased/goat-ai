@@ -2059,3 +2059,15 @@ from 15–49 to 20–44, but the paired interval still reaches zero and a fresh
 promoted. The next M4 experiment should improve the decision signal or
 credit assignment and test it on new deck families and seeds; larger volume
 or weaker KL alone has not met the exit. See [the ablation](evaluation.md#ppo-parent-kl-ablation-after-the-240-duel-plateau-28-october-2026).
+
+A matched 240-duel continuation raised learner sampling temperature from
+1.0 to 2.0. All 132,618 saved decisions replay-verified and passed the
+visibility audit. On 710 verified parent-policy multi-option states it
+changed six greedy choices. On unseen Main Decks it split 33–31 directly
+with the selected parent; against Tactical-v14 it scored 22–42 versus the
+parent's matched 16–48, then 20–44 versus the parent's 17–47 on fresh
+seeds. Both paired Tactical difference intervals reached zero. A fresh
+direct match favored it 37–27 over the temperature-1 child, with the paired
+interval touching 50%. Keep the parent selected; higher rollout temperature
+is a useful ablation but does not close M4's held-out gain gate. See
+[the experiment](evaluation.md#ppo-learner-temperature-ablation-after-the-240-duel-plateau-28-october-2026).

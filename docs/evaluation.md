@@ -10533,3 +10533,69 @@ both children, their common parent, and the eight
 `.cache/goat-ai/public_age_policy_90500_90501/matchup_*.json` trajectories
 for the fixed-state diagnostic. The tournament commands are the previous
 section's commands with the named checkpoints and seed blocks.
+
+## PPO learner-temperature ablation after the 240-duel plateau (28 October 2026)
+
+The earlier 240-duel 0.5-KL child changed only seven greedy choices on
+710 multi-option decisions from eight independently verified parent-policy
+replays (seeds 90500–90501). This diagnostic describes those sampled states,
+not the cause of weak competitive results.
+
+To test more action exploration, a controlled continuation changed only
+`--learner-temperature` from 1.0 to **2.0**. It used the same v23 parent,
+three training pairings, seeds 91000–91239, 240 games, and PPO settings as
+the 0.5-KL continuation above. All **240** games reached terminal, with no
+decision cap; the learner's training record was **72–167–1** and it made
+20,507 decisions against the changing Tactical/frozen-snapshot mixture.
+The trainer measured **99.86 seconds**. All **132,618 decisions** in the
+240 saved trajectories independently replay-verified and passed the
+player-visibility audit. The ignored checkpoint
+`.cache/goat-ai/ppo_mixed_240_temp2_91000_91239.pt` has SHA-256
+`96e467772d6fa9c42a86bea91cb649cb43f45c6ee46ae77f0be620d5fcd696c0`.
+On the eight diagnostic replays, it matched **704/710** multi-option greedy
+choices of its parent, changing six. The agreement report is
+`.cache/goat-ai/ppo_mixed_240_temp2_agreement_90500_90501.json`, SHA-256
+`2c56bf515f0f52485e3809f0efc6e64d96f339623f7f6edc446b7e75469ae732`.
+
+On the same two unseen-Main-Deck pairings and both-assignment, both-seat
+schedule as the earlier children, seeds 91300–91307, the temperature-2 child
+scored **33–31** directly against the v23 parent. Its paired 95% interval was
+**43.8–59.4%**. Against Tactical-v14 on matched seeds 91308–91315, it went
+**22–42**, versus **16–48** for the parent and **15–49** for the
+temperature-1, 0.5-KL child. Strict report comparison verified deck files,
+unseen Main Decks, native assets, code, and schedule. The temperature-2
+minus-parent score difference was **+9.38 percentage points**, paired 95%
+interval **−1.56 to +20.31 points**; versus temperature 1 it was **+10.94
+points**, interval **+1.56 to +20.31 points**. A fresh 64-game direct match
+against the temperature-1 child, seeds 91500–91507, scored **37–27**, with
+a paired 95% interval **50.0–65.6%**. On a second matched Tactical seed block,
+91520–91527, the temperature-2 child scored **20–44** and the parent
+**17–47**: **+4.69 points**, interval **−3.13 to +14.06 points**.
+
+The Tactical comparisons favor the higher temperature, but neither matched
+block establishes a gain against the selected parent and the direct-parent
+score is near even. The checkpoint is **not promoted**. The six changed
+greedy choices also show that higher rollout temperature alone did not
+substantially move the deterministic policy on the diagnostic sample. The
+next experiment should improve the decision signal or credit assignment,
+then confirm any gain on new deck families and fresh seeds.
+
+The ignored reports are
+`.cache/goat-ai/ppo_mixed_240_temp2_vs_parent_91300_91307.json`,
+`.cache/goat-ai/ppo_mixed_240_temp2_vs_tactical_91308_91315.json`,
+`.cache/goat-ai/ppo_mixed_240_temp2_vs_temp1_91500_91507.json`,
+`.cache/goat-ai/ppo_mixed_240_temp2_vs_tactical_91520_91527.json`, and
+`.cache/goat-ai/ppo_parent_vs_tactical_91520_91527.json`; their SHA-256
+values in order are
+`f7feeced9f9b35a31494fa3dba1bf41b81769bf44b490ffd12d4630a909140d6`,
+`643f109ee0f315ef721faaa1743bc8b0d0bedf288cd51d5984d7f0a0b199e53e`,
+`d949349ff2e89dd87d1651273d43399cb90a2f8e13ad1ae0af2ea7752db07a2b`,
+`ecd5dfd88cedf1d196128a1e0e9d6a633491f4d72cb7cfbd89c193456524428c`,
+and `ef829ac1011b7458e0d91fe12ca58a95bf5071f7ed5dfcc8b96a5b3c32a31a73`.
+Reproduce training with the preceding 240-game command plus
+`--learner-temperature 2.0` and the named output. Use
+`scripts/audit_policy_agreement.py` with the common parent and two children
+on the eight named diagnostic trajectories. Reproduce tournaments with
+`scripts/evaluate_policy.py --engine experimental --both-deck-assignments
+--require-unseen-main-decks --workers 4 --max-decisions 3000`, the two
+unseen pairings above, and the listed opponents and seed blocks.
