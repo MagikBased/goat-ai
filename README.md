@@ -121,6 +121,9 @@ own legal player-visible observations. Generated games stay in ignored
 `.cache/goat-ai/user_games/`; the page lists recent games so you can reopen
 them. Add a legal `.ydk` file to `examples/decks/` to use a custom Deck.
 The creator is also linked from replay pages served on localhost.
+Recent games show clickable **review flags** for simple player-visible
+mistake patterns. These are prompts to inspect, not correctness judgments or
+training labels; clicking one opens the recorded decision frame.
 
 Live browser play against an AI is a later step. The terminal human-versus-AI
 workflow above already uses the same observation and legal-action interface;

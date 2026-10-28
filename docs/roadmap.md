@@ -2360,6 +2360,14 @@ work: the server must keep a duel session alive across requests, expose only
 the human seat's observation and legal actions, reject stale or illegal
 choices, and keep hidden cards inaccessible until a separate postgame replay.
 The existing terminal `HumanAgent` already exercises the same action contract.
+Locally created games can now pass through the existing visible-decision
+review scanner with an explicit seat. Their heuristic flags are linked to
+viewer frames and stored separately from trajectories and human annotations;
+no flag is treated as a training label. On a verified 543-decision Tactical
+versus Random game at seed 4321 it reported two flags for Random and none for
+Tactical. A separate verified 348-decision selected-policy-versus-Tactical
+game at seed 6803 produced no flags for either seat. This is a narrow
+diagnostic, not a policy-strength comparison.
 
 An [action-encoding audit](evaluation.md#legal-action-representation-collision-audit-28-october-2026)
 found no collision in the current 22 shortlisted review comparisons, but did

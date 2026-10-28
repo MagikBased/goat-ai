@@ -86,13 +86,16 @@ def review_candidates(trajectory: Trajectory,
     The default seat is the recorded policy or learner; an explicit other
     seat supports separate review of the evaluation opponent.
     """
-    if trajectory.source not in ("policy_evaluation", "self_play_rl", "tactical"):
-        raise ValueError("review candidates require a policy_evaluation, self_play_rl, or tactical replay")
+    if trajectory.source not in ("policy_evaluation", "self_play_rl", "tactical",
+                                 "local_ai_match"):
+        raise ValueError("review candidates require a verified AI replay")
     metadata = trajectory.skill_metadata or {}
-    seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
-                        else "demonstrator_seat")
+    seat = (review_seat if trajectory.source == "local_ai_match" else
+            metadata.get("learner_seat" if trajectory.source == "self_play_rl"
+                         else "demonstrator_seat"))
     if type(seat) is not int or seat not in (0, 1):
-        raise ValueError("replay must identify its policy seat or learner seat")
+        raise ValueError("replay must identify its policy seat or learner seat, "
+                         "or pass a review seat")
     if review_seat is not None:
         if type(review_seat) is not int or review_seat not in (0, 1):
             raise ValueError("review seat must be player 0 or 1")

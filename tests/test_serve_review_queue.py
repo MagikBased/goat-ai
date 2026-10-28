@@ -121,6 +121,9 @@ def test_game_creator_page_and_api_reject_unlisted_decks(tmp_path, monkeypatch):
         assert options["decks"] == []
         assert not options["native_ready"]
         with pytest.raises(HTTPError) as error:
+            _request(f"{base}/api/games/audit?id=../secret")
+        assert error.value.code == 400
+        with pytest.raises(HTTPError) as error:
             _request(f"{base}/api/games", {
                 "deck1": "../../secret.ydk", "deck2": "missing.ydk",
                 "agent1": "tactical", "agent2": "random", "seed": 42})

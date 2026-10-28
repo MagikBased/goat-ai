@@ -302,12 +302,20 @@ def test_sampled_review_separates_frozen_parent_greedy_choice():
 
 def test_shortlist_rejects_non_policy_source_or_missing_seat():
     saved = policy(record(view(), Action("pass", "pass", 0)))
-    with pytest.raises(ValueError, match="policy_evaluation"):
+    with pytest.raises(ValueError, match="verified AI replay"):
         review_candidates(replace(saved, source="human_cli"))
     with pytest.raises(ValueError, match="policy seat"):
         review_candidates(replace(saved, skill_metadata={}))
     with pytest.raises(ValueError, match="checkpoint SHA-256"):
         review_candidates(replace(saved, skill_metadata={"demonstrator_seat": 0}))
+
+
+def test_local_ai_match_needs_explicit_review_seat():
+    saved = replace(policy(record(view(), Action("pass", "pass", 0))),
+                    source="local_ai_match", skill_metadata={"agents": ["Policy", "Tactical"]})
+    with pytest.raises(ValueError, match="review seat"):
+        review_candidates(saved)
+    assert review_candidates(saved, review_seat=0) == ()
 
 
 def test_shortlist_accepts_versioned_tactical_teacher_source():

@@ -1,6 +1,7 @@
 """Create a verified native AI-versus-AI duel for the local replay viewer."""
 
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 from threading import Lock
@@ -13,8 +14,10 @@ from goat_ai.agents import (
     load_card_races,
     load_flip_monster_codes,
 )
+from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.replay_review import review_candidates
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import verify_trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
@@ -54,6 +57,14 @@ class GameCreator:
         records = sorted(self.output_dir.glob("*.info.json"),
                          key=lambda path: path.stat().st_mtime_ns, reverse=True)[:20]
         return [json.loads(path.read_text(encoding="utf-8")) for path in records]
+
+    def audit(self, identifier: str) -> dict:
+        if not isinstance(identifier, str) or not re.fullmatch(r"[0-9a-f]{16}", identifier):
+            raise ValueError("invalid local game ID")
+        path = self.output_dir / f"{identifier}.audit.json"
+        if not path.is_file():
+            raise FileNotFoundError("local game audit is unavailable")
+        return json.loads(path.read_text(encoding="utf-8"))
 
     def _agent(self, name: str, seed: int):
         if name == "random":
@@ -118,6 +129,16 @@ class GameCreator:
             verified = verify_trajectory(trajectory,
                                          ExperimentalOcgcoreEngine(self.native_root))
             audit_trajectory_visibility(trajectory)
+            races = load_card_races(self.native_root)
+            weak_flips = load_weak_flip_monster_attack(self.native_root)
+            card_facts = load_card_facts(self.native_root)
+            review_flags = sorted((flag.to_dict()
+                                   for seat in (0, 1)
+                                   for flag in review_candidates(
+                                       trajectory, races, weak_flips, review_seat=seat,
+                                       card_facts=card_facts)),
+                                  key=lambda flag: (flag["decision_index"],
+                                                    flag["acting_player"]))
             self.output_dir.mkdir(parents=True, exist_ok=True)
             write_trajectory(base.with_suffix(".json"), trajectory)
             render_replay(base.with_suffix(".json"), base.with_suffix(".html"),
@@ -127,13 +148,19 @@ class GameCreator:
                       "deck2": spec["deck2"], "agent1": spec["agent1"],
                       "agent2": spec["agent2"], "seed": seed,
                       "winner": trajectory.winner, "decisions": verified,
+                      "review_flags": len(review_flags),
                       "viewer": "/" + base.with_suffix(".html").relative_to(
                           self.root).as_posix()}
+            base.with_suffix(".audit.json").write_text(json.dumps({
+                "schema_version": 1, "game_id": identifier,
+                "purpose": "heuristic_review_candidates_not_training_labels",
+                "flags": review_flags}, indent=2) + "\n", encoding="utf-8")
             base.with_suffix(".info.json").write_text(
                 json.dumps(result, indent=2) + "\n", encoding="utf-8")
             return result
         except Exception:
-            for suffix in (".json", ".html", ".review.json", ".info.json"):
+            for suffix in (".json", ".html", ".review.json", ".audit.json",
+                           ".info.json"):
                 base.with_suffix(suffix).unlink(missing_ok=True)
             raise
         finally:

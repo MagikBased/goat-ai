@@ -36,6 +36,8 @@ def test_game_creator_rejects_unlisted_paths_and_invalid_agents(tmp_path):
         creator.create({**spec, "seed": True})
     with pytest.raises(FileNotFoundError, match="native GOAT assets"):
         creator.create(spec)
+    with pytest.raises(ValueError, match="invalid local game ID"):
+        creator.audit("../../secret")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -46,6 +48,7 @@ def test_game_creator_generates_verified_reviewer_replay(tmp_path):
     result = creator.create(spec)
     assert result["winner"] in (0, 1, None)
     assert result["decisions"] > 0
+    assert result["review_flags"] >= 0
     assert result["viewer"].endswith(".html")
     replay = creator.output_dir / f"{result['id']}.json"
     viewer = creator.output_dir / f"{result['id']}.html"
@@ -58,4 +61,9 @@ def test_game_creator_generates_verified_reviewer_replay(tmp_path):
     assert "__EMBEDDED_REPLAY__" not in viewer.read_text(encoding="utf-8")
     reveals = json.loads(reviewer.read_text(encoding="utf-8"))
     assert len(reveals["frames"]) == result["decisions"] + 1
+    audit = creator.audit(result["id"])
+    assert audit["purpose"] == "heuristic_review_candidates_not_training_labels"
+    assert len(audit["flags"]) == result["review_flags"]
+    assert all(flag["viewer_frame"] == flag["decision_index"] + 1
+               for flag in audit["flags"])
     assert creator.recent()[0] == result

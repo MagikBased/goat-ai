@@ -55,6 +55,15 @@ def server_healthy(port: int, source: str | None) -> bool:
                                     timeout=5) as response:
             if response.status != 200 or json.load(response).get("api_version") != REVIEW_API_VERSION:
                 return False
+        # Older processes can report the same review API version while lacking
+        # the game-audit route added afterward. Probe the route's validation.
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/games/audit?id=invalid",
+                                   timeout=5)
+            return False
+        except urllib.error.HTTPError as error:
+            if error.code != 400:
+                return False
         if source is None:
             with urllib.request.urlopen(
                     f"http://127.0.0.1:{port}/api/games/options", timeout=5) as response:

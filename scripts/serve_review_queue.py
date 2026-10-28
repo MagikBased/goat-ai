@@ -384,6 +384,13 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
             if parsed.path == "/api/games/options":
                 self._json(200, creator.options())
                 return
+            if parsed.path == "/api/games/audit":
+                identifier = parse_qs(parsed.query).get("id", [""])[0]
+                try:
+                    self._json(200, creator.audit(identifier))
+                except (ValueError, OSError) as error:
+                    self._json(400, {"error": str(error)})
+                return
             if parsed.path == "/api/review/version":
                 self._json(200, {"api_version": REVIEW_API_VERSION})
                 return

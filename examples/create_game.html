@@ -22,6 +22,10 @@
     #status.error { color: #ffadad; }
     ul { padding-left: 20px; } li { margin: 9px 0; }
     .muted { color: #a9c6cc; }
+    dialog { width: min(760px, 90vw); max-height: 80vh; overflow: auto;
+      background: #142c36; color: inherit; border: 1px solid #68949a; border-radius: 12px; }
+    dialog::backdrop { background: #0009; }
+    .audit-button { width: auto; margin: 0 0 0 8px; padding: 3px 8px; font-size: .85rem; }
     @media (max-width: 650px) { .seats { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -49,6 +53,11 @@
   <section class="panel"><h2>Recent games</h2><ul id="recent"></ul>
     <p class="muted">Replays stay on this computer in <code>.cache/goat-ai/user_games/</code>.</p>
   </section>
+  <dialog id="audit-dialog"><h2>Decisions to review</h2>
+    <p>These are heuristic flags from player-visible decisions. They are not
+       correctness judgments or training labels.</p>
+    <ul id="audit-list"></ul><button id="close-audit" type="button">Close</button>
+  </dialog>
   <script>
     const byId = id => document.getElementById(id);
     const deckLabel = filename => filename.replace(/\.ydk$/, "").replace(/_/g, " ");
@@ -65,7 +74,15 @@
         const link = document.createElement("a");
         link.href = game.viewer;
         link.textContent = `${deckLabel(game.deck1)} (${game.agent1}) vs ${deckLabel(game.deck2)} (${game.agent2}) · seed ${game.seed}`;
-        item.append(link, ` · ${game.decisions} decisions`); list.append(item);
+        item.append(link, ` · ${game.decisions} decisions`);
+        if (Number.isInteger(game.review_flags)) {
+          const button = document.createElement("button");
+          button.type = "button"; button.className = "audit-button";
+          button.dataset.gameId = game.id;
+          button.textContent = `${game.review_flags} review ${game.review_flags === 1 ? "flag" : "flags"}`;
+          item.append(button);
+        }
+        list.append(item);
       }
       if (!games.length) list.textContent = "No local games yet.";
     };
@@ -111,6 +128,27 @@
         status(error.message, true); button.disabled = false;
       }
     });
+    byId("recent").addEventListener("click", async event => {
+      const button = event.target.closest("button[data-game-id]");
+      if (!button) return;
+      const game = (await (await fetch("/api/games/options")).json()).recent
+        .find(item => item.id === button.dataset.gameId);
+      if (!game) return;
+      const response = await fetch(`/api/games/audit?id=${encodeURIComponent(game.id)}`);
+      if (!response.ok) { status("Could not load review flags.", true); return; }
+      const report = await response.json();
+      const list = byId("audit-list"); list.replaceChildren();
+      for (const flag of report.flags) {
+        const item = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = `${game.viewer}#decision=${flag.viewer_frame}`;
+        link.textContent = `Frame ${flag.viewer_frame} · P${flag.acting_player + 1} · Turn ${flag.turn} · ${flag.category.replace(/_/g, " ")}`;
+        item.append(link); list.append(item);
+      }
+      if (!report.flags.length) list.textContent = "No obvious review flags in this game.";
+      byId("audit-dialog").showModal();
+    });
+    byId("close-audit").addEventListener("click", () => byId("audit-dialog").close());
     load().catch(error => status(error.message, true));
   </script>
 </body>
