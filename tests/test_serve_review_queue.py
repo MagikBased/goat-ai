@@ -1,11 +1,11 @@
 """Local review saves remain legal, replay-bound, and confined to one queue."""
 
 import json
-from dataclasses import replace
-from io import BytesIO
 import re
 import shutil
 import subprocess
+from dataclasses import replace
+from io import BytesIO
 from threading import Thread
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -16,8 +16,7 @@ from goat_ai.actions import Action
 from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, read_decision_annotations, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
-from scripts import serve_review_queue
-from scripts import launch_review_server
+from scripts import launch_review_server, serve_review_queue
 from scripts.launch_review_server import server_healthy
 from scripts.render_replay import render_replay
 from scripts.shortlist_policy_disagreements import write_review_index
@@ -415,8 +414,11 @@ def test_queue_navigation_waits_for_choice_save(tmp_path, monkeypatch, operation
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_queue_next_item_updates_same_replay_after_label_save(tmp_path, monkeypatch):
     queue, replay, _, trajectory = _queue(tmp_path)
+    second_view = replace(trajectory.decisions[0].observation, turn=2,
+                          life_points=(7000, 8000))
+    second_decision = replace(trajectory.decisions[0], observation=second_view)
     write_trajectory(replay, replace(trajectory,
-                                     decisions=(trajectory.decisions[0],) * 2))
+                                     decisions=(trajectory.decisions[0], second_decision)))
     digest = sha256_file(replay)
     viewer = tmp_path / "game.html"
     render_replay(replay, viewer, tmp_path / "native")
@@ -425,6 +427,7 @@ def test_queue_next_item_updates_same_replay_after_label_save(tmp_path, monkeypa
     for index in (0, 1):
         selected.append({**item, "trajectory_sha256": digest,
                          "decision_index": index, "viewer_frame": index + 1,
+                         "turn": index + 1,
                          "viewer": f"{viewer.resolve()}#decision={index + 1}",
                          "audit_flags": []})
     raw = json.loads(queue.read_text())
@@ -444,12 +447,21 @@ def test_queue_next_item_updates_same_replay_after_label_save(tmp_path, monkeypa
         clearInterval(timer);
         inner.document.querySelector('#legal button:not(.recorded)').click();
         document.getElementById('next-item').click();
-        setTimeout(() => { document.body.dataset.sameReplay = [
+        setTimeout(() => {
+          const forward = [
           frame.contentWindow.document.getElementById('jump').value,
-          frame.contentWindow.document.getElementById('turn').textContent.includes('Turn 1'),
+          frame.contentWindow.document.querySelector('[aria-label="Player 1: 7000 life points"]') !== null,
           frame.contentWindow.eval('annotations.get(0)'),
           document.getElementById('item-position').textContent,
-          labels.size].join('|'); }, 600);
+          labels.size];
+          document.getElementById('show-labeled').click();
+          document.getElementById('previous-item').click();
+          setTimeout(() => { document.body.dataset.sameReplay = forward.concat([
+            frame.contentWindow.document.getElementById('jump').value,
+            frame.contentWindow.document.querySelector('[aria-label="Player 1: 8000 life points"]') !== null,
+            document.getElementById('item-position').textContent,
+            frame.contentWindow.eval('annotations.get(0)')]).join('|'); }, 150);
+        }, 350);
       }, 30);
     </script></html>"""
     page = queue.with_suffix(".html")
@@ -462,12 +474,12 @@ def test_queue_next_item_updates_same_replay_after_label_save(tmp_path, monkeypa
     try:
         result = subprocess.run([
             shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
-            "--disable-dev-shm-usage", "--virtual-time-budget=1800", "--dump-dom",
+            "--disable-dev-shm-usage", "--virtual-time-budget=2100", "--dump-dom",
             f"http://127.0.0.1:{server.server_port}/queue.html",
         ], capture_output=True, text=True, timeout=20, check=True)
         match = re.search(r'data-same-replay="([^"]+)"', result.stdout)
         assert match, result.stderr[-1000:]
-        assert match.group(1) == "2|true|1|2 / 2|1"
+        assert match.group(1) == "2|true|1|2 / 2|1|1|true|1 / 2|1"
         assert json.loads((output / f"{digest}.json").read_text())["choices"] == [
             {"decision_index": 0, "action_index": 1}]
     finally:

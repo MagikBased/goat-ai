@@ -48,6 +48,9 @@
     .zones { min-height: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
     .slot { position: relative; min-height: 0; min-width: 0; border: 2px solid #638677; border-radius: 6px; padding: 3px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; background: #081b2459; box-shadow: inset 0 0 12px #091f2299, 0 0 7px #2b9d8a33; }
     .target-marker { position: absolute; z-index: 6; inset: 3px; pointer-events: none; background: linear-gradient(#ff4655,#ff4655) top left / 17px 3px no-repeat, linear-gradient(#ff4655,#ff4655) top left / 3px 17px no-repeat, linear-gradient(#ff4655,#ff4655) top right / 17px 3px no-repeat, linear-gradient(#ff4655,#ff4655) top right / 3px 17px no-repeat, linear-gradient(#ff4655,#ff4655) bottom left / 17px 3px no-repeat, linear-gradient(#ff4655,#ff4655) bottom left / 3px 17px no-repeat, linear-gradient(#ff4655,#ff4655) bottom right / 17px 3px no-repeat, linear-gradient(#ff4655,#ff4655) bottom right / 3px 17px no-repeat; filter: drop-shadow(0 0 5px #ff4655); animation: target-pulse .7s ease-in-out infinite alternate; }
+    .effect-burst { position: absolute; z-index: 7; inset: 0; pointer-events: none; display: grid; place-items: center; animation: effect-burst .95s ease-out both; }
+    .effect-burst::before { content: ""; position: absolute; width: min(95%, 110px); aspect-ratio: 1; border-radius: 50%; background: repeating-conic-gradient(from 0deg, transparent 0deg 13deg, #fff3a4 15deg 19deg, transparent 22deg 45deg); filter: drop-shadow(0 0 7px #f7cc4f); animation: effect-spin .95s ease-out both; }
+    .effect-burst::after { content: "✦"; color: #fff7ce; font-size: clamp(30px, 6vw, 72px); line-height: 1; text-shadow: 0 0 8px #fff, 0 0 18px #ffe878, 0 0 28px #ee9b24; animation: effect-shimmer .95s ease-out both; }
     .effect-layer { position: absolute; z-index: 7; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
     .attack-line { stroke: #ffcc61; stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 0 6px #ff6b29); stroke-dasharray: 1; animation: attack-line .5s ease-out both; }
     .travel-card { position: fixed; z-index: 30; pointer-events: none; transform-origin: top left; filter: drop-shadow(0 0 9px #f4c774); }
@@ -138,7 +141,10 @@
     @keyframes target-pulse { to { opacity: .55; } }
     @keyframes life-delta { from { opacity: 0; transform: translateY(10px); } 25% { opacity: 1; } to { opacity: 0; transform: translateY(-14px); } }
     @keyframes phase-glow { to { box-shadow: 0 0 6px #fb2c77; } }
-    @media (prefers-reduced-motion: reduce) { .card-arrive, .card-flip, .card-draw, .card-attack, .phase-chip.active, .hand-preview, .target-marker, .attack-line, .life-delta { animation: none; } .life-fill { transition: none; } .travel-card { display: none; } }
+    @keyframes effect-burst { 0% { opacity: 0; transform: scale(.4); } 18% { opacity: 1; transform: scale(1.12); } 60% { opacity: .9; } 100% { opacity: 0; transform: scale(1.35); } }
+    @keyframes effect-spin { from { transform: rotate(-35deg) scale(.65); } to { transform: rotate(155deg) scale(1.2); } }
+    @keyframes effect-shimmer { 0% { transform: scale(.5) rotate(-20deg); } 40% { transform: scale(1.25) rotate(35deg); } 100% { transform: scale(.75) rotate(90deg); } }
+    @media (prefers-reduced-motion: reduce) { .card-arrive, .card-flip, .card-draw, .card-attack, .phase-chip.active, .hand-preview, .target-marker, .attack-line, .life-delta { animation: none; } .effect-burst { display: none; } .life-fill { transition: none; } .travel-card { display: none; } }
     .sidebar { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding: calc(var(--load-height) + 6px) 3px 0 0; }
     .controls { position: sticky; top: calc(var(--load-height) + 6px); z-index: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; background: #203744; }
     .controls button { padding: 7px 3px; }
@@ -942,6 +948,20 @@
       }
       return card;
     }
+    function markFaceupEffect(board, observation, action) {
+      const source = action?.parameters;
+      if (!["activate", "chain"].includes(action?.kind) || source?.location !== 4)
+        return;
+      const card = observation.field.find(item =>
+        item.controller === source.controller && item.zone === "monster" &&
+        item.sequence === source.sequence && item.position === "faceup" &&
+        (source.code == null || source.code === item.code));
+      const slot = card && findFieldCard(board, card)?.closest(".slot");
+      if (!slot) return;
+      const burst = node("span", "effect-burst");
+      burst.setAttribute("aria-hidden", "true");
+      slot.append(burst);
+    }
     function drawAttackArrow(board, source, destination) {
       if (!source || !destination) return;
       const box = board.getBoundingClientRect();
@@ -1088,6 +1108,7 @@
       if (!terminal) placeChainBadges(board, observation);
       byId("board-seat").textContent = `P${boardBottomPlayer + 1} at bottom · Switch sides`;
       const selected = record?.selected_action;
+      if (previousFrame !== index) markFaceupEffect(board, observation, selected);
       if (selected?.kind === "attack") {
         const targetKey = `${selected.actor}:monster:${selected.parameters?.sequence}`;
         const attacker = [...board.querySelectorAll("[data-field-key]")].find(
@@ -1368,20 +1389,26 @@
       byId("file-name").textContent = label; render();
       if (localReviewLoading) loadLocalReview(hash);
     }
-    // Queue items from the same duel differ only by #decision. Browsers keep
-    // the iframe document alive for that navigation, so update its board here.
-    window.addEventListener("hashchange", () => {
-      if (!replay) return;
-      const match = location.hash.match(/^#decision=(\d+)$/);
-      if (!match) return;
-      const requested = Number(match[1]);
+    // A queue can move between decisions in an already loaded duel. Set the
+    // frame synchronously so an in-flight label-save render cannot restore the
+    // old hash before the browser dispatches hashchange.
+    window.goatAiNavigateToDecision = requested => {
+      if (!replay || !Number.isInteger(requested)) return false;
       const last = replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation));
       const next = Math.max(0, Math.min(last, requested - 1));
-      if (next === index) return;
+      if (next === index) {
+        history.replaceState(null, "", `#decision=${next + 1}`);
+        return true;
+      }
       stop();
       if (byId("pile-dialog").open) byId("pile-dialog").close();
       index = next; previousObservation = null; previousFrame = -1;
       animateNext = false; render();
+      return true;
+    };
+    window.addEventListener("hashchange", event => {
+      const match = new URL(event.newURL).hash.match(/^#decision=(\d+)$/);
+      if (match) window.goatAiNavigateToDecision(Number(match[1]));
     });
     byId("file").addEventListener("change", async event => {
       const file = event.target.files[0];

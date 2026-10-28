@@ -11,6 +11,41 @@ from scripts.render_replay import _embed_viewer
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_faceup_monster_effect_has_burst_without_replaying_on_same_frame(tmp_path):
+    faceup = _observation()
+    facedown = deepcopy(faceup)
+    facedown["field"][0]["position"] = "facedown"
+    effect = {"id": "effect", "kind": "activate", "actor": 0,
+              "parameters": {"controller": 0, "location": 4,
+                             "sequence": 0, "code": 1}}
+    replay = {"seed": 1, "source": "test", "winner": 0, "decisions": [
+        {"observation": faceup, "selected_action": effect,
+         "legal_actions": [effect]},
+        {"observation": facedown, "selected_action": effect,
+         "legal_actions": [effect]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {1: "Breaker"}, {}, {})
+    probe = """<script>
+      const count = () => document.querySelectorAll('#board .effect-burst').length;
+      const first = count();
+      render(); const sameFrame = count();
+      goatAiNavigateToDecision(2); const facedown = count();
+      goatAiNavigateToDecision(1); const returned = count();
+      document.body.dataset.effectProbe = [first, sameFrame, facedown, returned].join('|');
+    </script></body>"""
+    path = tmp_path / "effect_burst.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-effect-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "1|0|0|1"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_reviewer_deck_popup_shows_remaining_cards_top_first(tmp_path):
     observation = _observation()
     observation["deck_counts"] = [3, 2]
