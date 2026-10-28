@@ -17,6 +17,7 @@ from goat_ai.engine.ocgcore_probe import MSG_SELECT_CHAIN, MSG_SELECT_IDLECMD
 MAX_CARD_SELECTION_COMBINATIONS = 4096
 MAX_SUM_SELECTION_COMBINATIONS = 4096
 MAX_ZONE_SELECTION_COMBINATIONS = 2048
+MAX_COUNTER_SELECTION_COMBINATIONS = 4096
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,9 @@ class NativeChoice:
     attribute: int | None = None
     number: int | None = None
     announced_card: int | None = None
+    counter_type: int | None = None
+    counter_total: int | None = None
+    counter_allocations: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -510,6 +514,55 @@ def decode_decision(message: bytes,
                     choices.append(NativeChoice("select_cards", response, cards=selected))
         if not choices:
             raise ValueError("sum selection has no valid responses")
+        return NativeDecision(player, tuple(choices))
+    if kind == 22:  # MSG_SELECT_COUNTER
+        player = reader.integer(1)
+        counter_type = reader.integer(2)
+        total = reader.integer(2)
+        count = reader.integer(4)
+        if player not in (0, 1) or not 0 < total <= 32767 or not 2 <= count <= 22:
+            raise ValueError("invalid counter selection bounds")
+        if count > (len(reader.data) - reader.offset) // 9:
+            raise ValueError("truncated counter selection cards")
+        cards = []
+        available = []
+        for _ in range(count):
+            code = reader.integer(4)
+            controller = reader.integer(1)
+            location = reader.integer(1)
+            sequence = reader.integer(1)
+            amount = reader.integer(2)
+            if controller not in (0, 1) or location not in (4, 8) or not amount:
+                raise ValueError("invalid counter selection card")
+            cards.append((code, controller, location, sequence))
+            available.append(amount)
+        reader.finish()
+        if len({(card[1], card[2], card[3]) for card in cards}) != count \
+                or sum(available) < total:
+            raise ValueError("counter selection has no valid allocation")
+        choices = []
+
+        def enumerate_allocations(index: int, remaining: int,
+                                  prefix: tuple[int, ...]) -> None:
+            if index == count:
+                if remaining == 0:
+                    if len(choices) >= MAX_COUNTER_SELECTION_COMBINATIONS:
+                        raise NotImplementedError("counter selection has too many allocations")
+                    picked = tuple(card for card, amount in zip(cards, prefix, strict=True)
+                                   if amount)
+                    amounts = tuple(amount for amount in prefix if amount)
+                    choices.append(NativeChoice(
+                        "select_counters", struct.pack(f"<{count}h", *prefix),
+                        cards=picked, counter_type=counter_type, counter_total=total,
+                        counter_allocations=amounts))
+                return
+            for amount in range(min(available[index], remaining) + 1):
+                enumerate_allocations(index + 1, remaining - amount,
+                                      (*prefix, amount))
+
+        enumerate_allocations(0, total, ())
+        if not choices:
+            raise ValueError("counter selection has no valid allocation")
         return NativeDecision(player, tuple(choices))
     if kind == 26:  # MSG_SELECT_UNSELECT_CARD
         player = reader.integer(1)

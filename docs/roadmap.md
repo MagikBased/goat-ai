@@ -265,6 +265,16 @@ see [GOAT rules](goat_rules.md).
 
 A fresh 50-pair whitelist sweep exposed `MSG_SORT_CHAIN` while ordering Dark Elf's and Toll's attack payments; the native message name does not mean chain links were present. The adapter now decodes that bounded ordering request, and both orders complete full replay-verified, visibility-audited duels. Rerunning the exact seeds produced 50/50 terminal games and 50,084 verified decisions; see [the protocol sweep](evaluation.md#chain-order-native-protocol-sweep-27-october-2026). This broadens native action coverage without certifying historical rulings for every sampled card.
 
+The native adapter now decodes bounded `MSG_SELECT_COUNTER` prompts as
+`select_counters` actions with explicit per-card amounts. It sends the core's
+ordered 16-bit allocation response and checks that each offered amount is
+supported by the acting player's visible face-up field. Synthetic protocol,
+adapter, visibility, and trajectory-serialization tests pass; no historical
+card fixture has yet exercised this prompt end to end. Prompts with more than
+4,096 legal allocations still fail explicitly, pending a staged action design.
+Existing policy feature versions do not encode per-card counter amounts; a
+versioned action representation is required before learning from these prompts.
+
 ## M2 — Historical correctness gate
 
 A source-backed Card Destruction/Banisher of the Light fixture now confirms

@@ -15,7 +15,7 @@ def _choice_cards(action: Action) -> Iterable[dict]:
     if action.kind in ("select_card", "tribute"):
         yield action.parameters
     if action.kind in ("select_card", "select_cards", "finish_selection",
-                       "tribute_cards", "sort_cards"):
+                       "tribute_cards", "sort_cards", "select_counters"):
         yield from action.parameters.get("cards", ())
 
 
@@ -31,6 +31,25 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
     for action in record.legal_actions:
         if action.actor != observation.acting_player:
             raise VisibilityViolation("legal action actor differs from acting player")
+        if action.kind == "select_counters":
+            cards = action.parameters.get("cards", ())
+            counter_type = action.parameters.get("counter_type")
+            total = action.parameters.get("counter_total")
+            slots = set()
+            if (type(counter_type) is not int or type(total) is not int
+                    or total <= 0 or not isinstance(cards, (list, tuple))
+                    or not cards or sum(card.get("amount", 0) for card in cards) != total):
+                raise VisibilityViolation("counter selection has invalid public allocation")
+            for choice in cards:
+                zone = {4: "monster", 8: "spell_trap"}.get(choice.get("location"))
+                slot = (choice.get("controller"), zone, choice.get("sequence"))
+                card = field.get(slot)
+                amount = choice.get("amount")
+                if (card is None or card.position != "faceup" or slot in slots
+                        or type(amount) is not int or amount <= 0
+                        or amount > dict(card.counters).get(counter_type, 0)):
+                    raise VisibilityViolation("counter selection exceeds visible field counters")
+                slots.add(slot)
         hand_choices: Counter[int] = Counter()
         for choice in _choice_cards(action):
             controller = choice.get("controller")

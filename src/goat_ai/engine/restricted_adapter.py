@@ -229,7 +229,7 @@ class RestrictedOcgcoreEngine:
                     parameters["code"] = code
             if choice.cards:
                 cards = []
-                for code, controller, location, sequence in choice.cards:
+                for card_index, (code, controller, location, sequence) in enumerate(choice.cards):
                     target = {"controller": controller, "location": location}
                     if location not in (0x01, 0x40) and not (
                             location == 0x02 and controller != native.player):
@@ -237,8 +237,14 @@ class RestrictedOcgcoreEngine:
                     visible_code = public_code(code, controller, location, sequence)
                     if visible_code is not None:
                         target["code"] = visible_code
+                    if kind == "select_counters":
+                        target["amount"] = choice.counter_allocations[card_index]
                     cards.append(target)
                 parameters["cards"] = cards
+            if choice.counter_type is not None:
+                parameters["counter_type"] = choice.counter_type
+            if choice.counter_total is not None:
+                parameters["counter_total"] = choice.counter_total
             if choice.zones:
                 parameters["zones"] = [
                     {"controller": controller, "location": location, "sequence": sequence}

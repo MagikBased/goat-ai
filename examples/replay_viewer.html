@@ -818,10 +818,13 @@
         parts.push(`${owner} ${place}${slot}`);
       }
       if (parameters.cards) {
-        const cards = parameters.cards.map(card => cardLabel(observation, card, known)).join(", ");
+        const cards = parameters.cards.map(card =>
+          `${card.amount != null ? `${card.amount}× ` : ""}${cardLabel(observation, card, known)}`).join(", ");
         parts.push(action.kind === "select_card" && parameters.selection_maximum != null
           ? `Already selected: ${cards}` : cards);
       }
+      if (parameters.counter_type != null)
+        parts.push(`${parameters.counter_total} counter${parameters.counter_total === 1 ? "" : "s"} (type ${parameters.counter_type})`);
       if (parameters.zones) parts.push(parameters.zones.map(zone =>
         `P${zone.controller + 1} ${locationName(zone.location)} ${zone.sequence + 1}`).join(", "));
       if (parameters.position != null) parts.push(positionName(parameters.position));
