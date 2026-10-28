@@ -9865,3 +9865,44 @@ DECK_B --seed FIRST_SEED --seeds 2 --max-decisions 3000 --verify-replays
 above. These are **synthetic Tactical choices**, not human demonstrations or
 new evidence of a stronger policy. Any checkpoint trained on them must exclude
 these exact Main Deck compositions and seeds from its held-out evaluation.
+
+## Four-duel 2005 behavioral-cloning transfer check (28 October 2026)
+
+An experimental feature-v23 child continued the selected current-core policy
+from the four replay-verified Rhymus Goat Control/Jae Kim Zombie Tactical-v14
+mirror games above. Those two Main Deck compositions were absent from the
+parent's training provenance. The trainer replay-verified all **2,155** source
+decisions, selected **1,053** designated teacher-seat decisions, and fit the
+**314** non-forced choices for one epoch (batch 16, learning rate 0.0001,
+seed 10902). Its ignored checkpoint is
+`.cache/goat-ai/fv23_rhymus_zombie_bc_10902_10903.pt` (SHA-256
+`baef5d76f5320a673acb91e1a09b2b99f5833bd68739b0a89b2d04b3ce6d6c8f`).
+
+On Phoenix Control versus WikiFormat Dimension Fusion, which are unseen Main
+Deck compositions for **both** checkpoints, the child scored **35–28–1**
+directly against its frozen parent over 64 seat-swapped, both-assignment duels
+on seeds 59000–59015. Its paired score interval was **47.7–64.1%**, including
+50%. On separate seeds 59016–59031, it scored **18–46** against Tactical-v14;
+the parent scored **17–46–1** on the identical schedule. The validated paired
+child-minus-parent Tactical score difference was **+0.8 percentage points**,
+95% interval **−5.5 to +6.3 points**. This does not establish a competitive
+gain. The parent remains selected, and M4's separate self-play gain gate is
+still open.
+
+The ignored direct, child-versus-Tactical, and parent-versus-Tactical reports
+are respectively
+`.cache/goat-ai/fv23_rhymus_zombie_bc_vs_parent_phoenix_df_59000_59015.json`
+(SHA-256 `b019d3a6335f1417201f5128515061fba3dc1c49c69c49f93a38c97bc1a39aeb`),
+`.cache/goat-ai/fv23_rhymus_zombie_bc_vs_tactical_phoenix_df_59016_59031.json`
+(SHA-256 `c0751653cfa3b8c997431bfa4403e9b013cb502ad9b0576e39a15e985c1faff5`),
+and `.cache/goat-ai/fv23_parent_vs_tactical_phoenix_df_59016_59031.json`
+(SHA-256 `189fd3944f98746fc663f089ba5eab5e2be6b6d65afa217fdaa3320f6a38d12c`).
+All tournament commands used `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --workers 4 --seeds 16
+--max-decisions 3000` with the Phoenix/WikiFormat pairing above. Reproduce
+the clone with `scripts/train_behavioral_clone.py` and the four
+`seed_*.json` files from the Rhymus/Zombie collection, `--engine experimental
+--init-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt
+--feature-version 23 --width 32 --epochs 1 --batch-size 16 --batched-forward
+--skip-forced-training --learning-rate 0.0001 --seed 10902`, writing to a new
+ignored checkpoint path.

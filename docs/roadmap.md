@@ -637,6 +637,12 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A four-duel Tactical imitation continuation on previously unseen Rhymus/Zombie
+2005 decks scored 35–28–1 against its parent on an independent Phoenix/Dimension
+Fusion pairing. The paired interval includes 50%, and its matched Tactical
+score improved by only 0.8 points with an interval including no gain. Keep the
+parent selected; see the [transfer check](evaluation.md#four-duel-2005-behavioral-cloning-transfer-check-28-october-2026).
+
 The current-core feature-v23 reference scored 25–39 versus Tactical-v14 on
 two independent 2005 deck pairings. A matched Tactical mirror showed a
 10.9-point policy score deficit with a paired 95% interval from −20.3 to
