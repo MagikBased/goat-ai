@@ -127,21 +127,20 @@ def test_bazoo_banish_cost_boost_and_return_revival(tmp_path, opposing_kycoo):
                 assert {FIRST, SECOND}.issubset({c.code for c in obs.field})
                 assert any(c.code == BAZOO and c.attack == 1600 for c in obs.field)
                 return_resolved = True
-            if return_resolved and obs.turn >= 4:
-                if not checked:
-                    assert graceful and discarded and summoned and bazoo_used
-                    assert cost_paid and boosted and trap_set and expired
-                    assert {c.code for c in obs.banished[0]} == {FIRST, SECOND}
-                    assert any(c.code == BAZOO for c in obs.field)
-                    assert not any(c.code in (FIRST, SECOND) for c in obs.field)
-                    if opposing_kycoo:
-                        assert any(c.code == KYCOO and c.position == "faceup"
-                                   for c in obs.field)
-                    required = {f"official/c{code}.lua" for code in (BAZOO, RETURN)}
-                    if opposing_kycoo:
-                        required.add(f"official/c{KYCOO}.lua")
-                    assert required <= env.engine.probe.loaded_script_sha256.keys()
-                    checked = True
+            if return_resolved and obs.turn >= 4 and not checked:
+                assert graceful and discarded and summoned and bazoo_used
+                assert cost_paid and boosted and trap_set and expired
+                assert {c.code for c in obs.banished[0]} == {FIRST, SECOND}
+                assert any(c.code == BAZOO for c in obs.field)
+                assert not any(c.code in (FIRST, SECOND) for c in obs.field)
+                if opposing_kycoo:
+                    assert any(c.code == KYCOO and c.position == "faceup"
+                               for c in obs.field)
+                required = {f"official/c{code}.lua" for code in (BAZOO, RETURN)}
+                if opposing_kycoo:
+                    required.add(f"official/c{KYCOO}.lua")
+                assert required <= env.engine.probe.loaded_script_sha256.keys()
+                checked = True
     pytest.fail(f"Bazoo/Return line did not resolve: turn={obs.turn} "
                 f"phase={obs.phase} flags={graceful, discarded, summoned, bazoo_used, cost_paid, trap_set, boosted, expired, return_used, return_resolved} "
                 f"field={[(c.code, c.attack) for c in obs.field]} "

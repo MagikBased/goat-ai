@@ -5,13 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from scripts.probe_random_decks import generate_deck, write_deck
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
-
+from scripts.probe_random_decks import generate_deck, write_deck
 
 ENERGY_DRAIN_GOAT = 504700090
 

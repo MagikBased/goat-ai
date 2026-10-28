@@ -7,7 +7,10 @@ import pytest
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.mr1_synchro_probe import (
-    CAIUS, SANGAN, SOUL_EXCHANGE, Mr1SynchroProbeEngine,
+    CAIUS,
+    SANGAN,
+    SOUL_EXCHANGE,
+    Mr1SynchroProbeEngine,
 )
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
@@ -37,7 +40,7 @@ def test_mr1_soul_exchange_opponent_sangan_chain_order(tmp_path):
         for _ in range(80):
             actions = env.legal_actions()
 
-            def choose(kind, code=None):
+            def choose(kind, code=None, actions=actions):
                 return next((a for a in actions if a.kind == kind and (
                     code is None or a.parameters.get("code") == code)), None)
 

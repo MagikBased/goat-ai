@@ -12,7 +12,6 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
-
 PETEN = 504700084  # GOAT variant
 TORRENTIAL = 53582587
 
@@ -47,7 +46,7 @@ def test_both_players_peten_optional_triggers_after_torrential(tmp_path):
                 break
             actions = env.legal_actions()
 
-            def choose(kind, code=None):
+            def choose(kind, code=None, actions=actions):
                 return next((action for action in actions if action.kind == kind
                              and (code is None or action.parameters.get("code") == code)), None)
 

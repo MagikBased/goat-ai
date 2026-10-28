@@ -160,15 +160,15 @@ def test_torrential_after_spy_recruits_destroys_both_monsters(tmp_path):
                 action = next(a for a in actions if a.parameters.get("code") == GUARD
                               and a.parameters.get("location") == 1)
                 recruited = True
-            if recruited and not chained and obs.acting_player == 1:
-                if SPY in {c.code for c in obs.field} and GUARD in {
+            if recruited and not chained and obs.acting_player == 1 \
+                    and SPY in {c.code for c in obs.field} and GUARD in {
                         c.code for c in obs.field}:
-                    assert obs.deck_counts[0] == deck_before - 1
-                    assert not obs.chain
-                    action = next((a for a in actions if a.kind == "chain"
-                                   and a.parameters.get("code") == TORRENTIAL), None)
-                    assert action is not None, "Torrential missing after Spy recruits Guard"
-                    chained = True
+                assert obs.deck_counts[0] == deck_before - 1
+                assert not obs.chain
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == TORRENTIAL), None)
+                assert action is not None, "Torrential missing after Spy recruits Guard"
+                chained = True
             if action is None and not checked:
                 action = next((a for a in actions if a.kind in (
                     "place", "select_position", "pass", "end_phase")), actions[0])

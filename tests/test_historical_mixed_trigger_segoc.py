@@ -12,7 +12,6 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
-
 SANGAN = 504700178  # GOAT variant
 PETEN = 504700084  # GOAT variant
 TORRENTIAL = 53582587
@@ -61,7 +60,7 @@ def test_torrential_orders_mandatory_before_optional_across_controllers(
                 break
             actions = env.legal_actions()
 
-            def choose(kind, code=None):
+            def choose(kind, code=None, actions=actions):
                 return next((item for item in actions if item.kind == kind
                              and (code is None or item.parameters.get("code") == code)), None)
 

@@ -7,7 +7,6 @@ from goat_ai.agents import RandomAgent
 from goat_ai.engine.mr1_synchro_probe import BRIONAC, JUNK_SYNCHRON, Mr1SynchroProbeEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import write_trajectory
-
 from scripts.record_mr1_goyo_probe import DARK_BLADE, GIANT_SOLDIER
 
 

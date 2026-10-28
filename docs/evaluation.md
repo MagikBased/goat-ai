@@ -9591,3 +9591,20 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
   --seed 10506 --seeds 50 --max-decisions 3000 \
   --verify-replays --distinct-opponents --count-card-actions
 ```
+
+## Local full-suite and lint gate (27 October 2026)
+
+On commit `3cb3c6b` with `GOAT_AI_NATIVE_ROOT=.cache/goat-ai`, Python 3.12.3,
+PyTorch 2.5.1+cpu, and the pinned native assets, the documented full command
+`PYTHONPATH=src:. .venv/bin/python -m pytest -q` finished with **1,296 passed**
+in **909.17 seconds**. It emitted six PyTorch `TracerWarning` messages from
+three traced-rollout tests and no test failures. The run does not prove all
+historical card rulings or competitive policy strength.
+
+The next local lint command, `.venv/bin/ruff check .`, found 30 existing
+findings across import ordering, closure capture, exception style, and simple
+control flow. After safe formatting and contract-preserving fixes, the same
+lint command passed. The 66 tests covering the touched files and related
+scripts passed in 58.66 seconds with the pinned native assets. The full
+1,296-test suite was not repeated after these lint-only edits; this section
+keeps the two verification scopes distinct.

@@ -5,13 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from scripts.probe_random_decks import generate_deck, write_deck
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.ocgcore_probe import UPSTREAM_GOAT_RIVALRY_SHA256
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
+from scripts.probe_random_decks import generate_deck, write_deck
 
 CHAOS_NECROMANCER = 1434352  # Fiend
 BIRDFACE_GOAT = 504700073  # Winged Beast

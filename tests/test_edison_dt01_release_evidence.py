@@ -5,7 +5,6 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-
 SOURCE = (Path(__file__).resolve().parents[1] / "configs/historical"
           / "edison_dt01_new_card_exclusions_2010_04_20.tsv")
 CUTOFF = date(2010, 4, 20)

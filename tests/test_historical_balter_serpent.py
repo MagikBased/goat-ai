@@ -5,8 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from goat_ai.agents import (TacticalHeuristicAgent, load_card_facts,
-                            load_card_races, load_flip_monster_codes)
+from goat_ai.agents import (
+    TacticalHeuristicAgent,
+    load_card_facts,
+    load_card_races,
+    load_flip_monster_codes,
+)
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility

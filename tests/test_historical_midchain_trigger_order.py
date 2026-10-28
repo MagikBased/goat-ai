@@ -12,7 +12,6 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
-
 SANGAN = 504700178  # GOAT variant
 RAIGEKI_BREAK = 4178474
 MYSTICAL_ELF = 15025844
@@ -46,7 +45,7 @@ def test_two_sangans_destroyed_at_different_chain_links_follow_event_time(tmp_pa
                 break
             actions = env.legal_actions()
 
-            def choose(kind, code=None, location=None, controller=None):
+            def choose(kind, code=None, location=None, controller=None, actions=actions):
                 return next((item for item in actions if item.kind == kind
                              and (code is None or item.parameters.get("code") == code)
                              and (location is None or item.parameters.get("location") == location)

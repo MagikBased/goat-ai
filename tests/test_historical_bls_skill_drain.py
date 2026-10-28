@@ -85,14 +85,13 @@ def test_skill_drain_negates_bls_banish_but_keeps_attack_restriction(tmp_path, d
                     and action.parameters.get("code") == SKILL_DRAIN
                 response_made |= drain_activated
             if obs.turn == 3 and obs.acting_player == 0 and drain_set:
-                if not activated:
-                    if drain_timing != "already_active" or drain_activated:
-                        action = next((a for a in actions if a.kind == "activate"
-                                       and a.parameters.get("code") == BLS), None)
-                        if drain_timing == "already_active" and action is not None:
-                            assert any(c.code == SKILL_DRAIN and c.position == "faceup"
-                                       for c in obs.field)
-                        activated |= action is not None
+                if not activated and (drain_timing != "already_active" or drain_activated):
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == BLS), None)
+                    if drain_timing == "already_active" and action is not None:
+                        assert any(c.code == SKILL_DRAIN and c.position == "faceup"
+                                   for c in obs.field)
+                    activated |= action is not None
                 if activated and not targeted and actions[0].kind == "select_card":
                     action = next((a for a in actions if a.parameters.get("code")
                                    == monster_code and a.parameters.get("controller") == 1), None)

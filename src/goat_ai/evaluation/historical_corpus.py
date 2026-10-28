@@ -8,7 +8,6 @@ import csv
 from collections import Counter
 from pathlib import Path
 
-
 CORPUS_PATH = (Path(__file__).resolve().parents[3] / "configs" / "historical"
                / "sjc_indianapolis_2005_top8_main.csv")
 

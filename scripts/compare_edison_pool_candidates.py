@@ -30,7 +30,7 @@ def _api_ids(path: Path) -> tuple[set[int], set[int]]:
         ids.add(code)
         card_sets = row.get("card_sets", [])
         if not isinstance(card_sets, list):
-            raise ValueError("API JSON card_sets must be a list")
+            raise ValueError("API JSON card_sets must be a list")  # noqa: TRY004
         if any(isinstance(card_set, dict)
                and card_set.get("set_name") == "Duel Terminal 1"
                for card_set in card_sets):

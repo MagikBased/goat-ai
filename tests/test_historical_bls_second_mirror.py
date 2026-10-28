@@ -100,15 +100,15 @@ def test_mirror_force_on_bls_second_attack(tmp_path, use_mirror):
                                            and c.controller == 1)
                 if obs.phase == "main1":
                     action = next((a for a in actions if a.kind == "battle_phase"), action)
-                elif obs.phase in ("battle_start", "battle_step"):
-                    if not first_attack or second_enabled and not second_attack:
-                        action = next((a for a in actions if a.kind == "attack"
-                                       and a.parameters.get("code") == BLS), action)
-                        if action is not None and action.kind == "attack":
-                            if first_attack:
-                                second_attack = True
-                            else:
-                                first_attack = True
+                elif obs.phase in ("battle_start", "battle_step") and (
+                        not first_attack or second_enabled and not second_attack):
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == BLS), action)
+                    if action is not None and action.kind == "attack":
+                        if first_attack:
+                            second_attack = True
+                        else:
+                            first_attack = True
                 if first_attack and not first_targeted \
                         and actions[0].kind == "select_card":
                     action = next((a for a in actions if a.parameters.get("code")

@@ -53,14 +53,14 @@ def test_pot_near_empty_deck_and_terminal_winner(tmp_path, remaining):
                 return
             actions = env.legal_actions()
             action = None
-            if obs.acting_player == 0 and obs.phase == "main1" and not activated:
-                if obs.deck_counts[0] == remaining and not boundary_seen:
-                    action = next((a for a in actions if a.kind == "activate"
-                                   and a.parameters.get("code") == POT), None)
-                    assert POT in {c.code for c in obs.hand}
-                    assert action is not None
-                    activated = True
-                    boundary_seen = True
+            if obs.acting_player == 0 and obs.phase == "main1" and not activated \
+                    and obs.deck_counts[0] == remaining and not boundary_seen:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == POT), None)
+                assert POT in {c.code for c in obs.hand}
+                assert action is not None
+                activated = True
+                boundary_seen = True
             if action is None and actions[0].kind == "select_card":
                 action = next((a for a in actions if a.parameters.get("code") != POT),
                               actions[0])

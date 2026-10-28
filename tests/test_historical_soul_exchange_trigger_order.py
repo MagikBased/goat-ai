@@ -11,7 +11,6 @@ from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
-
 SOUL_EXCHANGE = 68005187
 SANGAN = 504700178  # Historical GOAT script.
 THESTALOS = 26205777
@@ -40,7 +39,7 @@ def test_soul_exchange_opponent_sangan_triggers_before_thestalos(tmp_path):
         for _ in range(80):
             actions = env.legal_actions()
 
-            def choose(kind, code=None):
+            def choose(kind, code=None, actions=actions):
                 return next((a for a in actions if a.kind == kind and (
                     code is None or a.parameters.get("code") == code)), None)
 

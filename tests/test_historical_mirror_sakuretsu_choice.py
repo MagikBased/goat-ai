@@ -157,17 +157,17 @@ def test_mirror_and_sakuretsu_can_share_an_attack_response_chain(tmp_path, first
                 action = next((a for a in actions if a.kind in ("battle_phase", "attack")),
                               None)
                 attacked |= action is not None and action.kind == "attack"
-            if attacked and not checked:
-                if obs.acting_player == 1 and len(chain_choices) < 2:
-                    wanted = first_trap if not chain_choices else (
-                        SAKURETSU if first_trap == MIRROR else MIRROR)
-                    action = next((a for a in actions if a.kind == "chain"
-                                   and a.parameters.get("code") == wanted), None)
-                    if action is not None:
-                        assert obs.phase == "battle_step"
-                        if chain_choices:
-                            assert [link.card_code for link in obs.chain] == [first_trap]
-                        chain_choices.append(wanted)
+            if attacked and not checked and obs.acting_player == 1 \
+                    and len(chain_choices) < 2:
+                wanted = first_trap if not chain_choices else (
+                    SAKURETSU if first_trap == MIRROR else MIRROR)
+                action = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == wanted), None)
+                if action is not None:
+                    assert obs.phase == "battle_step"
+                    if chain_choices:
+                        assert [link.card_code for link in obs.chain] == [first_trap]
+                    chain_choices.append(wanted)
             if action is None and not checked:
                 action = next((a for a in actions if a.kind in (
                     "place", "select_position", "pass", "end_phase")), actions[0])

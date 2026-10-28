@@ -10,8 +10,7 @@ import torch
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.replay.fingerprint import sha256_file
-from goat_ai.training import load_policy_agent
-from goat_ai.training import policy
+from goat_ai.training import load_policy_agent, policy
 from goat_ai.training.self_play import run_learning_episode
 
 

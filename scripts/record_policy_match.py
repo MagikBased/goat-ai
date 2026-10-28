@@ -57,12 +57,14 @@ def main() -> None:
         parser.error("choose one experimental extension of guard v3")
     if args.position_guard and args.tactical_guard:
         parser.error("position guard is a standalone ablation")
-    policy_options = dict(tactical_guard=args.tactical_guard,
-        card_races=load_card_races(args.native_root) if args.tactical_guard else None,
-        weak_flip_attacks=(load_weak_flip_monster_attack(args.native_root)
-                           if args.weak_flip_guard else None),
-        self_target_guard=args.self_target_guard,
-        position_guard=args.position_guard)
+    policy_options = {
+        "tactical_guard": args.tactical_guard,
+        "card_races": load_card_races(args.native_root) if args.tactical_guard else None,
+        "weak_flip_attacks": (load_weak_flip_monster_attack(args.native_root)
+                              if args.weak_flip_guard else None),
+        "self_target_guard": args.self_target_guard,
+        "position_guard": args.position_guard,
+    }
     policy = load_policy_agent(args.checkpoint, **policy_options)
     flip_codes = (load_flip_monster_codes(args.native_root)
                   if args.opponent in ("combat_flip", "tactical") else frozenset())

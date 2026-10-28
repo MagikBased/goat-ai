@@ -5,8 +5,8 @@ import lzma
 import os
 import struct
 import sys
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 

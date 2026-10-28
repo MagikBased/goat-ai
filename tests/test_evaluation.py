@@ -10,11 +10,11 @@ from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation import (
     GameResult,
+    TournamentReport,
     both_deck_assignments,
     paired_score_difference,
     run_tournament,
     run_tournament_parallel,
-    TournamentReport,
     wilson_interval,
 )
 from goat_ai.evaluation.tournament import bootstrap_score_interval

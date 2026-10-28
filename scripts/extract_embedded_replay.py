@@ -27,7 +27,7 @@ def extract_embedded_replay(viewer: Path, output: Path) -> str:
     if actual != expected:
         raise ValueError(f"embedded replay SHA-256 mismatch: {actual} != {expected}")
     if not isinstance(json.loads(payload), dict):
-        raise ValueError("embedded replay is not a JSON object")
+        raise ValueError("embedded replay is not a JSON object")  # noqa: TRY004
     if output.exists():
         raise FileExistsError(output)
     output.parent.mkdir(parents=True, exist_ok=True)
