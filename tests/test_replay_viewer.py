@@ -2,11 +2,13 @@
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -99,10 +101,15 @@ def test_reviewer_frame_combines_private_views_without_changing_agent_observatio
         def observation(self, viewer, *, terminal=False):
             return (own, opponent)[viewer]
 
+        def _query_location(self, viewer, location):
+            return tuple(SimpleNamespace(code=code) for code in
+                         ((14, 15), (16, 17))[viewer])
+
     engine = type("Engine", (), {"probe": Probe()})()
     frame = _reviewer_frame(engine)
     assert frame["hands"] == [[10], [11]]
     assert frame["field"] == {"0:monster:0": 12, "1:monster:0": 13}
+    assert frame["remaining_decks"] == [[15, 14], [17, 16]]
     assert own.field[1].code is None
     assert opponent.field[0].code is None
 
@@ -126,15 +133,49 @@ def test_reviewer_sidecar_is_separate_from_trajectory(tmp_path, monkeypatch):
     monkeypatch.setattr(renderer, "_reviewer_data", lambda *args: {
         "schema_version": 1, "source_trajectory_sha256": hashlib.sha256(before).hexdigest(),
         "frames": [{"hands": [[], [11]], "field": {"1:monster:0": 13},
-                    "banished": [[], []], "extra": [[], []], "decks": [[], []]}],
+                    "banished": [[], []], "extra": [[], []], "decks": [[], []],
+                    "remaining_decks": [[101], [202]]}],
     })
     render_replay(source, output, tmp_path / "native", reviewer_reveal=True)
     assert source.read_bytes() == before
     assert b'"code":13' not in before
+    assert b'"remaining_decks"' not in before
     assert '"1:monster:0":13' in output.read_text()
+    assert '"remaining_decks":[[101],[202]]' in output.read_text()
     sidecar = output.with_suffix(".review.json")
     assert sidecar.is_file()
     assert json.loads(sidecar.read_text())["source_trajectory_sha256"] == hashlib.sha256(before).hexdigest()
+    visible_output = tmp_path / "visible.html"
+    render_replay(source, visible_output, tmp_path / "native")
+    assert '"remaining_decks"' not in visible_output.read_text()
+    assert '"remaining_decks"' not in source.read_text()
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_reviewer_remaining_deck_is_top_first_and_matches_next_draw():
+    from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+    from goat_ai.environments import GoatEnvironment
+
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    deck = "examples/decks/chaos_control_insids_worlds_2022.ydk"
+    with GoatEnvironment(deck, deck, seed=0,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        frame = _reviewer_frame(env.engine)
+        assert [len(cards) for cards in frame["remaining_decks"]] == list(obs.deck_counts)
+        before = Counter(card.code for card in env.engine.probe.observation(1).hand)
+        for _ in range(30):
+            if obs.turn == 2:
+                break
+            actions = env.legal_actions()
+            action = next((item for item in actions if item.kind in ("pass", "end_phase")),
+                          actions[0])
+            obs = env.step(action)
+        assert obs.turn == 2
+        after = Counter(card.code for card in env.engine.probe.observation(1).hand)
+        assert list((after - before).elements()) == frame["remaining_decks"][1][:1]
+        assert _reviewer_frame(env.engine)["remaining_decks"][1] \
+            == frame["remaining_decks"][1][1:]
 
 
 def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):

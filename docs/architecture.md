@@ -167,8 +167,12 @@ at each decision. It stores hand, Set field, banished, and Extra Deck identities
 in a SHA-256-bound `.review.json` sidecar and generated HTML, not in trajectory
 JSON or `GoatEnvironment` observations. Reviewer mode disables action labels
 in the browser to avoid training on decisions inspected with hidden information.
-Neither player-scoped view contains remaining Deck order, so the reviewer
-export shows only starting Main Deck composition and current Deck counts.
+The reviewer exporter additionally queries the native engine's private Deck
+locations after verifying the replay and stores each player's *current*
+remaining Deck in draw order, top card first, at every frame. It checks those
+lengths against both player-visible Deck counts. The ordinary label viewer
+continues to show only starting Main Deck composition and current counts;
+the agent never receives the private order.
 The v19 equip relation comes from ocgcore's `QUERY_EQUIP_CARD` field on the
 Spell/Trap Zone. The adapter exposes only the field slot of a face-up Equip
 Card's current target, including a monster absorbed by Thousand-Eyes Restrict;

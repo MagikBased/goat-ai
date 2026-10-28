@@ -137,6 +137,8 @@ def _embed_viewer(raw: dict | None, source_sha256: str, names: dict[int, str],
 
 def _reviewer_frame(engine, *, terminal: bool = False) -> dict:
     """Combine two legitimate player views for offline review, outside the agent API."""
+    from goat_ai.engine.ocgcore_probe import LOCATION_DECK
+
     views = (engine.probe.observation(0, terminal=terminal),
              engine.probe.observation(1, terminal=terminal))
     field = {}
@@ -151,6 +153,13 @@ def _reviewer_frame(engine, *, terminal: bool = False) -> dict:
                      for player, view in enumerate(views)],
         "extra": [[card.code for card in view.own_extra_deck] for view in views],
         "decks": [list(view.own_main_deck) for view in views],
+        # Native Deck sequences run bottom to top. Only the reviewer artifact
+        # receives this private query; player observations remain unchanged.
+        "remaining_decks": [
+            [card.code for card in reversed(engine.probe._query_location(
+                player, LOCATION_DECK)) if card is not None]
+            for player in (0, 1)
+        ],
     }
 
 
@@ -189,6 +198,9 @@ def _reviewer_data(trajectory, native_root: Path, source_sha256: str,
             opponent = 1 - visible.viewer
             if len(frame["hands"][opponent]) != visible.opponent_hand_count:
                 raise ValueError(f"decision {index}: reviewer hand count differs")
+            if any(len(frame["remaining_decks"][player]) != visible.deck_counts[player]
+                   for player in (0, 1)):
+                raise ValueError(f"decision {index}: reviewer Deck count differs")
             if any(card.code is None and frame["field"].get(
                     f"{card.controller}:{card.zone}:{card.sequence}") is None
                    for card in visible.field):
@@ -219,7 +231,7 @@ def render_replay(source: Path, output: Path, native_root: Path, *,
     if reviewer:
         for frame in reviewer["frames"]:
             codes.update(frame["field"].values())
-            for zone in ("hands", "banished", "extra", "decks"):
+            for zone in ("hands", "banished", "extra", "decks", "remaining_decks"):
                 codes.update(code for player_cards in frame[zone]
                              for code in player_cards if code is not None)
     codes |= _catalog_codes(native_root)

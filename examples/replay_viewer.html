@@ -502,13 +502,14 @@
         element.prepend(node("span", "card-placeholder", "✦"));
       }
     }
-    function pileCard(code, count = 1, opponent = false) {
+    function pileCard(code, count = 1, opponent = false, order = null) {
       const tile = node("div", "pile-card");
       const card = node("div", "card monster");
       addCardVisual(card, code, code == null, opponent);
       card.append(node("strong", "", code == null ? "Concealed" : nameOf(code)));
       tile.append(card);
       const caption = node("div", "pile-card-caption");
+      if (order != null) caption.append(node("span", "pile-card-order", `${order}. `));
       if (count > 1) caption.append(node("span", "pile-card-count", `${count}× `));
       caption.append(document.createTextNode(code == null ? "Concealed card" : nameOf(code)));
       tile.append(caption);
@@ -539,9 +540,13 @@
         }
       } else if (zone === "deck") {
         const remaining = observation.deck_counts[player];
+        const ordered = reveal?.remaining_decks?.[player];
         const decklist = reveal?.decks[player] || (own ? observation.own_main_deck : null);
-        if (decklist?.length) {
-          note = `${remaining} cards remain. Starting Main Deck composition is shown below; the identities and order of the remaining cards are unknown.`;
+        if (Array.isArray(ordered)) {
+          note = `${remaining} cards remain. Current Deck in draw order, top card first (reviewer view only).`;
+          ordered.forEach((code, position) => grid.append(pileCard(code, 1, false, position + 1)));
+        } else if (decklist?.length) {
+          note = `${remaining} cards remain. Starting Main Deck composition is shown below; current contents and order are not recorded in this view. Use Reveal all cards for the exact remaining Deck.`;
           const counts = new Map();
           for (const code of decklist) counts.set(code, (counts.get(code) || 0) + 1);
           for (const [code, count] of counts) grid.append(pileCard(code, count));
@@ -1363,6 +1368,21 @@
       byId("file-name").textContent = label; render();
       if (localReviewLoading) loadLocalReview(hash);
     }
+    // Queue items from the same duel differ only by #decision. Browsers keep
+    // the iframe document alive for that navigation, so update its board here.
+    window.addEventListener("hashchange", () => {
+      if (!replay) return;
+      const match = location.hash.match(/^#decision=(\d+)$/);
+      if (!match) return;
+      const requested = Number(match[1]);
+      const last = replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation));
+      const next = Math.max(0, Math.min(last, requested - 1));
+      if (next === index) return;
+      stop();
+      if (byId("pile-dialog").open) byId("pile-dialog").close();
+      index = next; previousObservation = null; previousFrame = -1;
+      animateNext = false; render();
+    });
     byId("file").addEventListener("change", async event => {
       const file = event.target.files[0];
       if (!file) return;

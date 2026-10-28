@@ -10,6 +10,79 @@ import pytest
 from scripts.render_replay import _embed_viewer
 
 
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_reviewer_deck_popup_shows_remaining_cards_top_first(tmp_path):
+    observation = _observation()
+    observation["deck_counts"] = [3, 2]
+    action = {"id": "pass", "kind": "pass", "actor": 0, "parameters": {}}
+    replay = {"seed": 1, "source": "test", "winner": 0, "decisions": [
+        {"observation": observation, "selected_action": action,
+         "legal_actions": [action]},
+    ]}
+    reviewer = {"schema_version": 1, "source_trajectory_sha256": "0" * 64,
+                "frames": [{"hands": [[], []], "field": {}, "banished": [[], []],
+                            "extra": [[], []], "decks": [[11, 22, 33], [44, 55]],
+                            "remaining_decks": [[11, 22, 11], [55, 44]]}]}
+    html = _embed_viewer(replay, "0" * 64,
+                         {11: "Alpha", 22: "Beta", 44: "Delta", 55: "Echo"},
+                         {}, {}, reviewer)
+    probe = """<script>
+      document.querySelector('[data-deck-player="0"]').click();
+      const first = [...document.querySelectorAll('#pile-scroll .pile-card-caption')]
+        .map(card => card.textContent);
+      const note = byId('pile-note').textContent;
+      byId('pile-close').click();
+      document.querySelector('[data-deck-player="1"]').click();
+      const second = [...document.querySelectorAll('#pile-scroll .pile-card-caption')]
+        .map(card => card.textContent);
+      document.body.dataset.deckOrder = [first.join(','), second.join(','),
+        note.includes('top card first')].join('|');
+    </script></body>"""
+    path = tmp_path / "ordered_decks.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-deck-order="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "1. Alpha,2. Beta,3. Alpha|1. Echo,2. Delta|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_hash_only_navigation_updates_board_after_label(tmp_path):
+    first = _observation()
+    second = deepcopy(first)
+    second["turn"] = 2
+    action = {"id": "pass", "kind": "pass", "actor": 0, "parameters": {}}
+    other = {"id": "end", "kind": "end_phase", "actor": 0, "parameters": {}}
+    replay = {"seed": 1, "source": "test", "winner": 0, "decisions": [
+        {"observation": first, "selected_action": action,
+         "legal_actions": [action, other]},
+        {"observation": second, "selected_action": action,
+         "legal_actions": [action, other]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {}, {}, {})
+    probe = """<script>
+      annotations.set(0, 1); labelsExported = true;
+      location.hash = '#decision=2';
+      setTimeout(() => { document.body.dataset.hashNav = [index,
+        byId('jump').value, byId('turn').textContent.includes('Turn 2'),
+        annotations.get(0)].join('|'); }, 100);
+    </script></body>"""
+    path = tmp_path / "same_replay_nav.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-hash-nav="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "1|2|true|1"
+
+
 def _observation(*, life=9000, target_on_field=True, pending_attack=False,
                  destination="graveyards"):
     attacker = {"controller": 0, "zone": "monster", "sequence": 0,

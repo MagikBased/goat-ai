@@ -683,6 +683,16 @@ knowledge must not enter a player-visible training label. Use **Open in new
 tab** if you want a separate full-size duel page. Older local queues under
 `.cache/goat-ai` were refreshed with the current viewer layout; their original
 queues did not include reviewer reveals.
+Clicking a Deck in **Reveal all cards** now lists the cards still in that Deck
+at the current decision, top card first, with position numbers. This order is
+read from a verified native replay into the separate reviewer artifact. The
+label view continues to show the starting Main Deck composition and the
+current remaining count, since an acting player cannot know the draw order.
+When two queue items refer to the same duel, the replay board now follows the
+new `#decision` fragment after a saved label; the browser no longer leaves the
+previous frame displayed. Reload an already open queue tab to get these viewer
+changes. The current New Jersey and broader-deck local queue viewers were
+regenerated without changing queue JSON or saved labels.
 Generated queue viewers now find the shared ignored `replays/card_images/`
 cache two directory levels above them. The 22 full-queue label views and 22
 reviewer views were regenerated locally with 96 cached card image files;
