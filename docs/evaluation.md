@@ -9639,3 +9639,36 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
 This is additional M1 protocol and observation evidence from random decks and
 random decisions. It does not validate every sampled card's historical ruling
 or measure competitive playing strength.
+
+## Third consecutive distinct-whitelist protocol sweep (27 October 2026)
+
+Seeds 10606–10655 paired 50 independently generated, whitelist-legal
+40-card Main Decks with 50 different opponent decks. All **50/50** games
+reached native terminal outcomes below the 3,000-decision cap. All **52,875**
+decisions replay-verified and passed the player-visible information audit.
+The longest game took 1,551 decisions. The audit counted 538 hidden-field,
+2,652 opponent-field, and 36 opponent-hand choices. This report has 1,204
+loaded native assets, 4,042 card-source/action-kind pairs, and 24 selected
+chain-response pairs. It exercised `disable_zones` again; it found no
+previously unsupported action kind. Compared with the preceding sweep, 109
+loaded assets and 1,084 card-source/action-kind pairs were new. Across the
+three consecutive sweeps, 1,316 distinct assets and 5,748 distinct
+card-source/action-kind pairs were observed, with no shared asset-hash
+conflicts.
+
+The ignored report is
+`.cache/goat-ai/whitelist_distinct_10606_10655/report.json` (SHA-256
+`adcf78a2152ea8e0363a4d119815f2435661cbf3df7b2e155fde545281314df0`).
+Rerunning the exact command produced the same report hash:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_distinct_10606_10655 \
+  --seed 10606 --seeds 50 --max-decisions 3000 \
+  --verify-replays --distinct-opponents --count-card-actions
+```
+
+This measures native protocol and observation coverage under random play.
+It does not certify the sampled cards' historical rulings or measure playing
+strength.

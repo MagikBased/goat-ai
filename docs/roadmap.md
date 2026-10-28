@@ -281,6 +281,13 @@ counter type, and total cost. It can warm-start from a v23 checkpoint without
 changing logits on existing actions. This adds a learnable representation for
 counter decisions; it has not been trained or evaluated for playing strength.
 
+A third consecutive 50-pair distinct-whitelist sweep reached 50/50 terminal
+games and replay-verified, visibility-audited 52,875 decisions. The exact
+report hash reproduced on rerun; combined with the preceding two sweeps, it
+observed 1,316 native assets and 5,748 card-source/action-kind pairs. This
+extends protocol coverage without validating all historical card rulings;
+see [evaluation](evaluation.md#third-consecutive-distinct-whitelist-protocol-sweep-27-october-2026).
+
 ## M2 — Historical correctness gate
 
 A source-backed Card Destruction/Banisher of the Light fixture now confirms
