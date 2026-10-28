@@ -495,7 +495,12 @@ Set Normal Monster. Both turn face-up in Defense Position, but only Faith
 counts toward Ceasefire's 500 damage, and its Flip Effect does not recover the
 previously spent Pot of Greed. Both duels reach terminal, replay-verify, and
 pass the visibility audit; see [GOAT rules](goat_rules.md). Other Ceasefire
-chains and Token/Jinzo interactions remain open.
+chains and Token interactions remain open.
+An additional Ceasefire/Jinzo fixture checks the historical resolution
+exception: a Set Jinzo becomes face-up during Ceasefire, which still deals
+500 damage before Jinzo's Trap suppression applies. The duel reaches terminal,
+replay-verifies, and passes the visibility audit. Token counting and other
+Ceasefire chain orders remain open.
 
 An attacked Morphing Jar / Skill Drain pair now checks a sourced Damage Step
 boundary: an aged Set Drain cannot be chained to Jar's battle-triggered Flip
