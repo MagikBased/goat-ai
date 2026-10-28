@@ -99,15 +99,23 @@ class GameCreator:
             if policy.select_action(record.observation,
                                     record.legal_actions) != record.selected_action:
                 raise ValueError(f"recorded policy choice differs at decision {index}")
+        queue_dir.mkdir(parents=True, exist_ok=True)
+        visible = queue_dir / "visible.html"
         if queue.is_file():
             saved = json.loads(queue.read_text(encoding="utf-8"))
             if (saved.get("checkpoint_sha256") != checkpoint_hash
                     or any(item.get("trajectory_sha256") != source_hash
                            for item in saved.get("selected", []))):
                 raise ValueError("existing game review queue differs from its replay")
+            verify_queue_items(trajectory, {item["decision_index"]: item
+                                            for item in saved["selected"]}, checkpoint_hash)
+            render_replay(source, visible, self.native_root)
+            render_replay(source, visible.with_suffix(".review.html"),
+                          self.native_root, reviewer_reveal=True,
+                          deck_paths=tuple(trajectory.decks))
+            write_review_index(saved["selected"], queue, self.native_root,
+                               comparison_label="Tactical heuristic")
             return queue
-        queue_dir.mkdir(parents=True, exist_ok=True)
-        visible = queue_dir / "visible.html"
         render_replay(source, visible, self.native_root)
         render_replay(source, visible.with_suffix(".review.html"),
                       self.native_root, reviewer_reveal=True,

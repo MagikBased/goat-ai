@@ -88,12 +88,15 @@ def test_policy_game_review_queue_separates_visible_labels_from_reveals(tmp_path
     assert result["policy_review_flags"] >= 1
     queue = creator.review_queue(result["id"])
     digest = sha256_file(queue)
+    visible = queue.parent / "visible.html"
+    visible.write_text("stale generated viewer", encoding="utf-8")
     assert creator.review_queue(result["id"]) == queue
     assert sha256_file(queue) == digest
+    assert "__EMBEDDED_REPLAY__" not in visible.read_text(encoding="utf-8")
+    assert "stale generated viewer" not in visible.read_text(encoding="utf-8")
     report = json.loads(queue.read_text(encoding="utf-8"))
     assert len(report["selected"]) == result["policy_review_flags"]
     assert report["purpose"] == "human_review_candidates_not_training_labels"
-    visible = queue.parent / "visible.html"
     reveal = queue.parent / "visible.review.html"
     assert visible.is_file() and reveal.is_file()
     assert queue.with_suffix(".html").is_file()

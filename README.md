@@ -131,6 +131,8 @@ inspection view with labeling disabled. Saved choices are kept in the local
 review-label folder. Queue creation replays the duel, audits player visibility,
 and reproduces the recorded policy choices from the pinned checkpoint. Saved
 choices require replay and visibility validation before use for training.
+Reopening an existing game queue refreshes its generated viewer pages while
+retaining the queue identity and any locally saved labels.
 
 Live browser play against an AI is a later step. The terminal human-versus-AI
 workflow above already uses the same observation and legal-action interface;

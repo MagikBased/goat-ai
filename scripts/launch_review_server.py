@@ -13,7 +13,7 @@ import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-REVIEW_API_VERSION = 3  # Keep in sync with serve_review_queue.py.
+REVIEW_API_VERSION = 4  # Keep in sync with serve_review_queue.py.
 SEARCH_DIRS = (ROOT / "replays", ROOT / ".cache/goat-ai")
 LOG = ROOT / ".cache/goat-ai/review_server.log"
 PORTS = range(8765, 8865)
