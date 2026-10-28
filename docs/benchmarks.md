@@ -1255,3 +1255,50 @@ minibatch updates, not an equivalence claim. Batch 32 is a useful opt-in speed
 setting, pending stronger held-out playing-strength evidence. The generated
 checkpoints, replays, and JSON reports use `ppo_batch{16,32}_28000_*` names
 under ignored `.cache/goat-ai/`.
+
+## Eight versus sixteen native workers (2026-10-27)
+
+At commit `500abdb`, 32 RandomAgent duels paired Matt Peddle's 2005 Goat
+Control Main Deck with Riclar's 2020 Chaos Turbo Main Deck across both seat
+orders, seeds 49900–49915. The experimental pinned GOAT core, 3,000-decision
+cap, `OMP_NUM_THREADS=1`, and all game inputs were fixed. This host has 16
+logical CPUs and 46 GiB of RAM. All 32 games reached terminal in each run;
+the ordered winners and **32,381** decision counts matched exactly across the
+four reports. Runs were sequential, first 8 then 16 workers, followed by 16
+then 8 workers.
+
+| Run | Workers observed | Wall including spawn | Duels/s | Decisions/s | Mean reset | Sum worker peak RSS |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A1 | 8 | 3.130 s | 10.22 | 10,346 | 69.7 ms | 472,596 KiB |
+| A2 | 16 | 2.646 s | 12.09 | 12,238 | 111.7 ms | 919,784 KiB |
+| B1 | 16 | 2.535 s | 12.62 | 12,772 | 104.4 ms | 918,160 KiB |
+| B2 | 8 | 3.159 s | 10.13 | 10,252 | 67.8 ms | 471,768 KiB |
+
+Sixteen workers achieved 1.18–1.25× the eight-worker throughput in the two
+orderings while nearly doubling the sum of worker high-water RSS. That RSS
+sum is **not** an instantaneous memory peak. Parent peak RSS was 26,520–26,644
+KiB. The schedule is short and excludes neural inference, trajectory writing,
+and replay verification; these rates cannot be projected to a training job.
+For this host and this pure-simulation schedule, eight workers are the more
+memory-efficient default and sixteen are an opt-in throughput choice.
+
+Reproduce with the pinned assets from [native setup](native_setup.md):
+
+```bash
+for specification in 8:a1 16:a2 16:b1 8:b2; do
+  workers=${specification%%:*}
+  run=${specification##*:}
+  OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+    scripts/benchmark_parallel_native.py \
+    --deck-a examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+    --deck-b examples/decks/chaos_turbo_riclar_2020.ydk \
+    --seed 49900 --games 32 --workers "$workers" \
+    --output ".cache/goat-ai/parallel_matt_chaos_49900_${workers}w_${run}.json"
+done
+```
+
+The ignored report SHA-256 values for A1, A2, B1, B2 are respectively
+`203595ec719a2bb768a133a4e6c61086a510490547d367d6aff6c099a547e961`,
+`a2c66793a10845a6ded844c0e83ba4dadcd7af917707448900c15c229062526f`,
+`fb786c0d48d306c76144e1bf7674607f175e52ca07cf82a175401cf696082bbf`,
+and `9ececbe40e96b02248191c5b0ebc5091ff21461c5a469825d09e303fe4b8953f`.
