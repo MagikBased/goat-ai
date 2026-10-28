@@ -10267,3 +10267,55 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
 
 This smoke run checks isolation and reproducibility of the sampling path. It
 does not measure a competitive strength gain or close M4's self-play gate.
+
+### Mixed-deck self-play with independent opponent sampling
+
+Starting from the selected feature-v23 checkpoint, a clipped-PPO trial used
+the new independent frozen-opponent stream on two sourced Main Deck pairings:
+Jesse Twohig 2005 Goat Control versus Montague Warrior, and DingoSig Chaos
+Return versus Weirdchamp Bazoo Return. A four-role schedule covered both
+decks in both learner seats over seeds 90300–90363. It used 64 terminal
+games, four-game frozen rollouts, four workers, two PPO epochs, batch 32,
+per-episode weighting, a learner-deck baseline, parent KL weight 0.5,
+learning rate 0.00005, and a 50% historical-snapshot probability with
+Tactical-v14 otherwise. The realized training opponents were 33 Tactical
+and 31 frozen snapshots. The sampled learner went 21–40–3 against this
+mixture; this is a training outcome, not a strength estimate. The trainer
+reported 19.22 seconds and 3,951 learner decisions. All 64 trajectories,
+covering **24,851 decisions**, passed exact native replay verification and
+the player-visibility audit. The checkpoint SHA-256 is
+`06d3d8ec4d19de8935eace5d40ed586e5c7de57a022ccc1e045d20aa735af40b`;
+the ignored replay-audit report SHA-256 is
+`55320db450a41742d1044ebb559705427f19bd0dd6d3bd9c10c87188549639b8`.
+
+Held-out evaluation used two other pairings: Roberto Martinez Phoenix
+Control/Jae Kim Zombie and Rhymus Lizo Goat Control/WikiFormat Dimension
+Fusion. Both deck assignments, both policy seats, and seeds 90400–90407
+produced 64 direct child-versus-parent games. The evaluator rejected any
+Main Deck composition used in either checkpoint's training. The child went
+**32–32**, a 50.0% score with paired 95% interval **45.3–54.7%**. On a
+matched Tactical-v14 schedule, seeds 90408–90415, the child went **22–42**
+and the unchanged parent **23–41**. The validated paired child-minus-parent
+difference was **−1.56 percentage points**, interval **−7.81 to +4.69
+points**. Neither comparison establishes a gain. The parent remains the
+selected checkpoint; independent sampling alone did not close M4.
+
+The direct, child-versus-Tactical, and parent-versus-Tactical reports have
+SHA-256 values respectively
+`bd9cd70569faebda9651d52200b05e8bff7ae2bd873ce3ebbf3ea3a2e724150c`,
+`68053e58342b122e4ddcf3eed3dfccefa9cc8908c9c40bf258413662b2a73ba8`,
+and `17465256ccf6c280d4c97a7255fd257b1d77cb9bf49c133d45a7e354dfd238cf`.
+The comparison checked local Deck bytes, native assets, source code, opponent,
+schedule, and unseen Main Deck compositions. Reproduce training with
+`scripts/train_self_play.py --engine experimental --schedule-mode four_roles
+--seed 90300 --games 64 --max-decisions 3000 --policy-update clipped_ppo
+--ppo-rollout-games 4 --ppo-epochs 2 --ppo-batch-size 32
+--ppo-rollout-weighting per_episode --baseline-scope learner_deck
+--snapshot-every 4 --parent-kl-weight 0.5 --historical-probability 0.5
+--baseline-opponent tactical --rollout-workers 4 --independent-opponent-rng
+--learning-rate 0.00005` on the two named training pairings. Audit with
+`scripts/audit_selfplay_replays.py`; evaluate with
+`scripts/evaluate_policy.py --engine experimental --both-deck-assignments
+--require-unseen-main-decks --seeds 8 --workers 4 --max-decisions 3000`
+on the two named holdout pairings using seed 90400 for the direct checkpoint
+match and 90408 for both Tactical arms.
