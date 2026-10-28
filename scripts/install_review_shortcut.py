@@ -11,9 +11,8 @@ DESKTOP_ID = "goat-ai-review.desktop"
 def main() -> None:
     app_dir = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "applications"
     app_dir.mkdir(parents=True, exist_ok=True)
-    launcher = ROOT / "scripts/launch_review_server.py"
-    python = ROOT / ".venv/bin/python"
-    if not python.is_file():
+    launcher = ROOT / "start_review_viewer.sh"
+    if not (ROOT / ".venv/bin/python").is_file():
         raise SystemExit("Install the project venv first; see README.md")
     desktop = app_dir / DESKTOP_ID
     # Desktop Exec quoting is deliberately restricted to paths with no embedded
@@ -25,7 +24,7 @@ def main() -> None:
         "Type=Application\n"
         "Name=GOAT AI Review Viewer\n"
         "Comment=Open the newest GOAT AI replay review queue\n"
-        f'Exec="{python}" "{launcher}"\n'
+        f'Exec="{launcher}"\n'
         "Icon=applications-games\n"
         "Terminal=false\n"
         "Categories=Game;\n"

@@ -117,7 +117,7 @@ To review queued policy decisions without downloading or moving label files,
 start the [local review server](docs/replay_audit.md) from the repository root:
 
 ```bash
-.venv/bin/python scripts/launch_review_server.py
+./start_review_viewer.sh
 ```
 
 This opens the newest local review queue in your browser. To open a specific
