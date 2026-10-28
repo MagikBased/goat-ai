@@ -1256,6 +1256,57 @@ setting, pending stronger held-out playing-strength evidence. The generated
 checkpoints, replays, and JSON reports use `ppo_batch{16,32}_28000_*` names
 under ignored `.cache/goat-ai/`.
 
+## Eight versus sixteen PPO rollout workers on mixed Decks (2026-10-28)
+
+At commit `fe4f2dc`, four matched 32-game runs used the selected feature-v23
+checkpoint, two sourced Deck pairings (Goat Control/Chaos Turbo and
+Warrior/Beastdown), four-role seat and Deck assignment, seeds 152000–152031,
+and sixteen-game frozen PPO rollout batches. All runs used two PPO epochs,
+batch size 32, frozen-parent KL weight 0.5, a 3,000-decision cap, and
+`OMP_NUM_THREADS=1`. The worker-count order was 8, 16, 16, then 8.
+
+| Run | Rollout workers | CLI training wall | Terminal games | Decisions |
+| --- | ---: | ---: | ---: | ---: |
+| A1 | 8 | 11.169 s | 32 | 16,708 |
+| A2 | 16 | 12.024 s | 32 | 16,708 |
+| B1 | 16 | 12.068 s | 32 | 16,708 |
+| B2 | 8 | 10.993 s | 32 | 16,708 |
+
+All 32 replay files were byte-identical across the four arms; all 38 saved
+policy tensors matched exactly. Every arm recorded 2,486 learner decisions
+and a 17–15 self-play outcome split. One 8-worker arm independently
+replay-verified all 16,708 decisions against fresh pinned native engines and
+passed the player-visibility audit. Sixteen workers were **about 8–10% slower**
+than eight in the adjacent comparisons on this i7-10700K host. This is a
+short, CPU-only training schedule; worker RSS and a larger job are unmeasured.
+The score is a same-policy training outcome, not a competitive strength result.
+
+Reproduce each arm from the pinned assets, changing `--rollout-workers` and
+`--output` for the four ordered runs:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/warrior_montague_clash.ydk \
+            examples/decks/beastdown_ramon_ciriano_new_jersey_2005.ydk \
+  --schedule-mode four_roles --seed 152000 --games 32 --max-decisions 3000 \
+  --historical-probability 1 --independent-opponent-rng \
+  --policy-update clipped_ppo --ppo-rollout-games 16 \
+  --ppo-epochs 2 --ppo-batch-size 32 --snapshot-every 16 \
+  --parent-kl-weight 0.5 --rollout-workers 8 \
+  --output .cache/goat-ai/ppo_workers_8_16_152000/8w_a1.pt
+```
+
+The ignored reports are in `.cache/goat-ai/ppo_workers_8_16_152000/`; their
+SHA-256 values for A1, A2, B1, B2 are
+`facc3fc02ac7454654e897dd8d6d1b8440bbee0829d5e96e36c7933fa2f3ce85`,
+`14f5600f4bc3a9694ea6fcbc3e0eabdb6879d709bc32c1564ae0e4923199d0e6`,
+`9b30644563291ce6a83767a75faf7b21673c5fff9b3f17bbb5512f52f97c5376`,
+and `5697fe19401f2649d16e1436e5d0c357054fe43064a2a12c5a7dbe5beb4763ca`.
+
 ## Sixteen versus thirty-two native workers (2026-10-28)
 
 At commit `584b819`, 64 RandomAgent duels paired Matt Peddle's 2005 Goat
