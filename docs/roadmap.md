@@ -501,10 +501,10 @@ exception: a Set Jinzo becomes face-up during Ceasefire, which still deals
 replay-verifies, and passes the visibility audit. Paired Faith fixtures now
 show the distinct result when Ceasefire chains to an already activated Flip
 Effect: Faith still returns Pot of Greed after Ceasefire resolves. A separate
-Scapegoat fixture checks that four Sheep Tokens add no Ceasefire damage when
-the fifth Monster Zone contains a Set Normal Monster. All three new duels
-reach terminal, replay-verify, and pass the visibility audit. Other Ceasefire
-chain orders and token-only activation legality remain open.
+Scapegoat fixture checks that four Sheep Tokens do not enable Ceasefire in
+response to Pot of Greed and add no damage once a Set Normal Monster makes
+Ceasefire legal. All three new duels reach terminal, replay-verify, and pass
+the visibility audit. Other Ceasefire chain orders remain open.
 
 An attacked Morphing Jar / Skill Drain pair now checks a sourced Damage Step
 boundary: an aged Set Drain cannot be chained to Jar's battle-triggered Flip

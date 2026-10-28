@@ -277,7 +277,7 @@ def test_ceasefire_excludes_four_sheep_tokens_from_damage(tmp_path):
         pytest.skip("GOAT Scapegoat script not installed")
     own = tmp_path / "goats.ydk"
     own.write_text("#main\n" + "\n".join(map(str, (
-        SCAPEGOAT, ELF, *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
+        SCAPEGOAT, POT, ELF, *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
     opponent = tmp_path / "ceasefire.ydk"
     opponent.write_text("#main\n" + "\n".join(map(str, (
         CEASEFIRE, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
@@ -285,12 +285,13 @@ def test_ceasefire_excludes_four_sheep_tokens_from_damage(tmp_path):
     with GoatEnvironment(str(own), str(opponent), seed=100,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
-        assert {SCAPEGOAT, ELF} <= {card.code for card in obs.hand}
-        goats_used = trap_set = elf_set = responded = checked = False
+        assert {SCAPEGOAT, POT, ELF} <= {card.code for card in obs.hand}
+        goats_used = trap_set = pot_used = gate_checked = False
+        elf_set = responded = checked = False
         agents = (RandomAgent(100), RandomAgent(101))
         for _ in range(5000):
             if env.is_terminal():
-                assert checked
+                assert gate_checked and checked
                 path = tmp_path / "ceasefire_goats.json"
                 write_trajectory(path, env.trajectory())
                 replay = read_trajectory(path)
@@ -310,10 +311,23 @@ def test_ceasefire_excludes_four_sheep_tokens_from_damage(tmp_path):
                     action = next((a for a in actions if a.kind == "set_spell_trap"
                                    and a.parameters.get("code") == CEASEFIRE), None)
                     trap_set |= action is not None
-                if obs.turn == 3 and obs.acting_player == 0 and not elf_set:
-                    action = next((a for a in actions if a.kind == "set_monster"
-                                   and a.parameters.get("code") == ELF), None)
-                    elf_set |= action is not None
+                if obs.turn == 3 and obs.acting_player == 0:
+                    if not pot_used:
+                        action = next((a for a in actions if a.kind == "activate"
+                                       and a.parameters.get("code") == POT), None)
+                        pot_used |= action is not None
+                    if pot_used and gate_checked and not elf_set and action is None:
+                        action = next((a for a in actions if a.kind == "set_monster"
+                                       and a.parameters.get("code") == ELF), None)
+                        elf_set |= action is not None
+                if pot_used and not gate_checked and obs.turn == 3 \
+                        and obs.acting_player == 1 and [link.card_code for link in obs.chain] \
+                        == [POT]:
+                    assert not any(a.kind == "chain" and
+                                   a.parameters.get("code") == CEASEFIRE for a in actions)
+                    assert sum(c.zone == "monster" and c.controller == 0
+                               for c in obs.field) == 4
+                    gate_checked = True
                 if elf_set and obs.turn == 3 and obs.acting_player == 1 \
                         and not responded:
                     option = next((a for a in actions if a.kind == "chain"
