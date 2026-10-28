@@ -740,6 +740,16 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A new experimental preference child used 14 changed choices from 21 locally
+saved high-margin reviews, with exact native replay and visibility validation.
+It scored 38–25–1 directly against the selected v23 parent on four previously
+unseen Main Decks, but only 13–19 on two newly transcribed 2005 New Jersey Top
+8 Main Decks. A matched Tactical comparison favored the child by five wins
+over 64 games but its paired interval crossed zero. Keep v23 selected: the
+new-deck reversal fails the cross-family strength gate. The Deck fixtures,
+label snapshot, training settings, hashes, and measured results are in the
+[evaluation log](evaluation.md#high-margin-human-review-preference-pilot-on-new-2005-decks-28-october-2026).
+
 The [new 2005 New Jersey review queue](replay_audit.md#selected-policy-on-new-2005-new-jersey-decks-28-october-2026)
 adds 24 fresh human-review prompts from eight replay-verified, both-agent
 reproduced policy/Tactical duels. A staged Thunder Dragon search correction

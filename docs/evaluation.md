@@ -1,5 +1,56 @@
 # Baseline evaluation log
 
+## High-margin human-review preference pilot on new 2005 decks (28 October 2026)
+
+The local [New Jersey high-margin queue](replay_audit.md#new-jersey-high-margin-review-queue-28-october-2026)
+had **21 saved choices** when this experiment was snapshotted: **14** differed
+from the selected v23 policy's recorded action, seven matched it, and item #22
+remained unlabeled. Each label was validated against its exact shortlisted
+decision, replay-verified trajectory, and player-visibility audit. The
+multi-queue converter created pairwise preferences only for the 14 changed
+choices. These are local human review choices, not expert demonstrations or
+proof that each alternative is best. The ignored preference manifest SHA-256
+is `6bbda158d195188d94bec978b8ac4725b20fa38ac4c872ed15277aa64570b515`;
+the source queue and each label hash are recorded inside it. The optional
+upstream MST review was still **0/1** and was not used.
+
+A 120-step parent-KL fit at learning rate 0.0001 and seed 208 used those 14
+preferences plus 64 preservation states from four current-core replays on
+Warrior/Beastdown and Phoenix/Flip. Preference loss fell from **3.8387** to
+**1.2916**; final sampled preservation KL was **0.00991**. An initial fit
+attempt correctly rejected older preservation replays because the pinned core
+and one card script had changed; no checkpoint was written by that attempt.
+The resulting experimental child SHA-256 is
+`588f4e973998948ebd51d4b8a77674928bdc84aaead4d14fa1d62e4787504a9e`.
+
+On fresh seeds 98200–98207 with both deck assignments and seats, the child
+scored **38–25–1** directly against its unchanged parent on Dimension Fusion
+and Zombie/Rhymus Main Deck pairs (64 terminal duels; paired 95% interval
+**50.0%–70.3%**). It scored **22–42** against Tactical-v14 on matched fresh
+seeds 98208–98215, versus the parent's **17–47**. The verified paired score
+difference was **+7.81 percentage points**, interval **−1.56 to +17.19**.
+These results suggested a gain but did not establish one.
+
+For a genuinely new composition check, the published SJC New Jersey 2005
+Top 8 Main Decks of [Mary Triatafilidi and Bryan Coronel](https://www.goatformat.com/home/top-8-decklists)
+were transcribed as 40- and 41-card fixtures. Their pinned card identities,
+copy limits, and reported name counts pass tests; neither Main Deck
+composition occurs in the child training provenance. On fresh seeds
+98300–98307, both deck assignments and seats, the child scored **13–19**
+directly against its parent (32 terminal duels; paired interval
+**31.3%–46.9%**): **7–9** with Mary's Deck and **6–10** with Bryan's. This
+reversal blocks promotion. The selected v23 parent remains unchanged; a
+larger and more varied set of independently reviewed decisions is needed.
+
+Ignored report SHA-256 values: direct first family
+`3c93c583212f5c89946baa761e0537ce3adb585b065ec18b729885964105b41e`;
+child/Tactical `ac8a628a9b4667db194bc6653a3ee189221bd4ee0c0bc676b1793534a684b9bf`;
+parent/Tactical `0b8a2c55b1a2ede7582b59c1cca255187c26c06bf58d4a0379b79852eeb1b996`;
+new-deck direct `cd2863269c60d2fc3861d787cb96eda868a5647d1bb07ce461524fe2af2a1ab6`.
+The source labels and generated checkpoints remain ignored local data; the
+source URL and committed Deck fixtures make the new composition check
+repeatable once those authorized labels are supplied.
+
 ## Tactical Fusion-stress random-deck protocol probe (28 October 2026)
 
 Twenty new seeded pairs of independently generated whitelist-legal Main Decks
