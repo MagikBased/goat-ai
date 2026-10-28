@@ -225,8 +225,11 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
       const skipped = document.getElementById('next-item').disabled;
       document.getElementById('show-labeled').click();
       const restored = !document.getElementById('next-item').disabled;
+      notes.set(bookmarkKey(items[0]), 'upstream_mistake'); updateProgress();
+      const noted = !document.querySelector('.review-card .note-status').hidden &&
+        document.getElementById('review-progress').textContent.includes('1 noted');
       document.body.dataset.queueProbe = [first, protectedItem, second, reveal,
-        skipped, restored].join('|');
+        skipped, restored, noted].join('|');
       })();
     </script>"""
     index.write_text(index.read_text().replace("</html>", probe + "</html>"))
@@ -237,4 +240,4 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-queue-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "1 / 2|1 / 2|2 / 2|true|true|true"
+    assert match.group(1) == "1 / 2|1 / 2|2 / 2|true|true|true|true"

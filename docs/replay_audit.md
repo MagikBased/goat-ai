@@ -160,7 +160,8 @@ followed by a forced target, select **The earlier action was the mistake** under
 note without approving any current legal action. Notes live under the ignored
 `_review_state/notes/` folder, remain separate from training annotations, and
 carry forward only when the exact replay and decision remain in a rebuilt
-queue. The queue keeps note-only items unlabeled so they can still be reviewed.
+queue. The queue marks these items **Noted** separately from **Labeled** and
+keeps note-only items visible for further review.
 
 After saving one or more **earlier action was the mistake** notes, build a
 separate queue of nearby earlier activations from the same replay, turn, and

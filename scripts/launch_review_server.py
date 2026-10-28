@@ -51,7 +51,8 @@ def server_healthy(port: int, source: str) -> bool:
         # Older servers may serve the same HTML while lacking newer save APIs.
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/review/progress",
                                     timeout=5) as response:
-            if response.status != 200:
+            if response.status != 200 or not isinstance(
+                    json.load(response).get("notes"), list):
                 return False
         with urllib.request.urlopen(
                 f"http://127.0.0.1:{port}/api/review/state?source={source}",

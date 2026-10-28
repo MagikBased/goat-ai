@@ -149,6 +149,7 @@ def write_review_index(selected: list[dict], output: Path,
             f'<div class="card-top"><span class="badge">#{number} · '
             f'{"Flagged play" if item["audit_flags"] else "Alternative" if not teacher_agrees else "Review"}</span>'
             f'<span class="label-status" hidden>✓ Labeled</span>'
+            f'<span class="note-status" hidden>✎ Noted</span>'
             f'<span>Turn {item["turn"]} · {escape(item["phase"].replace("_", " "))}'
             f' · decision {item["viewer_frame"]}</span></div>'
             f'<h3>{escape(reason)}</h3>'
@@ -176,6 +177,7 @@ def write_review_index(selected: list[dict], output: Path,
             ".card-top{display:flex;justify-content:space-between;gap:12px;"
             "flex-wrap:wrap;color:#a7c5ca;font-size:.85rem}.badge{color:#ffe2a3}"
             ".label-status{color:#a8ead0;font-weight:700}"
+            ".note-status{color:#ffe2a3;font-weight:700}"
             ".links{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}"
             ".links a{display:inline-block;border:1px solid #4f7980;border-radius:7px;"
             "padding:8px 10px;text-decoration:none}.links a:hover{background:#306575}"
@@ -246,7 +248,7 @@ def write_review_index(selected: list[dict], output: Path,
             "let saveWaiters=[];"
             "let bookmarks=new Set(),bookmarkMode=false;"
             "const bookmarkKey=item=>`${item.source}:${item.decision_index}`;"
-            "let labels=new Map(),progressMode=false;"
+            "let labels=new Map(),notes=new Map(),progressMode=false;"
             "function neighbor(direction){let i=current+direction;"
             "while(i>=0&&i<items.length&&progressMode"
             "&&!document.getElementById('show-labeled').checked"
@@ -262,9 +264,10 @@ def write_review_index(selected: list[dict], output: Path,
             "||!card.textContent.toLowerCase().includes(term);});}"
             "function updateProgress(){document.querySelectorAll('.review-card').forEach(card=>{"
             "const item=items[Number(card.dataset.queueIndex)];"
-            "card.querySelector('.label-status').hidden=!labels.has(bookmarkKey(item));});"
+            "card.querySelector('.label-status').hidden=!labels.has(bookmarkKey(item));"
+            "card.querySelector('.note-status').hidden=!notes.has(bookmarkKey(item));});"
             "document.getElementById('review-progress').textContent="
-            "`${labels.size} of ${items.length} review items labeled · ${items.length-labels.size} remaining`;"
+            "`${labels.size} of ${items.length} review items labeled · ${notes.size} noted · ${items.length-labels.size} unlabeled`;"
             "document.getElementById('labeled-filter').hidden=false;"
             "document.getElementById('stage-label-status').textContent="
             "current<0?'':labels.has(bookmarkKey(items[current]))?'✓ Labeled':'Unlabeled';"
@@ -275,6 +278,7 @@ def write_review_index(selected: list[dict], output: Path,
             "if(!response.ok)throw Error('Saved progress unavailable');"
             "const data=await response.json();labels=new Map(data.choices.map(choice=>"
             "[bookmarkKey(choice),choice.action_index]));"
+            "notes=new Map((data.notes||[]).map(note=>[bookmarkKey(note),note.kind]));"
             "progressMode=true;updateProgress();}catch(error){"
             "document.getElementById('review-progress').textContent="
             "`${error.message}. Restart this queue with ./start_review_viewer.sh.`;}}"

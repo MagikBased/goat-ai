@@ -266,10 +266,15 @@ class ReviewStore:
     def progress(self) -> dict:
         """Report saved choices for this queue without exposing replay hidden state."""
         choices = []
+        notes = []
         for digest in sorted(self.sources):
             for choice in self.state(digest)["choices"]:
                 choices.append({"source": digest, **choice})
+            for note in self.note_state(digest)["notes"]:
+                notes.append({"source": digest, "decision_index": note["decision_index"],
+                              "kind": note["kind"]})
         return {"choices": choices,
+                "notes": notes,
                 "total": sum(len(offered) for _, offered in self.sources.values())}
 
     def choose(self, digest: str, decision_index: int, action_index: int | None) -> dict:

@@ -65,7 +65,7 @@ def test_upstream_queue_preserves_target_labels_and_offers_pass(tmp_path, monkey
     assert original_store.label_path(digest).read_bytes() == label_before
     assert output.with_suffix(".html").is_file()
     upstream_store = ReviewStore(output, tmp_path / "upstream_labels")
-    assert upstream_store.progress() == {"choices": [], "total": 1}
+    assert upstream_store.progress() == {"choices": [], "notes": [], "total": 1}
     candidate = json.loads(output.read_text())["selected"][0]
     assert candidate["decision_index"] == 0
     assert candidate["teacher_action"] == {"kind": "pass", "parameters": {}}

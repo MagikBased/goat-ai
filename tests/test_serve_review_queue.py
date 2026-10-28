@@ -73,7 +73,7 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
         assert _request(f"{base}/api/review/state?source={digest}")[1] == {
             "choices": [], "offered": [0], "saved": True}
         assert _request(f"{base}/api/review/progress")[1] == {
-            "choices": [], "total": 1}
+            "choices": [], "notes": [], "total": 1}
         mark = {"source": digest, "decision_index": 0, "bookmarked": True}
         assert _request(f"{base}/api/review/bookmarks")[1] == {"bookmarks": []}
         assert _request(f"{base}/api/review/bookmark", mark)[1] == {
@@ -100,6 +100,7 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
         assert _request(f"{base}/api/review/state?source={digest}")[1]["offered"] == [0]
         assert _request(f"{base}/api/review/progress")[1] == {
             "choices": [{"source": digest, "decision_index": 0, "action_index": 1}],
+            "notes": [],
             "total": 1}
         for invalid in ({**payload, "action_index": 2},
                         {**payload, "decision_index": 1},
@@ -112,7 +113,7 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
                         {**payload, "action_index": None})[1]["choices"] == []
         assert not saved.exists()
         assert _request(f"{base}/api/review/progress")[1] == {
-            "choices": [], "total": 1}
+            "choices": [], "notes": [], "total": 1}
         assert _request(f"{base}/api/review/bookmark",
                         {**mark, "bookmarked": False})[1] == {"bookmarks": []}
         replay.write_text(replay.read_text() + " ")
@@ -323,6 +324,12 @@ def test_browser_upstream_note_saves_without_creating_action_label(tmp_path, mon
         assert json.loads(path.read_text())["notes"] == [
             {"decision_index": 0, "kind": "upstream_mistake",
              "text": "Do not activate MST earlier"}]
+        assert _request(f"http://127.0.0.1:{server.server_port}/api/review/progress")[1] == {
+            "choices": [],
+            "notes": [{"source": digest, "decision_index": 0,
+                       "kind": "upstream_mistake"}],
+            "total": 1,
+        }
         assert not list(output.glob("*.json"))
     finally:
         server.shutdown()
