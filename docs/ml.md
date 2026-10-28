@@ -566,3 +566,15 @@ parent's logits before training. New behavioral-cloning data for this version
 must use schema v26; existing older checkpoints retain their original encoder.
 This only makes timing information available to the model. No competitive
 strength gain has been measured for v29.
+
+Opt-in feature version 30 gives each `select_option` action its ordinal in the
+player-visible legal list. The native prompt IDs for adjacent choices can
+differ by one; dividing their low 32 bits by `2^32-1` makes them identical in
+float32 under feature v23. In eight recent reviewed replays, all six prompts
+with multiple `select_option` actions had this collision. The old checkpoint
+cannot learn a preference between those choices from its current input.
+Version 30 inherits v29's counter and public-age inputs and adds the ordinal
+as one action number. `--upgrade-feature-23-to-30` zero-extends the selected
+v23 weights, preserving its initial logits and training provenance. This is
+a representation correction, not evidence of a playing-strength gain; the
+feature-v23 checkpoint remains selected pending a held-out comparison.

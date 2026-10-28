@@ -1742,6 +1742,44 @@ def test_v29_warm_start_preserves_v23_logits_and_zeros_age_weight(tmp_path):
     assert torch.allclose(actual, expected, atol=1e-6)
 
 
+def test_v30_distinguishes_adjacent_native_option_ids_and_warm_starts(tmp_path):
+    vocabulary = CardVocabulary((10, 20), ((10, 0, 1000), (20, 0, 2000)))
+    choices = (Action("0", "select_option", 0, {"prompt_id": 102807698931713}),
+               Action("1", "select_option", 0, {"prompt_id": 102807698931714}))
+    old = encode_decision(view(), choices, vocabulary, 23)
+    new = encode_decision(view(), choices, vocabulary, 30)
+    assert torch.equal(old.action_numbers[0], old.action_numbers[1])
+    assert not torch.equal(new.action_numbers[0], new.action_numbers[1])
+    assert new.action_numbers[:, -1].tolist() == [0.0, 1 / 16]
+
+    torch.manual_seed(30)
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    path = tmp_path / "parent.pt"
+    torch.save({"schema_version": 1, "model_state": parent.state_dict(),
+                "vocabulary_codes": vocabulary.codes,
+                "vocabulary_card_properties": vocabulary.card_properties,
+                "width": 8, "feature_version": 23,
+                "trajectory_sha256": {"training.json": "a" * 64},
+                "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                                    "main_deck_composition_sha256": ("c", "d")}]}, path)
+    child = LegalActionPolicy(vocabulary.size, width=8, feature_version=30)
+    with pytest.raises(ValueError, match="architecture or vocabulary"):
+        load_parent_checkpoint(path, child, vocabulary)
+    load_parent_checkpoint(path, child, vocabulary, allow_v23_to_v30=True)
+    assert torch.count_nonzero(child.action_numbers[0].weight[:, -3:]) == 0
+    assert torch.count_nonzero(child.card_numbers[0].weight[:, -1]) == 0
+    with torch.no_grad():
+        assert torch.allclose(child(new), parent(old), atol=1e-6)
+    optimizer = torch.optim.Adam(child.parameters(), lr=0.01)
+    for _ in range(40):
+        optimizer.zero_grad()
+        loss = torch.nn.functional.cross_entropy(child(new).unsqueeze(0),
+                                                 torch.tensor([1]))
+        loss.backward()
+        optimizer.step()
+    assert child(new)[1] > child(new)[0] + 0.1
+
+
 def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):
     vocabulary = CardVocabulary((10, 20))
     legacy = LegalActionPolicy(vocabulary.size, width=16, feature_version=1)
