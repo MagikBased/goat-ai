@@ -25,8 +25,9 @@ Use **☆ Bookmark** in the queue or replay bar to mark an item for follow-up;
 it saves locally in `_review_state/bookmarks.json` and never becomes a
 training label. Open **Open label view** and choose a legal action in the
 sidebar only when you want to record the play you would make. The recorded
-action has an **AI played** marker, and the saved-choice line says whether
-your choice matches it. **Approve AI-played action** explicitly labels the
+action has an **AI played** marker; clicking its row does not save a label.
+The saved-choice line says whether your choice matches it.
+**Approve AI-played action** explicitly labels the
 recorded action. No reviewer name or file download is needed with the local
 server; the default `local-reviewer` alias is provenance for the validator.
 The

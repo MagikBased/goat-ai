@@ -31,6 +31,39 @@ def _observation(*, life=9000, target_on_field=True, pending_attack=False,
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_inspecting_ai_played_row_does_not_create_review_label(tmp_path):
+    first = {"id": "played", "kind": "battle_phase", "actor": 0, "parameters": {}}
+    other = {"id": "other", "kind": "end_phase", "actor": 0, "parameters": {}}
+    replay = {"seed": 1, "source": "test", "winner": 0, "decisions": [
+        {"observation": _observation(), "selected_action": first,
+         "legal_actions": [first, other]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {}, {}, {})
+    probe = """<script>
+      const played = document.querySelector('#legal button.recorded');
+      played.click();
+      const inspected = annotations.size === 0 &&
+        byId('review-instructions').textContent.includes('Use Approve AI-played action');
+      document.querySelector('#legal button:not(.recorded)').click();
+      const alternativeSaved = annotations.get(0) === 1;
+      byId('clear-label').click();
+      byId('label-recorded').click();
+      document.body.dataset.reviewProbe = [inspected, alternativeSaved,
+        annotations.get(0) === 0].join('|');
+    </script></body>"""
+    path = tmp_path / "review_clicks.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=300", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-review-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 @pytest.mark.parametrize("destination", ["graveyards", "banished"])
 def test_attack_target_life_fill_and_field_card_movement(tmp_path, destination):
     attack = {"id": "0", "kind": "attack", "actor": 0,

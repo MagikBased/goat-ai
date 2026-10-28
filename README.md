@@ -132,8 +132,10 @@ Choosing a legal action saves it to an
 ignored local folder and restores it when you return; no reviewer name is
 needed. Use **☆ Bookmark** on a queue card or in the replay bar to save an
 item for later without choosing a play. Bookmarks are stored separately from
-training labels. The legal-action list marks the recorded action **AI played**
-and confirms whether your saved choice matches it. Validate saved choices
+training labels. The legal-action list marks the recorded action **AI played**;
+clicking that row only points to the explicit **Approve AI-played action**
+button. Clicking an alternative action saves that choice directly. The viewer
+confirms whether your saved choice matches the recorded play. Validate saved choices
 before training on them.
 
 The renderer also reads card-effect choice text from the local databases, so prompts such as Enemy Controller's two modes have distinct labels. Position and monster-Type choices use names. If a database has no text for a particular option, the viewer labels it by choice number.

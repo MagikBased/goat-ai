@@ -205,7 +205,7 @@
         </div>
         <div class="panel" id="review-panel">
           <h2>Review a decision</h2>
-          <p class="muted" id="review-instructions">Choose an action from the legal list above to label this frame. Labels are retrospective and stay on this device until downloaded.</p>
+          <p class="muted" id="review-instructions">Choose an alternative action from the legal list above, or use Approve AI-played action to label the recorded play. Labels are retrospective and stay on this device until downloaded.</p>
           <p id="annotation-status" class="muted"></p>
           <div class="annotation-actions">
             <button id="label-recorded" type="button">Approve AI-played action</button>
@@ -1046,8 +1046,13 @@
                               `${actionLabel(observation, action, known, actionIndex)}${recorded ? " · AI played" : ""}`);
           button.type = "button";
           button.disabled = !canAnnotateFrame(observation);
+          if (recorded) button.title = "Inspect the recorded play; approve it with the button below";
           button.addEventListener("click", () => {
-            if (canAnnotateFrame(observation)) setAnnotation(index, actionIndex);
+            if (!canAnnotateFrame(observation)) return;
+            if (recorded) {
+              byId("review-instructions").textContent = "This is the AI's recorded play. Use Approve AI-played action below to save it as your choice.";
+              byId("label-recorded").focus({preventScroll: true});
+            } else setAnnotation(index, actionIndex);
           });
           item.append(button);
           return item;
@@ -1159,7 +1164,7 @@
                                                             choice.action_index]));
         localReviewMode = true; labelsExported = true; saveError = false;
         byId("manual-review-export").hidden = true;
-      byId("review-instructions").textContent = "Choose the action you would play from All legal actions. The AI's choice is marked ‘AI played.’ Your choice saves automatically on this computer; no name or download is needed.";
+      byId("review-instructions").textContent = "Choose an alternative action from All legal actions, or use Approve AI-played action to label the recorded play. Your choice saves automatically on this computer; no name or download is needed.";
       } catch (_) { /* File viewers and ordinary static servers use offline export. */ }
       finally {
         if (sourceSha256 === hash) { localReviewLoading = false; notifyLabelState(); render(); }
