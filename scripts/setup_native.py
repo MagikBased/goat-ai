@@ -26,10 +26,10 @@ CORE_PROCESSOR_UPSTREAM_SHA256 = "083b4da8e33f22890d186c7d19ebbcf0113aa4c89d59e3
 CORE_PROCESSOR_GOAT_SHA256 = "544f99bb3e8f3148c6abe17a01b0d8cde27466ccaba062b6a9c815edff9bf3b5"
 CORE_SEGOC_PATCH = Path(__file__).resolve().parent / "native_patches/0001-goat-cross-controller-segoc.patch"
 CORE_SEGOC_PATCH_SHA256 = "fb2bc9fde96863af230085c1b03aa444fa75145b81eb20479620d18fd2126aef"
-CORE_PROCESSOR_FORCED_BATTLE_SHA256 = "eae85af2da638d227b2f992f3d200d2ecc0ff16110e66e2e7faf3da47a148f01"
+CORE_PROCESSOR_FORCED_BATTLE_SHA256 = "a0a934f095eb4af6d19bcf75489d771f369a19854ad4701ad80eb8e8729748ed"
 CORE_FORCED_BATTLE_PATCH = (Path(__file__).resolve().parent
                             / "native_patches/0002-goat-forced-battle-interrupted-attack.patch")
-CORE_FORCED_BATTLE_PATCH_SHA256 = "6fea71d5a9af520738aa6cac5d33623a8c9c9c04607bdcf8d75221c9f4e698cf"
+CORE_FORCED_BATTLE_PATCH_SHA256 = "87a5bb885281161948e83ff798020954aa7dd4d56830704b3083cca2d546d6f8"
 
 
 def run(*args: str) -> None:

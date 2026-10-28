@@ -9763,7 +9763,9 @@ ignored report is
 The next 40 seeds initially exposed two failures. Seed 10786 activated Last
 Turn during an attack; its forced battle cleared the shared native attacker,
 and the interrupted battle command dereferenced a null pointer. A
-checksum-verified core patch now restarts that interrupted command. Seed 10772
+checksum-verified core patch now restarts that interrupted command at either
+response window. A smaller seed-100 fixture reproduced the second window and
+verified Last Turn's End Phase winner after the forced battle. Seed 10772
 activated Morale Boost; when an Equip Card left the field, its pinned script
 used the card's current controller to identify who takes damage. That value
 can be absent after the move. A hash-guarded in-memory script correction uses
@@ -9778,17 +9780,17 @@ On the corrected build, seeds 10760–10799 reached **40/40 terminal** with
 selected 111 Metamorphosis activations and offered 50 Thousand-Eyes Restrict
 activations, selecting eight. It loaded 1,122 distinct native assets. The
 ignored report is
-`.cache/goat-ai/whitelist_fusion_stress_10760_10799_verified/report.json`
+`.cache/goat-ai/whitelist_fusion_stress_10760_10799_final/report.json`
 (SHA-256
-`915db48fb0063c913c992ed8001fef4bc49dc464d3a4da437af5bebf166d35f3`).
+`71a4a3196d11ee0f4a3230a8ccbbe82b59a4ee1e8cfb790aec6d3dab31e774bb`).
 Its native library SHA-256 is
-`b082628bb944b62f64cfa6b945e32bd2cb69b4e0cbff0ad3be7b24d94ddd58a5`.
+`48763d36b1beba3ce37782d7d41cbee58fefe8f65573ab53090e319674bc5358`.
 Reproduce from a full-card-scripts native setup:
 
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
   scripts/probe_random_decks.py --native-root .cache/goat-ai \
-  --output .cache/goat-ai/whitelist_fusion_stress_10760_10799_verified \
+  --output .cache/goat-ai/whitelist_fusion_stress_10760_10799_final \
   --seed 10760 --seeds 40 --max-decisions 3000 \
   --random-extra --fusion-stress --distinct-opponents \
   --verify-replays --count-card-actions
@@ -9798,5 +9800,6 @@ This probes native protocol coverage under random play. It neither validates
 the historical rulings of every sampled card nor establishes arbitrary-deck
 completeness or playing strength. A separate Morale Boost fixture checks the
 1,000 LP gain from Snatch Steal being equipped and the 1,000 LP loss after MST
-removes it, then replay-verifies the complete duel. Last Turn's forced-battle
-outcome still needs a smaller card-specific ruling fixture.
+removes it, then replay-verifies the complete duel. The Last Turn fixture
+replay-verifies its forced-battle outcome; other rulings for both cards remain
+untested.

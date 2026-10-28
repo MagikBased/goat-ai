@@ -1,16 +1,27 @@
 --- a/processor.cpp
 +++ b/processor.cpp
-@@ -2178,6 +2178,13 @@
+@@ -2152,6 +2152,12 @@
+ 		return FALSE;
+ 	}
+ 	case 9: {
++		// A forced battle can replace the announced attack while its
++		// response window is open, clearing the shared attacker pointer.
++		if(!core.attacker) {
++			arg.step = Processors::restart;
++			return FALSE;
++		}
+ 		if(is_player_affected_by_effect(infos.turn_player, EFFECT_SKIP_BP)
+ 			|| core.attacker->is_status(STATUS_ATTACK_CANCELED) || core.attack_rollback) {
+ 			arg.step = 10;
+@@ -2178,6 +2184,11 @@
  		return FALSE;
  	}
  	case 11: {
-+			// A forced battle started by a resolving effect (for example Last
-+			// Turn) can replace this attack and clear the shared attacker when
-+			// it finishes. The interrupted attack has nothing left to resolve.
-+			if(!core.attacker) {
-+				arg.step = Processors::restart;
-+				return FALSE;
-+			}
++		// A forced battle can also finish after the second response window.
++		if(!core.attacker) {
++			arg.step = Processors::restart;
++			return FALSE;
++		}
  		if(core.attacker->is_affected_by_effect(EFFECT_ATTACK_DISABLED)) {
  			core.attacker->reset(EFFECT_ATTACK_DISABLED, RESET_CODE);
  			pduel->new_message(MSG_ATTACK_DISABLED);

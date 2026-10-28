@@ -273,8 +273,11 @@ actions. An additional 40 stress seeds exposed a Last Turn forced-battle native
 null dereference and a Morale Boost script error. Checksum-verified corrections
 and subprocess regressions now cover both; all 40 rerun duels reached terminal
 with 39,677 replay-verified, visibility-audited decisions and 111 selected
-Metamorphosis activations. These are protocol and crash-resistance samples,
-not arbitrary-deck completeness or card-ruling certification. See [the Fusion
+Metamorphosis activations. A separate Last Turn fixture forces an attack in
+response to an announced attack and verifies the End Phase winner; a Morale
+Boost fixture checks its 1,000 LP Equip gain and removal damage. Both complete
+duels replay-verify and pass the visibility audit. These are protocol and
+specific-ruling samples, not arbitrary-deck completeness. See [the Fusion
 stress report](evaluation.md#random-fusion-deck-protocol-sweep-27-october-2026).
 
 The native adapter now decodes bounded `MSG_SELECT_COUNTER` prompts as
