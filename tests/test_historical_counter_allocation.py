@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import pytest
+import torch
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
@@ -11,6 +12,7 @@ from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
+from goat_ai.training import CardVocabulary, LegalActionPolicy, encode_decision
 
 STONE = 34029630
 ANTI_SPELL = 53112492
@@ -84,6 +86,18 @@ def test_native_counter_allocation_negates_pot_and_completes_duel(tmp_path, allo
                                        if card["sequence"] == sequence), 0)
                                  for sequence in (0, 1)) for candidate in actions}
                 assert offered == {(2, 0), (1, 1), (0, 2)}
+                if allocation == (1, 1):
+                    vocabulary = CardVocabulary.from_goat_whitelist(
+                        root / "banlist/GOAT.lflist.conf", native_root=root)
+                    features = encode_decision(observation, actions, vocabulary, 28)
+                    assert features.action_target_context.shape[-1] == 7
+                    assert features.action_numbers.shape == (3, 103)
+                    assert len({tuple(row.flatten().tolist()) for row in
+                                features.action_target_context}) == 3
+                    logits = LegalActionPolicy(vocabulary.size, width=8,
+                                               feature_version=28)(features)
+                    assert logits.shape == (3,)
+                    assert torch.isfinite(logits).all()
                 action = next(candidate for candidate in actions if tuple(
                     next((card["amount"] for card in candidate.parameters["cards"]
                           if card["sequence"] == sequence), 0)
