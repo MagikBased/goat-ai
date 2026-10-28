@@ -761,6 +761,8 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 A [nine-choice New Jersey parent-review pilot](evaluation.md#nine-new-jersey-parent-review-preferences-pilot-28-october-2026) snapshotted 14 locally saved queue choices, converted the nine changed actions to replay-verified preferences, and fit an experimental 120-step child with parent preservation. It scored 17–15 directly against the frozen parent on two unseen Main Deck pairings, but 9–23 against Tactical-v14 versus the parent's matched 10–22. Both intervals include no improvement; keep v23 selected and continue collecting independently reviewed choices across more deck families.
 
+A [400-step fit-length ablation](evaluation.md#longer-fit-on-the-same-nine-reviewed-choices) put the reviewed choice first at seven of nine training decisions, versus four of nine after 120 steps, but scored 13–19 against v23 and 14–18 against the shorter child on fresh direct games. Its matched Tactical comparison was inconclusive. More optimization on this nine-choice snapshot did not close the competitive gate; broader authorized decision data remains the next training input.
+
 A new experimental preference child used 14 changed choices from 21 locally
 saved high-margin reviews, with exact native replay and visibility validation.
 It scored 38–25–1 directly against the selected v23 parent on four previously
