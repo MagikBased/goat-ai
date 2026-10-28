@@ -9295,3 +9295,68 @@ The four saved log SHA-256 values, in run order, are
 `94adf784254eb1e470efcb974c96dfd3f53393bb46cb09233f6a0df4d27f7686`,
 `ab3a92f193dc9691f3f793d0c86d022828afbad6b19a20c5873d840ad982e1b0`,
 and `b46bf5a7fbc7223de91065096df8a59dbdf82b0892e871a49bbd89a918b8ae3a`.
+### Current-core 32-game on-policy Tactical continuation (27 October 2026)
+
+The selected feature-v23 policy had 32 current-core policy-versus-Tactical-v14
+replays on Jesse Twohig 2005 Goat Control versus Montague Warrior, both policy
+seats and seeds 44000–44015. These decks occurred in the parent training
+provenance, but these **policy-visited states** were new to that checkpoint.
+The trainer independently replay-verified all 32 full duels, audited
+player-visible observations, and assigned Tactical-v14 choices at **2,293
+multi-option decisions**. The synthetic teacher is a baseline, not a human
+demonstrator. A single unweighted continuation used two epochs, batch size
+16, feature v23, width 32, learning rate 0.0001, seed 82, batched forward,
+forced-forward omission, and four native verification workers. The two epoch
+losses were **0.6311** and **0.4295**; CLI wall time was 13.48 seconds,
+including 4.85 seconds of verification and 3.72 seconds of fitting. The
+ignored child checkpoint is
+`.cache/goat-ai/fv23_current_on_policy_jw_44000_44015.pt` (SHA-256
+`9696034b14bd07638555ef80ca499c28e3cf1976b397a462238a74f8a3f00de6`).
+
+Held-out evaluation used two independent deck pairs absent from both
+checkpoints' Main Deck composition provenance, both deck assignments and
+policy seats, four workers, the same native assets, and a 3,000-decision cap.
+Every duel reached terminal. The child scored **16–14–2** directly against
+the unchanged parent on Rhymus 2005 Goat Control/Charlotte 2005 Zombie,
+seeds 49900–49907; its paired 95% score interval was 35.9375–71.875%. On
+Phoenix 2005 Control/WikiFormat Dimension Fusion, seeds 50000–50007, the
+child scored **14–18**, interval 34.375–56.25%. Neither direct comparison
+establishes an improvement.
+
+Against Tactical-v14 on matched fresh seeds 49908–49915, the child and
+parent each scored **9–23** on Rhymus/Zombie. The paired child-minus-parent
+score difference was zero, with a 95% interval of −9.375 to +9.375 points.
+On Phoenix/Dimension Fusion, seeds 50008–50015, the child scored **6–26**
+and the parent **9–23**; the paired difference was −9.375 points, interval
+−21.875 to +3.125. The saved-report comparator verified the matching
+opponent, assets, scripts, source, seeds, local deck hashes, and unseen Main
+Deck compositions. More fitting of this synthetic teacher on these states
+did not transfer into a measured competitive gain. Retain the unchanged v23
+parent; this child is an experimental negative result, not a self-play
+improvement.
+
+Reproduce the child with the current native setup:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/train_behavioral_clone.py \
+  .cache/goat-ai/fixed_policy_value_44000_44015/matchup_00_seed_440*_seat_*.json \
+  --engine experimental --on-policy-teacher tactical_v14 \
+  --init-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --epochs 2 --batch-size 16 --batched-forward --omit-forced-forward \
+  --verification-workers 4 --width 32 --feature-version 23 \
+  --learning-rate 0.0001 --seed 82 \
+  --output .cache/goat-ai/fv23_current_on_policy_jw_44000_44015.pt
+```
+
+The six ignored tournament reports use prefix `current_on_policy_jw_` in
+`.cache/goat-ai/`; their SHA-256 values are
+`4297ca6e7d6a76baaecc07b92a4370f6ea8af6889ea4e8dc0e522e2a7db751a5`
+and `0f34fba244f633f4e8b8e7e3778bf1a2119d741dc6b050ca277b41d11652db1c`
+for the direct Rhymus and Phoenix comparisons; and, in child/parent order,
+`ce842eeec36791d1e853ce9298118d09ebb5d52c411697986096916e2f1535e0` /
+`614060791a0499a9bc6a44ebd5b6b6c9d7deccf7e13bef7c005954637d25ca02`
+for Rhymus Tactical, and
+`c5dd5a07e5cf90df09e54d685f75411a5de4796705c6e98535e8740e9b2b528e` /
+`c1d6cde278c953b21d467b5572411089b08eb4e5be01b936f76f2d7bc146ca4b`
+for Phoenix Tactical.
