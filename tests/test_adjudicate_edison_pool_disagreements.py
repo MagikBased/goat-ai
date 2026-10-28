@@ -72,6 +72,15 @@ def test_adjudication_requires_community_evidence(tmp_path):
         adjudicate(report, dt01, other, community)
 
 
+def test_adjudication_accepts_period_sanctioned_community_card(tmp_path):
+    report, dt01, other, community = _inputs(tmp_path)
+    community.write_text("card_id\tassessment\n4\tinclude_pre_cutoff_sanctioned_play\n")
+    result = adjudicate(report, dt01, other, community)
+    assert result["community_only_included_ids"] == [4]
+    assert result["community_only_pending_ids"] == []
+    assert result["complete_release_pool"] is False
+
+
 def test_community_only_ledger_preserves_promotional_provenance():
     path = (Path(__file__).resolve().parents[1] / "configs/historical"
             / "edison_community_only_candidate_discrepancies_2010_04_20.tsv")
@@ -80,8 +89,8 @@ def test_community_only_ledger_preserves_promotional_provenance():
     assert set(rows) == {13893596, 31038159}
     assert rows[13893596]["pre_cutoff_record"].startswith("JUMP-EN025 (May 2008")
     assert rows[31038159]["pre_cutoff_record"].startswith("JUMP-EN034 (March 2010")
-    assert all(row["assessment"] == "pending_north_america_subscription_promo"
-               for row in rows.values())
-    assert all(row["primary_evidence"].startswith(
-        "https://www.db.yugioh-card.com/yugiohdb/card_search.action?")
-        for row in rows.values())
+    assert rows[13893596]["assessment"] == "pending_north_america_subscription_promo"
+    assert rows[31038159]["assessment"] == "include_pre_cutoff_sanctioned_play"
+    assert "2010-01-10" in rows[31038159]["pre_cutoff_record"]
+    assert rows[31038159]["primary_evidence"].startswith(
+        "https://yugiohblog.konami.com/2010/sjc/")

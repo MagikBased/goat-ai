@@ -79,9 +79,12 @@ def adjudicate(report_path: Path, dt01_path: Path,
         raise ValueError("evidence decisions do not partition API-only differences")
     community_decisions = {"exclude": set(), "include": set(), "pending": set()}
     for row in community_rows:
-        if row["assessment"] != "pending_north_america_subscription_promo":
+        if row["assessment"] not in {
+            "pending_north_america_subscription_promo",
+            "include_pre_cutoff_sanctioned_play",
+        }:
             raise ValueError(f"unknown community assessment: {row['assessment']}")
-        community_decisions["pending"].add(int(row["card_id"]))
+        community_decisions[row["assessment"].split("_", 1)[0]].add(int(row["card_id"]))
     return {
         "purpose": "partial_edison_candidate_disagreement_adjudication_not_whitelist",
         "cutoff": CUTOFF.isoformat(),

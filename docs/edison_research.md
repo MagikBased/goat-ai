@@ -150,7 +150,8 @@ The raw HTML is not redistributed. This is a bounded source check of 28
 cards, not proof that the entire Edison release pool is complete or that a
 current card record cannot omit an old regional printing. The other six
 named API-only discrepancies and the two community-only promotional cards
-need separate adjudication.
+need separate adjudication; the Genesis Dragon decision below resolves one
+of the latter.
 
 The [six-card non-DT01 discrepancy ledger](../configs/historical/edison_non_dt01_candidate_discrepancies_2010_04_20.tsv)
 now records independent North American evidence and remaining questions.
@@ -178,8 +179,8 @@ and [Yu-Jo Friendship](https://www.db.yugioh-card.com/yugiohdb/card_search.actio
 have older promotional records, but their period North American legal dates
 have not been proved. Thus 29 of the 34 named API-only discrepancies have a
 source-backed exclusion, one has a dated-booster inclusion, and four await a
-promotional-card or cross-territory check. The two community-only promotions and the wider
-release pool remain open.
+promotional-card or cross-territory check. One of the two community-only
+promotions remains open, and so does the wider release pool.
 
 An [archived official card-legality page captured 6 November
 2010](https://web.archive.org/web/20101106023610id_/http://www.yugioh-card.com/en/gameplay/cardlegality.html)
@@ -223,12 +224,14 @@ API-only named differences in the candidate comparison, and that the
 covers the opposite difference, with no duplicate or conflicting IDs. It
 rejects a DT01 exclusion if its first listed ordinary
 printing precedes the cutoff. Against the cached comparison above, it reports
-29 excluded IDs, one provisionally included ID (Restructer Revolution), four
-pending API-only promotions, and two pending community-only promotions. Its
+29 excluded IDs, one provisionally included API-only ID (Restructer
+Revolution), four pending API-only promotions, one included community-only
+ID (Genesis Dragon), and one pending community-only promotion. Its
 `complete_release_pool` field is always false: neither candidate source nor
 this reconciliation establishes every eligible North American card. The
 ignored local output is
-`.cache/goat-ai/edison_partial_adjudication_20261027.json`.
+`.cache/goat-ai/edison_partial_adjudication_20261027.json` (SHA-256
+`477e064cd256e91b8e68549609cd39fe5e234d6409ee36485673ecea08d1ebb6`).
 
 ```sh
 PYTHONPATH=src:. .venv/bin/python scripts/adjudicate_edison_pool_disagreements.py \
@@ -244,9 +247,20 @@ lists `JUMP-EN025` as a May 2008 subscription promotion and its first listed
 ordinary product as a November 2010 tin. [Konami's Genesis Dragon
 record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7978&ope=2&request_locale=en)
 lists `JUMP-EN034` as a March 2010 subscription promotion and its first
-listed ordinary product as *Gold Series 4* in July 2011. Neither page gives
-the promotion's North American tournament legal date; both cards remain
-pending in the ledger.
+listed ordinary product as *Gold Series 4* in July 2011. Neither card page
+gives a North American legal date. However, [Konami's 10 January 2010 Los
+Angeles SHONEN JUMP Championship feature
+match](https://yugiohblog.konami.com/2010/sjc/round-7-feature-match-richard-clarke-vs-matt-highline/)
+records Richard Clarke using Genesis Dragon during sanctioned play. This
+period North American event evidence supports including that card by the
+20 April Edison cutoff, regardless of the later March date shown for the
+subscription record. The discrepancy between the event use and the card
+page's listed print month has not been explained, so the ledger records
+the event rather than inferring a precise distribution date. Exodius
+remains pending. The retrieved Konami article is in ignored local cache at
+`.cache/goat-ai/edison_genesis_dragon_sjc_2010_01_10.html` (SHA-256
+`ae1ac4205061fb2f7d23cffd213c2532a7f49a0c6e0cdaa5b952c7478bd7706b`);
+the article HTML is not redistributed.
 
 The [archived official legality page from November 2010](https://web.archive.org/web/20101106023610id_/http://www.yugioh-card.com/en/gameplay/cardlegality.html)
 lists SHONEN JUMP promos through `JUMP-EN044` as North American legal then,

@@ -1230,12 +1230,14 @@ from its dated 2005 English booster printing and unrestricted March 2010 list;
 this is an inference from those sources, not a complete regional whitelist.
 Three older promotional cards and Darkness Destroyer's
 cross-territory game promo still need period North American adjudication.
-The two community-only promotions also remain open. See the
+Konami's January 2010 Los Angeles SHONEN JUMP Championship coverage shows
+Genesis Dragon in sanctioned play before the Edison cutoff, resolving one
+community-only discrepancy. Exodius remains open. See the
 [six-card discrepancy ledger](../configs/historical/edison_non_dt01_candidate_discrepancies_2010_04_20.tsv)
 and [Edison audit](edison_research.md).
 The candidate-disagreement audit command now verifies that the documented
 DT01 and non-DT01 evidence covers every named API-only difference exactly
-once, while keeping all six promotional discrepancies unresolved. It produces
+once, while keeping the five remaining promotional discrepancies unresolved. It produces
 no Edison whitelist; see [the Edison audit](edison_research.md).
 The MR1 Synchro probe now applies a checksum-guarded in-memory correction for
 Goyo Guardian's period generic-Tuner material text. Paired seed-5 duels use a
