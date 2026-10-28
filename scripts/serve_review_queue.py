@@ -19,6 +19,7 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+REVIEW_API_VERSION = 2
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -368,6 +369,9 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
                 self.send_response(302)
                 self.send_header("Location", start_path)
                 self.end_headers()
+                return
+            if parsed.path == "/api/review/version":
+                self._json(200, {"api_version": REVIEW_API_VERSION})
                 return
             if parsed.path == "/api/review/state":
                 digest = parse_qs(parsed.query).get("source", [""])[0]

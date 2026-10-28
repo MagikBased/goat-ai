@@ -1,6 +1,7 @@
 """Local review saves remain legal, replay-bound, and confined to one queue."""
 
 import json
+from io import BytesIO
 import re
 import shutil
 import subprocess
@@ -78,6 +79,21 @@ def test_launcher_reuses_a_compatible_later_port_before_claiming_a_free_one(
         "http://127.0.0.1:8767/queue.html")
 
 
+def test_launcher_rejects_running_server_with_old_api(monkeypatch):
+    class Reply(BytesIO):
+        status = 200
+
+    called = []
+
+    def old_version(url, timeout):
+        called.append(url)
+        return Reply(b'{"api_version":1}')
+
+    monkeypatch.setattr(launch_review_server.urllib.request, "urlopen", old_version)
+    assert not server_healthy(8765, "a" * 64)
+    assert called == ["http://127.0.0.1:8765/api/review/version"]
+
+
 def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, monkeypatch):
     queue, replay, digest, trajectory = _queue(tmp_path)
     monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
@@ -87,6 +103,9 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
     thread.start()
     base = f"http://127.0.0.1:{server.server_port}"
     try:
+        assert _request(f"{base}/api/review/version")[1] == {"api_version": 2}
+        assert launch_review_server.REVIEW_API_VERSION == serve_review_queue.REVIEW_API_VERSION
+        assert server_healthy(server.server_port, digest)
         assert _request(f"{base}/api/review/state?source={digest}")[1] == {
             "choices": [], "offered": [0], "saved": True}
         assert _request(f"{base}/api/review/progress")[1] == {

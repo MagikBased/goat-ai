@@ -13,6 +13,7 @@ import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+REVIEW_API_VERSION = 2  # Keep in sync with serve_review_queue.py.
 SEARCH_DIRS = (ROOT / "replays", ROOT / ".cache/goat-ai")
 LOG = ROOT / ".cache/goat-ai/review_server.log"
 PORTS = range(8765, 8865)
@@ -49,7 +50,11 @@ def port_in_use(port: int) -> bool:
 
 def server_healthy(port: int, source: str) -> bool:
     try:
-        # Older servers may serve the same HTML while lacking newer save APIs.
+        # A running process keeps its imported code after the files change.
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/review/version",
+                                    timeout=5) as response:
+            if response.status != 200 or json.load(response).get("api_version") != REVIEW_API_VERSION:
+                return False
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/review/progress",
                                     timeout=5) as response:
             if response.status != 200 or not isinstance(
