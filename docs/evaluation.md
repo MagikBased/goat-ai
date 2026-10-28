@@ -9120,6 +9120,65 @@ examples/decks/zombie_jae_kim_charlotte_2005.ydk --both-deck-assignments
 --require-unseen-main-decks --seed 37200 --seeds 8 --workers 4
 --max-decisions 3000` and the v26 checkpoint as the positional argument.
 
+### Action-conditioned visible-card attention, feature v27 (27 October 2026)
+
+The current feature-v23 policy uses one mean of visible cards for every legal
+action. An opt-in v27 branch lets each action attend to the player-visible
+cards before scoring it. The residual output starts at zero, so loading the
+selected v23 checkpoint preserves its exact initial logits; a unit test also
+checks mixed-length padded batches after the attention weights become nonzero.
+The branch reads only `encode_decision` inputs, with unknown opponent cards
+still represented by unknown identities. It does not inspect native hidden
+state or change the default inference policy.
+
+A matched continuation used the same eight replay-verified fixed-policy games
+and **437** Tactical-v14 labels as the [v23/v26 control](#separate-player-card-pools-feature-v26-27-october-2026), with one epoch,
+batch size 16, seed 81, and learning rate 0.0002. The v27 training loss was
+**0.6069**, versus **0.6391** for the prior matched v23 control. This measures
+fit on synthetic teacher decisions only. The ignored checkpoint is
+`.cache/goat-ai/v27_attention_child_44000_44003.pt` (SHA-256
+`03d4ebd9880210c0f73f1a5442011a7a655b92eb086b98885794e60dca24ebbe`).
+
+Against that exact v23 control on held-out Rhymus 2005 Goat Control/Charlotte
+Zombie, seeds 37200–37207 with both deck assignments and seats, v27 scored
+**13–19** over 32 terminal duels (paired-bootstrap 95% score interval
+**31.25–50%**). On held-out Phoenix 2005 Control/WikiFormat Dimension Fusion
+under the same balanced schedule, it scored **19–13** (interval
+**46.875–71.875%**). The two point scores sum to 32–32, and each family's
+interval includes 50%; the result does not establish a robust improvement.
+The four exact Main Deck compositions are absent from both checkpoints'
+training provenance; `load_report(..., require_unseen_main_decks=True)`
+validated both reports. The local report hashes are respectively
+`71b8c98e89c33eac7877c745d6675a2ecbacff19514af0b3989ab55ec1c78959`
+and `c8b006dc32d45db63a5818ecbddb3c6b654e3beea6752ca84bbde875964f5bc7`.
+This is a direct checkpoint comparison, not a claim that v27 beats Tactical.
+
+Reproduce from the pinned native setup with `OMP_NUM_THREADS=1 PYTHONPATH=src:.`:
+
+```bash
+.venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/fixed_policy_value_44000_44015/matchup_00_seed_4400[0-3]_seat_*.json \
+  --on-policy-teacher tactical_v14 --engine experimental \
+  --init-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --epochs 1 --batch-size 16 --batched-forward --omit-forced-forward \
+  --verification-workers 4 --width 32 --learning-rate 0.0002 --seed 81 \
+  --feature-version 27 --upgrade-feature-23-to-27 \
+  --output .cache/goat-ai/v27_attention_child_44000_44003.pt
+.venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/v27_attention_child_44000_44003.pt \
+  --engine experimental \
+  --opponent-checkpoint .cache/goat-ai/v23_owner_pool_control_44000_44003.pt \
+  --matchup examples/decks/goat_control_rhymus_lizo_new_jersey_2005.ydk \
+            examples/decks/zombie_jae_kim_charlotte_2005.ydk \
+  --both-deck-assignments --require-unseen-main-decks \
+  --seed 37200 --seeds 8 --workers 4 --max-decisions 3000 \
+  --output .cache/goat-ai/v27_attention_vs_v23_rhymus_zombie_37200_37207.json
+```
+
+Repeat the evaluator with the Phoenix/WikiFormat deck paths and a distinct
+output file for the second held-out family. Keep v23 selected pending a gain
+across deck families and against baselines.
+
 ### Tournament-card private-draw differential (27 October 2026)
 
 A native regression varies only one card at the seeded draw slot of player

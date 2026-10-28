@@ -152,18 +152,21 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
                            vocabulary: CardVocabulary, *,
                            allow_v23_to_v24: bool = False,
                            allow_v23_to_v25: bool = False,
-                           allow_v23_to_v26: bool = False) -> dict:
+                           allow_v23_to_v26: bool = False,
+                           allow_v23_to_v27: bool = False) -> dict:
     """Continue a clone only when weights and held-out provenance are compatible."""
     parent = torch.load(path, map_location="cpu", weights_only=True)
     if not isinstance(parent, dict) or parent.get("schema_version") != 1:
         raise ValueError("unsupported parent policy checkpoint schema")
-    if (allow_v23_to_v24 or allow_v23_to_v25 or allow_v23_to_v26) and parent.get(
+    if (allow_v23_to_v24 or allow_v23_to_v25 or allow_v23_to_v26
+            or allow_v23_to_v27) and parent.get(
             "feature_version") != 23:
         raise ValueError("feature upgrade requires a feature-v23 parent")
     upgrade = (parent.get("feature_version") == 23
                and ((allow_v23_to_v24 and model.feature_version == 24)
                     or (allow_v23_to_v25 and model.feature_version == 25)
-                    or (allow_v23_to_v26 and model.feature_version == 26)))
+                    or (allow_v23_to_v26 and model.feature_version == 26)
+                    or (allow_v23_to_v27 and model.feature_version == 27)))
     if (parent.get("width") != model.card.embedding_dim
             or (parent.get("feature_version", 1) != model.feature_version and not upgrade)
             or tuple(parent.get("vocabulary_codes", ())) != vocabulary.codes
@@ -199,6 +202,9 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
             state["trade_head.weight"] = model.state_dict()["trade_head.weight"].clone()
         if model.feature_version == 26:
             state["player_pool.weight"] = model.state_dict()["player_pool.weight"].clone()
+        if model.feature_version == 27:
+            for key in ("action_query.weight", "attended_card.weight"):
+                state[key] = model.state_dict()[key].clone()
     model.load_state_dict(state, strict=True)
     return parent
 
@@ -233,6 +239,8 @@ def main() -> None:
                         help="zero-extend v23 action numbers and initialize a zero trade head")
     parser.add_argument("--upgrade-feature-23-to-26", action="store_true",
                         help="load v23 weights and add a zero-initialized owner pool")
+    parser.add_argument("--upgrade-feature-23-to-27", action="store_true",
+                        help="load v23 weights and add zero-output action-to-card attention")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=1,
                         help="decisions per optimizer update; combine forward passes with --batched-forward")
@@ -251,7 +259,7 @@ def main() -> None:
                         help="use optional orjson to decode input trajectories in the main "
                              "process and replay-verification workers")
     parser.add_argument("--width", type=int, default=64)
-    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 27)),
+    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 28)),
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
@@ -305,6 +313,12 @@ def main() -> None:
     if args.upgrade_feature_23_to_26 and (not args.init_checkpoint
                                          or args.feature_version != 26):
         parser.error("--upgrade-feature-23-to-26 requires a parent and feature v26")
+    if args.upgrade_feature_23_to_27 and (not args.init_checkpoint
+                                         or args.feature_version != 27):
+        parser.error("--upgrade-feature-23-to-27 requires a parent and feature v27")
+    if sum((args.upgrade_feature_23_to_24, args.upgrade_feature_23_to_25,
+            args.upgrade_feature_23_to_26, args.upgrade_feature_23_to_27)) > 1:
+        parser.error("select only one feature-upgrade path")
     if args.on_policy_teacher and (not args.init_checkpoint or args.annotation
                                    or args.annotation_for):
         parser.error("--on-policy-teacher requires --init-checkpoint and no annotations")
@@ -456,7 +470,8 @@ def main() -> None:
         args.init_checkpoint, model, vocabulary,
         allow_v23_to_v24=args.upgrade_feature_23_to_24,
         allow_v23_to_v25=args.upgrade_feature_23_to_25,
-        allow_v23_to_v26=args.upgrade_feature_23_to_26)
+        allow_v23_to_v26=args.upgrade_feature_23_to_26,
+        allow_v23_to_v27=args.upgrade_feature_23_to_27)
               if args.init_checkpoint else None)
     try:
         restrict_trainable_modules(model, args.trainable_module)
@@ -551,7 +566,8 @@ def main() -> None:
         "parent_checkpoint_sha256": (hashlib.sha256(
             args.init_checkpoint.read_bytes()).hexdigest()
             if args.init_checkpoint else None),
-        "parent_feature_upgrade": ("v23_to_v26" if args.upgrade_feature_23_to_26
+        "parent_feature_upgrade": ("v23_to_v27" if args.upgrade_feature_23_to_27
+                                   else "v23_to_v26" if args.upgrade_feature_23_to_26
                                    else "v23_to_v25" if args.upgrade_feature_23_to_25
                                    else "v23_to_v24" if args.upgrade_feature_23_to_24
                                    else None),

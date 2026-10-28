@@ -1549,6 +1549,64 @@ def test_v26_separate_player_pool_loads_exact_v23_logits_and_batches(tmp_path):
                                allow_v23_to_v26=True)
 
 
+def test_v27_action_attention_preserves_parent_logits_and_batches(tmp_path):
+    vocabulary = CardVocabulary((10, 20), ((10, 33, 300), (20, 33, 2000)))
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    checkpoint = {
+        "schema_version": 1, "model_state": parent.state_dict(),
+        "vocabulary_codes": vocabulary.codes,
+        "vocabulary_card_properties": vocabulary.card_properties,
+        "width": 8, "feature_version": 23,
+        "trajectory_sha256": {"training.json": "a" * 64},
+        "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                            "main_deck_composition_sha256": ("c", "d")}],
+    }
+    path = tmp_path / "parent.pt"
+    torch.save(checkpoint, path)
+    child = LegalActionPolicy(vocabulary.size, width=8, feature_version=27)
+    with pytest.raises(ValueError, match="architecture or vocabulary"):
+        load_parent_checkpoint(path, child, vocabulary)
+    load_parent_checkpoint(path, child, vocabulary, allow_v23_to_v27=True)
+    assert torch.count_nonzero(child.attended_card.weight) == 0
+    assert all(torch.equal(child.state_dict()[key], value)
+               for key, value in parent.state_dict().items())
+    observation = replace(view(), field=(
+        CardView(0, "monster", "faceup", 10, 0),
+        CardView(1, "monster", "faceup", 20, 0),
+    ))
+    old = encode_decision(observation, actions(), vocabulary, 23)
+    new = encode_decision(observation, actions(), vocabulary, 27)
+    with torch.no_grad():
+        expected = parent(old)
+        actual = child(new)
+        batched, mask = child.forward_batch((new, new))
+    assert torch.allclose(actual, expected, atol=1e-6)
+    assert torch.allclose(batched[0, mask[0]], actual, atol=1e-6)
+    assert torch.allclose(batched[1, mask[1]], actual, atol=1e-6)
+    shorter = encode_decision(view(), actions()[:2], vocabulary, 27)
+    with torch.no_grad():
+        child.attended_card.weight.copy_(torch.eye(8))
+        full_logits = child(new)
+        short_logits = child(shorter)
+        padded, padded_mask = child.forward_batch((new, shorter))
+    assert torch.allclose(padded[0, padded_mask[0]], full_logits, atol=1e-6)
+    assert torch.allclose(padded[1, padded_mask[1]], short_logits, atol=1e-6)
+    assert not padded_mask[1, -1]
+    empty = encode_decision(replace(view(), hand=(), field=()),
+                            actions()[-1:], vocabulary, 27)
+    with torch.no_grad():
+        assert torch.isfinite(child(empty)).all()
+        padded_empty, empty_mask = child.forward_batch((new, empty))
+    assert torch.allclose(padded_empty[1, empty_mask[1]], child(empty), atol=1e-6)
+    checkpoint["feature_version"] = 27
+    checkpoint["model_state"] = child.state_dict()
+    torch.save(checkpoint, path)
+    with pytest.raises(ValueError, match="feature-v23 parent"):
+        load_parent_checkpoint(path, LegalActionPolicy(vocabulary.size, width=8,
+                                                      feature_version=27), vocabulary,
+                               allow_v23_to_v27=True)
+
+
 def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):
     vocabulary = CardVocabulary((10, 20))
     legacy = LegalActionPolicy(vocabulary.size, width=16, feature_version=1)

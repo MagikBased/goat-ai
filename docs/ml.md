@@ -62,6 +62,12 @@ and [evaluation](evaluation.md) track the measured follow-up.
 
 This is a first representation, not a validated strong architecture. It does not yet model public event history, recipient-scoped reveals, other restrictions, changes to the Deck since duel start, or individual Damage Step substeps. Unknown card IDs share one embedding. Target context is pooled and may still lose relationships among cards. The model does not infer hidden hands or deck order. Ordinary inference scores one decision at a time; behavioral cloning can optionally pad variable-length decisions and score a minibatch together with `--batched-forward`. Batched inference across live duels, recurrent memory, and action-set attention remain open experiments. The original batch size 1 remains the default because faster training has not demonstrated stronger play. See [the measured training comparison](evaluation.md) and [throughput benchmark](benchmarks.md).
 
+Feature v27 is an opt-in action-to-visible-card attention branch from v23.
+It uses the same player-visible input and starts with identical v23 logits.
+The first matched 437-label experiment split 32–32 against its v23 control
+across two unseen-deck families, with opposite family results. Keep the v23
+reference selected; see [the held-out comparison](evaluation.md#action-conditioned-visible-card-attention-feature-v27-27-october-2026).
+
 For local replay review, `scripts/score_reviewed_decisions.py` verifies the
 native trajectory and its visibility, checks SHA-256-bound annotation indices,
 and reports the model's rank and logit margin for each reviewed legal action.

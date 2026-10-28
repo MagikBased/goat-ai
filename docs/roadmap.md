@@ -1824,3 +1824,11 @@ held-out own-only Nobleman choice or establish a gain over the unweighted
 child on two independent 64-duel families. Keep the weight experimental and
 the reference unchanged; more synthetic weight alone has not closed M4.
 See [the matched ablation](evaluation.md#recorded-bad-preference-weight-ablation-27-october-2026).
+
+An opt-in feature-v27 action-to-visible-card attention branch preserved the
+selected v23 policy's initial logits and fitted the same 437 verified
+Tactical labels more closely than a matched v23 continuation. Held-out direct
+comparisons split **13–19** on Rhymus/Zombie and **19–13** on Phoenix/Dimension
+Fusion, each with a paired interval reaching 50%. The attention branch is not
+promoted; this small synthetic-label experiment does not close M4's
+cross-family strength gate. See [evaluation](evaluation.md#action-conditioned-visible-card-attention-feature-v27-27-october-2026).

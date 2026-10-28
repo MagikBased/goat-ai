@@ -3,7 +3,7 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import cached_property, lru_cache
-from math import cos, log1p, sin
+from math import cos, log1p, sin, sqrt
 from pathlib import Path
 
 import torch
@@ -58,6 +58,8 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # estimate. With only this head trainable, all other action logits stay frozen.
 # Version 26 branches from v23 and adds separate own/opponent visible-card
 # pools. The residual is zero-initialized for exact v23 checkpoint behavior.
+# Version 27 branches from v23 and lets each legal action attend to visible
+# cards before scoring. Its output is zero-initialized for exact v23 behavior.
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 SPELL_TYPE = 0x2  # TYPE_SPELL in pinned ocgcore constant.lua
@@ -156,7 +158,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 27):
+    if feature_version not in range(1, 28):
         raise ValueError("unsupported policy feature version")
     if feature_version >= 22 and not vocabulary.card_properties:
         raise ValueError("feature version 22 requires pinned printed card properties")
@@ -480,7 +482,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 27):
+        if feature_version not in range(1, 28):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -542,6 +544,10 @@ class LegalActionPolicy(nn.Module):
         if feature_version == 26:
             self.player_pool = nn.Linear(width * 2, width, bias=False)
             nn.init.zeros_(self.player_pool.weight)
+        if feature_version == 27:
+            self.action_query = nn.Linear(width, width, bias=False)
+            self.attended_card = nn.Linear(width, width, bias=False)
+            nn.init.zeros_(self.attended_card.weight)
 
     def forward(self, features: DecisionFeatures) -> Tensor:
         return self._forward(features)
@@ -648,6 +654,13 @@ class LegalActionPolicy(nn.Module):
             matched = (multi_match.to(visible.dtype) @ visible)
             multi_mask = (multi_slots[:, :, 1] != 0).unsqueeze(-1)
             action = action + (matched * multi_mask).sum(1) / multi_mask.sum(1).clamp(min=1)
+        if self.feature_version == 27:
+            relevance = self.action_query(action) @ visible.transpose(0, 1)
+            relevance = relevance / sqrt(visible.shape[1])
+            valid_cards = cards[:, 1] != 0
+            relevance = relevance.masked_fill(~valid_cards[None, :], -1e9)
+            attended = (relevance.softmax(dim=1) * valid_cards[None, :]) @ visible
+            action = action + self.attended_card(attended)
         logits = self.score(torch.cat((state.expand(action.shape[0], -1), action), dim=1)).squeeze(1)
         if self.feature_version == 25:
             trade = features.action_numbers[:, -3] * 5
