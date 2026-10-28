@@ -324,18 +324,23 @@ def test_torrential_answers_completed_call_of_the_haunted_summon(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_call_chained_to_pot_does_not_open_torrential_window(tmp_path):
+@pytest.mark.parametrize("chain_card,expect_torrential", [
+    (POT_OF_GREED, False), (SCAPEGOAT, True),
+])
+def test_call_at_chain_link_two_uses_last_summon_for_torrential_window(
+        tmp_path, chain_card, expect_torrential):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    for code in (GRACEFUL_CHARITY, POT_OF_GREED, CALL_OF_THE_HAUNTED,
+    for code in (GRACEFUL_CHARITY, chain_card, CALL_OF_THE_HAUNTED,
                  TORRENTIAL_TRIBUTE):
-        if not (root / f"scripts/official/c{code}.lua").is_file():
+        if not any((root / f"scripts/{folder}/c{code}.lua").is_file()
+                   for folder in ("official", "goat")):
             pytest.skip(f"script for {code} not installed")
     own = tmp_path / "call_chain.ydk"
     own.write_text("#main\n" + "\n".join(map(str, (
         GRACEFUL_CHARITY, CALL_OF_THE_HAUNTED, BOOK_OF_MOON,
         *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
-    other = tmp_path / "pot_torrential.ydk"
-    other_cards = [POT_OF_GREED, TORRENTIAL_TRIBUTE, *VANILLA_DECK[2:]]
+    other = tmp_path / "chain_torrential.ydk"
+    other_cards = [chain_card, TORRENTIAL_TRIBUTE, *VANILLA_DECK[2:]]
     other_cards[1], other_cards[4] = other_cards[4], other_cards[1]
     other.write_text("#main\n" + "\n".join(map(str, other_cards))
                      + "\n#extra\n!side\n")
@@ -343,17 +348,17 @@ def test_call_chained_to_pot_does_not_open_torrential_window(tmp_path):
     with GoatEnvironment(str(own), str(other), seed=100,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
-        graceful = discarded = call_set = trap_set = pot_used = call_used = False
-        targeted = checked = False
+        graceful = discarded = call_set = trap_set = lead_used = call_used = False
+        targeted = checked = torrential_fired = torrential_resolved = False
         agents = (RandomAgent(100), RandomAgent(101))
         for _ in range(3000):
             if env.is_terminal():
                 assert checked, (graceful, discarded, call_set, trap_set,
-                                 pot_used, call_used, targeted, obs.turn)
+                                 lead_used, call_used, targeted, obs.turn)
+                assert torrential_resolved == expect_torrential
                 assert {f"official/c{code}.lua" for code in (
-                    GRACEFUL_CHARITY, POT_OF_GREED, CALL_OF_THE_HAUNTED,
-                    TORRENTIAL_TRIBUTE)}.issubset(
-                        env.engine.probe.loaded_script_sha256)
+                    GRACEFUL_CHARITY, CALL_OF_THE_HAUNTED,
+                    TORRENTIAL_TRIBUTE)}.issubset(env.engine.probe.loaded_script_sha256)
                 trajectory = env.trajectory()
                 assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) == len(
                     trajectory.decisions)
@@ -361,6 +366,10 @@ def test_call_chained_to_pot_does_not_open_torrential_window(tmp_path):
                 return
             actions = env.legal_actions()
             action = None
+            if torrential_fired and not torrential_resolved and obs.chain == () \
+                    and TORRENTIAL_TRIBUTE in {card.code for card in obs.graveyards[1]}:
+                assert not any(card.zone == "monster" for card in obs.field)
+                torrential_resolved = True
             if not checked:
                 if obs.turn == 1 and obs.acting_player == 0:
                     if not graceful:
@@ -380,12 +389,12 @@ def test_call_chained_to_pot_does_not_open_torrential_window(tmp_path):
                     action = next((a for a in actions if a.kind == "set_spell_trap"
                                    and a.parameters.get("code") == TORRENTIAL_TRIBUTE), None)
                     trap_set |= action is not None
-                if obs.turn == 4 and obs.acting_player == 1 and trap_set and not pot_used:
+                if obs.turn == 4 and obs.acting_player == 1 and trap_set and not lead_used:
                     action = next((a for a in actions if a.kind == "activate"
-                                   and a.parameters.get("code") == POT_OF_GREED), None)
-                    pot_used |= action is not None
-                if pot_used and obs.acting_player == 0 and not call_used \
-                        and any(link.card_code == POT_OF_GREED for link in obs.chain):
+                                   and a.parameters.get("code") == chain_card), None)
+                    lead_used |= action is not None
+                if lead_used and obs.acting_player == 0 and not call_used \
+                        and any(link.card_code == chain_card for link in obs.chain):
                     action = next((a for a in actions if a.kind == "chain"
                                    and a.parameters.get("code") == CALL_OF_THE_HAUNTED), None)
                     call_used |= action is not None
@@ -393,13 +402,19 @@ def test_call_chained_to_pot_does_not_open_torrential_window(tmp_path):
                     action = next((a for a in actions if a.parameters.get("code")
                                    == MYSTICAL_ELF and a.parameters.get("controller") == 0), None)
                     targeted |= action is not None
-                if targeted and obs.chain == () and POT_OF_GREED in {
+                if targeted and obs.chain == () and chain_card in {
                         card.code for card in obs.graveyards[1]} and any(
                         card.code == MYSTICAL_ELF for card in obs.field):
-                    assert not any(a.kind == "chain" and a.parameters.get("code")
-                                   == TORRENTIAL_TRIBUTE for a in actions)
+                    offered = any(a.kind == "chain" and a.parameters.get("code")
+                                  == TORRENTIAL_TRIBUTE for a in actions)
+                    assert offered == expect_torrential
                     assert any(card.code == TORRENTIAL_TRIBUTE and
                                card.position == "facedown" for card in obs.field)
+                    if expect_torrential:
+                        assert sum(card.code in SHEEP_CODES for card in obs.field) == 4
+                        action = next(a for a in actions if a.kind == "chain" and
+                                      a.parameters.get("code") == TORRENTIAL_TRIBUTE)
+                        torrential_fired = True
                     checked = True
                 if action is None:
                     action = next((a for a in actions if a.kind in (
