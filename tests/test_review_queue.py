@@ -77,6 +77,7 @@ def test_review_index_separates_player_label_and_hidden_reveal_views(tmp_path):
     assert 'href="queue_viewers/game.html#decision=7"' in html
     assert 'href="queue_viewers/game.review.html#decision=7"' in html
     assert "labeling is disabled there" in html
+    assert "Offline view: choices are not saved automatically" in html
     assert "weak flip summon" in html
     assert 'id="previous-item"' in html
     assert 'id="next-item"' in html

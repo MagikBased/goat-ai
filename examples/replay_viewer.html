@@ -266,6 +266,7 @@
     let annotations = new Map();
     let labelsExported = false;
     let localReviewMode = false;
+    let localReviewableFrames = null;
     let localReviewLoading = false;
     let saveRevision = 0;
     let saveQueue = Promise.resolve();
@@ -293,6 +294,7 @@
     function canAnnotateFrame(observation) {
       const authorization = annotationAuthorization();
       return !reviewerData && !localReviewLoading && authorization && observation &&
+        (!localReviewMode || !localReviewableFrames || localReviewableFrames.has(index)) &&
         (authorization === "policy_review"
           ? observation.acting_player === replay.skill_metadata.demonstrator_seat
           : authorization === "self_play_review"
@@ -1100,6 +1102,9 @@
         + (terminal ? " · Final state" : frameLabel == null ? " · This frame is unlabeled"
           : ` · Your choice: ${actionLabel(observation, record.legal_actions[frameLabel], known, frameLabel)}`
             + (frameLabel === recordedIndex ? " (AI played)" : " (different from AI played)"))
+        + (localReviewMode && localReviewableFrames && !terminal &&
+           !localReviewableFrames.has(index)
+          ? " · Outside this review queue; open a queued decision to label it" : "")
         + (localReviewMode ? saveError ? " · Save failed; use Download labels"
           : labelsExported ? " · Saved on this computer" : " · Saving…" : "");
       byId("label-recorded").disabled = terminal || !canAnnotateFrame(observation);
@@ -1189,6 +1194,10 @@
         if (!response.ok) throw new Error("local review endpoint unavailable");
         const data = await response.json();
         if (sourceSha256 !== hash) return;
+        if (data.offered != null &&
+            (!Array.isArray(data.offered) || !data.offered.every(Number.isInteger)))
+          throw new Error("review server returned invalid queue decisions");
+        localReviewableFrames = data.offered == null ? null : new Set(data.offered);
         annotations = new Map(data.choices.map(choice => [choice.decision_index,
                                                             choice.action_index]));
         localReviewMode = true; labelsExported = true; saveError = false;
@@ -1202,10 +1211,12 @@
     function setReplay(data, label, hash) {
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
       stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map(); labelsExported = false;
-      localReviewMode = false; saveError = false;
+      localReviewMode = false; localReviewableFrames = null; saveError = false;
       localReviewLoading = location.protocol === "http:" &&
         ["127.0.0.1", "localhost"].includes(location.hostname) && /^[a-f0-9]{64}$/.test(hash);
       byId("manual-review-export").hidden = false;
+      if (location.protocol === "file:")
+        byId("review-instructions").textContent = "This file was opened directly, so choices cannot save automatically. Open the queue through start_review_viewer.sh for automatic saving, or download labels manually before leaving.";
       notifyLabelState();
       reviewerData = embeddedReviewer?.source_trajectory_sha256 === hash ? embeddedReviewer : null;
       const seat = data.skill_metadata?.learner_seat ?? data.skill_metadata?.demonstrator_seat;

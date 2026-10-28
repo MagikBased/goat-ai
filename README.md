@@ -146,7 +146,14 @@ start the [local review server](docs/replay_audit.md) from the repository root:
 This opens the newest local review queue or recheck queue in your browser. To open a specific
 queue, pass its `queue.json` path as an argument. The launcher reuses a running
 server for that queue and writes startup logs to
-`.cache/goat-ai/review_server.log`. On Cinnamon/Linux Mint, run
+`.cache/goat-ai/review_server.log`.
+
+Open the printed `http://127.0.0.1` address to save choices automatically.
+Opening `queue.html` as a `file://` page only offers a manual download;
+its choices are lost if you leave without exporting them. The save-enabled
+server accepts labels only for decisions listed in the opened queue.
+
+On Cinnamon/Linux Mint, run
 `.venv/bin/python scripts/install_review_shortcut.py` once to add **GOAT AI
 Review Viewer** to the app menu and pinned taskbar apps. If Cinnamon is already
 running, its taskbar may show the new pin after the next session reload.

@@ -70,7 +70,7 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
     base = f"http://127.0.0.1:{server.server_port}"
     try:
         assert _request(f"{base}/api/review/state?source={digest}")[1] == {
-            "choices": [], "saved": True}
+            "choices": [], "offered": [0], "saved": True}
         assert _request(f"{base}/api/review/progress")[1] == {
             "choices": [], "total": 1}
         mark = {"source": digest, "decision_index": 0, "bookmarked": True}
@@ -96,6 +96,7 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
         assert records[0].selected_action == trajectory.decisions[0].legal_actions[1]
         assert _request(f"{base}/api/review/state?source={digest}")[1]["choices"] == [
             {"decision_index": 0, "action_index": 1}]
+        assert _request(f"{base}/api/review/state?source={digest}")[1]["offered"] == [0]
         assert _request(f"{base}/api/review/progress")[1] == {
             "choices": [{"source": digest, "decision_index": 0, "action_index": 1}],
             "total": 1}

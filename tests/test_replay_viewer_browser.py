@@ -64,6 +64,40 @@ def test_inspecting_ai_played_row_does_not_create_review_label(tmp_path):
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_local_review_only_enables_decisions_offered_by_queue(tmp_path):
+    played = {"id": "played", "kind": "battle_phase", "actor": 0, "parameters": {}}
+    other = {"id": "other", "kind": "end_phase", "actor": 0, "parameters": {}}
+    decision = {"observation": _observation(), "selected_action": played,
+                "legal_actions": [played, other]}
+    replay = {"seed": 1, "source": "test", "winner": 0,
+              "decisions": [decision, decision]}
+    html = _embed_viewer(replay, "0" * 64, {}, {}, {})
+    probe = """<script>
+      localReviewMode = true;
+      localReviewableFrames = new Set([0]);
+      labelsExported = true;
+      index = 0; render();
+      const offered = !byId('choose-alternative').hidden &&
+        !document.querySelector('#legal button:not(.recorded)').disabled;
+      index = 1; render();
+      const blocked = byId('choose-alternative').hidden &&
+        document.querySelector('#legal button:not(.recorded)').disabled &&
+        byId('annotation-status').textContent.includes('Outside this review queue');
+      document.body.dataset.offeredProbe = [offered, blocked].join('|');
+    </script></body>"""
+    path = tmp_path / "offered_frames.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=300", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-offered-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_search_selects_alternative_beyond_first_100_actions(tmp_path):
     played = {"id": "played", "kind": "pass", "actor": 0, "parameters": {}}
     alternatives = [

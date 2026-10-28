@@ -382,6 +382,11 @@ PYTHONPATH=src:. .venv/bin/python scripts/serve_review_queue.py \
 ```
 
 The server prints the localhost URL and the ignored folder receiving choices.
+Use that URL for automatic saving. Opening the HTML directly as a `file://`
+page cannot write labels; keep that tab open until you have exported any
+unsaved choice or re-entered it through the server. Only decisions listed in
+the active queue can be saved through its server, even though the full duel
+remains navigable in the viewer.
 The queue now shows **N of M review items labeled** above the cards. A saved
 choice hides that item from the queue grid by default; **Show labeled items**
 reveals it again with a **✓ Labeled** marker so you can revisit or change it.

@@ -114,14 +114,15 @@ class ReviewStore:
         with self.lock:
             trajectory, offered = self._trajectory(digest)
             if not path.is_file():
-                return {"choices": [], "saved": True}
+                return {"choices": [], "offered": sorted(offered), "saved": True}
             labels, _ = read_decision_annotations(path, digest, trajectory)
             if labels.reviewer != self.reviewer_alias:
                 raise ValueError("saved labels belong to another reviewer alias")
             if any(index not in offered for index, _ in labels.choices):
                 raise ValueError("saved label is outside this queue")
             return {"choices": [{"decision_index": index, "action_index": action}
-                                for index, action in labels.choices], "saved": True}
+                                for index, action in labels.choices],
+                    "offered": sorted(offered), "saved": True}
 
     def progress(self) -> dict:
         """Report saved choices for this queue without exposing replay hidden state."""
