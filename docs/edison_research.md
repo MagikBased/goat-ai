@@ -231,7 +231,7 @@ ID (Genesis Dragon), and one pending community-only promotion. Its
 this reconciliation establishes every eligible North American card. The
 ignored local output is
 `.cache/goat-ai/edison_partial_adjudication_20261027.json` (SHA-256
-`477e064cd256e91b8e68549609cd39fe5e234d6409ee36485673ecea08d1ebb6`).
+`e2d1681179348b18a323da64df9a8a438a9936a7f154440e8b779a9206758d17`).
 
 ```sh
 PYTHONPATH=src:. .venv/bin/python scripts/adjudicate_edison_pool_disagreements.py \
@@ -260,7 +260,10 @@ the event rather than inferring a precise distribution date. Exodius
 remains pending. The retrieved Konami article is in ignored local cache at
 `.cache/goat-ai/edison_genesis_dragon_sjc_2010_01_10.html` (SHA-256
 `ae1ac4205061fb2f7d23cffd213c2532a7f49a0c6e0cdaa5b952c7478bd7706b`);
-the article HTML is not redistributed.
+the article HTML is not redistributed. The adjudicator requires an ISO event
+date on or before the cutoff and the `north_america` region for any
+sanctioned-play inclusion. These checks guard the structured evidence fields;
+they do not independently authenticate the linked event report.
 
 The [archived official legality page from November 2010](https://web.archive.org/web/20101106023610id_/http://www.yugioh-card.com/en/gameplay/cardlegality.html)
 lists SHONEN JUMP promos through `JUMP-EN044` as North American legal then,

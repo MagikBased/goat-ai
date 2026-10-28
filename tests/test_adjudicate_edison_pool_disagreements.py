@@ -74,11 +74,28 @@ def test_adjudication_requires_community_evidence(tmp_path):
 
 def test_adjudication_accepts_period_sanctioned_community_card(tmp_path):
     report, dt01, other, community = _inputs(tmp_path)
-    community.write_text("card_id\tassessment\n4\tinclude_pre_cutoff_sanctioned_play\n")
+    community.write_text(
+        "card_id\tassessment\tevent_date\tevent_region\n"
+        "4\tinclude_pre_cutoff_sanctioned_play\t2010-01-10\tnorth_america\n")
     result = adjudicate(report, dt01, other, community)
     assert result["community_only_included_ids"] == [4]
     assert result["community_only_pending_ids"] == []
     assert result["complete_release_pool"] is False
+
+
+@pytest.mark.parametrize("event_date,region", [
+    ("2010-04-21", "north_america"),
+    ("2010-01-10", "europe"),
+    ("unknown", "north_america"),
+])
+def test_adjudication_rejects_unverified_sanctioned_play_date_or_region(
+        tmp_path, event_date, region):
+    report, dt01, other, community = _inputs(tmp_path)
+    community.write_text(
+        "card_id\tassessment\tevent_date\tevent_region\n"
+        f"4\tinclude_pre_cutoff_sanctioned_play\t{event_date}\t{region}\n")
+    with pytest.raises(ValueError, match="sanctioned-play inclusion"):
+        adjudicate(report, dt01, other, community)
 
 
 def test_community_only_ledger_preserves_promotional_provenance():
@@ -91,6 +108,7 @@ def test_community_only_ledger_preserves_promotional_provenance():
     assert rows[31038159]["pre_cutoff_record"].startswith("JUMP-EN034 (March 2010")
     assert rows[13893596]["assessment"] == "pending_north_america_subscription_promo"
     assert rows[31038159]["assessment"] == "include_pre_cutoff_sanctioned_play"
-    assert "2010-01-10" in rows[31038159]["pre_cutoff_record"]
+    assert rows[31038159]["event_date"] == "2010-01-10"
+    assert rows[31038159]["event_region"] == "north_america"
     assert rows[31038159]["primary_evidence"].startswith(
         "https://yugiohblog.konami.com/2010/sjc/")

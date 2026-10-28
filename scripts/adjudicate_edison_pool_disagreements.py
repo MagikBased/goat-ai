@@ -84,6 +84,13 @@ def adjudicate(report_path: Path, dt01_path: Path,
             "include_pre_cutoff_sanctioned_play",
         }:
             raise ValueError(f"unknown community assessment: {row['assessment']}")
+        if row["assessment"] == "include_pre_cutoff_sanctioned_play":
+            try:
+                event_date = date.fromisoformat(row["event_date"])
+            except (KeyError, TypeError, ValueError) as error:
+                raise ValueError("sanctioned-play inclusion requires an event date") from error
+            if event_date > CUTOFF or row.get("event_region") != "north_america":
+                raise ValueError("sanctioned-play inclusion must predate the North American cutoff")
         community_decisions[row["assessment"].split("_", 1)[0]].add(int(row["card_id"]))
     return {
         "purpose": "partial_edison_candidate_disagreement_adjudication_not_whitelist",
