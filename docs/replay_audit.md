@@ -479,8 +479,9 @@ eight source replays and 14 saved choices, three warm requests to the older
 running server took 3.669, 3.615, and 3.613 seconds; three requests to a
 new server running the revised code took 1.931, 1.949, and 1.957 seconds.
 These are local wall-clock
-measurements, not a general throughput claim. The already running server
-process must be restarted to use the revised endpoint.
+measurements, not a general throughput claim. The launcher checks the server
+API version and starts a current process when an older one is still running;
+save any choice in an older tab before switching to the new URL.
 Bookmarks remain separate reminders and do not count as labels. Progress is
 specific to the queue's source replays and saved labels; a newly generated
 queue starts with its own count. If an older server is still running, launch
