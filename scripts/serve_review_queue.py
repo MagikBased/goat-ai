@@ -123,6 +123,15 @@ class ReviewStore:
             return {"choices": [{"decision_index": index, "action_index": action}
                                 for index, action in labels.choices], "saved": True}
 
+    def progress(self) -> dict:
+        """Report saved choices for this queue without exposing replay hidden state."""
+        choices = []
+        for digest in sorted(self.sources):
+            for choice in self.state(digest)["choices"]:
+                choices.append({"source": digest, **choice})
+        return {"choices": choices,
+                "total": sum(len(offered) for _, offered in self.sources.values())}
+
     def choose(self, digest: str, decision_index: int, action_index: int | None) -> dict:
         path = self.label_path(digest)
         with self.lock:
@@ -209,6 +218,12 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
             if parsed.path == "/api/review/bookmarks":
                 try:
                     self._json(200, store.bookmark_state())
+                except (ValueError, KeyError, TypeError, OSError) as error:
+                    self._json(400, {"error": str(error)})
+                return
+            if parsed.path == "/api/review/progress":
+                try:
+                    self._json(200, store.progress())
                 except (ValueError, KeyError, TypeError, OSError) as error:
                     self._json(400, {"error": str(error)})
                 return

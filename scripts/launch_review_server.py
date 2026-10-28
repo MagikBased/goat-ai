@@ -47,7 +47,9 @@ def port_in_use(port: int) -> bool:
 
 def server_healthy(port: int) -> bool:
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/review/bookmarks",
+        # A server from an earlier launch may still serve the same queue but
+        # lack the progress endpoint needed by the current queue page.
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/review/progress",
                                     timeout=0.4) as response:
             return response.status == 200
     except (urllib.error.URLError, ValueError, OSError):

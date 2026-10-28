@@ -71,6 +71,8 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
     try:
         assert _request(f"{base}/api/review/state?source={digest}")[1] == {
             "choices": [], "saved": True}
+        assert _request(f"{base}/api/review/progress")[1] == {
+            "choices": [], "total": 1}
         mark = {"source": digest, "decision_index": 0, "bookmarked": True}
         assert _request(f"{base}/api/review/bookmarks")[1] == {"bookmarks": []}
         assert _request(f"{base}/api/review/bookmark", mark)[1] == {
@@ -94,6 +96,9 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
         assert records[0].selected_action == trajectory.decisions[0].legal_actions[1]
         assert _request(f"{base}/api/review/state?source={digest}")[1]["choices"] == [
             {"decision_index": 0, "action_index": 1}]
+        assert _request(f"{base}/api/review/progress")[1] == {
+            "choices": [{"source": digest, "decision_index": 0, "action_index": 1}],
+            "total": 1}
         for invalid in ({**payload, "action_index": 2},
                         {**payload, "decision_index": 1},
                         {**payload, "source": "a" * 64}):
@@ -104,6 +109,8 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
         assert _request(f"{base}/api/review/choice",
                         {**payload, "action_index": None})[1]["choices"] == []
         assert not saved.exists()
+        assert _request(f"{base}/api/review/progress")[1] == {
+            "choices": [], "total": 1}
         assert _request(f"{base}/api/review/bookmark",
                         {**mark, "bookmarked": False})[1] == {"bookmarks": []}
         replay.write_text(replay.read_text() + " ")
@@ -221,6 +228,62 @@ def test_queue_bookmark_button_saves_without_creating_training_label(tmp_path, m
         assert not list(output.glob("*.json"))
         assert json.loads((output / "_review_state/bookmarks.json").read_text())[
             "bookmarks"] == [{"source": digest, "decision_index": 0}]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_queue_hides_saved_labels_and_can_show_them_again(tmp_path, monkeypatch):
+    queue, replay, digest, _ = _queue(tmp_path)
+    viewer = tmp_path / "game.html"
+    render_replay(replay, viewer, tmp_path / "native")
+    selected = json.loads(queue.read_text())["selected"]
+    selected[0]["viewer"] = str(viewer) + "#decision=1"
+    selected[0]["audit_flags"] = []
+    write_review_index(selected, queue, tmp_path / "native")
+    probe = """<script>
+      setTimeout(() => {
+        const card = document.querySelector('.review-card');
+        const before = document.getElementById('review-progress').textContent;
+        card.querySelector('.primary').click();
+        setTimeout(() => {
+          document.getElementById('stage-frame').contentDocument
+            .getElementById('label-recorded').click();
+          setTimeout(() => {
+            document.getElementById('back-to-queue').click();
+            setTimeout(() => {
+              const hidden = card.hidden;
+              const progress = document.getElementById('review-progress').textContent;
+              document.getElementById('show-labeled').click();
+              document.body.dataset.progressProbe = [
+                before.includes('0 of 1 review items labeled'), hidden,
+                progress.includes('1 of 1 review items labeled'), !card.hidden,
+                !card.querySelector('.label-status').hidden].join('|');
+            }, 200);
+          }, 300);
+        }, 200);
+      }, 200);
+    </script></html>"""
+    page = queue.with_suffix(".html")
+    page.write_text(page.read_text().replace("</html>", probe))
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    output = tmp_path / "saved"
+    server = serve_review_queue.make_server(queue, output, port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = subprocess.run([
+            shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+            "--disable-dev-shm-usage", "--virtual-time-budget=1800", "--dump-dom",
+            f"http://127.0.0.1:{server.server_port}/queue.html",
+        ], capture_output=True, text=True, timeout=20, check=True)
+        match = re.search(r'data-progress-probe="([^"]+)"', result.stdout)
+        assert match, result.stderr[-1000:]
+        assert match.group(1) == "true|true|true|true|true"
+        assert json.loads((output / f"{digest}.json").read_text())["choices"] == [
+            {"decision_index": 0, "action_index": 0}]
     finally:
         server.shutdown()
         server.server_close()

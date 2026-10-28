@@ -137,6 +137,8 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
         viewer.write_text(f"<html><body>Game {number}</body></html>")
         viewer.with_suffix(".review.html").write_text("<html><body>Reveal</body></html>")
         selected.append({"viewer": f"{viewer}#decision={number}",
+                         "trajectory_sha256": str(number) * 64,
+                         "decision_index": number,
                          "turn": number, "phase": "main1", "viewer_frame": number,
                          "policy_action": {"kind": "pass", "parameters": {}},
                          "teacher_action": {"kind": "end_phase", "parameters": {}},
@@ -157,8 +159,13 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
       document.getElementById('toggle-reveal').click();
       const reveal = document.getElementById('stage-frame').src.includes('.review.html');
       document.getElementById('back-to-queue').click();
+      labels.set(bookmarkKey(items[1]), 0); progressMode = true; updateProgress();
+      openItem(0);
+      const skipped = document.getElementById('next-item').disabled;
+      document.getElementById('show-labeled').click();
+      const restored = !document.getElementById('next-item').disabled;
       document.body.dataset.queueProbe = [first, protectedItem, second, reveal,
-        document.getElementById('stage').hidden].join('|');
+        skipped, restored].join('|');
     </script>"""
     index.write_text(index.read_text().replace("</html>", probe + "</html>"))
     result = subprocess.run([
@@ -168,4 +175,4 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-queue-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "1 / 2|1 / 2|2 / 2|true|true"
+    assert match.group(1) == "1 / 2|1 / 2|2 / 2|true|true|true"

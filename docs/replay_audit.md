@@ -288,6 +288,17 @@ PYTHONPATH=src:. .venv/bin/python scripts/serve_review_queue.py \
 ```
 
 The server prints the localhost URL and the ignored folder receiving choices.
+The queue now shows **N of M review items labeled** above the cards. A saved
+choice hides that item from the queue grid by default; **Show labeled items**
+reveals it again with a **✓ Labeled** marker so you can revisit or change it.
+Items are never deleted, and the replay stays open after you label it. The
+queue updates after the local save completes and when you return to the queue.
+The queue's Previous/Next buttons skip already labeled items while the
+unlabeled filter is active.
+Bookmarks remain separate reminders and do not count as labels. Progress is
+specific to the queue's source replays and saved labels; a newly generated
+queue starts with its own count. If an older server is still running, launch
+`./start_review_viewer.sh` again to open the updated server and queue page.
 Use **☆ Bookmark** in the queue or replay bar to mark an item for follow-up;
 it saves locally in `_review_state/bookmarks.json` and never becomes a
 training label. Open **Open label view** and choose a legal action in the
