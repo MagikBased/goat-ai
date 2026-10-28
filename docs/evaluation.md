@@ -1,5 +1,95 @@
 # Baseline evaluation log
 
+## Stronger local-review preference fit on a new Beastdown holdout (28 October 2026)
+
+The [archived 2005 New Jersey Ramon Ciriano deck profile](https://www.goatformat.com/home/deck-profile-ramon-ciriano)
+lists a 40-card Beastdown Main Deck. The new
+[`beastdown_ramon_ciriano_new_jersey_2005.ydk`](../examples/decks/beastdown_ramon_ciriano_new_jersey_2005.ydk)
+matches all 40 published Main card names and quantities against the pinned
+GOAT database and whitelist. The profile gives a Side Deck, omitted here for
+single duels, and no Fusion Deck list, so the Extra Deck is empty. Two seeded,
+seat-swapped RandomAgent duels against the sourced Phoenix Control list reached
+terminal below 3,000 decisions, replay-verified, and passed the visibility
+audit. This adds a genuinely different 2005 aggressive deck family to the
+protocol and evaluation corpus; it does not certify every Beastdown ruling.
+
+A stronger exploratory feature-v23 child used the **same 11 changed human
+review choices** as the earlier preference check. The six validated replay /
+preference pairs are enumerated with their hashes in
+`.cache/goat-ai/current_2005_development_review_49600_49601/changed_preferences/manifest.json`.
+Training used the reproduced first-patch native binary, four exact parent
+provenance replays (`seed_33016` and `seed_33030`, both seats), 64 sampled
+preservation states, 200 updates, parent KL weight 0.5, learning rate 0.0001,
+and seed 174. The first and final preference losses were 2.8683 and 0.2970;
+final preservation KL was 0.1680. On the 11 **training** choices, the child
+ranked the reviewed alternative first in 11/11, up from the parent's 0/11;
+mean preferred-minus-recorded logit margin rose from −2.736 to +1.327.
+These are fit diagnostics, not a playing-strength result.
+
+On the current pinned native core, the child played its unchanged parent on
+Beastdown versus the independent WikiFormat Dimension Fusion Main Deck. Neither
+Main Deck composition nor seeds 94000–94015 appears in the child checkpoint's
+training provenance. Both deck assignments and both seats yielded **64 terminal
+duels: 27 child wins and 37 losses**, or 42.2% of points (paired-seed bootstrap
+95% interval 32.8%–50.0%). By assigned deck, it scored 25–7 on Beastdown but
+only 2–30 on Dimension Fusion. The direct tournament took 10.11 seconds for
+27,076 decisions with four workers on this machine. The strong training fit
+did **not** transfer across these decks; this checkpoint is not promoted, and
+M4's held-out competitive-strength gate remains open. This is one experimental
+schedule, not a claim about all matchups.
+
+The ignored child checkpoint SHA-256 is
+`75a05dc7ad939ae2524cd3aa546abd40be38e3a57bad657ee6ede1a41b0057c9`;
+the ignored tournament report SHA-256 is
+`51e01a0e4012d6ee2365a1d1eadb3482d0ec21cbd97c7a90c80ddbc6ef3526c9`.
+The source YDK SHA-256 is
+`5395bfb43b3f07cdad26d6f05b331a66ab5705cda2cd901c4b887db7afebb8e2`.
+Reproduce the fit after [rebuilding the first-patch native root](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python - <<'PY'
+import json
+import subprocess
+from pathlib import Path
+
+manifest = json.loads(Path(
+    '.cache/goat-ai/current_2005_development_review_49600_49601/'
+    'changed_preferences/manifest.json').read_text())
+command = [
+    '.venv/bin/python', 'scripts/train_review_preferences.py',
+    '.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt',
+    '--native-root', '.cache/goat-ai/reproduced_first_patch_native',
+    '--steps', '200', '--parent-kl-weight', '0.5',
+    '--learning-rate', '0.0001', '--seed', '174',
+    '--output', '.cache/goat-ai/human11_pref_200step_kl05_seed174.pt',
+]
+for case in manifest['cases']:
+    if case['preferences']:
+        command += ['--case', case['trajectory'], case['preferences']]
+for seed in (33016, 33030):
+    for seat in (0, 1):
+        command += ['--preserve-trajectory',
+                    f'.cache/goat-ai/current_tactical_goat_mirror_33016_33031/'
+                    f'seed_{seed}_seat_{seat}.json']
+subprocess.run(command, check=True)
+PY
+```
+
+Reproduce the direct tournament with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/human11_pref_200step_kl05_seed174.pt \
+  --native-root .cache/goat-ai --engine experimental \
+  --matchup examples/decks/beastdown_ramon_ciriano_new_jersey_2005.ydk \
+            examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk \
+  --both-deck-assignments \
+  --opponent-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --require-unseen-main-decks --seed 94000 --seeds 16 --workers 4 \
+  --max-decisions 3000 \
+  --output .cache/goat-ai/human11_pref200_vs_parent_beast_df_94000_94015.json
+```
+
 ## Local human-review label update (28 October 2026)
 
 The [current 2005-deck review queue](replay_audit.md#current-2005-deck-development-queue-27-october-2026)

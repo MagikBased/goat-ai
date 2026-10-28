@@ -712,6 +712,18 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A new [source-backed 2005 New Jersey Beastdown Main Deck](../examples/decks/beastdown_ramon_ciriano_new_jersey_2005.ydk)
+is distinct from the selected policy's training compositions and gives M4
+another aggressive evaluation family. Two seat-swapped native random duels
+reach terminal, replay-verify, and pass visibility checks. A stronger
+200-step parent-KL fit learned all 11 changed local human-review preferences
+on their training states but scored 27–37 directly against its unchanged
+parent on 64 held-out Beastdown/Dimension Fusion duels, with only 2–30 when
+assigned Dimension Fusion. Keep that child experimental and the selected
+parent unchanged. The [measured result](evaluation.md#stronger-local-review-preference-fit-on-a-new-beastdown-holdout-28-october-2026)
+shows that fitting a small preference set more strongly did not solve
+cross-deck transfer; M4's competitive-strength gate remains open.
+
 A [winner-only self-play imitation fit-length check](evaluation.md#three-epoch-winner-only-imitation-check-28-october-2026)
 lowered label loss over three epochs, but split 32–32 directly with its
 one-epoch child on unseen Main Decks and showed no clear Tactical-v14 score
