@@ -2356,8 +2356,10 @@ the queue starts unlabeled and establishes no policy-strength gain.
 An [action-encoding audit](evaluation.md#legal-action-representation-collision-audit-28-october-2026)
 found no collision in the current 22 shortlisted review comparisons, but did
 find that v23 cannot distinguish two card-announcement prompts in the source
-duels. Experimental v30 resolves the observed option-choice collisions while
-the announcement collisions remain. Before using reviewer labels on those
-prompts, represent announced card identity without exposing hidden state and
-verify that distinct names produce distinct action features. This is an M4
-representation gap, not evidence of improved playing strength.
+duels. Experimental v30 resolves the observed option-choice collisions. An
+opt-in v31 now represents announced card IDs exactly and uses only public
+known-hand information; the same eight-duel audit found no distinct-choice
+collisions. Its warm start preserves v23 logits, but it has not been trained
+or competitively evaluated. Obtain independent reviewed announcement labels
+and run held-out strength checks before considering promotion. M4's policy
+strength gate remains open.

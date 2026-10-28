@@ -11815,9 +11815,7 @@ prompts. In both card-announcement prompts, different card codes fall outside
 the checkpoint vocabulary and map to the shared unknown-card index; the
 other v23/v30 action features do not encode their identity. Preference labels
 that distinguish those card names therefore cannot be fitted by either
-version. Add a collision-free representation for announced card identity,
-using visible information only, before training on such labels. This audit
-does not justify promoting v30 or claim a competitive gain.
+version. This audit does not justify promoting v30 or claim a competitive gain.
 
 Reproduce from the pinned environment:
 
@@ -11831,3 +11829,22 @@ Pass `--feature-version 30` to audit that alternative with the same
 vocabulary. The ignored v23 and v30 report hashes are respectively
 `4ca0b6eed16e7c6fb1c038f10742c8adfaa1c55305fd7908f11838aac150eb8c`
 and `f0a628b1af6a3802344c8df522bf78ff8a2a69ecc74b80f30f64f360e356f026`.
+
+An opt-in **feature v31** now appends 32 exact binary card-code inputs for
+`announce_card`, plus a bit indicating that the announced name is in the
+player-visible tracked opponent hand. The code must be a positive 32-bit
+native card ID; other action kinds receive zeros. The v23-to-v31 loader
+zero-extends the new action, counter, option, and public-card-age inputs, so
+the selected parent remains unchanged at initialization. On all 22 current
+review prompts, the warmed-up v31 model's maximum absolute logit difference
+from v23 was **2.38×10⁻⁷**. The v31 encoding audit of the same eight
+trajectories found **zero distinct-choice collision groups**; the remaining
+three groups (eight actions) are structurally identical duplicate choices.
+The ignored v31 audit report has SHA-256
+`8fa5aa905a3aaa304ef563e5949c066347a366cb59ecbf62e947575a9a96c2e4`.
+To reproduce, use the command above with `--feature-version 31`.
+
+This establishes a learnable representation for card-announcement labels,
+not that such labels exist or that v31 plays better. Feature v23 remains the
+selected competitive checkpoint. V31 needs independent reviewed decisions,
+training, and held-out competitive evaluation before promotion.

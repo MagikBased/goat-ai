@@ -1784,6 +1784,51 @@ def test_v30_distinguishes_adjacent_native_option_ids_and_warm_starts(tmp_path):
     assert child(new)[1] > child(new)[0] + 0.1
 
 
+def test_v31_distinguishes_unknown_announced_cards_and_warm_starts(tmp_path):
+    from scripts.audit_policy_action_aliases import feature_aliases
+
+    vocabulary = CardVocabulary((10, 20), ((10, 0, 1000), (20, 0, 2000)))
+    choices = (Action("0", "announce_card", 0, {"code": 218704}),
+               Action("1", "announce_card", 0, {"code": 423705}))
+    visible = replace(view(), known_opponent_hand_cards=(423705,))
+    old = encode_decision(visible, choices, vocabulary, 23)
+    new = encode_decision(visible, choices, vocabulary, 31)
+    assert feature_aliases(old, choices) == [(0, 1)]
+    assert feature_aliases(new, choices) == []
+    assert new.action_numbers[:, -1].tolist() == [0.0, 1.0]
+    assert new.action_numbers.shape[1] == 137
+    with pytest.raises(ValueError, match="positive 32-bit"):
+        encode_decision(visible, (Action("bad", "announce_card", 0,
+                                         {"code": 1 << 32}),), vocabulary, 31)
+
+    torch.manual_seed(31)
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    path = tmp_path / "parent.pt"
+    torch.save({"schema_version": 1, "model_state": parent.state_dict(),
+                "vocabulary_codes": vocabulary.codes,
+                "vocabulary_card_properties": vocabulary.card_properties,
+                "width": 8, "feature_version": 23,
+                "trajectory_sha256": {"training.json": "a" * 64},
+                "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                                    "main_deck_composition_sha256": ("c", "d")}]}, path)
+    child = LegalActionPolicy(vocabulary.size, width=8, feature_version=31)
+    with pytest.raises(ValueError, match="architecture or vocabulary"):
+        load_parent_checkpoint(path, child, vocabulary)
+    load_parent_checkpoint(path, child, vocabulary, allow_v23_to_v31=True)
+    assert torch.count_nonzero(child.action_numbers[0].weight[:, -36:]) == 0
+    assert torch.count_nonzero(child.card_numbers[0].weight[:, -1]) == 0
+    with torch.no_grad():
+        assert torch.allclose(child(new), parent(old), atol=1e-6)
+    optimizer = torch.optim.Adam(child.parameters(), lr=0.01)
+    for _ in range(40):
+        optimizer.zero_grad()
+        loss = torch.nn.functional.cross_entropy(child(new).unsqueeze(0),
+                                                 torch.tensor([1]))
+        loss.backward()
+        optimizer.step()
+    assert child(new)[1] > child(new)[0] + 0.1
+
+
 def test_legacy_policy_checkpoint_loads_with_original_feature_encoder(tmp_path):
     vocabulary = CardVocabulary((10, 20))
     legacy = LegalActionPolicy(vocabulary.size, width=16, feature_version=1)
