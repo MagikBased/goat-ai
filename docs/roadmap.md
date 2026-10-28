@@ -655,6 +655,12 @@ Fusion pairing. The paired interval includes 50%, and its matched Tactical
 score improved by only 0.8 points with an interval including no gain. Keep the
 parent selected; see the [transfer check](evaluation.md#four-duel-2005-behavioral-cloning-transfer-check-28-october-2026).
 
+On ten additional, training-unseen tournament-card mixes, the selected parent
+scored 24–55–1 against Tactical-v14 and that child scored 23–57 on the same
+80-game schedule. The paired child-minus-parent interval includes no gain;
+more small off-policy Tactical imitation is not yet a demonstrated path to
+M4's strength gate. See the [broader holdout](evaluation.md#neural-policy-on-unseen-tournament-card-mixes-28-october-2026).
+
 The current-core feature-v23 reference scored 25–39 versus Tactical-v14 on
 two independent 2005 deck pairings. A matched Tactical mirror showed a
 10.9-point policy score deficit with a paired 95% interval from −20.3 to

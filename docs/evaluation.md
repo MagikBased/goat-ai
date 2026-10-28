@@ -9965,3 +9965,37 @@ Reproduce either run with `scripts/probe_random_decks.py --native-root
 --max-decisions 3000 --distinct-opponents --verify-replays
 --count-card-actions --isolate-games --agent AGENT --output OUTPUT`, setting
 `AGENT` to `tactical` or `random` and using a fresh output directory.
+
+## Neural policy on unseen tournament-card mixes (28 October 2026)
+
+Ten legal, independently generated deck pairs from the Tactical probe above
+(seeds 10990–10999) formed a broader held-out policy test. Both the selected
+feature-v23 parent and the four-duel Rhymus/Zombie imitation child had **zero
+Main Deck composition overlap** with these 20 generated decks. Each policy
+faced Tactical-v14 on both deck assignments, both seats, and two fresh duel
+seeds (60000–60001): 80 games per policy. The evaluator's strict unseen-Main-
+Deck gate passed for both checkpoint reports.
+
+The selected parent scored **24–55–1**, or **30.6%** score (paired 95% interval
+**21.3–40.6%**). The imitation child scored **23–57**, or **28.8%** (interval
+**21.3–37.5%**). The validated paired child-minus-parent score difference was
+**−1.9 percentage points**, 95% interval **−10.6 to +6.3 points**. The child
+therefore remains experimental; this additional deck-diversity check gives no
+reason to promote it. Both policies remain well behind this synthetic Tactical
+baseline on the measured schedule. These decks combine cards from sourced
+tournament lists but are not published historical decklists, and this
+tournament did not independently replay-verify its neural games or audit every
+card-specific ruling. It measures current native-game outcomes, not human-level
+competitive strength.
+
+The ignored parent and child reports are respectively
+`.cache/goat-ai/fv23_parent_vs_tactical_mix_60000_60001.json` (SHA-256
+`ebd85ebae716fe4374820b3450262e498d45cf37d11ba234657942525c70881c`)
+and `.cache/goat-ai/fv23_child_vs_tactical_mix_60000_60001.json` (SHA-256
+`65530ab904f6eecf1807baf6a2495d8e8c9faedb8e91a07faf5c927bbb3d1cda`).
+Reproduce with `scripts/evaluate_policy.py --engine experimental --opponent
+tactical --both-deck-assignments --require-unseen-main-decks --seed 60000
+--seeds 2 --workers 4 --max-decisions 3000`, adding ten `--matchup` pairs
+from the isolated probe's `seed_10990` through `seed_10999` deck files and
+using the named checkpoint for each run. Validate the matched reports with
+`scripts/compare_tournament_reports.py --require-unseen-main-decks`.
