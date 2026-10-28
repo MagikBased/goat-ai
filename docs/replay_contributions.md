@@ -1,5 +1,18 @@
 # Contributing GOAT replay data
 
+## Record your own local GOAT duel
+
+`examples/play_goat.py` accepts two GOAT YDK Decks and records one CLI human
+seat against a RandomAgent, TacticalHeuristicAgent, or saved policy. It shows
+only the acting player's observation and numbered legal actions. A completed
+duel is written to an ignored local trajectory only after exact native replay
+verification and the player-visibility audit; a failed check removes the
+temporary file. The trajectory records `source=human_cli`,
+`authorization=self_recorded`, the human seat, and opponent provenance. This
+is an authorized self-recording path, separate from imported EDOPro or
+DuelingBook material. See [README](../README.md#play-and-record-a-goat-duel)
+for the command.
+
 A real, authorized GOAT EDOPro replay is the next data-pipeline fixture. The
 project currently parses `.yrp` and `.yrpX` containers and reconstructs
 synthetic GOAT response traces against pinned native assets. It has **not**

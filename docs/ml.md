@@ -123,7 +123,11 @@ A full-duel trajectory can name `skill_metadata.demonstrator_seat` as 0 or 1. Be
 
 Raw behavioral-clone labels are admitted only from known local sources:
 `self_play`, `self_play_rl`, `heuristic`, `combat_heuristic`, `combat_flip`,
-`tactical`, and `human_cli`. Teacher and CLI recordings require a valid
+`tactical`, and `human_cli`. The generic
+[`examples/play_goat.py`](../examples/play_goat.py) records a CLI human seat
+against a baseline or policy on user-selected GOAT Decks and checks the saved
+duel against the native engine and player-visible audit before publication to
+the local trajectory path. Teacher and CLI recordings require a valid
 demonstrator seat; CLI recordings also require the `self_recorded` authorization
 declaration. Checkpoint policy replays need explicit review labels or an
 automated teacher. Scripted scenarios need matching scripted annotations.

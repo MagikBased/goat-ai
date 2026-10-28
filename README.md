@@ -82,6 +82,27 @@ recordings also check rules-profile, deck-file, and loaded native-asset hashes. 
 prove that a card interaction is historically correct; it detects divergence
 from the engine and assets used for the replay.
 
+## Play and record a GOAT duel
+
+To play a GOAT Deck yourself in the terminal and save a local demonstration:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python examples/play_goat.py \
+  --deck1 examples/decks/goat_control_lolmarcus_2020.ydk \
+  --deck2 examples/decks/chaos_turbo_riclar_2020.ydk \
+  --human-seat 0 --opponent tactical --seed 42 \
+  --trajectory replays/my_goat_duel_42.json
+```
+
+The command shows card names and the player-visible field, takes a numbered
+legal action at each decision, and saves only after the complete duel passes
+native replay verification and the visibility audit. `--human-seat 1` plays
+the second Deck; `--opponent random` or `--opponent policy --checkpoint PATH`
+changes the opponent. The recording is marked `self_recorded` and stored in
+ignored `replays/`. A terminal may be cumbersome for large card-choice lists;
+the saved game can be opened in the replay viewer afterward. See
+[replay contribution rules](docs/replay_contributions.md) before sharing it.
+
 ## View a replay
 
 The offline [replay viewer](examples/replay_viewer.html) shows each recorded decision as a board snapshot from the acting player's visible view. Record and render a Scapegoat fixture duel:

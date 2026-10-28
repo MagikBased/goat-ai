@@ -569,6 +569,16 @@ audit; the [ruling log](goat_rules.md) records the sources and limits.
 
 ## M3 — Evaluation and data
 
+A new `examples/play_goat.py` path records a local human seat on arbitrary
+validated GOAT YDK Decks against a Random, Tactical, or saved policy opponent.
+It prints player-visible card names and field state, accepts only enumerated
+legal actions, and writes a `self_recorded` trajectory only after native replay
+verification and a visibility audit. A native test completes the recording
+path and checks that a failed verification leaves no accepted output; a
+separate display test checks hidden opponent names stay hidden. This supplies
+an authorized self-recording path, not imported expert replays or a strength
+claim.
+
 An eight-duel native pilot now reports per-process Linux peak RSS, reset
 overhead, and throughput at two, four, and eight spawned workers on sourced
 decks; see the [evaluation log](evaluation.md#native-worker-scaling-on-sourced-decks-27-october-2026).

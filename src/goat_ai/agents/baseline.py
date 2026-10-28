@@ -360,16 +360,36 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
 
 class HumanAgent:
     def __init__(self, input_fn: Callable[[str], str] = input,
-                 output_fn: Callable[[str], None] = print) -> None:
+                 output_fn: Callable[[str], None] = print,
+                 card_names: dict[int, str] | None = None) -> None:
         self.input_fn = input_fn
         self.output_fn = output_fn
+        self.card_names = card_names or {}
+
+    def _name(self, code: int | None) -> str:
+        return (self.card_names.get(code, f"Card #{code}")
+                if code is not None else "Hidden card")
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
             raise ValueError("no legal actions")
-        self.output_fn(f"Turn {observation.turn}, {observation.phase}, player {observation.acting_player}")
+        self.output_fn(f"Turn {observation.turn}, {observation.phase}, "
+                       f"player {observation.acting_player}; LP {observation.life_points}")
+        self.output_fn("Hand: " + (", ".join(self._name(card.code)
+                                              for card in observation.hand) or "empty"))
+        for seat in (observation.acting_player, 1 - observation.acting_player):
+            field = [card for card in observation.field if card.controller == seat]
+            self.output_fn(f"Player {seat} field: " + (
+                ", ".join(f"{card.zone} {card.sequence}: {self._name(card.code)} "
+                          f"({card.position}{', ' + card.orientation if card.orientation else ''})"
+                          for card in field) or "empty"))
+        self.output_fn(f"Opponent hand: {observation.opponent_hand_count}; "
+                       f"Decks: {observation.deck_counts}; "
+                       f"Graveyards: {tuple(map(len, observation.graveyards))}")
         for index, action in enumerate(legal_actions):
-            self.output_fn(f"{index}: {action.kind} {action.parameters}")
+            code = action.parameters.get("code")
+            label = f" {self._name(code)}" if isinstance(code, int) else ""
+            self.output_fn(f"{index}: {action.kind}{label} {action.parameters}")
         while True:
             answer = self.input_fn("Action number: ")
             try:

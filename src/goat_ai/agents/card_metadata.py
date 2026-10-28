@@ -7,6 +7,20 @@ FLIP_MONSTER_TYPE = 0x200000  # TYPE_FLIP in pinned ocgcore constant.lua
 CARD_DATABASES = ("cards.cdb", "goat-entries.cdb", "cards-unofficial.cdb")
 
 
+def load_card_names(native_root: str | Path) -> dict[int, str]:
+    """Read static printed names for a human interface, never duel state."""
+    root = Path(native_root)
+    names: dict[int, str] = {}
+    for name in CARD_DATABASES:
+        path = root / "database" / name
+        if not path.is_file():
+            raise FileNotFoundError(f"card database missing: {path}")
+        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as database:
+            names.update((code, title) for code, title in database.execute(
+                "SELECT id, name FROM texts"))
+    return names
+
+
 def load_card_properties(native_root: str | Path,
                          codes: set[int]) -> dict[int, tuple[int, int]]:
     """Read printed Type and ATK for allowed cards from pinned databases.

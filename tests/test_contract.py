@@ -120,6 +120,18 @@ def test_visible_schema_excludes_hidden_opponent_cards():
         replace(view(), field=(replace(view().field[0], faceup_turns=1),))
 
 
+def test_human_display_uses_visible_card_names_only():
+    output = []
+    agent = HumanAgent(input_fn=lambda _: "0", output_fn=output.append,
+                       card_names={123: "My card", 999: "Secret opponent card"})
+    action = Action("0", "pass", 0)
+    assert agent.select_action(view(999), (action,)) == action
+    display = "\n".join(output)
+    assert "My card" in display
+    assert "Hidden card" in display
+    assert "Secret opponent card" not in display
+
+
 def test_schema_twelve_round_trips_visible_stats_and_legacy_reader_strips_them(tmp_path):
     observation = replace(view(), field=(CardView(
         0, "monster", "faceup", 71413901, 0, "attack", 1900, 1000, ((1, 1),)),))
