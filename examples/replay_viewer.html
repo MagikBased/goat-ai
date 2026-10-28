@@ -158,6 +158,8 @@
     #legal-filter { box-sizing: border-box; width: 100%; margin-top: 8px; }
     .annotation-actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
     .annotation-actions button { flex: 1; }
+    #review-note { width: 100%; min-height: 72px; resize: vertical; padding: 7px; color: inherit; background: #14242d; border: 1px solid #4f7980; border-radius: 6px; font: inherit; }
+    #review-note-kind { width: 100%; padding: 6px; color: inherit; background: #14242d; border: 1px solid #4f7980; border-radius: 6px; font: inherit; }
     #legal-more { margin-top: 7px; width: 100%; }
     .notice { padding: 10px 12px; border-left: 3px solid #e5cb6d; background: #293734; margin: 12px 0; }
     [hidden] { display: none !important; }
@@ -213,6 +215,20 @@
           <div class="annotation-actions">
             <button id="label-recorded" type="button">Approve AI-played action</button>
             <button id="clear-label" type="button">Clear frame label</button>
+          </div>
+          <div id="review-note-panel" hidden>
+            <label for="review-note-kind">Review finding</label>
+            <select id="review-note-kind">
+              <option value="context">Context or strategy note</option>
+              <option value="upstream_mistake">The earlier action was the mistake</option>
+            </select>
+            <label for="review-note">Explanation (optional for an earlier mistake)</label>
+            <textarea id="review-note" maxlength="2000" placeholder="What should have happened earlier, or why this action is better?"></textarea>
+            <div class="annotation-actions">
+              <button id="save-note" type="button">Save review note</button>
+              <button id="clear-note" type="button">Clear note</button>
+            </div>
+            <p id="review-note-status" class="muted"></p>
           </div>
           <div id="manual-review-export">
             <label for="reviewer">Reviewer alias</label>
@@ -271,10 +287,17 @@
     let saveRevision = 0;
     let saveQueue = Promise.resolve();
     let saveError = false;
+    let reviewNotes = new Map();
+    let reviewNotesAvailable = false;
+    let noteFrame = -1;
+    let noteDirty = false;
+    let noteSaving = false;
+    let noteError = false;
     function notifyLabelState() {
       if (window.parent !== window) window.parent.postMessage(
-        {type: "goat-ai-review-label-state", pending: annotations.size > 0 && !labelsExported,
-         saving: localReviewMode && annotations.size > 0 && !labelsExported && !saveError}, "*");
+        {type: "goat-ai-review-label-state",
+         pending: annotations.size > 0 && !labelsExported || noteDirty,
+         saving: localReviewMode && annotations.size > 0 && !labelsExported && !saveError || noteSaving}, "*");
     }
     function annotationAuthorization() {
       if (!replay) return null;
@@ -301,6 +324,31 @@
           : authorization === "self_play_review"
             ? observation.acting_player === replay.skill_metadata.learner_seat
             : true);
+    }
+    function renderNotePanel(terminal, observation) {
+      const panel = byId("review-note-panel");
+      const available = reviewNotesAvailable && localReviewMode &&
+        !terminal && canAnnotateFrame(observation);
+      panel.hidden = !available;
+      if (!available) return;
+      if (noteFrame !== index) {
+        const saved = reviewNotes.get(index);
+        byId("review-note-kind").value = saved?.kind || "context";
+        byId("review-note").value = saved?.text || "";
+        noteFrame = index;
+        noteDirty = false;
+        noteError = false;
+      }
+      byId("review-note-status").textContent = noteError ? "Note save failed; keep this frame open and retry"
+        : noteSaving ? "Saving note…" : noteDirty ? "Unsaved note"
+          : reviewNotes.has(index) ? "Review note saved on this computer · separate from training labels"
+            : "Notes do not label an action or enter training";
+      byId("clear-note").disabled = noteSaving || (!noteDirty && !reviewNotes.has(index));
+      byId("save-note").disabled = noteSaving;
+    }
+    function mayChangeNoteFrame() {
+      return !noteSaving && (!noteDirty ||
+        confirm("Your review note is unsaved. Discard it and change frames?"));
     }
     let commonFrames = [];
     let cardFiles = new Map();
@@ -1110,6 +1158,7 @@
           : labelsExported ? " · Saved on this computer" : " · Saving…" : "");
       byId("label-recorded").disabled = terminal || !canAnnotateFrame(observation);
       byId("clear-label").disabled = terminal || frameLabel == null;
+      renderNotePanel(terminal, observation);
       const knownHand = observation.known_opponent_hand_cards || [];
       byId("known-hand").textContent = (reviewerData ? "AI-visible knowledge: " : "") + (knownHand.length
         ? `${knownHand.length} of ${observation.opponent_hand_count} known: ${knownHand.map(nameOf).join(" · ")}`
@@ -1130,6 +1179,7 @@
     }
     function move(direction) {
       if (!replay) return;
+      if (!mayChangeNoteFrame()) { stop(); return; }
       let candidate = index + direction;
       const skip = byId("skip").checked;
       const lastIndex = replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation));
@@ -1158,6 +1208,7 @@
     }
     function moveCommon(direction) {
       if (!replay) return;
+      if (!mayChangeNoteFrame()) return;
       const candidate = nearbyCommon(direction);
       if (candidate == null) return;
       stop(); index = candidate; render();
@@ -1189,6 +1240,38 @@
         notifyLabelState(); render();
       });
     }
+    async function saveReviewNote(kind, content) {
+      if (!localReviewMode || !reviewNotesAvailable || noteSaving ||
+          !canAnnotateFrame(replay?.decisions[index]?.observation)) return;
+      const frame = index, digest = sourceSha256;
+      noteSaving = true; noteDirty = true; noteError = false;
+      notifyLabelState(); renderNotePanel(false, replay.decisions[index].observation);
+      try {
+        const response = await fetch("/api/review/note", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({source: digest, decision_index: frame,
+                                kind, text: content}),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.saved || !Array.isArray(data.notes))
+          throw new Error(data.error || "Local note save failed");
+        if (digest === sourceSha256 && frame === index) {
+          reviewNotes = new Map(data.notes.map(note => [note.decision_index, note]));
+          noteDirty = false; noteError = false;
+          noteFrame = -1;
+        }
+      } catch (error) {
+        if (digest === sourceSha256 && frame === index) {
+          noteError = true;
+          byId("review-note-status").textContent = `Note save failed: ${error.message}`;
+        }
+      } finally {
+        if (digest === sourceSha256) {
+          noteSaving = false; notifyLabelState();
+          renderNotePanel(false, replay.decisions[index].observation);
+        }
+      }
+    }
     async function loadLocalReview(hash) {
       try {
         const response = await fetch(`/api/review/state?source=${encodeURIComponent(hash)}`);
@@ -1201,6 +1284,17 @@
         localReviewableFrames = data.offered == null ? null : new Set(data.offered);
         annotations = new Map(data.choices.map(choice => [choice.decision_index,
                                                             choice.action_index]));
+        try {
+          const notesResponse = await fetch(`/api/review/notes?source=${encodeURIComponent(hash)}`);
+          if (notesResponse.ok) {
+            const notesData = await notesResponse.json();
+            if (!Array.isArray(notesData.notes)) throw new Error("Invalid review notes");
+            reviewNotes = new Map(notesData.notes.map(note => [note.decision_index, note]));
+            reviewNotesAvailable = true;
+            noteFrame = -1;
+          }
+        } catch (_) { /* An older local server can still save action labels. */ }
+        if (sourceSha256 !== hash) return;
         localReviewMode = true; labelsExported = true; saveError = false;
         byId("manual-review-export").hidden = true;
       byId("review-instructions").textContent = "Choose an alternative action from All legal actions, or use Approve AI-played action to label the recorded play. Your choice saves automatically on this computer; no name or download is needed.";
@@ -1213,6 +1307,8 @@
       if (!data || !Array.isArray(data.decisions) || !data.decisions.length || !data.decisions[0].observation) throw new Error("This is not a GOAT AI decision trajectory.");
       stop(); replay = data; legalFrame = -1; sourceSha256 = hash; annotations = new Map(); labelsExported = false;
       localReviewMode = false; localReviewableFrames = null; saveError = false;
+      reviewNotes = new Map(); reviewNotesAvailable = false; noteFrame = -1;
+      noteDirty = false; noteSaving = false; noteError = false;
       localReviewLoading = location.protocol === "http:" &&
         ["127.0.0.1", "localhost"].includes(location.hostname) && /^[a-f0-9]{64}$/.test(hash);
       byId("manual-review-export").hidden = false;
@@ -1302,6 +1398,18 @@
       setAnnotation(index, selected);
     });
     byId("clear-label").addEventListener("click", () => setAnnotation(index, null));
+    for (const id of ["review-note-kind", "review-note"])
+      byId(id).addEventListener("input", () => {
+        stop(); noteDirty = true; noteError = false; notifyLabelState();
+        renderNotePanel(false, replay.decisions[index].observation);
+      });
+    byId("save-note").addEventListener("click", () => saveReviewNote(
+      byId("review-note-kind").value, byId("review-note").value));
+    byId("clear-note").addEventListener("click", () => {
+      byId("review-note-kind").value = "context";
+      byId("review-note").value = "";
+      saveReviewNote("context", "");
+    });
     byId("download-labels").addEventListener("click", () => {
       if (reviewerData) return;
       const authorization = annotationAuthorization();
@@ -1322,15 +1430,22 @@
       labelsExported = true; notifyLabelState();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
-    byId("slider").addEventListener("input", event => { index = Number(event.target.value); render(); });
+    byId("slider").addEventListener("input", event => {
+      if (!mayChangeNoteFrame()) { event.target.value = index; return; }
+      index = Number(event.target.value); render();
+    });
     byId("board-seat").addEventListener("click", () => {
       boardBottomPlayer = 1 - boardBottomPlayer;
       animateNext = false;
       render();
     });
-    byId("jump").addEventListener("change", event => { index = Math.max(0, Math.min(replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation)), Number(event.target.value) - 1)); render(); });
+    byId("jump").addEventListener("change", event => {
+      if (!mayChangeNoteFrame()) { event.target.value = index + 1; return; }
+      index = Math.max(0, Math.min(replay.decisions.length - 1 + Number(Boolean(replay.terminal_observation)), Number(event.target.value) - 1)); render();
+    });
     byId("play").addEventListener("click", () => {
       if (timer) { stop(); return; }
+      if (!mayChangeNoteFrame()) return;
       byId("play").textContent = "Pause";
       timer = setInterval(() => move(1), 650);
     });

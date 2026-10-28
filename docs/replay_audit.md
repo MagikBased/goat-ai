@@ -154,6 +154,14 @@ decision still match. Earlier files remain in their original ignored folder.
 Clearing a choice in the current revision stays cleared after the next rebuild;
 untagged folders and different queue paths are not imported automatically.
 
+For a prompt caused by an earlier mistake, such as an avoidable MST activation
+followed by a forced target, select **The earlier action was the mistake** under
+**Review finding** and save an explanation. This creates a replay-bound local
+note without approving any current legal action. Notes live under the ignored
+`_review_state/notes/` folder, remain separate from training annotations, and
+carry forward only when the exact replay and decision remain in a rebuilt
+queue. The queue keeps note-only items unlabeled so they can still be reviewed.
+
 Record the eight `matchup_*.json` duels from the repository root with:
 
 ```bash

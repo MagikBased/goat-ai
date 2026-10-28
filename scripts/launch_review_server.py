@@ -1,6 +1,7 @@
 """Open the newest local GOAT AI review queue with its save-enabled server."""
 
 import argparse
+import json
 import os
 import socket
 import subprocess
@@ -45,12 +46,16 @@ def port_in_use(port: int) -> bool:
         return probe.connect_ex(("127.0.0.1", port)) == 0
 
 
-def server_healthy(port: int) -> bool:
+def server_healthy(port: int, source: str) -> bool:
     try:
-        # A server from an earlier launch may still serve the same queue but
-        # lack the progress endpoint needed by the current queue page.
+        # Older servers may serve the same HTML while lacking newer save APIs.
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/review/progress",
                                     timeout=0.4) as response:
+            if response.status != 200:
+                return False
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/api/review/notes?source={source}",
+                timeout=0.4) as response:
             return response.status == 200
     except (urllib.error.URLError, ValueError, OSError):
         return False
@@ -67,10 +72,14 @@ def launch(queue: Path, *, open_browser: bool = True) -> str:
         raise ValueError("queue must be an existing file inside the goat-ai repository")
     if not queue.with_suffix(".html").is_file():
         raise ValueError(f"{queue.stem}.html is missing; refresh this queue first")
+    selected = json.loads(queue.read_text(encoding="utf-8")).get("selected")
+    if not isinstance(selected, list) or not selected:
+        raise ValueError("review queue has no selected decisions")
+    source = selected[0]["trajectory_sha256"]
     route = "/" + queue.with_suffix(".html").relative_to(ROOT).as_posix()
     for port in range(8765, 8785):
         existing = server_queue(port)
-        if existing == route and server_healthy(port):
+        if existing == route and server_healthy(port, source):
             url = f"http://127.0.0.1:{port}{route}"
             if open_browser:
                 webbrowser.open(url)

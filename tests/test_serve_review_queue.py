@@ -15,6 +15,7 @@ from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, read_decision_annotations, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from scripts import serve_review_queue
+from scripts.launch_review_server import server_healthy
 from scripts.render_replay import render_replay
 from scripts.shortlist_policy_disagreements import write_review_index
 
@@ -135,6 +136,8 @@ def test_rebuilt_queue_carries_choices_once_without_resurrecting_cleared_label(
     first = parent / sha256_file(queue)[:12]
     assert serve_review_queue.prepare_review_labels(queue, first) == 0
     serve_review_queue.ReviewStore(queue, first).choose(digest, 0, 1)
+    serve_review_queue.ReviewStore(queue, first).save_note(
+        digest, 0, "upstream_mistake", "Do not activate the Spell earlier")
 
     report = json.loads(queue.read_text())
     report["revision_note"] = "new review prompt wording"
@@ -143,14 +146,19 @@ def test_rebuilt_queue_carries_choices_once_without_resurrecting_cleared_label(
     assert serve_review_queue.prepare_review_labels(queue, second) == 1
     assert serve_review_queue.ReviewStore(queue, second).state(digest)["choices"] == [
         {"decision_index": 0, "action_index": 1}]
+    assert serve_review_queue.ReviewStore(queue, second).note_state(digest)["notes"] == [
+        {"decision_index": 0, "kind": "upstream_mistake",
+         "text": "Do not activate the Spell earlier"}]
     assert serve_review_queue.prepare_review_labels(queue, second) == 0
     serve_review_queue.ReviewStore(queue, second).choose(digest, 0, None)
+    serve_review_queue.ReviewStore(queue, second).save_note(digest, 0, "context", "")
 
     report["revision_note"] = "second revision"
     queue.write_text(json.dumps(report))
     third = parent / sha256_file(queue)[:12]
     assert serve_review_queue.prepare_review_labels(queue, third) == 0
     assert serve_review_queue.ReviewStore(queue, third).state(digest)["choices"] == []
+    assert serve_review_queue.ReviewStore(queue, third).note_state(digest)["notes"] == []
     assert (first / f"{digest}.json").is_file()
 
 
@@ -202,6 +210,43 @@ def test_local_review_rejects_cross_origin_and_other_repo_files(tmp_path, monkey
         thread.join(timeout=5)
 
 
+def test_review_note_marks_upstream_mistake_without_training_label(tmp_path, monkeypatch):
+    queue, _, digest, _ = _queue(tmp_path)
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    output = tmp_path / "saved"
+    server = serve_review_queue.make_server(queue, output, port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        assert server_healthy(server.server_port, digest)
+        assert not server_healthy(server.server_port, "a" * 64)
+        assert _request(f"{base}/api/review/notes?source={digest}")[1] == {"notes": []}
+        note = {"source": digest, "decision_index": 0,
+                "kind": "upstream_mistake", "text": "MST should not have activated"}
+        assert _request(f"{base}/api/review/note", note)[1]["notes"] == [
+            {"decision_index": 0, "kind": "upstream_mistake",
+             "text": "MST should not have activated"}]
+        assert _request(f"{base}/api/review/progress")[1]["choices"] == []
+        assert not list(output.glob("*.json"))
+        assert (output / "_review_state/notes" / f"{digest}.json").is_file()
+        for invalid in ({**note, "decision_index": 1},
+                        {**note, "source": "a" * 64},
+                        {**note, "kind": "training_label"},
+                        {**note, "text": "x" * 2001}):
+            with pytest.raises(HTTPError) as error:
+                _request(f"{base}/api/review/note", invalid)
+            assert error.value.code == 400
+        assert _request(f"{base}/api/review/note",
+                        {**note, "kind": "context", "text": ""})[1] == {
+            "notes": [], "saved": True}
+        assert _request(f"{base}/api/review/notes?source={digest}")[1] == {"notes": []}
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_browser_review_choice_autosaves_without_name_or_download(tmp_path, monkeypatch):
     queue, replay, digest, _ = _queue(tmp_path)
@@ -235,6 +280,50 @@ def test_browser_review_choice_autosaves_without_name_or_download(tmp_path, monk
         assert match.group(1) == "true|true|true|true|1"
         raw = json.loads((output / f"{digest}.json").read_text())
         assert raw["choices"] == [{"decision_index": 0, "action_index": 1}]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_browser_upstream_note_saves_without_creating_action_label(tmp_path, monkeypatch):
+    queue, replay, digest, _ = _queue(tmp_path)
+    viewer = tmp_path / "game.html"
+    render_replay(replay, viewer, tmp_path / "native")
+    probe = """<script>
+      setTimeout(() => {
+        byId('review-note-kind').value = 'upstream_mistake';
+        byId('review-note-kind').dispatchEvent(new Event('input'));
+        byId('review-note').value = 'Do not activate MST earlier';
+        byId('review-note').dispatchEvent(new Event('input'));
+        byId('save-note').click();
+        setTimeout(() => { document.body.dataset.noteProbe = [
+          localReviewMode, reviewNotesAvailable,
+          byId('review-note-status').textContent.includes('saved on this computer'),
+          annotations.size, noteDirty].join('|'); }, 300);
+      }, 200);
+    </script></body>"""
+    viewer.write_text(viewer.read_text().replace("</body>", probe))
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    output = tmp_path / "saved"
+    server = serve_review_queue.make_server(queue, output, port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = subprocess.run([
+            shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+            "--disable-dev-shm-usage", "--virtual-time-budget=900", "--dump-dom",
+            f"http://127.0.0.1:{server.server_port}/game.html",
+        ], capture_output=True, text=True, timeout=20, check=True)
+        match = re.search(r'data-note-probe="([^"]+)"', result.stdout)
+        assert match, result.stderr[-1000:]
+        assert match.group(1) == "true|true|true|0|false"
+        path = output / "_review_state/notes" / f"{digest}.json"
+        assert json.loads(path.read_text())["notes"] == [
+            {"decision_index": 0, "kind": "upstream_mistake",
+             "text": "Do not activate MST earlier"}]
+        assert not list(output.glob("*.json"))
     finally:
         server.shutdown()
         server.server_close()

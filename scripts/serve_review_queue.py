@@ -76,6 +76,16 @@ def prepare_review_labels(queue: Path, output_dir: Path,
     for (digest, decision), action in sorted(candidates.items()):
         store.choose(digest, decision, action)
         carried += 1
+    if previous_dir:
+        for path in (previous_dir / "_review_state" / "notes").glob("*.json"):
+            digest = path.stem
+            if digest not in store.sources:
+                continue
+            _, offered = store._trajectory(digest)
+            for note in store._read_notes(path, digest, None):
+                if note["decision_index"] in offered:
+                    store.save_note(digest, note["decision_index"], note["kind"],
+                                    note["text"])
     identity_path.parent.mkdir(parents=True, exist_ok=True)
     identity_path.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
     return carried
@@ -158,6 +168,75 @@ class ReviewStore:
         if not SHA256.fullmatch(digest) or digest not in self.sources:
             raise ValueError("source replay is absent from this queue")
         return self.output_dir / f"{digest}.json"
+
+    def note_path(self, digest: str) -> Path:
+        self.label_path(digest)
+        return self.output_dir / "_review_state" / "notes" / f"{digest}.json"
+
+    def _read_notes(self, path: Path, digest: str,
+                    offered: set[int] | None) -> list[dict]:
+        if not path.is_file():
+            return []
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if (not isinstance(payload, dict) or payload.get("schema_version") != 1
+                or payload.get("source_trajectory_sha256") != digest
+                or payload.get("reviewer") != self.reviewer_alias
+                or not isinstance(payload.get("notes"), list)):
+            raise ValueError("review notes do not match this replay or reviewer")
+        seen = set()
+        for note in payload["notes"]:
+            if (not isinstance(note, dict)
+                    or set(note) != {"decision_index", "kind", "text"}
+                    or type(note["decision_index"]) is not int
+                    or note["decision_index"] < 0
+                    or offered is not None and note["decision_index"] not in offered
+                    or note["decision_index"] in seen
+                    or note["kind"] not in ("context", "upstream_mistake")
+                    or not isinstance(note["text"], str)
+                    or len(note["text"]) > 2000):
+                raise ValueError("invalid review note or decision outside this queue")
+            seen.add(note["decision_index"])
+        return payload["notes"]
+
+    def note_state(self, digest: str) -> dict:
+        path = self.note_path(digest)
+        with self.lock:
+            _, offered = self._trajectory(digest)
+            return {"notes": self._read_notes(path, digest, offered)}
+
+    def save_note(self, digest: str, decision_index: int,
+                  kind: str, content: str) -> dict:
+        path = self.note_path(digest)
+        with self.lock:
+            _, offered = self._trajectory(digest)
+            if (type(decision_index) is not int or decision_index not in offered
+                    or kind not in ("context", "upstream_mistake")
+                    or not isinstance(content, str) or len(content) > 2000):
+                raise ValueError("invalid review note or decision outside this queue")
+            notes = {note["decision_index"]: note for note in
+                     self._read_notes(path, digest, offered)}
+            text = content.strip()
+            if kind == "context" and not text:
+                notes.pop(decision_index, None)
+            else:
+                notes[decision_index] = {"decision_index": decision_index,
+                                         "kind": kind, "text": text}
+            if not notes:
+                path.unlink(missing_ok=True)
+                return {"notes": [], "saved": True}
+            payload = {"schema_version": 1, "source_trajectory_sha256": digest,
+                       "reviewer": self.reviewer_alias,
+                       "notes": [notes[index] for index in sorted(notes)]}
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_suffix(".json.tmp")
+            try:
+                temporary.write_text(json.dumps(payload, indent=2) + "\n",
+                                     encoding="utf-8")
+                self._read_notes(temporary, digest, offered)
+                temporary.replace(path)
+            finally:
+                temporary.unlink(missing_ok=True)
+            return {"notes": payload["notes"], "saved": True}
 
     def _trajectory(self, digest: str):
         if sha256_file(self.queue_path) != self.queue_sha256:
@@ -287,6 +366,13 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
                 except (ValueError, KeyError, TypeError, OSError) as error:
                     self._json(400, {"error": str(error)})
                 return
+            if parsed.path == "/api/review/notes":
+                digest = parse_qs(parsed.query).get("source", [""])[0]
+                try:
+                    self._json(200, store.note_state(digest))
+                except (ValueError, KeyError, TypeError, OSError) as error:
+                    self._json(400, {"error": str(error)})
+                return
             if parsed.path == "/api/review/progress":
                 try:
                     self._json(200, store.progress())
@@ -304,7 +390,8 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
 
         def do_POST(self) -> None:
             endpoint = urlsplit(self.path).path
-            if endpoint not in ("/api/review/choice", "/api/review/bookmark"):
+            if endpoint not in ("/api/review/choice", "/api/review/bookmark",
+                                "/api/review/note"):
                 self._json(404, {"error": "unknown endpoint"})
                 return
             origin = self.headers.get("Origin")
@@ -315,20 +402,25 @@ def make_server(queue: Path, output_dir: Path, *, port: int = 8765,
                 return
             try:
                 size = int(self.headers.get("Content-Length", "0"))
-                if not 1 <= size <= 4096:
+                if not 1 <= size <= (16384 if endpoint == "/api/review/note" else 4096):
                     raise ValueError("request body size is invalid")
                 data = json.loads(self.rfile.read(size))
                 expected = ({"source", "decision_index", "action_index"}
                             if endpoint == "/api/review/choice" else
-                            {"source", "decision_index", "bookmarked"})
+                            {"source", "decision_index", "bookmarked"}
+                            if endpoint == "/api/review/bookmark" else
+                            {"source", "decision_index", "kind", "text"})
                 if not isinstance(data, dict) or set(data) != expected:
                     raise ValueError("invalid review payload")
                 if endpoint == "/api/review/choice":
                     result = store.choose(data["source"], data["decision_index"],
                                           data["action_index"])
-                else:
+                elif endpoint == "/api/review/bookmark":
                     result = store.bookmark(data["source"], data["decision_index"],
                                             data["bookmarked"])
+                else:
+                    result = store.save_note(data["source"], data["decision_index"],
+                                             data["kind"], data["text"])
             except (ValueError, TypeError, KeyError, OSError) as error:
                 self._json(400, {"error": str(error)})
                 return
