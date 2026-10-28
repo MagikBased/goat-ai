@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Play GOAT AI</title>
+  <style>
+    :root { color-scheme: dark; font: 16px/1.35 system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 12px; background: #071923; color: #eef8f6; }
+    a { color: #9ee6da; }
+    button, select, input { font: inherit; color: inherit; border: 1px solid #628b95;
+      background: #173744; border-radius: 7px; padding: 7px; }
+    button { cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    #setup { max-width: 850px; margin: 20px auto; padding: 20px; background: #142c36;
+      border: 1px solid #446873; border-radius: 12px; }
+    #setup label { display: grid; gap: 4px; margin: 12px 0; }
+    #setup .seats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+    #game { display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
+      gap: 12px; height: calc(100vh - 24px); min-height: 650px; }
+    #board { min-width: 0; display: grid; grid-template-rows: auto 74px 1fr 1fr auto 1fr 1fr 74px auto;
+      gap: 6px; padding: 10px; border: 1px solid #386873; border-radius: 12px;
+      background: repeating-linear-gradient(35deg, #071923, #071923 70px, #0d2d37 72px); }
+    .player { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .player strong { font-size: 1.2rem; }
+    .lp { border: 2px solid #e5c963; border-radius: 30px; padding: 3px 12px;
+      background: linear-gradient(90deg, #a42f45, #2878bd); font-weight: 800; }
+    .hand { display: flex; justify-content: center; gap: 5px; min-height: 75px;
+      overflow: hidden; }
+    .hand .card { width: min(7.5vw, 72px); height: 100%; }
+    .row { display: grid; grid-template-columns: 65px repeat(5, minmax(0, 1fr)) 65px;
+      gap: 5px; min-height: 0; }
+    .zone { border: 2px solid #6dc827; border-radius: 7px; min-width: 0; min-height: 0;
+      display: grid; place-items: center; position: relative; overflow: hidden; }
+    .self .zone { border-color: #e833a9; }
+    .pile { border-color: #b681d7; font-size: .8rem; text-align: center; }
+    .zone small { position: absolute; right: 2px; bottom: 1px; background: #071923bb;
+      padding: 1px 4px; border-radius: 4px; z-index: 1; }
+    .card { max-width: 92%; max-height: 96%; aspect-ratio: 0.69; display: grid;
+      place-items: center; border-radius: 4px; background: #263c52; color: white;
+      position: relative; overflow: hidden; text-align: center; font-size: .72rem; }
+    .card img { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .card.defense { transform: rotate(90deg) scale(.7); }
+    .card .fallback { position: absolute; inset: 0; display: grid; place-items: center;
+      padding: 3px; overflow-wrap: anywhere; background: #344457; }
+    .phase { display: flex; justify-content: center; align-items: center; gap: 8px;
+      color: #a8d6da; font-weight: 700; }
+    #sidebar { min-height: 0; display: flex; flex-direction: column; gap: 8px;
+      padding: 12px; background: #142c36; border: 1px solid #446873; border-radius: 12px; }
+    #sidebar h1 { font-size: 1.25rem; margin: 0; }
+    #message { min-height: 2.5em; color: #a8d6da; }
+    #message.error { color: #ffb7b7; }
+    #action-list { min-height: 0; overflow: auto; display: grid; align-content: start; gap: 5px; }
+    #action-list button { text-align: left; overflow-wrap: anywhere; }
+    #action-list button:hover { background: #256757; }
+    #search { width: 100%; }
+    #history { font-size: .85rem; color: #afc7c9; max-height: 120px; overflow: auto; }
+    dialog { color: inherit; background: #142c36; border: 1px solid #628b95;
+      border-radius: 10px; max-height: 75vh; overflow: auto; }
+    dialog::backdrop { background: #000a; }
+    @media (max-width: 850px) { #game { height: auto; display: block; }
+      #board { height: 650px; } #sidebar { margin-top: 12px; height: 400px; }
+      #setup .seats { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <section id="setup">
+    <p><a href="/games/new">← AI game creator</a></p>
+    <h1>Play against GOAT AI</h1>
+    <p>Choose your Deck, an AI opponent, and a seed. Your decisions use the native GOAT rules engine. A completed game becomes a verified local replay.</p>
+    <form id="new-game">
+      <div class="seats">
+        <label>Player 1 Deck<select id="deck1" required></select></label>
+        <label>Player 2 Deck<select id="deck2" required></select></label>
+        <label>Your seat<select id="seat"><option value="0">Player 1</option><option value="1">Player 2</option></select></label>
+        <label>AI opponent<select id="opponent" required></select></label>
+      </div>
+      <label>Seed<input id="seed" type="number" min="0" max="4294967295" step="1" value="42" required></label>
+      <button id="start" type="submit">Start duel</button>
+    </form>
+    <p id="setup-status" role="status"></p>
+  </section>
+  <main id="game" hidden>
+    <section id="board" aria-label="Duel field">
+      <div class="player"><strong id="opp-name">Opponent</strong><span id="opp-lp" class="lp"></span></div>
+      <div id="opp-hand" class="hand"></div>
+      <div id="opp-spell" class="row"></div>
+      <div id="opp-monster" class="row"></div>
+      <div id="phase" class="phase"></div>
+      <div id="own-monster" class="row self"></div>
+      <div id="own-spell" class="row self"></div>
+      <div id="own-hand" class="hand"></div>
+      <div class="player"><strong id="own-name">You</strong><span id="own-lp" class="lp"></span></div>
+    </section>
+    <aside id="sidebar">
+      <h1>GOAT AI · live duel</h1>
+      <a href="/games/new">Create an AI replay</a>
+      <button id="quit" type="button">Leave unfinished duel</button>
+      <p id="message" role="status" aria-live="polite"></p>
+      <div id="history"></div>
+      <details><summary>Visible information</summary><div id="visible-info"></div></details>
+      <label>Find a legal action<input id="search" type="search" placeholder="Card name, action, target…"></label>
+      <div id="action-count"></div>
+      <div id="action-list"></div>
+      <a id="finished-replay" hidden>View verified replay</a>
+    </aside>
+  </main>
+  <dialog id="pile-dialog"><h2 id="pile-title"></h2><ul id="pile-list"></ul>
+    <button id="close-pile" type="button">Close</button></dialog>
+  <script>
+    const byId = id => document.getElementById(id);
+    let state = null;
+    let busy = false;
+    const cardName = code => code == null ? "Face-down card" :
+      state?.card_names?.[String(code)] || `Card #${code}`;
+    const fieldCard = (observation, player, zone, sequence) =>
+      observation.field.find(card => card.controller === player && card.zone === zone && card.sequence === sequence);
+    function cardElement(card, hidden = false) {
+      const element = document.createElement("div"); element.className = "card";
+      if (card?.orientation === "defense") element.classList.add("defense");
+      const code = hidden ? null : card?.code;
+      element.title = cardName(code);
+      const fallback = document.createElement("span"); fallback.className = "fallback";
+      fallback.textContent = cardName(code); element.append(fallback);
+      const image = document.createElement("img");
+      image.src = code == null ? "/replays/card_images/cover.png" :
+        `/replays/card_images/${code}.jpg`;
+      image.alt = cardName(code); image.onerror = () => image.remove();
+      element.append(image); return element;
+    }
+    function zone(card, label, count) {
+      const element = document.createElement("div"); element.className = "zone";
+      if (count != null) element.classList.add("pile");
+      if (card) element.append(cardElement(card));
+      else if (count != null) element.textContent = label;
+      if (count != null) {
+        const badge = document.createElement("small"); badge.textContent = count;
+        element.append(badge);
+      }
+      return element;
+    }
+    function boardRow(id, observation, player, zoneName, leftLabel, leftCount,
+                      rightLabel, rightCount) {
+      const row = byId(id); row.replaceChildren();
+      if (leftLabel === "Field") row.append(zone(fieldCard(observation, player, "spell_trap", 5)));
+      else row.append(pileZone(player, leftLabel, leftCount));
+      for (let index = 0; index < 5; index++)
+        row.append(zone(fieldCard(observation, player, zoneName, index)));
+      row.append(pileZone(player, rightLabel, rightCount));
+    }
+    function pileZone(player, label, count) {
+      const element = zone(null, label, count);
+      if (label === "GY" || label === "Banished") {
+        element.style.cursor = "pointer";
+        element.title = `View Player ${player + 1} ${label}`;
+        element.onclick = () => {
+          const cards = label === "GY" ? state.observation.graveyards[player] :
+            state.observation.banished[player];
+          byId("pile-title").textContent = `Player ${player + 1} · ${label}`;
+          byId("pile-list").replaceChildren(...cards.map(card => {
+            const item = document.createElement("li"); item.textContent = cardName(card.code);
+            return item;
+          }));
+          byId("pile-dialog").showModal();
+        };
+      }
+      return element;
+    }
+    function actionLabel(action) {
+      const params = action.parameters || {};
+      const name = Number.isInteger(params.code) ? ` · ${cardName(params.code)}` : "";
+      return `${action.kind.replaceAll("_", " ")}${name} · ${JSON.stringify(params)}`;
+    }
+    function actions() {
+      const list = byId("action-list"); list.replaceChildren();
+      if (!state || state.terminal) return;
+      const term = byId("search").value.toLowerCase();
+      const matching = state.legal_actions.map((action, index) => ({action, index}))
+        .filter(item => actionLabel(item.action).toLowerCase().includes(term));
+      byId("action-count").textContent = `${matching.length} of ${state.legal_actions.length} legal actions`;
+      for (const item of matching.slice(0, 100)) {
+        const button = document.createElement("button"); button.type = "button";
+        button.textContent = `${item.index + 1}. ${actionLabel(item.action)}`;
+        button.disabled = busy;
+        button.onclick = () => choose(item.index);
+        list.append(button);
+      }
+      if (matching.length > 100) list.append(`Showing the first 100 matches. Narrow your search.`);
+    }
+    function render(data) {
+      state = data;
+      byId("setup").hidden = true; byId("game").hidden = false;
+      if (data.terminal) {
+        byId("message").textContent = data.winner == null ? "Duel ended in a draw." :
+          `Duel ended. Player ${data.winner + 1} won.`;
+        byId("action-count").textContent = "No legal actions";
+        byId("action-list").replaceChildren();
+        byId("finished-replay").href = data.viewer;
+        byId("finished-replay").hidden = !data.viewer;
+        return;
+      }
+      const o = data.observation, you = data.human_seat, opponent = 1 - you;
+      byId("own-name").textContent = `Player ${you + 1} · you · Extra ${o.extra_deck_counts[you]}`;
+      byId("opp-name").textContent = `Player ${opponent + 1} · AI · Extra ${o.extra_deck_counts[opponent]}`;
+      byId("own-lp").textContent = `${o.life_points[you]} LP`;
+      byId("opp-lp").textContent = `${o.life_points[opponent]} LP`;
+      byId("phase").textContent = `Turn ${o.turn} · ${o.phase} · Player ${(o.turn_player ?? you) + 1}'s turn`;
+      const ownHand = byId("own-hand"); ownHand.replaceChildren(...o.hand.map(card => cardElement(card)));
+      const oppHand = byId("opp-hand"); oppHand.replaceChildren(...Array.from(
+        {length: o.opponent_hand_count}, () => cardElement(null, true)));
+      boardRow("opp-spell", o, opponent, "spell_trap", "Banished", o.banished[opponent].length,
+               "GY", o.graveyards[opponent].length);
+      boardRow("opp-monster", o, opponent, "monster", "Field", null,
+               "Deck", o.deck_counts[opponent]);
+      boardRow("own-monster", o, you, "monster", "Field", null,
+               "Deck", o.deck_counts[you]);
+      boardRow("own-spell", o, you, "spell_trap", "Banished", o.banished[you].length,
+               "GY", o.graveyards[you].length);
+      byId("history").textContent = o.public_history.slice(-6).join(" · ");
+      const visibleInfo = byId("visible-info"); visibleInfo.replaceChildren();
+      const facts = [
+        `Known opponent hand: ${o.known_opponent_hand_cards.map(cardName).join(", ") || "none"}`,
+        `Known face-down field cards: ${o.known_opponent_field_cards.map(card =>
+          `${card.zone} ${card.sequence + 1}: ${cardName(card.code)}`).join(", ") || "none"}`,
+        `Your Extra Deck: ${o.own_extra_deck.map(card => cardName(card.code)).join(", ") || "empty"}`,
+        `Restrictions: ${o.restrictions.join(", ") || "none"}`,
+        `Chain: ${o.chain.map(link => `${link.index}: ${cardName(link.card_code)}`).join(" → ") || "none"}`,
+      ];
+      for (const fact of facts) { const line = document.createElement("p"); line.textContent = fact;
+        visibleInfo.append(line); }
+      byId("message").textContent = `Your choice · decision ${data.decisions + 1}`;
+      actions();
+    }
+    async function request(path, payload) {
+      const response = await fetch(path, payload ? {
+        method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)
+      } : undefined);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      return result;
+    }
+    async function choose(index) {
+      if (busy) return;
+      busy = true; actions(); byId("message").textContent = "AI is responding…";
+      try { render(await request("/api/live/choice", {id: state.id, action_index: index})); }
+      catch (error) { byId("message").textContent = error.message; byId("message").classList.add("error"); }
+      finally { busy = false; actions(); }
+    }
+    byId("search").addEventListener("input", actions);
+    byId("close-pile").addEventListener("click", () => byId("pile-dialog").close());
+    byId("quit").addEventListener("click", async () => {
+      if (!state || state.terminal || !confirm("Leave this unfinished duel? It will not be saved as a replay.")) return;
+      try { await request("/api/live/close", {id: state.id}); location.href = "/games/play"; }
+      catch (error) { byId("message").textContent = error.message; }
+    });
+    byId("new-game").addEventListener("submit", async event => {
+      event.preventDefault(); byId("start").disabled = true;
+      try {
+        const result = await request("/api/live/start", {
+          deck1: byId("deck1").value, deck2: byId("deck2").value,
+          human_seat: Number(byId("seat").value), opponent: byId("opponent").value,
+          seed: Number(byId("seed").value),
+        });
+        location.hash = `game=${result.id}`; render(result);
+      } catch (error) { byId("setup-status").textContent = error.message;
+        byId("start").disabled = false; }
+    });
+    (async () => {
+      try {
+        const options = await request("/api/games/options");
+        const decks = options.decks.map(name => [name, name.replace(/\.ydk$/, "").replaceAll("_", " ")]);
+        for (const id of ["deck1", "deck2"]) {
+          byId(id).replaceChildren(...decks.map(([value, label]) => {
+            const option = document.createElement("option"); option.value = value;
+            option.textContent = label; return option;
+          }));
+        }
+        byId("opponent").replaceChildren(...Object.entries(options.agents).map(([value, label]) => {
+          const option = document.createElement("option"); option.value = value;
+          option.textContent = label; return option;
+        }));
+        byId("opponent").value = "tactical";
+        const id = /^#game=([a-f0-9]{16})$/.exec(location.hash)?.[1];
+        if (id) render(await request(`/api/live/state?id=${id}`));
+      } catch (error) { byId("setup-status").textContent = error.message; }
+    })();
+  </script>
+</body>
+</html>

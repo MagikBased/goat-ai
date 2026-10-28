@@ -32,6 +32,7 @@
 <body>
   <p><a href="/">← Review queue</a></p>
   <h1>Create a GOAT AI game</h1>
+  <p><a href="/games/play">Play against an AI in your browser</a></p>
   <p>Choose two published decks and AI agents. The server runs a complete native
      duel, verifies its replay, and opens it in the replay viewer. A seed makes
      the same setup reproducible.</p>
@@ -75,7 +76,7 @@
         link.href = game.viewer;
         link.textContent = `${deckLabel(game.deck1)} (${game.agent1}) vs ${deckLabel(game.deck2)} (${game.agent2}) · seed ${game.seed}`;
         item.append(link, ` · ${game.decisions} decisions`);
-        if (Number.isInteger(game.review_flags)) {
+        if (game.review_flags > 0) {
           const button = document.createElement("button");
           button.type = "button"; button.className = "audit-button";
           button.dataset.gameId = game.id;

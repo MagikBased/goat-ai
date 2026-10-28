@@ -654,6 +654,15 @@ A paired Smashing Ground / Book of Moon fixture now checks that this common 2005
 
 ## M3 — Evaluation and data
 
+The local replay server now also supports a browser human-versus-AI duel on
+the native engine. Each human turn is supplied only the player-visible
+observation and enumerated legal actions; the opponent moves through the same
+agent interface. A completed duel is saved as `human_web` only after native
+replay and visibility verification, with `self_recorded` authorization and
+the human seat in provenance. The raw cloning gate admits only that seat.
+An unfinished browser session remains in local server memory and is not
+training data. This is an authorized self-recording path, not expert data.
+
 Human choices from separate review queues over one verified replay can now be
 validated queue by queue and converted into a single replay-bound preference
 file. This lets an upstream activation correction coexist with target-choice

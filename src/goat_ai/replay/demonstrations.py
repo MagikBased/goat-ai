@@ -15,7 +15,7 @@ def demonstrator_seat(trajectory: Trajectory) -> int | None:
             raise ValueError("demonstrator_seat conflicts with learner_seat")
         seat = learner
     if seat is None:
-        if trajectory.source in ("heuristic", "combat_heuristic", "human_cli"):
+        if trajectory.source in ("heuristic", "combat_heuristic", "human_cli", "human_web"):
             raise ValueError(f"{trajectory.source} trajectory lacks demonstrator_seat")
         return None
     if type(seat) is not int or seat not in (0, 1):
@@ -46,12 +46,12 @@ def training_demonstrator_records(trajectory: Trajectory) -> tuple[DecisionRecor
     if source.startswith("scripted_"):
         raise ValueError("scripted replay requires explicit annotations")
     teachers = {"heuristic", "combat_heuristic", "combat_flip", "tactical"}
-    if source == "human_cli":
+    if source in ("human_cli", "human_web"):
         if (trajectory.skill_metadata or {}).get("authorization") != "self_recorded":
-            raise ValueError("human_cli training requires self_recorded authorization")
+            raise ValueError(f"{source} training requires self_recorded authorization")
     elif source not in teachers | {"self_play", "self_play_rl"}:
         raise ValueError(f"{source} is not an admitted raw training source")
-    if source in teachers | {"human_cli"}:
+    if source in teachers | {"human_cli", "human_web"}:
         seat = (trajectory.skill_metadata or {}).get("demonstrator_seat")
         if type(seat) is not int or seat not in (0, 1):
             raise ValueError(f"{source} training requires demonstrator_seat 0 or 1")

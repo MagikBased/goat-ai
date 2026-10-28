@@ -17,11 +17,12 @@ from goat_ai.replay import read_decision_annotations, read_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from scripts.create_viewer_game import GameCreator
 from scripts.launch_review_server import launch
+from scripts.live_human_game import LiveGameManager
 from scripts.validate_review_queue_labels import queue_sources, verify_queue_items
 
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
-REVIEW_API_VERSION = 4
+REVIEW_API_VERSION = 5
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -346,6 +347,7 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
             raise ValueError("review queue requires a label output directory")
     store = ReviewStore(queue, output_dir, reviewer_alias) if queue is not None else None
     creator = GameCreator(root=ROOT)
+    live = LiveGameManager(creator)
     start_path = ("/" + queue.with_suffix(".html").relative_to(ROOT).as_posix()
                   if queue is not None else "/games/new")
 
@@ -381,6 +383,17 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 self.send_response(302)
                 self.send_header("Location", "/examples/create_game.html")
                 self.end_headers()
+                return
+            if parsed.path == "/games/play":
+                self.send_response(302)
+                self.send_header("Location", "/examples/play_game.html")
+                self.end_headers()
+                return
+            if parsed.path == "/api/live/state":
+                try:
+                    self._json(200, live.get(parse_qs(parsed.query).get("id", [""])[0]))
+                except (ValueError, OSError) as error:
+                    self._json(400, {"error": str(error)})
                 return
             if parsed.path == "/api/games/options":
                 self._json(200, creator.options())
@@ -432,7 +445,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                           and target.suffix == ".html")
             art = (target.is_relative_to(ROOT / "replays/card_images")
                    and target.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
-            creator_html = target == ROOT / "examples/create_game.html"
+            creator_html = target in (ROOT / "examples/create_game.html",
+                                      ROOT / "examples/play_game.html")
             game_html = (target.is_relative_to(creator.output_dir)
                          and target.suffix == ".html")
             if not (queue_html or art or creator_html or game_html):
@@ -443,10 +457,14 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
         def do_POST(self) -> None:
             endpoint = urlsplit(self.path).path
             if endpoint not in ("/api/review/choice", "/api/review/bookmark",
-                                "/api/review/note", "/api/games", "/api/games/review"):
+                                "/api/review/note", "/api/games", "/api/games/review",
+                                "/api/live/start", "/api/live/choice",
+                                "/api/live/close"):
                 self._json(404, {"error": "unknown endpoint"})
                 return
-            if endpoint not in ("/api/games", "/api/games/review") and store is None:
+            if endpoint not in ("/api/games", "/api/games/review",
+                                "/api/live/start", "/api/live/choice",
+                                "/api/live/close") and store is None:
                 self._json(404, {"error": "no review queue is open"})
                 return
             origin = self.headers.get("Origin")
@@ -460,7 +478,11 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 if not 1 <= size <= (16384 if endpoint == "/api/review/note" else 4096):
                     raise ValueError("request body size is invalid")
                 data = json.loads(self.rfile.read(size))
-                expected = ({"id"} if endpoint == "/api/games/review" else
+                expected = ({"id"} if endpoint in ("/api/games/review",
+                                                 "/api/live/close") else
+                            {"deck1", "deck2", "human_seat", "opponent", "seed"}
+                            if endpoint == "/api/live/start" else
+                            {"id", "action_index"} if endpoint == "/api/live/choice" else
                             {"deck1", "deck2", "agent1", "agent2", "seed"}
                             if endpoint == "/api/games" else
                             {"source", "decision_index", "action_index"}
@@ -473,6 +495,12 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 if endpoint == "/api/games/review":
                     result = {"url": launch(creator.review_queue(data["id"]),
                                             open_browser=False)}
+                elif endpoint == "/api/live/start":
+                    result = live.start(data)
+                elif endpoint == "/api/live/choice":
+                    result = live.choose(data["id"], data["action_index"])
+                elif endpoint == "/api/live/close":
+                    result = live.close(data["id"])
                 elif endpoint == "/api/games":
                     result = creator.create(data)
                 elif endpoint == "/api/review/choice":
@@ -489,7 +517,12 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 return
             self._json(200, result)
 
-    return ThreadingHTTPServer((host, port), Handler)
+    class LiveServer(ThreadingHTTPServer):
+        def server_close(self) -> None:
+            live.close_all()
+            super().server_close()
+
+    return LiveServer((host, port), Handler)
 
 
 def main() -> None:

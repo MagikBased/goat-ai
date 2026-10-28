@@ -134,9 +134,17 @@ choices require replay and visibility validation before use for training.
 Reopening an existing game queue refreshes its generated viewer pages while
 retaining the queue identity and any locally saved labels.
 
-Live browser play against an AI is a later step. The terminal human-versus-AI
-workflow above already uses the same observation and legal-action interface;
-the browser currently creates complete AI-versus-AI games for review.
+To play a duel yourself in the browser, open `/games/play` on the same local
+server. Choose the human seat, two Decks, and a Random, Tactical, or selected
+neural opponent. The board and legal-action list show only the human player's
+visible observation. Choose an action from the list; the native engine resolves
+it and the AI responds. On completion the server replay-verifies the duel,
+checks player visibility, and saves a `human_web` self-recording and full
+postgame replay under `.cache/goat-ai/user_games/`. Only the human seat is
+admitted as a raw demonstration. Unfinished games live in server memory and
+are discarded if the server stops; **Leave unfinished duel** releases one
+explicitly. The browser is an experimental local play interface, subject to
+the same unresolved GOAT ruling coverage as the native adapter.
 
 The offline [replay viewer](examples/replay_viewer.html) shows each recorded decision as a board snapshot from the acting player's visible view. Record and render a Scapegoat fixture duel:
 
