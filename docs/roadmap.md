@@ -702,6 +702,12 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A [winner-only self-play imitation fit-length check](evaluation.md#three-epoch-winner-only-imitation-check-28-october-2026)
+lowered label loss over three epochs, but split 32–32 directly with its
+one-epoch child on unseen Main Decks and showed no clear Tactical-v14 score
+gain over the selected parent. The current v23 parent remains selected; M4's
+held-out competitive gain gate is open.
+
 Extending the verified on-policy Tactical-v14 imitation fit from one to three
 epochs reduced teacher-label loss, but the child scored 24–55–1 versus
 Tactical on fresh held-out mixed decks, compared with the selected parent's

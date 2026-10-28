@@ -10845,3 +10845,42 @@ pairings, seed blocks, and either the parent checkpoint or `--opponent
 tactical`. This is a single small-rate continuation and does not isolate
 selection bias, demonstrate generalization to all GOAT decks, or measure
 performance against human players.
+
+## Three-epoch winner-only imitation check (28 October 2026)
+
+To test whether the single-epoch continuation above was underfit, the same
+selected v23 parent and exact 78 winning self-play trajectories were trained
+with the same seed 91850, learning rate `0.00001`, batch size 32, and
+verification settings, changing **only** the epoch count from one to three.
+The 7,376 multi-option fitting decisions had epoch losses 0.434506,
+0.433264, and 0.432425. The trainer measured **41.93 seconds** total and
+**11.73 seconds** fitting. The ignored three-epoch checkpoint
+`.cache/goat-ai/winner_bc_3epoch_mixed_78_91000_91239.pt` has SHA-256
+`ea4be702df27c97542048c343f7e9930d8f8a27b6516b02c9cd801539f6fe056`.
+
+With the same two training-unseen Main Deck pairings, both deck assignments,
+and both policy seats, the three-epoch child scored **34–30** directly versus
+the original parent on fresh seeds 91876–91883; the one-epoch child scored
+**32–32** against that parent on the same schedule. The strict matched-report
+score difference was **+3.13 points**, paired 95% interval **−3.13 to +9.38
+points**. Direct three-epoch versus one-epoch play on a further seed block,
+91884–91891, split **32–32**. On the earlier Tactical-v14 block, 91868–91875,
+the three-epoch child scored **23–41**, the one-epoch child **20–42–2**, and
+the parent **22–41–1**. The three-epoch-minus-parent Tactical score difference
+was **+0.78 points**, paired 95% interval **−6.25 to +7.81 points**. All
+comparisons passed the unseen-Main-Deck gate; the matched-report comparator
+checked the opponent, seed schedule, deck hashes, native assets, card scripts,
+and policy evaluation source. Lower imitation loss still does not establish a
+held-out competitive gain. Keep the v23 parent selected.
+
+The ignored report hashes for three-epoch versus parent, one-epoch versus
+parent, three-epoch versus one-epoch, and three-epoch versus Tactical are,
+respectively, `9e5c2eabaa1b3ef9f917552d2ef3d0bb487807ca17112a717ff25d885909d28a`,
+`3939c0b0b30cfb8ba2b0945681ebb0c09c4dadb91d30cf3201d4b289d66581e7`,
+`03fb0b17438f757e06248ca40b9077942cad8392984b8ae03be648e41c57be79`,
+and `ea42274e757261a44a9a5c49bcadec88bc5faae8f07b1e377f803f41d58a0f4a`.
+Reproduce training with the preceding section's command, changing
+`--epochs 1` to `--epochs 3` and setting the three-epoch output path. Use
+`scripts/evaluate_policy.py` with the same matchups and flags and the stated
+seed blocks. This one fit-length comparison is not evidence that all
+winner-only or longer-fit approaches fail.
