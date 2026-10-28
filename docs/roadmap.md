@@ -821,6 +821,17 @@ unchanged Tactical-v14 baseline on 64 fresh direct games, with an interval
 including 50%. Neither the review prompts nor this teacher variant closes
 the learned-policy strength gate.
 
+A separate [broader-deck review queue](replay_audit.md#broader-deck-parent-policy-review-queue-28-october-2026)
+now exposes 14 high-margin disagreements from eight replay-verified v23/Tactical
+duels on Warrior/Chaos and Zombie/Dimension Fusion pairings. The queue gives
+human reviewers new deck contexts without treating Tactical's choices as
+correct labels. A 64-duel clipped-PPO continuation of the earlier 14-preference
+human-review child was replay-verified, but scored 135–121 against that child
+on 256 fresh-seed direct games with a paired interval crossing 50%; it scored
+64–63–1 against selected v23 on another 128 games. Neither result closes M4.
+The [evaluation log](evaluation.md#human-review-preference-followed-by-self-play-28-october-2026)
+records the settings, artifacts, and limits.
+
 Two [published 2005 New Jersey Top 8 Main and Fusion Decks](evaluation.md#preference-child-on-two-new-2005-new-jersey-top-8-lists-28-october-2026)
 now provide strict, training-unseen compositions for another seat-swapped
 holdout. The 200-step human-preference child scored 26–37–1 against its

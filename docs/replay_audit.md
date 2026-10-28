@@ -155,6 +155,41 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
   --output .cache/goat-ai/new_jersey_high_margin_review_96000_96001/queue.json
 ```
 
+## Broader-deck parent-policy review queue (28 October 2026)
+
+The [optional local review queue](../.cache/goat-ai/broad_parent_review_97200_97201/queue.html)
+offers 14 high-margin disagreements from eight complete selected-v23 versus
+Tactical-v14 duels on Mary Triatafilidi Warrior/Bryan Coronel Chaos and Jae
+Kim Zombie/WikiFormat Dimension Fusion. Seeds 97200–97201 cover both policy
+seats for each pairing. All **2,873** decisions replay-verified and passed the
+player-visibility audit. The selection compared 53 disagreements, kept at
+most three per replay, and required a raw policy-to-Tactical logit gap of at
+least 2; the selected gaps range from 2.0105 to 8.7505. Tactical's action is
+only a review candidate, not an expert label. The source Main Decks are absent
+from the selected checkpoint's training compositions, but the project has
+used these families in previous evaluation, so they are not an untouched
+strength holdout. The ignored manifest and queue JSON SHA-256 values are
+`f5b6fd985af3066bb170d61235cb3c06e08f66b51da8fe5a884d542afb1bea6d`
+and `f75390640bb75bb0719bb1449b483d6bc93e09224258edd74af425a9d5936515`.
+The queue's live server progress is authoritative for any later human labels;
+none is inferred from the Tactical comparison.
+
+To open its own save-enabled server without replacing the New Jersey parent
+queue's saved progress:
+
+```bash
+./start_review_viewer.sh \
+  .cache/goat-ai/broad_parent_review_97200_97201/queue.json
+```
+
+Reproduce the ignored source collection with `scripts/collect_policy_matches.py`
+using the selected `fv23_current_tactical_broader_33000_33031.pt`, the two
+named deck pairings, `--opponent tactical --seed 97200 --seeds 2 --workers 4
+--max-decisions 3000`, and a fresh output directory. Run
+`scripts/shortlist_policy_disagreements.py` on its eight `matchup_*.json`
+replays with the same checkpoint and `--rank-by logit --min-logit-margin 2
+--limit 24 --per-replay 3 --render-viewers`.
+
 ## Selected policy on new 2005 New Jersey decks (28 October 2026)
 
 The [local review queue](../.cache/goat-ai/new_jersey_parent_review_96000_96001/queue.html)
