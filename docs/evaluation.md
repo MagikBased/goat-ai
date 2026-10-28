@@ -9475,3 +9475,57 @@ Reproduce with `scripts/evaluate_policy.py --engine experimental
 with `--seeds 16`, and respectively `--opponent-checkpoint` or
 `--opponent tactical`. Compare the matched Tactical reports with
 `scripts/compare_tournament_reports.py --require-unseen-main-decks`.
+
+### Half-Tactical PPO continuation from the current-core child (27 October 2026)
+
+A new clipped-PPO trial began from the current-core Tactical-imitation child,
+using the same Jesse Goat Control/Warrior four-role training family but new
+seeds 57000–57127. Compared with the earlier 64-duel trial, this one used
+128 games, a 50% frozen-snapshot probability, a Tactical-v14 opponent in the
+other 50%, and learning rate 0.00005. It retained four-game frozen rollouts,
+four workers, two PPO epochs, batch 32, per-episode weighting, learner-deck
+baseline, and parent KL weight 0.5. Exactly 64 games sampled Tactical and 64
+sampled historical policy snapshots. All 128 reached terminal below 3,000
+decisions, with no censored or unsupported games. The sampled learner went
+47–80–1 over those mixed training opponents; this is not a strength estimate.
+The trainer reported 45.45 seconds and 9,962 learner decisions. Independent
+native replay verification and player-visible auditing passed all 128 saved
+trajectories, covering **63,275 decisions**.
+
+Held-out evaluation used two Main Deck pairings absent from both checkpoints'
+training compositions: Rhymus Goat Control/Charlotte Zombie and Phoenix
+Control/WikiFormat Dimension Fusion. It covered both deck assignments and
+policy seats, four workers, seeds 57200–57215 for the direct match and
+57216–57231 for matched Tactical-v14 comparisons. Every game reached terminal.
+The PPO child scored **61–66–1** directly against its parent over 128 games,
+a 48.0% score with paired 95% interval **42.6–52.7%**. Against Tactical, the
+child scored **46–81–1** and the parent **44–84** on 128 matched games each.
+The validated paired child-minus-parent difference was **+2.0 percentage
+points**, interval **−2.3 to +6.3**. The direct and matched intervals include
+no gain. This trial does not satisfy M4's self-play improvement gate, and the
+selected checkpoint stays unchanged. Increasing Tactical exposure in this
+mixture did not produce a measured held-out gain.
+
+The ignored PPO checkpoint is
+`.cache/goat-ai/current_ppo_half_tactical_57000_57127.pt` (SHA-256
+`9076728d82a8b4aa82548eddd4dd34daead456b84c6d60c1fc9f55f0c6ab9706`).
+The 128-replay audit at
+`.cache/goat-ai/current_ppo_half_tactical_57000_57127_audit.json` has SHA-256
+`5c38d933dab6bc41e427016f8eda38fdd9837bf31a007a392a00a5545a5b0fe3`.
+The direct, child-versus-Tactical, and parent-versus-Tactical report SHA-256
+values are respectively
+`1e46ba053374011da000dc98196cf91845155c7d203c1906ed1fbaf24ccae2a9`,
+`d2f07bbda6eda2dd847d510004efec74f455b78316e9c1784d3a4908e4e88288`,
+and `6bf78eec4d35f4a3cac142d190ebcd600f3c5174706a7b7236bee5a7dfd0c43c`.
+Reproduce training with `scripts/train_self_play.py` and the parent above,
+`--engine experimental --schedule-mode four_roles --seed 57000 --games 128
+--max-decisions 3000 --policy-update clipped_ppo --ppo-rollout-games 4
+--ppo-epochs 2 --ppo-batch-size 32 --ppo-rollout-weighting per_episode
+--baseline-scope learner_deck --snapshot-every 4 --parent-kl-weight 0.5
+--historical-probability 0.5 --baseline-opponent tactical --rollout-workers 4
+--learning-rate 0.00005`, and the Jesse/Warrior matchup named above. Audit
+with `scripts/audit_selfplay_replays.py`, then evaluate with
+`scripts/evaluate_policy.py --both-deck-assignments --require-unseen-main-decks
+--workers 4 --seeds 16` on the named holdouts and seed blocks. Compare the
+two Tactical reports with `scripts/compare_tournament_reports.py
+--require-unseen-main-decks`.
