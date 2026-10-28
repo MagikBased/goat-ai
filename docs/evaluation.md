@@ -9702,3 +9702,40 @@ The elapsed times will vary by machine. This measures the worst single-card
 choice menu, not complete-duel speed or competitive strength. Multiple such
 menus in parallel workers could create a material memory load; the project
 has no observed native frequency estimate for this extreme prompt.
+
+## Cross-pairing holdout for the half-Tactical PPO child (27 October 2026)
+
+The half-Tactical PPO checkpoint from seeds 57000–57127 was checked on two
+new pairings of four Main Decks already used separately in its earlier
+holdout: Rhymus Goat Control versus Roberto Martinez Phoenix Control, and
+Jae Kim Zombie versus WikiFormat Dimension Fusion. All four Main Deck
+compositions are absent from both checkpoints' training provenance, as
+enforced by `--require-unseen-main-decks`. These are new matchups and seeds,
+not new deck families. The evaluation used both deck assignments and both
+policy seats, the pinned experimental engine, four workers, and a 3,000
+decision cap. Every one of the 128 direct games and 256 Tactical games
+reached terminal.
+
+On direct seeds 57300–57315, the PPO child scored **66–60–2** against its
+imitation parent: **52.3%** with paired 95% interval **46.1–58.6%**. On
+matched Tactical-v14 seeds 57316–57331, the child scored **43–85** and the
+parent **44–83–1**. The validated paired child-minus-parent score difference
+was **−1.2 percentage points**, interval **−5.5 to +3.1 points**. Neither
+comparison establishes a gain. The child is not promoted; M4's self-play
+strength gate remains open.
+
+The ignored direct, child-versus-Tactical, and parent-versus-Tactical reports
+are respectively
+`.cache/goat-ai/ppo_half_tactical_cross_pair_direct_57300_57315.json`,
+`.cache/goat-ai/ppo_half_tactical_cross_pair_child_tactical_57316_57331.json`,
+and `.cache/goat-ai/ppo_half_tactical_cross_pair_parent_tactical_57316_57331.json`.
+Their SHA-256 hashes are respectively
+`1295fa24215b658252cf03737ee445e197b7f3089e750abfed2956405c0065de`,
+`9527d10d757583fcdd959b71b1bc373552b0ba63583113f2cb7491a52af2c0d1`,
+and `390731b081da4ef2ddfc766b6e5b15bd913af4b7b44093b8baa49c4d03222979`.
+Reproduce the three reports with `scripts/evaluate_policy.py --engine
+experimental --both-deck-assignments --require-unseen-main-decks --workers 4
+--seeds 16 --max-decisions 3000`, the two matchups above, and respectively
+`--opponent-checkpoint` with the parent or `--opponent tactical` for each
+checkpoint. Use seeds 57300 and 57316 as above. Compare the Tactical reports
+with `scripts/compare_tournament_reports.py --require-unseen-main-decks`.
