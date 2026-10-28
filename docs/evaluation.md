@@ -9622,6 +9622,10 @@ loaded native assets, 4,282 card-source/action-kind pairs, and 35 selected
 chain-response pairs. Its ignored artifact is
 `.cache/goat-ai/whitelist_distinct_10556_10605/report.json` (SHA-256
 `ce1afbd533b67ec634d5a152eaa637727ee51a427ee3633d2e19332afd1cc7c9`).
+Compared with the preceding 10506–10555 sweep, this run loaded 102 previously
+unseen native assets and offered 1,237 new card-source/action-kind pairs. The
+combined two-sweep totals are 1,303 loaded assets and 5,337 such pairs;
+all shared loaded-asset hashes agree. No new action kind appeared.
 Reproduce after [native setup](native_setup.md):
 
 ```bash
