@@ -18,6 +18,16 @@ intermediate steps are recorded as ordinary trajectory decisions and replay
 deterministically. The legal-action sequence carries selection progress;
 schema v23 separately records the public turn player; v24 adds each face-up monster's current public Type.
 
+For `MSG_SORT_CARD` and `MSG_SORT_CHAIN`, prompts with at most 2,048
+permutations retain complete `sort_cards` actions. Larger prompts expose one
+`sort_cards` action per remaining card and carry the already chosen order in
+`parameters.cards`. The adapter sends one validated permutation to ocgcore
+only after the last pick. A seven-card protocol message now exposes seven
+initial actions instead of 5,040 permutations. Forcing this path on a real
+three-card Fruits of Kozaky's Studies prompt produces a complete,
+replay-verified duel with a passing visibility audit. No seven-card
+historical duel has yet been observed.
+
 For `MSG_SELECT_COUNTER`, at most 4,096 complete allocations retain one action
 per allocation. Larger prompts expose the feasible amounts for the next
 visible card in native order. Each staged `select_counters` action carries

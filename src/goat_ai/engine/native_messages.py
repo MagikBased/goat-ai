@@ -18,6 +18,7 @@ MAX_CARD_SELECTION_COMBINATIONS = 4096
 MAX_SUM_SELECTION_COMBINATIONS = 4096
 MAX_ZONE_SELECTION_COMBINATIONS = 2048
 MAX_COUNTER_SELECTION_COMBINATIONS = 4096
+MAX_SORT_PERMUTATIONS = 2048
 
 
 @dataclass(frozen=True)
@@ -196,6 +197,15 @@ class NativeZoneSelection:
 
 
 @dataclass(frozen=True)
+class NativeSortSelection:
+    cards: tuple[tuple[int, int, int, int], ...]
+
+    def accepts(self, response: int | bytes) -> bool:
+        return (isinstance(response, bytes) and len(response) == len(self.cards)
+                and sorted(response) == list(range(len(self.cards))))
+
+
+@dataclass(frozen=True)
 class NativeCounterSelection:
     cards: tuple[tuple[int, int, int, int], ...]
     available: tuple[int, ...]
@@ -228,6 +238,7 @@ class NativeDecision:
     sum_selection: NativeSumSelection | None = None
     zone_selection: NativeZoneSelection | None = None
     counter_selection: NativeCounterSelection | None = None
+    sort_selection: NativeSortSelection | None = None
 
 
 class _Reader:
@@ -324,7 +335,7 @@ def decode_decision(message: bytes,
     if kind in (21, 25):  # MSG_SORT_CHAIN / MSG_SORT_CARD
         player = reader.integer(1)
         count = reader.integer(4)
-        if player not in (0, 1) or not 1 <= count <= 6 or factorial(count) > 2048:
+        if player not in (0, 1) or not 1 <= count <= 64:
             raise NotImplementedError("card or chain sorting bounds are not supported")
         cards = tuple((reader.integer(4), reader.integer(1), reader.integer(4),
                        reader.integer(4)) for _ in range(count))
@@ -332,6 +343,11 @@ def decode_decision(message: bytes,
         if any(controller not in (0, 1) or location not in (1, 2, 4, 8, 16, 32, 64)
                for _, controller, location, _ in cards):
             raise ValueError("invalid card sorting location")
+        if factorial(count) > MAX_SORT_PERMUTATIONS:
+            return NativeDecision(player, tuple(
+                NativeChoice("sort_cards", index, cards=(card,))
+                for index, card in enumerate(cards)),
+                sort_selection=NativeSortSelection(cards))
         return NativeDecision(player, tuple(
             NativeChoice("sort_cards", bytes(order),
                          cards=tuple(cards[index] for index in order))

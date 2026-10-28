@@ -1349,6 +1349,8 @@ class OcgcoreProbe:
                  if decision.zone_selection is not None
                  else decision.counter_selection.accepts(response_value)
                  if decision.counter_selection is not None
+                 else decision.sort_selection.accepts(response_value)
+                 if decision.sort_selection is not None
                  else response_value in {choice.response for choice in decision.choices})
         if not legal:
             raise ValueError("illegal native response")

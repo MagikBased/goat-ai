@@ -185,8 +185,17 @@ def test_new_native_choice_formats():
     assert sorted_cards.choices[0].response == b"\x00\x01\x02"
     assert sorted_cards.choices[-1].response == b"\x02\x01\x00"
     assert [card[0] for card in sorted_cards.choices[-1].cards] == [300, 200, 100]
-    with pytest.raises(NotImplementedError, match="sorting bounds"):
+    with pytest.raises(ValueError, match="truncated"):
         decode_decision(b"\x19\x00" + struct.pack("<I", 7))
+    seven = b"\x19\x00" + struct.pack("<I", 7) + b"".join(
+        struct.pack("<IBII", 100 + index, 0, LOCATION_HAND, index)
+        for index in range(7))
+    staged_sort = decode_decision(seven)
+    assert staged_sort.sort_selection is not None
+    assert len(staged_sort.choices) == 7
+    assert [choice.response for choice in staged_sort.choices] == list(range(7))
+    assert staged_sort.sort_selection.accepts(bytes((6, 5, 4, 3, 2, 1, 0)))
+    assert not staged_sort.sort_selection.accepts(bytes((0, 1, 2, 3, 4, 5, 5)))
     tribute = (b"\x14\x00\x01" + struct.pack("<III", 1, 2, 2)
                + struct.pack("<IBBIB", 111, 0, 4, 0, 1)
                + struct.pack("<IBBIB", 222, 0, 4, 1, 1))

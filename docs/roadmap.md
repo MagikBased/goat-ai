@@ -21,6 +21,13 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+Large card/chain sort prompts now use staged, linear-size legal actions after
+2,048 complete permutations. A synthetic seven-card message exercises the
+bounded menu; a forced staged path on Fruits of Kozaky's Studies finishes a
+native duel, replay-verifies, and passes the visibility audit. This removes
+one explicit protocol limit, while a real seven-card sort remains unobserved.
+See [architecture](architecture.md).
+
 A deterministic coverage suite now partitions every one of the **1,624**
 canonical legal Main Deck IDs into 41 valid decks and distributes all **52**
 canonical legal Fusion IDs into their Extra Decks. Pairing those decks ran

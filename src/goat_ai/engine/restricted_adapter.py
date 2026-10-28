@@ -162,6 +162,16 @@ class RestrictedOcgcoreEngine:
                             for choice in native.choices
                             if choice.response not in selected)
             native = replace(native, choices=choices)
+        elif native.sort_selection is not None:
+            self._counter_prefix = None
+            if self._selection_indices is None:
+                self._selection_indices = ()
+            selected = self._selection_indices
+            selection = native.sort_selection
+            choices = tuple(replace(choice, cards=tuple(
+                selection.cards[index] for index in (*selected, choice.response)))
+                for choice in native.choices if choice.response not in selected)
+            native = replace(native, choices=choices)
         else:
             self._selection_indices = None
             self._counter_prefix = None
@@ -305,6 +315,10 @@ class RestrictedOcgcoreEngine:
                 parameters["selection_minimum"] = native.zone_selection.count
                 parameters["selection_maximum"] = native.zone_selection.count
                 parameters["selected_count"] = len(self._selection_indices)
+            if native.sort_selection is not None:
+                parameters["selection_minimum"] = len(native.sort_selection.cards)
+                parameters["selection_maximum"] = len(native.sort_selection.cards)
+                parameters["selected_count"] = len(self._selection_indices)
             if (choice.sequence is not None and choice.location not in (0x01, 0x40)
                     and not (choice.location == 0x02 and choice.controller != native.player)):
                 parameters["sequence"] = choice.sequence
@@ -381,6 +395,19 @@ class RestrictedOcgcoreEngine:
                     self._selection_indices = selected
                     return self._decision(reuse_observation=True)
                 response = self._card_selection_response(selected)
+            elif self._selection_indices is not None and choice.kind == "sort_cards" \
+                    and isinstance(choice.response, int):
+                native = self.probe.decode_pending()
+                selection = native.sort_selection
+                if selection is None:
+                    raise RuntimeError("staged sorting lost its native prompt")
+                selected = (*self._selection_indices, choice.response)
+                if len(selected) < len(selection.cards):
+                    self._selection_indices = selected
+                    return self._decision(reuse_observation=True)
+                response = bytes(selected)
+                if not selection.accepts(response):
+                    raise RuntimeError("staged sorting produced invalid permutation")
             else:
                 response = choice.response
             self._selection_indices = None
