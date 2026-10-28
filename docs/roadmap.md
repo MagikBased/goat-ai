@@ -611,6 +611,8 @@ Heavy Storm fixture checks that a DMoC Summoned at Chain Link 2 misses its
 optional recovery timing. It also replay-verifies and passes the visibility
 audit; the [ruling log](goat_rules.md) records the sources and limits.
 
+A paired Smashing Ground / Book of Moon fixture now checks that this common 2005 removal Spell does not target and determines the highest-DEF face-up opposing monster on resolution. Both branches complete, replay-verify, and pass the visibility audit; the Book branch hides the surviving Set card from the acting player. Highest-DEF ties and protection effects are still open. See [GOAT rules](goat_rules.md).
+
 ## M3 — Evaluation and data
 
 Human choices from separate review queues over one verified replay can now be
