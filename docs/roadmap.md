@@ -1475,6 +1475,13 @@ through the remaining battle response windows, then the full duel
 replay-verifies and passes visibility checks. See
 [GOAT rules](goat_rules.md#cyber-jar-followed-by-bottomless-trap-hole).
 
+A paired Cyber Jar placement differential now permutes five publicly revealed
+monsters across hidden opponent zones. The placing player's private mapping
+changes; the other player's complete observation and legal actions are
+identical. Both full duels replay-verify and pass visibility checks. This
+narrows the M1 hidden-information boundary for a high-use Flip monster; see
+[GOAT rules](goat_rules.md#cyber-jar).
+
 A Metamorphosis fixture now checks the historical option to Tribute the
 player's own face-down Level 1 Dark Mimic for Thousand-Eyes Restrict, without
 triggering Mimic's Flip draw. With no matching Fusion in the Extra Deck,
