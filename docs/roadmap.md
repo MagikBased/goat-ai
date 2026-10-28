@@ -1330,6 +1330,11 @@ base teacher version for named Tactical variants; see [evaluation](evaluation.md
 
 ## M5 — Search and other formats
 
+A [paired MR1 Bottomless/Synchro fixture](edison_research.md#bottomless-trap-hole-after-a-synchro-summon)
+now tests the response window after Junk Warrior is Synchro Summoned. Both
+branches finish, replay-verify, and pass the visibility audit. This is another
+isolated protocol/ruling check; it does not certify an Edison simulator.
+
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
 

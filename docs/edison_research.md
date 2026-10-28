@@ -578,6 +578,39 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_historical_exiled_torrential.py
 ```
 
+## Bottomless Trap Hole after a Synchro Summon
+
+The [official Bottomless Trap Hole card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5400&ope=2&request_locale=en)
+specifies the 1500-ATK Summon response and banishment after destruction;
+the [official Junk Warrior record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7696&ope=2&request_locale=en)
+identifies its Synchro materials and 2300 original ATK. The pinned
+[March 2010 list](https://www.yugioh-card.com/en/downloads/alt_format/2010-03-01.pdf)
+caps Bottomless at two copies, which the new 40-card probe deck respects.
+This current card text and period restriction support the narrow interaction,
+not every historical Bottomless ruling.
+
+In paired seed-52 MR1 duels, player 0 Sets Bokoichi, then Flip Summons it
+alongside Junk Synchron to Synchro Summon Junk Warrior; player 1 previously
+Set Bottomless. At decision 36 the 2300-ATK Warrior is on the field and player
+1 is offered Bottomless as a chain response. Chaining it banishes Warrior;
+passing leaves Warrior on the field and Bottomless Set. Before the response,
+player 0's observation shows an unidentified opposing Set Trap. Both full
+duels terminate (1,267 and 1,238 decisions), serialize, replay-verify, and
+pass the player-visibility audit. The pinned official Bottomless script is
+loaded without a patch for this test; its loaded SHA-256 is
+`86ac205586401acd978132edcdca85455c221dc2ca70fee18ff8895a2fdb88de`.
+This validates one Synchro Summon response in the isolated MR1 probe, not
+the complete Edison profile. Reproduce with:
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_bottomless_synchro_probe.py \
+  --output replays/mr1_bottomless_synchro_seed52.json
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_bottomless_synchro_probe.py \
+  --pass-bottomless --output replays/mr1_bottomless_pass_seed52.json
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_bottomless_synchro.py
+```
+
 ## Same-time trigger ordering
 
 The [2009 official rulebook's simultaneous-effects section](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
