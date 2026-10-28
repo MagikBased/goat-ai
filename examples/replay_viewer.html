@@ -178,6 +178,7 @@
     <div><h1>GOAT AI Replay Viewer</h1><p id="view-mode" class="muted subtitle">Player-visible decision snapshots</p></div>
     <div class="toolbar">
       <a id="create-game-link" href="/games/new" hidden>Create AI game</a>
+      <a id="play-ai-link" href="/games/play" hidden>Play against AI</a>
       <label>Open trajectory <input id="file" type="file" accept=".json,application/json"></label>
       <label>Reviewer reveals <input id="review-file" type="file" accept=".json,application/json" title="Choose a verified .review.json sidecar"></label>
       <label class="image-picker" title="Select your local card image folder">Card images <input id="images" type="file" webkitdirectory directory multiple accept="image/jpeg,image/png,image/webp"></label>
@@ -1566,6 +1567,7 @@
     }, {passive: false});
     addEventListener("resize", placePreview);
     byId("create-game-link").hidden = !["127.0.0.1", "localhost"].includes(location.hostname);
+    byId("play-ai-link").hidden = !["127.0.0.1", "localhost"].includes(location.hostname);
     try {
       names = JSON.parse(byId("embedded-names").textContent);
       optionTexts = JSON.parse(byId("embedded-options").textContent);
