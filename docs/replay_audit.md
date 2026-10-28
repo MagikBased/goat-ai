@@ -1,5 +1,29 @@
 # Early replay decision audit
 
+## New Jersey high-margin review queue (28 October 2026)
+
+The [local queue](../.cache/goat-ai/new_jersey_high_margin_review_96000_96001/queue.html)
+uses the same eight independently sourced 2005 New Jersey duels described
+below. It retains **22** distinct policy/Tactical-v14 disagreements from
+**74** candidates where the selected policy's raw score gap over the Tactical
+suggestion is at least 2. Selected gaps range from **2.223 to 7.971**.
+Each source duel was replay-verified and visibility-audited again during
+selection. A large gap means the policy strongly scores its recorded action;
+Tactical's alternative is only a prompt for human review. The queue contains
+no human labels. `./start_review_viewer.sh` opens this newest local queue and
+saves review choices on the local server. The ignored queue JSON SHA-256 is
+`cfcc6ce174b3908167c2a5e96cf22442e5d82d1fccb089f14570e92270cbdfee`.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/new_jersey_parent_review_96000_96001/matchup_*.json \
+  --native-root .cache/goat-ai --rank-by logit --min-logit-margin 2 \
+  --limit 24 --per-replay 3 --render-viewers \
+  --output .cache/goat-ai/new_jersey_high_margin_review_96000_96001/queue.json
+```
+
 ## Selected policy on new 2005 New Jersey decks (28 October 2026)
 
 The [local review queue](../.cache/goat-ai/new_jersey_parent_review_96000_96001/queue.html)

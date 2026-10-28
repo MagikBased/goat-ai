@@ -1,5 +1,30 @@
 # Baseline evaluation log
 
+## Self-play action-margin check on independent 2005 lists (28 October 2026)
+
+The 240-duel PPO child's limited change to the selected parent's greedy
+decisions was checked on a second deck family, the Ryan Hayakawa and Theeresak
+Poonsombat New Jersey 2005 lists. All eight previously recorded parent-policy
+versus Tactical-v14 trajectories from seeds 96000–96001 replay-verified against
+the current pinned core and passed the visibility audit. Neither checkpoint
+trained on those seeds. Across **715** multi-option parent-policy decisions,
+the PPO child changed **8** final choices. All eight changes came from parent
+raw top-two logit gaps below **0.241** (median **0.038**); the 707 unchanged
+choices had median gap **2.932**, and 455 had gaps of at least 2. This repeats
+the near-tie pattern seen on the earlier eight-duel sample, now with different
+Main Deck compositions. It is an off-policy action diagnostic, not a strength
+result or a calibration of model confidence. The ignored report SHA-256 is
+`334e198b6f2d4e4f6498e2382a21cb5baa15b5004e867b454930aae4b01200b0`.
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_margins.py \
+  --parent .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --child .cache/goat-ai/ppo_mixed_240_91000_91239.pt \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/new_jersey_ppo_margins_96000_96001.json \
+  .cache/goat-ai/new_jersey_parent_review_96000_96001/matchup_*.json
+```
+
 ## Synthetic Thunder Dragon relabeling ablation (28 October 2026)
 
 An opt-in clone-training flag now substitutes a legal Deck-copy `select_card`
