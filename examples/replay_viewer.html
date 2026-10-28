@@ -199,9 +199,10 @@
         <div class="panel">
           <h2>Selected action</h2>
           <div id="action" class="action"></div>
+          <button id="choose-alternative" type="button">Choose a different action</button>
           <p id="selection-progress" class="selection-progress" hidden></p>
           <p id="legal-count" class="muted"></p>
-          <details><summary>All legal actions</summary><ol id="legal" class="legal-list"></ol><button id="legal-more" type="button" hidden>Show more</button></details>
+          <details id="legal-details"><summary>All legal actions</summary><ol id="legal" class="legal-list"></ol><button id="legal-more" type="button" hidden>Show more</button></details>
         </div>
         <div class="panel" id="review-panel">
           <h2>Review a decision</h2>
@@ -1045,6 +1046,7 @@
       }
       const count = terminal ? 0 : record.legal_actions.length;
       byId("legal-count").textContent = terminal ? "No legal actions" : `${count} legal actions at this decision`;
+      byId("choose-alternative").hidden = terminal || !canAnnotateFrame(observation);
       const legal = byId("legal");
       legal.replaceChildren(...(terminal ? [] : record.legal_actions.slice(0, legalShown).map(
         (action, actionIndex) => {
@@ -1073,7 +1075,8 @@
         action => action.id === record.selected_action.id);
       byId("annotation-status").textContent = `${annotations.size} labeled frame${annotations.size === 1 ? "" : "s"}`
         + (terminal ? " · Final state" : frameLabel == null ? " · This frame is unlabeled"
-          : ` · Your choice: option ${frameLabel + 1} (${frameLabel === recordedIndex ? "matches AI played" : "differs from AI played"})`)
+          : ` · Your choice: ${actionLabel(observation, record.legal_actions[frameLabel], known, frameLabel)}`
+            + (frameLabel === recordedIndex ? " (AI played)" : " (different from AI played)"))
         + (localReviewMode ? saveError ? " · Save failed; use Download labels"
           : labelsExported ? " · Saved on this computer" : " · Saving…" : "");
       byId("label-recorded").disabled = terminal || !canAnnotateFrame(observation);
@@ -1253,6 +1256,12 @@
     byId("previous-common").addEventListener("click", () => moveCommon(-1));
     byId("next-common").addEventListener("click", () => moveCommon(1));
     byId("legal-more").addEventListener("click", () => { legalShown += 100; render(); });
+    byId("choose-alternative").addEventListener("click", () => {
+      const details = byId("legal-details");
+      details.open = true;
+      details.scrollIntoView({block: "nearest"});
+      details.querySelector("summary").focus({preventScroll: true});
+    });
     byId("label-recorded").addEventListener("click", () => {
       if (!replay || index >= replay.decisions.length ||
           !canAnnotateFrame(replay.decisions[index].observation)) return;

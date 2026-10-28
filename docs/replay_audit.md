@@ -144,6 +144,9 @@ The saved-choice line says whether your choice matches it.
 **Approve AI-played action** explicitly labels the
 recorded action. No reviewer name or file download is needed with the local
 server; the default `local-reviewer` alias is provenance for the validator.
+The **Choose a different action** button beside the recorded play opens the
+legal list and brings it into view. Click the action you would play; the saved
+choice line shows its name and whether it differs from the AI's play.
 The
 reviewer-only reveal is for diagnosis and cannot be labeled. Do not use this
 queue's choices in training without validating them, and do not evaluate a
