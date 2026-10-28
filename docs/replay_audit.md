@@ -1,5 +1,34 @@
 # Early replay decision audit
 
+## On-policy tournament-card review queue (28 October 2026)
+
+The [local queue](../.cache/goat-ai/on_policy_mix_review_65000_65001/queue.html)
+selects **24 distinct prompts** from eight of the new tournament-card-mix
+policy-versus-Tactical duels. The source trajectories contain **3,566**
+replay-verified, visibility-audited decisions. The queue builder reproduced
+every greedy choice of the unchanged feature-v23 checkpoint and found 166
+candidate disagreements or visible-state flags. Four selected prompts carry
+conservative audit flags: own-set-monster Nobleman, Heavy Storm against only
+friendly backrow, a weak Flip monster Normal Summon with a Set available, and
+Pot of Greed before an available Thunder Dragon. These are review prompts,
+not proven optimal alternatives or human labels. No choices from this queue
+have been used for training.
+
+Run `./start_review_viewer.sh` to open the newest queue through the local
+save-enabled server. To return to the earlier ambiguous-choice recheck, run
+`./start_review_viewer.sh .cache/goat-ai/ambiguous_review_recheck/recheck.json`.
+The new queue JSON SHA-256 is
+`7ea372cef3b71f08636d68e7b1cb4a7c8b8e25bb5387f64b7e7933f8eb0073d5`.
+Rebuild it from the ignored source replays and selected parent checkpoint with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/shortlist_policy_disagreements.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/on_policy_mix_11030_11069_65000_65001/matchup_0[0-3]_seed_6500[01]_seat_0.json \
+  --native-root .cache/goat-ai --limit 24 --per-replay 3 --render-viewers \
+  --output .cache/goat-ai/on_policy_mix_review_65000_65001/queue.json
+```
+
 ## Current 2005-deck development queue (27 October 2026)
 
 The [new local queue](../.cache/goat-ai/current_2005_development_review_49600_49601/queue.html)
