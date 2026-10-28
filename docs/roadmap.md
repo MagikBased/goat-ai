@@ -355,8 +355,12 @@ completeness unproven; see
 A paired Nobleman of Extermination fixture now distinguishes a hidden Set
 Trap from a Set Spell. It checks the GOAT-variant script, same visible target
 choice, Trap-only matching-copy banishment and recipient-scoped Deck reveals,
-then finishes and replay-verifies both duels with visibility audits. A chained
-activation of the targeted Trap remains open; see [GOAT rules](goat_rules.md).
+then finishes and replay-verifies both duels with visibility audits. A second
+paired fixture checks the historical response rule: targeted Dust Tornado
+chains, becomes face-up, and prevents Extermination's banishment and Deck
+verification; passing lets the banishment proceed. Both response branches
+also finish and replay-verify. Other responses remain open; see
+[GOAT rules](goat_rules.md).
 
 A source-backed Card Destruction/Banisher of the Light fixture now confirms
 that both players draw their full discarded counts even though Banisher sends

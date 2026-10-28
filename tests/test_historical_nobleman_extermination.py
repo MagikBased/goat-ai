@@ -15,6 +15,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 EXTERMINATION = 504700025  # historical Deck-verification script
 SAKURETSU = 56120475
 BOOK = 14087893
+DUST = 60082869
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -115,3 +116,109 @@ def test_extermination_hidden_trap_vs_spell_has_same_target_choice(tmp_path):
     trap_decision = run(SAKURETSU)
     spell_decision = run(BOOK)
     assert trap_decision == spell_decision
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("chain_dust", [False, True])
+def test_extermination_target_activated_as_chain_link_is_not_banished(
+        tmp_path, chain_dust):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"goat/c{EXTERMINATION}.lua", f"official/c{DUST}.lua"):
+        if not (root / "scripts" / relative).is_file():
+            pytest.skip(f"script {relative} not installed")
+    attacker = tmp_path / "attacker_dust.ydk"
+    defender = tmp_path / "defender_dust.ydk"
+    attacker.write_text("#main\n" + "\n".join(map(str, (
+        EXTERMINATION, *([DUST] * 3), *VANILLA_DECK[4:])))
+        + "\n#extra\n!side\n")
+    defender.write_text("#main\n" + "\n".join(map(str, (
+        *([DUST] * 3), *VANILLA_DECK[3:])))
+        + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(attacker), str(defender), seed=18,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert EXTERMINATION in {card.code for card in obs.hand}
+        assert DUST in {card.code for card in env.engine.probe.observation(1).hand}
+        set_target = activated = targeted = responded = dust_targeted = checked = False
+        deck_before = hand_copies = None
+        agents = (RandomAgent(18), RandomAgent(19))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1 and not set_target:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == DUST), None)
+                set_target = action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and set_target \
+                    and not activated:
+                action = next((a for a in actions if a.kind == "activate"
+                               and a.parameters.get("code") == EXTERMINATION), None)
+                activated = action is not None
+            if activated and not targeted and actions[0].kind == "select_card":
+                assert obs.viewer == obs.acting_player == 0
+                assert not obs.private_reveals
+                assert all("code" not in a.parameters for a in actions)
+                deck_before = obs.deck_counts
+                hand_copies = tuple(sum(card.code == DUST for card in
+                                        env.engine.probe.observation(seat).hand)
+                                    for seat in (0, 1))
+                action = next(a for a in actions
+                              if a.parameters.get("controller") == 1)
+                targeted = True
+            if targeted and obs.acting_player == 1 and not responded:
+                option = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == DUST), None)
+                if option is not None:
+                    action = option if chain_dust else next(
+                        a for a in actions if a.kind == "pass")
+                    responded = True
+            if responded and chain_dust and not dust_targeted \
+                    and actions[0].kind == "select_card":
+                action = next((a for a in actions
+                               if a.parameters.get("controller") == 0
+                               and a.parameters.get("code") == EXTERMINATION), None)
+                dust_targeted = action is not None
+            if action is None and not checked:
+                action = next((a for a in actions if a.kind in (
+                    "no", "place", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+            if responded and not checked and obs.turn == 3 \
+                    and obs.phase == "main1" and obs.acting_player == 0 \
+                    and not obs.chain and EXTERMINATION in {
+                        card.code for card in obs.graveyards[0]}:
+                assert dust_targeted == chain_dust
+                if chain_dust:
+                    assert not any(card.code == DUST for cards in obs.banished
+                                   for card in cards)
+                    assert obs.deck_counts == deck_before
+                    assert DUST in {card.code for card in obs.graveyards[1]}
+                    assert not env.engine.probe.observation(0).private_reveals
+                    assert not env.engine.probe.observation(1).private_reveals
+                else:
+                    assert sum(card.code == DUST for card in obs.banished[0]) \
+                        == 3 - hand_copies[0]
+                    assert sum(card.code == DUST for card in obs.banished[1]) \
+                        == 3 - hand_copies[1]
+                    assert obs.deck_counts == (
+                        deck_before[0] - (3 - hand_copies[0]),
+                        deck_before[1] - (2 - hand_copies[1]))
+                    assert env.engine.probe.observation(0).private_reveals
+                    assert env.engine.probe.observation(1).private_reveals
+                checked = True
+        assert set_target and activated and targeted and responded and checked
+        assert env.is_terminal()
+        scripts = env.engine.probe.loaded_script_sha256
+        assert f"goat/c{EXTERMINATION}.lua" in scripts
+        if chain_dust:
+            assert f"official/c{DUST}.lua" in scripts
+        path = tmp_path / f"extermination_dust_{chain_dust}.json"
+        write_trajectory(path, env.trajectory())
+        replay = read_trajectory(path)
+        audit_trajectory_visibility(replay)
+        assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) == len(
+            replay.decisions)
