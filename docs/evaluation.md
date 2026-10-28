@@ -11624,3 +11624,57 @@ PYTHONPATH=src:. GOAT_AI_NATIVE_ROOT=.cache/goat-ai .venv/bin/python \
 
 The next coverage step is to select cards whose effects or unusual prompts
 were not exercised and create forced-action native fixtures for them.
+## Human-review preference followed by self-play (28 October 2026)
+
+To test whether self-play can improve the 14-preference New Jersey human-review
+child, `scripts/train_self_play.py` continued
+`.cache/goat-ai/fv23_new_jersey_high_margin_14pref_120step.pt` (SHA-256
+`588f4e973998948ebd51d4b8a77674928bdc84aaead4d14fa1d62e4787504a9e`)
+for 64 terminal GOAT duels on seeds 97000–97063. The training pairings were
+Jesse Twohig Goat Control/Montague Warrior and DingoSig Chaos Return/Weirdchamp
+Bazoo Return, with the four-role schedule covering both learner seats and
+decks. The clipped-PPO configuration used four-game frozen rollouts, four
+workers, two epochs, batch size 32, per-episode weighting, learner-deck return
+baseline, learning rate 0.00005, parent KL weight 0.5, independent opponent
+sampling, and a 50% historical-snapshot probability with Tactical-v14
+otherwise. The sampled learner won 23, lost 41, and drew none against the
+training mixture; this is not an evaluation score. Training took 22.00 seconds
+and recorded 4,343 learner decisions. The checkpoint is
+`.cache/goat-ai/human14_ppo_mixed_64_97000_97063.pt` (SHA-256
+`d0a26c40e60ede0872a4aa3bc06e9a0a8bea30ecba01194ac06e07dfc59c8fc7`).
+All 64 saved trajectories and **27,511 decisions** passed exact native replay
+verification and player-visibility auditing through
+`scripts/audit_selfplay_replays.py`; the ignored audit JSON has SHA-256
+`9e06ab875c98f537b2661c018749bab614b07dc7cd0122ed4ed2b85ceed335cd`.
+
+For direct held-out evaluation, the trainer and evaluator rejected overlapping
+Main Deck compositions. The two matchups were Mary Triatafilidi Warrior/Bryan
+Coronel Chaos and Jae Kim Zombie/WikiFormat Dimension Fusion, with both deck
+assignments and policy seats. These deck compositions are absent from both
+checkpoints' training histories; this is **not an untouched deck-family test**,
+since the project has used these families in earlier model selection. The
+initial seeds 97080–97087 gave the PPO child **35–29** against its human-review
+parent over 64 duels (paired 95% score interval 46.9–64.1%). A larger run on
+fresh seeds 97100–97131 gave **135–121** over 256 duels (52.7%, paired 95%
+interval 49.2–56.6%). A separate 128-duel direct match on seeds 97150–97165
+against the selected v23 reference was **64–63–1** (50.4%, paired interval
+44.1–57.0%). Neither comparison establishes a competitive gain. The v23
+reference remains selected and M4's held-out self-play improvement gate is
+still open. The three ignored evaluation reports have SHA-256 values
+`083ed49201d7c653a721e3606d8a0f1e8235a69468e24fbc6435ff86b36086ed`,
+`7d0ade1851be3553d0de6e52abd059888dc8ef75b937edef540aab0e114e8b70`,
+and `9668cf0539b36a7d6891e11a0863426003f13369149f13d39ae5acd3d4787225`,
+respectively. No checkpoint or replay binary is committed.
+
+Reproduce the training using the above parent and pairings with
+`scripts/train_self_play.py --engine experimental --schedule-mode four_roles
+--seed 97000 --games 64 --max-decisions 3000 --policy-update clipped_ppo
+--ppo-rollout-games 4 --rollout-workers 4 --ppo-rollout-weighting per_episode
+--ppo-epochs 2 --ppo-batch-size 32 --learning-rate 0.00005 --parent-kl-weight
+0.5 --baseline-scope learner_deck --snapshot-every 4 --max-snapshots 8
+--historical-probability 0.5 --baseline-opponent tactical
+--independent-opponent-rng`, plus distinct `--output` and `--record-dir` paths.
+Run `scripts/audit_selfplay_replays.py` over the recorded trajectories. Use
+`scripts/evaluate_policy.py --engine experimental --both-deck-assignments
+--require-unseen-main-decks --workers 4 --max-decisions 3000` with the named
+holdout pairings, each stated seed range, and the stated opponent checkpoint.
