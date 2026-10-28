@@ -346,7 +346,8 @@ def test_browser_review_choice_autosaves_without_name_or_download(tmp_path, monk
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
-def test_queue_navigation_waits_for_alternative_choice_save(tmp_path, monkeypatch):
+@pytest.mark.parametrize("operation", ("select", "clear"))
+def test_queue_navigation_waits_for_choice_save(tmp_path, monkeypatch, operation):
     queue, replay, digest, _ = _queue(tmp_path)
     viewer = tmp_path / "game.html"
     render_replay(replay, viewer, tmp_path / "native")
@@ -366,20 +367,27 @@ def test_queue_navigation_waits_for_alternative_choice_save(tmp_path, monkeypatc
           return;
         }
         clearInterval(timer);
-        inner.document.querySelector('#legal button:not(.recorded)').click();
+        if (__OPERATION__ === 'clear') inner.document.getElementById('clear-label').click();
+        else inner.document.querySelector('#legal button:not(.recorded)').click();
+        const pendingAtClick = inner.goatAiReviewNavigationState().pending &&
+          inner.goatAiReviewNavigationState().saving;
         document.getElementById('back-to-queue').click();
         setTimeout(() => {
-          document.body.dataset.queueProbe = [stage.hidden, pendingLabels,
+          document.body.dataset.queueProbe = [pendingAtClick, stage.hidden, pendingLabels,
             labelSaving, confirmations,
-            document.getElementById('review-progress').textContent.includes('1 of 1')].join('|');
+            document.getElementById('review-progress').textContent.includes(
+              __OPERATION__ === 'clear' ? '0 of 1' : '1 of 1')].join('|');
         }, 600);
       }, 30);
     </script></body>"""
     queue.with_suffix(".html").write_text(
         queue.with_suffix(".html").read_text().replace("</script></html>",
-            "</script>" + probe.replace("</body>", "") + "</html>"))
+            "</script>" + probe.replace("</body>", "").replace(
+                "__OPERATION__", json.dumps(operation)) + "</html>"))
     monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
     output = tmp_path / "saved"
+    if operation == "clear":
+        serve_review_queue.ReviewStore(queue, output).choose(digest, 0, 1)
     server = serve_review_queue.make_server(queue, output, port=0)
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -391,9 +399,12 @@ def test_queue_navigation_waits_for_alternative_choice_save(tmp_path, monkeypatc
         ], capture_output=True, text=True, timeout=20, check=True)
         match = re.search(r'data-queue-probe="([^"]+)"', result.stdout)
         assert match, result.stderr[-1000:]
-        assert match.group(1) == "true|false|false|0|true"
-        assert json.loads((output / f"{digest}.json").read_text())["choices"] == [
-            {"decision_index": 0, "action_index": 1}]
+        assert match.group(1) == "true|true|false|false|0|true"
+        if operation == "clear":
+            assert not (output / f"{digest}.json").exists()
+        else:
+            assert json.loads((output / f"{digest}.json").read_text())["choices"] == [
+                {"decision_index": 0, "action_index": 1}]
     finally:
         server.shutdown()
         server.server_close()

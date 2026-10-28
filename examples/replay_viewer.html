@@ -297,8 +297,8 @@
     // The same-origin queue can inspect this synchronously before replacing
     // the iframe. postMessage alone may arrive after a quick navigation click.
     window.goatAiReviewNavigationState = () => ({
-      pending: annotations.size > 0 && !labelsExported || noteDirty,
-      saving: localReviewMode && annotations.size > 0 && !labelsExported && !saveError || noteSaving,
+      pending: (localReviewMode || annotations.size > 0) && !labelsExported || noteDirty,
+      saving: localReviewMode && !labelsExported && !saveError || noteSaving,
       error: saveError ? "Action save failed; see the replay sidebar" :
         noteError ? "Note save failed; see the replay sidebar" : "",
       actionSave: saveQueue,
@@ -306,8 +306,8 @@
     function notifyLabelState() {
       if (window.parent !== window) window.parent.postMessage(
         {type: "goat-ai-review-label-state",
-         pending: annotations.size > 0 && !labelsExported || noteDirty,
-         saving: localReviewMode && annotations.size > 0 && !labelsExported && !saveError || noteSaving,
+         pending: (localReviewMode || annotations.size > 0) && !labelsExported || noteDirty,
+         saving: localReviewMode && !labelsExported && !saveError || noteSaving,
          error: saveError ? "Action save failed; see the replay sidebar" :
            noteError ? "Note save failed; see the replay sidebar" :
            !localReviewMode && annotations.size > 0 && !labelsExported
@@ -1169,10 +1169,13 @@
         + (localReviewMode && localReviewableFrames && !terminal &&
            !localReviewableFrames.has(index)
           ? " · Outside this review queue; open a queued decision to label it" : "")
-        + (localReviewMode ? saveError ? " · Save failed; use Download labels"
+        + (localReviewMode ? saveError ? annotations.size ? " · Save failed; use Download labels"
+          : " · Save failed; click Retry clear"
           : labelsExported ? " · Saved on this computer" : " · Saving…" : "");
       byId("label-recorded").disabled = terminal || !canAnnotateFrame(observation);
-      byId("clear-label").disabled = terminal || frameLabel == null;
+      byId("clear-label").disabled = terminal || frameLabel == null && !saveError;
+      byId("clear-label").textContent = frameLabel == null && saveError
+        ? "Retry clear" : "Clear choice";
       renderNotePanel(terminal, observation);
       const knownHand = observation.known_opponent_hand_cards || [];
       byId("known-hand").textContent = (reviewerData ? "AI-visible knowledge: " : "") + (knownHand.length
@@ -1253,8 +1256,10 @@
       }).catch(error => {
         if (digest !== sourceSha256) return;
         saveError = true; labelsExported = false;
-        byId("manual-review-export").hidden = false;
-        byId("review-instructions").textContent = `Local save failed: ${error.message}. Download labels as a backup.`;
+        byId("manual-review-export").hidden = annotations.size === 0;
+        byId("review-instructions").textContent = annotations.size
+          ? `Local save failed: ${error.message}. Download labels as a backup.`
+          : `Local clear failed: ${error.message}. Use Retry clear before leaving.`;
         notifyLabelState(); render();
       });
     }

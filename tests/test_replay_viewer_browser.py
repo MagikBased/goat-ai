@@ -98,6 +98,45 @@ def test_local_review_only_enables_decisions_offered_by_queue(tmp_path):
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_failed_clear_can_be_retried_without_exporting_empty_labels(tmp_path):
+    played = {"id": "played", "kind": "battle_phase", "actor": 0, "parameters": {}}
+    other = {"id": "other", "kind": "end_phase", "actor": 0, "parameters": {}}
+    replay = {"seed": 1, "source": "test", "winner": 0, "decisions": [
+        {"observation": _observation(), "selected_action": played,
+         "legal_actions": [played, other]},
+    ]}
+    html = _embed_viewer(replay, "0" * 64, {}, {}, {})
+    probe = """<script>
+      (async () => {
+        localReviewMode = true; localReviewableFrames = new Set([0]);
+        annotations.set(0, 1); labelsExported = true; render();
+        let calls = 0;
+        window.fetch = async () => ({ok: ++calls > 1,
+          json: async () => calls > 1 ? {saved: true} : {error: 'temporary failure'}});
+        byId('clear-label').click();
+        await saveQueue;
+        const failed = saveError && !labelsExported &&
+          byId('clear-label').textContent === 'Retry clear' &&
+          !byId('clear-label').disabled && byId('manual-review-export').hidden;
+        byId('clear-label').click();
+        await saveQueue;
+        document.body.dataset.clearProbe = [failed, calls === 2,
+          !saveError, labelsExported, annotations.size === 0].join('|');
+      })();
+    </script></body>"""
+    path = tmp_path / "retry_clear.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=300", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-clear-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "true|true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_outdated_local_review_server_disables_unsavable_choices(tmp_path):
     played = {"id": "played", "kind": "battle_phase", "actor": 0, "parameters": {}}
     other = {"id": "other", "kind": "end_phase", "actor": 0, "parameters": {}}
