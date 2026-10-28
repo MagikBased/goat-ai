@@ -9201,3 +9201,45 @@ Reproduce it after native setup with:
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_historical_private_draw_pool.py
 ```
+### Native worker scaling on sourced decks (27 October 2026)
+
+Eight RandomAgent duels used Matt Peddle's sourced 2005 Goat Control Main Deck
+against the sourced Riclar 2020 Chaos Turbo Main Deck, paired across seats on
+seeds 49800–49803. The pinned experimental native adapter, identical decks and
+assets, a 3,000-decision cap, and `OMP_NUM_THREADS=1` were held fixed. Runs
+were sequential on an Intel Core i7-10700K with 16 logical CPUs and 46 GiB of
+RAM. Every game reached terminal; all three worker counts produced the same
+winners and **8,150 total decisions**, including identical per-game decision
+counts. Wall time includes process spawn and shutdown.
+
+| Spawned workers | Wall time | Duels/s | Decisions/s | Mean reset/duel | Sum of worker peak RSS |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 2.691 s | 2.973 | 3,028 | 61.1 ms | 118,308 KiB |
+| 4 | 1.518 s | 5.271 | 5,369 | 64.0 ms | 229,352 KiB |
+| 8 | 1.125 s | 7.112 | 7,246 | 87.7 ms | 447,036 KiB |
+
+The sums combine each worker's Linux `VmHWM`, so they are **not** simultaneous
+machine-wide memory peaks. Parent peak RSS was 26,680, 26,568, and 26,388 KiB
+respectively. These are single short runs, not confidence intervals for
+throughput or a forecast for long training; they exclude neural inference,
+trajectory writing, and verification. On this schedule eight workers were
+2.39 times as fast as two, with 3.78 times the summed worker high-water
+memory. Larger schedules and inference batching still need measurement.
+
+Reproduce from the pinned native setup at commit `0d14fc1` with:
+
+```bash
+for workers in 2 4 8; do
+  OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+    scripts/benchmark_parallel_native.py \
+    --deck-a examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+    --deck-b examples/decks/chaos_turbo_riclar_2020.ydk \
+    --seed 49800 --games 8 --workers "$workers" \
+    --output ".cache/goat-ai/parallel_2005_matt_chaos_49800_${workers}w.json"
+done
+```
+
+The ignored report SHA-256 values, in worker-count order, are
+`5008ead844418a40da0197e1b829dc167187486363072fafa158da2109e09ac6`,
+`cffec29a48b0c911fca20f6eb7e63d0b12d2b375dd2c35d918b5d127cbda3cdb`,
+and `2d21a57a4e7f0467579a04f0191595be3fc937c40349e2e2fc393587986790a4`.
