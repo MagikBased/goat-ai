@@ -1458,6 +1458,13 @@ Dekoichi with three copies of either card in the defender's Deck. The attacker
 cannot distinguish them at target selection; only the Flip branch removes
 matching Deck copies and reveals Decks. Both complete duels replay-verify.
 
+A paired Dimension Fusion/Bottomless fixture now checks simultaneous revival
+of two monsters with at least 1500 ATK. Bottomless banishes both without a
+response; chaining Book of Moon to one protects it face-down while the other
+is still banished. Both complete duels replay-verify and pass visibility
+checks. This closes one staple multi-Summon branch, not general GOAT card
+correctness; see [GOAT rules](goat_rules.md#bottomless-against-two-simultaneous-dimension-fusion-monsters).
+
 A Metamorphosis fixture now checks the historical option to Tribute the
 player's own face-down Level 1 Dark Mimic for Thousand-Eyes Restrict, without
 triggering Mimic's Flip draw. With no matching Fusion in the Extra Deck,
