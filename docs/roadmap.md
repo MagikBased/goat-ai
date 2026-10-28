@@ -2035,3 +2035,9 @@ checks the competitive choice at attack declaration: passing Ring allows
 Airknight before damage, deals 1,900 effect damage to each player, and prevents
 the draw. Both branches complete, replay-verify, and pass the visibility audit.
 This adds one M2 historical interaction; the wider correctness gate remains open.
+
+A second paired Airknight fixture checks Book of Moon at attack declaration.
+Setting Airknight ends the attack without a replay, damage, or draw and leaves
+no Main Phase 2 Flip Summon; passing Book allows 1,900 damage and the draw.
+Both branches complete and pass replay and visibility checks. The broader M2
+gate and M4 learned-policy strength gate remain open.
