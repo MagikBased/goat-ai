@@ -89,6 +89,8 @@ A [sixth sourced tournament Main Deck](../examples/decks/bazoo_return_weirdchamp
 
 **Exit:** A clean setup completes seeded random-agent duels with valid outcomes and no unhandled native messages in the fixture decks. Illegal actions are rejected. Repeated seeds reproduce action/observation/outcome traces. Changing a hidden opponent hand or deck order while holding the visible state fixed cannot change the observation supplied to the agent.
 
+A further [20-duel independent whitelist/Fusion sample](evaluation.md#additional-independent-whitelist-and-fusion-protocol-sample-28-october-2026) reached terminal with 19,282 replay-verified, visibility-audited decisions; two seeds reproduced identical traces. This widens protocol coverage without resolving card-specific historical correctness.
+
 Large `MSG_SELECT_PLACE` and `MSG_SELECT_DISFIELD` choices now use staged,
 linear-size public zone actions when complete combinations exceed 2,048.
 The adapter preserves each chosen zone's order and submits one native response

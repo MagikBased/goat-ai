@@ -10083,3 +10083,41 @@ tactical --both-deck-assignments --require-unseen-main-decks --seed 60000
 from the isolated probe's `seed_10990` through `seed_10999` deck files and
 using the named checkpoint for each run. Validate the matched reports with
 `scripts/compare_tournament_reports.py --require-unseen-main-decks`.
+## Additional independent whitelist and Fusion protocol sample (28 October 2026)
+
+An isolated RandomAgent probe paired 20 independently sampled, whitelist-legal
+40-card Main Decks with 20 different opponent Main Decks on seeds 11100–11119.
+Each deck received a deterministic 15-card Fusion Deck. All **20/20 duels**
+reached terminal within the 3,000-decision cap. All **19,282 decisions**
+replay-verified and passed the player-visibility audit, which observed 129
+hidden-field, 963 opponent-field, and 18 opponent-hand choices. The run loaded
+61 script paths absent from the earlier 50-game random-Fusion sample on seeds
+10700–10749; loading a script does not prove every effect branch was used.
+No protocol failure was found in this sample.
+
+Two of these seeds were rerun with deterministic trace checking. Both terminal
+duels reproduced all **1,587 decisions** and passed replay and visibility
+checks. The full report is ignored local data at
+`.cache/goat-ai/protocol_whitelist_11100_11119/report.json` (SHA-256
+`da08e64294d96376a5093d72962213cfb323528090c486fd93a1ba293147e37c`).
+The repeat report is
+`.cache/goat-ai/protocol_whitelist_repeat_11100_11101/report.json` (SHA-256
+`2d24487a2a653e9b1af5591bd9f86a41b16faa87a130c7d33e6820fe007b4cae`).
+
+```bash
+PYTHONPATH=src:. OMP_NUM_THREADS=1 .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/protocol_whitelist_11100_11119 \
+  --seed 11100 --seeds 20 --max-decisions 3000 --card-pool whitelist \
+  --distinct-opponents --random-extra --isolate-games --verify-replays
+
+PYTHONPATH=src:. OMP_NUM_THREADS=1 .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/protocol_whitelist_repeat_11100_11101 \
+  --seed 11100 --seeds 2 --max-decisions 3000 --card-pool whitelist \
+  --distinct-opponents --random-extra --isolate-games --verify-replays \
+  --repeat-seeds
+```
+
+This is native protocol and observation coverage. Random play and a sampled
+card pool cannot establish historical GOAT correctness for the loaded cards.
