@@ -11321,6 +11321,31 @@ information-flow and M2 card-ruling gates remain open.
 
 ## Native option feature-alias audit (28 October 2026)
 
+The alias audit now also reports selected option ordinals and their public
+chain-source cards, after exact native replay and visibility verification. A
+combined run over the eight New Jersey parent/Tactical games and eight
+Warrior/Beastdown and Phoenix/Flip Tactical games verified **16 complete
+duels and 8,504 decisions**. It found **2,758** multi-action decisions but
+only **12** prompts with multiple `select_option` actions: ten Enemy
+Controller prompts and two Don Zaloog prompts. All **12/12** selected ordinal
+zero; no second-option choice was recorded in this sample. Feature v30 had
+zero distinct-action aliases. The ignored report is
+`.cache/goat-ai/option_coverage_v30_96000_96105.json` (SHA-256
+`54f40bef6b02bf704de3cf49b5d2b24e5cd51c4003a143196a696a6194eaf5b1`).
+This is a coverage measurement on synthetic agents, not evidence that the
+first mode is strategically superior. The next representation experiment
+needs independently verified, player-visible decisions selecting other
+ordinals and separate held-out decks and seeds; the current corpus cannot
+test whether v30 learns those choices.
+
+Reproduce the combined report with `scripts/audit_policy_action_aliases.py`
+using the eight `matchup_*.json` files in
+`.cache/goat-ai/new_jersey_parent_review_96000_96001`, the four `seed_*.json`
+files in each of `.cache/goat-ai/option_audit_warrior_beastdown_96100_96101`
+and `.cache/goat-ai/option_audit_phoenix_flip_96104_96105`, and
+`--feature-version 30 --output
+.cache/goat-ai/option_coverage_v30_96000_96105.json`.
+
 `scripts/audit_policy_action_aliases.py` replays every input duel against the
 pinned native engine, audits player-visible information, and compares complete
 action-feature rows within each legal list. It ignores action IDs and treats

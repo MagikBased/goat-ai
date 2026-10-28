@@ -47,6 +47,9 @@ def main() -> None:
     examples = []
     replays = []
     multi_action = 0
+    option_ordinals = Counter()
+    option_by_source = Counter()
+    option_examples = []
     for path in args.trajectories:
         raw = path.read_bytes()
         trajectory = read_trajectory(path)
@@ -61,6 +64,20 @@ def main() -> None:
             if len(actions) < 2:
                 continue
             multi_action += 1
+            if all(action.kind == "select_option" for action in actions):
+                ordinal = actions.index(record.selected_action)
+                source = (record.observation.chain[-1].card_code
+                          if record.observation.chain else None)
+                option_ordinals[ordinal] += 1
+                option_by_source[(source, ordinal)] += 1
+                if len(option_examples) < 20:
+                    option_examples.append({
+                        "replay": str(path), "decision_index": decision_index,
+                        "acting_player": record.observation.acting_player,
+                        "public_chain_card_code": source,
+                        "selected_ordinal": ordinal,
+                        "offered_options": len(actions),
+                    })
             features = encode_decision(record.observation, actions, vocabulary,
                                        args.feature_version)
             aliases = feature_aliases(features, actions)
@@ -77,13 +94,22 @@ def main() -> None:
               "multi_action_decisions": multi_action,
               "aliased_action_pairs": sum(kinds.values()),
               "aliased_first_kinds": dict(sorted(kinds.items())),
-              "examples": examples}
+              "examples": examples,
+              "multi_option_prompt_count": sum(option_ordinals.values()),
+              "selected_option_ordinals": {
+                  str(ordinal): count for ordinal, count in sorted(option_ordinals.items())},
+              "selected_option_by_public_chain_card": [
+                  {"card_code": source, "ordinal": ordinal, "count": count}
+                  for (source, ordinal), count in sorted(option_by_source.items(),
+                    key=lambda item: (item[0][0] is None, item[0][0] or 0, item[0][1]))],
+              "option_examples": option_examples}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
                            encoding="utf-8")
     print(json.dumps({key: report[key] for key in (
         "feature_version", "multi_action_decisions", "aliased_action_pairs",
-        "aliased_first_kinds")}, sort_keys=True))
+        "aliased_first_kinds", "multi_option_prompt_count",
+        "selected_option_ordinals")}, sort_keys=True))
 
 
 if __name__ == "__main__":
