@@ -298,7 +298,11 @@
       if (window.parent !== window) window.parent.postMessage(
         {type: "goat-ai-review-label-state",
          pending: annotations.size > 0 && !labelsExported || noteDirty,
-         saving: localReviewMode && annotations.size > 0 && !labelsExported && !saveError || noteSaving}, "*");
+         saving: localReviewMode && annotations.size > 0 && !labelsExported && !saveError || noteSaving,
+         error: saveError ? "Action save failed; see the replay sidebar" :
+           noteError ? "Note save failed; see the replay sidebar" :
+           !localReviewMode && annotations.size > 0 && !labelsExported
+             ? "Offline viewer: use Download labels in the replay sidebar, or reopen this queue through the local server" : ""}, "*");
     }
     function annotationAuthorization() {
       if (!replay) return null;
@@ -1220,7 +1224,10 @@
       if (actionIndex == null) annotations.delete(frame);
       else annotations.set(frame, actionIndex);
       labelsExported = false; saveError = false; notifyLabelState(); render();
-      if (!localReviewMode) return;
+      if (!localReviewMode) {
+        byId("review-instructions").textContent = "This choice is unsaved because the viewer is offline. Use Download labels below before leaving, or reopen the queue through ./start_review_viewer.sh to save automatically.";
+        return;
+      }
       const revision = ++saveRevision;
       const digest = sourceSha256;
       saveQueue = saveQueue.catch(() => {}).then(async () => {

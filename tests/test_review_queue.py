@@ -228,8 +228,19 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
       notes.set(bookmarkKey(items[0]), 'upstream_mistake'); updateProgress();
       const noted = !document.querySelector('.review-card .note-status').hidden &&
         document.getElementById('review-progress').textContent.includes('1 noted');
+      let prompts = 0;
+      window.confirm = () => { prompts++; return false; };
+      window.dispatchEvent(new MessageEvent('message', {source: replayFrameProbe.contentWindow,
+        data: {type: 'goat-ai-review-label-state', pending: true, saving: true}}));
+      document.getElementById('next-item').click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const waitedForSave = document.getElementById('item-position').textContent === '1 / 2';
+      window.dispatchEvent(new MessageEvent('message', {source: replayFrameProbe.contentWindow,
+        data: {type: 'goat-ai-review-label-state', pending: false, saving: false}}));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const advancedAfterSave = document.getElementById('item-position').textContent === '2 / 2';
       document.body.dataset.queueProbe = [first, protectedItem, second, reveal,
-        skipped, restored, noted].join('|');
+        skipped, restored, noted, waitedForSave, advancedAfterSave, prompts].join('|');
       })();
     </script>"""
     index.write_text(index.read_text().replace("</html>", probe + "</html>"))
@@ -240,4 +251,4 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-queue-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "1 / 2|1 / 2|2 / 2|true|true|true|true"
+    assert match.group(1) == "1 / 2|1 / 2|2 / 2|true|true|true|true|true|true|0"
