@@ -2028,3 +2028,10 @@ nonzero after fitting but changed no greedy choice on 185 aged-Swords training
 states. This does not close M4's competitive-gain gate. Keep v23 selected and
 seek independent timing labels before a larger age-specific run; see the
 [measured pilot](evaluation.md#public-face-up-age-v29-controlled-pilot-28-october-2026).
+
+A paired pinned-native Airknight Parshath/Ring of Destruction fixture now
+checks the competitive choice at attack declaration: passing Ring allows
+1,900 battle damage and Airknight's draw, while pre-errata Ring destroys
+Airknight before damage, deals 1,900 effect damage to each player, and prevents
+the draw. Both branches complete, replay-verify, and pass the visibility audit.
+This adds one M2 historical interaction; the wider correctness gate remains open.
