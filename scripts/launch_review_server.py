@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SEARCH_DIRS = (ROOT / "replays", ROOT / ".cache/goat-ai")
 LOG = ROOT / ".cache/goat-ai/review_server.log"
+PORTS = range(8765, 8865)
 
 
 def latest_queue() -> Path | None:
@@ -84,14 +85,17 @@ def launch(queue: Path, *, open_browser: bool = True) -> str:
         raise ValueError("review queue has no selected decisions")
     source = selected[0]["trajectory_sha256"]
     route = "/" + queue.with_suffix(".html").relative_to(ROOT).as_posix()
-    for port in range(8765, 8785):
+    # Reuse a compatible server before claiming a free lower port. Reviewers
+    # may still have older queue tabs open on several local ports.
+    for port in reversed(PORTS):
         existing = server_queue(port)
         if existing == route and server_healthy(port, source):
             url = f"http://127.0.0.1:{port}{route}"
             if open_browser:
                 webbrowser.open(url)
             return url
-        if existing is not None or port_in_use(port):
+    for port in PORTS:
+        if port_in_use(port):
             continue
         LOG.parent.mkdir(parents=True, exist_ok=True)
         env = os.environ.copy()
@@ -115,7 +119,8 @@ def launch(queue: Path, *, open_browser: bool = True) -> str:
         if child.poll() is None:
             child.terminate()
         raise RuntimeError(f"review server did not start; see {LOG}")
-    raise RuntimeError("no free review server port between 8765 and 8784")
+    raise RuntimeError(f"no free review server port between {PORTS.start} and "
+                       f"{PORTS.stop - 1}")
 
 
 def main() -> None:

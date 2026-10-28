@@ -15,6 +15,7 @@ from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, read_decision_annotations, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from scripts import serve_review_queue
+from scripts import launch_review_server
 from scripts.launch_review_server import server_healthy
 from scripts.render_replay import render_replay
 from scripts.shortlist_policy_disagreements import write_review_index
@@ -59,6 +60,22 @@ def _request(url, payload=None):
                                    "Origin": url.split("/api/")[0]}, method="POST")
     with urlopen(request, timeout=5) as response:
         return response.status, json.load(response)
+
+
+def test_launcher_reuses_a_compatible_later_port_before_claiming_a_free_one(
+        tmp_path, monkeypatch):
+    queue, _, digest, _ = _queue(tmp_path)
+    monkeypatch.setattr(launch_review_server, "ROOT", tmp_path)
+    monkeypatch.setattr(launch_review_server, "PORTS", range(8765, 8768))
+    route = "/queue.html"
+    monkeypatch.setattr(launch_review_server, "server_queue",
+                        lambda port: route if port == 8767 else None)
+    monkeypatch.setattr(launch_review_server, "server_healthy",
+                        lambda port, source: port == 8767 and source == digest)
+    monkeypatch.setattr(launch_review_server, "port_in_use",
+                        lambda port: (_ for _ in ()).throw(AssertionError("must reuse")))
+    assert launch_review_server.launch(queue, open_browser=False) == (
+        "http://127.0.0.1:8767/queue.html")
 
 
 def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, monkeypatch):

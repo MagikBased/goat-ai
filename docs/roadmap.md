@@ -2278,3 +2278,9 @@ high-margin policy/Tactical disagreements for human review; the synthetic
 alternatives are not training labels. This targets the high-margin error
 hypothesis without claiming those 22 plays are mistakes. See the
 [review queue](replay_audit.md#high-margin-policy-disagreements-for-human-review-28-october-2026).
+
+A separate six-duel [diverse-deck queue](replay_audit.md#diverse-deck-high-margin-parent-review-28-october-2026)
+now offers 23 high-margin disagreements across three additional Deck pairings
+and both policy seats. All 3,295 source decisions replay-verified and passed
+visibility checks. This expands the independent human-review surface for M4;
+the queue starts unlabeled and establishes no policy-strength gain.
