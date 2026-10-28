@@ -46,6 +46,16 @@ the decision visibility audit. It still reports `training_ready: false` even
 when the pinned assets match, because original engine/script provenance and
 recording permission must be established separately.
 
+If reconstruction fails, the command exits with status 1 and reports a fixed
+`reconstruction_failure_code`. For a divergent saved response, it also reports
+the zero-based `reconstruction_response_index`. These fields help locate a
+compatibility problem without printing card identities or response bytes.
+For example, `wrapper_mismatch` means the `.yrpX` wrapper disagrees with its
+embedded replay; `unsupported_startup` means its setup is outside the native
+GOAT profile; `illegal_saved_response` means the indexed response cannot map
+to a legal action on the pinned assets. The codes diagnose local compatibility,
+not whether the original replay was a valid historical GOAT duel.
+
 Keep raw replays and generated trajectories in an ignored local directory.
 Share the replay file and permission statement directly with a maintainer;
 do not open a public issue attaching a replay that contains another player's

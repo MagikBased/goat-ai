@@ -150,10 +150,20 @@ def main() -> None:
                         "native_asset_manifest_sha256": hashlib.sha256(manifest).hexdigest(),
                         "training_ready": False,
                     })
-                except (ReplayReconstructionError, OSError, RuntimeError):
+                except (ReplayReconstructionError, OSError, RuntimeError) as exc:
                     reconstruction_failed = True
+                    if isinstance(exc, ReplayReconstructionError):
+                        reason = exc.code
+                    elif isinstance(exc, OSError):
+                        reason = "native_asset_io_error"
+                    else:
+                        reason = "native_runtime_error"
                     report.update({"conditional_native_reconstruction": "failed",
+                                   "reconstruction_failure_code": reason,
                                    "training_ready": False})
+                    if (isinstance(exc, ReplayReconstructionError)
+                            and exc.response_index is not None):
+                        report["reconstruction_response_index"] = exc.response_index
             summaries.append(report)
         except (OSError, ReplayContainerError) as exc:
             parser.error(f"{path}: {exc}")

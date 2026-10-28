@@ -27,6 +27,12 @@ from goat_ai.replay.trajectory import DecisionRecord
 class ReplayReconstructionError(ValueError):
     """Replay inputs or a saved response diverged from this native adapter."""
 
+    def __init__(self, message: str, *, code: str = "unknown",
+                 response_index: int | None = None):
+        super().__init__(message)
+        self.code = code
+        self.response_index = response_index
+
 
 @dataclass(frozen=True)
 class ReconstructedLegacyDuel:
@@ -57,14 +63,17 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
         try:
             embedded = replay.embedded_legacy_replay()
         except ReplayContainerError as exc:
-            raise ReplayReconstructionError(f"invalid embedded replay: {exc}") from exc
+            raise ReplayReconstructionError(f"invalid embedded replay: {exc}",
+                                            code="invalid_embedded_replay") from exc
         if embedded is None:
-            raise ReplayReconstructionError("yrpX has no embedded legacy responses")
+            raise ReplayReconstructionError("yrpX has no embedded legacy responses",
+                                            code="missing_legacy_responses")
         if (replay.duel_flags != embedded.duel_flags
                 or replay.player_count != embedded.player_count
                 or (replay.header.seed_words is not None
                     and replay.header.seed_words != embedded.header.seed_words)):
-            raise ReplayReconstructionError("yrpX wrapper disagrees with embedded replay")
+            raise ReplayReconstructionError("yrpX wrapper disagrees with embedded replay",
+                                            code="wrapper_mismatch")
         embedded_sha256 = embedded.sha256
         replay = embedded
     settings = replay.settings
@@ -76,9 +85,11 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                 settings.draw_count) != (8000, 5, 1)
             or replay.header.seed_words is None or not any(replay.header.seed_words)
             or replay.rule_cards):
-        raise ReplayReconstructionError("replay startup is outside supported GOAT profile")
+        raise ReplayReconstructionError("replay startup is outside supported GOAT profile",
+                                        code="unsupported_startup")
     if not replay.responses or len(replay.responses) > max_responses:
-        raise ReplayReconstructionError("replay response count outside reconstruction bound")
+        raise ReplayReconstructionError("replay response count outside reconstruction bound",
+                                        code="response_count_bound")
 
     engine = ExperimentalOcgcoreEngine(native_root)
     records: list[DecisionRecord] = []
@@ -87,11 +98,13 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
         try:
             decision = engine.reset_recorded(replay.header.seed_words, deck1, deck2)
         except (ValueError, RuntimeError) as exc:
-            raise ReplayReconstructionError(f"native replay startup failed: {exc}") from exc
+            raise ReplayReconstructionError(f"native replay startup failed: {exc}",
+                                            code="native_startup_failed") from exc
         for index, response in enumerate(replay.responses):
             if decision.terminal:
                 raise ReplayReconstructionError(
-                    f"response {index}: native duel ended before saved responses")
+                    f"response {index}: native duel ended before saved responses",
+                    code="extra_saved_response", response_index=index)
             try:
                 action = engine.action_for_recorded_response(response)
             except ValueError as exc:
@@ -100,7 +113,8 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                              or native.zone_selection)
                 if selection is None or not selection.accepts(response):
                     raise ReplayReconstructionError(
-                        f"response {index}: saved bytes do not map to one legal action") from exc
+                        f"response {index}: saved bytes do not map to one legal action",
+                        code="illegal_saved_response", response_index=index) from exc
                 if native.zone_selection is not None:
                     zones = native.zone_selection.zones
                     indices = tuple(zones.index(tuple(response[start:start + 3]))
@@ -116,7 +130,9 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                         decision = engine.step(action)
                     except (ValueError, RuntimeError) as stage_exc:
                         raise ReplayReconstructionError(
-                            f"response {index}: staged selection diverged: {stage_exc}") from stage_exc
+                            f"response {index}: staged selection diverged: {stage_exc}",
+                            code="staged_selection_diverged",
+                            response_index=index) from stage_exc
                 if native.zone_selection is None and engine.recorded_selection_in_progress():
                     try:
                         action = engine.action_for_recorded_response(response)
@@ -127,7 +143,9 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                         decision = engine.step(action)
                     except (ValueError, RuntimeError) as stage_exc:
                         raise ReplayReconstructionError(
-                            f"response {index}: selection finish diverged: {stage_exc}") from stage_exc
+                            f"response {index}: selection finish diverged: {stage_exc}",
+                            code="selection_finish_diverged",
+                            response_index=index) from stage_exc
                 continue
             records.append(DecisionRecord(decision.observation,
                                           decision.legal_actions, action))
@@ -135,18 +153,22 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                 decision = engine.step(action)
             except (ValueError, RuntimeError) as exc:
                 raise ReplayReconstructionError(
-                    f"response {index}: native transition failed: {exc}") from exc
+                    f"response {index}: native transition failed: {exc}",
+                    code="native_transition_failed", response_index=index) from exc
         if not decision.terminal:
-            raise ReplayReconstructionError("saved responses ended before native terminal state")
+            raise ReplayReconstructionError("saved responses ended before native terminal state",
+                                            code="incomplete_saved_responses")
         for index, record in enumerate(records):
             if record.selected_action not in record.legal_actions:
                 raise ReplayReconstructionError(
-                    f"decision {index}: saved response is not a legal visible action")
+                    f"decision {index}: saved response is not a legal visible action",
+                    code="illegal_visible_action")
             try:
                 audit_decision_visibility(record)
             except VisibilityViolation as exc:
                 raise ReplayReconstructionError(
-                    f"decision {index}: player-visible action audit failed: {exc}") from exc
+                    f"decision {index}: player-visible action audit failed: {exc}",
+                    code="visibility_audit_failed") from exc
         return ReconstructedLegacyDuel(source_sha256, embedded_sha256,
                                        tuple(records), len(replay.responses),
                                        decision.winner, decision.observation,

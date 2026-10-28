@@ -186,17 +186,36 @@ def test_reconstruction_fails_closed_when_visible_action_audit_fails(
     assert exited.value.code == 1
     report = json.loads(capsys.readouterr().out)[0]
     assert report["conditional_native_reconstruction"] == "failed"
+    assert report["reconstruction_failure_code"] == "visibility_audit_failed"
+    assert "reconstruction_response_index" not in report
     assert report["training_ready"] is False
     assert "opponent hand choice" not in str(report)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_reconstruction_rejects_divergent_and_incomplete_responses(native_legacy_responses):
+def test_reconstruction_rejects_divergent_and_incomplete_responses(
+        native_legacy_responses, tmp_path, monkeypatch, capsys):
+    from scripts.inspect_edopro_replay import main
+
     root, responses, _ = native_legacy_responses
     changed = responses.copy()
     changed[0] = b"\x7f" * 4
-    with pytest.raises(ReplayReconstructionError, match="response 0"):
+    with pytest.raises(ReplayReconstructionError, match="response 0") as failed:
         reconstruct_legacy_responses(_legacy_replay(changed), root)
+    assert failed.value.code == "illegal_saved_response"
+    assert failed.value.response_index == 0
+    path = tmp_path / "divergent.yrp"
+    path.write_bytes(_legacy_replay(changed, raw=True))
+    monkeypatch.setattr(sys, "argv", ["inspect_edopro_replay.py", str(path),
+                                       "--reconstruct-native", str(root)])
+    with pytest.raises(SystemExit) as exited:
+        main()
+    assert exited.value.code == 1
+    report = json.loads(capsys.readouterr().out)[0]
+    assert report["reconstruction_failure_code"] == "illegal_saved_response"
+    assert report["reconstruction_response_index"] == 0
+    assert report["training_ready"] is False
+    assert changed[0].hex() not in str(report)
     with pytest.raises(ReplayReconstructionError, match="before native terminal"):
         reconstruct_legacy_responses(_legacy_replay(responses[:-1]), root)
 
@@ -258,6 +277,8 @@ def test_native_inspection_fails_closed_without_exposing_replay_values(
     assert exited.value.code == 1
     report = json.loads(capsys.readouterr().out)[0]
     assert report["conditional_native_reconstruction"] == "failed"
+    assert report["reconstruction_failure_code"] == "wrapper_mismatch"
+    assert "reconstruction_response_index" not in report
     assert report["training_ready"] is False
     assert all(str(code) not in str(report) for code in VANILLA_DECK)
 
