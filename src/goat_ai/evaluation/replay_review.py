@@ -59,6 +59,19 @@ def _is_action(action: Action, kind: str, code: int) -> bool:
     return action.kind == kind and action.parameters.get("code") == code
 
 
+def thunder_search_count(action: Action, seat: int) -> int:
+    """Count Thunder Dragons offered by either native search prompt shape."""
+    if action.kind == "select_cards":
+        return sum(card.get("code") == THUNDER_DRAGON
+                   for card in action.parameters.get("cards", ()))
+    if (action.kind == "select_card"
+            and action.parameters.get("code") == THUNDER_DRAGON
+            and action.parameters.get("location") == 1
+            and action.parameters.get("controller") == seat):
+        return 1
+    return 0
+
+
 def review_candidates(trajectory: Trajectory,
                       card_races: Mapping[int, int] | None = None,
                       weak_flip_attacks: Mapping[int, int] | None = None,
@@ -154,10 +167,8 @@ def review_candidates(trajectory: Trajectory,
         if (selected.kind == "select_cards" and not selected.parameters.get("cards")
                 and obs.chain and obs.chain[-1].card_code == THUNDER_DRAGON
                 and obs.chain[-1].controller == seat):
-            available = max((sum(card.get("code") == THUNDER_DRAGON
-                                 for card in action.parameters.get("cards", ()))
-                             for action in record.legal_actions
-                             if action.kind == "select_cards"), default=0)
+            available = max((thunder_search_count(action, seat)
+                             for action in record.legal_actions), default=0)
             if available:
                 found.append(("thunder_empty_search_with_copies_available",
                               {"maximum_selectable_copies": available}))

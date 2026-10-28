@@ -17,6 +17,7 @@ from goat_ai.evaluation.replay_review import (
     NOBLEMAN_OF_CROSSOUT,
     THUNDER_DRAGON,
     review_candidates,
+    thunder_search_count,
 )
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_decision_preferences, read_trajectory, verify_trajectory
@@ -50,9 +51,7 @@ def preferred_indices(record, category: str) -> list[int]:
                 and action.parameters.get("location") == 4
                 and action.parameters.get("controller") == 1 - seat]
     if category == "thunder_empty_search_with_copies_available":
-        counts = [sum(card.get("code") == THUNDER_DRAGON
-                      for card in action.parameters.get("cards", ()))
-                  if action.kind == "select_cards" else 0 for action in actions]
+        counts = [thunder_search_count(action, seat) for action in actions]
         maximum = max(counts, default=0)
         return [i for i, count in enumerate(counts) if count == maximum] if maximum else []
     if category == "weak_flip_normal_summon_with_set_available":

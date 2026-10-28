@@ -31,17 +31,21 @@ def main() -> None:
                         help="complete policy_evaluation, sampled self_play_rl, or tactical trajectories")
     parser.add_argument("--checkpoint", type=Path,
                         help="required for greedy policy replays; optionally checks a sampled replay's parent hash")
+    parser.add_argument("--opponent-checkpoint", type=Path,
+                        help="also reproduce the recorded opponent policy's greedy choices")
     parser.add_argument("--compare-parent-greedy", action="store_true",
                         help="for sampled self-play, test flagged states with the frozen parent checkpoint")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--include-opponent", action="store_true",
                         help="also shortlist the evaluation opponent's visible decisions; "
-                             "native replay verified, but agent choices are not reproduced")
+                             "agent choices are reproduced with --opponent-checkpoint")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.compare_parent_greedy and args.checkpoint is None:
         parser.error("--compare-parent-greedy requires --checkpoint")
     checkpoint_sha256 = sha256_file(args.checkpoint) if args.checkpoint else None
+    opponent_sha256 = (sha256_file(args.opponent_checkpoint)
+                       if args.opponent_checkpoint else None)
     card_races = load_card_races(args.native_root)
     weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
     card_facts = load_card_facts(args.native_root)
@@ -56,6 +60,8 @@ def main() -> None:
             trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
         if trajectory.source == "self_play_rl":
+            if opponent_sha256 is not None:
+                raise ValueError("--opponent-checkpoint requires a policy_evaluation replay")
             provenance = sampled_self_play_provenance(trajectory, checkpoint_sha256)
         elif trajectory.source == "policy_evaluation":
             if checkpoint_sha256 is None:
@@ -99,7 +105,24 @@ def main() -> None:
                           "selection_temperature": None,
                           "choice_verification": "reproduced_greedy",
                           "verified_policy_choices": policy_choices}
+            if opponent_sha256 is not None:
+                if metadata.get("opponent_checkpoint_sha256") != opponent_sha256:
+                    raise ValueError(f"{path}: opponent checkpoint SHA-256 differs from recording")
+                opponent_policy = load_policy_agent(args.opponent_checkpoint)
+                opponent_choices = 0
+                for index, decision in enumerate(trajectory.decisions):
+                    if decision.observation.acting_player == policy_seat:
+                        continue
+                    chosen = opponent_policy.select_action(
+                        decision.observation, decision.legal_actions)
+                    if chosen != decision.selected_action:
+                        raise ValueError(f"{path}: opponent choice differs at decision {index}")
+                    opponent_choices += 1
+                provenance["opponent_checkpoint_sha256"] = opponent_sha256
+                provenance["verified_opponent_choices"] = opponent_choices
         elif trajectory.source == "tactical":
+            if opponent_sha256 is not None:
+                raise ValueError("--opponent-checkpoint requires a policy_evaluation replay")
             metadata = trajectory.skill_metadata or {}
             version = metadata.get("teacher_version")
             if (metadata.get("teacher") != "TacticalHeuristicAgent"
@@ -153,7 +176,8 @@ def main() -> None:
                 "seat": other_seat,
                 "agent": metadata.get("opponent"),
                 "agent_version": metadata.get("opponent_version"),
-                "choice_verification": "native_replay_only_not_agent_reproduced",
+                "choice_verification": ("reproduced_greedy" if opponent_sha256 is not None
+                                        else "native_replay_only_not_agent_reproduced"),
                 "category_counts": category_counts(other_candidates),
                 "candidates": [candidate.to_dict() for candidate in other_candidates],
             }

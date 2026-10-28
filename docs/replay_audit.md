@@ -1,5 +1,43 @@
 # Early replay decision audit
 
+## Child-versus-parent replay diagnostic (28 October 2026)
+
+The held-out Beastdown versus Dimension Fusion result in
+[the evaluation log](evaluation.md#stronger-local-review-preference-fit-on-a-new-beastdown-holdout-28-october-2026)
+can now be inspected as a complete child-versus-parent duel. The recorder
+accepts `--opponent-checkpoint` and fingerprints both policies. The audit
+replays the native duel, checks player-visible observations, and reproduces
+both policies' greedy choices against the recorded legal actions. For example:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/record_policy_match.py \
+  .cache/goat-ai/human11_pref_200step_kl05_seed174.pt \
+  --deck1 examples/decks/dimension_fusion_turbo_wikiformat_reference.ydk \
+  --deck2 examples/decks/beastdown_ramon_ciriano_new_jersey_2005.ydk \
+  --opponent-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --seed 94000 --policy-seat 0 --native-root .cache/goat-ai \
+  --output .cache/goat-ai/human11_pref200_diagnostic/child_vs_parent_seed94000.json
+
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_replays.py \
+  .cache/goat-ai/human11_pref200_diagnostic/child_vs_parent_seed94000.json \
+  --checkpoint .cache/goat-ai/human11_pref_200step_kl05_seed174.pt \
+  --opponent-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --native-root .cache/goat-ai --include-opponent \
+  --output .cache/goat-ai/human11_pref200_diagnostic/audit.json
+```
+
+The seed-94000 replay has SHA-256
+`bdcd706c8f8ff767e1bfe0e939a35390f968179117f6229831fde6550dc3a6af`.
+A fresh recording produced the same bytes. It contains 304 verified decisions:
+149 child choices and 155 parent choices. The child lost. At viewer frames 24
+and 37, the child ended Thunder Dragon's search with zero cards despite a
+legal `select_card` action for a Thunder Dragon in its deck. The native engine
+uses a staged `select_card` prompt here; the earlier review audit only checked
+complete `select_cards` alternatives, so it missed both choices. The audit
+now flags both and the preference derivation points to the legal deck-card
+selection. These are player-visible review prompts, not proof that one
+isolated choice caused the duel loss or that the child checkpoint is stronger.
+
 ## High-margin policy disagreements for human review (28 October 2026)
 
 The [local high-margin queue](../.cache/goat-ai/high_margin_review_90500_90501/queue.html)

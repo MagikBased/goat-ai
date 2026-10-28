@@ -38,6 +38,12 @@ did **not** transfer across these decks; this checkpoint is not promoted, and
 M4's held-out competitive-strength gate remains open. This is one experimental
 schedule, not a claim about all matchups.
 
+A [verified child-versus-parent replay](replay_audit.md#child-versus-parent-replay-diagnostic-28-october-2026)
+reproduces the same seed-94000 duel and exposes two empty Thunder Dragon
+searches while deck copies were selectable. The review and preference tools
+now recognize the native engine's staged search prompt. This identifies a
+specific decision problem; it does not change the tournament result.
+
 The ignored child checkpoint SHA-256 is
 `75a05dc7ad939ae2524cd3aa546abd40be38e3a57bad657ee6ede1a41b0057c9`;
 the ignored tournament report SHA-256 is

@@ -367,6 +367,21 @@ def test_shortlist_flags_thunder_order_empty_search_and_flip_metamorphosis():
     assert found[1].evidence == {"maximum_selectable_copies": 2}
 
 
+def test_shortlist_flags_staged_thunder_search_with_a_deck_copy_offered():
+    thunder = 504700054
+    search = replace(view(), chain=(ChainLinkView(1, thunder, 0, 2, 0),))
+    empty = Action("empty", "select_cards", 0)
+    take_one = Action("one", "select_card", 0,
+                      {"code": thunder, "location": 1, "controller": 0})
+    unrelated = Action("other", "select_card", 0,
+                       {"code": thunder, "location": 2, "controller": 0})
+    found = review_candidates(policy(record(search, empty, take_one, unrelated)))
+    assert [(item.category, item.evidence) for item in found] == [
+        ("thunder_empty_search_with_copies_available",
+         {"maximum_selectable_copies": 1})]
+    assert review_candidates(policy(record(search, empty, unrelated))) == ()
+
+
 def test_shortlist_flags_unused_activatable_thunder_only_at_own_turn_end():
     thunder = 504700054
     hand_card = CardView(0, "hand", "hidden", thunder)

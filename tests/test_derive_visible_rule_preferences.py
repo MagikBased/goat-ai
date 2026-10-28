@@ -7,7 +7,7 @@ import pytest
 
 from goat_ai.actions import Action
 from goat_ai.evaluation.replay_review import ReviewCandidate
-from goat_ai.observations import CardView, Observation
+from goat_ai.observations import CardView, ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory
 from goat_ai.replay.preferences import ReviewedPreference
 from scripts import derive_visible_rule_preferences as rules
@@ -52,6 +52,29 @@ def test_derive_skips_review_flags_without_a_safe_alternative():
     candidate = ReviewCandidate(0, "chaos_sorcerer_targets_itself_with_enemy_option",
                                 2, "main1", 0, {})
     assert derive(replay, (candidate,)) == ([], {})
+
+
+def test_derive_staged_thunder_search_prefers_offered_deck_copy():
+    thunder = 504700054
+    observation = Observation(
+        viewer=0, acting_player=0, turn=2, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(), graveyards=((), ()),
+        banished=((), ()), opponent_hand_count=4,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0),
+        chain=(ChainLinkView(1, thunder, 0, 2, 0),))
+    empty = Action("empty", "select_cards", 0)
+    choose = Action("choose", "select_card", 0,
+                    {"code": thunder, "location": 1, "controller": 0})
+    other_zone = Action("other", "select_card", 0,
+                        {"code": thunder, "location": 2, "controller": 0})
+    record = DecisionRecord(observation, (empty, choose, other_zone), empty)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1)
+    candidate = ReviewCandidate(0, "thunder_empty_search_with_copies_available",
+                                2, "main1", 0, {"maximum_selectable_copies": 1})
+    assert derive(replay, (candidate,)) == (
+        [{"decision_index": 0, "preferred_action_indices": [1],
+          "disfavored_action_indices": [0]}],
+        {"thunder_empty_search_with_copies_available": 1})
 
 
 def test_automated_labels_must_match_recomputed_visible_rule(monkeypatch):

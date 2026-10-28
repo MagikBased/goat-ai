@@ -1,4 +1,4 @@
-"""Record a greedy checkpoint against a baseline or itself in a native duel."""
+"""Record a greedy checkpoint against a baseline or another checkpoint."""
 
 import argparse
 import json
@@ -18,6 +18,7 @@ from goat_ai.agents import (
 from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
@@ -32,9 +33,12 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--seed", type=int, default=2202)
     parser.add_argument("--policy-seat", type=int, choices=(0, 1), default=0)
-    parser.add_argument("--opponent", choices=("combat_heuristic", "combat_flip", "tactical",
-                                               "heuristic", "random", "mirror_policy"),
-                        default="combat_heuristic")
+    opponents = parser.add_mutually_exclusive_group()
+    opponents.add_argument("--opponent", choices=("combat_heuristic", "combat_flip", "tactical",
+                                                   "heuristic", "random", "mirror_policy"),
+                           default="combat_heuristic")
+    opponents.add_argument("--opponent-checkpoint", type=Path,
+                           help="play a distinct saved policy and fingerprint it in the replay")
     parser.add_argument("--max-decisions", type=int, default=3000)
     parser.add_argument("--tactical-guard", action="store_true",
                         help="apply experimental visible-state action filter to policy")
@@ -68,16 +72,17 @@ def main() -> None:
     policy = load_policy_agent(args.checkpoint, **policy_options)
     flip_codes = (load_flip_monster_codes(args.native_root)
                   if args.opponent in ("combat_flip", "tactical") else frozenset())
-    opponent = {
-        "combat_heuristic": lambda: CombatHeuristicAgent(),
-        "combat_flip": lambda: CombatFlipHeuristicAgent(flip_codes),
-        "tactical": lambda: TacticalHeuristicAgent(
-            flip_codes, load_card_races(args.native_root),
-            card_facts=load_card_facts(args.native_root)),
-        "heuristic": lambda: HeuristicAgent(),
-        "random": lambda: RandomAgent(args.seed),
-        "mirror_policy": lambda: load_policy_agent(args.checkpoint, **policy_options),
-    }[args.opponent]()
+    opponent = (load_policy_agent(args.opponent_checkpoint)
+                if args.opponent_checkpoint else {
+                    "combat_heuristic": lambda: CombatHeuristicAgent(),
+                    "combat_flip": lambda: CombatFlipHeuristicAgent(flip_codes),
+                    "tactical": lambda: TacticalHeuristicAgent(
+                        flip_codes, load_card_races(args.native_root),
+                        card_facts=load_card_facts(args.native_root)),
+                    "heuristic": lambda: HeuristicAgent(),
+                    "random": lambda: RandomAgent(args.seed),
+                    "mirror_policy": lambda: load_policy_agent(args.checkpoint, **policy_options),
+                }[args.opponent]())
     agents = [None, None]
     agents[args.policy_seat] = policy
     agents[1 - args.policy_seat] = opponent
@@ -106,19 +111,38 @@ def main() -> None:
                         "policy_feature_version": policy.model.feature_version,
                         "opponent": type(opponent).__name__,
                         "opponent_version": getattr(opponent, "teacher_version", 1),
-                        **({"opponent_checkpoint_sha256": sha256_file(args.checkpoint)}
-                           if args.opponent == "mirror_policy" else {}),
+                        **({"opponent_checkpoint_sha256": sha256_file(
+                            args.opponent_checkpoint or args.checkpoint)}
+                           if args.opponent_checkpoint or args.opponent == "mirror_policy"
+                           else {}),
                     },
                 )
                 args.output.parent.mkdir(parents=True, exist_ok=True)
                 write_trajectory(args.output, trajectory)
+                replay = read_trajectory(args.output)
                 verified = verify_trajectory(
-                    read_trajectory(args.output), ExperimentalOcgcoreEngine(args.native_root))
+                    replay, ExperimentalOcgcoreEngine(args.native_root))
+                audit_trajectory_visibility(replay)
+                opponent_choices_verified = 0
+                if args.opponent_checkpoint or args.opponent == "mirror_policy":
+                    replay_opponent = load_policy_agent(
+                        args.opponent_checkpoint or args.checkpoint,
+                        **({} if args.opponent_checkpoint else policy_options))
+                    for index, record in enumerate(replay.decisions):
+                        if record.observation.acting_player != 1 - args.policy_seat:
+                            continue
+                        chosen = replay_opponent.select_action(
+                            record.observation, record.legal_actions)
+                        if chosen != record.selected_action:
+                            raise ValueError(f"opponent checkpoint choice differs at "
+                                             f"decision {index}")
+                        opponent_choices_verified += 1
                 print(json.dumps({"trajectory": str(args.output),
                                   "source": trajectory.source,
                                   "policy_seat": args.policy_seat,
                                   "opponent": type(opponent).__name__,
-                                  "winner": env.result(), "verified_decisions": verified},
+                                  "winner": env.result(), "verified_decisions": verified,
+                                  "opponent_choices_verified": opponent_choices_verified},
                                  indent=2))
                 return
     raise RuntimeError(f"duel exceeded {args.max_decisions} decisions")
