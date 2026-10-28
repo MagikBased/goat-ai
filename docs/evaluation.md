@@ -10599,3 +10599,82 @@ on the eight named diagnostic trajectories. Reproduce tournaments with
 `scripts/evaluate_policy.py --engine experimental --both-deck-assignments
 --require-unseen-main-decks --workers 4 --max-decisions 3000`, the two
 unseen pairings above, and the listed opponents and seed blocks.
+
+## Frozen visible-value local-advantage PPO ablation (28 October 2026)
+
+An opt-in `--ppo-gae-lambda` now applies [generalized advantage estimation](https://arxiv.org/abs/1506.02438)
+to PPO's learner decisions using the existing frozen, player-visible resource
+ridge. It uses undiscounted (`gamma=1`) transitions between successive
+learner decisions and a terminal-only duel reward; opponent and forced moves
+between those decisions are part of the transition. Lambda 1 is exactly the
+existing terminal-return-minus-value advantage. The option requires a
+verified frozen ridge and cannot be combined with leave-one-out return
+baselines. Neither future outcomes nor hidden native state enter the value
+prediction. This is an experimental credit-assignment signal, not a playing
+strength claim.
+
+A four-game native smoke run completed and all **1,846** decisions replay-
+verified and passed the visibility audit. Two matched 240-duel continuations
+then used the selected v23 parent, seeds 91000–91239, the same three training
+pairings and PPO settings as the earlier 0.5-KL continuation, and the same
+frozen ridge artifact
+`.cache/goat-ai/frozen_resource_ridge_48300_48323.json` (SHA-256
+`7115d29f4a6bedd2de870d26f43c570a902ab342a50593d185e4aa55dbb092dc`).
+Only local-advantage lambda differed: the control used the existing
+terminal-return-minus-value estimator, and the candidate used lambda **0.5**.
+Both arms reached **240/240 terminal** with no decision cap. The control's
+training record was **83–155–2**, 20,755 learner decisions, and **114.00 s**
+reported wall time; the candidate's was **87–151–2**, 20,176 learner decisions,
+and **109.98 s**. All **125,989 control** and **121,477 candidate** recorded
+decisions independently replay-verified and passed the visibility audit. The
+ignored checkpoints are `.cache/goat-ai/ppo_ridge_control_240_91000_91239.pt`
+(SHA-256 `5156aa0a2ca5189e1c52d46865c1426f01c61f79ca2249a6d51e35ea933a62ee`)
+and `.cache/goat-ai/ppo_ridge_gae05_240_91000_91239.pt` (SHA-256
+`5ff7fe8704d8511de6f48ffc3d51b558312dafdfd26945f50b5d482cd5f98cc5`).
+On eight verified parent-policy replays, the control matched **703/710**
+multi-option greedy decisions and the candidate **704/710**. The agreement
+report is `.cache/goat-ai/ppo_ridge_gae05_agreement_90500_90501.json`,
+SHA-256 `b95f07715fb9874da1c014c62ea6a8d4c0c3b26b1a6e9d628bb485fc6173601a`.
+
+Evaluation used Phoenix Control against WikiFormat Dimension Fusion with
+both deck assignments and both policy seats. Both Main Deck compositions
+were absent from the policy checkpoint training games and from all 96 ridge
+training replays; the latter was checked by reading the artifact's hashed
+replays and comparing Main Deck composition hashes. Phoenix Control appeared
+in an earlier ridge transfer check, so this is a training-deck holdout but
+not a completely untouched model-selection family. On fresh seeds
+91700–91715, lambda-0.5 scored **28–35–1** directly against the return-based
+control: **44.5% score**, paired 95% interval **36.7–52.3%**. On matched seeds
+91716–91731 against Tactical-v14, lambda-0.5 scored **16–47–1**, the control
+**21–42–1**, and the selected parent **17–46–1**. The strict report comparator
+verified the same deck files, schedule, opponent, native assets, code, and
+unseen policy Main Decks. Candidate-minus-control score was **−7.81
+percentage points**, paired 95% interval **−15.63 to −1.56 points**. The
+return-based control itself scored **31–32–1** directly against the selected
+parent on fresh seeds 91732–91747, with a paired interval **38.3–59.4%**;
+its matched Tactical difference from the parent was **+6.25 points**,
+interval **−1.56 to +14.06 points**. Neither child is promoted. This
+particular frozen-value GAE signal did not improve held-out play, and the
+candidate changed only six greedy decisions on the fixed diagnostic sample.
+
+The five ignored reports (candidate versus control, candidate versus Tactical,
+control versus Tactical, parent versus Tactical, control versus parent) are
+`.cache/goat-ai/ppo_ridge_gae05_vs_ridge_91700_91715.json`,
+`.cache/goat-ai/ppo_ridge_gae05_vs_tactical_91716_91731.json`,
+`.cache/goat-ai/ppo_ridge_control_vs_tactical_91716_91731.json`,
+`.cache/goat-ai/ppo_parent_vs_tactical_91716_91731.json`, and
+`.cache/goat-ai/ppo_ridge_control_vs_parent_91732_91747.json`. Their SHA-256
+values in order are
+`650e4602cc1a4e7d40e888994432805e4725a6f2dcf4dd9981e2feb42829bfb4`,
+`c27789664dc788c7793c84db488174f0ff1224cf969bdec94a1a1e240d2d5a64`,
+`ddceb7821aefbde96d907a8eb57a0e49df34d66f998e8cfe5c6939e52ed9cfde`,
+`bf6e0830bd7d4f09514fa22e6f4999b0ec726fc2b5f02e7c6fe7207fbab28e25`,
+and `1fc50e8e85bf7f4aaec4407ca9fad7daf21f458d464fc9335ed50ab7a9f174ce`.
+To reproduce, repeat the preceding 240-game PPO command with
+`--baseline-scope resource_ridge --resource-ridge-artifact` pointing to the
+named frozen artifact, once without `--ppo-gae-lambda` and once with
+`--ppo-gae-lambda 0.5`; use separate output paths. Verify the saved episodes
+with `scripts/audit_selfplay_replays.py`. Evaluate with
+`scripts/evaluate_policy.py --engine experimental --both-deck-assignments
+--require-unseen-main-decks --workers 4 --max-decisions 3000` and the named
+pairing, opponent checkpoints, and seed blocks.

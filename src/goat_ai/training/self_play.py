@@ -526,6 +526,29 @@ def clipped_surrogate(ratio: torch.Tensor, advantage: torch.Tensor,
                          ratio.clamp(1 - clip_epsilon, 1 + clip_epsilon) * advantage)
 
 
+def terminal_gae_advantages(values: Sequence[float], reward: float,
+                            trace_lambda: float) -> tuple[float, ...]:
+    """Undiscounted GAE over learner decisions with a terminal-only reward.
+
+    Opponent and forced actions occur between these decision states. The frozen
+    visible-state predictions are evaluated before the policy update. With
+    lambda=1 this reduces exactly to the existing reward-minus-value baseline.
+    """
+    if (not values or not isfinite(reward) or not isfinite(trace_lambda)
+            or not 0 <= trace_lambda <= 1
+            or any(not isfinite(value) for value in values)):
+        raise ValueError("GAE needs finite values, reward, and lambda in [0, 1]")
+    result = [0.0] * len(values)
+    advantage = 0.0
+    for index in range(len(values) - 1, -1, -1):
+        next_value = values[index + 1] if index + 1 < len(values) else 0.0
+        immediate_reward = reward if index + 1 == len(values) else 0.0
+        delta = immediate_reward + next_value - values[index]
+        advantage = delta + trace_lambda * advantage
+        result[index] = advantage
+    return tuple(result)
+
+
 def ppo_clipped_update(
     model: LegalActionPolicy, vocabulary: CardVocabulary,
     records: Sequence[DecisionRecord], reward: float, baseline: float,
@@ -716,6 +739,7 @@ def train_against_snapshot_pool(
     ppo_rollout_games: int = 1,
     ppo_rollout_weighting: str = "per_decision",
     ppo_baseline_timing: str = "online",
+    ppo_gae_lambda: float | None = None,
     rollout_workers: int = 0,
     rollout_batch_inference: bool = False,
     trace_rollout_inference: bool = False,
@@ -745,6 +769,10 @@ def train_against_snapshot_pool(
             or (baseline_scope == "resource_ridge") != (resource_value_model is not None)
             or not callable(baseline_opponent_factory)
             or not baseline_opponent_name
+            or (ppo_gae_lambda is not None and
+                (not isfinite(ppo_gae_lambda) or not 0 <= ppo_gae_lambda <= 1
+                 or policy_update != "clipped_ppo" or resource_value_model is None
+                 or ppo_baseline_timing == "leave_one_out"))
             or schedule_mode not in ("paired_seats", "four_roles")):
         raise ValueError("invalid self-play schedule or hyperparameters")
     if (policy_update not in ("reinforce", "clipped_ppo")
@@ -955,6 +983,9 @@ def train_against_snapshot_pool(
                             entropy_coefficient=entropy_coefficient,
                             temperature=learner_temperature,
                             state_baselines=state_baselines,
+                            advantages=(terminal_gae_advantages(
+                                state_baselines, episode.reward, ppo_gae_lambda)
+                                if ppo_gae_lambda is not None else None),
                             parent_model=parent_model,
                             parent_kl_weight=parent_kl_weight,
                             random_seed=random_seed + seed,
@@ -965,6 +996,9 @@ def train_against_snapshot_pool(
                         if reuse_rollout_features:
                             rollout_features.extend(episode.learner_features)
                         rollout_advantages.extend(
+                            terminal_gae_advantages(state_baselines, episode.reward,
+                                                    ppo_gae_lambda)
+                            if ppo_gae_lambda is not None else
                             (episode.reward - value for value in state_baselines)
                             if state_baselines is not None else
                             [episode.reward - baseline] * len(episode.learner_records))

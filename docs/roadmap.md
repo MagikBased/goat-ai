@@ -2071,3 +2071,16 @@ direct match favored it 37–27 over the temperature-1 child, with the paired
 interval touching 50%. Keep the parent selected; higher rollout temperature
 is a useful ablation but does not close M4's held-out gain gate. See
 [the experiment](evaluation.md#ppo-learner-temperature-ablation-after-the-240-duel-plateau-28-october-2026).
+
+An opt-in, terminal-only GAE estimator now uses the frozen player-visible
+resource ridge to assign local PPO advantages between learner decisions.
+In a matched 240-duel test against the existing return-minus-value baseline,
+both arms reached terminal and all 247,466 combined recorded decisions
+replay-verified and passed the visibility audit. On a Main-Deck holdout
+separate from both policy and value training, lambda-0.5 scored 28–35–1
+directly against the control and 16–47–1 against Tactical-v14, versus the
+control's matched 21–42–1. The paired Tactical difference favored the
+control. Neither child beat the selected parent convincingly. Keep GAE
+opt-in and v23 selected; M4 still needs an independently useful decision
+signal and competitive gain across deck families. See
+[the ablation](evaluation.md#frozen-visible-value-local-advantage-ppo-ablation-28-october-2026).

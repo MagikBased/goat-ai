@@ -64,6 +64,7 @@ from goat_ai.training.self_play import (
     predict_state_values,
     sample_legal_action,
     state_value_update,
+    terminal_gae_advantages,
     train_against_snapshot_pool,
 )
 from scripts.audit_policy_agreement import (
@@ -2466,6 +2467,57 @@ def test_multi_duel_ppo_freezes_policy_until_rollout_boundary(
     with pytest.raises(ValueError, match="multi-duel PPO"):
         train_against_snapshot_pool(model, vocabulary, (("a", "b"),), (100,),
                                     lambda: None, ppo_rollout_games=2)
+
+
+def test_terminal_gae_uses_visible_value_changes_and_terminal_outcome():
+    values = (0.2, 0.4)
+    assert terminal_gae_advantages(values, 1.0, 0.0) == pytest.approx((0.2, 0.6))
+    assert terminal_gae_advantages(values, 1.0, 0.5) == pytest.approx((0.5, 0.6))
+    assert terminal_gae_advantages(values, 1.0, 1.0) == pytest.approx((0.8, 0.6))
+    assert terminal_gae_advantages(values, -1.0, 0.5) == pytest.approx((-0.5, -1.4))
+    with pytest.raises(ValueError, match="GAE"):
+        terminal_gae_advantages(values, 1.0, 1.1)
+    with pytest.raises(ValueError, match="GAE"):
+        terminal_gae_advantages((float("nan"),), 1.0, 0.5)
+
+
+def test_frozen_visible_value_gae_reaches_multi_duel_ppo(monkeypatch):
+    vocabulary = CardVocabulary((10, 20))
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    seen = []
+
+    class FrozenValue:
+        def predict_records(self, records, _vocabulary, _feature_version):
+            assert len(records) == 2
+            return (0.2, 0.4)
+
+    def run_episode(_policy, _vocabulary, _opponent, _decks, seed, *_args):
+        records = (DecisionRecord(view(), actions(), actions()[0]),) * 2
+        return SimpleNamespace(
+            seed=seed, winner=0, reward=1.0 if seed == 100 else -1.0,
+            decisions=4, learner_records=records,
+            trajectory=SimpleNamespace(deck_sha256=("a", "b"),
+                                       asset_sha256={"core": "hash"},
+                                       rules_profile="goat"))
+
+    def update(_policy, _vocabulary, _records, _reward, _baseline, _optimizer, **kwargs):
+        seen.append(tuple(kwargs["advantages"]))
+        return 0.0
+
+    monkeypatch.setattr("goat_ai.training.self_play.run_learning_episode", run_episode)
+    monkeypatch.setattr("goat_ai.training.self_play.ppo_clipped_update", update)
+    train_against_snapshot_pool(
+        model, vocabulary, (("a", "b"),), (100, 101), lambda: None,
+        policy_update="clipped_ppo", ppo_rollout_games=2, snapshot_every=2,
+        historical_probability=0.0, baseline_scope="resource_ridge",
+        resource_value_model=FrozenValue(), ppo_gae_lambda=0.5)
+    assert len(seen) == 1
+    assert seen[0] == pytest.approx((0.5, 0.6, -0.5, -1.4))
+    with pytest.raises(ValueError, match="invalid self-play"):
+        train_against_snapshot_pool(
+            model, vocabulary, (("a", "b"),), (100, 101), lambda: None,
+            policy_update="clipped_ppo", ppo_rollout_games=2, snapshot_every=2,
+            ppo_gae_lambda=0.5)
 
 
 def test_leave_one_out_uses_other_same_deck_games_even_without_policy_choices(

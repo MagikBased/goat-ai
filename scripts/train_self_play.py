@@ -110,6 +110,8 @@ def main() -> None:
                         default="online",
                         help="frozen_rollout uses a pre-rollout estimate; leave_one_out "
                              "uses other terminal duels of the same learner deck in that rollout")
+    parser.add_argument("--ppo-gae-lambda", type=float,
+                        help="optional undiscounted terminal GAE from a frozen visible-resource ridge")
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
     parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value",
@@ -162,6 +164,13 @@ def main() -> None:
         parser.error("invalid training schedule or hyperparameters")
     if (args.baseline_scope == "resource_ridge") != bool(args.resource_ridge_artifact):
         parser.error("resource_ridge baseline requires --resource-ridge-artifact")
+    if args.ppo_gae_lambda is not None and (
+            args.policy_update != "clipped_ppo"
+            or args.baseline_scope != "resource_ridge"
+            or args.ppo_baseline_timing == "leave_one_out"
+            or not 0 <= args.ppo_gae_lambda <= 1):
+        parser.error("--ppo-gae-lambda requires clipped PPO, a frozen resource "
+                     "ridge, online/frozen rollout timing, and lambda in [0, 1]")
     parent = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     if not isinstance(parent, dict) or parent.get("schema_version") != 1:
         parser.error("unsupported parent checkpoint schema")
@@ -256,6 +265,7 @@ def main() -> None:
         reuse_rollout_features=args.reuse_rollout_features,
         ppo_rollout_weighting=args.ppo_rollout_weighting,
         ppo_baseline_timing=args.ppo_baseline_timing,
+        ppo_gae_lambda=args.ppo_gae_lambda,
         schedule_mode=args.schedule_mode,
         value_model=value_model,
         resource_value_model=resource_value_model,
@@ -320,6 +330,8 @@ def main() -> None:
                                         if args.policy_update == "clipped_ppo" else None),
               "ppo_baseline_timing": (args.ppo_baseline_timing
                                       if args.policy_update == "clipped_ppo" else None),
+              "ppo_gae_lambda": args.ppo_gae_lambda,
+              "ppo_gae_gamma": 1.0 if args.ppo_gae_lambda is not None else None,
               "baseline_accumulation": "all_terminal_rewards_v2",
               "value_width": args.value_width if value_model is not None else None,
               "value_architecture": (args.value_architecture
