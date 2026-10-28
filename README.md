@@ -117,11 +117,18 @@ To review queued policy decisions without downloading or moving label files,
 start the [local review server](docs/replay_audit.md) from the repository root:
 
 ```bash
-PYTHONPATH=src:. .venv/bin/python scripts/serve_review_queue.py \
-  replays/review_fixed_policy_44000_full/queue.json
+.venv/bin/python scripts/launch_review_server.py
 ```
 
-Open the localhost address it prints. Choosing a legal action saves it to an
+This opens the newest local review queue in your browser. To open a specific
+queue, pass its `queue.json` path as an argument. The launcher reuses a running
+server for that queue and writes startup logs to
+`.cache/goat-ai/review_server.log`. On Cinnamon/Linux Mint, run
+`.venv/bin/python scripts/install_review_shortcut.py` once to add **GOAT AI
+Review Viewer** to the app menu and pinned taskbar apps. If Cinnamon is already
+running, its taskbar may show the new pin after the next session reload.
+
+Choosing a legal action saves it to an
 ignored local folder and restores it when you return; no reviewer name is
 needed. Use **☆ Bookmark** on a queue card or in the replay bar to save an
 item for later without choosing a play. Bookmarks are stored separately from
