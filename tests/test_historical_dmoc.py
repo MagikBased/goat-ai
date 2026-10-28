@@ -5,9 +5,13 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.engine import native_messages
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import verify_trajectory
 
 DMOC = 511001039
 POT_OF_GREED = 55144522
@@ -16,10 +20,14 @@ BOOK_OF_MOON = 14087893
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_pre_errata_dmoc_retrieves_pot_after_tribute_summon(tmp_path):
+@pytest.mark.parametrize("staged_tribute", [False, True])
+def test_pre_errata_dmoc_retrieves_pot_after_tribute_summon(
+        tmp_path, monkeypatch, staged_tribute):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     if not (root / f"scripts/pre-errata/c{DMOC}.lua").is_file():
         pytest.skip("full pre-errata card script checkout not installed")
+    if staged_tribute:
+        monkeypatch.setattr(native_messages, "MAX_TRIBUTE_SELECTION_COMBINATIONS", 1)
     deck = tmp_path / "dmoc.ydk"
     deck.write_text("#main\n" + "\n".join(map(str, (POT_OF_GREED, DMOC,
                                                    *VANILLA_DECK[2:]))) + "\n")
@@ -29,20 +37,35 @@ def test_pre_errata_dmoc_retrieves_pot_after_tribute_summon(tmp_path):
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
         pot_activated = dmoc_summoned = dmoc_effect_accepted = spell_target_selected = False
+        staged_saw = False
         normal_monsters_summoned = 0
-        for _ in range(80):
+        reached = False
+        agent = RandomAgent(18)
+        for _ in range(3000 if staged_tribute else 80):
             choices = env.legal_actions()
-            if dmoc_effect_accepted and any(card.code == POT_OF_GREED
-                                            for card in observation.hand):
+            if not reached and dmoc_effect_accepted and any(
+                    card.code == POT_OF_GREED for card in observation.hand):
                 assert dmoc_summoned and spell_target_selected
                 assert normal_monsters_summoned == 2
+                assert staged_saw == staged_tribute
                 assert any(card.code == DMOC and card.position == "faceup"
                            for card in observation.field)
                 assert not any(card.code == POT_OF_GREED
                                for card in observation.graveyards[0])
                 assert "pre-errata/c511001039.lua" in (
                     env.engine.probe.loaded_script_sha256)
-                return
+                if not staged_tribute:
+                    return
+                reached = True
+            if reached:
+                if env.is_terminal():
+                    trajectory = env.trajectory()
+                    assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) == len(
+                        trajectory.decisions)
+                    audit_trajectory_visibility(trajectory)
+                    return
+                observation = env.step(agent.select_action(observation, choices))
+                continue
 
             action = None
             if observation.acting_player == 0:
@@ -64,6 +87,14 @@ def test_pre_errata_dmoc_retrieves_pot_after_tribute_summon(tmp_path):
                 if action is None and dmoc_summoned:
                     action = next((choice for choice in choices
                                    if choice.kind == "tribute_cards"), None)
+                    if staged_tribute and action is None:
+                        staged_saw |= env.engine.probe.decode_pending().tribute_selection is not None
+                        action = next((choice for choice in choices
+                                       if choice.kind == "finish_selection"), None)
+                        if action is None:
+                            action = next((choice for choice in choices
+                                           if choice.kind == "select_card"
+                                           and "selection_minimum" in choice.parameters), None)
                     if action is None:
                         action = next((choice for choice in choices
                                        if choice.kind == "yes"
@@ -81,7 +112,7 @@ def test_pre_errata_dmoc_retrieves_pot_after_tribute_summon(tmp_path):
                 action = next((choice for choice in choices
                                if choice.kind == "pass"), choices[0])
             observation = env.step(action)
-        pytest.fail("Dark Magician of Chaos did not retrieve Pot within 80 decisions")
+        pytest.fail("Dark Magician of Chaos did not finish the staged Tribute duel")
 
 
 @pytest.mark.parametrize("facedown,seed,expected_zone", [

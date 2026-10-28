@@ -115,6 +115,27 @@ class RestrictedOcgcoreEngine:
                 raise SimulatorUnavailable("staged counter selection has no legal continuation")
             native = replace(native, choices=choices)
             self._selection_indices = None
+        elif native.tribute_selection is not None:
+            self._counter_prefix = None
+            selection = native.tribute_selection
+            if self._selection_indices is None:
+                self._selection_indices = ()
+            selected = self._selection_indices
+            selected_cards = tuple(selection.cards[index][:4] for index in selected)
+            last = selected[-1] if selected else -1
+            choices = [replace(choice, cards=selected_cards)
+                       for choice in native.choices
+                       if choice.kind == "select_card" and choice.response > last
+                       and selection.has_completion((*selected, choice.response))]
+            if selection.accepts_indices(selected):
+                choices.append(NativeChoice(
+                    "finish_selection", self._card_selection_response(selected),
+                    cards=selected_cards))
+            if selection.cancelable:
+                choices.append(NativeChoice("cancel", -1))
+            if not choices:
+                raise SimulatorUnavailable("staged Tribute selection has no legal continuation")
+            native = replace(native, choices=tuple(choices))
         elif native.sum_selection is not None:
             self._counter_prefix = None
             selection = native.sum_selection
@@ -311,6 +332,10 @@ class RestrictedOcgcoreEngine:
                 parameters["selection_sum_target"] = native.sum_selection.target
                 parameters["selection_sum_mode"] = (
                     "exact" if native.sum_selection.mode == 0 else "greater")
+            if native.tribute_selection is not None:
+                parameters["selection_minimum"] = native.tribute_selection.minimum
+                parameters["selection_maximum"] = native.tribute_selection.maximum
+                parameters["selected_count"] = len(self._selection_indices)
             if native.zone_selection is not None:
                 parameters["selection_minimum"] = native.zone_selection.count
                 parameters["selection_maximum"] = native.zone_selection.count
@@ -386,6 +411,9 @@ class RestrictedOcgcoreEngine:
                 selected = (*self._selection_indices, choice.response)
                 native = self.probe.decode_pending()
                 if native.sum_selection is not None:
+                    self._selection_indices = selected
+                    return self._decision(reuse_observation=True)
+                if native.tribute_selection is not None:
                     self._selection_indices = selected
                     return self._decision(reuse_observation=True)
                 selection = native.card_selection

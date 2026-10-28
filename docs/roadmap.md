@@ -35,6 +35,14 @@ selection conditions, including mandatory cards and dual level values. This
 supports the decoder's pruning logic; it does not prove that every card using
 sum selection reaches the prompt correctly.
 
+Tribute prompts that would exceed 2,048 flat subsets now stage card picks
+and submit one weighted, count-bounded native response. A forced staged
+Dark Magician of Chaos Tribute line retrieves Pot of Greed, then completes
+the duel; its full trajectory replay-verifies and passes the visibility
+audit. A separate 120-case exhaustive check covers weighted staged prefixes.
+This removes a decoder action-count limit; naturally occurring large
+Tribute prompts and additional card interactions still need coverage.
+
 A deterministic coverage suite now partitions every one of the **1,624**
 canonical legal Main Deck IDs into 41 valid decks and distributes all **52**
 canonical legal Fusion IDs into their Extra Decks. Pairing those decks ran

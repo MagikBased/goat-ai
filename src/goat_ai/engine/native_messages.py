@@ -19,6 +19,7 @@ MAX_SUM_SELECTION_COMBINATIONS = 4096
 MAX_ZONE_SELECTION_COMBINATIONS = 2048
 MAX_COUNTER_SELECTION_COMBINATIONS = 4096
 MAX_SORT_PERMUTATIONS = 2048
+MAX_TRIBUTE_SELECTION_COMBINATIONS = 2048
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,48 @@ class NativeCardSelection:
         indices = struct.unpack_from(f"<{size}I", response, 8)
         return all(index < len(self.cards) for index in indices) \
             and tuple(sorted(set(indices))) == indices
+
+
+@dataclass(frozen=True)
+class NativeTributeSelection:
+    """Native-index Tribute candidates with per-card release weights."""
+
+    cards: tuple[tuple[int, int, int, int, int], ...]
+    minimum: int
+    maximum: int
+    cancelable: bool
+
+    def accepts(self, response: int | bytes) -> bool:
+        if isinstance(response, int):
+            return self.cancelable and response == -1
+        if not isinstance(response, bytes) or len(response) < 8:
+            return False
+        kind, size = struct.unpack_from("<II", response)
+        if kind != 0 or len(response) != 8 + 4 * size:
+            return False
+        return self.accepts_indices(struct.unpack_from(f"<{size}I", response, 8))
+
+    def accepts_indices(self, indices: tuple[int, ...]) -> bool:
+        return (len(indices) <= self.maximum
+                and all(0 <= index < len(self.cards) for index in indices)
+                and tuple(sorted(set(indices))) == indices
+                and sum(self.cards[index][4] for index in indices) >= self.minimum)
+
+    def has_completion(self, prefix: tuple[int, ...]) -> bool:
+        if (len(prefix) > self.maximum
+                or any(index < 0 or index >= len(self.cards) for index in prefix)
+                or tuple(sorted(set(prefix))) != prefix):
+            return False
+        if self.accepts_indices(prefix):
+            return True
+        remaining_slots = self.maximum - len(prefix)
+        if not remaining_slots:
+            return False
+        available = (self.cards[index][4] for index in
+                     range(prefix[-1] + 1 if prefix else 0, len(self.cards)))
+        largest = sorted(available, reverse=True)[:remaining_slots]
+        return (sum(self.cards[index][4] for index in prefix) + sum(largest)
+                >= self.minimum)
 
 
 @dataclass(frozen=True)
@@ -239,6 +282,7 @@ class NativeDecision:
     zone_selection: NativeZoneSelection | None = None
     counter_selection: NativeCounterSelection | None = None
     sort_selection: NativeSortSelection | None = None
+    tribute_selection: NativeTributeSelection | None = None
 
 
 class _Reader:
@@ -406,10 +450,25 @@ def decode_decision(message: bytes,
             weight = reader.integer(1)
             cards.append((code, controller, location, sequence, weight))
         reader.finish()
-        if sum(comb(count, size) for size in range(min(count, maximum) + 1)) > 2048:
-            raise NotImplementedError("tribute selection has too many combinations")
+        upper = min(count, maximum)
+        if sum(comb(count, size) for size in range(upper + 1)) \
+                > MAX_TRIBUTE_SELECTION_COMBINATIONS:
+            selection = NativeTributeSelection(tuple(cards), minimum, upper,
+                                               bool(cancelable))
+            choices = [NativeChoice("select_card", index, code, controller,
+                                    location, sequence)
+                       for index, (code, controller, location, sequence, _)
+                       in enumerate(cards)]
+            if selection.accepts_indices(()):
+                choices.append(NativeChoice("finish_selection", struct.pack("<II", 0, 0)))
+            if cancelable:
+                choices.append(NativeChoice("cancel", -1))
+            if not choices:
+                raise ValueError("empty tribute selection")
+            return NativeDecision(player, tuple(choices),
+                                  tribute_selection=selection)
         choices = []
-        for size in range(min(count, maximum) + 1):
+        for size in range(upper + 1):
             for indices in combinations(range(count), size):
                 if sum(cards[index][4] for index in indices) < minimum:
                     continue

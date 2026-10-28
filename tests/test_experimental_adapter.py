@@ -254,6 +254,53 @@ def test_new_native_choice_formats():
         "tribute", "tribute", "tribute_cards", "cancel"]
 
 
+def test_large_tribute_prompt_stages_only_completable_card_picks(monkeypatch):
+    monkeypatch.setattr(native_messages, "MAX_TRIBUTE_SELECTION_COMBINATIONS", 100)
+    cards = [(100 + index, 0, LOCATION_MZONE, index, 2 if index == 5 else 1)
+             for index in range(10)]
+    prompt = (b"\x14\x00\x01" + struct.pack("<III", 3, 5, len(cards))
+              + b"".join(struct.pack("<IBBIB", *card) for card in cards))
+    decision = decode_decision(prompt)
+    selection = decision.tribute_selection
+    assert selection is not None
+    assert len(decision.choices) == 11  # ten card picks and cancel
+    assert all(choice.kind == "select_card" for choice in decision.choices[:-1])
+    assert decision.choices[-1].kind == "cancel"
+    assert selection.has_completion((0, 1))
+    assert not selection.accepts_indices((0, 1))
+    assert selection.accepts_indices((0, 1, 2))
+    assert selection.accepts_indices((0, 5))
+    assert not selection.accepts_indices((0, 0, 5))
+    assert not selection.accepts_indices((0, 1, 2, 3, 4, 5))
+    assert selection.accepts(struct.pack("<4I", 0, 2, 0, 5))
+    assert selection.accepts(-1)
+    assert not selection.accepts(struct.pack("<4I", 0, 2, 0, 1))
+
+    # A late low-weight prefix cannot reach five Tribute weight in one slot.
+    assert not native_messages.NativeTributeSelection(
+        tuple(cards), 5, 4, False).has_completion((6, 7, 8))
+
+
+def test_staged_tribute_prefixes_match_exhaustive_weighted_subsets():
+    rng = Random(2810)
+    for _ in range(120):
+        count = rng.randint(1, 8)
+        cards = tuple((100 + index, 0, LOCATION_MZONE, index, rng.randint(1, 3))
+                      for index in range(count))
+        minimum = rng.randint(0, 8)
+        maximum = rng.randint(1, min(5, count))
+        selection = native_messages.NativeTributeSelection(
+            cards, minimum, maximum, rng.choice((False, True)))
+        complete = [indices for size in range(maximum + 1)
+                    for indices in combinations(range(count), size)
+                    if sum(cards[index][4] for index in indices) >= minimum]
+        for size in range(maximum + 1):
+            for prefix in combinations(range(count), size):
+                assert selection.accepts_indices(prefix) == (prefix in complete)
+                assert selection.has_completion(prefix) == any(
+                    indices[:size] == prefix for indices in complete)
+
+
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("code,kind,parameter,chosen", [
     (17078030, "announce_number", "number", 2000),
