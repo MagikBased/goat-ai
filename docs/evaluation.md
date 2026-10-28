@@ -1,5 +1,21 @@
 # Baseline evaluation log
 
+## Full local native regression (28 October 2026)
+
+On commit `5edecd98f82f7344a3eb792055cc13f74fad2801`, with the pinned
+native assets in `.cache/goat-ai`, the full local test command completed with
+**1,325 passed, 0 failed, 6 warnings** in 953.58 seconds. The current
+Relinquished/Book fixture is included in that count. Lint also passed with
+`All checks passed!`. These are regression results for the tested assets and
+fixtures, not a claim that the full GOAT card pool is historically correct.
+No GitHub jobs were used.
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. \
+  .venv/bin/python -m pytest -q --disable-warnings --maxfail=1
+.venv/bin/ruff check .
+```
+
 ## Current-core policy on independent 2005 decks (27 October 2026)
 
 The selected feature-v23 checkpoint
