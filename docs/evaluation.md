@@ -11376,3 +11376,25 @@ and `30`. These are synthetic baseline games, not human play or a strength
 evaluation. Their result increases confidence that the v30 representation
 fixes this observed collision across several deck families; it does not
 establish that v30 wins more duels.
+
+To see whether the selected policy visits enough option decisions for a
+training comparison, `scripts/collect_policy_matches.py` recorded **32**
+policy-versus-Tactical-v14 games on Montague Warrior versus Ciriano Beastdown,
+both policy seats and seeds 96200–96215. All games reached terminal; all
+**11,563 decisions** replay-verified. The ignored manifest is
+`.cache/goat-ai/option_train_policy_warrior_beast_96200_96215/manifest.json`
+with SHA-256 `c46c1ade3dd14bb27d28c27526b86100fdc8f8343daca36d270399c71bbf9602`.
+Only eight decisions offered multiple `select_option` actions, five to the
+policy seat. Tactical and the recorded policy chose option zero at all five.
+This collection supplies **no teacher disagreement on the affected action
+type**, so fitting v30 here would not test the representation correction.
+It is a data-coverage finding, not a competitive result; no v30 checkpoint
+was trained or promoted.
+
+Reproduce the collection with the selected
+`fv23_current_tactical_broader_33000_33031.pt` checkpoint and
+`scripts/collect_policy_matches.py --opponent tactical --seed 96200 --seeds 16
+--workers 4 --max-decisions 3000`, using the named decks and ignored output
+directory above. The next option-specific experiment needs independently
+verified situations where the better visible choice differs from the policy's
+current default, then separate deck and seed holdouts for match evaluation.
