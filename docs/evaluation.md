@@ -11350,3 +11350,29 @@ better preference, and only covers these eight replays. Feature v30 remains
 opt-in pending held-out competitive evaluation. The separate verified
 Tactical demonstration sets have only two multi-option prompts each, which
 is too little to support a meaningful option-specific transfer claim.
+
+An independent eight-duel Tactical-v14 collection sampled four published
+deck families: Montague Warrior versus Ramon Ciriano Beastdown on seeds
+96100–96101, and Roberto Martinez Phoenix Control versus Cas Stomphorst Flip
+Control on seeds 96104–96105, both teacher seats. Every duel reached terminal;
+all **4,139 decisions** replay-verified and passed the visibility audit.
+Among **1,332** multi-action decisions, v23 again aliased **six** distinct
+`select_option` pairs, and v30 aliased **zero**. The ignored collection
+manifests have SHA-256
+`9517e5e76d8f5e8e24d1f342977ea265ace1e31a609664be8501db9154ac8c06`
+and `6b2d6fdc2241d4ffeca5ddc21c6475022445ef6cc36b808124a050dca75f264b`.
+The v23/v30 audit report hashes are respectively
+`74ff6fa608668052efde4204e6b17e78720ed0e5e4426310d7a9e6ff04bb29c9`
+and `0b1f8cb4c31a26305ac729b5b410f5630090e93c986086a1e64091f2feee5095`.
+
+Reproduce the collection with `scripts/collect_heuristic_demos.py` using
+`--engine experimental --teacher tactical --opponent tactical --seeds 2
+--verify-replays --max-decisions 3000`, the two named deck pairs, seeds 96100
+and 96104, and the corresponding ignored output directories
+`option_audit_warrior_beastdown_96100_96101` and
+`option_audit_phoenix_flip_96104_96105` under `.cache/goat-ai`. Run the
+alias audit on each directory's `seed_*.json` with `--feature-version 23`
+and `30`. These are synthetic baseline games, not human play or a strength
+evaluation. Their result increases confidence that the v30 representation
+fixes this observed collision across several deck families; it does not
+establish that v30 wins more duels.
