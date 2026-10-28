@@ -10413,3 +10413,65 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
 
 This is protocol and information-boundary coverage. Random play on sampled
 decks does not establish complete historical GOAT legality or playing strength.
+
+## Larger mixed-deck PPO continuation of selected v23 (28 October 2026)
+
+The selected feature-v23 checkpoint (`975d06284b3035bc8bf8dbafa041a8a25a80195574d1ff695f2fbd25d1c7ff45`)
+was continued for **240 terminal duels** on seeds 91000–91239. A four-role
+schedule covered both learner seats and decks in three training pairings:
+Jesse Twohig 2005 Goat Control/Montague Warrior, DingoSig Chaos Return/
+Weirdchamp Bazoo Return, and Insids Chaos Control/Cas Stomphorst 2005 Flip
+Control. The run used the same clipped-PPO settings as the prior 64-game
+independent-opponent trial: four-game frozen rollouts, two epochs, minibatch
+32, per-episode weighting, learner-deck moving baseline, parent KL 0.5,
+learning rate 0.00005, 50% historical-snapshot probability, Tactical-v14
+otherwise, four native workers, and independent opponent sampling streams.
+The realized opponents were 116 frozen snapshots and 124 Tactical agents.
+The learner's training record was 78–159–3 against that changing mixture;
+this is not a strength estimate. The trainer reported **95.36 seconds** on
+this machine and 20,503 learner decisions. All **240/240** saved trajectories,
+containing **123,494 decisions**, independently replay-verified against the
+pinned native engine and passed the player-visibility audit. No duel hit the
+3,000-decision limit. The ignored checkpoint is
+`.cache/goat-ai/ppo_mixed_240_91000_91239.pt`, SHA-256
+`05698f306769dcb8cca873a048588010d5f74851a3f0137cfcc4acc7dcabc96c`.
+
+On two **unseen Main Deck** pairings, Roberto Martinez Phoenix Control/Jae
+Kim Zombie and Rhymus Lizo Goat Control/WikiFormat Dimension Fusion, both
+deck assignments and both policy seats were tested on seeds 91300–91307.
+The child scored **33–31** directly against the frozen v23 parent over 64
+games: 51.6% score, paired 95% interval **46.9–56.3%**. Assigned-deck
+splits were Dimension Fusion 2–14, Rhymus Goat Control 13–3, Phoenix Control
+5–11, and Zombie 13–3, so the aggregate does not establish broad transfer.
+On separate matched seeds 91308–91315 against Tactical-v14, the child went
+**15–49** and the parent **16–48**. The report comparator checked the same
+opponent, deck files, schedule, native assets, source code, and unseen Main
+Decks; child-minus-parent score was **−1.56 percentage points**, paired 95%
+interval **−9.38 to +6.25 points**. This larger self-play continuation gives
+no evidence for promotion or the M4 strength gate. Keep the original v23
+checkpoint selected.
+
+The direct, child-versus-Tactical, and parent-versus-Tactical ignored reports
+are `.cache/goat-ai/ppo_mixed_240_vs_parent_91300_91307.json`,
+`.cache/goat-ai/ppo_mixed_240_vs_tactical_91308_91315.json`, and
+`.cache/goat-ai/ppo_parent_vs_tactical_91308_91315.json`. Their SHA-256 values
+are respectively
+`03d09206544b8b2a26241589eb1e7ddb9fdde6b065e9c43d1a21ea81c12a5a02`,
+`3d758d15665563715b4ff260803bef84c652a5581f16e8d3c91f8261fdea242e`,
+and `37d6509931b401c055587b464ce084418577569699c5cc8406f3ba514096bebd`.
+Reproduce training with `scripts/train_self_play.py` using the three pairings
+above and `--engine experimental --schedule-mode four_roles --seed 91000
+--games 240 --max-decisions 3000 --policy-update clipped_ppo
+--ppo-rollout-games 4 --ppo-epochs 2 --ppo-batch-size 32
+--ppo-rollout-weighting per_episode --baseline-scope learner_deck
+--snapshot-every 4 --parent-kl-weight 0.5 --historical-probability 0.5
+--baseline-opponent tactical --rollout-workers 4 --independent-opponent-rng
+--learning-rate 0.00005`. Reproduce each tournament with
+`scripts/evaluate_policy.py --engine experimental --both-deck-assignments
+--require-unseen-main-decks --workers 4 --max-decisions 3000`, the named
+pairings, and the stated seed blocks. Verify all saved games with
+`scripts/audit_selfplay_replays.py
+.cache/goat-ai/ppo_mixed_240_91000_91239_replays/episode_*.json --output
+.cache/goat-ai/ppo_mixed_240_audit.json`. This experiment enlarges the training
+sample and adds a pairing; it does not isolate either change, and it does not
+measure performance against humans.

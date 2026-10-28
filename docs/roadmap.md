@@ -2041,3 +2041,11 @@ Setting Airknight ends the attack without a replay, damage, or draw and leaves
 no Main Phase 2 Flip Summon; passing Book allows 1,900 damage and the draw.
 Both branches complete and pass replay and visibility checks. The broader M2
 gate and M4 learned-policy strength gate remain open.
+
+A larger 240-duel mixed-deck PPO continuation of the selected v23 policy
+completed without a decision cap; all 123,494 recorded decisions replay-verified
+and passed the visibility audit. On unseen Main Decks it scored 33–31 directly
+against its parent, with a paired interval spanning 50%, and 15–49 versus
+Tactical-v14 compared with the parent's matched 16–48. The checkpoint is not
+promoted: increasing self-play volume on this schedule did not satisfy M4's
+held-out strength gate. See [the experiment](evaluation.md#larger-mixed-deck-ppo-continuation-of-selected-v23-28-october-2026).
