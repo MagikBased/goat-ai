@@ -9672,3 +9672,33 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
 This measures native protocol and observation coverage under random play.
 It does not certify the sampled cards' historical rulings or measure playing
 strength.
+
+## Synthetic maximum counter menu benchmark (27 October 2026)
+
+`scripts/benchmark_counter_allocation.py` constructs a protocol-only
+`MSG_SELECT_COUNTER` prompt with two visible cards, 32,767 counters on each,
+and a cost of 32,767. The first staged decision has **32,768** legal amount
+choices. This is the representable maximum for a single card in the current
+signed 16-bit native response; it is not a witnessed GOAT duel state. A
+width-32, feature-v28 PyTorch policy scored every choice with finite logits.
+
+On Linux 6.8, an Intel Core i7-10700K, PyTorch 2.5.1+cpu, and one Torch
+thread, three repeats gave median times of **0.019 s** to decode the native
+prompt, **0.361 s** to build public actions, **0.807 s** to encode features,
+and **0.038 s** for policy inference. Peak process RSS was **381.5 MiB**;
+this includes the Python and PyTorch runtime and is not the incremental
+memory attributable only to the counter decision. The ignored JSON report is
+`.cache/goat-ai/counter_allocation_benchmark_20261027.json` (SHA-256
+`7c5a6bd735b0d19d016bcfee8b87e760d5a9744413bcff7227d6c28f535c500b`).
+Reproduce the same synthetic workload after installing the `ml` extra:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/benchmark_counter_allocation.py \
+  --cards 2 --available 32767 --total 32767 --width 32 --repeats 3
+```
+
+The elapsed times will vary by machine. This measures the worst single-card
+choice menu, not complete-duel speed or competitive strength. Multiple such
+menus in parallel workers could create a material memory load; the project
+has no observed native frequency estimate for this extreme prompt.

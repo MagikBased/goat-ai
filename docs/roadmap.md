@@ -280,8 +280,11 @@ the adapter sends one validated response after the last amount. A synthetic
 ten-card prompt covers the large-allocation branch, and a forced-stage
 native Anti-Spell duel and saved-response reconstruction replay-verify the
 same response boundary. A naturally occurring large counter prompt remains
-untested. One per-card stage can still have up to 32,768 legal amounts, so
-its worst-case inference cost is unmeasured.
+untested. One per-card stage can still have up to 32,768 legal amounts. A
+synthetic maximum-menu benchmark measured its cost on one CPU, including
+381 MiB peak process memory; this remains a scaling concern for parallel
+training, not a duel-throughput result. See
+[evaluation](evaluation.md#synthetic-maximum-counter-menu-benchmark-27-october-2026).
 Opt-in policy feature v28 now encodes each selected card's counter amount,
 counter type, and total cost. It can warm-start from a v23 checkpoint without
 changing logits on existing actions. This adds a learnable representation for
