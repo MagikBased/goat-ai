@@ -13265,3 +13265,27 @@ audit. The ignored branch report is
 negative example for **that activation's immediate consequence**, but it is
 one state and does not prove that End Phase was the best move or that a new
 neural policy is stronger.
+
+### Scoring saved one-shot MST context notes without converting them to labels
+
+The seven saved context notes linked from the one-shot review queue now have
+a separate, validated upstream-activation queue; see [replay audit](replay_audit.md).
+`scripts/score_review_queue.py` scores its recorded and suggested legal
+actions under a named checkpoint after verifying queue metadata, source
+hashes, complete native replays, and player visibility. Its output calls the
+suggested action a **review prompt**, not a human label, and records exact
+replay and seed overlap with the scored checkpoint's training provenance.
+
+At these seven fixed MST-versus-Pass states, the selected feature-v23 parent
+ranked MST first **7/7** times. The experimental residual-v8 child ranked
+Pass first **6/7** times. The child had **six exact source replays** in its
+training provenance; the seventh also shared a training seed. Thus this is a
+fit diagnostic, not an independent holdout result. Its previously measured
+64-game direct result against the parent was **31–33**, so no checkpoint is
+promoted. Both score reports independently verified **4,377** source duel
+decisions and have SHA-256 values
+`eb98cda9bd02669b9c5a7c0f7c8b320fd99a6c131089615ff6c171b0342fe739`
+(parent) and
+`71becad999e386ed2b0a3a418b01af5f34126c02e8f3fa3c36c9793d2ef0675d`
+(child). They are ignored local artifacts named
+`context_upstream_{parent,residual_v8}_scores.json` beside the source queue.
