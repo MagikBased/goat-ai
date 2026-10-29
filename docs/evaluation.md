@@ -28,6 +28,35 @@ Run `scripts/evaluate_policy.py` with `--own-loss-guard-version 6` or `1`,
 and the four listed matchups; compare using
 `scripts/compare_tournament_reports.py --require-unseen-main-decks`.
 
+To inspect the six changed outcomes, `record_policy_match.py` now accepts
+`--opponent-own-loss-guard` and records that inference mode. Both v6 and v1
+arms of each changed game were recorded again with the **same v1 checkpoint
+opponent**. All twelve complete trajectories passed exact native replay and
+visibility auditing, and every opponent decision reproduced from its saved
+checkpoint and v1 guard. Their terminal winners matched the tournament
+reports. The first decision difference was five idle own-only Ring
+activations suppressed by v6 and one MST response to an opponent's Pot of
+Greed. In two Ring states, the v1 action selected a zero-ATK Sheep Token;
+the other three selected an owned 1000-, 1800-, or 2000-ATK monster. The
+MST response targeted the resolving Pot, whose effect was not negated.
+The v1 branches' observed material margins fell by one or two cards before
+their chains closed; one of those chains included a later activation, so its
+delta is not attributable solely to Ring. Yet v1 won three of these six
+complete games. This is a concrete example of why terminal outcome on one
+hidden deal is too noisy to label a local play as good.
+
+The ignored paired trajectories and `first_divergences.json` are under
+`.cache/goat-ai/own_loss_v6_v1_changed_105200_105207/`; the divergence
+report SHA-256 is
+`9631ea9aeb8d0a5a704a0bdf6a296d2a6403d922bfe375d795cb97239bbafe53`.
+Each arm can be reproduced with `scripts/record_policy_match.py` using
+the report's Decks and seed, `--policy-seat 0`, the selected v23 checkpoint
+as both checkpoint arguments, `--opponent-own-loss-guard-version 1`, and
+`--opponent-own-loss-guard`, plus candidate `--own-loss-guard` with version
+`1` or `6`. Human review should judge
+the activation in its visible position; these paired winners are not
+training labels.
+
 ## Idle own-only Ring inference experiment (29 October 2026)
 
 The selected feature-v23 checkpoint is unchanged. An opt-in own-loss guard v3

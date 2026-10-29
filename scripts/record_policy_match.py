@@ -39,6 +39,10 @@ def main() -> None:
                            default="combat_heuristic")
     opponents.add_argument("--opponent-checkpoint", type=Path,
                            help="play a distinct saved policy and fingerprint it in the replay")
+    parser.add_argument("--opponent-own-loss-guard", action="store_true",
+                        help="apply the experimental own-loss filter to a checkpoint opponent")
+    parser.add_argument("--opponent-own-loss-guard-version", type=int,
+                        choices=(1, 2, 3, 4, 5, 6), default=1)
     parser.add_argument("--max-decisions", type=int, default=3000)
     parser.add_argument("--tactical-guard", action="store_true",
                         help="apply experimental visible-state action filter to policy")
@@ -68,6 +72,10 @@ def main() -> None:
         parser.error("choose one standalone policy guard")
     if args.own_loss_guard_version != 1 and not args.own_loss_guard:
         parser.error("--own-loss-guard-version requires --own-loss-guard")
+    if args.opponent_own_loss_guard and not args.opponent_checkpoint:
+        parser.error("--opponent-own-loss-guard requires --opponent-checkpoint")
+    if args.opponent_own_loss_guard_version != 1 and not args.opponent_own_loss_guard:
+        parser.error("--opponent-own-loss-guard-version requires --opponent-own-loss-guard")
     policy_options = {
         "tactical_guard": args.tactical_guard,
         "card_races": load_card_races(args.native_root) if args.tactical_guard else None,
@@ -82,9 +90,17 @@ def main() -> None:
                        else None),
     }
     policy = load_policy_agent(args.checkpoint, **policy_options)
+    opponent_options = {
+        "own_loss_guard": args.opponent_own_loss_guard,
+        "own_loss_guard_version": args.opponent_own_loss_guard_version,
+        "card_facts": (load_card_facts(args.native_root)
+                       if args.opponent_own_loss_guard
+                       and args.opponent_own_loss_guard_version in (2, 5, 6)
+                       else None),
+    }
     flip_codes = (load_flip_monster_codes(args.native_root)
                   if args.opponent in ("combat_flip", "tactical") else frozenset())
-    opponent = (load_policy_agent(args.opponent_checkpoint)
+    opponent = (load_policy_agent(args.opponent_checkpoint, **opponent_options)
                 if args.opponent_checkpoint else {
                     "combat_heuristic": lambda: CombatHeuristicAgent(),
                     "combat_flip": lambda: CombatFlipHeuristicAgent(flip_codes),
@@ -133,6 +149,10 @@ def main() -> None:
                             args.opponent_checkpoint or args.checkpoint)}
                            if args.opponent_checkpoint or args.opponent == "mirror_policy"
                            else {}),
+                        **({"opponent_inference": (
+                            f"greedy_own_loss_guard_v{args.opponent_own_loss_guard_version}"
+                            if args.opponent_own_loss_guard else "greedy")}
+                           if args.opponent_checkpoint else {}),
                     },
                 )
                 args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -145,7 +165,7 @@ def main() -> None:
                 if args.opponent_checkpoint or args.opponent == "mirror_policy":
                     replay_opponent = load_policy_agent(
                         args.opponent_checkpoint or args.checkpoint,
-                        **({} if args.opponent_checkpoint else policy_options))
+                        **(opponent_options if args.opponent_checkpoint else policy_options))
                     for index, record in enumerate(replay.decisions):
                         if record.observation.acting_player != 1 - args.policy_seat:
                             continue
