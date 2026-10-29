@@ -13212,6 +13212,38 @@ against v5. The ignored report is
 `.cache/goat-ai/own_loss_v6_vs_v5_122000_122007.json` (SHA-256
 `12b966dbe691843bf08d2c0c88a2b3411b5c25850e3ff759566d192f44451faa`).
 This test shows no gain and does not measure how often the new condition was
-reached. The selected checkpoint and inference mode remain unchanged. A
-broader per-opportunity own-card-loss audit and new training evidence are
-still needed to address the reviewer's main concern.
+reached. The selected checkpoint and inference mode remain unchanged.
+
+### Visible own-card loss opportunities in the guarded v23 corpus (29 October 2026)
+
+The replay auditor now flags MST **at the activation prompt** when its only
+field target is the acting player's already resolving one-shot Spell/Trap.
+The corresponding opportunity count includes opponent-turn response windows,
+and deduplicates repeated priority prompts by category, turn, and phase. The
+check uses only the actor's observation and printed type of the public chain
+source. A forced MST target prompt is not counted as another activation
+choice. This audit definition is shared with experimental guard v6.
+
+All 128 recorded `ring_guard_blind_104400_104407` v23/v1-guarded duels
+replayed against the pinned native engine, passed the visibility audit, and
+reproduced **37,132** greedy policy choices, of which **12,707** offered
+multiple actions. The auditor found **18** conservative own-card-loss flags:
+14 idle own-only Ring activations, two negative visible Heavy Storm trades,
+one MST chained to its own one-shot card, and one own Ring target despite a
+safe opposing target. It counted **22** distinct idle own-only Ring
+opportunities and **3** own-one-shot MST response opportunities; the policy
+selected the flagged action in **14/22** and **1/3**, respectively. The MST
+case is viewer frame 302 of the reviewed seed-104405 replay. Other measured
+upstream categories in this corpus had zero flagged choices: own-only
+Nobleman **0/158**, own-only Heavy Storm **0/96**, idle own-back-row MST
+**0/26**, Breaker with only friendly back row **0/18**, and owned Chaos boss
+with no enemy monster **0/15**. There was no idle own-only Raigeki Break
+opportunity under this definition. These are rates **per observed
+opportunity**, not rates over all games or proof of optimal play. The v1
+guard already suppresses several categories, so the zeros do not describe
+an unguarded neural policy. The ignored report is
+`.cache/goat-ai/ring_guard_blind_104400_104407/own_loss_opportunity_audit_v6.json`
+(SHA-256 `deceb55ffbe39347ed0047012364ca063312113e10a6f5ad5cffaf7534ccac1d`).
+The Ring concentration makes Ring timing and targets a higher-priority
+review/training topic than the single MST example. These fixed replay states
+do not establish a policy strength gain or justify promoting guard v6.

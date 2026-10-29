@@ -10,7 +10,10 @@ from dataclasses import asdict, dataclass, replace
 from math import isfinite
 
 from goat_ai.actions import Action
-from goat_ai.agents.tactical_guard import visible_monster_race
+from goat_ai.agents.tactical_guard import (
+    safe_own_one_shot_response_indices,
+    visible_monster_race,
+)
 from goat_ai.replay import Trajectory
 
 HEAVY_STORM = 19613556
@@ -242,6 +245,14 @@ def review_candidates(trajectory: Trajectory,
                 found.append(("raigeki_break_idle_only_own_field",
                               {"own_field_targets": own_other_backrow
                                + len(own_monsters)}))
+        if (selected.kind == "chain"
+                and selected.parameters.get("code") == MYSTICAL_SPACE_TYPHOON
+                and can_pass and selected not in tuple(
+                    record.legal_actions[i] for i in safe_own_one_shot_response_indices(
+                        obs, record.legal_actions,
+                        range(len(record.legal_actions)), card_facts))):
+            found.append(("mst_chains_to_own_one_shot_only",
+                          {"chain_source_code": obs.chain[-1].card_code}))
         if (_is_action(selected, "chain", SAKURETSU_ARMOR) and can_pass
                 and any(c.zone == "spell_trap" and c.position == "faceup"
                         and c.code == ROYAL_DECREE for c in obs.field)):

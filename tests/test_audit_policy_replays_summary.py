@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 
 from goat_ai.actions import Action
-from goat_ai.observations import CardView, Observation
+from goat_ai.observations import CardView, ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord
 from scripts.audit_policy_replays import (
     own_card_activation_opportunities,
@@ -41,6 +41,7 @@ def test_summary_counts_only_policy_review_flags() -> None:
         "nobleman_only_own_set_monster": None,
         "heavy_storm_only_own_backrow": None,
         "mst_idle_only_own_backrow": None,
+        "mst_chains_to_own_one_shot_only": None,
         "raigeki_break_idle_only_own_field": None,
         "ring_idle_only_own_faceup": None,
         "breaker_activates_with_only_own_backrow": None,
@@ -100,6 +101,26 @@ def test_activation_opportunities_deduplicate_revisited_priority_prompts() -> No
     }
     assert own_card_activation_opportunities(
         SimpleNamespace(decisions=(trajectory.decisions[-1],)), 0) == {}
+
+
+def test_own_one_shot_mst_opportunity_counts_on_opponents_turn() -> None:
+    source = CardView(0, "spell_trap", "faceup", 44095762, 0)
+    mst_card = CardView(0, "spell_trap", "facedown", 5318639, 1)
+    mst = Action("mst", "chain", 0,
+                 {"code": 5318639, "location": 8, "sequence": 1})
+    decline = Action("pass", "pass", 0)
+    obs = Observation(
+        viewer=0, acting_player=0, turn=2, phase="battle_step",
+        life_points=(8000, 8000), hand=(), field=(source, mst_card),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=5,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=1,
+        chain=(ChainLinkView(1, 44095762, 0, 8, 0),),
+    )
+    decisions = (DecisionRecord(obs, (mst, decline), mst),
+                 DecisionRecord(obs, (mst, decline), decline))
+    assert own_card_activation_opportunities(
+        SimpleNamespace(decisions=decisions), 0,
+        {44095762: (4, 0, 0)}) == {"mst_chains_to_own_one_shot_only": 1}
 
 
 def test_idle_own_only_removal_opportunity_excludes_its_set_source() -> None:

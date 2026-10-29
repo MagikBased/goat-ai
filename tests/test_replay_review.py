@@ -75,6 +75,23 @@ def test_review_flags_idle_own_only_removal_before_target_prompt():
                    for index, category in flags)
 
 
+def test_review_flags_mst_on_own_resolving_one_shot_at_activation() -> None:
+    source = CardView(0, "spell_trap", "faceup", 44095762, 0)
+    mst_card = CardView(0, "spell_trap", "facedown", 5318639, 1)
+    observation = replace(view(source, mst_card, phase="battle_step", turn=2,
+                               turn_player=1),
+                          chain=(ChainLinkView(1, 44095762, 0, 8, 0),))
+    mst = Action("mst", "chain", 0,
+                 {"code": 5318639, "location": 8, "sequence": 1})
+    decline = Action("pass", "pass", 0)
+    replay = policy(record(observation, mst, decline))
+    flags = {(candidate.decision_index, candidate.category)
+             for candidate in review_candidates(
+                 replay, card_facts={44095762: (4, 0, 0)})}
+    assert (0, "mst_chains_to_own_one_shot_only") in flags
+    assert not review_candidates(replay, card_facts={})
+
+
 def test_sampled_self_play_provenance_cannot_be_mistaken_for_greedy_choices():
     sampled = replace(
         policy(record(view(), Action("pass", "pass", 0))),

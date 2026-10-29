@@ -17,6 +17,7 @@ from goat_ai.agents.tactical_guard import (
     BREAKER_THE_MAGICAL_WARRIOR,
     CHAOS_SORCERER,
     safe_idle_own_ring_indices,
+    safe_own_one_shot_response_indices,
 )
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import (
@@ -48,6 +49,7 @@ VISIBLE_OWN_CARD_LOSSES = frozenset({
     "tribe_race_hits_only_own_with_enemy_option",
     "tribe_race_hits_only_own_no_enemy_option",
     "mst_idle_only_own_backrow",
+    "mst_chains_to_own_one_shot_only",
     "raigeki_break_idle_only_own_field",
     "ring_idle_only_own_faceup",
     "ring_targets_own_with_safe_enemy_option",
@@ -57,17 +59,26 @@ VISIBLE_OWN_CARD_LOSSES = frozenset({
 
 ACTIVATION_OPPORTUNITY_CATEGORIES = (
     "nobleman_only_own_set_monster", "heavy_storm_only_own_backrow",
-    "mst_idle_only_own_backrow", "raigeki_break_idle_only_own_field",
+    "mst_idle_only_own_backrow", "mst_chains_to_own_one_shot_only",
+    "raigeki_break_idle_only_own_field",
     "ring_idle_only_own_faceup", "breaker_activates_with_only_own_backrow",
     "owned_chaos_boss_activates_without_enemy_monster")
 
 
-def own_card_activation_opportunities(trajectory, seat: int) -> dict[str, int]:
+def own_card_activation_opportunities(
+        trajectory, seat: int,
+        card_facts: dict[int, tuple[int, int, int]] | None = None) -> dict[str, int]:
     """Count distinct visible own-only removal opportunities in visited states."""
     seen: set[tuple[str, int, str]] = set()
     for record in trajectory.decisions:
         obs = record.observation
-        if obs.acting_player != seat or obs.turn_player != seat:
+        if obs.acting_player != seat:
+            continue
+        if card_facts and len(safe_own_one_shot_response_indices(
+                obs, record.legal_actions, range(len(record.legal_actions)),
+                card_facts)) < len(record.legal_actions):
+            seen.add(("mst_chains_to_own_one_shot_only", obs.turn, obs.phase))
+        if obs.turn_player != seat:
             continue
         own_sets = any(card.controller == seat and card.zone == "monster"
                        and card.position == "facedown" for card in obs.field)
@@ -288,7 +299,7 @@ def main() -> None:
                           "verified_policy_choices": policy_choices,
                           "verified_multi_action_policy_choices": multi_action_choices}
             own_card_opportunities = own_card_activation_opportunities(
-                trajectory, policy_seat)
+                trajectory, policy_seat, card_facts)
             if opponent_sha256 is not None:
                 if metadata.get("opponent_checkpoint_sha256") != opponent_sha256:
                     raise ValueError(f"{path}: opponent checkpoint SHA-256 differs from recording")
