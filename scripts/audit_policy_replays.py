@@ -2,6 +2,7 @@
 
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
 
 from goat_ai.agents import (
@@ -13,6 +14,8 @@ from goat_ai.agents import (
 from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import (
+    HEAVY_STORM,
+    NOBLEMAN_OF_CROSSOUT,
     category_counts,
     compare_parent_greedy_candidates,
     review_candidates,
@@ -23,6 +26,86 @@ from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION
+
+VISIBLE_OWN_CARD_LOSSES = frozenset({
+    "nobleman_only_own_set_monster",
+    "heavy_storm_only_own_backrow",
+    "breaker_targets_only_own_backrow",
+    "bls_targets_itself_with_enemy_option",
+    "chaos_sorcerer_targets_itself_with_enemy_option",
+    "mst_targets_own_card_with_enemy_option",
+    "raigeki_break_targets_own_card_with_enemy_option",
+    "tribe_race_hits_only_own_with_enemy_option",
+    "tribe_race_hits_only_own_no_enemy_option",
+})
+
+ACTIVATION_OPPORTUNITY_CATEGORIES = (
+    "nobleman_only_own_set_monster", "heavy_storm_only_own_backrow")
+
+
+def own_card_activation_opportunities(trajectory, seat: int) -> dict[str, int]:
+    """Count distinct visible own-only removal opportunities in visited states."""
+    seen: set[tuple[str, int, str]] = set()
+    for record in trajectory.decisions:
+        obs = record.observation
+        if obs.acting_player != seat or obs.turn_player != seat:
+            continue
+        own_sets = any(card.controller == seat and card.zone == "monster"
+                       and card.position == "facedown" for card in obs.field)
+        enemy_sets = any(card.controller != seat and card.zone == "monster"
+                         and card.position == "facedown" for card in obs.field)
+        own_backrow = [card for card in obs.field
+                       if card.controller == seat and card.zone == "spell_trap"]
+        enemy_backrow = any(card.controller != seat and card.zone == "spell_trap"
+                            for card in obs.field)
+        for action in record.legal_actions:
+            if action.kind != "activate":
+                continue
+            code = action.parameters.get("code")
+            if code == NOBLEMAN_OF_CROSSOUT and own_sets and not enemy_sets:
+                seen.add(("nobleman_only_own_set_monster", obs.turn, obs.phase))
+            elif code == HEAVY_STORM and not enemy_backrow:
+                source_is_set = action.parameters.get("location") == 8 and any(
+                    card.sequence == action.parameters.get("sequence")
+                    and card.code == HEAVY_STORM for card in own_backrow)
+                if len(own_backrow) - int(source_is_set) > 0:
+                    seen.add(("heavy_storm_only_own_backrow", obs.turn, obs.phase))
+    return dict(sorted(Counter(category for category, _, _ in seen).items()))
+
+
+def summarize_visible_own_card_losses(reports: list[dict]) -> dict:
+    """Count conservative review flags with a policy-decision denominator.
+
+    Review candidates are deduplicated by category, turn, and phase within a
+    replay. The rate is for flagged instances, not all raw activations or
+    opportunities. It must not be interpreted as an optimal-play error rate.
+    """
+    if not reports or any("verified_policy_choices" not in report
+                          for report in reports):
+        return {"available": False,
+                "reason": "requires greedy policy_evaluation replays"}
+    decisions = sum(report["verified_policy_choices"] for report in reports)
+    counts = Counter(candidate["category"] for report in reports
+                     for candidate in report["candidates"]
+                     if candidate["category"] in VISIBLE_OWN_CARD_LOSSES)
+    total = sum(counts.values())
+    opportunities = Counter()
+    for report in reports:
+        opportunities.update(report.get("visible_own_card_loss_opportunities", {}))
+    rates = {category: (counts[category] / opportunities[category]
+                        if opportunities[category] else None)
+             for category in ACTIVATION_OPPORTUNITY_CATEGORIES}
+    return {"available": True, "replays": len(reports),
+            "verified_policy_choices": decisions,
+            "flagged_instances": total,
+            "flagged_instances_per_1000_policy_choices": (
+                1000 * total / decisions if decisions else None),
+            "category_counts": dict(sorted(counts.items())),
+            "activation_opportunity_counts": dict(sorted(opportunities.items())),
+            "flagged_per_activation_opportunity": rates,
+            "counting_note": "review flags and activation opportunities deduplicated "
+                             "per category, turn, and phase; not an "
+                             "optimal-play error rate"}
 
 
 def tactical_agent(version: int, native_root: Path, card_races):
@@ -118,6 +201,8 @@ def main() -> None:
                           "selection_temperature": None,
                           "choice_verification": "reproduced_greedy",
                           "verified_policy_choices": policy_choices}
+            own_card_opportunities = own_card_activation_opportunities(
+                trajectory, policy_seat)
             if opponent_sha256 is not None:
                 if metadata.get("opponent_checkpoint_sha256") != opponent_sha256:
                     raise ValueError(f"{path}: opponent checkpoint SHA-256 differs from recording")
@@ -208,12 +293,15 @@ def main() -> None:
             "winner": trajectory.winner,
             "verified_decisions": verified,
             "category_counts": category_counts(candidates),
+            **({"visible_own_card_loss_opportunities": own_card_opportunities}
+               if trajectory.source == "policy_evaluation" else {}),
             "candidates": [candidate.to_dict() for candidate in candidates],
             **({"parent_greedy_review": parent_greedy_review}
                if parent_policy is not None else {}),
             "opponent_review": opponent_review,
         })
-    result = {"schema_version": 1, "replays": reports}
+    result = {"schema_version": 1, "replays": reports,
+              "visible_own_card_losses": summarize_visible_own_card_losses(reports)}
     payload = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

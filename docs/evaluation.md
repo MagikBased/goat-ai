@@ -37,6 +37,34 @@ rates and match results on fresh games. It should compare pass/hold options
 before activation, because choosing a less harmful target after an unnecessary
 activation cannot recover the spent card.
 
+`scripts/audit_policy_replays.py` now includes a
+`visible_own_card_losses` aggregate for greedy policy evaluation replays. It
+uses reproduced policy choices as the denominator and counts the conservative
+own-card review categories, which are deduplicated per category, turn, and
+phase. For own-only Nobleman and Heavy Storm it also counts distinct visited
+turn/phase states where activation was legal, so their selection rates have
+an opportunity denominator. Sampled self-play reports deliberately do not
+get a greedy rate.
+
+As a fresh current-core baseline, the selected v23 policy played Tactical-v14
+in eight terminal duels on seeds 99800–99803, alternating policy seats across
+the Theeresak/Christian Seattle and Rhymus/Dimension Fusion matchups. All
+eight trajectories passed exact native replay verification and visibility
+auditing; all **2,398** policy decisions were reproduced from the checkpoint.
+The aggregate found **three** flagged own-card losses: two own-only Nobleman
+activations and one Heavy Storm that hit only its own back row, or **1.25
+flagged instances per 1,000 policy decisions**. Among visited distinct
+turn/phase opportunities, own-only Nobleman was offered **6** times and
+selected **2** times; own-only Heavy Storm was offered **8** times and selected
+**1** time. Four games per matchup and category/turn/phase deduplication make
+this a baseline diagnostic, not a population error-rate estimate. Other
+categories may simply not have arisen. The ignored replay directory is
+`.cache/goat-ai/fresh_self_loss_99800_99803/`; its audit JSON has SHA-256
+`66700d1e91507a453ad5bf3776a33651e3cebf4211b57694c63612da6864c1e0`.
+Run `scripts/record_policy_match.py` with the selected checkpoint, the named
+decks, seeds, and seats, then `scripts/audit_policy_replays.py` with that
+checkpoint and the eight generated JSON files to reproduce the report.
+
 ## Self-play continuation of the 25-preference child (28 October 2026)
 
 To test the next M4 step, `scripts/train_self_play.py` continued the experimental
