@@ -1391,6 +1391,26 @@ many varied, verified ownership contexts and separate positive examples of
 valuable removal; the fixed-state target should be paired with fresh-game
 error and competitive results before any policy promotion.
 
+To inventory available contexts without silently turning them into labels,
+`scripts/catalog_mst_contexts.py` now native-replays and visibility-audits each
+source trajectory, then records selected MST activations and only the acting
+player's visible back row. It excludes MST's own Set source slot and retains
+`null` for an unknown opposing Set card. On all **128** sampled control PPO
+replays from seeds 106800–106927, it found **12 own-only**, **10 opposing-only**,
+and **12 mixed** visible back-row contexts. The matched preference-retention
+arm had **11**, **10**, and **13**, respectively. Only two control and one
+retention opposing-only choices faced exactly one visible face-up opposing
+back-row card; most of the possible positive examples involve Set cards or
+multiple cards and need contextual review. These are selected-action counts,
+not legal-opportunity counts or good/bad-play rates. Both sets of 128
+trajectories passed native replay and visibility audit in this catalog run.
+Ignored catalog SHA-256 values are
+`7fa49cf13f19f526412ebb4772f313a9c40b93d704699fdd3bbcae6d9b155ef4`
+and
+`45b3c661b6f57d124bf267611d921c9645cc4c4e1fbfbfbbab36f2a994947f63`.
+Reproduce with `scripts/catalog_mst_contexts.py` over each arm's saved
+`episode_*.json` files and `--output` to a local ignored JSON file.
+
 ## Selected own-loss preference trial (29 October 2026)
 
 The versioned `visible_selected_own_loss_v10` rule retains only V9 decisions
