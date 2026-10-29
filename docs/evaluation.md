@@ -1,5 +1,47 @@
 # Baseline evaluation log
 
+## Exact visible-guard distillation into v23 (29 October 2026)
+
+`visible_guard_distillation_v7` now creates automated masked-parent
+preferences from the exact player-visible activation and target masks used by
+the measured own-loss inference guard. Each comparison partitions all offered
+legal actions into kept and removed sets; it does not endorse one specific
+surviving move. The converter replay-verifies and visibility-audits every
+source, while the trainer recomputes the mask and checks its source hash
+before fitting. These are automated policy hypotheses, not human labels.
+
+Sixteen current-core parent-versus-Tactical replays on seeds 99900–99907
+yielded 67 comparisons across 10 replays. An archived seed-44000 source set
+failed the exact native-asset gate because its core binary differed, so it
+was excluded. A new current-core collection on Indianapolis Matt/Daryl and
+Jesse/Cas training-deck families produced 32 replay-verified duels (19,327
+decisions) on seeds 101000–101007 and 92 comparisons across 21 replays. The
+child used only these 92 comparisons, plus 128 preservation states from eight
+separate current-core seed-101008–101009 replays. It started from the selected
+v23 checkpoint, used the masked-parent objective for 80 steps, bad-choice
+weight 10, KL weight 1, learning rate 0.0001, and seed 77. Sampled preference
+loss fell from 1.400 to 0.813; final sampled preservation KL was 0.0181.
+The ignored child is `.cache/goat-ai/guard_v7_distill_101000_101009.pt`.
+Its SHA-256 is
+`08596d24cea14ad57363c644fe988ee68f1653ee0678eb58483673c70077a5f4`;
+the automated-preference manifest SHA-256 is
+`b7492f1f9e5ed1dfaaf58849dc78c5f87bf4df0ccd82a7c5d3219dc7433693b5`.
+
+On 67 fixed, held-out comparison states from the seed-99900 replays, the
+unchanged parent chose a removed action seven times and the child four times.
+Those states were *not* used to fit the child. Across four different unseen
+Main Deck pairings, both assignments and policy seats, and fresh seeds
+102000–102007, the child scored **63–65** directly against the parent over
+128 complete duels (paired 95% interval **40.63%–57.81%**). In a matched
+Tactical-v14 schedule, the child won **45/128** versus the parent's **41/128**;
+the strict paired difference was **+3.13 percentage points** (95% interval
+**−4.69 to +10.94 points**). The training set did not include any of the
+four evaluation Main Deck compositions. This trial improves the targeted
+fixed-state error count but does not establish a competitive neural gain.
+Keep the v23 checkpoint selected and the measured inference guard in local
+play. Further distillation needs more diverse, independently reviewed
+decisions or a value signal that survives complete-duel evaluation.
+
 ## Expanded own-loss guard held-out strength check (29 October 2026)
 
 The expanded `own_loss_guard` was compared with the *same* selected feature-v23

@@ -358,6 +358,38 @@ def test_v6_declines_breaker_effect_before_forced_own_target():
     assert derive(with_enemy, (), rule_set_id=rules.RULE_SET_V6) == ([], {})
 
 
+def test_v7_distills_visible_guard_activation_and_target_masks():
+    own_set = CardView(0, "spell_trap", "facedown", 45986603, 1)
+    view = Observation(
+        viewer=0, acting_player=0, turn=3, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(own_set,),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=4,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=0)
+    mst = Action("mst", "chain", 0, {"code": 5318639})
+    pass_action = Action("pass", "pass", 0)
+    activation = DecisionRecord(view, (mst, pass_action), mst)
+    own_target = Action("own", "select_card", 0,
+                        {"controller": 0, "location": 4, "sequence": 0})
+    enemy_target = Action("enemy", "select_card", 0,
+                          {"controller": 1, "location": 4, "sequence": 0})
+    target_view = replace(view, chain=(ChainLinkView(1, 504700118, 0, 4, 0),))
+    target = DecisionRecord(target_view, (own_target, enemy_target), own_target)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42,
+                        (activation, target), 1, source="self_play_rl",
+                        skill_metadata={"learner_seat": 0})
+    expected = ([
+        {"decision_index": 0, "preferred_action_indices": [1],
+         "disfavored_action_indices": [0]},
+        {"decision_index": 1, "preferred_action_indices": [1],
+         "disfavored_action_indices": [0]},
+    ], {"activation": 1, "target": 1})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V7) == expected
+    valid = SimpleNamespace(rule_set_id=rules.RULE_SET_V7,
+                            preferences=(ReviewedPreference(0, (1,), (0,)),
+                                         ReviewedPreference(1, (1,), (0,))))
+    rules.validate_automated_preferences(replay, valid, {})
+
+
 def test_v6_declines_only_own_boss_banish_and_off_turn_torrential():
     boss = CardView(0, "monster", "faceup", 504700118, 0, owner=0)
     observation = Observation(

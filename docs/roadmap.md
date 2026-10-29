@@ -2501,3 +2501,8 @@ matched Tactical-v14 results by 14 wins over 256 held-out games. Local viewer
 games now use the guarded inference mode. The neural checkpoint remains
 unchanged, still loses to Tactical-v14, and M4's learned-strength gate remains
 open.
+An [exact guard-distillation child](evaluation.md#exact-visible-guard-distillation-into-v23-29-october-2026)
+reduced held-out fixed-state guard violations from seven to four, but scored
+63–65 directly against its v23 parent on 128 unseen-deck games. Its matched
+Tactical gain was inconclusive. Keep the inference guard for local play and
+continue pursuing a learned policy with a verified complete-duel gain.
