@@ -142,6 +142,8 @@ a placement or attack target; when the engine offers a matching next choice,
 the dragged destination is used. Empty or occupied zones that cannot accept the
 drag are not highlighted. Visible card faces and card backs load from the local
 server's art cache; missing artwork displays the card name instead.
+On desktop, the field fits both players' zones and hands in the viewport; the
+sidebar scrolls independently when its details are expanded.
 Click an available phase button to advance, use **Pass** for response windows,
 or use **End turn** when that transition is legal. Unusual prompts and every
 legal choice remain available under **All legal actions** in the sidebar.

@@ -115,3 +115,49 @@ def test_drag_highlights_only_legal_targets_and_missing_art_keeps_name(tmp_path)
     match = re.search(r'data-drag-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1200:]
     assert match.group(1) == "1|true|false|Attack,×|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+@pytest.mark.parametrize("width,height", [(1920, 1080), (1365, 768)])
+def test_desktop_board_keeps_both_hands_and_card_art_in_view(tmp_path, width, height):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      const hand = Array.from({length:5}, (_,sequence) => ({code:123,sequence}));
+      render({id:'1234567890abcdef',human_seat:0,decisions:0,terminal:false,
+        card_names:{123:'Test Monster'},
+        observation:{viewer:0,acting_player:0,turn_player:0,turn:2,phase:'main1',
+          life_points:[8000,8000],hand,field:[{controller:0,zone:'monster',
+            sequence:0,code:123,position:'faceup',orientation:'attack'}],
+          graveyards:[[],[]],banished:[[],[]],extra_deck_counts:[0,0],
+          deck_counts:[34,35],opponent_hand_count:5,public_history:[],
+          known_opponent_hand_cards:[],known_opponent_field_cards:[],
+          own_extra_deck:[],restrictions:[],chain:[]},legal_actions:[]});
+      const board = document.querySelector('#board').getBoundingClientRect();
+      const ownHand = document.querySelector('#own-hand').getBoundingClientRect();
+      const card = document.querySelector('#own-monster .card').getBoundingClientRect();
+      const zoneRect = document.querySelector('#own-monster .zone:nth-child(2)').getBoundingClientRect();
+      const handCard = document.querySelector('#own-hand .card').getBoundingClientRect();
+      const rows = ['opp-spell','opp-monster','own-monster','own-spell'];
+      const rowHeights = rows.map(id => document.getElementById(id).getBoundingClientRect().height);
+      document.querySelectorAll('.card').forEach(element => element.remove());
+      const emptyHeights = rows.map(id => document.getElementById(id).getBoundingClientRect().height);
+      document.body.dataset.layoutProbe = [
+        Math.round(board.bottom) <= window.innerHeight - 10,
+        Math.round(ownHand.bottom) <= Math.round(board.bottom),
+        card.height > 20 && card.height <= zoneRect.height,
+        card.width > 10 && card.width <= zoneRect.width,
+        handCard.height > 20 && handCard.bottom <= ownHand.bottom,
+        rowHeights.every((height,index) => Math.abs(height-emptyHeights[index]) < 1),
+        document.documentElement.scrollHeight <= window.innerHeight + 1
+      ].join('|');
+    </script></body>"""
+    path = tmp_path / f"live_layout_{width}_{height}.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", f"--window-size={width},{height}",
+        "--virtual-time-budget=1200", "--dump-dom", path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-layout-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "true|true|true|true|true|true|true"
