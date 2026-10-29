@@ -519,6 +519,12 @@ Phoenix cases are recorded in [GOAT rules](goat_rules.md).
 
 A paired native Ring of Destruction and Book of Moon fixture checks target validity at resolution, the no-damage outcome when Book sets the target, and the opponent's hidden field view. The preserved historical Book ruling states this interaction explicitly. Both branches now finish, replay-verify, and pass the visibility audit; see [GOAT rules](goat_rules.md).
 
+A native Scapegoat/Enemy Controller fixture now checks a Sheep Token paying
+Enemy Controller's Tribute cost, all four visible Token choices, use of the
+freed fifth Monster Zone for the stolen monster, and End Phase return. Its
+complete duel replay-verifies and passes visibility auditing; see
+[GOAT rules](goat_rules.md#scapegoat-token-as-enemy-controller-cost).
+
 Four more source-backed response fixtures now continue through terminal duels:
 both Book of Moon versus Raigeki Break branches, Ring chained to Mirror Force,
 Call of the Haunted chained to Heavy Storm before Sangan searches, and both
