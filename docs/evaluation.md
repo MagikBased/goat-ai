@@ -9,6 +9,14 @@ mass. This does not rank the other legal actions or alter game rules. No new
 human rejection labels were present in the local review folders at the time of
 implementation, so there is **no trained child or measured strength gain**
 from this path yet. The previously tested v6 children remain unpromoted.
+An end-to-end **synthetic smoke test** used one actual seed-99906 replay frame:
+the temporary rejection passed exact native replay and visibility validation,
+converted to one negative-only preference, and completed a one-step
+masked-parent update with two separate preservation states. The temporary
+review and checkpoint were discarded. This verifies the plumbing only; it is
+not a human label or evidence of playing strength. The queue UI now counts
+saved recorded-action rejections as reviewed and hides them from its default
+pending list, while context and upstream notes remain notes.
 
 ## Offline action-branch outcome diagnostic (29 October 2026)
 

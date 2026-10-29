@@ -792,8 +792,8 @@ def test_queue_hides_saved_labels_and_can_show_them_again(tmp_path, monkeypatch)
               const progress = document.getElementById('review-progress').textContent;
               document.getElementById('show-labeled').click();
               document.body.dataset.progressProbe = [
-                before.includes('0 of 1 review items labeled'), hidden,
-                progress.includes('1 of 1 review items labeled'), !card.hidden,
+                    before.includes('0 of 1 review items reviewed'), hidden,
+                    progress.includes('1 of 1 review items reviewed'), !card.hidden,
                 !card.querySelector('.label-status').hidden].join('|');
             }, 200);
           }, 300);

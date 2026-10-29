@@ -267,6 +267,13 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
       notes.set(bookmarkKey(items[0]), 'upstream_mistake'); updateProgress();
       const noted = !document.querySelector('.review-card .note-status').hidden &&
         document.getElementById('review-progress').textContent.includes('1 noted');
+      notes.set(bookmarkKey(items[0]), 'reject_recorded'); updateProgress();
+      document.getElementById('show-labeled').click();
+      const rejectionReviewed = document.getElementById('review-progress').textContent
+        .includes('2 of 2 review items reviewed') &&
+        document.querySelector('.review-card').hidden &&
+        document.querySelector('.review-card .label-status').textContent === '✓ Rejected';
+      document.getElementById('show-labeled').click();
       let prompts = 0;
       window.confirm = () => { prompts++; return false; };
       window.dispatchEvent(new MessageEvent('message', {source: replayFrameProbe.contentWindow,
@@ -279,7 +286,7 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
       await new Promise(resolve => setTimeout(resolve, 0));
       const advancedAfterSave = document.getElementById('item-position').textContent === '2 / 2';
       document.body.dataset.queueProbe = [first, protectedItem, second, reveal,
-        skipped, restored, noted, waitedForSave, advancedAfterSave, prompts].join('|');
+        skipped, restored, noted, rejectionReviewed, waitedForSave, advancedAfterSave, prompts].join('|');
       })();
     </script>"""
     index.write_text(index.read_text().replace("</html>", probe + "</html>"))
@@ -290,4 +297,4 @@ def test_review_queue_navigation_stays_in_one_page(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-queue-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "1 / 2|1 / 2|2 / 2|true|true|true|true|true|true|0"
+    assert match.group(1) == "1 / 2|1 / 2|2 / 2|true|true|true|true|true|true|true|0"
