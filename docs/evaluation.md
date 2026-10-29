@@ -16,9 +16,10 @@ search/value model must still decide exceptions where removing one's own
 card has a strategic payoff.
 
 Sixteen fresh greedy parent-versus-Tactical replays on seeds 99900–99907
-yielded **111** v6 comparisons in 12 replays: 88 negative visible Heavy
-Storm trades, 13 own-only Nobleman opportunities, six own-only Torrential,
-three Breaker, three Tribe activations, and one Tribe-Type choice. Only **six**
+yielded **111** v6 comparisons in 12 replays. The category counts (which can
+overlap at one decision) were 88 negative visible Heavy Storm trades, 13
+own-only Nobleman opportunities, six own-only Torrential, three Breaker,
+three Tribe activations, and one Tribe-Type choice. Only **six**
 recorded choices were actually disfavored: five Nobleman activations and one
 Breaker activation. All source replays were native replay-verified and
 visibility-audited. The ignored manifest SHA-256 is
