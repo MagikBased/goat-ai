@@ -1,5 +1,25 @@
 # Baseline evaluation log
 
+## Fresh tactical whitelist/Fusion protocol sample (29 October 2026)
+
+An independent `probe_random_decks.py` run sampled 20 whitelist-legal Main
+Deck pairs with distinct opponent Decks and 15 random legal Fusion cards per
+Extra Deck. Both seats used Tactical-v14; each seed ran in an isolated process
+on the pinned experimental GOAT adapter. Seeds 112000–112019 produced **20/20
+terminal duels** below the 3,000-decision cap, with **9,824** decisions that
+all passed exact native replay and player-visibility audit. The audit observed
+36 hidden-field and five opponent-hand choice prompts. This is protocol and
+privacy coverage for sampled interactions, not historical ruling validation
+or a playing-strength benchmark. No duels-per-second figure was measured in
+this run. The ignored report is
+`.cache/goat-ai/whitelist_tactical_fusion_112000_112019.json/report.json`
+(SHA-256
+`bebfeb2fdb2fa7512998cb2d72e67aad6f78b2910f3a46c8d2332935cd4384b8`).
+Reproduce with `scripts/probe_random_decks.py --card-pool whitelist --agent
+tactical --distinct-opponents --random-extra --isolate-games --verify-replays
+--seed 112000 --seeds 20 --max-decisions 3000 --output
+.cache/goat-ai/whitelist_tactical_fusion_112000_112019.json`.
+
 ## Pinned native integration baseline (29 October 2026)
 
 At source commit `691d4a1`, `GOAT_AI_NATIVE_ROOT=.cache/goat-ai

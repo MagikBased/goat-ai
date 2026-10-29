@@ -21,6 +21,12 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+A further [20-duel Tactical-v14 whitelist/Fusion sample](evaluation.md#fresh-tactical-whitelistfusion-protocol-sample-29-october-2026)
+on seeds 112000–112019 completed and native-replay/visibility-verified all
+9,824 decisions with distinct independently sampled opponent Main Decks and
+random legal Fusion Extra Decks. It extends sampled protocol coverage while
+arbitrary-deck correctness and historical card interactions remain open.
+
 Schema v27 now retains the last 32 public attack announcements as attacker
 and target field slots, including direct attacks, without recording a
 face-down target's identity. The pinned native Des Koala battle fixture
