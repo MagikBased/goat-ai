@@ -2,6 +2,30 @@
 
 ## Chained own-back-row MST branch (29 October 2026)
 
+### Fresh selected-policy material diagnostic
+
+Before adding a dense card-count reward, the 32 verified seed-107600–107607
+policy-versus-Tactical duels were audited through chain closure. Their 21,619
+decisions include 156 resolved monster-effect activations and 601 resolved
+Spell/Trap activations across both seats. Comparing mean observed material
+change for winner versus loser *within the same duel* gave +0.321 cards for
+monster abilities over 22 paired duels (bootstrap 95% interval −0.031 to
++0.669) and +0.015 cards for Spell/Trap effects over 32 paired duels
+(−0.119 to +0.147). Neither interval excludes zero.
+
+For the selected policy seat alone, 23 MST activations had a later observed
+chain closure: one with only friendly back row (material delta −2), 12 with
+only opposing back row (eight at 0, three at +1, one at −1), and ten with
+both players' back row (six at 0, one at +1, three at −1). Opponent responses
+or later triggers can affect these changes, and the material count ignores
+card quality. The result reinforces review of the own-only case but gives no
+evidence that rewarding every positive immediate material change would improve
+duel wins. The ignored audit is
+`.cache/goat-ai/mst_review_source_107600_107607/effect_material_audit.json`
+(SHA-256 `296c7b11e8bec169b78c194dcd058ea5113f8493d904e526a5bb8a1abd5aed39`).
+Reproduce with `scripts/audit_effect_material.py` over the 32
+`mst_review_source_107600_107607/*_seed*_seat*.json` replays.
+
 The selected feature-v23 policy with its v1 own-loss guard still made a clear
 own-card trade in a new, replay-verified case. At zero-based decision 266 of
 `.cache/goat-ai/mst_review_source_107600_107607/max_theeresak_seed107607_seat0.json`,
