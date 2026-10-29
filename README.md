@@ -172,6 +172,8 @@ Choose each replay **JSON** with **Open trajectory**. Open a generated replay **
 
 With **Skip passes and placement** enabled, playback skips routine pass decisions even when the field changed since the previous decision. It still stops once on a newly built chain if that chain would resolve before the next meaningful choice, so a chained Trap can be seen face up. During a chain, numbered icons appear over the source card zones, Graveyards, or banished piles. Life-point changes and field-to-pile movement appear at the next displayed frame. Previously generated HTML embeds its own copy of the viewer; regenerate it with `scripts/render_replay.py` to pick up viewer fixes.
 
+Face-up cards with Spell Counters show a numbered counter badge on the field and in the enlarged card preview. The badge uses the counter count recorded in the player-visible observation; it does not reveal counters on hidden cards.
+
 The replay field keeps the same player at the bottom as decisions pass between players. It starts with the recorded learner or demonstrator seat when available; use **Switch sides** in the sidebar to change it. Action locations use fixed P1/P2 labels; the decision details still identify whose player-visible snapshot is being shown. Load a verified reviewer reveal if you want both hands visible throughout the replay.
 
 If the original JSON is missing, `python scripts/extract_embedded_replay.py REPLAY.html OUTPUT.json` restores it from a generated standalone viewer and checks the embedded SHA-256. Catalog-only viewers have no trajectory to restore.

@@ -11,6 +11,48 @@ from scripts.render_replay import _embed_viewer
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_spell_counter_badge_tracks_public_count_and_hover_preview(tmp_path):
+    first = _observation()
+    first["field"][0]["counters"] = [[1, 1]]
+    second = deepcopy(first)
+    second["field"][0]["counters"] = [[1, 2], [2, 1]]
+    third = deepcopy(second)
+    third["field"][0]["position"] = "facedown"
+    fourth = deepcopy(first)
+    fourth["field"][0]["counters"] = [[2, 1]]
+    action = {"id": "pass", "kind": "pass", "actor": 0, "parameters": {}}
+    replay = {"seed": 1, "source": "test", "winner": 0, "decisions": [
+        {"observation": observation, "selected_action": action,
+         "legal_actions": [action]} for observation in (first, second, third, fourth)]}
+    html = _embed_viewer(replay, "0" * 64, {1: "Breaker"}, {}, {})
+    probe = """<script>
+      const badge = () => document.querySelector('#board .spell-counter-badge');
+      const first = badge()?.getAttribute('aria-label');
+      showCardPreview(badge().closest('.card'));
+      const preview = document.querySelector('#hand-preview .spell-counter-badge')
+        ?.getAttribute('aria-label');
+      goatAiNavigateToDecision(2);
+      const second = badge()?.getAttribute('aria-label');
+      goatAiNavigateToDecision(3);
+      const hidden = badge() === null;
+      goatAiNavigateToDecision(4);
+      const otherType = badge() === null;
+      document.body.dataset.spellCounterProbe =
+        [first, preview, second, hidden, otherType].join('|');
+    </script></body>"""
+    path = tmp_path / "spell_counter.html"
+    path.write_text(html.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-spell-counter-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "1 Spell Counter|1 Spell Counter|2 Spell Counters|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_faceup_monster_effect_has_burst_without_replaying_on_same_frame(tmp_path):
     faceup = _observation()
     facedown = deepcopy(faceup)

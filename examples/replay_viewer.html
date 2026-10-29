@@ -72,6 +72,11 @@
     .card-placeholder { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(1.2rem, 3vw, 2.4rem); color: #bde0d1; text-shadow: 0 2px 9px #071015; z-index: 0; }
     .card.has-art::after { content: none; }
     .card-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 0; }
+    .spell-counter-badge { position: absolute; z-index: 5; top: 3px; left: 3px; width: 31px; height: 31px; display: grid; place-items: center; border: 2px solid #d7c17d; border-radius: 50%; background: radial-gradient(circle at 38% 30%, #6fe1cf, #126d8b 52%, #102a60 78%); box-shadow: 0 0 0 1px #122333, 0 0 8px #4cdae9; pointer-events: none; }
+    .spell-counter-badge svg { width: 23px; height: 23px; filter: drop-shadow(0 0 2px #fff3a3); }
+    .spell-counter-count { position: absolute; right: -5px; bottom: -5px; min-width: 18px; height: 18px; padding: 0 3px; display: grid; place-items: center; border: 1px solid #e7d691; border-radius: 10px; background: #132b3b; color: #fff; font-size: 11px; line-height: 1; font-weight: 800; text-shadow: 0 1px 2px #000; }
+    .card.defense .spell-counter-badge { transform: rotate(-90deg); }
+    .hand-preview .card.defense .spell-counter-badge { transform: none; }
     .card-back { position: absolute; inset: 5px; border: 2px solid #c69454; border-radius: 4px; background: repeating-radial-gradient(ellipse at center, #e1b46e 0 2px, #874a34 3px 6px, #351b37 7px 10px); box-shadow: inset 0 0 0 4px #432840, inset 0 0 0 6px #c69454; opacity: .8; z-index: 0; }
     .monster { background: #b18b50; color: #201709; }
     .spell_trap { background: #457d85; color: #08181b; }
@@ -604,6 +609,28 @@
           card => COMMON_CARD_CODES.has(card.code));
       });
     };
+    function spellCounterBadge(count) {
+      const badge = node("span", "spell-counter-badge");
+      badge.setAttribute("role", "img");
+      badge.setAttribute("aria-label", `${count} Spell Counter${count === 1 ? "" : "s"}`);
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 32 32");
+      svg.setAttribute("aria-hidden", "true");
+      const triangle = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      triangle.setAttribute("d", "M16 4 27 25 5 25Z");
+      triangle.setAttribute("fill", "none");
+      triangle.setAttribute("stroke", "#ffe7a3");
+      triangle.setAttribute("stroke-width", "3");
+      triangle.setAttribute("stroke-linejoin", "round");
+      const center = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      center.setAttribute("cx", "16");
+      center.setAttribute("cy", "18");
+      center.setAttribute("r", "3");
+      center.setAttribute("fill", "#fff4c7");
+      svg.append(triangle, center);
+      badge.append(svg, node("span", "spell-counter-count", count));
+      return badge;
+    }
     const replayAgents = data => {
       const meta = data?.skill_metadata || {};
       if (Array.isArray(meta.agents) && meta.agents.length === 2) return meta.agents;
@@ -649,6 +676,14 @@
       const counters = (card.counters || []).map(([type, count]) =>
         `${count}× ${type === 1 ? "Spell Counter" : `counter ${type}`}`).join(", ");
       element.append(node("small", "", `${status}${card.orientation ? ` · ${card.orientation.toUpperCase()}` : ""}${stats}${counters ? ` · ${counters}` : ""}${publicAge}`));
+      if (card.position === "faceup") {
+        const spellCount = (card.counters || []).reduce((sum, [type, count]) =>
+          sum + (type === 1 && Number.isInteger(count) && count > 0 ? count : 0), 0);
+        if (spellCount) {
+          element.append(spellCounterBadge(spellCount));
+          element.title += ` · ${spellCount} Spell Counter${spellCount === 1 ? "" : "s"}`;
+        }
+      }
       return element;
     }
     function zoneRow(observation, player, zone, known) {

@@ -87,9 +87,9 @@ def agent_factory(name: str, native_root: Path):
     if name == "combat_flip":
         return partial(make_combat_flip,
                        flip_monster_codes=flip_monster_codes(native_root))
-    if name in ("tactical_mof_readiness", "tactical_thunder_search", "tactical_card_advantage", "tactical_reaper_set", "tactical", "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9",
+    if name in ("tactical_main2_set", "tactical_mof_readiness", "tactical_thunder_search", "tactical_card_advantage", "tactical_reaper_set", "tactical", "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9",
                 "tactical_v8", "tactical_v7"):
-        version = (15 if name in ("tactical_mof_readiness", "tactical_reaper_set", "tactical_card_advantage",
+        version = (15 if name in ("tactical_main2_set", "tactical_mof_readiness", "tactical_reaper_set", "tactical_card_advantage",
                                   "tactical_thunder_search")
                    else 14 if name == "tactical"
                    else int(name.removeprefix("tactical_v")))
@@ -107,7 +107,8 @@ def agent_factory(name: str, native_root: Path):
                        reaper_set_guard=name == "tactical_reaper_set",
                        card_advantage_guard=name == "tactical_card_advantage",
                        thunder_search_guard=name == "tactical_thunder_search",
-                       mof_readiness_guard=name == "tactical_mof_readiness")
+                       mof_readiness_guard=name == "tactical_mof_readiness",
+                       main2_set_guard=name == "tactical_main2_set")
     if name == "flip_heuristic":
         return partial(make_flip_heuristic,
                        flip_monster_codes=flip_monster_codes(native_root))
@@ -116,7 +117,7 @@ def agent_factory(name: str, native_root: Path):
 
 def agent_version(name: str) -> int:
     """Record the underlying teacher version; variant flags stay in the name."""
-    if name in ("tactical", "tactical_mof_readiness", "tactical_reaper_set", "tactical_card_advantage",
+    if name in ("tactical", "tactical_main2_set", "tactical_mof_readiness", "tactical_reaper_set", "tactical_card_advantage",
                 "tactical_thunder_search"):
         return TacticalHeuristicAgent.teacher_version
     if name in ("tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10",
@@ -160,7 +161,8 @@ def make_tactical(_seed: int, *, flip_monster_codes: frozenset[int],
                   reaper_set_guard: bool = False,
                   card_advantage_guard: bool = False,
                   thunder_search_guard: bool = False,
-                  mof_readiness_guard: bool = False) -> TacticalHeuristicAgent:
+                  mof_readiness_guard: bool = False,
+                  main2_set_guard: bool = False) -> TacticalHeuristicAgent:
     return TacticalHeuristicAgent(flip_monster_codes, card_races,
                                   card_facts=card_facts,
                                   v8_guards=v8_guards, v9_guards=v9_guards,
@@ -170,7 +172,8 @@ def make_tactical(_seed: int, *, flip_monster_codes: frozenset[int],
                                   reaper_set_guard=reaper_set_guard,
                                   card_advantage_guard=card_advantage_guard,
                                   thunder_search_guard=thunder_search_guard,
-                                  mof_readiness_guard=mof_readiness_guard)
+                                  mof_readiness_guard=mof_readiness_guard,
+                                  main2_set_guard=main2_set_guard)
 
 
 def main() -> None:
@@ -189,14 +192,14 @@ def main() -> None:
                         help="evaluate each deck pair with either agent assigned either deck")
     parser.add_argument("--agent-a", choices=("random", "heuristic", "combat_heuristic",
                                               "combat_flip", "flip_heuristic", "tactical",
-                                              "tactical_reaper_set", "tactical_card_advantage",
+                                              "tactical_main2_set", "tactical_reaper_set", "tactical_card_advantage",
                                               "tactical_thunder_search", "tactical_mof_readiness",
                                               "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9",
                                               "tactical_v8", "tactical_v7"),
                         default="random")
     parser.add_argument("--agent-b", choices=("random", "heuristic", "combat_heuristic",
                                               "combat_flip", "flip_heuristic", "tactical",
-                                              "tactical_reaper_set", "tactical_card_advantage",
+                                              "tactical_main2_set", "tactical_reaper_set", "tactical_card_advantage",
                                               "tactical_thunder_search", "tactical_mof_readiness",
                                               "tactical_v13", "tactical_v12", "tactical_v11", "tactical_v10", "tactical_v9",
                                               "tactical_v8", "tactical_v7"),

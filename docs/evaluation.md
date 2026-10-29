@@ -14717,3 +14717,35 @@ decisions and have SHA-256 values
 `71becad999e386ed2b0a3a418b01af5f34126c02e8f3fa3c36c9793d2ef0675d`
 (child). They are ignored local artifacts named
 `context_upstream_{parent,residual_v8}_scores.json` beside the source queue.
+
+## Main Phase 2 Spell/Trap Set Tactical probe (29 October 2026)
+
+`tactical_main2_set` is an opt-in Tactical-v14 variant. When Tactical would
+Set a Spell/Trap in its own Main Phase 1 and Battle Phase is legal, it enters
+Battle Phase first, leaving the Set for Main Phase 2. It keeps earlier summon
+and activation choices. The unchanged `tactical` name remains the comparison
+baseline. This is a timing preference, not a claim that every backrow card
+should be Set.
+
+Against unchanged Tactical-v14, the variant scored **62–66** across **128**
+complete duels on two 2005 deck pairings, both deck assignments and both
+seats, seeds 126100–126115. Its score was **48.4%**, with paired-bootstrap
+95% interval **43.8–53.1%**. It won **25–39** in the first seat and **37–27**
+in the second. The tournament took **13.73 seconds** on four workers; this is
+evaluation throughput, not neural training speed. No strength improvement is
+established, so the variant is not the default.
+
+The ignored report is
+`.cache/goat-ai/tactical_main2_set_vs_v14_126100_126115.json` (SHA-256
+`dda24db8146867ddba2ff6fa4914aa12dded74c5aec71e5da10dc821f7431ebe`).
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_native.py \
+  --engine experimental --agent-a tactical_main2_set --agent-b tactical \
+  --both-deck-assignments \
+  --matchup examples/decks/goat_control_max_suffridge_nationals_2005.ydk examples/decks/chaos_bryan_coronel_new_jersey_2005.ydk \
+  --matchup examples/decks/warrior_mary_triatafilidi_new_jersey_2005.ydk examples/decks/gravekeeper_daryl_gessler_indianapolis_2005.ydk \
+  --seed 126100 --seeds 16 --max-decisions 3000 --workers 4 \
+  --output .cache/goat-ai/tactical_main2_set_vs_v14_126100_126115.json
+```

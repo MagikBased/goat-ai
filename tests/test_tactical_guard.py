@@ -34,6 +34,26 @@ def kept(observation, actions):
     return tuple(actions[i] for i in admissible_action_indices(observation, actions))
 
 
+def test_opt_in_tactical_sets_spell_trap_after_battle_when_possible():
+    set_trap = Action("set", "set_spell_trap", 0, {"code": 44095762})
+    battle = Action("battle", "battle_phase", 0)
+    summon = Action("summon", "normal_summon", 0, {"code": 45986603})
+    activate = Action("activate", "activate", 0, {"code": 55144522})
+    baseline = TacticalHeuristicAgent()
+    candidate = TacticalHeuristicAgent(main2_set_guard=True)
+    main1 = board(turn=3, turn_player=0)
+    assert baseline.select_action(main1, (set_trap, battle)) == set_trap
+    assert candidate.select_action(main1, (set_trap, battle)) == battle
+    assert candidate.select_action(main1, (set_trap, battle, summon)) == summon
+    assert candidate.select_action(main1, (set_trap, battle, activate)) == activate
+    assert candidate.select_action(board(phase="main2", turn=3, turn_player=0),
+                                   (set_trap,)) == set_trap
+    assert candidate.select_action(board(turn=1, turn_player=0),
+                                   (set_trap,)) == set_trap
+    assert candidate.select_action(board(turn=3, turn_player=1),
+                                   (set_trap, battle)) == set_trap
+
+
 def test_heavy_storm_avoids_solely_damaging_own_backrow():
     storm = Action("storm", "activate", 0, {"code": 19613556})
     wait = Action("wait", "end_phase", 0)

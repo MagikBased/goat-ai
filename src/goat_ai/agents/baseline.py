@@ -175,7 +175,8 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                  reaper_set_guard: bool = False,
                  card_advantage_guard: bool = False,
                  thunder_search_guard: bool = False,
-                 mof_readiness_guard: bool = False) -> None:
+                 mof_readiness_guard: bool = False,
+                 main2_set_guard: bool = False) -> None:
         super().__init__(flip_monster_codes)
         self.card_races = dict(card_races or {})
         self.card_facts = dict(card_facts or {})
@@ -190,6 +191,7 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
         self.card_advantage_guard = card_advantage_guard
         self.thunder_search_guard = thunder_search_guard
         self.mof_readiness_guard = mof_readiness_guard
+        self.main2_set_guard = main2_set_guard
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
@@ -387,7 +389,15 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                            and action.parameters.get("code") == self.SANGAN), None)
             if known_graveyard and not spell_available and faith and sangan is not None:
                 return sangan
-        return super().select_action(observation, filtered)
+        chosen = super().select_action(observation, filtered)
+        if (self.main2_set_guard and chosen.kind == "set_spell_trap"
+                and observation.phase == "main1"
+                and observation.turn_player == observation.viewer):
+            battle = next((action for action in filtered
+                           if action.kind == "battle_phase"), None)
+            if battle is not None:
+                return battle
+        return chosen
 
 
 class HumanAgent:
