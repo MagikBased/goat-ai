@@ -147,6 +147,35 @@ def safe_optional_own_loss_indices(observation: Observation,
     return kept or indices
 
 
+def safe_idle_own_ring_indices(observation: Observation,
+                               legal_actions: Sequence[Action],
+                               admissible: Sequence[int]) -> tuple[int, ...]:
+    """Defer an idle own-only Ring activation unless visible damage can win.
+
+    The opponent may still have hidden responses. This narrow experiment only
+    applies on our turn with no pending chain; Ring responses remain available.
+    """
+    indices = tuple(admissible)
+    own = observation.viewer
+    if observation.turn_player != own or observation.chain:
+        return indices
+    if any(card.controller != own and card.zone == "monster"
+           and card.position == "faceup" for card in observation.field):
+        return indices
+    own_targets = [card for card in observation.field
+                   if card.controller == own and card.zone == "monster"
+                   and card.position == "faceup"]
+    if not own_targets:
+        return indices
+    if any(card.attack is None or card.attack >= observation.life_points[1 - own]
+           for card in own_targets):
+        return indices
+    kept = tuple(index for index in indices if not (
+        legal_actions[index].kind in ("activate", "chain")
+        and legal_actions[index].parameters.get("code") == RING_OF_DESTRUCTION))
+    return kept or indices
+
+
 def safe_position_indices(observation: Observation,
                           legal_actions: Sequence[Action],
                           admissible: Sequence[int], *,

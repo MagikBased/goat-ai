@@ -1,5 +1,55 @@
 # Baseline evaluation log
 
+## Idle own-only Ring inference experiment (29 October 2026)
+
+The selected feature-v23 checkpoint is unchanged. An opt-in own-loss guard v3
+adds one narrow action filter to v1: on the policy's own turn with no pending
+chain, if Ring of Destruction has only the policy's face-up monsters as visible
+targets, it defers activation when none has enough current ATK to deal lethal
+damage to the opponent. An opposing face-up monster, an ongoing chain, the
+opponent's turn, unknown own ATK, and a possible lethal target all retain the
+Ring action. The filter sees only the acting player's observation. It is a
+strategic experiment, not a legality ruling or a general card-value model.
+
+We compared v3 with the prior v1 guard against Tactical-v14 on four Main Deck
+pairings absent from the checkpoint's training games: Theeresak/Phoenix,
+Bryan/Mary, Rhymus/Charlotte, and Ramon/Christian. Both deck assignments and
+both policy seats were played on two fresh eight-seed blocks, 104000–104007
+and 104100–104107. Reports fingerprint the checkpoint, native assets, card
+scripts, project source, decks, and schedules. The paired report comparator
+verified unseen Main Decks and identical controls within each block.
+
+| Seeds | Games per version | v3 wins | v1 wins | Paired score gain | 95% paired bootstrap interval |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 104000–104007 | 128 | 49 | 47 | +1.56 points | 0 to +3.91 points |
+| 104100–104107 | 128 | 53 | 50 | +2.34 points | 0 to +5.47 points |
+| Combined | 256 | 102 | 97 | +1.95 points | +0.39 to +3.91 points |
+
+The matched outcome changed in five games, all from a v1 loss to a v3 win;
+the other 251 outcomes matched. This is evidence for this narrow schedule,
+not a claim that all own-target Rings are bad or that the neural policy
+learned to value cards. Both versions still lost most games to Tactical-v14.
+Keep v3 experimental until more independent deck and opponent schedules and
+reviewed edge cases support promotion. In particular, Ring can be worthwhile
+for lethal damage, to respond to removal, or to trigger a monster's effect.
+
+For one changed game, the seed-104000 Theeresak/Phoenix pair with the policy
+in seat 1 was re-recorded under both versions. At decision 560 on turn 20,
+v1 activated a Set Ring while it controlled two face-up monsters and the
+opponent controlled no face-up monster; v3 Normal Summoned instead. Both
+complete trajectories reached terminal state, replay-verified exactly on the
+pinned native core (1,230 and 1,003 decisions), and passed visibility audit.
+The policy auditor independently reproduced all 629 v1 and 537 v3 policy-seat
+choices from the saved checkpoint and recorded inference modes.
+The ignored local replays are `.cache/goat-ai/ring_guard_v1_104000_seat1.json`
+and `.cache/goat-ai/ring_guard_v3_104000_seat1.json`; the four ignored
+tournament reports are `ring_guard_v{1,3}_tactical_{104000_104007,104100_104107}.json`
+under `.cache/goat-ai/`. Run `scripts/evaluate_policy.py` with
+`--own-loss-guard --own-loss-guard-version 1` or `3`, the four matchups above,
+`--both-deck-assignments --require-unseen-main-decks`, and the listed seeds;
+then compare each block using `scripts/compare_tournament_reports.py
+--require-unseen-main-decks`.
+
 ## Idle own-only removal activation audit (29 October 2026)
 
 The player-visible review audit now flags an optional, unchained MST or

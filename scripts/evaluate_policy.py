@@ -140,8 +140,8 @@ def main() -> None:
                         help="avoid observed BLS and MST self-target losses; requires tactical guard")
     parser.add_argument("--own-loss-guard", action="store_true",
                         help="standalone visible own-only removal ablation")
-    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2), default=1,
-                        help="v2 also defers MST on an isolated resolving one-shot card")
+    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3), default=1,
+                        help="v2 defers isolated one-shot MST; v3 defers idle own-only Ring")
     parser.add_argument("--position-guard", action="store_true",
                         help="standalone Sheep Token and empty-field position filter")
     parser.add_argument("--opponent-tactical-guard", action="store_true",

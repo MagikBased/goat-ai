@@ -2932,6 +2932,33 @@ def test_optional_self_target_guard_changes_only_target_choice():
         snapshot, (own, enemy)) == enemy
 
 
+def test_optional_own_loss_v3_defers_idle_own_ring_without_changing_v1():
+    class FavorFirst(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, features):
+            return -torch.arange(len(features.action_cards)).float() + self.dummy
+
+    ring_code = 511000824
+    ring = Action("ring", "chain", 0, {"code": ring_code})
+    wait = Action("wait", "pass", 0)
+    monster = CardView(0, "monster", "faceup", 71413901, 0,
+                       "attack", 1900, 1000)
+    snapshot = replace(view(), field=(monster,), turn_player=0)
+    model = FavorFirst()
+    vocabulary = CardVocabulary(tuple(sorted((ring_code, 71413901))))
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True).select_action(
+        snapshot, (ring, wait)) == ring
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                       own_loss_guard_version=3).select_action(
+        snapshot, (ring, wait)) == wait
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                       own_loss_guard_version=3).select_action(
+        replace(snapshot, life_points=(8000, 1900)), (ring, wait)) == ring
+
+
 def test_optional_position_guard_preserves_defending_sheep_token():
     class FavorFirst(torch.nn.Module):
         def __init__(self):

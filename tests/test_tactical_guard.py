@@ -6,8 +6,9 @@ from goat_ai.actions import Action
 from goat_ai.agents import TacticalHeuristicAgent
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
-    safe_optional_own_loss_indices,
+    safe_idle_own_ring_indices,
     safe_one_shot_response_indices,
+    safe_optional_own_loss_indices,
     safe_position_indices,
     safe_target_indices,
     weak_flip_set_substitute,
@@ -59,6 +60,28 @@ def test_opt_in_own_loss_guard_defers_visible_own_only_removal():
         assert safe_optional_own_loss_indices(
             board(own_card, enemy_card), actions, range(2)) == (0, 1)
         assert safe_optional_own_loss_indices(board(own_card), (action,), (0,)) == (0,)
+
+
+def test_idle_own_ring_experiment_keeps_lethal_and_reactive_uses():
+    ring = Action("ring", "chain", 0, {"code": 511000824})
+    wait = Action("wait", "pass", 0)
+    actions = (ring, wait)
+    own = CardView(0, "monster", "faceup", 71413901, 0,
+                   "attack", 1900, 1000)
+    enemy = CardView(1, "monster", "faceup", 31560081, 0,
+                     "attack", 1200, 1000)
+    idle = board(own, turn_player=0)
+    assert safe_idle_own_ring_indices(idle, actions, range(2)) == (1,)
+    assert safe_idle_own_ring_indices(
+        replace(idle, life_points=(8000, 1900)), actions, range(2)) == (0, 1)
+    assert safe_idle_own_ring_indices(board(own, enemy, turn_player=0),
+                                      actions, range(2)) == (0, 1)
+    assert safe_idle_own_ring_indices(board(own, turn_player=1),
+                                      actions, range(2)) == (0, 1)
+    assert safe_idle_own_ring_indices(
+        board(own, turn_player=0, chain=(ChainLinkView(1, 19613556, 1, 8, 0),)),
+        actions, range(2)) == (0, 1)
+    assert safe_idle_own_ring_indices(idle, (ring,), (0,)) == (0,)
 
 
 def test_opt_in_own_loss_guard_catches_storm_and_torrential_before_targets():
