@@ -24,6 +24,12 @@ records the broader findings and reproducible commands. Thunder Dragon's
 zero-copy finish is [historically legal](goat_rules.md), even
 when searching a copy appears strategically preferable.
 
+The seven flagged weak Flip summons were all Magical Merchant. A separate
+[exact-state branch check](evaluation.md#seven-magical-merchant-set-versus-summon-branches-29-october-2026)
+found three states where Set led to a win and Normal Summon to a loss, one
+with the reverse result, and three with the same winner. Please assess each
+board state rather than treating Set as an automatic label.
+
 ## Ring activation before a poor own-card target (29 October 2026)
 
 Combined queue item 55 shows a Ring of Destruction target prompt where the

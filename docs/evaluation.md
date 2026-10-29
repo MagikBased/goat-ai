@@ -1,5 +1,47 @@
 # Baseline evaluation log
 
+## Seven Magical Merchant Set-versus-Summon branches (29 October 2026)
+
+The fresh four-pairing audit below flagged seven selected Normal Summons of
+Magical Merchant when a Set of that same physical hand card was legal. We
+reconstructed each exact source position from its verified seed and action
+prefix, then continued the recorded Normal Summon and the corresponding Set
+to a terminal native duel. The selected v23 checkpoint retained its recorded
+v1 own-loss inference mode; Tactical-v14 remained the opponent. Both agents
+received only their player-visible observations during continuation. All 14
+branch trajectories reached terminal, replay-verified, and passed the
+visibility audit.
+
+On these seven fixed hidden states, Set changed a loss into a win **three**
+times; Normal Summon changed a loss into a win **once**; the winner was the
+same for the other **three**. The Normal-Summon-favoring case was seed 126002,
+policy seat 0, zero-based decision 140. Three Sheep Tokens were on the policy's
+field and the opponent had no visible monster. The recorded Normal Summon
+entered Battle Phase and attacked directly with Merchant; the Set branch
+skipped that attack. This first-turn difference does not by itself explain
+the eventual winner, but the two full continuations ended differently. A
+fresh repeat of both branches produced byte-identical trajectory hashes.
+
+These are **single-seed, exact-full-state offline diagnostics**. They do not
+estimate the expected value of Set, do not provide a legal online search
+oracle, and are not training labels. In particular, this evidence argues
+against automatically relabeling every weak Flip Normal Summon to Set. The
+remaining context-dependent decisions stay in the human review queue. The
+ignored seven-case summary
+`.cache/goat-ai/weak_flip_branch_sweep_126000_126007.json` has SHA-256
+`6b46ad174ed379e281e788f0f927da8240f23b24e2e14501d836f89a2dd0f7f9`;
+it identifies each source replay, decision and legal-action index, branch
+report hash, winner, and replay hash. Reproduce one case with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_decision_branches.py \
+  .cache/goat-ai/own_loss_review_source_126000_126007/matchup_02_seed_126002_seat_0.json \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --native-root .cache/goat-ai --decision-index 140 \
+  --action-index 1 --action-index 6 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/weak_flip_branch_field_tokens_reproduction
+```
+
 ## Fresh four-pairing policy risk audit (29 October 2026)
 
 The selected feature-v23 checkpoint with v1 visible own-loss inference played
