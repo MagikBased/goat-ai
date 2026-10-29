@@ -144,6 +144,15 @@ a placement or attack target; when the engine offers a matching next choice,
 the dragged destination is used. Empty or occupied zones that cannot accept the
 drag are not highlighted. Visible card faces and card backs load from the local
 server's art cache; missing artwork displays the card name instead.
+When an effect asks for multiple cards, such as Graceful Charity's two
+discards, click the cards in your hand or on the field, then press **Confirm
+selected cards**. Click a selected card again to undo it. The advanced action
+list remains available for choices outside the board. Open placement zones are
+chosen automatically after a Summon or Set; uncheck **Automatically choose open
+card zones** to select the zone yourself. With **Hold priority** off, the live
+UI also passes through your own immediate chain window after a Set or Summon,
+then returns to the next actionable decision. It stops if the opponent adds a
+chain link that you can answer.
 On desktop, the field fits both players' zones and hands in the viewport; the
 sidebar scrolls independently when its details are expanded.
 The live board uses the replay viewer's vertical phase rail. Click a Graveyard

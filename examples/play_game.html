@@ -69,6 +69,8 @@
       padding: 3px; overflow-wrap: anywhere; background: #344457; }
     .card .fallback.art-missing { background: #684044; font-weight: 700; }
     .card[draggable=true] { cursor: grab; }
+    .card.selectable { cursor: pointer; outline: 2px solid #e5c963; outline-offset: -2px; }
+    .card.selected { outline: 4px solid #55e2c0; outline-offset: -4px; filter: brightness(1.2); }
     .card img { z-index: 1; }
     .phase { grid-column: 2; grid-row: 3 / 7; min-height: 0; display: flex;
       flex-direction: column; justify-content: center; align-items: center; gap: min(1.2dvh, 7px);
@@ -86,6 +88,10 @@
     #quick-controls { display: flex; gap: 6px; flex-wrap: wrap; }
     #quick-controls button { flex: 1 1 110px; }
     #quick-controls button.primary { background: #78304c; border-color: #ebbd68; font-weight: 750; }
+    #card-selection[hidden] { display: none; }
+    #card-selection { padding: 8px; border: 1px solid #e5c963; border-radius: 8px;
+      background: #193c43; }
+    #card-selection button { width: 100%; margin-top: 6px; }
     #card-actions { position: absolute; z-index: 20; display: flex; align-items: center;
       gap: 5px; padding: 6px; max-width: min(92%, 650px); overflow-x: auto;
       background: #172e3af5; border: 1px solid #e5c963; border-radius: 10px;
@@ -165,6 +171,9 @@
       <button id="quit" type="button">Leave unfinished duel</button>
       <p id="message" role="status" aria-live="polite"></p>
       <label class="priority-toggle"><input id="hold-priority" type="checkbox"> Hold priority after your activations</label>
+      <label class="priority-toggle"><input id="auto-place" type="checkbox" checked> Automatically choose open card zones</label>
+      <div id="card-selection" hidden><div id="card-selection-message"></div>
+        <button id="confirm-cards" type="button">Confirm selected cards</button></div>
       <div id="quick-controls"><button id="pass-action" type="button">Pass</button><button id="end-turn" class="primary" type="button">End turn</button></div>
       <div id="history"></div>
       <details><summary>Visible information</summary><div id="visible-info"></div></details>
@@ -185,6 +194,49 @@
     let dragSource = null;
     let phaseTraveling = false;
     let autoOwnChain = false;
+    let selectedCards = [];
+    const cardKey = card => `${card.controller}:${card.location}:${card.sequence}`;
+    function multiCardChoices() {
+      if (!state?.legal_actions?.length || !state.legal_actions.every(action =>
+          action.kind === "select_cards" && Array.isArray(action.parameters?.cards))) return [];
+      return state.legal_actions.map((action, index) => ({action, index}));
+    }
+    function multiCardOptions() {
+      const choices = multiCardChoices();
+      const cards = new Map();
+      for (const {action} of choices) for (const card of action.parameters.cards) {
+        if (card.sequence != null && card.location != null && card.controller != null)
+          cards.set(cardKey(card), card);
+      }
+      return cards;
+    }
+    function matchingCardChoices(keys) {
+      return multiCardChoices().filter(({action}) => {
+        const offered = action.parameters.cards.map(cardKey);
+        return keys.every(key => offered.includes(key));
+      });
+    }
+    function renderCardSelection() {
+      const choices = multiCardChoices(), panel = byId("card-selection");
+      panel.hidden = !choices.length || !multiCardOptions().size;
+      if (panel.hidden) return;
+      const selected = selectedCards.length;
+      const complete = choices.find(({action}) => action.parameters.cards.length === selected &&
+        selectedCards.every(key => action.parameters.cards.map(cardKey).includes(key)));
+      const sizes = [...new Set(choices.map(({action}) => action.parameters.cards.length))].sort();
+      byId("card-selection-message").textContent =
+        `Choose ${sizes.join(" or ")} card${sizes.every(size => size === 1) ? "" : "s"} on the field or in your hand (${selected} selected). Click a selected card to undo.`;
+      const confirm = byId("confirm-cards"); confirm.disabled = busy || !complete;
+      confirm.onclick = () => { if (complete) choose(complete.index); };
+      document.querySelectorAll(".card[data-card-key]").forEach(card =>
+        card.classList.toggle("selected", selectedCards.includes(card.dataset.cardKey)));
+    }
+    function toggleCardSelection(key) {
+      const next = selectedCards.includes(key) ? selectedCards.filter(item => item !== key)
+        : [...selectedCards, key];
+      if (matchingCardChoices(next).length) selectedCards = next;
+      renderCardSelection();
+    }
     function randomSeed() {
       const value = new Uint32Array(1);
       crypto.getRandomValues(value);
@@ -286,6 +338,17 @@
         ref.code != null ? cardName(ref.code) : "Choose an action", destination);
     }
     function makeInteractive(element, ref) {
+      const key = cardKey(ref);
+      if (multiCardOptions().has(key)) {
+        element.classList.add("selectable"); element.dataset.cardKey = key;
+        element.tabIndex = 0; element.setAttribute("role", "button");
+        element.setAttribute("aria-label", `Select ${cardName(ref.code)} for card choice`);
+        element.onclick = () => toggleCardSelection(key);
+        element.onkeydown = event => { if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault(); toggleCardSelection(key);
+        }};
+        return;
+      }
       if (!refActions(ref).length) return;
       element.classList.add("available"); element.tabIndex = 0;
       element.setAttribute("role", "button");
@@ -549,8 +612,10 @@
     }
     function render(data) {
       state = data; closeCardActions();
+      selectedCards = [];
       byId("setup").hidden = true; byId("game").hidden = false;
       if (data.terminal) {
+        byId("card-selection").hidden = true;
         byId("message").textContent = data.winner == null ? "Duel ended in a draw." :
           `Duel ended. Player ${data.winner + 1} won.`;
         byId("action-count").textContent = "No legal actions";
@@ -594,6 +659,7 @@
       byId("message").textContent = `Your choice · decision ${data.decisions + 1}`;
       byId("message").classList.remove("error");
       actions();
+      renderCardSelection();
       renderPromptActions();
     }
     async function request(path, payload) {
@@ -624,6 +690,29 @@
               && action.parameters?.sequence === destination.sequence);
           if (matching.length === 1) next = await request("/api/live/choice", {
             id: next.id, action_index: matching[0].index, expected_decisions: next.decisions});
+        }
+        if (byId("auto-place").checked) {
+          for (let count = 0; count < 4 && !next.terminal; count++) {
+            const placements = next.legal_actions.map((action, index) => ({action, index}))
+              .filter(({action}) => action.kind === "place");
+            if (!placements.length || placements.length !== next.legal_actions.length) break;
+            next = await request("/api/live/choice", {id: next.id,
+              action_index: placements[0].index, expected_decisions: next.decisions});
+          }
+        }
+        if (!byId("hold-priority").checked && !phaseTraveling &&
+            ["set_monster", "set_spell_trap", "normal_summon", "special_summon",
+             "flip_summon", "activate", "chain", "change_position", "place"].includes(played?.kind)) {
+          for (let count = 0; count < 4 && !next.terminal; count++) {
+            const options = next.legal_actions;
+            if (!options.length || !options.every(action => ["pass", "chain"].includes(action.kind))) break;
+            const lastLink = next.observation.chain?.at(-1);
+            if (lastLink && lastLink.controller !== oldState.human_seat) break;
+            const pass = options.findIndex(action => action.kind === "pass");
+            if (pass < 0) break;
+            next = await request("/api/live/choice", {id: next.id,
+              action_index: pass, expected_decisions: next.decisions});
+          }
         }
         render(next);
         const own = oldState.human_seat;
