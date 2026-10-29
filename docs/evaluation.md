@@ -9,16 +9,51 @@ would prefer either opposing Sheep Token at decision 821 over the own Dekoichi,
 but spending Ring on a zero-ATK token is still a poor trade. Treating the
 target choice as the entire error would teach an incomplete lesson.
 
-The new opt-in `visible_selected_own_loss_with_idle_ring_v13` rule emits a
+The opt-in `visible_selected_own_loss_with_idle_ring_v13` rule emits a
 preference at the activation decision when the opponent controls only visible
 Sheep Tokens, the actor has a face-up monster, and no visible own Ring target
 could deal lethal damage. On that exact replay it compares the selected Ring
 activation (legal index 7) with the offered Battle Phase and End Phase actions
 (indices 8 and 9). The rule is a visible-state training hypothesis, not a
 winning-move label. It leaves all prior versioned rule sets unchanged and does
-not claim that either phase action wins the duel; the exact branch experiment
-below found that a one-step delay can repeat the same error later. No v13
-checkpoint or competitive evaluation has yet been produced.
+not claim that either phase action wins the duel; the parent branch experiment
+below found that a one-step delay can repeat the same error later.
+
+One small fit tested whether that correction can change the learned policy.
+The v13 generator replay-verified and visibility-audited the source duel and
+emitted exactly one preference (manifest SHA-256
+`6a6072713047bb9894a2fb281fc759565cf9169bbb54b4ae0c81f68cbed0c32a`).
+Starting from the frozen v23 parent, `train_review_preferences.py` used 120
+steps, learning rate 0.0001, seed 1313, four other replay-verified current-core
+preservation duels (64 sampled decisions), batch 16, and parent KL weight 1.0.
+The preference loss fell from **5.476** to **0.188**, while the final sampled
+preservation KL was **0.041**. The ignored child checkpoint is
+`.cache/goat-ai/fv23_ring_idle_v13_seed124112_120step.pt` (SHA-256
+`edb23dfa07dec53e839806729b23e4648128322d7640fd01b2b7b309019890a3`).
+At the **training position**, the parent ranked Ring first (legal index 7);
+the child ranked normal summoning first (index 0) and Ring below the two
+offered phase transitions. This demonstrates local fitting, not transfer.
+
+The child scored **33–31** directly against its parent over **64** complete
+native duels on fresh seeds 125300–125307, both seats and deck assignments,
+using Christian Goat versus Ramon Beastdown and Jonathan Chaos versus Roberto
+Phoenix. Both checkpoints used own-loss guard v1. All four Main Deck
+compositions passed the unseen-training check; the paired-bootstrap 95% score
+interval was **40.63%–62.5%**. First-seat score was 19–13 and second-seat
+score was 14–18. All duels terminated before the 3,000-decision cap (maximum
+1,309). This result does **not** establish a playing-strength gain. The ignored
+report is `.cache/goat-ai/fv23_ring_v13_vs_parent_125300_125307.json`
+(SHA-256 `f32e9c1dbc0f20c1f5fa0b0401e8a65cd699a809c3874b8a5ee9fe8e8530d883`).
+An exact-state offline continuation of the recorded Ring action and the
+offered Battle Phase action with the child policy produced two replay-verified,
+visibility-audited terminal duels. The Battle Phase branch had **no later
+same-turn Ring activation**, unlike the earlier parent continuation; both
+branches still lost. The ignored branch report is
+`.cache/goat-ai/ring_v13_child_branch_124112/report.json` (SHA-256
+`53beacaa200244456632f3bb4fdb10a1927f1bd8032bed65774c097ea927b5f0`).
+One synthetic preference is too small to promote a policy. Broader examples
+of own-card loss and independently reviewed alternatives remain the next
+training input.
 
 ## Ring on own Dekoichi: target information versus learned value (29 October 2026)
 
