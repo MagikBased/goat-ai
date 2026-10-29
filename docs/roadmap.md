@@ -2649,3 +2649,8 @@ MST chain to its own resolving one-shot card. These eight cases are in the
 only from authorized reviewed choices, then compared against the unchanged
 selected checkpoint on fresh decks and seeds; the queue itself does not
 demonstrate improvement.
+The [fresh v3 Ring guard transfer check](evaluation.md#fresh-ring-guard-direct-transfer-check-29-october-2026)
+suppressed six fresh idle own-only Ring activations, but a 256-duel direct
+comparison against v1 tied its matched v1 control at 127 wins, 127 losses,
+and two draws. The guard remains experimental; use independent human review
+and wider competitive evidence before selecting it as the default.

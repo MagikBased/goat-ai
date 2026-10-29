@@ -1,5 +1,55 @@
 # Baseline evaluation log
 
+## Fresh Ring guard direct transfer check (29 October 2026)
+
+The opt-in v3 guard was checked against six new, replay-verified idle
+own-only Ring activations: two from the seed-124100–124215 single-pair
+batch and four from the seed-124900–124907 varied-deck batch. The unchanged
+v1 checkpoint chose Ring at all six; the same checkpoint with v3 chose a
+different legal action at all six. This verifies the narrow filter catches
+the observed pattern, without establishing that every alternate line wins.
+
+A separate direct v3-versus-v1 comparison used fresh seeds 125000–125031,
+Theeresak Seattle Goat versus Ramon Beastdown and Christian Seattle Goat
+versus Bryan Chaos, both Deck assignments and policy seats. All four Main
+Deck compositions were verified unseen in the shared checkpoint's training
+sources. A matched v1-versus-v1 control used exactly the same seeds, Decks,
+native assets, and opponent v1 checkpoint. Each run completed **256** duels;
+both scored **127 wins, 127 losses, and two draws**. The paired score
+difference was **0.00 percentage points**, with 95% bootstrap interval
+**−1.95 to +1.95 points**. Six matched game outcomes changed, three in
+each direction. This independent schedule does not establish a competitive
+gain from v3. Keep v1 selected; keep v3 available as an experimental ablation.
+
+One changed game, seed 125002 with the policy in seat 1 and Ramon Beastdown
+against Theeresak Goat, was re-recorded under both guards. For that seat the
+tournament swaps the Deck order: the engine receives Theeresak first and
+Ramon second. Both complete replays reproduced the reported outcomes,
+verified against the pinned native core and player-visibility audit, and
+reproduced every opponent v1 choice. At shared decision 324, turn 12 Main
+Phase 1, v1 activated Set Ring with four owned Sheep Tokens and no opposing
+face-up monster; v3 entered Battle Phase. V1 then selected its own token.
+The v1 line won after 866 decisions and the v3 line lost after 588. The
+different terminal results on this one fixed deal do not establish that
+destroying the token was strategically good; later decisions diverged.
+
+Ignored reports: `.cache/goat-ai/ring_v3_vs_v1_125000_125031.json` (SHA-256
+`7ecff405c2681e822ef5aa820a86219f1315ac2ff5cdf576da6da4c12742671c`)
+and `.cache/goat-ai/ring_v1_control_125000_125031.json` (SHA-256
+`191fef18ce6598508b7f2047e128dc2e205211751074b61c2005db13f2390006`).
+Reproduce each with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --seed 125000 --seeds 32
+--opponent-checkpoint` set to the same v23 checkpoint, candidate
+`--own-loss-guard --own-loss-guard-version 3` or `1`, and opponent
+`--opponent-own-loss-guard --opponent-own-loss-guard-version 1`.
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks` verified the comparison. The re-recorded
+trajectories are `correct_v1.json` and `correct_v3.json` under
+`.cache/goat-ai/ring_v3_v1_changed_125002_seat1/` (SHA-256
+`b7f0b5613923bd9b21301038f1bf923c771b9bb1d62e5eac0f1799149e617c13`
+and `fb92f720c744add5574bf93bfca099d810d1c5fd162cc53ee1d9e87f16926ddf`,
+respectively).
+
 ## Varied-deck own-card baseline (29 October 2026)
 
 A separate, prespecified seed-124900–124907 batch recorded the unchanged
