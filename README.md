@@ -136,9 +136,14 @@ retaining the queue identity and any locally saved labels.
 
 To play a duel yourself in the browser, open `/games/play` on the same local
 server. Choose the human seat, two Decks, and a Random, Tactical, or selected
-neural opponent. The board and legal-action list show only the human player's
-visible observation. Choose an action from the list; the native engine resolves
-it and the AI responds. On completion the server replay-verifies the duel,
+neural opponent. Click a card to open its legal actions beside the card. Drag a
+card to a field zone or opposing monster to choose a placement or attack target;
+when the engine offers a matching next choice, the dragged destination is used.
+Click an available phase button to advance, use **Pass** for response windows,
+or use **End turn** when that transition is legal. Unusual prompts and every
+legal choice remain available under **All legal actions** in the sidebar.
+The board and controls use only the human player's visible observation and
+native legal actions. On completion the server replay-verifies the duel,
 checks player visibility, and saves a `human_web` self-recording and full
 postgame replay under `.cache/goat-ai/user_games/`. Only the human seat is
 admitted as a raw demonstration. Unfinished games live in server memory and
@@ -147,7 +152,10 @@ explicitly. The browser is an experimental local play interface, subject to
 the same unresolved GOAT ruling coverage as the native adapter.
 The board lists public Graveyard and banished cards, your Extra Deck and known
 opponent cards, and card names in the legal-action menu without exposing the
-opponent's private hand or Deck order.
+opponent's private hand or Deck order. Missing card images are fetched from the
+existing YGOPRODeck image source when first shown and cached locally in
+ignored `replays/card_images/`; historical card IDs use their printed-card
+artwork alias. If an image is unavailable, the card name remains visible.
 
 The offline [replay viewer](examples/replay_viewer.html) shows each recorded decision as a board snapshot from the acting player's visible view. Record and render a Scapegoat fixture duel:
 

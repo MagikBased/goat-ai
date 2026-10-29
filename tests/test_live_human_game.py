@@ -43,6 +43,54 @@ def test_live_game_rejects_invalid_requests(tmp_path):
         manager.start(spec)
 
 
+def test_local_card_art_is_cached_on_demand(tmp_path, monkeypatch):
+    creator = GameCreator(root=tmp_path, native_root=tmp_path)
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    monkeypatch.setattr(serve_review_queue, "GameCreator", lambda root: creator)
+    database = tmp_path / "database/cards.cdb"
+    database.parent.mkdir(parents=True)
+    database.write_bytes(b"test")
+    monkeypatch.setattr(serve_review_queue, "load_card_names", lambda root: {123: "Test"})
+    calls = []
+
+    def cache(code, output_dir, native_root):
+        calls.append(code)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / f"{code}.jpg").write_bytes(b"\xff\xd8\xfftest")
+        return True
+
+    monkeypatch.setattr(serve_review_queue, "cache_card_image", cache)
+    backs = []
+
+    def cache_backs(output_dir):
+        backs.append(True)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "cover.png").write_bytes(b"\x89PNG\r\n\x1a\nback")
+        return 1, 0
+
+    monkeypatch.setattr(serve_review_queue, "setup_card_backs", cache_backs)
+    server = serve_review_queue.make_server(None, None, port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with urlopen(f"{base}/replays/card_images/123.jpg", timeout=5) as response:
+            assert response.read() == b"\xff\xd8\xfftest"
+        with urlopen(f"{base}/replays/card_images/123.jpg", timeout=5) as response:
+            assert response.status == 200
+        assert calls == [123]
+        with urlopen(f"{base}/replays/card_images/cover.png", timeout=5) as response:
+            assert response.read().endswith(b"back")
+        assert backs == [True]
+        with pytest.raises(HTTPError) as missing:
+            urlopen(f"{base}/replays/card_images/999.jpg", timeout=5)
+        assert missing.value.code == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_live_game_completes_and_saves_human_only_demonstration(tmp_path):
     manager = _manager(tmp_path, Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve())

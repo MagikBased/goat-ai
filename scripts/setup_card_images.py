@@ -6,7 +6,7 @@ import json
 import sqlite3
 import time
 from pathlib import Path
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from goat_ai.replay import read_trajectory
@@ -39,6 +39,31 @@ def _image_aliases(codes: list[int], native_root: Path) -> dict[int, int]:
     return result
 
 
+def cache_card_image(code: int, output_dir: Path, native_root: Path,
+                     alias: int | None = None) -> bool:
+    """Cache one printed card face; return False when the source has no image."""
+    target = output_dir / f"{code}.jpg"
+    if target.is_file():
+        return True
+    printed_id = alias if alias is not None else _image_aliases([code], native_root).get(code, code)
+    request = Request(f"{IMAGE_BASE}/{printed_id}.jpg",
+                      headers={"User-Agent": "goat-ai-local-replay-viewer/0.1"})
+    try:
+        with urlopen(request, timeout=15) as response:
+            data = response.read(2_000_001)
+    except HTTPError as error:
+        if error.code == 404:
+            return False
+        raise
+    if not data.startswith(b"\xff\xd8\xff") or len(data) > 2_000_000:
+        raise ValueError(f"unexpected image data for card {code}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(".jpg.tmp")
+    temporary.write_bytes(data)
+    temporary.replace(target)
+    return True
+
+
 def setup_card_images(trajectory: Path | list[Path], output_dir: Path, native_root: Path,
                       delay: float = 0.5) -> tuple[int, int, int]:
     """Download once per visible card ID; return downloaded, cached, unavailable."""
@@ -58,23 +83,11 @@ def setup_card_images(trajectory: Path | list[Path], output_dir: Path, native_ro
         if target.is_file():
             cached += 1
             continue
-        request = Request(f"{IMAGE_BASE}/{aliases.get(code, code)}.jpg",
-                          headers={"User-Agent": "goat-ai-local-replay-viewer/0.1"})
-        try:
-            with urlopen(request, timeout=15) as response:
-                data = response.read(2_000_001)
-            if not data.startswith(b"\xff\xd8\xff") or len(data) > 2_000_000:
-                raise ValueError(f"unexpected image data for card {code}")
-            temporary = target.with_suffix(".jpg.tmp")
-            temporary.write_bytes(data)
-            temporary.replace(target)
+        if cache_card_image(code, output_dir, native_root,
+                            alias=aliases.get(code, code)):
             downloaded += 1
-        except HTTPError as error:
-            if error.code != 404:
-                raise
+        else:
             unavailable += 1
-        except URLError:
-            raise
         if index < len(codes) - 1:
             time.sleep(delay)
     return downloaded, cached, unavailable

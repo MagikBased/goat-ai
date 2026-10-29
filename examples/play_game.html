@@ -19,7 +19,7 @@
     #setup .seats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
     #game { display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
       gap: 12px; height: calc(100vh - 24px); min-height: 650px; }
-    #board { min-width: 0; display: grid; grid-template-rows: auto 74px 1fr 1fr auto 1fr 1fr 74px auto;
+    #board { min-width: 0; position: relative; display: grid; grid-template-rows: auto 74px 1fr 1fr auto 1fr 1fr 74px auto;
       gap: 6px; padding: 10px; border: 1px solid #386873; border-radius: 12px;
       background: repeating-linear-gradient(35deg, #071923, #071923 70px, #0d2d37 72px); }
     .player { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
@@ -33,6 +33,8 @@
       gap: 5px; min-height: 0; }
     .zone { border: 2px solid #6dc827; border-radius: 7px; min-width: 0; min-height: 0;
       display: grid; place-items: center; position: relative; overflow: hidden; }
+    .zone.available, .hand .card.available { cursor: pointer; box-shadow: inset 0 0 0 2px #e9d88688; }
+    .zone.drop-ready { background: #2d6b6b99; outline: 2px solid #f9e589; }
     .self .zone { border-color: #e833a9; }
     .pile { border-color: #b681d7; font-size: .8rem; text-align: center; }
     .zone small { position: absolute; right: 2px; bottom: 1px; background: #071923bb;
@@ -44,8 +46,26 @@
     .card.defense { transform: rotate(90deg) scale(.7); }
     .card .fallback { position: absolute; inset: 0; display: grid; place-items: center;
       padding: 3px; overflow-wrap: anywhere; background: #344457; }
+    .card[draggable=true] { cursor: grab; }
+    .card img { position: relative; z-index: 1; }
     .phase { display: flex; justify-content: center; align-items: center; gap: 8px;
       color: #a8d6da; font-weight: 700; }
+    .phase button { min-width: 43px; padding: 5px 7px; border-radius: 22px; font-size: .82rem; }
+    .phase button.current { background: #a31f56; border-color: #f5dc83; color: white; }
+    .phase button:disabled { cursor: default; opacity: .45; }
+    #quick-controls { display: flex; gap: 6px; flex-wrap: wrap; }
+    #quick-controls button { flex: 1 1 110px; }
+    #quick-controls button.primary { background: #78304c; border-color: #ebbd68; font-weight: 750; }
+    #card-actions { position: absolute; z-index: 20; display: flex; align-items: center;
+      gap: 5px; padding: 7px; max-width: min(92%, 650px); overflow-x: auto;
+      background: #172e3af5; border: 1px solid #e5c963; border-radius: 10px;
+      box-shadow: 0 8px 24px #000c; }
+    #card-actions[hidden] { display: none; }
+    #card-actions button { display: grid; justify-items: center; gap: 2px; flex: 0 0 70px;
+      min-height: 56px; padding: 4px; font-size: .72rem; white-space: normal; }
+    #card-actions button svg { width: 24px; height: 24px; }
+    #card-actions .close-actions { flex-basis: 34px; min-height: 34px; align-self: flex-start; }
+    #card-actions .tray-title { flex: 0 0 90px; font-size: .72rem; color: #f4df9a; }
     #sidebar { min-height: 0; display: flex; flex-direction: column; gap: 8px;
       padding: 12px; background: #142c36; border: 1px solid #446873; border-radius: 12px; }
     #sidebar h1 { font-size: 1.25rem; margin: 0; }
@@ -92,17 +112,20 @@
       <div id="own-spell" class="row self"></div>
       <div id="own-hand" class="hand"></div>
       <div class="player"><strong id="own-name">You</strong><span id="own-lp" class="lp"></span></div>
+      <div id="card-actions" hidden aria-label="Card actions"></div>
     </section>
     <aside id="sidebar">
       <h1>GOAT AI · live duel</h1>
       <a href="/games/new">Create an AI replay</a>
       <button id="quit" type="button">Leave unfinished duel</button>
       <p id="message" role="status" aria-live="polite"></p>
+      <div id="quick-controls"><button id="pass-action" type="button">Pass</button><button id="end-turn" class="primary" type="button">End turn</button></div>
       <div id="history"></div>
       <details><summary>Visible information</summary><div id="visible-info"></div></details>
-      <label>Find a legal action<input id="search" type="search" placeholder="Card name, action, target…"></label>
-      <div id="action-count"></div>
-      <div id="action-list"></div>
+      <details id="advanced-actions"><summary>All legal actions</summary>
+        <label>Find a legal action<input id="search" type="search" placeholder="Card name, action, target…"></label>
+        <div id="action-count"></div><div id="action-list"></div>
+      </details>
       <a id="finished-replay" hidden>View verified replay</a>
     </aside>
   </main>
@@ -112,6 +135,101 @@
     const byId = id => document.getElementById(id);
     let state = null;
     let busy = false;
+    let dragSource = null;
+    const phaseSteps = [{name:"DP", value:"draw"}, {name:"SP", value:"standby"},
+      {name:"M1", value:"main1", action:"main1"},
+      {name:"BP", value:"battle", action:"battle_phase"},
+      {name:"M2", value:"main2", action:"main2"},
+      {name:"EP", value:"end", action:"end_phase"}];
+    const shortAction = {normal_summon:"Summon", special_summon:"Special", flip_summon:"Flip",
+      set_monster:"Set", set_spell_trap:"Set", activate:"Activate", chain:"Chain",
+      attack:"Attack", change_position:"Position", select_card:"Choose", tribute:"Tribute",
+      place:"Place", select_position:"Position", yes:"Yes", no:"No", pass:"Pass",
+      cancel:"Cancel", end_phase:"End turn", battle_phase:"Battle", main2:"Main 2"};
+    function actionIcon(kind) {
+      const paths = {
+        normal_summon:"M12 3v18 M3 12h18", special_summon:"M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z",
+        set_monster:"M4 6h16v12H4z M7 9h10 M7 12h10", set_spell_trap:"M4 6h16v12H4z M7 9h10 M7 12h10",
+        activate:"M13 2 5 13h6l-1 9 9-12h-6z", chain:"M8 8 4 12l4 4 M16 8l4 4-4 4 M9 12h6",
+        attack:"M3 20 20 3 M11 3h9v9", flip_summon:"M4 7h15l-3-3 M20 17H5l3 3",
+        change_position:"M12 3v18 M3 12h18", select_card:"M4 5h16v14H4z M8 9h8v6H8z",
+        place:"M12 3v18 M3 12h18", select_position:"M4 7h15l-3-3 M20 17H5l3 3",
+        pass:"M4 12h16 M15 7l5 5-5 5", end_phase:"M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18 M12 7v5l4 2",
+        battle_phase:"M3 20 20 3 M11 3h9v9", main2:"M4 12h16 M15 7l5 5-5 5",
+      };
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("fill", "none");
+      svg.setAttribute("stroke", "currentColor"); svg.setAttribute("stroke-width", "2");
+      svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", paths[kind] || "M12 3v12 M12 19v2"); svg.append(path);
+      svg.setAttribute("aria-hidden", "true"); return svg;
+    }
+    function refActions(ref) {
+      if (!state || state.terminal) return [];
+      return state.legal_actions.map((action, index) => ({action, index})).filter(({action}) => {
+        const p = action.parameters || {};
+        return p.location === ref.location && p.controller === ref.controller &&
+          p.sequence === ref.sequence;
+      });
+    }
+    function closeCardActions() { byId("card-actions").hidden = true; }
+    function showActionTray(offered, anchor, titleText, destination = null) {
+      if (!offered.length) { closeCardActions(); return; }
+      const tray = byId("card-actions"); tray.replaceChildren();
+      const title = document.createElement("span"); title.className = "tray-title";
+      title.textContent = titleText; tray.append(title);
+      for (const {action, index} of offered) {
+        const button = document.createElement("button"); button.type = "button";
+        button.title = actionLabel(action); button.setAttribute("aria-label", actionLabel(action));
+        button.append(actionIcon(action.kind), document.createTextNode(shortAction[action.kind] || action.kind.replaceAll("_", " ")));
+        button.onclick = () => choose(index, destination);
+        tray.append(button);
+      }
+      const close = document.createElement("button"); close.type = "button";
+      close.className = "close-actions"; close.textContent = "×"; close.title = "Close actions";
+      close.onclick = closeCardActions; tray.append(close);
+      const board = byId("board"), bounds = board.getBoundingClientRect();
+      const box = anchor.getBoundingClientRect();
+      tray.hidden = false;
+      tray.style.left = `${Math.max(8, Math.min(box.left - bounds.left, bounds.width - tray.offsetWidth - 8))}px`;
+      tray.style.top = `${Math.max(8, Math.min(box.bottom - bounds.top + 5, bounds.height - tray.offsetHeight - 8))}px`;
+    }
+    function contextActions(ref, anchor, destination = null) {
+      let offered = refActions(ref);
+      if (destination && offered.length) {
+        const kinds = destination.controller !== ref.controller && destination.location === 4
+          ? ["attack", "activate", "chain"]
+          : ref.location === 2 && destination.location === 4
+            ? ["normal_summon", "special_summon", "set_monster"]
+            : ref.location === 2 && destination.location === 8
+              ? ["set_spell_trap", "activate"] : [];
+        if (kinds.length) offered = offered.filter(({action}) => kinds.includes(action.kind));
+      }
+      showActionTray(offered, anchor,
+        ref.code != null ? cardName(ref.code) : "Choose an action", destination);
+    }
+    function makeInteractive(element, ref) {
+      if (!refActions(ref).length) return;
+      element.classList.add("available"); element.tabIndex = 0;
+      element.setAttribute("role", "button");
+      element.setAttribute("aria-label", `${ref.code == null ? "Zone" : cardName(ref.code)} actions`);
+      element.onclick = () => contextActions(ref, element);
+      element.onkeydown = event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault(); contextActions(ref, element);
+        }
+      };
+      if (ref.code != null && ref.controller === state.human_seat) {
+        element.draggable = true;
+        element.ondragstart = event => {
+          dragSource = ref; event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", `${ref.controller}:${ref.location}:${ref.sequence}`);
+        };
+        element.ondragend = () => { dragSource = null;
+          document.querySelectorAll(".drop-ready").forEach(zone => zone.classList.remove("drop-ready")); };
+      }
+    }
     const cardName = code => code == null ? "Face-down card" :
       state?.card_names?.[String(code)] || `Card #${code}`;
     const locationName = location => ({1:"Deck", 2:"Hand", 4:"Monster",
@@ -129,41 +247,61 @@
     }
     const fieldCard = (observation, player, zone, sequence) =>
       observation.field.find(card => card.controller === player && card.zone === zone && card.sequence === sequence);
-    function cardElement(card, hidden = false) {
+    function cardElement(card, hidden = false, ref = null) {
       const element = document.createElement("div"); element.className = "card";
       if (card?.orientation === "defense") element.classList.add("defense");
       const code = hidden ? null : card?.code;
+      const faceDown = hidden || card?.position === "facedown";
       element.title = cardName(code);
       const fallback = document.createElement("span"); fallback.className = "fallback";
-      fallback.textContent = cardName(code); element.append(fallback);
+      fallback.textContent = faceDown ? "Face-down card" : cardName(code); element.append(fallback);
       const image = document.createElement("img");
-      image.src = code == null ? "/replays/card_images/cover.png" :
+      image.src = faceDown || code == null ? "/replays/card_images/cover.png" :
         `/replays/card_images/${code}.jpg`;
       image.alt = cardName(code); image.onerror = () => image.remove();
-      element.append(image); return element;
+      element.append(image);
+      if (ref) makeInteractive(element, ref);
+      return element;
     }
-    function zone(card, label, count) {
+    function zone(card, label, count, ref = null) {
       const element = document.createElement("div"); element.className = "zone";
       if (count != null) element.classList.add("pile");
-      if (card) element.append(cardElement(card));
+      if (card) element.append(cardElement(card, false, ref));
       else if (count != null) element.textContent = label;
       if (count != null) {
         const badge = document.createElement("small"); badge.textContent = count;
         element.append(badge);
+      }
+      if (ref) {
+        if (!card) makeInteractive(element, ref);
+        element.ondragover = event => { if (!dragSource) return;
+          event.preventDefault(); element.classList.add("drop-ready"); };
+        element.ondragleave = () => element.classList.remove("drop-ready");
+        element.ondrop = event => {
+          event.preventDefault(); element.classList.remove("drop-ready");
+          if (dragSource) contextActions(dragSource, element, ref);
+          dragSource = null;
+        };
       }
       return element;
     }
     function boardRow(id, observation, player, zoneName, leftLabel, leftCount,
                       rightLabel, rightCount) {
       const row = byId(id); row.replaceChildren();
-      if (leftLabel === "Field") row.append(zone(fieldCard(observation, player, "spell_trap", 5)));
+      if (leftLabel === "Field") row.append(zone(fieldCard(observation, player, "spell_trap", 5),
+        null, null, {location:8, controller:player, sequence:5,
+          code:fieldCard(observation, player, "spell_trap", 5)?.code}));
       else row.append(pileZone(player, leftLabel, leftCount));
       for (let index = 0; index < 5; index++)
-        row.append(zone(fieldCard(observation, player, zoneName, index)));
+        row.append(zone(fieldCard(observation, player, zoneName, index), null, null,
+          {location:zoneName === "monster" ? 4 : 8, controller:player, sequence:index,
+           code:fieldCard(observation, player, zoneName, index)?.code}));
       row.append(pileZone(player, rightLabel, rightCount));
     }
     function pileZone(player, label, count) {
-      const element = zone(null, label, count);
+      const location = label === "GY" ? 16 : label === "Banished" ? 32 : label === "Deck" ? 1 : 64;
+      const element = zone(null, label, count,
+        {location, controller:player, sequence:0});
       if (label === "GY" || label === "Banished") {
         element.style.cursor = "pointer";
         element.title = `View Player ${player + 1} ${label}`;
@@ -172,7 +310,15 @@
             state.observation.banished[player];
           byId("pile-title").textContent = `Player ${player + 1} · ${label}`;
           byId("pile-list").replaceChildren(...cards.map(card => {
-            const item = document.createElement("li"); item.textContent = cardName(card.code);
+            const item = document.createElement("li");
+            const ref = {location, controller:player, sequence:card.sequence, code:card.code};
+            const button = document.createElement("button"); button.type = "button";
+            button.textContent = cardName(card.code);
+            const offered = refActions(ref);
+            button.disabled = !offered.length;
+            button.onclick = () => { byId("pile-dialog").close();
+              showActionTray(offered, element, cardName(card.code)); };
+            item.append(button);
             return item;
           }));
           byId("pile-dialog").showModal();
@@ -218,14 +364,56 @@
       }
       if (matching.length > 100) list.append(`Showing the first 100 matches. Narrow your search.`);
     }
+    function renderPhase(observation) {
+      const rail = byId("phase"); rail.replaceChildren();
+      const turn = document.createElement("span");
+      turn.textContent = `T${observation.turn} · P${observation.turn_player + 1}`;
+      rail.append(turn);
+      for (const step of phaseSteps) {
+        const button = document.createElement("button"); button.type = "button";
+        button.textContent = step.name; button.title = step.value.replaceAll("_", " ");
+        const direct = (observation.phase === "draw" && step.value === "standby") ||
+          (observation.phase === "standby" && step.value === "main1")
+          ? "pass" : step.action;
+        const index = direct && (step.action || direct === "pass")
+          ? state.legal_actions.findIndex(action => action.kind === direct) : -1;
+        const reachable = (observation.phase === "draw" && step.value === "standby") ||
+          (observation.phase === "standby" && step.value === "main1") ||
+          (step.value === "battle" && observation.phase === "main1") ||
+          (step.value === "main2" && observation.phase === "battle") ||
+          (step.value === "end" && ["main1", "main2"].includes(observation.phase));
+        button.disabled = busy || index < 0 || !reachable;
+        if (observation.phase === step.value) button.classList.add("current");
+        if (index >= 0) button.onclick = () => choose(index);
+        rail.append(button);
+      }
+    }
+    function renderQuickControls() {
+      const passIndex = state?.legal_actions?.findIndex(action =>
+        ["pass", "no", "cancel"].includes(action.kind)) ?? -1;
+      let endIndex = state?.legal_actions?.findIndex(action => action.kind === "end_phase") ?? -1;
+      if (endIndex < 0 && state?.observation?.phase === "end") endIndex = passIndex;
+      const pass = byId("pass-action"), end = byId("end-turn");
+      pass.disabled = busy || passIndex < 0; pass.onclick = () => choose(passIndex);
+      end.disabled = busy || endIndex < 0; end.onclick = () => choose(endIndex);
+    }
+    function renderPromptActions() {
+      const kinds = new Set(["yes", "no", "select_position", "announce_race",
+        "announce_attribute", "announce_number", "announce_card", "select_option"]);
+      const choices = state.legal_actions.map((action, index) => ({action, index}))
+        .filter(({action}) => kinds.has(action.kind));
+      if (choices.length && choices.length === state.legal_actions.length)
+        showActionTray(choices.slice(0, 32), byId("phase"), "Choose a response");
+    }
     function render(data) {
-      state = data;
+      state = data; closeCardActions();
       byId("setup").hidden = true; byId("game").hidden = false;
       if (data.terminal) {
         byId("message").textContent = data.winner == null ? "Duel ended in a draw." :
           `Duel ended. Player ${data.winner + 1} won.`;
         byId("action-count").textContent = "No legal actions";
         byId("action-list").replaceChildren();
+        byId("phase").replaceChildren(); renderQuickControls();
         byId("finished-replay").href = data.viewer;
         byId("finished-replay").hidden = !data.viewer;
         return;
@@ -235,8 +423,10 @@
       byId("opp-name").textContent = `Player ${opponent + 1} · AI · Extra ${o.extra_deck_counts[opponent]}`;
       byId("own-lp").textContent = `${o.life_points[you]} LP`;
       byId("opp-lp").textContent = `${o.life_points[opponent]} LP`;
-      byId("phase").textContent = `Turn ${o.turn} · ${o.phase} · Player ${(o.turn_player ?? you) + 1}'s turn`;
-      const ownHand = byId("own-hand"); ownHand.replaceChildren(...o.hand.map(card => cardElement(card)));
+      renderPhase(o); renderQuickControls();
+      const ownHand = byId("own-hand"); ownHand.replaceChildren(...o.hand.map(card =>
+        cardElement(card, false, {location:2, controller:you,
+          sequence:card.sequence, code:card.code})));
       const oppHand = byId("opp-hand"); oppHand.replaceChildren(...Array.from(
         {length: o.opponent_hand_count}, () => cardElement(null, true)));
       boardRow("opp-spell", o, opponent, "spell_trap", "Banished", o.banished[opponent].length,
@@ -260,7 +450,9 @@
       for (const fact of facts) { const line = document.createElement("p"); line.textContent = fact;
         visibleInfo.append(line); }
       byId("message").textContent = `Your choice · decision ${data.decisions + 1}`;
+      byId("message").classList.remove("error");
       actions();
+      renderPromptActions();
     }
     async function request(path, payload) {
       const response = await fetch(path, payload ? {
@@ -270,13 +462,27 @@
       if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
       return result;
     }
-    async function choose(index) {
+    async function choose(index, destination = null) {
       if (busy) return;
-      busy = true; actions(); byId("message").textContent = "AI is responding…";
-      try { render(await request("/api/live/choice", {id: state.id,
-        action_index: index, expected_decisions: state.decisions})); }
+      busy = true; closeCardActions(); actions(); renderQuickControls();
+      byId("message").textContent = "AI is responding…";
+      try {
+        let next = await request("/api/live/choice", {id: state.id,
+          action_index: index, expected_decisions: state.decisions});
+        if (destination && !next.terminal) {
+          const matching = next.legal_actions.map((action, index) => ({action, index}))
+            .filter(({action}) => ["place", "select_card"].includes(action.kind)
+              && action.parameters?.location === destination.location
+              && action.parameters?.controller === destination.controller
+              && action.parameters?.sequence === destination.sequence);
+          if (matching.length === 1) next = await request("/api/live/choice", {
+            id: next.id, action_index: matching[0].index, expected_decisions: next.decisions});
+        }
+        render(next);
+      }
       catch (error) { byId("message").textContent = error.message; byId("message").classList.add("error"); }
-      finally { busy = false; actions(); }
+      finally { busy = false; actions(); renderQuickControls();
+        if (state && !state.terminal) renderPhase(state.observation); }
     }
     byId("search").addEventListener("input", actions);
     byId("close-pile").addEventListener("click", () => byId("pile-dialog").close());

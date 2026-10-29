@@ -11,13 +11,16 @@ import re
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock
+from urllib.error import URLError
 from urllib.parse import parse_qs, urlsplit
 
+from goat_ai.agents.card_metadata import load_card_names
 from goat_ai.replay import read_decision_annotations, read_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from scripts.create_viewer_game import GameCreator
 from scripts.launch_review_server import launch
 from scripts.live_human_game import LiveGameManager
+from scripts.setup_card_images import cache_card_image, setup_card_backs
 from scripts.validate_review_queue_labels import queue_sources, verify_queue_items
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -361,6 +364,12 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
     store = ReviewStore(queue, output_dir, reviewer_alias) if queue is not None else None
     creator = GameCreator(root=ROOT)
     live = LiveGameManager(creator)
+    image_locks_lock = Lock()
+    image_locks: dict[int, Lock] = {}
+    try:
+        allowed_image_codes = set(load_card_names(creator.native_root))
+    except FileNotFoundError:
+        allowed_image_codes = set()
     start_path = ("/" + queue.with_suffix(".html").relative_to(ROOT).as_posix()
                   if queue is not None else "/games/new")
 
@@ -387,6 +396,36 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
 
         def do_GET(self) -> None:
             parsed = urlsplit(self.path)
+            if parsed.path in ("/replays/card_images/cover.png",
+                               "/replays/card_images/cover2.png"):
+                with image_locks_lock:
+                    back_lock = image_locks.setdefault(0, Lock())
+                with back_lock:
+                    try:
+                        target = ROOT / parsed.path.lstrip("/")
+                        if not target.is_file():
+                            setup_card_backs(target.parent)
+                    except (ValueError, OSError, URLError):
+                        self.send_error(503, "card back source unavailable")
+                        return
+            art_match = re.fullmatch(r"/replays/card_images/([0-9]{1,10})\.jpg", parsed.path)
+            if art_match:
+                code = int(art_match.group(1))
+                if code not in allowed_image_codes:
+                    self.send_error(404, "unknown card image")
+                    return
+                with image_locks_lock:
+                    image_lock = image_locks.setdefault(code, Lock())
+                with image_lock:
+                    try:
+                        target = ROOT / "replays/card_images" / f"{code}.jpg"
+                        if not target.is_file() and not cache_card_image(
+                                code, target.parent, creator.native_root):
+                            self.send_error(404, "card image unavailable")
+                            return
+                    except (ValueError, OSError, URLError):
+                        self.send_error(503, "card image source unavailable")
+                        return
             if parsed.path == "/":
                 self.send_response(302)
                 self.send_header("Location", start_path)
