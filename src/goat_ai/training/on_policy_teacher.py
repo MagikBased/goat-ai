@@ -4,6 +4,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import replace
 
 from goat_ai.agents import Agent
+from goat_ai.evaluation.thunder_search_audit import thunder_search_choice
 from goat_ai.replay import DecisionRecord, Trajectory
 
 
@@ -58,6 +59,29 @@ def filter_activation_opportunities(
                for action in original.legal_actions):
             kept.append(teacher)
             disagreements += original.selected_action != teacher.selected_action
+    return tuple(kept), disagreements
+
+
+def filter_thunder_search_opportunities(
+    trajectory: Trajectory, labeled: Sequence[DecisionRecord],
+) -> tuple[tuple[DecisionRecord, ...], int]:
+    """Keep only staged Thunder searches with a visible Deck-copy option."""
+    seat = (trajectory.skill_metadata or {}).get("demonstrator_seat")
+    originals = [record for record in trajectory.decisions
+                 if record.observation.acting_player == seat
+                 and len(record.legal_actions) > 1]
+    if seat not in (0, 1) or len(originals) != len(labeled):
+        raise ValueError("Thunder focus needs aligned policy decisions and seat")
+    kept = []
+    disagreements = 0
+    for original, teacher in zip(originals, labeled, strict=True):
+        if (original.observation != teacher.observation
+                or original.legal_actions != teacher.legal_actions):
+            raise ValueError("Thunder labels do not match recorded visible decisions")
+        if thunder_search_choice(original, seat) is None:
+            continue
+        kept.append(teacher)
+        disagreements += original.selected_action != teacher.selected_action
     return tuple(kept), disagreements
 
 

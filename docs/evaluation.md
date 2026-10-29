@@ -1,5 +1,63 @@
 # Baseline evaluation log
 
+## On-policy staged Thunder Dragon correction (29 October 2026)
+
+To test whether fresh policy states transfer better than the earlier six-label
+synthetic correction, we added an optional `tactical_thunder_search` teacher
+and a staged-search focus to `train_behavioral_clone.py`. The teacher uses the
+existing Tactical agent with its Thunder search correction; these are
+**automated teacher labels, not human approvals**. The two ignored source
+batches, `thunder_on_policy_train_124100_124115/` and
+`thunder_on_policy_train_124200_124215/`, contain 64 complete native-replay-
+verified policy-versus-Tactical games and 32,291 decisions. They yielded 18
+staged prompts offering a Thunder Dragon Deck copy; the recorded policy and
+teacher disagreed at all 18. The nine recorded zero-copy finishes demonstrate
+the recurring error. A two-copy direct choice and the staged `select_card`
+path can both be legal ways to take copies, so disagreement is not itself a
+proof of bad play at every prompt.
+
+A ten-epoch clone fit on the 18 focused labels without preservation scored
+31–33 against its parent in 64 fresh direct duels and 20 wins against Tactical
+versus the parent's 24 wins on a matched 64-game schedule. Its saved metadata
+incorrectly reports zero teacher disagreements because the aggregate counter
+was reset by the focus filter; the counter is fixed in the training script.
+This clone was not selected.
+
+A second child fit the same 18 labels with 80 parent-policy KL steps. Its
+preservation states came from four complete, replay-verified games generated
+by the exact parent checkpoint on the current native assets; the new
+`--allow-policy-preservation` option checks checkpoint hash, inference version,
+demonstrator seat, replay, and player visibility. It sampled 80 multi-option
+preservation states (KL weight 0.1, final reported KL 0.01587). The child
+selected a Deck copy at both fresh seed-124001 zero-choice diagnostics. It
+scored 36–28 against the parent in 64 direct duels, and 28 wins against
+Tactical versus the parent's 27 wins on a matched 64-game schedule. Neither
+small result established a reliable strength gain.
+
+A larger prespecified direct check used 256 complete duels on seeds
+124700–124731, both seats and Deck assignments, with Theeresak Goat versus
+Ramon Beastdown and Christian Goat versus Bryan Chaos. All four Main Deck
+compositions were unseen in either checkpoint's training sources. Both agents
+used identical v1 own-loss inference. The KL child scored **129 wins, 126
+losses, one draw**: score 50.59%, paired-bootstrap 95% interval **46.09%–
+55.27%**. This does not establish improvement. Neither child is promoted;
+the selected feature-v23 checkpoint and v1 guard remain in use. The result
+supports the user's concern that a narrow correction does not solve broader
+own-card targeting and timing errors. The next policy experiment should use
+reviewed target/activation examples and measure those errors plus match wins
+on an independent schedule.
+
+Ignored artifacts: `.cache/goat-ai/fv23_on_policy_thunder_search_124100_124215.pt`,
+`.cache/goat-ai/fv23_on_policy_thunder_search_kl_124100_124215.pt`, and the
+`on_policy_thunder_*_124*.json` reports. To reproduce the large check, run
+`scripts/evaluate_policy.py` with the KL child as positional checkpoint,
+`--opponent-checkpoint` set to the selected feature-v23 parent, `--engine
+experimental --own-loss-guard --own-loss-guard-version 1
+--opponent-own-loss-guard --opponent-own-loss-guard-version 1
+--both-deck-assignments --require-unseen-main-decks --seed 124700 --seeds 32`
+and the two Deck pairs named above, using the pinned native assets. Report
+file: `.cache/goat-ai/on_policy_thunder_kl_broad_vs_parent_124700_124731.json`.
+
 ## Fresh staged Thunder Dragon transfer check (29 October 2026)
 
 Eight selected-v23/v1-guarded policy-versus-Tactical duels on seeds

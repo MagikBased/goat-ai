@@ -2627,3 +2627,11 @@ The [combined outcome-blind own-card review queue](replay_audit.md#idle-own-ring
 now puts 17 verified Ring and Heavy Storm decisions in one place. Review
 choices or explicit rejections from that queue are the next usable human
 signal; its suggested alternatives and offline branch winners are not labels.
+
+An [on-policy Thunder Dragon teacher experiment](evaluation.md#on-policy-staged-thunder-dragon-correction-29-october-2026)
+corrected two fresh staged-search diagnostics, but the preserved child scored
+129–126–1 against its parent over 256 unseen-deck duels; the paired interval
+includes 50%. This does not close M4 or address the broader own-card removal
+failure. Prioritize explicit human review of activation and target choices,
+then evaluate the resulting policy for fewer verified own-card losses and a
+complete-duel strength gain. Keep the selected v23/v1 checkpoint meanwhile.

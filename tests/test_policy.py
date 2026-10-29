@@ -47,6 +47,7 @@ from goat_ai.training import (
 )
 from goat_ai.training.on_policy_teacher import (
     filter_activation_opportunities,
+    filter_thunder_search_opportunities,
     label_policy_trajectory,
     teacher_disagreement_flags,
 )
@@ -88,6 +89,7 @@ from scripts.train_behavioral_clone import (
     focus_opportunity,
     load_parent_checkpoint,
     parse_source_weights,
+    preservation_source_kind,
     restrict_trainable_modules,
 )
 
@@ -253,6 +255,59 @@ def test_activation_focus_keeps_both_good_and_bad_trade_opportunities():
         filter_activation_opportunities(trajectory, labeled[:1], {HEAVY_STORM})
     with pytest.raises(ValueError, match="card IDs"):
         filter_activation_opportunities(trajectory, labeled, set())
+
+
+def test_thunder_search_focus_keeps_staged_decisions_and_counts_corrections():
+    thunder = 504700054
+    copy = Action("copy", "select_card", 0,
+                  {"code": thunder, "location": 1, "controller": 0})
+    zero = Action("zero", "select_cards", 0, {})
+    search = replace(view(), chain=(ChainLinkView(1, thunder, 0, 2, 0),))
+    other = DecisionRecord(view(), actions(), actions()[0])
+    records = (DecisionRecord(search, (copy, zero), zero), other,
+               DecisionRecord(search, (copy, zero), copy))
+    trajectory = Trajectory("goat", ("a", "b"), 7, records, 0,
+                            source="policy_evaluation",
+                            skill_metadata={"demonstrator_seat": 0,
+                                            "policy_checkpoint_sha256": "a" * 64})
+
+    class Teacher:
+        def select_action(self, observation, legal_actions):
+            return legal_actions[0]
+
+    labeled, _ = label_policy_trajectory(trajectory, Teacher(), "a" * 64)
+    focused, disagreements = filter_thunder_search_opportunities(trajectory, labeled)
+    assert len(focused) == 2
+    assert disagreements == 1
+    assert all(record.selected_action == copy for record in focused)
+    with pytest.raises(ValueError, match="aligned"):
+        filter_thunder_search_opportunities(trajectory, labeled[:1])
+
+
+def test_parent_kl_preservation_accepts_only_matching_verified_policy_provenance():
+    path = Path("fresh_policy.json")
+    parent_hash = "a" * 64
+    record = DecisionRecord(view(), actions(), actions()[0])
+    trajectory = Trajectory("goat", ("a", "b"), 7, (record,), 0,
+                            source="policy_evaluation",
+                            skill_metadata={"demonstrator_seat": 0,
+                                            "policy_checkpoint_sha256": parent_hash,
+                                            "policy_inference_version": 6})
+    assert preservation_source_kind(trajectory, path, "b" * 64, {},
+                                    parent_hash, True) == "matching_parent_policy"
+    with pytest.raises(ValueError, match="absent from parent provenance"):
+        preservation_source_kind(trajectory, path, "b" * 64, {}, parent_hash, False)
+    with pytest.raises(ValueError, match="absent from parent provenance"):
+        preservation_source_kind(replace(trajectory, skill_metadata={
+            **trajectory.skill_metadata, "policy_checkpoint_sha256": "c" * 64}),
+            path, "b" * 64, {}, parent_hash, True)
+    with pytest.raises(ValueError, match="absent from parent provenance"):
+        preservation_source_kind(replace(trajectory, skill_metadata={
+            **trajectory.skill_metadata, "policy_inference_version": 5}),
+            path, "b" * 64, {}, parent_hash, True)
+    assert preservation_source_kind(trajectory, path, "b" * 64,
+                                    {str(path): "b" * 64}, parent_hash,
+                                    False) == "parent_training"
 
 
 def test_position_action_features_bind_visible_stats_without_hidden_enemy_stats():

@@ -41,10 +41,27 @@ from goat_ai.training import (
 )
 from goat_ai.training.on_policy_teacher import (
     filter_activation_opportunities,
+    filter_thunder_search_opportunities,
     label_policy_trajectory,
     teacher_disagreement_flags,
 )
-from goat_ai.training.policy import POLICY_FEATURE_VERSION
+from goat_ai.training.policy import POLICY_FEATURE_VERSION, POLICY_INFERENCE_VERSION
+
+
+def preservation_source_kind(trajectory, path: Path, digest: str,
+                             parent_sources: dict[str, str], parent_sha256: str,
+                             allow_policy: bool) -> str:
+    """Accept a parent source or an explicitly allowed, matching policy replay."""
+    if parent_sources.get(str(path)) == digest:
+        return "parent_training"
+    metadata = trajectory.skill_metadata or {}
+    if (allow_policy and trajectory.source == "policy_evaluation"
+            and metadata.get("policy_checkpoint_sha256") == parent_sha256
+            and metadata.get("policy_inference_version") == POLICY_INFERENCE_VERSION
+            and type(metadata.get("demonstrator_seat")) is int
+            and metadata["demonstrator_seat"] in (0, 1)):
+        return "matching_parent_policy"
+    raise ValueError(f"{path}: preservation replay is absent from parent provenance")
 
 SOURCE_KINDS = frozenset((
     "activate", "attack", "chain", "change_position", "flip_summon",
@@ -256,11 +273,15 @@ def main() -> None:
                         metavar="TRAJECTORY=LABELS",
                         help="label selected trajectories; unlisted demonstrations use their "
                              "recorded demonstrator seat")
-    parser.add_argument("--on-policy-teacher", choices=("tactical_v14", "tactical_card_advantage"),
+    parser.add_argument("--on-policy-teacher", choices=("tactical_v14", "tactical_card_advantage",
+                                                        "tactical_thunder_search"),
                         help="label replay-verified policy-visited states with the "
                              "named synthetic teacher; requires --init-checkpoint")
     parser.add_argument("--on-policy-teacher-activation-focus-only", action="store_true",
                         help="train only decisions offering activation of a --focus-card")
+    parser.add_argument("--on-policy-thunder-search-only", action="store_true",
+                        help="train only staged Thunder Dragon search prompts with an "
+                             "offered Deck copy; requires tactical_thunder_search")
     parser.add_argument("--on-policy-disagreement-weight", type=float, default=1.0,
                         help="relative sampling weight for policy/teacher disagreements")
     parser.add_argument("--synthetic-thunder-search-correction", action="store_true",
@@ -323,6 +344,9 @@ def main() -> None:
                         help="fit selected labels with parent-policy KL preservation")
     parser.add_argument("--preserve-trajectories", nargs="+", type=Path, default=[],
                         help="replay-verified parent training games for KL preservation")
+    parser.add_argument("--allow-policy-preservation", action="store_true",
+                        help="also admit replay-verified games from the exact parent "
+                             "checkpoint as KL preservation states")
     parser.add_argument("--preserve-per-trajectory", type=int, default=32,
                         help="multi-option parent states sampled from each preservation game")
     parser.add_argument("--preserve-batch", type=int, default=8,
@@ -388,8 +412,14 @@ def main() -> None:
     if args.on_policy_teacher_activation_focus_only and (
             not args.on_policy_teacher or not args.focus_card):
         parser.error("activation focus requires --on-policy-teacher and --focus-card")
+    if args.on_policy_thunder_search_only and (
+            args.on_policy_teacher != "tactical_thunder_search"
+            or args.on_policy_teacher_activation_focus_only):
+        parser.error("Thunder focus requires tactical_thunder_search teacher "
+                     "and cannot combine with activation focus")
     if args.on_policy_disagreement_weight > 1 and (
-            not args.on_policy_teacher or args.on_policy_teacher_activation_focus_only):
+            not args.on_policy_teacher or args.on_policy_teacher_activation_focus_only
+            or args.on_policy_thunder_search_only):
         parser.error("disagreement weighting requires unfiltered on-policy teacher labels")
     if (args.parent_kl_steps < 0 or args.preserve_per_trajectory < 1
             or args.preserve_batch < 1 or not isfinite(args.parent_kl_weight)
@@ -399,6 +429,8 @@ def main() -> None:
         parser.error("parent KL requires --init-checkpoint and --preserve-trajectories")
     if not args.parent_kl_steps and args.preserve_trajectories:
         parser.error("--preserve-trajectories requires --parent-kl-steps")
+    if args.allow_policy_preservation and not args.parent_kl_steps:
+        parser.error("--allow-policy-preservation requires --parent-kl-steps")
     if args.parent_kl_steps and (source_weights or args.focus_weight > 1):
         parser.error("parent KL uses labeled decisions directly; omit sampling weights")
     if args.parent_kl_steps and args.on_policy_disagreement_weight > 1:
@@ -418,7 +450,8 @@ def main() -> None:
         load_flip_monster_codes(args.native_root),
         load_card_races(args.native_root),
         card_facts=load_card_facts(args.native_root),
-        card_advantage_guard=args.on_policy_teacher == "tactical_card_advantage")
+        card_advantage_guard=args.on_policy_teacher == "tactical_card_advantage",
+        thunder_search_guard=args.on_policy_teacher == "tactical_thunder_search")
         if args.on_policy_teacher else None)
     teacher_parent_hash = (hashlib.sha256(args.init_checkpoint.read_bytes()).hexdigest()
                            if teacher is not None else None)
@@ -481,6 +514,10 @@ def main() -> None:
             if args.on_policy_teacher_activation_focus_only:
                 selected, disagreements = filter_activation_opportunities(
                     trajectory, selected, args.focus_card)
+                disagreement_flags = (False,) * len(selected)
+            if args.on_policy_thunder_search_only:
+                selected, disagreements = filter_thunder_search_opportunities(
+                    trajectory, selected)
                 disagreement_flags = (False,) * len(selected)
         elif label_path is not None:
             annotation, selected = read_decision_annotations(
@@ -594,11 +631,14 @@ def main() -> None:
         rng = random.Random(args.seed)
         preservation = []
         preservation_hashes = {}
+        preservation_kinds = {}
         for path in args.preserve_trajectories:
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            if parent["trajectory_sha256"].get(str(path)) != digest:
-                raise ValueError(f"{path}: preservation replay is absent from parent provenance")
             trajectory = read_trajectory(path, fast_json=args.fast_trajectory_json)
+            preservation_kinds[str(path)] = preservation_source_kind(
+                trajectory, path, digest, parent["trajectory_sha256"],
+                hashlib.sha256(args.init_checkpoint.read_bytes()).hexdigest(),
+                args.allow_policy_preservation)
             verify_trajectory(trajectory, engine_type(args.native_root))
             audit_trajectory_visibility(trajectory)
             candidates = [record for record in demonstrator_records(trajectory)
@@ -618,6 +658,7 @@ def main() -> None:
                              for record in records])
         preservation_metadata = {
             "trajectory_sha256": preservation_hashes,
+            "source_kinds": preservation_kinds,
             "states": len(preservation),
             "per_trajectory": args.preserve_per_trajectory,
             "batch": args.preserve_batch,
@@ -677,8 +718,10 @@ def main() -> None:
         "focus_cards": tuple(sorted(focus_codes)),
         "focus_weight": args.focus_weight,
         "on_policy_activation_focus_only": args.on_policy_teacher_activation_focus_only,
+        "on_policy_thunder_search_only": args.on_policy_thunder_search_only,
         "on_policy_disagreement_weight": args.on_policy_disagreement_weight,
-        "on_policy_disagreements": sum(record_disagreements),
+        "on_policy_disagreements": sum(
+            game["automated_teacher_disagreements"] or 0 for game in training_games),
         "source_weights": source_weights,
         "label_kind_weights": label_kind_weights,
         "trainable_modules": tuple(args.trainable_module) or ("all",),
