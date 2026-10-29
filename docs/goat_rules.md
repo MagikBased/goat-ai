@@ -535,6 +535,14 @@ copies remain is generally a poor policy choice. The rules test checks legality;
 the replay audit separately flags that strategic choice for review. On the
 current pinned native assets, the nine Thunder Dragon search and staged-choice
 regressions passed on 27 October 2026.
+The zero-copy choices (explicit empty selection and cancel) and a one-copy
+choice now each continue to terminal, serialize, replay-verify, and pass the
+player-visibility audit. The one-copy path uses a staged `select_card` action;
+it reduces Deck count by one and reveals only the selected Thunder Dragon to
+the opponent. These tests distinguish the three legal search counts without
+treating the strategically poor zero-copy choice as a rules error.
+The two-copy search followed by a no-copy Deck verification now receives the
+same complete-duel replay and visibility checks.
 
 The same [period Thunder Dragon FAQ](https://www.goatformat.com/rulings7.html)
 explicitly permits discarding an opponent-owned copy obtained with Exchange

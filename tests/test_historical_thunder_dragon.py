@@ -17,8 +17,10 @@ BANISHER_OF_THE_LIGHT = 61528025
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("zero_action", ["select_cards", "cancel"])
-def test_thunder_dragon_may_choose_zero_with_copies_remaining(tmp_path, zero_action):
+@pytest.mark.parametrize("search_count,choice_kind", [
+    (0, "select_cards"), (0, "cancel"), (1, "select_card")])
+def test_thunder_dragon_zero_or_one_with_copies_remaining(
+        tmp_path, search_count, choice_kind):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     if not (root / f"scripts/goat/c{THUNDER_DRAGON}.lua").is_file():
         pytest.skip("GOAT Thunder Dragon script not installed")
@@ -28,7 +30,7 @@ def test_thunder_dragon_may_choose_zero_with_copies_remaining(tmp_path, zero_act
     with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=4,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
-        activated = selected_zero = False
+        activated = selected_choice = checked = False
         for _ in range(12):
             actions = env.legal_actions()
             action = None
@@ -36,24 +38,47 @@ def test_thunder_dragon_may_choose_zero_with_copies_remaining(tmp_path, zero_act
                 action = next((a for a in actions if a.kind == "activate"
                                and a.parameters.get("code") == THUNDER_DRAGON), None)
                 activated |= action is not None
-            if activated and any(a.kind == "select_cards" for a in actions):
+            if activated and not selected_choice and any(
+                    a.kind == "select_cards" for a in actions):
                 assert any(len(a.parameters.get("cards", ())) == 2
                            for a in actions if a.kind == "select_cards")
-                action = next(a for a in actions if a.kind == zero_action
-                              and not a.parameters.get("cards"))
-                selected_zero = True
+                action = next(a for a in actions if a.kind == choice_kind
+                              and (search_count == 1 or not a.parameters.get("cards")))
+                selected_choice = True
             if action is None:
                 action = next((a for a in actions if a.kind == "pass"), actions[0])
             obs = env.step(action)
-            if selected_zero and sum(c.code == THUNDER_DRAGON
-                                     for c in obs.graveyards[0]) == 1:
+            if selected_choice and sum(c.code == THUNDER_DRAGON
+                                       for c in obs.graveyards[0]) == 1:
                 own = env.engine.probe.observation(0)
                 other = env.engine.probe.observation(1)
-                assert own.deck_counts[0] == 34
-                assert len(own.hand) == 5
-                assert not other.private_reveals
-                return
-    pytest.fail("Thunder Dragon zero-copy option did not resolve")
+                assert own.deck_counts[0] == 34 - search_count
+                assert len(own.hand) == 5 + search_count
+                assert len(other.private_reveals) == search_count
+                assert not own.private_reveals
+                if search_count:
+                    assert other.known_opponent_hand_cards == (THUNDER_DRAGON,)
+                    assert [card.code for card in other.private_reveals[0].cards] == [
+                        THUNDER_DRAGON]
+                checked = True
+                break
+        assert checked, "Thunder Dragon selected search count did not resolve"
+        fallback = (RandomAgent(401), RandomAgent(402))
+        for _ in range(5000):
+            if env.is_terminal():
+                break
+            obs = env.step(fallback[obs.acting_player].select_action(
+                obs, env.legal_actions()))
+        assert env.is_terminal(), "Thunder Dragon duel did not finish"
+        trajectory = env.trajectory()
+    path = tmp_path / f"thunder_search_{search_count}_{choice_kind}.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, ExperimentalOcgcoreEngine(root)) == len(
+        trajectory.decisions)
+    assert audit_trajectory_visibility(loaded)["decisions"] == len(
+        trajectory.decisions)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -108,8 +133,25 @@ def test_thunder_dragon_two_then_zero_and_opponent_verification(tmp_path):
                 assert not own.private_reveals
                 assert f"goat/c{THUNDER_DRAGON}.lua" in (
                     env.engine.probe.loaded_script_sha256)
-                return
-    pytest.fail("Thunder Dragon two-copy and zero-copy searches did not resolve")
+                break
+        else:
+            pytest.fail("Thunder Dragon two-copy and zero-copy searches did not resolve")
+        fallback = (RandomAgent(411), RandomAgent(412))
+        for _ in range(5000):
+            if env.is_terminal():
+                break
+            obs = env.step(fallback[obs.acting_player].select_action(
+                obs, env.legal_actions()))
+        assert env.is_terminal(), "Thunder Dragon two-then-zero duel did not finish"
+        trajectory = env.trajectory()
+    path = tmp_path / "thunder_two_then_zero.json"
+    write_trajectory(path, trajectory)
+    loaded = read_trajectory(path)
+    assert loaded == trajectory
+    assert verify_trajectory(loaded, ExperimentalOcgcoreEngine(root)) == len(
+        trajectory.decisions)
+    assert audit_trajectory_visibility(loaded)["decisions"] == len(
+        trajectory.decisions)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
