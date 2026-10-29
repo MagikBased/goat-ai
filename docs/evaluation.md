@@ -1,5 +1,45 @@
 # Baseline evaluation log
 
+## Matched complete-replay own-card-loss audit (29 October 2026)
+
+To test whether the optional visible own-loss guard changes the actual mistakes
+seen in play, we re-recorded its policy against Tactical-v14 on the same 16
+seed, seat, and deck assignments as the earlier unguarded v23 review set
+(99900–99907). All 16 guarded duels reached terminal, passed exact native
+replay and visibility verification, and had every guarded policy choice
+reproduced by the replay auditor. Both sets use the same v23 checkpoint;
+the only inference difference is `greedy_own_loss_guard_v1`.
+
+| Inference | Reproduced policy choices | Clear visible own-card-loss review flags | Policy wins vs Tactical |
+| --- | ---: | ---: | ---: |
+| Unguarded v23 | 4,068 | 6 (five own-only Nobleman, one Breaker on own back row) | 4/16 |
+| Guarded v23 | 4,633 | 0 | 3/16 |
+
+The guarded trajectories contained 16 distinct turn/phase opportunities to
+activate Nobleman with only a friendly Set monster, versus 12 in the parent
+trajectories; none were taken by the guarded policy. The opportunity counts
+and decision totals differ because the policies visited different states.
+This is evidence that the guard eliminates *these audited failure types* in
+complete games, not that it prevents every bad trade. The guarded set still
+had one unrelated flag: it chained MST to a resolving one-shot Spell, which
+does not negate that Spell. The 16-game win count is too small to infer a
+strength gain and went the other direction. The separate 256-duel held-out
+comparison below is the better strength estimate: 144–112 against the same
+unguarded checkpoint, and 95 versus 81 matched wins against Tactical-v14.
+Keep the neural checkpoint unchanged until learned improvements pass a
+complete-duel held-out gate.
+
+Ignored verified audit artifacts are
+`.cache/goat-ai/own_card_parent_review_99900_99907/audit.json` (SHA-256
+`e6963138e2cafc4dc61cf00c26b5323b2c58e944ff4a13211bde406b58cdcc58`)
+and `.cache/goat-ai/own_loss_guard_matched_99900_99907/audit.json` (SHA-256
+`24ef21d3692fe63880447066b195ff84864e93e144c71d65f20f6706199f501e`).
+The latter directory contains the 16 replay-verified guarded trajectories.
+Reproduce an individual duel with `scripts.record_policy_match --own-loss-guard`
+using the source replay's `decks`, `seed`, and `demonstrator_seat`; run
+`scripts.audit_policy_replays` on the resulting trajectories with the pinned
+v23 checkpoint to reproduce the counts.
+
 ## Single-position own-loss branch outcomes (29 October 2026)
 
 The seven recorded selected-policy actions filtered by the expanded own-loss

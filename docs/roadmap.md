@@ -2506,3 +2506,10 @@ reduced held-out fixed-state guard violations from seven to four, but scored
 63–65 directly against its v23 parent on 128 unseen-deck games. Its matched
 Tactical gain was inconclusive. Keep the inference guard for local play and
 continue pursuing a learned policy with a verified complete-duel gain.
+A [matched complete-replay audit](evaluation.md#matched-complete-replay-own-card-loss-audit-29-october-2026)
+found zero of six previously observed clear own-card-loss flags in 16 guarded
+duels on the same seeds, seats, decks, and checkpoint. It also found an MST
+chained to a resolving one-shot Spell; this narrower behavioral improvement
+does not imply a general card-advantage model. The small sample scored 3/16
+guarded wins against Tactical versus 4/16 unguarded; use the larger 256-duel
+study for the existing guard's strength estimate.
