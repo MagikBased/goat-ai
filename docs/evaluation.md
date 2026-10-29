@@ -1,5 +1,33 @@
 # Baseline evaluation log
 
+## Wider own-loss filter versus the selected policy (29 October 2026)
+
+The optional v6 own-loss inference filter defers more own-only activations and
+isolated own one-shot Mystical Space Typhoon responses than v1. A fresh direct
+comparison used the same frozen feature-v23 checkpoint in both seats: v6
+versus v1, with a v1-versus-v1 control. Four 2005 Main Deck pairings
+(Theeresak/Phoenix, Bryan/Mary, Rhymus/Charlotte, Ramon/Christian), both
+deck assignments, both policy seats, and seeds 105200–105207 produced **128
+complete duels per arm**. The report comparator verified equal native assets,
+card scripts, source, schedules, opponent settings, and Main Deck compositions
+absent from checkpoint training.
+
+V6 scored **64–64** directly against v1; the matched v1 control also scored
+**64–64**. Three matched outcomes flipped from loss to win, three from win to
+loss, and 122 stayed the same. The paired score difference was **0 percentage
+points**, with a 95% paired bootstrap interval of **−3.125 to +3.125 points**.
+This does not show a strength gain and does not evaluate whether the neural
+policy learned the concept. Keep v6 experimental. The ignored reports are
+`.cache/goat-ai/own_loss_v6_vs_v1_105200_105207.json` (SHA-256
+`704fc033493e044ec2dcec2b88cb2005a115bd83671ac69b8d43b9c26f13cc5c`)
+and `.cache/goat-ai/own_loss_v1_control_105200_105207.json` (SHA-256
+`3553c023c2e76f8f8a4e626f6cf70d5c317aabcb7beca28dc27a3fcbef36c7cc`).
+Run `scripts/evaluate_policy.py` with `--own-loss-guard-version 6` or `1`,
+`--opponent-checkpoint` set to the same v23 checkpoint, opponent guard v1,
+`--both-deck-assignments --require-unseen-main-decks --seed 105200 --seeds 8`,
+and the four listed matchups; compare using
+`scripts/compare_tournament_reports.py --require-unseen-main-decks`.
+
 ## Idle own-only Ring inference experiment (29 October 2026)
 
 The selected feature-v23 checkpoint is unchanged. An opt-in own-loss guard v3
