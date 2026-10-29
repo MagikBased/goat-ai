@@ -1,5 +1,31 @@
 # Early replay decision audit
 
+## Fresh own-card cases added to the combined queue (29 October 2026)
+
+The [updated local review queue](../.cache/goat-ai/own_removal_combined_queue_20261029_v2.html)
+contains **55** distinct decisions: the earlier 51 plus four fresh cases from
+64 selected-v23/v1-guarded policy-versus-Tactical games. The new cases are two
+optional Ring of Destruction activations with only friendly face-up targets,
+one Ring own-target choice while an opposing target was offered, and one
+Tribe-Infecting Virus Type declaration that would hit only friendly monsters
+despite an opposing option. The queue builder verified all **46** source
+replays and **31,983** decisions with the pinned native engine and visibility
+audit. Queue SHA-256:
+`75d8ea7433acc7083f348c9e350f200b036f0eb42043a8d4401e870490ce68a9`.
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/own_removal_combined_queue_20261029_v2.json
+```
+
+The four additions are candidates, not accepted labels. The earlier combined
+queue had no saved labels when v2 was built. The new queue does not import
+labels from its component queues. Rebuild it with `scripts/combine_review_queues.py`
+using `own_removal_combined_queue_20261029.json` and
+`own_card_fresh_review_124100_124215/queue.json` as inputs and the v2 JSON
+path as output. The fresh queue was created from the four flagged source
+replays with `scripts/shortlist_policy_disagreements.py` and the three named
+`--focus-audit-category` values.
+
 ## Combined own-card decision review (29 October 2026)
 
 A [single local queue](../.cache/goat-ai/own_removal_combined_queue_20261029.html)

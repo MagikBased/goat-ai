@@ -2635,3 +2635,9 @@ includes 50%. This does not close M4 or address the broader own-card removal
 failure. Prioritize explicit human review of activation and target choices,
 then evaluate the resulting policy for fewer verified own-card losses and a
 complete-duel strength gain. Keep the selected v23/v1 checkpoint meanwhile.
+The [fresh own-card baseline](evaluation.md#fresh-own-card-decision-baseline-29-october-2026)
+verified 64 complete selected-policy duels and found four remaining visible
+own-card flags, including two negative-material idle Ring activations. Those
+four decisions have been added to the single 55-item local review queue.
+Human choices in that queue, followed by held-out replay-error and duel-win
+checks, are the next M4 evidence needed; the flags alone are not labels.

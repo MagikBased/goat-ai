@@ -1,5 +1,40 @@
 # Baseline evaluation log
 
+## Fresh own-card decision baseline (29 October 2026)
+
+We independently audited the 64 complete selected-v23/v1-guarded policy
+replays from the two seed-124100–124115 and seed-124200–124215 Thunder
+on-policy batches. Native replay, player-visibility, checkpoint provenance,
+and all **15,966** policy choices verified. The visible audit found **four**
+distinct own-card review flags in **5,731** multi-action policy decisions:
+two idle own-only Ring activations, one Ring target on a friendly monster with
+an opposing option, and one Tribe Type choice hitting only friendly monsters
+with an opposing option. The two idle Ring activations each closed with a
+negative observed material change and no intervening activation. This is a
+single Deck pairing and a flagged-pattern rate, not an optimal-play error
+rate or a cross-archetype estimate.
+
+The same trajectories offered 51 distinct turn/phase opportunities for Heavy
+Storm with only friendly back row, 25 for Nobleman with only a friendly Set
+monster, 15 for idle own-only MST, ten for an owned Chaos boss effect without
+an opposing monster, four for Breaker with only friendly back row, and four
+for idle own-only Ring. The policy took two of the four Ring opportunities
+and none of those other flagged opportunities. This shows that the v1 guard
+prevents many previously seen mistakes in this sample while own-card choices
+still occur. It does not establish competitive strength or generalize to all
+target and timing decisions.
+
+Ignored reports:
+`.cache/goat-ai/own_card_full_audit_124100_124215.json` (SHA-256
+`b2eb73eca6f1f62533a165f7d4e5cac1cb5909c84a217e59ad67dc05f7810d2b`)
+and `.cache/goat-ai/own_card_risks_124100_124215.json` (SHA-256
+`accb28c3f5fae6d1169876e4e80d46d45c9fa74e2d09eed32e0ffc73e3752323`).
+Reproduce them with `scripts/audit_policy_replays.py` and
+`scripts/audit_own_card_risks.py` respectively over both complete batches,
+supplying the selected checkpoint and pinned native root. The four flagged
+decisions are in the [updated review queue](replay_audit.md#fresh-own-card-cases-added-to-the-combined-queue-29-october-2026)
+for independent human judgment before they become training data.
+
 ## On-policy staged Thunder Dragon correction (29 October 2026)
 
 To test whether fresh policy states transfer better than the earlier six-label
