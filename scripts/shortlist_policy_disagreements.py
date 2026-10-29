@@ -99,11 +99,27 @@ def optional_upstream_activation(trajectory, forced_index: int) -> int | None:
         if prior.observation.turn != forced.observation.turn:
             break
         if (prior.observation.acting_player == forced.observation.acting_player
-                and prior.selected_action.kind in ("activate", "chain")
-                and prior.selected_action.parameters.get("code") == source.card_code
+                and activation_matches_chain_source(prior.selected_action, source)
                 and any(action.kind == "pass" for action in prior.legal_actions)):
             return prior_index
     return None
+
+
+def activation_matches_chain_source(action, source) -> bool:
+    """Match a visible effect activation to its chain link when slots are known.
+
+    An activation from hand can move to the Spell/Trap Zone before the chain
+    prompt, so its action location need not equal the link's final location.
+    A field activation retains its slot, which disambiguates same-name cards.
+    """
+    if (action.kind not in ("activate", "chain")
+            or action.parameters.get("code") != source.card_code
+            or action.actor != source.controller):
+        return False
+    location = action.parameters.get("location")
+    return (location != source.location
+            or action.parameters.get("sequence") is None
+            or action.parameters["sequence"] == source.sequence)
 
 
 def write_review_index(selected: list[dict], output: Path,

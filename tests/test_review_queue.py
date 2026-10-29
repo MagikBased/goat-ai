@@ -12,6 +12,7 @@ import pytest
 from goat_ai.actions import Action
 from scripts.refresh_review_queue import refresh_review_queue
 from scripts.shortlist_policy_disagreements import (
+    activation_matches_chain_source,
     optional_upstream_activation,
     select_diverse_candidates,
     write_review_index,
@@ -71,7 +72,8 @@ def test_forced_own_target_review_returns_to_optional_activation():
     prior_view = SimpleNamespace(turn=4, acting_player=1)
     forced_view = SimpleNamespace(
         turn=4, acting_player=1,
-        chain=(SimpleNamespace(card_code=breaker),),
+        chain=(SimpleNamespace(card_code=breaker, controller=1,
+                               location=4, sequence=2),),
     )
     replay = SimpleNamespace(decisions=(
         SimpleNamespace(observation=prior_view, selected_action=activate,
@@ -82,6 +84,34 @@ def test_forced_own_target_review_returns_to_optional_activation():
     assert optional_upstream_activation(replay, 1) == 0
     replay.decisions[0].legal_actions = (activate,)
     assert optional_upstream_activation(replay, 1) is None
+
+
+def test_upstream_effect_link_distinguishes_unrelated_and_same_name_activations():
+    source = SimpleNamespace(card_code=5318639, controller=0,
+                             location=8, sequence=2)
+    def action(code, slot):
+        return Action(str(slot), "chain", 0,
+                      {"code": code, "location": 8, "sequence": slot})
+    assert activation_matches_chain_source(action(5318639, 2), source)
+    assert not activation_matches_chain_source(action(5318639, 1), source)
+    assert not activation_matches_chain_source(action(14087893, 2), source)
+    # Activating from hand moves the card to the public Spell/Trap Zone.
+    assert activation_matches_chain_source(Action(
+        "hand", "activate", 0, {"code": 5318639, "location": 2,
+                                  "sequence": 0}), source)
+    pass_action = Action("pass", "pass", 0)
+    target = Action("target", "select_card", 0)
+    view = SimpleNamespace(turn=3, acting_player=0)
+    forced = SimpleNamespace(turn=3, acting_player=0, chain=(source,))
+    replay = SimpleNamespace(decisions=(
+        SimpleNamespace(observation=view, selected_action=action(5318639, 2),
+                        legal_actions=(action(5318639, 2), pass_action)),
+        SimpleNamespace(observation=view, selected_action=action(14087893, 3),
+                        legal_actions=(action(14087893, 3), pass_action)),
+        SimpleNamespace(observation=forced, selected_action=target,
+                        legal_actions=(target,)),
+    ))
+    assert optional_upstream_activation(replay, 2) == 0
 
 
 def test_review_queue_can_rank_raw_logit_gaps_without_changing_default():

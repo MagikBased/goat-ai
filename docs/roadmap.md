@@ -708,6 +708,12 @@ reviews without changing either queue or silently counting a forced target as
 approval of the activation. Conflicting labels are rejected; only changed
 choices become pairwise preferences. Human data volume and independent review
 quality remain the M3/M4 bottlenecks.
+When a reviewed target prompt exposes its resolving chain link, the automatic
+upstream queue now matches earlier optional activations by public effect code,
+controller, and stable field slot. This prevents a later unrelated activation
+in the same turn from being suggested as the cause of an own-card target.
+If no chain link remains, earlier activations are still only review candidates;
+the reviewer must confirm the causal link before making a training label.
 
 A new `examples/play_goat.py` path records a local human seat on arbitrary
 validated GOAT YDK Decks against a Random, Tactical, or saved policy opponent.

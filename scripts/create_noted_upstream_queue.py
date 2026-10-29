@@ -14,7 +14,10 @@ from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from scripts.create_upstream_review import upstream_candidate
 from scripts.serve_review_queue import ROOT, ReviewStore
-from scripts.shortlist_policy_disagreements import write_review_index
+from scripts.shortlist_policy_disagreements import (
+    activation_matches_chain_source,
+    write_review_index,
+)
 from scripts.validate_review_queue_labels import queue_sources, verify_queue_items
 
 
@@ -56,6 +59,7 @@ def create_noted_upstream_queue(queue_path: Path, output: Path, native_root: Pat
             reviewed[digest] = trajectory
         trajectory = reviewed[digest]
         target = trajectory.decisions[item["decision_index"]].observation
+        source = target.chain[-1] if target.chain else None
         found = 0
         for prior_index in range(item["decision_index"] - 1, -1, -1):
             prior = trajectory.decisions[prior_index]
@@ -65,7 +69,8 @@ def create_noted_upstream_queue(queue_path: Path, output: Path, native_root: Pat
             if (observation.turn != target.turn
                     or observation.acting_player != target.acting_player
                     or prior.selected_action.kind not in ("activate", "chain")
-                    or prior.selected_action.kind == "pass"
+                    or source is not None and not activation_matches_chain_source(
+                        prior.selected_action, source)
                     or sum(action.kind == "pass" for action in prior.legal_actions) != 1):
                 continue
             key = (digest, prior_index)

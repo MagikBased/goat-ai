@@ -1,11 +1,12 @@
 """Earlier mistakes are reviewed without changing a forced-choice queue."""
 
 import json
+from dataclasses import replace
 
 import pytest
 
 from goat_ai.actions import Action
-from goat_ai.observations import Observation
+from goat_ai.observations import ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from scripts import create_noted_upstream_queue, create_upstream_review
@@ -121,6 +122,42 @@ def test_saved_upstream_note_builds_separate_unlabeled_queue(tmp_path, monkeypat
     assert "MST should have stayed unactivated" in output.with_suffix(".html").read_text()
     assert source_store.progress()["choices"] == []
     assert ReviewStore(output, tmp_path / "upstream_labels").progress()["choices"] == []
+
+
+def test_noted_upstream_queue_links_note_to_matching_effect(tmp_path, monkeypatch):
+    queue, replay, _, trajectory = _source_queue(tmp_path)
+    initial, target = trajectory.decisions
+    mst = replace(initial.selected_action, parameters={
+        "code": 5318639, "location": 8, "sequence": 2})
+    initial = replace(initial, selected_action=mst,
+                      legal_actions=(mst, initial.legal_actions[1]))
+    book = Action("book", "chain", 0, {"code": 14087893,
+                                      "location": 8, "sequence": 3})
+    unrelated = DecisionRecord(initial.observation,
+                               (book, initial.legal_actions[1]), book)
+    source = ChainLinkView(1, 5318639, 0, 8, 2)
+    target = replace(target, observation=replace(
+        target.observation, chain=(source,)))
+    write_trajectory(replay, replace(trajectory, schema_version=2,
+                                     decisions=(initial, unrelated, target)))
+    digest = sha256_file(replay)
+    listing = json.loads(queue.read_text())
+    listing["selected"][0].update(trajectory_sha256=digest, decision_index=2,
+                                    viewer_frame=3, legal_action_count=2)
+    queue.write_text(json.dumps(listing))
+    labels = tmp_path / "source_labels"
+    ReviewStore(queue, labels).save_note(digest, 2, "upstream_mistake",
+                                         "MST activation was the mistake")
+    monkeypatch.setattr(create_noted_upstream_queue, "ExperimentalOcgcoreEngine",
+                        lambda root: None)
+    monkeypatch.setattr(create_noted_upstream_queue, "verify_trajectory", lambda *a: 3)
+    monkeypatch.setattr(create_noted_upstream_queue, "audit_trajectory_visibility",
+                        lambda *a: {"decisions": 3})
+    output = tmp_path / "noted_upstream.json"
+    create_noted_upstream_queue.create_noted_upstream_queue(
+        queue, output, tmp_path / "native", labels_dir=labels)
+    assert [item["decision_index"] for item in json.loads(output.read_text())[
+        "selected"]] == [0]
 
 
 def test_noted_upstream_queue_requires_a_saved_note(tmp_path):
