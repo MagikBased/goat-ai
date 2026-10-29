@@ -456,6 +456,10 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 except (ValueError, KeyError, TypeError, OSError) as error:
                     self._json(400, {"error": str(error)})
                 return
+            if parsed.path == "/api/review/identity":
+                self._json(200, {"queue_sha256": store.queue_sha256,
+                                 "reviewer": store.reviewer_alias})
+                return
             target = Path(self.translate_path(self.path)).resolve()
             queue_html = (queue is not None and target.is_relative_to(queue.parent)
                           and target.suffix == ".html")
@@ -473,7 +477,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
         def do_POST(self) -> None:
             endpoint = urlsplit(self.path).path
             if endpoint not in ("/api/review/choice", "/api/review/bookmark",
-                                "/api/review/note", "/api/games", "/api/games/review",
+                                "/api/review/note", "/api/review/upstream",
+                                "/api/games", "/api/games/review",
                                 "/api/live/start", "/api/live/choice",
                                 "/api/live/close"):
                 self._json(404, {"error": "unknown endpoint"})
@@ -506,6 +511,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                             if endpoint == "/api/review/choice" else
                             {"source", "decision_index", "bookmarked"}
                             if endpoint == "/api/review/bookmark" else
+                            {"source", "decision_index"}
+                            if endpoint == "/api/review/upstream" else
                             {"source", "decision_index", "kind", "text"})
                 if not isinstance(data, dict) or set(data) != expected:
                     raise ValueError("invalid review payload")
@@ -527,6 +534,23 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 elif endpoint == "/api/review/bookmark":
                     result = store.bookmark(data["source"], data["decision_index"],
                                             data["bookmarked"])
+                elif endpoint == "/api/review/upstream":
+                    from scripts.create_upstream_review import create_upstream_review
+                    digest, index = data["source"], data["decision_index"]
+                    store.label_path(digest)
+                    if type(index) is not int:
+                        raise ValueError("invalid upstream decision index")
+                    item_number = next((number for number, item in
+                                        enumerate(store.queue["selected"], 1)
+                                        if item["trajectory_sha256"] == digest
+                                        and item["decision_index"] == index), None)
+                    if item_number is None:
+                        raise ValueError("decision is absent from this queue")
+                    upstream = queue.parent / f"upstream_{item_number}.json"
+                    create_upstream_review(queue, item_number, None, upstream,
+                                           creator.native_root)
+                    result = {"url": launch(upstream, open_browser=False,
+                                            reviewer_alias=store.reviewer_alias)}
                 else:
                     result = store.save_note(data["source"], data["decision_index"],
                                              data["kind"], data["text"])

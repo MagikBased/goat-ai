@@ -77,6 +77,29 @@ def test_upstream_queue_preserves_target_labels_and_offers_pass(tmp_path, monkey
         upstream_store.choose(digest, 1, 0)
 
 
+def test_upstream_queue_finds_matching_activation_automatically(tmp_path,
+                                                                 monkeypatch):
+    queue, replay, _, trajectory = _source_queue(tmp_path)
+    target = trajectory.decisions[1]
+    source = ChainLinkView(1, 5318639, 0, 8, 0)
+    target = replace(target, observation=replace(
+        target.observation, chain=(source,)))
+    write_trajectory(replay, replace(trajectory, schema_version=2,
+                                     decisions=(trajectory.decisions[0], target)))
+    listing = json.loads(queue.read_text())
+    listing["selected"][0]["trajectory_sha256"] = sha256_file(replay)
+    queue.write_text(json.dumps(listing))
+    monkeypatch.setattr(create_upstream_review, "ExperimentalOcgcoreEngine",
+                        lambda root: None)
+    monkeypatch.setattr(create_upstream_review, "verify_trajectory", lambda *a: 2)
+    monkeypatch.setattr(create_upstream_review, "audit_trajectory_visibility",
+                        lambda *a: {"decisions": 2})
+    output = tmp_path / "upstream.json"
+    create_upstream_review.create_upstream_review(
+        queue, 1, None, output, tmp_path / "native")
+    assert json.loads(output.read_text())["selected"][0]["decision_index"] == 0
+
+
 def test_upstream_review_rejects_invalid_index_and_original_output(tmp_path,
                                                                     monkeypatch):
     queue, _, _, _ = _source_queue(tmp_path)

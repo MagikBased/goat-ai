@@ -714,6 +714,10 @@ controller, and stable field slot. This prevents a later unrelated activation
 in the same turn from being suggested as the cause of an own-card target.
 If no chain link remains, earlier activations are still only review candidates;
 the reviewer must confirm the causal link before making a training label.
+The local review bar can now create and open a separate, replay-verified
+upstream activation queue with one click. The launcher checks the exact queue
+hash and reviewer alias before reusing a running save server, so labels stay
+attached to the intended review source.
 
 A new `examples/play_goat.py` path records a local human seat on arbitrary
 validated GOAT YDK Decks against a Random, Tactical, or saved policy opponent.

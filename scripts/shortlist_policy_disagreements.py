@@ -91,10 +91,18 @@ def disagreement_fingerprint(record, teacher_action) -> tuple:
 def optional_upstream_activation(trajectory, forced_index: int) -> int | None:
     """Find the avoidable activation behind a forced effect-choice prompt."""
     forced = trajectory.decisions[forced_index]
-    if len(forced.legal_actions) != 1 or not forced.observation.chain:
+    if len(forced.legal_actions) != 1:
+        return None
+    return matching_upstream_activation(trajectory, forced_index)
+
+
+def matching_upstream_activation(trajectory, target_index: int) -> int | None:
+    """Find the nearest optional activation matching a visible chain source."""
+    forced = trajectory.decisions[target_index]
+    if not forced.observation.chain:
         return None
     source = forced.observation.chain[-1]
-    for prior_index in range(forced_index - 1, max(-1, forced_index - 65), -1):
+    for prior_index in range(target_index - 1, max(-1, target_index - 65), -1):
         prior = trajectory.decisions[prior_index]
         if prior.observation.turn != forced.observation.turn:
             break
@@ -251,8 +259,9 @@ def write_review_index(selected: list[dict], output: Path,
             " manual label download. <strong>Reveal all cards</strong> opens a separate inspection"
             " view with hidden cards shown; labeling is disabled there.</li>"
             "<li>If the bad play happened earlier, choose <strong>The earlier action was the mistake</strong>"
-            " in Review finding and save a note. This does not endorse a legal action at the"
-            " current prompt or become a training label.</li>"
+            " in Review finding and save a note. Use <strong>Review earlier activation</strong>"
+            " to open its own legal-action review in the local server. The note alone"
+            " does not become a training label.</li>"
             "<li>If the recorded action itself is clearly bad but no replacement is known,"
             " choose <strong>Reject the AI's recorded action</strong> and save the note."
             " This is a negative-only review for later validation and training.</li>"
@@ -277,6 +286,7 @@ def write_review_index(selected: list[dict], output: Path,
             "<span id=\"stage-label-status\"></span>"
             "<button id=\"next-item\" type=\"button\">Next item</button>"
             "<button id=\"toggle-reveal\" type=\"button\">Reveal all cards</button>"
+            "<button id=\"review-upstream\" type=\"button\" disabled>Review earlier activation</button>"
             "<button id=\"stage-bookmark\" type=\"button\" hidden>Bookmark</button>"
             "<span class=\"stage-title\" id=\"stage-title\"></span>"
             "<a id=\"open-tab\" target=\"_blank\" rel=\"noopener\">Open in new tab</a>"
@@ -317,6 +327,7 @@ def write_review_index(selected: list[dict], output: Path,
             "document.getElementById('labeled-filter').hidden=false;"
             "document.getElementById('stage-label-status').textContent="
             "current<0?'':reviewStatus(items[current]);"
+            "document.getElementById('review-upstream').disabled=current<0||!progressMode;"
             "applyFilters();if(current>=0)updateNavigation();}"
             "async function loadProgress(){if(location.protocol!=='http:'||"
             "!['127.0.0.1','localhost'].includes(location.hostname))return;"
@@ -398,6 +409,7 @@ def write_review_index(selected: list[dict], output: Path,
             "updateBookmarks();"
             "document.getElementById('stage-label-status').textContent="
             "progressMode?reviewStatus(items[i]):'';"
+            "document.getElementById('review-upstream').disabled=!progressMode;"
             "document.getElementById('open-tab').href=url;"
             "updateNavigation();"
             "const toggle=document.getElementById('toggle-reveal');"
@@ -419,6 +431,15 @@ def write_review_index(selected: list[dict], output: Path,
             "document.getElementById('next-item').onclick=()=>openItem(neighbor(1),mode);"
             "document.getElementById('toggle-reveal').onclick=()=>openItem(current,"
             "mode==='reveal'?'visible':'reveal');"
+            "document.getElementById('review-upstream').onclick=async()=>{"
+            "if(current<0||!progressMode||!await mayLeave())return;"
+            "const button=document.getElementById('review-upstream');button.disabled=true;"
+            "try{const item=items[current];const response=await fetch('/api/review/upstream',{"
+            "method:'POST',headers:{'Content-Type':'application/json'},"
+            "body:JSON.stringify({source:item.source,decision_index:item.decision_index})});"
+            "const data=await response.json();if(!response.ok)throw Error(data.error||"
+            "'Earlier activation review unavailable');location.assign(data.url);"
+            "}catch(error){alert(error.message);button.disabled=false;}};"
             "document.getElementById('queue-search').oninput=applyFilters;"
             "document.getElementById('show-labeled').onchange=()=>{applyFilters();"
             "if(current>=0)updateNavigation();};"

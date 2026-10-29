@@ -1,6 +1,7 @@
 """Open a local review queue or AI game creator with its save-enabled server."""
 
 import argparse
+import hashlib
 import json
 import os
 import socket
@@ -49,7 +50,9 @@ def port_in_use(port: int) -> bool:
         return probe.connect_ex(("127.0.0.1", port)) == 0
 
 
-def server_healthy(port: int, source: str | None) -> bool:
+def server_healthy(port: int, source: str | None,
+                   reviewer_alias: str = "local-reviewer",
+                   queue_hash: str | None = None) -> bool:
     try:
         # A running process keeps its imported code after the files change.
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/review/version",
@@ -95,7 +98,15 @@ def server_healthy(port: int, source: str | None) -> bool:
         with urllib.request.urlopen(
                 f"http://127.0.0.1:{port}/api/review/notes?source={source}",
                 timeout=5) as response:
-            return response.status == 200
+            if response.status != 200:
+                return False
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/api/review/identity",
+                timeout=5) as response:
+            identity = json.load(response)
+            return (response.status == 200
+                    and identity.get("reviewer") == reviewer_alias
+                    and (queue_hash is None or identity.get("queue_sha256") == queue_hash))
     except (urllib.error.URLError, ValueError, OSError):
         return False
 
@@ -106,11 +117,13 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def launch(queue: Path | None, *, open_browser: bool = True,
-           page: str = "queue") -> str:
+           page: str = "queue", reviewer_alias: str = "local-reviewer") -> str:
     if page not in ("queue", "games"):
         raise ValueError("unknown server page")
     if queue is None and page != "games":
         raise ValueError("a review page requires a queue")
+    if not reviewer_alias.strip():
+        raise ValueError("reviewer alias must be nonempty")
     if queue is not None:
         queue = queue.resolve()
         if not queue.is_file() or not queue.is_relative_to(ROOT):
@@ -121,9 +134,11 @@ def launch(queue: Path | None, *, open_browser: bool = True,
         if not isinstance(selected, list) or not selected:
             raise ValueError("review queue has no selected decisions")
         source = selected[0]["trajectory_sha256"]
+        queue_hash = hashlib.sha256(queue.read_bytes()).hexdigest()
         route = "/" + queue.with_suffix(".html").relative_to(ROOT).as_posix()
     else:
         source = None
+        queue_hash = None
         route = "/games/new"
     open_route = "/games/new" if page == "games" else route
     # Reuse a compatible server before claiming a free lower port. Reviewers
@@ -131,7 +146,7 @@ def launch(queue: Path | None, *, open_browser: bool = True,
     for port in reversed(PORTS):
         existing = server_queue(port)
         if (existing == route or (queue is None and existing is not None)) and server_healthy(
-                port, source):
+                port, source, reviewer_alias, queue_hash):
             url = f"http://127.0.0.1:{port}{open_route}"
             if open_browser:
                 webbrowser.open(url)
@@ -144,9 +159,15 @@ def launch(queue: Path | None, *, open_browser: bool = True,
         env["PYTHONPATH"] = os.pathsep.join((str(ROOT / "src"), str(ROOT),
                                              env.get("PYTHONPATH", "")))
         with LOG.open("ab") as log:
+            alias_args = ([] if reviewer_alias == "local-reviewer" or queue is None else [
+                "--reviewer-alias", reviewer_alias,
+                "--output-dir", str(ROOT / ".cache/goat-ai/review_labels" /
+                                    (queue_hash[:12] + "_" +
+                                     hashlib.sha256(reviewer_alias.encode()).hexdigest()[:8]))])
             child = subprocess.Popen(
                 [sys.executable, str(ROOT / "scripts/serve_review_queue.py"),
-                 *([str(queue)] if queue is not None else []), "--port", str(port)],
+                 *([str(queue)] if queue is not None else []), "--port", str(port),
+                 *alias_args],
                 cwd=ROOT, env=env, stdin=subprocess.DEVNULL,
                 stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         for _ in range(40):

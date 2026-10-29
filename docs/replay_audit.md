@@ -124,6 +124,15 @@ PYTHONPATH=src:. .venv/bin/python scripts/create_upstream_review.py \
   --native-root .cache/goat-ai
 ```
 
+The local review server now also offers **Review earlier activation** in the
+queue's replay bar. It finds the nearest optional activation matching the
+visible chain source, replay-verifies the duel, creates the separate upstream
+queue, and opens its save-enabled page. The automatic path recovered item
+#22's MST activation at decision index 73. If the reviewed prompt has no
+visible chain source or matching optional activation, it reports that it
+cannot identify one; use the manual command above when the earlier decision
+is known. The saved source queue and its labels are left intact.
+
 After an upstream choice is saved, both queues' labels for the same replay can
 be validated and converted into **one** preference file with
 `scripts/convert_multi_queue_reviews.py --case ORIGINAL_QUEUE ORIGINAL_LABEL
@@ -275,6 +284,11 @@ note without approving any current legal action. Notes live under the ignored
 carry forward only when the exact replay and decision remain in a rebuilt
 queue. The queue marks these items **Noted** separately from **Labeled** and
 keeps note-only items visible for further review.
+
+For a target prompt with a visible chain source, click **Review earlier
+activation** in the local server's queue bar to create and open a one-item
+upstream review. It uses the same reviewer alias and never treats the note as
+an action label. The server refuses an item outside its current queue.
 
 After saving one or more **earlier action was the mistake** notes, build a
 separate queue of nearby earlier activations from the same replay, turn, and

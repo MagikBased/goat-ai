@@ -12,7 +12,11 @@ from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
-from scripts.shortlist_policy_disagreements import action_summary, write_review_index
+from scripts.shortlist_policy_disagreements import (
+    action_summary,
+    matching_upstream_activation,
+    write_review_index,
+)
 from scripts.validate_review_queue_labels import queue_sources, verify_queue_items
 
 
@@ -47,7 +51,7 @@ def upstream_candidate(trajectory, item: dict, digest: str, replay_path: Path,
     }
 
 
-def create_upstream_review(queue_path: Path, item_number: int, upstream_index: int,
+def create_upstream_review(queue_path: Path, item_number: int, upstream_index: int | None,
                            output: Path, native_root: Path) -> Path:
     """Offer an earlier legal pass as a human-review candidate, not a label."""
     queue_path = queue_path.resolve()
@@ -69,6 +73,11 @@ def create_upstream_review(queue_path: Path, item_number: int, upstream_index: i
     verify_queue_items(trajectory, offered, queue["checkpoint_sha256"])
     verify_trajectory(trajectory, ExperimentalOcgcoreEngine(native_root))
     audit_trajectory_visibility(trajectory)
+    if upstream_index is None:
+        upstream_index = matching_upstream_activation(
+            trajectory, item["decision_index"])
+        if upstream_index is None:
+            raise ValueError("no matching optional activation precedes this review item")
     candidate = upstream_candidate(trajectory, item, digest, replay_path,
                                    queue_path, upstream_index)
     result = {

@@ -166,6 +166,8 @@ def test_review_index_distinguishes_shared_flagged_play_from_disagreement(tmp_pa
     assert "Both agents played:" in html
     assert "Tactical suggests:" not in html
     assert "A flagged play can be one both agents made." in html
+    assert 'id="review-upstream"' in html
+    assert "/api/review/upstream" in html
 
 
 def test_review_index_names_comparison_policy_instead_of_tactical(tmp_path):

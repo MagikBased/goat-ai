@@ -22,7 +22,8 @@ from goat_ai.replay import (
     write_trajectory,
 )
 from goat_ai.replay.fingerprint import sha256_file
-from scripts import convert_rejected_review_notes, launch_review_server, serve_review_queue
+from scripts import (convert_rejected_review_notes, create_upstream_review,
+                     launch_review_server, serve_review_queue)
 from scripts.launch_review_server import server_healthy
 from scripts.render_replay import render_replay
 from scripts.shortlist_policy_disagreements import write_review_index
@@ -78,7 +79,10 @@ def test_launcher_reuses_a_compatible_later_port_before_claiming_a_free_one(
     monkeypatch.setattr(launch_review_server, "server_queue",
                         lambda port: route if port == 8767 else None)
     monkeypatch.setattr(launch_review_server, "server_healthy",
-                        lambda port, source: port == 8767 and source == digest)
+                        lambda port, source, alias, queue_hash: (
+                            port == 8767 and source == digest
+                            and alias == "local-reviewer"
+                            and queue_hash == sha256_file(queue)))
     monkeypatch.setattr(launch_review_server, "port_in_use",
                         lambda port: (_ for _ in ()).throw(AssertionError("must reuse")))
     assert launch_review_server.launch(queue, open_browser=False) == (
@@ -100,14 +104,88 @@ def test_launcher_rejects_running_server_with_old_api(monkeypatch):
     assert called == ["http://127.0.0.1:8765/api/review/version"]
 
 
+def test_upstream_review_api_uses_only_shortlisted_item_and_reviewer(tmp_path,
+                                                                    monkeypatch):
+    queue, _, digest, _ = _queue(tmp_path)
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    calls = []
+
+    def create(source, number, upstream_index, output, native_root):
+        calls.append((source, number, upstream_index, output))
+        output.write_text('{}')
+        output.with_suffix('.html').write_text('<html></html>')
+
+    monkeypatch.setattr(create_upstream_review, "create_upstream_review", create)
+    monkeypatch.setattr(serve_review_queue, "launch", lambda path, **kwargs: (
+        calls.append((path, kwargs)) or 'http://127.0.0.1:8800/upstream_1.html'))
+    server = serve_review_queue.make_server(
+        queue, tmp_path / 'saved', port=0, reviewer_alias='tester')
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f'http://127.0.0.1:{server.server_port}'
+    try:
+        assert _request(f'{base}/api/review/identity')[1] == {
+            'queue_sha256': sha256_file(queue), 'reviewer': 'tester'}
+        payload = {'source': digest, 'decision_index': 0}
+        assert _request(f'{base}/api/review/upstream', payload)[1] == {
+            'url': 'http://127.0.0.1:8800/upstream_1.html'}
+        assert calls == [
+            (queue.resolve(), 1, None, tmp_path / 'upstream_1.json'),
+            (tmp_path / 'upstream_1.json',
+             {'open_browser': False, 'reviewer_alias': 'tester'}),
+        ]
+        for invalid in ({**payload, 'source': 'a' * 64},
+                        {**payload, 'decision_index': 1},
+                        {**payload, 'decision_index': True}):
+            with pytest.raises(HTTPError) as error:
+                _request(f'{base}/api/review/upstream', invalid)
+            assert error.value.code == 400
+        assert len(calls) == 2
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_launcher_reuses_game_server_without_a_queue(monkeypatch):
     monkeypatch.setattr(launch_review_server, "PORTS", range(8765, 8768))
     monkeypatch.setattr(launch_review_server, "server_queue",
                         lambda port: "/games/new" if port == 8767 else None)
     monkeypatch.setattr(launch_review_server, "server_healthy",
-                        lambda port, source: port == 8767 and source is None)
+                        lambda port, source, alias, queue_hash: (
+                            port == 8767 and source is None and queue_hash is None))
     assert launch_review_server.launch(None, open_browser=False, page="games") == (
         "http://127.0.0.1:8767/games/new")
+
+
+def test_launcher_preserves_custom_reviewer_alias_on_new_queue(tmp_path,
+                                                                monkeypatch):
+    queue, _, _, _ = _queue(tmp_path)
+    monkeypatch.setattr(launch_review_server, "ROOT", tmp_path)
+    monkeypatch.setattr(launch_review_server, "LOG", tmp_path / "server.log")
+    monkeypatch.setattr(launch_review_server, "PORTS", range(8765, 8766))
+    attempts = []
+    route = "/queue.html"
+    monkeypatch.setattr(launch_review_server, "server_queue",
+                        lambda port: route if attempts else None)
+    monkeypatch.setattr(launch_review_server, "port_in_use", lambda port: False)
+
+    class Child:
+        def poll(self):
+            return None
+
+    def spawn(command, **kwargs):
+        attempts.append(command)
+        return Child()
+
+    monkeypatch.setattr(launch_review_server.subprocess, "Popen", spawn)
+    assert launch_review_server.launch(
+        queue, open_browser=False, reviewer_alias="reviewer A") == (
+            "http://127.0.0.1:8765/queue.html")
+    assert attempts and "--reviewer-alias" in attempts[0]
+    assert attempts[0][attempts[0].index("--reviewer-alias") + 1] == "reviewer A"
+    folder = attempts[0][attempts[0].index("--output-dir") + 1]
+    assert folder.startswith(str(tmp_path / ".cache/goat-ai/review_labels"))
 
 
 def test_game_creator_page_and_api_reject_unlisted_decks(tmp_path, monkeypatch):
@@ -222,6 +300,10 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
         assert _request(f"{base}/api/live/version")[1] == {"api_version": 2}
         assert launch_review_server.REVIEW_API_VERSION == serve_review_queue.REVIEW_API_VERSION
         assert server_healthy(server.server_port, digest)
+        assert server_healthy(server.server_port, digest,
+                              queue_hash=sha256_file(queue))
+        assert not server_healthy(server.server_port, digest,
+                                  queue_hash="0" * 64)
         assert _request(f"{base}/api/review/state?source={digest}")[1] == {
             "choices": [], "offered": [0], "saved": True}
         assert _request(f"{base}/api/review/progress")[1] == {
