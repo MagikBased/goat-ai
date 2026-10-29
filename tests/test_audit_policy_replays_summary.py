@@ -7,8 +7,24 @@ from goat_ai.observations import CardView, ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord
 from scripts.audit_policy_replays import (
     own_card_activation_opportunities,
+    recorded_opponent_policy_options,
     summarize_visible_own_card_losses,
 )
+
+
+def test_checkpoint_opponent_audit_rebuilds_recorded_guard() -> None:
+    facts = {5318639: (4, 0, 0)}
+    assert recorded_opponent_policy_options({"opponent_inference":
+                                             "greedy_own_loss_guard_v1"}, facts) == {
+        "own_loss_guard": True, "own_loss_guard_version": 1,
+        "card_facts": None,
+    }
+    assert recorded_opponent_policy_options({"opponent_inference":
+                                             "greedy_own_loss_guard_v6"}, facts) == {
+        "own_loss_guard": True, "own_loss_guard_version": 6,
+        "card_facts": facts,
+    }
+    assert recorded_opponent_policy_options({}, facts) == {}
 
 
 def test_summary_counts_only_policy_review_flags() -> None:

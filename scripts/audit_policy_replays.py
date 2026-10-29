@@ -35,6 +35,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION
+from scripts.shortlist_policy_disagreements import recorded_policy_options
 
 VISIBLE_OWN_CARD_LOSSES = frozenset({
     "nobleman_only_own_set_monster",
@@ -196,6 +197,12 @@ def tactical_agent(version: int, native_root: Path, card_races):
         v14_guards=version >= 14)
 
 
+def recorded_opponent_policy_options(metadata: dict, card_facts: dict) -> dict:
+    """Rebuild a checkpoint opponent's recorded inference mode for verification."""
+    inference = metadata.get("opponent_inference", "greedy")
+    return recorded_policy_options(inference, card_facts)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("replays", nargs="+", type=Path,
@@ -303,7 +310,9 @@ def main() -> None:
             if opponent_sha256 is not None:
                 if metadata.get("opponent_checkpoint_sha256") != opponent_sha256:
                     raise ValueError(f"{path}: opponent checkpoint SHA-256 differs from recording")
-                opponent_policy = load_policy_agent(args.opponent_checkpoint)
+                opponent_policy = load_policy_agent(
+                    args.opponent_checkpoint,
+                    **recorded_opponent_policy_options(metadata, card_facts))
                 opponent_choices = 0
                 for index, decision in enumerate(trajectory.decisions):
                     if decision.observation.acting_player == policy_seat:

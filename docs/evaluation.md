@@ -60,8 +60,26 @@ The ignored replay audit is
 (SHA-256 `dc456570945981cb85fa72949b3525c28db74491d1b23ac793e37a474c720f83`).
 Reproduce with `python -m scripts.audit_own_card_risks` over the planned
 `*_v1.json` and `*_v6.json` replays and the same `--checkpoint` argument.
-The three flagged patterns do not cover every kind of wasteful own-card play;
-a broader reviewed diagnostic is still needed.
+
+The existing broader `scripts.audit_policy_replays` reviewer was also run on
+the same 32 replay-verified games with the same checkpoint. It found **two
+v1 review candidates and zero v6 candidates**: the Ring activation above and
+an MST target choice on an opponent's activated Delinquent Duo. In the latter
+game, v1 chained MST at decision 30 and chose Delinquent Duo at the next
+target prompt; v6 passed at decision 30. MST's observed chain-closure material
+margin was −1, but Scapegoat was also activated before closure, so that delta
+cannot be assigned solely to MST. Both arms won that game, and the single
+changed match outcome was the Ring game. The broader review flags are
+*candidates for human judgment*, not demonstrated optimal-play errors. Its
+ignored report is
+`.cache/goat-ai/own_card_prospective_105500_105501/broad_review_audit.json`
+(SHA-256 `b40448a01382363a3e2c083779c36953d42c416552c968bb50e1441479b5e29e`).
+Reproduce with `python -m scripts.audit_policy_replays` over the same replay
+files, `--checkpoint`, and `--opponent-checkpoint` both set to the v23
+checkpoint. The auditor now reconstructs the opponent's recorded inference
+guard; all **11,205 opponent choices** reproduced independently, alongside
+the 11,250 policy choices. Both diagnostics still cover only selected visible
+patterns; neither measures all self-targeting or long-term card value.
 
 ## Wider own-loss filter versus the selected policy (29 October 2026)
 
