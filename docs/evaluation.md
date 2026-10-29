@@ -1068,6 +1068,59 @@ this paired changed-policy diagnostic. This trained-state example does not
 establish generalization; the earlier fresh 64-duel direct comparison remains
 **31–33** for the child against its parent.
 
+## Independent 2005 Nationals deck check (29 October 2026)
+
+Two additional historical Main Decks are transcribed from the
+[preserved 2005 U.S. Nationals Top 8 lists](https://www.goatformat.com/home/us-nationals-top-8-decklists):
+[Max Suffridge](../examples/decks/goat_control_max_suffridge_nationals_2005.ydk)
+(41 Main, 23 printed Fusion) and
+[Jonathan LaBounty](../examples/decks/chaos_jonathan_labounty_nationals_2005.ydk)
+(40 Main). The published LaBounty list contains no Fusion Deck, so its YDK
+leaves that section empty. The Side Decks are omitted for single-duel play.
+The pinned-native test checks every printed Main/Fusion name and copy count
+against the source and validates GOAT whitelist legality. Two Max-versus-
+LaBounty parent-policy/Tactical duels on seed 106400 reached terminal,
+replay-verified, and passed the visibility audit; the ignored two-replay
+audit SHA-256 is
+`e8cc993f3212369f30c3890906e025cc663745fe78986dedd4c8477c5c7033b5`.
+
+The new Max and LaBounty decks were paired with one another and Max was
+paired with the previously sourced Theeresak Seattle list. All three Main
+Deck compositions passed the unseen-training-composition gate for the
+selected parent and V10/V11 experimental children. With both deck
+assignments and policy seats, V11 scored **35–28–1** directly against the
+parent on seeds 106401–106408 (64 terminal games; paired 95% score interval
+**48.4%–62.5%**); V10 scored **31–33** on the same schedule. V11's paired
+score difference from V10 was **+7.0 percentage points** (95% interval
+**−3.9 to +19.5**). Their ignored report SHA-256 values are
+`296d2113c83afedf576929bbf132a9ad9aa28b47fdd32fb6897e11fe80c4e658`
+and
+`332390d7434489b74a653eb4872a021a99105d668568c6a9850e81220acf26ca`.
+
+Against Tactical-v14 on matched seeds 106409–106416, V11 scored **24–40**
+and the parent **18–46**. The paired score difference was **+9.4 points**,
+95% interval **−6.3 to +25.0**. The ignored Tactical report SHA-256 values
+are `5af5dd98ec2f2f5068e8d4913f0143a0a705f1af99f53bcac2d5af723009b73e`
+for V11 and
+`49b4e82dc2556d43584cd4ae4713297e5667941444d5f87a0c98c8d6f59db2c5`
+for the parent. The results do not establish a general competitive gain.
+
+An additional eight V11 and eight parent duels against Tactical on seeds
+106417–106418 were serialized. All **16** reached terminal, passed native
+replay and visibility audits, and reproduced the checkpoint's policy
+choices. The conservative own-card review audit flagged **six** parent
+instances (four own-only Nobleman, one own-only Heavy Storm, one idle-own
+Ring) over 2,610 policy decisions and **four** V11 instances (three
+own-only Nobleman, one idle-own Ring) over 2,725. Nobleman opportunities
+were five for the parent and 17 for V11; Ring opportunities were three for
+each. Different-policy trajectories and small samples make raw counts a
+weak causal comparison. V11 **still makes the exact classes of mistakes at
+issue**, so it remains experimental and the selected parent is unchanged.
+The ignored audit SHA-256 values are
+`f22eed394421c4bf1a1906069dde960b4b7f9aec805615e9b49dcf239a2faa4d`
+and
+`3adf9c122700f35f00b9fc2fee6da86caee6834fa2feea432f2109c2e05d366c`.
+
 ## Selected own-loss plus Ring/MST response trial (29 October 2026)
 
 The versioned `visible_selected_own_loss_with_responses_v11` rule combines
