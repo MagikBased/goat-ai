@@ -1,5 +1,18 @@
 # Baseline evaluation log
 
+## Pinned native integration baseline (29 October 2026)
+
+At source commit `691d4a1`, `GOAT_AI_NATIVE_ROOT=.cache/goat-ai
+.venv/bin/python -m pytest -q` completed with **1,573 passed, 6 warnings,
+0 failed** in 1,404.51 seconds on the local Python 3.12 environment. The
+warnings are PyTorch `TracerWarning` messages from RNN shape checks in the
+traced-rollout tests. This run includes the paired native Mystical Space
+Typhoon / Delinquent Duo regression, replay and visibility fixtures, and
+training/evaluation unit tests. Passing this finite suite does not certify
+every legal Deck, historical ruling, hidden-information path, or policy
+strength. The selected feature-v23 checkpoint and its inference guard remain
+unchanged.
+
 ## Own-card risk diagnostic for the v6-versus-v1 changed games (29 October 2026)
 
 `scripts/audit_own_card_risks.py` now checks selected policy decisions for
