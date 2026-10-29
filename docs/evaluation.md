@@ -848,6 +848,29 @@ It does show why a target-only correction is insufficient. The avoidable
 choice was activating Ring; the better tested branch held it and ended the
 turn.
 
+A batch of the same offline test covered all **13** flagged own-only Ring
+activations in the 128-duel audit where `end_phase` was legal; one other flag
+had no End Phase option and was excluded. Of the 13 paired continuations,
+**nine lost in both branches, three won in both, and one changed from a loss
+after activation to a win after End Phase**. No case changed from a win to a
+loss, but these are selected, correlated decision states, not independent
+games or an estimate of how often a revised policy would win. The continuations
+reuse the same policy, which may make later mistakes even after deferring Ring.
+Each recorded branch reproduced its source, and all 26 branches passed exact
+native replay and visibility checks. The ignored batch summary is
+`.cache/goat-ai/ring_flagged_end_phase_repro_104400_104407/summary.json`
+(SHA-256 `4502f04da7e7dfcd4ea3ea7ef8cdf02dc7e5372a914057f78ca30a0d6d363670`).
+Regenerate it with:
+
+```bash
+PYTHONPATH=src:. OMP_NUM_THREADS=1 .venv/bin/python \
+  scripts/evaluate_flagged_phase_branches.py \
+  .cache/goat-ai/ring_guard_blind_104400_104407/audit_upstream_128.json \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --native-root .cache/goat-ai --category ring_idle_only_own_faceup \
+  --phase-action end_phase --output-dir .cache/goat-ai/NEW_EMPTY_DIRECTORY
+```
+
 ## Visible own-card losses in the selected policy (28 October 2026)
 
 The weak average material association and the v5 preference trial do **not**
