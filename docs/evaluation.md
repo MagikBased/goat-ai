@@ -13247,3 +13247,21 @@ an unguarded neural policy. The ignored report is
 The Ring concentration makes Ring timing and targets a higher-priority
 review/training topic than the single MST example. These fixed replay states
 do not establish a policy strength gain or justify promoting guard v6.
+
+The review audit now distinguishes the narrower
+`ring_visible_self_lethal_if_resolved` case from the 14 broad idle-own-Ring
+flags. It requires every visible own face-up target to have ATK at least the
+acting player's LP but below the opponent's LP, with no opposing face-up
+monster. The check does not inspect hidden responses and therefore states
+what the current visible damage would do **if Ring resolves unmodified**.
+Exactly one of the 14 recorded activations meets this condition: seed 104401,
+policy seat 0, viewer frame 746. The policy had 200 LP, the opponent 3,000 LP,
+and targeted its own 300-ATK Sinister Serpent. The recorded native duel ended
+four decisions later with the policy losing when Ring resolved. An exact-state
+branch that instead chose End Phase also ultimately lost, after 775 decisions
+rather than 749; both complete branches replay-verified and passed visibility
+audit. The ignored branch report is
+`.cache/goat-ai/ring_self_lethal_104401_d745/report.json`. This is a strong
+negative example for **that activation's immediate consequence**, but it is
+one state and does not prove that End Phase was the best move or that a new
+neural policy is stronger.

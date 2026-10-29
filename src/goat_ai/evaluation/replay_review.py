@@ -278,6 +278,11 @@ def review_candidates(trajectory: Trajectory,
                 found.append(("ring_idle_only_own_faceup",
                               {"own_faceup_monsters": len(visible_own),
                                "opponent_life_points": obs.life_points[1 - seat]}))
+                if all(c.attack >= obs.life_points[seat] for c in visible_own):
+                    found.append(("ring_visible_self_lethal_if_resolved",
+                                  {"own_life_points": obs.life_points[seat],
+                                   "minimum_target_attack": min(
+                                       c.attack for c in visible_own)}))
         if (_is_action(selected, "chain", SOLEMN_JUDGMENT) and can_pass
                 and obs.chain and obs.chain[-1].card_code == SCAPEGOAT
                 and obs.chain[-1].controller != seat):

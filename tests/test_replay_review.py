@@ -92,6 +92,23 @@ def test_review_flags_mst_on_own_resolving_one_shot_at_activation() -> None:
     assert not review_candidates(replay, card_facts={})
 
 
+def test_ring_self_lethal_flag_is_narrower_than_idle_own_ring() -> None:
+    ring = Action("ring", "activate", 0, {"code": 511000824})
+    wait = Action("wait", "end_phase", 0)
+    serpent = CardView(0, "monster", "faceup", 511000818, 0,
+                       "attack", 300, 250)
+    observation = replace(view(serpent), life_points=(200, 3000))
+    flags = {item.category for item in review_candidates(
+        policy(record(observation, ring, wait)))}
+    assert "ring_idle_only_own_faceup" in flags
+    assert "ring_visible_self_lethal_if_resolved" in flags
+    healthy = replace(observation, life_points=(8000, 3000))
+    flags = {item.category for item in review_candidates(
+        policy(record(healthy, ring, wait)))}
+    assert "ring_idle_only_own_faceup" in flags
+    assert "ring_visible_self_lethal_if_resolved" not in flags
+
+
 def test_sampled_self_play_provenance_cannot_be_mistaken_for_greedy_choices():
     sampled = replace(
         policy(record(view(), Action("pass", "pass", 0))),
