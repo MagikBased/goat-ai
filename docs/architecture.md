@@ -67,6 +67,13 @@ terminal observation; older hand-built v17 recordings remain readable for
 compatibility. Callers creating current records directly must set v27 and
 supply the terminal observation.
 
+A native paired attack test changes only the identity of a Set opponent
+defender while keeping the attacking player's visible state and seed fixed.
+The attacker receives identical observations and legal actions before the
+target selection and after the public attack announcement. Both complete
+trajectories replay-verify and pass the visibility audit. This checks the v27
+attack-slot boundary; it does not validate every hidden-card interaction.
+
 The opening information-flow audit can be reproduced with the pinned native
 assets:
 

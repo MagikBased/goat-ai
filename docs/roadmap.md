@@ -28,6 +28,11 @@ replay-verifies with this observation, checks the hidden target boundary,
 and also verifies a projected v26 recording of the same duel. Existing
 policy encoders do not yet consume the new attack history; a learned benefit
 would require a separate feature ablation and held-out evaluation.
+A paired native differential now swaps a Set Des Koala for a Set Normal Monster
+at the same shuffled Deck position. The attack target prompt and immediate
+post-announcement observation and legal actions match exactly for the attacking
+player, including the public attack slots. Both complete duels replay-verify
+and pass the visibility audit; later Flip resolution may legitimately differ.
 
 Large card/chain sort prompts now use staged, linear-size legal actions after
 2,048 complete permutations. A synthetic seven-card message exercises the
