@@ -581,6 +581,12 @@ Merchant resolves its excavation while still on the field, then reaches the
 Graveyard after the Damage Step. The public excavation, opponent's known-hand
 card, hidden attack-target choice, complete replay, and visibility audit all
 pass; see [GOAT rules](goat_rules.md).
+A paired Merchant/Book of Moon fixture now checks the historical rule that
+an already activated Flip Effect resolves after its monster is set again.
+Both branches expose the same 19-card public excavation and send the separate
+kept-Pot hand reveal only to the opponent, then finish and replay-verify with
+visibility audits. Other Merchant chain interruptions remain open; see
+[GOAT rules](goat_rules.md#book-of-moon-chained-to-merchants-flip-effect).
 
 A paired Metamorphosis fixture now confirms that Raigeki Break can discard a
 card and destroy the activated Normal Spell without stopping its Fusion

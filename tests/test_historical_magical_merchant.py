@@ -15,6 +15,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 MAGICAL_MERCHANT = 32362575
 POT_OF_GREED = 55144522
+BOOK_OF_MOON = 14087893
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -256,3 +257,114 @@ def test_battle_destroyed_merchant_still_resolves_flip_effect(tmp_path):
                            env.engine.probe.observation(0).field)
                 checked = True
     pytest.fail("battle-destroyed Magical Merchant effect did not resolve")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("chain_book", [False, True])
+def test_book_chained_to_merchant_flip_preserves_public_excavation(tmp_path, chain_book):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    scripts = {f"official/c{code}.lua" for code in (
+        MAGICAL_MERCHANT, POT_OF_GREED, BOOK_OF_MOON)}
+    if any(not (root / "scripts" / relative).is_file() for relative in scripts):
+        pytest.skip("required card script not installed")
+    merchant_deck = tmp_path / "merchant_book_owner.ydk"
+    merchant_deck.write_text("#main\n" + "\n".join(map(str, (
+        MAGICAL_MERCHANT, MAGICAL_MERCHANT, MAGICAL_MERCHANT,
+        POT_OF_GREED, *VANILLA_DECK[4:]))) + "\n#extra\n!side\n")
+    book_deck = tmp_path / "merchant_book_opponent.ydk"
+    book_deck.write_text("#main\n" + "\n".join(map(str, (
+        BOOK_OF_MOON, BOOK_OF_MOON, BOOK_OF_MOON,
+        *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(merchant_deck), str(book_deck), seed=11,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert MAGICAL_MERCHANT in {card.code for card in obs.hand}
+        assert POT_OF_GREED not in {card.code for card in obs.hand}
+        assert BOOK_OF_MOON in {card.code for card in env.engine.probe.observation(1).hand}
+        merchant_set = book_set = flipped = responded = targeted = checked = False
+        deck_before = hand_before = None
+        grave_before = Counter()
+        agents = (RandomAgent(110), RandomAgent(111))
+        for _ in range(3000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / f"merchant_book_{chain_book}.json"
+                write_trajectory(path, env.trajectory())
+                replay = read_trajectory(path)
+                assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) == len(
+                    replay.decisions)
+                audit_trajectory_visibility(replay)
+                return
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0 and not merchant_set:
+                action = next((a for a in actions if a.kind == "set_monster"
+                               and a.parameters.get("code") == MAGICAL_MERCHANT), None)
+                merchant_set |= action is not None
+            if obs.turn == 2 and obs.acting_player == 1 and not book_set:
+                action = next((a for a in actions if a.kind == "set_spell_trap"
+                               and a.parameters.get("code") == BOOK_OF_MOON), None)
+                book_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not flipped:
+                action = next((a for a in actions if a.kind == "flip_summon"
+                               and a.parameters.get("code") == MAGICAL_MERCHANT), None)
+                if action is not None:
+                    deck_before = obs.deck_counts[0]
+                    hand_before = len(obs.hand)
+                    grave_before = Counter(card.code for card in obs.graveyards[0])
+                    flipped = True
+            if flipped and obs.acting_player == 1 and not responded and obs.chain:
+                assert [link.card_code for link in obs.chain] == [MAGICAL_MERCHANT]
+                option = next((a for a in actions if a.kind == "chain"
+                               and a.parameters.get("code") == BOOK_OF_MOON), None)
+                assert option is not None
+                action = option if chain_book else next(a for a in actions if a.kind == "pass")
+                responded = True
+            if chain_book and responded and not targeted and actions[0].kind == "select_card":
+                action = next((a for a in actions if a.parameters.get("code")
+                               == MAGICAL_MERCHANT and a.parameters.get("controller") == 0),
+                              None)
+                targeted |= action is not None
+            if action is None and not checked:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+            if responded and not checked and obs.turn == 3 and obs.phase == "main1" \
+                    and obs.acting_player == 0 and not obs.chain \
+                    and POT_OF_GREED in {card.code for card in obs.hand}:
+                owner = env.engine.probe.observation(0)
+                opponent = env.engine.probe.observation(1)
+                reveal = next(event for event in owner.public_reveals
+                              if event.player == 0 and event.zone == "deck_top"
+                              and POT_OF_GREED in event.codes)
+                milled = Counter(card.code for card in owner.graveyards[0]) - grave_before
+                assert Counter(reveal.codes) == milled + Counter((POT_OF_GREED,))
+                assert len(reveal.codes) == 19 and reveal.codes[-1] == POT_OF_GREED
+                assert owner.deck_counts[0] == deck_before - len(reveal.codes)
+                assert len(owner.hand) == hand_before + 1
+                assert opponent.public_reveals == owner.public_reveals
+                assert opponent.known_opponent_hand_cards == (POT_OF_GREED,)
+                merchant = next(card for card in owner.field
+                                if card.controller == 0 and card.code == MAGICAL_MERCHANT)
+                if chain_book:
+                    assert targeted
+                    assert merchant.position == "facedown"
+                    assert BOOK_OF_MOON in {card.code for card in owner.graveyards[1]}
+                    hidden = next(card for card in opponent.field
+                                  if card.controller == 0 and card.sequence == merchant.sequence)
+                    assert hidden.code is None and hidden.position == "facedown"
+                    assert any(card.code == MAGICAL_MERCHANT
+                               and card.sequence == merchant.sequence
+                               for card in opponent.known_opponent_field_cards)
+                else:
+                    assert merchant.position == "faceup"
+                    assert BOOK_OF_MOON not in {card.code for card in owner.graveyards[1]}
+                loaded = env.engine.probe.loaded_script_sha256
+                assert f"official/c{MAGICAL_MERCHANT}.lua" in loaded
+                if chain_book:
+                    assert f"official/c{BOOK_OF_MOON}.lua" in loaded
+                checked = True
+        pytest.fail("Magical Merchant / Book chain duel did not terminate")
