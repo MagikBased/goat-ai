@@ -1,5 +1,33 @@
 # Baseline evaluation log
 
+## Fresh staged Thunder Dragon transfer check (29 October 2026)
+
+Eight selected-v23/v1-guarded policy-versus-Tactical duels on seeds
+124000–124003 used a three-Thunder Dragon Chaos Turbo Main Deck against Max
+Suffridge Goat Control, both policy seats. All **4,725** decisions in the
+complete trajectories replay-verified and passed player-visibility auditing.
+The policy activated Thunder Dragon five times. In one seed-124001 duel it
+chose the legal zero-card finish at two staged search prompts even though a
+Deck-copy `select_card` action was offered; in another duel it selected both
+copies. This confirms the strategic error still appears in fresh play, rather
+than a simulator refusal to add cards. The zero search is legal under the
+[historical TCG Netrep ruling](https://www.goatformat.com/rulings7.html).
+
+The selected checkpoint's **144** fingerprinted Tactical-v14 training replays
+contained **six** such zero-copy labels at prompts offering a Deck copy, and
+19 two-copy labels. The existing opt-in synthetic correction changed those
+six labels and fixed two earlier diagnostic states, but on both new
+seed-124001 prompts its saved child still chose the zero finish. The changed
+labels therefore did not generalize to these two fresh states; its prior
+held-out tournament also established no strength gain. This identifies a
+teacher/protocol coverage issue at staged choices, not a rule error. The
+ignored source trajectories and manifest are in
+`.cache/goat-ai/thunder_selected_124000_124003/` (manifest SHA-256
+`e87cba3ce7dc0f8f00f7302a55c413b2490eebc08ccbdb3061b6ff74b2c9110d`);
+the selected-checkpoint label audit is
+`.cache/goat-ai/fv23_thunder_label_audit_20261029.json` (SHA-256
+`887039d712373fabba87e81e9eb66dd36e890d5a1e78e4e52fb35a2674f73e0c`).
+
 ## Chained own-back-row MST branch (29 October 2026)
 
 ### Fresh selected-policy material diagnostic
