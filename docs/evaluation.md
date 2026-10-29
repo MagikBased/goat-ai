@@ -1305,6 +1305,30 @@ the v23 selected checkpoint. The ignored reports and trajectories are under
 `.cache/goat-ai/v11_ppo_retention_heldout_107000_107015/` and
 `.cache/goat-ai/fv23_v11_ppo_{retain,control}_128_106800_106927*`.
 
+Eight new greedy complete duels per child were then recorded against
+Tactical-v14 on seeds 107100–107101 with both policy seats and two Nationals
+Main Deck pairings. All **16** reached terminal state and passed native replay,
+visibility, and saved-policy choice verification. The same conservative own-
+card audit flagged **three** activation decisions for each child: two early
+MST uses with only own back row visible, and one Nobleman activation with only
+an own Set monster. The retained child had one additional flagged target
+prompt for MST against a resolving one-shot Spell/Trap; that prompt offered
+only one legal target, so the optional MST activation is the decision needing
+review. The audit's activation counts were 2/2 available MST situations and
+1/1 available Nobleman situations for **both** children. These counts describe
+this small visited-state sample, not a population mistake rate. They show the
+fixed-state preference gain did not generalize to these repeated positions.
+The replay/audit files are in the ignored directory
+`.cache/goat-ai/v11_ppo_retention_fresh_107100_107101/`.
+
+The V11 preference generator labels selected Nobleman own-loss activations but
+does not currently label an idle own-only MST activation. This is a concrete
+coverage gap. Future training should expand *verified, player-visible*
+activation comparisons across more decks and contexts, distinguish optional
+activation from forced target prompts, and reserve fresh seeds for testing
+generalization. Neither a simple card-count heuristic nor these few labels
+establishes whether a play is strategically good in every position.
+
 ## Selected own-loss preference trial (29 October 2026)
 
 The versioned `visible_selected_own_loss_v10` rule retains only V9 decisions
