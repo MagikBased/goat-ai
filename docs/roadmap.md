@@ -658,6 +658,11 @@ response boundary extends M2 but does not certify all monster effects; see
 
 A paired Sangan/Skill Drain fixture checks the historical Graveyard-effect exception: Tributing Sangan for Jinzo still offers and resolves its Deck search while Skill Drain is face-up. A second paired fixture checks battle destruction under active Skill Drain and an inactive control. All four full duels replay-verify and pass visibility checks; see [GOAT rules](goat_rules.md#sangans-graveyard-effect-under-skill-drain).
 
+A paired Magician of Faith/Enemy Controller fixture now checks that taking
+Faith after its Flip Effect starts does not transfer Spell recovery to the
+new monster controller. Both branches replay-verify and pass visibility
+checks, including the public recovered-card memory; see [GOAT rules](goat_rules.md#enemy-controller-chained-to-magician-of-faith).
+
 **Work:** Create source-backed regression fixtures for first-turn draw, summon response and Ignition priority, chain construction and resolution, trigger ordering and missed timing, Damage Step restrictions, flip effects, summon negation, historical field spells, the April 2005 list, and representative pre-errata card rulings. Track unresolved rulings in `docs/goat_rules.md` with the chosen interpretation and evidence.
 
 A focused native first-turn draw fixture now checks both players' initial hand
