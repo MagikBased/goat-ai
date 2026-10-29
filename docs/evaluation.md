@@ -1,5 +1,39 @@
 # Baseline evaluation log
 
+## Fresh own-card effects: resolved material versus decision value (29 October 2026)
+
+The eight source duels in the varied-deck own-card review addition were
+independently rechecked with `scripts/audit_review_material.py`. All **3,916**
+decisions replay-verified against the pinned native core and passed the
+player-visibility audit. Every one of the eight flagged activations reached
+chain closure without another selected activation in its measurement window.
+The four idle own-only Ring of Destruction cases each changed the acting
+player's visible non-token hand-plus-field margin by **−2**. The three
+negative-visible-trade Heavy Storm cases changed it by **−1, −3, and −3**.
+
+The remaining case, MST chained to the AI's own Delinquent Duo, measured
+**zero** net material change. The AI spent MST targeting its already
+resolving Normal Spell, while Delinquent Duo still made the opponent discard.
+The chain's net change therefore hides the wasted MST. A raw observed-material
+reward would treat that decision as neutral; it does not compare against
+passing on MST. This result reinforces using upstream activation reviews and
+matched counterfactual evaluations for these cases instead of converting
+chain deltas directly into supervised labels or an RL reward. The same caution
+applies to monster abilities, whose costs and other chain links can change
+the observed margin independently of whether their target was good.
+
+The ignored report is
+`.cache/goat-ai/own_card_broad_review_124900_124907/review_material.json`
+(SHA-256 `1c05b9b11aeaf9da21a57e070d93334bb091640fc4ceec79a0d565a506675aae`).
+Reproduce it with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_review_material.py \
+  .cache/goat-ai/own_card_broad_review_124900_124907/queue.json \
+  --output .cache/goat-ai/own_card_broad_review_124900_124907/review_material.json
+```
+
+
 ## Cross-review transfer check for human preferences (29 October 2026)
 
 We used the new strict replay, seed, and Main Deck holdout gates to test
