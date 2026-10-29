@@ -44,6 +44,27 @@ def test_live_game_rejects_invalid_requests(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_live_game_auto_passes_only_forced_human_windows(tmp_path):
+    manager = _manager(tmp_path, Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve())
+    base = {"deck1": DECK1, "deck2": DECK2, "human_seat": 0,
+            "opponent": "random"}
+    try:
+        forced = manager.start({**base, "seed": 4322})
+        assert forced["decisions"] == 2
+        assert forced["observation"]["phase"] == "main1"
+        assert len(forced["legal_actions"]) > 1
+        journal = manager.creator.output_dir / "_in_progress" / f"{forced['id']}.json"
+        assert len(json.loads(journal.read_text())["entries"]) == forced["decisions"]
+
+        optional = manager.start({**base, "seed": 5})
+        assert optional["decisions"] == 0
+        assert optional["observation"]["phase"] == "draw"
+        assert {action["kind"] for action in optional["legal_actions"]} == {"chain", "pass"}
+    finally:
+        manager.close_all()
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_unfinished_duel_recovers_from_verified_actions_after_server_restart(tmp_path):
     native = Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve()
     spec = {"deck1": DECK1, "deck2": DECK2, "human_seat": 1,

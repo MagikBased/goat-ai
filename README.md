@@ -153,6 +153,12 @@ card zones** to select the zone yourself. With **Hold priority** off, the live
 UI also passes through your own immediate chain window after a Set or Summon,
 then returns to the next actionable decision. It stops if the opponent adds a
 chain link that you can answer.
+The server also passes automatically whenever **Pass** is your only native
+legal action, including after an AI move. Such passes stay in the verified
+trajectory and unfinished-game journal. If any Chain response is available,
+the game stops for your choice. Hover or focus a card to enlarge it; your own
+face-down cards preview their known faces, while unknown opponent cards stay
+concealed. Scroll over the previewed card to resize it.
 On desktop, the field fits both players' zones and hands in the viewport; the
 sidebar scrolls independently when its details are expanded.
 The live board uses the replay viewer's vertical phase rail. Click a Graveyard

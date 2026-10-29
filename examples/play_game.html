@@ -101,6 +101,13 @@
       min-height: 56px; padding: 4px; font-size: .72rem; white-space: normal; }
     #card-actions button svg { width: 24px; height: 24px; }
     #card-actions .close-actions { flex-basis: 34px; min-height: 34px; align-self: flex-start; }
+    #card-preview { position: fixed; z-index: 40; padding: 3px; border: 2px solid #e5c963;
+      border-radius: 8px; background: #11232b; box-shadow: 0 10px 30px #000c;
+      pointer-events: none; overflow: hidden; }
+    #card-preview[hidden] { display: none; }
+    #card-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
+    #card-preview .preview-fallback { display: grid; place-items: center; width: 100%;
+      height: 100%; padding: 8px; text-align: center; overflow-wrap: anywhere; }
     #sidebar { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
       padding: 12px; background: #142c36; border: 1px solid #446873; border-radius: 12px; }
     #sidebar h1 { font-size: 1.25rem; margin: 0; }
@@ -186,6 +193,7 @@
   </main>
   <dialog id="pile-dialog"><h2 id="pile-title"></h2><ul id="pile-list"></ul>
     <button id="close-pile" type="button">Close</button></dialog>
+  <div id="card-preview" hidden aria-hidden="true"></div>
   <script src="/examples/duel_audio.js"></script>
   <script>
     const byId = id => document.getElementById(id);
@@ -194,6 +202,41 @@
     let dragSource = null;
     let phaseTraveling = false;
     let autoOwnChain = false;
+    let previewSource = null;
+    let previewHeight = 250;
+    function previewLimit() {
+      return Math.max(110, Math.min(innerHeight - 16, (innerWidth - 16) * 700 / 480));
+    }
+    function hidePreview() {
+      byId("card-preview").hidden = true;
+      previewSource = null;
+    }
+    function placePreview() {
+      if (!previewSource) return;
+      const preview = byId("card-preview");
+      const height = Math.min(previewHeight, previewLimit());
+      const width = height * 480 / 700;
+      const rect = previewSource.getBoundingClientRect();
+      preview.style.width = `${width}px`; preview.style.height = `${height}px`;
+      preview.style.left = `${Math.max(8, Math.min(innerWidth - width - 8,
+        rect.left + rect.width / 2 - width / 2))}px`;
+      const above = rect.top - 8, below = innerHeight - rect.bottom - 8;
+      const preferred = above >= height || above >= below ? rect.top - height - 8 : rect.bottom + 8;
+      preview.style.top = `${Math.max(8, Math.min(innerHeight - height - 8, preferred))}px`;
+    }
+    function showPreview(source) {
+      const code = Number(source.dataset.previewCode);
+      if (!code) return;
+      previewSource = source;
+      const preview = byId("card-preview");
+      const fallback = document.createElement("span");
+      fallback.className = "preview-fallback"; fallback.textContent = cardName(code);
+      const image = document.createElement("img");
+      image.src = `/replays/card_images/${code}.jpg`; image.alt = cardName(code);
+      image.onerror = () => image.remove();
+      preview.replaceChildren(fallback, image);
+      preview.hidden = false; placePreview();
+    }
     let selectedCards = [];
     const cardKey = card => `${card.controller}:${card.location}:${card.sequence}`;
     function multiCardChoices() {
@@ -395,7 +438,8 @@
       if (card?.orientation === "defense") element.classList.add("defense");
       const code = hidden ? null : card?.code;
       const faceDown = hidden || card?.position === "facedown" || code == null;
-      element.title = faceDown ? "Face-down card" : cardName(code);
+      element.title = code == null ? "Face-down card" : cardName(code);
+      if (code != null) element.dataset.previewCode = String(code);
       const fallback = document.createElement("span"); fallback.className = "fallback";
       fallback.textContent = faceDown ? "Face-down card" : cardName(code); element.append(fallback);
       const image = document.createElement("img");
@@ -611,7 +655,7 @@
         showActionTray(choices.slice(0, 32), byId("phase"), "Choose a response");
     }
     function render(data) {
-      state = data; closeCardActions();
+      state = data; closeCardActions(); hidePreview();
       selectedCards = [];
       byId("setup").hidden = true; byId("game").hidden = false;
       if (data.terminal) {
@@ -752,6 +796,30 @@
         if (state && !state.terminal) renderPhase(state.observation); }
     }
     byId("search").addEventListener("input", actions);
+    document.addEventListener("pointerover", event => {
+      const source = event.target instanceof Element
+        ? event.target.closest(".card[data-preview-code]") : null;
+      if (source && source !== previewSource) showPreview(source);
+    });
+    document.addEventListener("pointerout", event => {
+      if (previewSource && !previewSource.contains(event.relatedTarget)) hidePreview();
+    });
+    document.addEventListener("focusin", event => {
+      const source = event.target instanceof Element
+        ? event.target.closest(".card[data-preview-code]") : null;
+      if (source) showPreview(source);
+    });
+    document.addEventListener("focusout", event => {
+      if (previewSource?.contains(event.target)) hidePreview();
+    });
+    document.addEventListener("wheel", event => {
+      if (!previewSource || !previewSource.contains(event.target)) return;
+      event.preventDefault();
+      previewHeight = Math.max(110, Math.min(previewLimit(),
+        previewHeight * (event.deltaY < 0 ? 1.14 : 1 / 1.14)));
+      placePreview();
+    }, {passive:false});
+    addEventListener("resize", placePreview);
     byId("sidebar").querySelector("[data-duel-mute]").addEventListener("click", () =>
       window.DuelAudio?.toggle());
     byId("close-pile").addEventListener("click", () => byId("pile-dialog").close());

@@ -122,15 +122,25 @@ class LiveGame:
         if not self.env.is_terminal() and self.env._current().observation.acting_player != self.human_seat:
             raise ValueError("unfinished duel journal ends before the human decision")
         self.journal_entries = list(journal["entries"])
-        if self.env.is_terminal():
-            self._finish()
+        # Older journals may end at a human prompt whose only legal choice is
+        # Pass. Resume through those forced windows using the current rules.
+        self._advance_opponent()
+        self._save_journal()
 
     def _advance_opponent(self) -> None:
-        while not self.env.is_terminal() and self.env._current().observation.acting_player != self.human_seat:
+        while not self.env.is_terminal():
             if self.decisions >= self.max_decisions:
                 raise RuntimeError("duel exceeded the decision limit")
             observation = self.env._current().observation
-            action = self.opponent.select_action(observation, self.env.legal_actions())
+            actions = self.env.legal_actions()
+            if observation.acting_player == self.human_seat:
+                # A sole pass is a forced response, not a strategic human
+                # decision. Record it for deterministic replay and recovery.
+                if len(actions) != 1 or actions[0].kind != "pass":
+                    break
+                action = actions[0]
+            else:
+                action = self.opponent.select_action(observation, actions)
             self._apply(action)
         if self.env.is_terminal() and self.viewer is None:
             self._finish()

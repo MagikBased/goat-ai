@@ -141,3 +141,47 @@ def test_manual_zone_toggle_leaves_placement_choice_for_player(tmp_path):
     match = re.search(r'data-manual-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
     assert match.group(1) == "0|1|2"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_own_set_card_previews_face_without_revealing_opponent_set(tmp_path):
+    page = Path(__file__).resolve().parents[1] / "examples/play_game.html"
+    probe = """<script>
+      const observation = {turn:1,turn_player:0,acting_player:0,phase:'main1',
+        life_points:[8000,8000],extra_deck_counts:[0,0],deck_counts:[35,35],
+        hand:[],opponent_hand_count:5,
+        field:[{code:101,controller:0,zone:'monster',sequence:0,
+          position:'facedown',orientation:'defense'},
+          {code:null,controller:1,zone:'monster',sequence:0,
+          position:'facedown',orientation:'defense'}],
+        graveyards:[[],[]],banished:[[],[]],known_opponent_hand_cards:[],
+        known_opponent_field_cards:[],own_extra_deck:[],restrictions:[],
+        chain:[],public_history:[]};
+      window.fetch = async () => { throw new Error('probe only'); };
+      setTimeout(() => {
+        render({id:'test',terminal:false,decisions:0,human_seat:0,
+          observation,legal_actions:[{kind:'end_phase',parameters:{}}],
+          card_names:{101:'Known Set Monster'}});
+        const own = document.querySelector('#own-monster .card');
+        const opponent = document.querySelector('#opp-monster .card');
+        own.dispatchEvent(new Event('pointerover',{bubbles:true}));
+        const preview = byId('card-preview');
+        const ownVisible = !preview.hidden &&
+          preview.querySelector('img')?.getAttribute('src') ===
+            '/replays/card_images/101.jpg';
+        own.dispatchEvent(new Event('pointerout',{bubbles:true}));
+        opponent.dispatchEvent(new Event('pointerover',{bubbles:true}));
+        document.body.dataset.previewProbe = [ownVisible,preview.hidden,
+          own.dataset.previewCode,opponent.dataset.previewCode || 'hidden'].join('|');
+      }, 60);
+    </script></body>"""
+    html = tmp_path / "live.html"
+    html.write_text(page.read_text().replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=650", "--dump-dom",
+        html.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-preview-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "true|true|101|hidden"
