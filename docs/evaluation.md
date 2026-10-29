@@ -10,6 +10,8 @@ damage to the opponent. An opposing face-up monster, an ongoing chain, the
 opponent's turn, unknown own ATK, and a possible lethal target all retain the
 Ring action. The filter sees only the acting player's observation. It is a
 strategic experiment, not a legality ruling or a general card-value model.
+A [native lethal-own-Ring regression](goat_rules.md#own-monster-ring-can-win)
+verifies why the visible lethal exception must remain available.
 
 We compared v3 with the prior v1 guard against Tactical-v14 on four Main Deck
 pairings absent from the checkpoint's training games: Theeresak/Phoenix,
