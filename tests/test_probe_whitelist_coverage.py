@@ -5,7 +5,26 @@ from pathlib import Path
 
 import pytest
 
-from scripts.probe_whitelist_coverage import canonical_pool, coverage_decks
+from goat_ai.actions import Action
+from scripts.probe_whitelist_coverage import (
+    FirstActivationProbeAgent,
+    canonical_pool,
+    coverage_decks,
+)
+
+
+def test_first_activation_probe_exercises_each_offered_card_once():
+    actions = (
+        Action("a", "activate", 0, {"code": 10}),
+        Action("b", "chain", 0, {"code": 20}),
+        Action("c", "pass", 0),
+    )
+    agent = FirstActivationProbeAgent(42)
+    first = agent.select_action(None, actions)
+    second = agent.select_action(None, actions)
+    assert {first.parameters["code"], second.parameters["code"]} == {10, 20}
+    assert agent.activated == {10, 20}
+    assert agent.select_action(None, actions) in actions
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),

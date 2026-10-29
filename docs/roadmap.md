@@ -71,6 +71,16 @@ selected at least once. Per-duel ID lists identify unexercised cards for
 forced fixtures. Automatic triggers and successful effect resolution remain
 outside this count; see the [refined coverage report](evaluation.md#whitelist-activation-coverage-refinement-28-october-2026).
 
+An optional first-offered-activation probe now prefers an activation whose
+card ID that player has not activated in the duel, then falls back to seeded
+random play.
+Two 21-duel deck partitions completed, replay-verified, and passed visibility
+audits, exercising 480 distinct activation IDs between them. Combined with
+the earlier random partition, 507 distinct IDs were activated at least once.
+The second partition reproduced all 22,355 decisions with one and four
+workers. This expands sampled effect paths without certifying unexercised
+cards or historical outcomes; see the [activation probe](evaluation.md#first-offered-activation-probe-29-october-2026).
+
 A tactical-agent Fusion stress sweep now adds 20 complete seeded duels on 40
 independently generated legal Main Decks with Scapegoat, Metamorphosis, and
 sampled Extra Decks containing Thousand-Eyes Restrict. All 12,385 decisions

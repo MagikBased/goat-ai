@@ -12833,6 +12833,40 @@ training, and held-out competitive evaluation before promotion.
 
 ## Whitelist activation coverage refinement (28 October 2026)
 
+### First-offered activation probe (29 October 2026)
+
+An opt-in `first_activation` agent now picks an offered `activate` or `chain`
+action for a card ID it has not yet activated in that duel, using only the
+acting player's legal actions. It falls back to seeded random play after
+those first opportunities. This probes native decision and effect paths; it
+is not a competitive agent or a historical-ruling oracle.
+
+On the same seed-120000 partition of 1,624 canonical Main Deck IDs into 41
+decks as the earlier random-agent suite, and with identical native assets and
+deck bytes, all **21** first-activation duels reached terminal and all
+**21,898** decisions replay-verified and passed visibility auditing. Distinct
+effect activation IDs offered/selected rose from the random run's **308/281**
+to **339/339**. Because choices change future states, the new run also missed
+54 IDs selected by random play; the counts are coverage of visited paths,
+not a strictly nested comparison.
+
+A second independently shuffled partition at seed 120001 completed **21/21**
+duels and verified **22,355** decisions. It offered **350** distinct activation
+IDs and selected **347**. The two first-activation partitions selected **480**
+distinct IDs in union; with the earlier random run, the union is **507**.
+Repeating seed 120001 with one worker rather than four gave identical ordered
+decisions and winners in all 21 duels, with identical deck and native asset
+hashes. This broadens sampled M1 protocol coverage, but most legal cards
+still did not have their effects exercised and these runs do not prove
+historical correctness.
+
+The ignored report SHA-256 values for seeds 120000 and 120001 are
+`06623c122ea1568c9780106513718e7f17d9ffd9488cebe3dfee6a5a04b3ad0d`
+and `91ced801bee935ba426a2b7e6d4b910c3a63c61bb54a57c22a312b70f4ce4c6b`,
+respectively. Reproduce each with
+`scripts/probe_whitelist_coverage.py --agent-mode first_activation --seed
+SEED --output NEW_EMPTY_DIRECTORY --workers 4`, using the pinned native root.
+
 The canonical-whitelist suite now records which printed card IDs appeared in
 legal `activate` or `chain` actions, and which were selected. The existing
 `offered_card_codes` and `selected_card_codes` counts include summons,

@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from time import perf_counter
 
+from goat_ai.actions import Action
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.decks import (
     Decklist,
@@ -30,6 +31,25 @@ from scripts.evaluate_native import card_scripts_sha256, source_code_sha256
 from scripts.probe_random_decks import write_deck
 
 REPO = Path(__file__).resolve().parents[1]
+
+
+class FirstActivationProbeAgent(RandomAgent):
+    """Exercise each offered card activation once, using only legal actions."""
+
+    def __init__(self, seed: int = 0) -> None:
+        super().__init__(seed)
+        self.activated: set[int] = set()
+
+    def select_action(self, observation, legal_actions) -> Action:
+        candidates = [action for action in legal_actions
+                      if action.kind in ("activate", "chain")
+                      and type(action.parameters.get("code")) is int
+                      and action.parameters["code"] not in self.activated]
+        if candidates:
+            selected = self.rng.choice(candidates)
+            self.activated.add(selected.parameters["code"])
+            return selected
+        return super().select_action(observation, legal_actions)
 
 
 def canonical_pool(root: Path) -> tuple[tuple[int, ...], tuple[int, ...]]:
@@ -88,13 +108,18 @@ def coverage_decks(root: Path, seed: int) -> tuple[Decklist, ...]:
 
 
 def run_duel(root: Path, deck_a: Path, deck_b: Path, seed: int,
-             max_decisions: int, trajectory_path: Path) -> dict:
+             max_decisions: int, trajectory_path: Path,
+             agent_mode: str = "random") -> dict:
     """Run in a dedicated process; verify the exact completed trajectory."""
     started = perf_counter()
     with GoatEnvironment(str(deck_a), str(deck_b), seed,
                          ExperimentalOcgcoreEngine(root)) as env:
         observation = env.reset()
-        agents = (RandomAgent(seed * 2), RandomAgent(seed * 2 + 1))
+        agent_type = {"random": RandomAgent,
+                      "first_activation": FirstActivationProbeAgent}.get(agent_mode)
+        if agent_type is None:
+            raise ValueError(f"unknown coverage agent mode: {agent_mode}")
+        agents = (agent_type(seed * 2), agent_type(seed * 2 + 1))
         decisions = 0
         offered_codes: set[int] = set()
         selected_codes: set[int] = set()
@@ -135,9 +160,11 @@ def run_duel(root: Path, deck_a: Path, deck_b: Path, seed: int,
 
 
 def run_suite(root: Path, output: Path, seed: int, max_decisions: int,
-              workers: int) -> dict:
+              workers: int, agent_mode: str = "random") -> dict:
     if workers < 1 or max_decisions < 1:
         raise ValueError("workers and max_decisions must be positive")
+    if agent_mode not in ("random", "first_activation"):
+        raise ValueError("unknown coverage agent mode")
     if output.exists() and any(output.iterdir()):
         raise ValueError("coverage output must be empty")
     output.mkdir(parents=True, exist_ok=True)
@@ -158,7 +185,7 @@ def run_suite(root: Path, output: Path, seed: int, max_decisions: int,
                    "--deck-a", str(output / f"deck_{left:02d}.ydk"),
                    "--deck-b", str(output / f"deck_{right:02d}.ydk"),
                    "--seed", str(duel_seed), "--max-decisions", str(max_decisions),
-                   "--trajectory", str(trajectory)]
+                   "--trajectory", str(trajectory), "--agent-mode", agent_mode]
         completed = subprocess.run(command, check=False, cwd=REPO, env=environment,
                                    capture_output=True, text=True)
         if completed.returncode == 0:
@@ -181,6 +208,7 @@ def run_suite(root: Path, output: Path, seed: int, max_decisions: int,
                    for i, (left, right) in enumerate(pairings)]
         games = [future.result() for future in futures]
     report = {"seed": seed, "max_decisions": max_decisions, "workers": workers,
+              "agent_mode": agent_mode,
               "wall_seconds": perf_counter() - started,
               "canonical_main_cards": len(main), "canonical_fusion_cards": len(fusion),
               "decks": len(decks), "duels": len(games),
@@ -223,6 +251,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=120000)
     parser.add_argument("--max-decisions", type=int, default=3000)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--agent-mode", choices=("random", "first_activation"),
+                        default="random")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--deck-a", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--deck-b", type=Path, help=argparse.SUPPRESS)
@@ -233,10 +263,11 @@ def main() -> None:
         if not all((args.deck_a, args.deck_b, args.trajectory)):
             parser.error("worker requires both decks and a trajectory path")
         print(json.dumps(run_duel(root, args.deck_a, args.deck_b, args.seed,
-                                  args.max_decisions, args.trajectory)))
+                                  args.max_decisions, args.trajectory,
+                                  args.agent_mode)))
     else:
         result = run_suite(root, args.output.resolve(), args.seed,
-                           args.max_decisions, args.workers)
+                           args.max_decisions, args.workers, args.agent_mode)
         print(json.dumps({key: result[key] for key in (
             "decks", "duels", "complete_duels", "verified_decisions",
             "offered_card_codes", "selected_card_codes",
