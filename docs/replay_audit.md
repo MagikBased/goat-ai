@@ -2578,3 +2578,25 @@ effect; inspect the complete position before labeling. Open the queue with:
 ```bash
 ./start_review_viewer.sh .cache/goat-ai/one_shot_review_104400_104407/queue.json
 ```
+
+Seven later saved **context** notes in this queue describe MST activation as
+the earlier mistake while the displayed frame offered target choices. The
+upstream queue builder now accepts `--include-context-notes` for this case.
+It preserves the note text and its `context` kind, locates the matching
+earlier optional activation from the public chain source, and offers Pass
+there as a **review candidate**, not as an inferred human label. All seven
+source duels passed exact native replay and visibility checks; every note
+mapped to a distinct earlier MST activation with Pass legal. The ignored
+queue `context_upstream_20261029.json` has SHA-256
+`49dc86e53a48988377abecf2db515977878f3dc2baf1182cbeaffcf16d19c862`.
+Open the save-enabled activation review with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/one_shot_review_104400_104407/context_upstream_20261029.json
+```
+
+These seven choices remain unlabeled until the reviewer selects an action on
+the new queue. The earlier target approvals in the source queue do not imply
+approval of MST activation. The new queue is a reproducible transformation of
+the saved notes: run `scripts/create_noted_upstream_queue.py` on the source
+queue with `--include-context-notes` and `--output` set to the path above.

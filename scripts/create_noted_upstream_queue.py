@@ -23,7 +23,8 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 
 def create_noted_upstream_queue(queue_path: Path, output: Path, native_root: Path,
                                 *, labels_dir: Path | None = None,
-                                max_per_note: int = 3) -> tuple[Path, int]:
+                                max_per_note: int = 3,
+                                include_context_notes: bool = False) -> tuple[Path, int]:
     if max_per_note < 1:
         raise ValueError("max_per_note must be positive")
     queue_path, output = queue_path.resolve(), output.resolve()
@@ -46,7 +47,9 @@ def create_noted_upstream_queue(queue_path: Path, output: Path, native_root: Pat
                 for note in store.note_state(digest)["notes"]}
         notes = saved_notes[digest]
         note = notes.get(item["decision_index"])
-        if not note or note["kind"] != "upstream_mistake":
+        if not note or note["kind"] not in (
+                ("upstream_mistake", "context") if include_context_notes
+                else ("upstream_mistake",)):
             continue
         if digest not in reviewed:
             replay_path, offered = sources[digest]
@@ -82,6 +85,7 @@ def create_noted_upstream_queue(queue_path: Path, output: Path, native_root: Pat
             candidate["source_item_number"] = item_number
             candidate["source_decision_index"] = item["decision_index"]
             candidate["review_note"] = note["text"]
+            candidate["source_note_kind"] = note["kind"]
             selected.append(candidate)
             seen.add(key)
             found += 1
@@ -96,6 +100,8 @@ def create_noted_upstream_queue(queue_path: Path, output: Path, native_root: Pat
         "purpose": "human_review_candidates_not_training_labels",
         "checkpoint_sha256": queue["checkpoint_sha256"],
         "source_queue_sha256": sha256_file(queue_path),
+        "included_note_kinds": (["context", "upstream_mistake"]
+                                if include_context_notes else ["upstream_mistake"]),
         "unmatched_note_count": unmatched,
         "selected": selected,
     }
@@ -116,10 +122,14 @@ def main() -> None:
                         help="saved label folder; defaults to the source queue hash folder")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--max-per-note", type=int, default=3)
+    parser.add_argument("--include-context-notes", action="store_true",
+                        help="also offer matched earlier activations from context notes; "
+                             "these remain unlabeled review prompts")
     args = parser.parse_args()
     output, unmatched = create_noted_upstream_queue(
         args.queue, args.output or args.queue.parent / "noted_upstream.json",
-        args.native_root, labels_dir=args.labels_dir, max_per_note=args.max_per_note)
+        args.native_root, labels_dir=args.labels_dir, max_per_note=args.max_per_note,
+        include_context_notes=args.include_context_notes)
     print(f"{output} ({unmatched} notes without an eligible earlier activation)")
 
 

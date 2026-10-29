@@ -49,7 +49,7 @@ def _source_queue(tmp_path):
 
 
 def test_upstream_queue_preserves_target_labels_and_offers_pass(tmp_path, monkeypatch):
-    queue, replay, digest, trajectory = _source_queue(tmp_path)
+    queue, _, digest, _ = _source_queue(tmp_path)
     monkeypatch.setattr(create_upstream_review, "ExperimentalOcgcoreEngine",
                         lambda root: None)
     monkeypatch.setattr(create_upstream_review, "verify_trajectory", lambda *a: 2)
@@ -144,6 +144,32 @@ def test_saved_upstream_note_builds_separate_unlabeled_queue(tmp_path, monkeypat
     assert result["selected"][0]["teacher_action"]["kind"] == "pass"
     assert "MST should have stayed unactivated" in output.with_suffix(".html").read_text()
     assert source_store.progress()["choices"] == []
+    assert ReviewStore(output, tmp_path / "upstream_labels").progress()["choices"] == []
+
+
+def test_context_note_can_offer_upstream_activation_without_becoming_label(
+        tmp_path, monkeypatch):
+    queue, _, digest, _ = _source_queue(tmp_path)
+    labels = tmp_path / "source_labels"
+    ReviewStore(queue, labels).save_note(
+        digest, 1, "context", "MST activation was the earlier mistake")
+    monkeypatch.setattr(create_noted_upstream_queue, "ExperimentalOcgcoreEngine",
+                        lambda root: None)
+    monkeypatch.setattr(create_noted_upstream_queue, "verify_trajectory", lambda *a: 2)
+    monkeypatch.setattr(create_noted_upstream_queue, "audit_trajectory_visibility",
+                        lambda *a: {"decisions": 2})
+    output = tmp_path / "context_upstream.json"
+    with pytest.raises(ValueError, match="no earlier optional activations"):
+        create_noted_upstream_queue.create_noted_upstream_queue(
+            queue, output, tmp_path / "native", labels_dir=labels)
+    path, unmatched = create_noted_upstream_queue.create_noted_upstream_queue(
+        queue, output, tmp_path / "native", labels_dir=labels,
+        include_context_notes=True)
+    assert path == output and unmatched == 0
+    item = json.loads(output.read_text())["selected"][0]
+    assert item["decision_index"] == 0
+    assert item["source_note_kind"] == "context"
+    assert item["teacher_action"]["kind"] == "pass"
     assert ReviewStore(output, tmp_path / "upstream_labels").progress()["choices"] == []
 
 
