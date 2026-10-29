@@ -233,6 +233,49 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_guard_branches
   --output-dir .cache/goat-ai/guard_branch_batch_99900_99907
 ```
 
+## Residual Ring and MST distillation (29 October 2026)
+
+`visible_residual_guard_distillation_v8` labels only the additional actions
+removed by the opt-in combined v5 guard relative to v1. It uses the acting
+player's visible observation, offered legal actions, and pinned printed card
+Type; the converter verifies each complete native replay and visibility
+boundary before writing labels. The trainer recomputes the mask from the
+source trajectory and rejects changed labels. These are automated guard
+hypotheses, not human reviews or claims about the best surviving move.
+
+The 128 v1-guarded source duels at seeds 104400–104407 produced **56**
+comparisons from **22** replays: 47 idle own-only Ring opportunities and
+nine isolated one-shot MST responses. The recorded policy chose a removed
+action in **23** of those comparisons. The preference manifest SHA-256 is
+`dff5ef8508801990f46b30bbc4ac0b2cb2d96116b954c21d41e0d2fdfbffcd2b`.
+Starting from the selected v23 parent, one experimental child used masked
+parent distillation for 80 steps, recorded-bad weight 5, learning rate
+0.0001, parent KL weight 1, seed 78, and 128 preservation states from eight
+separate current-core seed-101008–101009 replays. Sampled preference loss
+fell from 2.218 to 0.644; the last sampled preservation KL was 0.0124.
+The ignored child `.cache/goat-ai/residual_v8_child_104400_104407.pt` has
+SHA-256 `7541c2ab50a26c013d194dcc418d98a16421bf89556ce6bbaafe36a82b97da5a`.
+
+Thirty-two fresh v1-guarded policy-versus-Tactical duels on different
+Indianapolis Main Decks and seeds 105000–105007 were recorded, replay-verified,
+and visibility-audited. They supplied eight held-out comparison positions
+from five replays; their source manifest SHA-256 is
+`495ab2f948a3ce9166d0df821d31b217a62950cdb297761539aa0610bc687172`.
+The parent's top legal action was removed by the v5 mask in **3/8** positions;
+the child's in **0/8**. The parent and child fixed-state score reports have
+SHA-256 values `b7c05b822e0e29aa469fc385fa7af8618776bb23feeb8367ea8b81eabcc17754`
+and `2fc7f69d214842021030a44f519da44ae2ada448dd6df191ecddaf8e48431ab0`.
+Eight positions are too few to establish broad error reduction.
+
+In **64** direct complete duels on four Main Decks absent from both the
+preference and preservation data, across both deck assignments and both
+policy seats at fresh seeds 105100–105107, the child scored **31–33** against
+the parent. Both used the same v1 inference guard. The paired 95% child score
+interval was **37.5–60.9%**. The ignored direct report SHA-256 is
+`3d781387b794d76c810db7154d4b593b4f693ec29b5ec74361c79260e0a46a4d`.
+The local fixed-state result is encouraging, but this trial establishes no
+competitive gain. Keep the v23 parent selected and v8 experimental.
+
 ## Exact visible-guard distillation into v23 (29 October 2026)
 
 `visible_guard_distillation_v7` now creates automated masked-parent

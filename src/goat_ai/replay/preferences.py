@@ -76,7 +76,8 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
                 or (schema_version == 2 and rule_set_id not in (
                     "visible_resource_v3", "visible_material_choices_v4",
                     "visible_material_avoidance_v5", "visible_optional_own_loss_v6",
-                    "visible_guard_distillation_v7"))):
+                    "visible_guard_distillation_v7",
+                    "visible_residual_guard_distillation_v8"))):
             raise ValueError("automated preferences require a supported visible audit rule set")
         seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
                             else "demonstrator_seat")

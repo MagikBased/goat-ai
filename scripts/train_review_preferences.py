@@ -9,7 +9,7 @@ from pathlib import Path
 
 import torch
 
-from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
+from goat_ai.agents.card_metadata import load_card_facts, load_weak_flip_monster_attack
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
@@ -102,6 +102,7 @@ def main() -> None:
     training_games = []
     preference_hashes = {}
     weak_flip_attacks = None
+    residual_card_facts = None
     for replay_path, preferences_path in args.case:
         replay_path = Path(replay_path)
         preferences_path = Path(preferences_path)
@@ -121,7 +122,13 @@ def main() -> None:
         if preferences.authorization == "automated_rule":
             if weak_flip_attacks is None:
                 weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
-            validate_automated_preferences(trajectory, preferences, weak_flip_attacks)
+            if (preferences.rule_set_id == "visible_residual_guard_distillation_v8"
+                    and residual_card_facts is None):
+                residual_card_facts = load_card_facts(args.native_root)
+            validate_automated_preferences(
+                trajectory, preferences, weak_flip_attacks,
+                residual_card_facts if preferences.rule_set_id ==
+                "visible_residual_guard_distillation_v8" else None)
         reviewed.extend((trajectory.decisions[item.decision_index], item)
                         for item in preferences.preferences)
         new_hashes[str(replay_path)] = replay_hash

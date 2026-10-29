@@ -10,11 +10,13 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from goat_ai.agents.card_metadata import load_card_facts, load_weak_flip_monster_attack
 from goat_ai.agents.tactical_guard import (
+    safe_idle_own_ring_indices,
+    safe_one_shot_response_indices,
     safe_optional_own_loss_indices,
     safe_target_indices,
 )
-from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import (
     BLACK_LUSTER_SOLDIER,
@@ -39,6 +41,7 @@ RULE_SET_V4 = "visible_material_choices_v4"
 RULE_SET_V5 = "visible_material_avoidance_v5"
 RULE_SET_V6 = "visible_optional_own_loss_v6"
 RULE_SET_V7 = "visible_guard_distillation_v7"
+RULE_SET_V8 = "visible_residual_guard_distillation_v8"
 SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -97,11 +100,16 @@ def preferred_indices(record, category: str) -> list[int]:
     return []
 
 
-def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID
+def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID,
+           card_facts=None
            ) -> tuple[list[dict], Counter]:
     """Keep one unambiguous automated comparison per recorded decision."""
     if rule_set_id == RULE_SET_V7:
         return derive_guard_distillation(trajectory)
+    if rule_set_id == RULE_SET_V8:
+        if card_facts is None:
+            raise ValueError("v8 residual guard labels require printed card facts")
+        return derive_residual_guard_distillation(trajectory, card_facts)
     if rule_set_id == RULE_SET_V3:
         return derive_resource_counterfactuals(trajectory)
     if rule_set_id in (RULE_SET_V4, RULE_SET_V5, RULE_SET_V6):
@@ -169,6 +177,44 @@ def derive_guard_distillation(trajectory) -> tuple[list[dict], Counter]:
                        "preferred_action_indices": good,
                        "disfavored_action_indices": bad})
         counts["activation" if len(activation_kept) < len(legal) else "target"] += 1
+    return result, counts
+
+
+def derive_residual_guard_distillation(trajectory, card_facts) -> tuple[list[dict], Counter]:
+    """Label only the extra action removals from the opt-in v5 versus v1 guard.
+
+    All v5 survivors are acceptable in this synthetic comparison; none is
+    asserted to be the best play or to win the duel.
+    """
+    metadata = trajectory.skill_metadata or {}
+    seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
+                        else "demonstrator_seat")
+    if type(seat) is not int or seat not in (0, 1):
+        raise ValueError("residual guard distillation requires a recorded policy seat")
+    result = []
+    counts = Counter()
+    for index, record in enumerate(trajectory.decisions):
+        if record.observation.acting_player != seat or len(record.legal_actions) < 2:
+            continue
+        obs, legal = record.observation, record.legal_actions
+        base = safe_optional_own_loss_indices(obs, legal, range(len(legal)))
+        v1 = safe_target_indices(obs, legal, base, protect_removal_targets=True)
+        one_shot = safe_one_shot_response_indices(obs, legal, base, card_facts)
+        ring = safe_idle_own_ring_indices(obs, legal, one_shot)
+        v5 = safe_target_indices(obs, legal, ring, protect_removal_targets=True)
+        if not set(v5) <= set(v1):
+            raise ValueError("v5 unexpectedly expanded the v1 action set")
+        removed = sorted(set(v1) - set(v5))
+        if not removed:
+            continue
+        chosen = legal.index(record.selected_action)
+        if chosen not in (*v5, *removed):
+            continue
+        result.append({"decision_index": index,
+                       "preferred_action_indices": sorted(v5),
+                       "disfavored_action_indices": removed})
+        counts["one_shot_mst" if any(choice not in one_shot for choice in removed)
+               else "idle_own_ring"] += 1
     return result, counts
 
 
@@ -353,14 +399,16 @@ def derive_material_choice_counterfactuals(trajectory) -> tuple[list[dict], Coun
     return result, counts
 
 
-def validate_automated_preferences(trajectory, preferences, weak_flip_attacks) -> None:
+def validate_automated_preferences(trajectory, preferences, weak_flip_attacks,
+                                   card_facts=None) -> None:
     """Reject edits that no longer match the declared visible-rule output."""
     rule_set_id = getattr(preferences, "rule_set_id", None) or RULE_SET_ID
     candidates = (() if rule_set_id in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
-                                       RULE_SET_V6, RULE_SET_V7)
+                                       RULE_SET_V6, RULE_SET_V7, RULE_SET_V8)
                   else review_candidates(
         trajectory, weak_flip_attacks=weak_flip_attacks))
-    expected, _ = derive(trajectory, candidates, rule_set_id=rule_set_id)
+    expected, _ = derive(trajectory, candidates, rule_set_id=rule_set_id,
+                         card_facts=card_facts)
     actual = [{"decision_index": item.decision_index,
                "preferred_action_indices": list(item.preferred_action_indices),
                "disfavored_action_indices": list(item.disfavored_action_indices)}
@@ -377,13 +425,14 @@ def main() -> None:
     parser.add_argument("--rule-set", choices=(RULE_SET_ID, RULE_SET_V2,
                                                RULE_SET_V3, RULE_SET_V4,
                                                RULE_SET_V5, RULE_SET_V6,
-                                               RULE_SET_V7),
+                                               RULE_SET_V7, RULE_SET_V8),
                         default=RULE_SET_ID)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
         parser.error("output directory must be empty")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
+    card_facts = load_card_facts(args.native_root) if args.rule_set == RULE_SET_V8 else None
     report = []
     for path in args.replays:
         trajectory = read_trajectory(path)
@@ -392,11 +441,12 @@ def main() -> None:
         verified = verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
         candidates = (() if args.rule_set in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
-                                             RULE_SET_V6, RULE_SET_V7)
+                                             RULE_SET_V6, RULE_SET_V7, RULE_SET_V8)
                       else review_candidates(
             trajectory, weak_flip_attacks=weak_flip_attacks))
         preferences, categories = derive(trajectory, candidates,
-                                         rule_set_id=args.rule_set)
+                                         rule_set_id=args.rule_set,
+                                         card_facts=card_facts)
         if not preferences:
             continue
         seat = trajectory.skill_metadata.get("learner_seat" if trajectory.source
@@ -404,7 +454,7 @@ def main() -> None:
         payload = {
             "schema_version": 2 if args.rule_set in (RULE_SET_V3, RULE_SET_V4,
                                                      RULE_SET_V5, RULE_SET_V6,
-                                                     RULE_SET_V7)
+                                                     RULE_SET_V7, RULE_SET_V8)
             else 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",

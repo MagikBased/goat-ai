@@ -390,6 +390,53 @@ def test_v7_distills_visible_guard_activation_and_target_masks():
     rules.validate_automated_preferences(replay, valid, {})
 
 
+def test_v8_labels_only_new_ring_and_one_shot_mst_masks():
+    own_monster = CardView(0, "monster", "faceup", 71413901, 0,
+                           attack=1600, defense=1000)
+    base = Observation(
+        viewer=0, acting_player=0, turn=3, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(own_monster,),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=4,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=0)
+    ring = Action("ring", "chain", 0, {"code": 511000824})
+    pass_action = Action("pass", "pass", 0)
+    ring_record = DecisionRecord(base, (ring, pass_action), ring)
+    chain = ChainLinkView(1, 55144522, 1, 8, 0)
+    one_shot_view = replace(base, field=(CardView(
+        1, "spell_trap", "faceup", 55144522, 0),), chain=(chain,))
+    mst = Action("mst", "chain", 0, {"code": 5318639})
+    mst_record = DecisionRecord(one_shot_view, (mst, pass_action), mst)
+    own_target = Action("own", "select_card", 0,
+                        {"controller": 0, "location": 4, "sequence": 0})
+    enemy_target = Action("enemy", "select_card", 0,
+                          {"controller": 1, "location": 4, "sequence": 0})
+    target_view = replace(base, chain=(ChainLinkView(1, 504700118, 0, 4, 0),))
+    target_record = DecisionRecord(target_view, (own_target, enemy_target), own_target)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42,
+                        (ring_record, mst_record, target_record), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    facts = {55144522: (2, 0, 0)}
+    expected = ([
+        {"decision_index": 0, "preferred_action_indices": [1],
+         "disfavored_action_indices": [0]},
+        {"decision_index": 1, "preferred_action_indices": [1],
+         "disfavored_action_indices": [0]},
+    ], {"idle_own_ring": 1, "one_shot_mst": 1})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V8,
+                  card_facts=facts) == expected
+    valid = SimpleNamespace(rule_set_id=rules.RULE_SET_V8,
+                            preferences=(ReviewedPreference(0, (1,), (0,)),
+                                         ReviewedPreference(1, (1,), (0,))))
+    rules.validate_automated_preferences(replay, valid, {}, facts)
+    with pytest.raises(ValueError, match="do not match"):
+        edited = SimpleNamespace(rule_set_id=rules.RULE_SET_V8,
+                                 preferences=(ReviewedPreference(0, (0,), (1,)),
+                                              ReviewedPreference(1, (1,), (0,))))
+        rules.validate_automated_preferences(replay, edited, {}, facts)
+    with pytest.raises(ValueError, match="printed card facts"):
+        derive(replay, (), rule_set_id=rules.RULE_SET_V8)
+
+
 def test_v6_declines_only_own_boss_banish_and_off_turn_torrential():
     boss = CardView(0, "monster", "faceup", 504700118, 0, owner=0)
     observation = Observation(
