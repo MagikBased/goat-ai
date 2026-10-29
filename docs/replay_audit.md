@@ -2481,3 +2481,41 @@ an experiment, but they do not establish better playing strength. Compare a
 trained child on
 fresh decks and seeds before promotion. Existing upstream/context notes remain
 separate from training.
+
+## Idle own-Ring coverage and outcome-blind review (29 October 2026)
+
+A scan of the existing v7 guard-distillation training (32 duels), preservation
+(8 duels), and prior own-card held-out review (16 duels) replays found **zero**
+decisions where the proposed idle own-Ring v3 filter applies. Relabeling those
+replays cannot teach that behavior. A five-duel diagnostic selected from games
+whose outcomes differed between v1 and v3 found one such Ring activation in
+each replay. That selection is conditioned on outcome, so it is useful for
+debugging but unsuitable for estimating the behavior's frequency or building a
+representative training set.
+
+To measure coverage without selecting on the winner, we recorded **128**
+complete v23-policy (v1 inference guard) versus Tactical-v14 duels on seeds
+104400–104407. The fixed schedule used four Main Deck pairings in both deck
+assignments and both policy seats. All **74,685** decisions passed exact native
+replay verification and player-visibility auditing. Among **37,132** policy
+decisions, the v3 Ring filter would apply at **47** prompts; the v1 policy
+activated Ring at **14** of those prompts. These are prompt counts, potentially
+including repeated opportunities in one game, and do not measure optimality.
+The ignored replay manifest is
+`.cache/goat-ai/ring_guard_blind_104400_104407/manifest.json`.
+
+All 14 chosen activations are in the ignored
+`.cache/goat-ai/ring_guard_blind_104400_104407/queue.json` queue. Its 14 source
+replays were independently replay-verified while shortlisting; their queue
+hashes and legal actions also passed the queue validator. The suggested
+alternative is the highest-scoring move *after* the visible v3 guard, not a
+human-approved play. The reviewer should mark whether Ring itself was a
+mistake, whether the proposed alternative was preferable, or whether the
+position needs a different choice. Open the queue with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/ring_guard_blind_104400_104407/queue.json
+```
+
+Reviewer reveals remain separate from the policy's player-visible observation.
+No new preference labels or neural checkpoint were promoted from this audit.

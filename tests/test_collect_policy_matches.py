@@ -49,6 +49,7 @@ def test_batch_manifest_preserves_schedule_and_existing_files(tmp_path, monkeypa
     summary = json.loads(capsys.readouterr().out)
     manifest = json.loads((output / "manifest.json").read_text())
     assert summary["verified_games"] == manifest["verified_games"] == 8
+    assert manifest["policy_inference"] == "greedy"
     assert summary["verified_decisions"] == manifest["verified_decisions"] == 56
     assert [(game["matchup_index"], game["seed"], game["policy_seat"])
             for game in manifest["games"]] == [
@@ -58,3 +59,30 @@ def test_batch_manifest_preserves_schedule_and_existing_files(tmp_path, monkeypa
     with pytest.raises(SystemExit):
         collector.main()
     assert (output / "manifest.json").exists()
+
+
+def test_batch_manifest_records_guard_version(tmp_path, monkeypatch, capsys):
+    checkpoint = tmp_path / "policy.pt"
+    checkpoint.write_bytes(b"checkpoint")
+    deck1 = tmp_path / "a.ydk"
+    deck2 = tmp_path / "b.ydk"
+    for deck in (deck1, deck2):
+        deck.write_text("#main\n123\n")
+    seen = []
+
+    def fake_record(task, **kwargs):
+        seen.append((kwargs["own_loss_guard"], kwargs["own_loss_guard_version"]))
+        task.output.write_text("recorded")
+        return {"verified_decisions": 1}
+
+    monkeypatch.setattr(collector, "record_task", fake_record)
+    monkeypatch.setattr(sys, "argv", ["collect_policy_matches.py", str(checkpoint),
+                                     "--matchup", str(deck1), str(deck2),
+                                     "--seed", "52", "--seeds", "1",
+                                     "--own-loss-guard", "--own-loss-guard-version", "3",
+                                     "--output-dir", str(tmp_path / "guarded")])
+    collector.main()
+    assert seen == [(True, 3), (True, 3)]
+    assert json.loads((tmp_path / "guarded/manifest.json").read_text())[
+        "policy_inference"] == "greedy_own_loss_guard_v3"
+    assert json.loads(capsys.readouterr().out)["verified_games"] == 2

@@ -163,6 +163,27 @@ def test_shortlist_flags_own_monster_removal_as_review_candidates():
         "torrential_only_own_monsters", "ring_without_visible_enemy_target"]
 
 
+def test_shortlist_flags_idle_own_ring_but_preserves_visible_lethal_exception():
+    own = CardView(0, "monster", "faceup", 49881766, 0,
+                   "attack", 1900, 1500)
+    ring = Action("ring", "activate", 0, {"code": 511000824})
+    summon = Action("summon", "normal_summon", 0, {"code": 71413901})
+    idle = record(view(own, turn=3), ring, summon)
+    lethal = replace(idle, observation=replace(
+        idle.observation, life_points=(8000, 1000)))
+    enemy = CardView(1, "monster", "faceup", 31560081, 0,
+                     "attack", 1200, 1000)
+    with_enemy = replace(idle, observation=replace(
+        idle.observation, field=(own, enemy)))
+    own_response = replace(idle, observation=replace(
+        idle.observation, chain=(ChainLinkView(1, 19613556, 1, 8, 0),)))
+    assert [c.category for c in review_candidates(policy(idle))] == [
+        "ring_idle_only_own_faceup"]
+    assert review_candidates(policy(lethal)) == ()
+    assert review_candidates(policy(with_enemy)) == ()
+    assert review_candidates(policy(own_response)) == ()
+
+
 def test_book_on_monster_under_torrential_is_a_review_prompt_only():
     own = CardView(0, "monster", "faceup", 87621407, 0,
                    "attack", 1400, 1000)

@@ -21,6 +21,11 @@ from goat_ai.agents import (
     load_flip_monster_codes,
 )
 from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
+from goat_ai.agents.tactical_guard import (
+    safe_idle_own_ring_indices,
+    safe_optional_own_loss_indices,
+    safe_target_indices,
+)
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import review_candidates
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
@@ -62,6 +67,31 @@ def select_diverse_candidates(candidates: list[dict], limit: int,
 def action_summary(action) -> dict:
     """Present only the structured action the agent could already select."""
     return {"kind": action.kind, "parameters": action.parameters}
+
+
+def recorded_policy_options(inference: str, card_facts: dict) -> dict:
+    """Rebuild the recorded visible inference mode before shortlisting it."""
+    if inference == "greedy":
+        return {}
+    versions = {"greedy_own_loss_guard_v1": 1,
+                "greedy_own_loss_guard_v2": 2,
+                "greedy_own_loss_guard_v3": 3}
+    if inference not in versions:
+        raise ValueError(f"unsupported policy inference {inference!r}")
+    version = versions[inference]
+    return {"own_loss_guard": True, "own_loss_guard_version": version,
+            "card_facts": card_facts if version == 2 else None}
+
+
+def visible_ring_guard_alternative(observation, legal, scores):
+    """Suggest the exact v3 surviving action at an idle-own-Ring prompt."""
+    indices = safe_optional_own_loss_indices(observation, legal, range(len(legal)))
+    kept = safe_idle_own_ring_indices(observation, legal, indices)
+    if len(kept) == len(indices):
+        raise ValueError("reviewed Ring activation was not filtered by v3")
+    kept = safe_target_indices(observation, legal, kept,
+                               protect_removal_targets=True)
+    return legal[max(kept, key=lambda choice: scores[choice].item())]
 
 
 def visible_faceup_age(observation, code: int, minimum: int) -> int | None:
@@ -524,10 +554,11 @@ def main() -> None:
         if (trajectory.source != "policy_evaluation" or type(seat) is not int
                 or seat not in (0, 1)
                 or metadata.get("policy_checkpoint_sha256") != checkpoint_hash
-                or metadata.get("policy_inference") != "greedy"
                 or metadata.get("policy_inference_version") != POLICY_INFERENCE_VERSION
                 or metadata.get("policy_feature_version") != model.feature_version):
-            raise ValueError(f"{path}: expected a plain greedy replay from this checkpoint")
+            raise ValueError(f"{path}: expected a greedy replay from this checkpoint")
+        inference = metadata.get("policy_inference")
+        policy_options = recorded_policy_options(inference, card_facts)
         verified = verify_trajectory(
             trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
@@ -562,7 +593,7 @@ def main() -> None:
             audit_by_index.setdefault(finding.decision_index, []).append(finding.category)
         disagreements = 0
         policy_choices = 0
-        replay_agent = load_policy_agent(args.checkpoint)
+        replay_agent = load_policy_agent(args.checkpoint, **policy_options)
         for index, record in enumerate(trajectory.decisions):
             if record.observation.acting_player != seat:
                 continue
@@ -586,15 +617,18 @@ def main() -> None:
                 logits = model(features.to(next(model.parameters()).device))
                 probabilities = torch.softmax(logits, 0).cpu()
             policy_index = legal.index(record.selected_action)
+            audit_flags = audit_by_index.get(index, [])
+            ring_guard_review = "ring_idle_only_own_faceup" in audit_flags
             alternative = (next(action for action in legal if action.kind == "pass")
                            if index in upstream_by_index else
+                           visible_ring_guard_alternative(record.observation, legal, logits)
+                           if ring_guard_review else
                            comparison_agent.select_action(record.observation, legal)
                            if comparison_agent else
                            fresh_teacher().select_action(record.observation, legal))
             if alternative not in legal:
                 raise ValueError(f"{path}: teacher choice is illegal at {index}")
             disagreed = alternative != record.selected_action
-            audit_flags = audit_by_index.get(index, [])
             if not disagreed and not audit_flags and age is None \
                     and not args.review_option_prompts:
                 continue
@@ -622,6 +656,8 @@ def main() -> None:
                 "logit_margin": round(logit_margin, 6),
                 "audit_flags": audit_flags,
                 "teacher_disagrees": disagreed,
+                **({"alternative_source": "visible_ring_guard_v3"}
+                   if ring_guard_review else {}),
                 **({"upstream_target_decision_index": upstream_by_index[index]}
                    if index in upstream_by_index else {}),
                 **({"option_source_card": record.observation.chain[-1].card_code}
@@ -642,6 +678,7 @@ def main() -> None:
             })
         replay_report.append({"trajectory": str(path.resolve()),
                               "trajectory_sha256": source_hash,
+                              "policy_inference": inference,
                               "verified_decisions": verified,
                               "policy_choices": policy_choices,
                               "disagreements": disagreements,
@@ -673,7 +710,14 @@ def main() -> None:
     report = {"schema_version": 1,
               "purpose": "human_review_candidates_not_training_labels",
               "checkpoint_sha256": checkpoint_hash,
-              "teacher": ("PolicyAgent" if comparison_agent else "TacticalHeuristicAgent_v14"),
+              "teacher": ("visible_ring_guard_v3"
+                          if selected and all(item.get("alternative_source")
+                                              == "visible_ring_guard_v3" for item in selected)
+                          else "mixed_visible_guard_and_policy"
+                          if any(item.get("alternative_source")
+                                 == "visible_ring_guard_v3" for item in selected)
+                          else "PolicyAgent" if comparison_agent
+                          else "TacticalHeuristicAgent_v14"),
               **({"comparison_checkpoint_sha256": comparison_hash}
                  if comparison_hash else {}),
               "rank_by": args.rank_by,

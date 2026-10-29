@@ -14,9 +14,44 @@ from scripts.refresh_review_queue import refresh_review_queue
 from scripts.shortlist_policy_disagreements import (
     activation_matches_chain_source,
     optional_upstream_activation,
+    recorded_policy_options,
     select_diverse_candidates,
+    visible_ring_guard_alternative,
     write_review_index,
 )
+
+
+def test_review_queue_rebuilds_recorded_guard_versions_without_extra_facts():
+    facts = {511000824: (4, 0, 0)}
+    assert recorded_policy_options("greedy", facts) == {}
+    assert recorded_policy_options("greedy_own_loss_guard_v1", facts) == {
+        "own_loss_guard": True, "own_loss_guard_version": 1, "card_facts": None}
+    assert recorded_policy_options("greedy_own_loss_guard_v2", facts) == {
+        "own_loss_guard": True, "own_loss_guard_version": 2, "card_facts": facts}
+    assert recorded_policy_options("greedy_own_loss_guard_v3", facts) == {
+        "own_loss_guard": True, "own_loss_guard_version": 3, "card_facts": None}
+    with pytest.raises(ValueError, match="unsupported policy inference"):
+        recorded_policy_options("greedy_unknown", facts)
+
+
+def test_review_queue_ring_suggestion_applies_full_v3_mask():
+    import torch
+
+    from goat_ai.observations import CardView, Observation
+
+    own_monster = CardView(0, "monster", "faceup", 49881766, 0,
+                           "attack", 1900, 1500)
+    own_spell = CardView(0, "spell_trap", "facedown", 45986603, 0)
+    view = Observation(
+        viewer=0, acting_player=0, turn=3, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(own_monster, own_spell),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=5,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=0)
+    ring = Action("ring", "activate", 0, {"code": 511000824})
+    storm = Action("storm", "activate", 0, {"code": 19613556})
+    summon = Action("summon", "normal_summon", 0, {"code": 71413901})
+    assert visible_ring_guard_alternative(
+        view, (ring, storm, summon), torch.tensor([3.0, 2.0, 1.0])) == summon
 
 
 def test_review_queue_prioritizes_margin_and_caps_prompt_and_replay():

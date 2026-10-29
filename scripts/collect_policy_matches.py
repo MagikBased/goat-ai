@@ -40,13 +40,17 @@ def schedule_matches(matchups: list[tuple[Path, Path]], first_seed: int,
 
 def record_task(task: MatchTask, *, checkpoint: Path, native_root: Path,
                 opponent: str, max_decisions: int,
-                checkpoint_sha256: str) -> dict:
+                checkpoint_sha256: str, own_loss_guard: bool = False,
+                own_loss_guard_version: int = 1) -> dict:
     """Use the single-duel recorder so both paths have identical provenance."""
     command = [sys.executable, str(Path(__file__).with_name("record_policy_match.py")),
                str(checkpoint), "--deck1", str(task.deck1), "--deck2", str(task.deck2),
                "--native-root", str(native_root), "--seed", str(task.seed),
                "--policy-seat", str(task.policy_seat), "--opponent", opponent,
                "--max-decisions", str(max_decisions), "--output", str(task.output)]
+    if own_loss_guard:
+        command.extend(("--own-loss-guard", "--own-loss-guard-version",
+                        str(own_loss_guard_version)))
     environment = os.environ.copy()
     environment.setdefault("OMP_NUM_THREADS", "1")
     repo = Path(__file__).resolve().parent.parent
@@ -65,6 +69,8 @@ def record_task(task: MatchTask, *, checkpoint: Path, native_root: Path,
     trajectory_sha256 = sha256_file(task.output)
     trajectory = read_trajectory(task.output)
     audit_trajectory_visibility(trajectory)
+    expected_inference = (f"greedy_own_loss_guard_v{own_loss_guard_version}"
+                          if own_loss_guard else "greedy")
     deck_sha256 = (sha256_file(task.deck1), sha256_file(task.deck2))
     if (trajectory.deck_sha256 != deck_sha256
             or trajectory.decks != (str(task.deck1), str(task.deck2))
@@ -75,6 +81,8 @@ def record_task(task: MatchTask, *, checkpoint: Path, native_root: Path,
             or (trajectory.skill_metadata or {}).get("demonstrator_seat") != task.policy_seat
             or (trajectory.skill_metadata or {}).get("policy_checkpoint_sha256")
             != checkpoint_sha256
+            or (trajectory.skill_metadata or {}).get("policy_inference")
+            != expected_inference
             or sha256_file(task.output) != trajectory_sha256):
         raise ValueError(f"{task.output}: recorded trajectory provenance changed")
     return {
@@ -105,10 +113,16 @@ def main() -> None:
     parser.add_argument("--seeds", type=int, default=8)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--max-decisions", type=int, default=3000)
+    parser.add_argument("--own-loss-guard", action="store_true",
+                        help="record the policy with an experimental visible own-loss guard")
+    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3),
+                        default=1)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     if args.workers < 1 or args.max_decisions < 1:
         parser.error("workers and max decisions must be positive")
+    if args.own_loss_guard_version != 1 and not args.own_loss_guard:
+        parser.error("--own-loss-guard-version requires --own-loss-guard")
     if not args.checkpoint.is_file() or any(not deck.is_file()
                                             for pair in args.matchup for deck in pair):
         parser.error("checkpoint and matchup deck files must exist")
@@ -130,7 +144,9 @@ def main() -> None:
     def record(task: MatchTask) -> dict:
         return record_task(task, checkpoint=checkpoint, native_root=native_root,
                            opponent=args.opponent, max_decisions=args.max_decisions,
-                           checkpoint_sha256=checkpoint_sha256)
+                           checkpoint_sha256=checkpoint_sha256,
+                           own_loss_guard=args.own_loss_guard,
+                           own_loss_guard_version=args.own_loss_guard_version)
 
     with ThreadPoolExecutor(max_workers=args.workers) as workers:
         games = list(workers.map(record, tasks))
@@ -140,6 +156,8 @@ def main() -> None:
         "schema_version": 1,
         "checkpoint_sha256": checkpoint_sha256,
         "opponent": args.opponent,
+        "policy_inference": (f"greedy_own_loss_guard_v{args.own_loss_guard_version}"
+                             if args.own_loss_guard else "greedy"),
         "max_decisions": args.max_decisions,
         "seeds": [args.seed, args.seed + args.seeds - 1],
         "workers": args.workers,

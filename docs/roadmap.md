@@ -2558,3 +2558,10 @@ review flag in 16 matched verified games, but scored 96 rather than 95 wins
 against Tactical-v14 over 256 held-out paired games. This is too little
 strength evidence to replace the current local-play guard or count as learned
 improvement.
+An [outcome-blind Ring coverage audit](replay_audit.md#idle-own-ring-coverage-and-outcome-blind-review-29-october-2026)
+found no applicable Ring decisions in the current guard-distillation corpus.
+A fresh 128-duel verified batch found 47 applicable prompts and 14 v1-policy
+Ring activations; all 14 are now available for independent review. The next M4
+step is to collect explicit human judgments across own-card activation and
+target decisions, train on reviewed preferences, and require a held-out
+complete-duel strength gain before selecting a new checkpoint.

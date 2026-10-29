@@ -240,6 +240,17 @@ def review_candidates(trajectory: Trajectory,
             found.append(("ring_without_visible_enemy_target",
                           {"own_monsters": len(own_monsters),
                            "visible_enemy_monsters": 0}))
+        if (_is_action(selected, "activate", RING_OF_DESTRUCTION)
+                and obs.turn_player == seat and not obs.chain
+                and len(record.legal_actions) > 1
+                and not any(c.position == "faceup" for c in enemy_monsters)):
+            visible_own = [c for c in own_monsters if c.position == "faceup"]
+            if (visible_own and all(c.attack is not None
+                                    and c.attack < obs.life_points[1 - seat]
+                                    for c in visible_own)):
+                found.append(("ring_idle_only_own_faceup",
+                              {"own_faceup_monsters": len(visible_own),
+                               "opponent_life_points": obs.life_points[1 - seat]}))
         if (_is_action(selected, "chain", SOLEMN_JUDGMENT) and can_pass
                 and obs.chain and obs.chain[-1].card_code == SCAPEGOAT
                 and obs.chain[-1].controller != seat):
