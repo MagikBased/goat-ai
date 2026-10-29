@@ -2429,3 +2429,7 @@ now measures both monster ability activations and Spell/Trap effects on
 replay-verified, player-visible self-play trajectories. It does not produce
 counterfactual expected card advantage or training labels; candidate reward
 shaping still requires a controlled held-out strength experiment.
+The paired 64-duel outcome check found only weak winner associations for
+both ability and Spell/Trap material changes, with game-level bootstrap
+intervals crossing zero. Do not promote raw material delta to a training
+reward on that evidence; see the [outcome analysis](evaluation.md#does-immediate-material-change-track-the-duel-winner).

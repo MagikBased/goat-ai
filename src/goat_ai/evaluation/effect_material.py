@@ -5,6 +5,8 @@ follow-up trigger, so its material change is not a counterfactual action value.
 """
 
 from collections.abc import Mapping
+from random import Random
+from statistics import mean
 
 from goat_ai.observations import Observation
 from goat_ai.replay import Trajectory
@@ -93,3 +95,49 @@ def effect_material_changes(trajectory: Trajectory,
                 })
                 break
     return results
+
+
+def paired_outcome_association(
+    games: list[tuple[int | None, list[dict]]], *, bootstrap_samples: int = 10_000,
+    seed: int = 0,
+) -> dict[str, dict]:
+    """Compare winners' and losers' observed deltas within each duel.
+
+    Only single selected activations with a decision after chain closure are
+    included. This descriptive association does not establish that an effect
+    caused a win or estimate the value of an alternative legal action.
+    """
+    if bootstrap_samples < 1:
+        raise ValueError("bootstrap_samples must be positive")
+    result = {}
+    for source in ("monster_ability", "spell_trap_effect"):
+        paired_differences = []
+        for winner, effects in games:
+            if winner not in (0, 1):
+                continue
+            winner_deltas = [effect["material_delta"] for effect in effects
+                             if effect["source_type"] == source
+                             and effect["additional_activations"] == 0
+                             and effect["acting_player"] == winner]
+            loser_deltas = [effect["material_delta"] for effect in effects
+                            if effect["source_type"] == source
+                            and effect["additional_activations"] == 0
+                            and effect["acting_player"] == 1 - winner]
+            if winner_deltas and loser_deltas:
+                paired_differences.append(mean(winner_deltas) - mean(loser_deltas))
+        if not paired_differences:
+            result[source] = {"paired_games": 0, "mean_winner_minus_loser": None,
+                              "bootstrap_95_interval": None}
+            continue
+        rng = Random(seed)
+        estimates = sorted(mean(rng.choices(paired_differences,
+                                            k=len(paired_differences)))
+                           for _ in range(bootstrap_samples))
+        lower = int(0.025 * bootstrap_samples)
+        upper = int(0.975 * bootstrap_samples) - 1
+        result[source] = {
+            "paired_games": len(paired_differences),
+            "mean_winner_minus_loser": mean(paired_differences),
+            "bootstrap_95_interval": [estimates[lower], estimates[upper]],
+        }
+    return result

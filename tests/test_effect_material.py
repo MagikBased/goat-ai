@@ -3,7 +3,11 @@
 import pytest
 
 from goat_ai.actions import Action
-from goat_ai.evaluation.effect_material import effect_material_changes, material_margin
+from goat_ai.evaluation.effect_material import (
+    effect_material_changes,
+    material_margin,
+    paired_outcome_association,
+)
 from goat_ai.observations import CardView, ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory
 
@@ -70,3 +74,26 @@ def test_unresolved_activation_is_not_called_a_material_result():
         record(view(), "pass"),
     ), winner=None)
     assert effect_material_changes(trajectory, FACTS) == []
+
+
+def test_paired_outcome_uses_duels_with_both_seats_and_single_activations():
+    def effect(source, seat, delta, additional=0):
+        return {"source_type": source, "acting_player": seat,
+                "material_delta": delta, "additional_activations": additional}
+
+    games = [
+        (0, [effect("monster_ability", 0, 2),
+             effect("monster_ability", 1, 0),
+             effect("monster_ability", 1, 9, additional=1),
+             effect("spell_trap_effect", 0, 1)]),
+        (1, [effect("monster_ability", 1, 1),
+             effect("monster_ability", 0, 0)]),
+        (None, [effect("monster_ability", 0, 100),
+                effect("monster_ability", 1, -100)]),
+    ]
+    result = paired_outcome_association(games, bootstrap_samples=100, seed=3)
+    assert result["monster_ability"]["paired_games"] == 2
+    assert result["monster_ability"]["mean_winner_minus_loser"] == 1.5
+    assert result["spell_trap_effect"]["paired_games"] == 0
+    assert result["spell_trap_effect"]["bootstrap_95_interval"] is None
+    assert result == paired_outcome_association(games, bootstrap_samples=100, seed=3)

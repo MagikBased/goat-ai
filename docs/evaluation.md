@@ -11937,3 +11937,33 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
 The next training experiment can use this observed signal as a small
 auxiliary value target or carefully constructed reward potential, then
 compare it with the unchanged policy on held-out Main Decks and seeds.
+
+### Does immediate material change track the duel winner?
+
+The same 64 verified duels were re-audited with a paired outcome check. For
+each source type, it compares the winner's and loser's **mean observed material
+change within the same duel**. A duel enters the comparison only when both
+seats had at least one resolved activation of that type, with no additional
+selected activation before the chain closed. The 95% intervals resample
+whole duels 10,000 times with seed 0; they do not treat every activation as
+an independent game.
+
+| Source | Paired duels | Winner minus loser, cards | Bootstrap 95% interval |
+| --- | ---: | ---: | ---: |
+| Monster ability | 30 | +0.066 | −0.307 to +0.449 |
+| Spell/Trap effect | 63 | +0.129 | −0.035 to +0.304 |
+
+Both intervals include zero. The winner was only slightly ahead on this
+metric, with no clear association in this small sample. Moreover, winning
+position, deck choice, timing, and opponent responses can affect both the
+activation and the duel outcome. These numbers do not justify rewarding every
+positive material delta or penalizing every negative one in PPO. Keep duel
+outcome as the training objective; any auxiliary material signal needs a
+separate controlled ablation on held-out decks and seeds.
+
+The ignored schema-v2 report is
+`.cache/goat-ai/effect_material_human14_97000_97063_v2.json` (SHA-256
+`1aada6a08092d422c83d3ea77b6cc1001a5f3a33f5ac7ea6954771d1c78de1c5`).
+It contains the same per-effect records as the schema-v1 report above; the
+new field is `paired_outcome_association`. Reproduce it with the same command
+above and a `_v2.json` output filename.

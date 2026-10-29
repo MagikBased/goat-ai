@@ -11,6 +11,7 @@ from goat_ai.evaluation.effect_material import (
     LOCATIONS,
     TYPE_MONSTER,
     effect_material_changes,
+    paired_outcome_association,
 )
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory
@@ -28,6 +29,7 @@ def main() -> None:
     by_source = Counter()
     by_delta = Counter()
     selected_by_source = Counter()
+    outcome_games = []
     for path in args.replays:
         trajectory = read_trajectory(path)
         verified = verify_trajectory(trajectory,
@@ -45,10 +47,11 @@ def main() -> None:
         by_source.update(item["source_type"] for item in effects)
         by_delta.update((item["source_type"], item["material_delta"])
                         for item in effects)
+        outcome_games.append((trajectory.winner, effects))
         games.append({"replay": str(path), "sha256": sha256_file(path),
                       "verified_decisions": verified, "effects": effects})
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "scope": "observed_chain_material_change_not_counterfactual_value",
         "game_count": len(games),
         "selected_activations_by_source": dict(sorted(selected_by_source.items())),
@@ -56,6 +59,7 @@ def main() -> None:
         "effect_count_by_source_and_delta": [
             {"source_type": source, "material_delta": delta, "count": count}
             for (source, delta), count in sorted(by_delta.items())],
+        "paired_outcome_association": paired_outcome_association(outcome_games),
         "games": games,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
