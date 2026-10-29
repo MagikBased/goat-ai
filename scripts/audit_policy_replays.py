@@ -15,7 +15,9 @@ from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import (
     HEAVY_STORM,
+    MYSTICAL_SPACE_TYPHOON,
     NOBLEMAN_OF_CROSSOUT,
+    RAIGEKI_BREAK,
     category_counts,
     compare_parent_greedy_candidates,
     review_candidates,
@@ -37,10 +39,13 @@ VISIBLE_OWN_CARD_LOSSES = frozenset({
     "raigeki_break_targets_own_card_with_enemy_option",
     "tribe_race_hits_only_own_with_enemy_option",
     "tribe_race_hits_only_own_no_enemy_option",
+    "mst_idle_only_own_backrow",
+    "raigeki_break_idle_only_own_field",
 })
 
 ACTIVATION_OPPORTUNITY_CATEGORIES = (
-    "nobleman_only_own_set_monster", "heavy_storm_only_own_backrow")
+    "nobleman_only_own_set_monster", "heavy_storm_only_own_backrow",
+    "mst_idle_only_own_backrow", "raigeki_break_idle_only_own_field")
 
 
 def own_card_activation_opportunities(trajectory, seat: int) -> dict[str, int]:
@@ -58,18 +63,36 @@ def own_card_activation_opportunities(trajectory, seat: int) -> dict[str, int]:
                        if card.controller == seat and card.zone == "spell_trap"]
         enemy_backrow = any(card.controller != seat and card.zone == "spell_trap"
                             for card in obs.field)
+        own_monsters = any(card.controller == seat and card.zone == "monster"
+                           for card in obs.field)
+        enemy_monsters = any(card.controller != seat and card.zone == "monster"
+                             for card in obs.field)
         for action in record.legal_actions:
-            if action.kind != "activate":
+            if action.kind not in ("activate", "chain"):
                 continue
             code = action.parameters.get("code")
-            if code == NOBLEMAN_OF_CROSSOUT and own_sets and not enemy_sets:
+            if (action.kind == "activate" and code == NOBLEMAN_OF_CROSSOUT
+                    and own_sets and not enemy_sets):
                 seen.add(("nobleman_only_own_set_monster", obs.turn, obs.phase))
-            elif code == HEAVY_STORM and not enemy_backrow:
+            elif action.kind == "activate" and code == HEAVY_STORM and not enemy_backrow:
                 source_is_set = action.parameters.get("location") == 8 and any(
                     card.sequence == action.parameters.get("sequence")
                     and card.code == HEAVY_STORM for card in own_backrow)
                 if len(own_backrow) - int(source_is_set) > 0:
                     seen.add(("heavy_storm_only_own_backrow", obs.turn, obs.phase))
+            elif (len(record.legal_actions) > 1 and not obs.chain
+                  and code in (MYSTICAL_SPACE_TYPHOON, RAIGEKI_BREAK)):
+                source_is_set = action.parameters.get("location") == 8 and any(
+                    card.sequence == action.parameters.get("sequence")
+                    and card.code == code for card in own_backrow)
+                own_other_backrow = len(own_backrow) - int(source_is_set)
+                if (code == MYSTICAL_SPACE_TYPHOON and own_other_backrow > 0
+                        and not enemy_backrow):
+                    seen.add(("mst_idle_only_own_backrow", obs.turn, obs.phase))
+                elif (code == RAIGEKI_BREAK
+                      and own_other_backrow + int(own_monsters) > 0
+                      and not (enemy_backrow or enemy_monsters)):
+                    seen.add(("raigeki_break_idle_only_own_field", obs.turn, obs.phase))
     return dict(sorted(Counter(category for category, _, _ in seen).items()))
 
 

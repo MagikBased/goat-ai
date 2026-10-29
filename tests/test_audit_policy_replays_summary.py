@@ -33,6 +33,8 @@ def test_summary_counts_only_policy_review_flags() -> None:
     assert result["flagged_per_activation_opportunity"] == {
         "nobleman_only_own_set_monster": None,
         "heavy_storm_only_own_backrow": None,
+        "mst_idle_only_own_backrow": None,
+        "raigeki_break_idle_only_own_field": None,
     }
 
 
@@ -74,3 +76,33 @@ def test_activation_opportunities_deduplicate_revisited_priority_prompts() -> No
     }
     assert own_card_activation_opportunities(
         SimpleNamespace(decisions=(trajectory.decisions[-1],)), 0) == {}
+
+
+def test_idle_own_only_removal_opportunity_excludes_its_set_source() -> None:
+    own_mst = CardView(0, "spell_trap", "facedown", 5318639, 0)
+    own_other = CardView(0, "spell_trap", "facedown", 456, 1)
+    own_monster = CardView(0, "monster", "faceup", 123, 0)
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 0)
+    mst = Action("mst", "chain", 0,
+                 {"code": 5318639, "location": 8, "sequence": 0})
+    break_card = Action("break", "chain", 0,
+                        {"code": 4178474, "location": 2, "sequence": 0})
+    decline = Action("pass", "pass", 0)
+
+    def decision(cards):
+        obs = Observation(viewer=0, acting_player=0, turn=2, phase="main1",
+                          life_points=(8000, 8000), hand=(), field=cards,
+                          graveyards=((), ()), banished=((), ()),
+                          opponent_hand_count=5, deck_counts=(35, 35),
+                          extra_deck_counts=(0, 0), turn_player=0)
+        return DecisionRecord(obs, (mst, break_card, decline), mst)
+
+    trajectory = SimpleNamespace(decisions=(
+        decision((own_mst, own_other, own_monster)),
+        decision((own_mst, own_other, own_monster)),
+        decision((own_mst, enemy_set, own_monster)),
+    ))
+    assert own_card_activation_opportunities(trajectory, 0) == {
+        "mst_idle_only_own_backrow": 1,
+        "raigeki_break_idle_only_own_field": 1,
+    }

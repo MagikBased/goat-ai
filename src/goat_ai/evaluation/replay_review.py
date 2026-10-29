@@ -208,6 +208,24 @@ def review_candidates(trajectory: Trajectory,
                           {"own_set_monsters": sum(c.position == "facedown"
                                                    for c in own_monsters),
                            "enemy_set_monsters": 0}))
+        if (selected.kind in ("activate", "chain") and not obs.chain
+                and obs.turn_player == seat and len(record.legal_actions) > 1):
+            source_is_set = (selected.parameters.get("location") == 8
+                             and any(c.zone == "spell_trap"
+                                     and c.sequence == selected.parameters.get("sequence")
+                                     and c.code == selected.parameters.get("code")
+                                     for c in own))
+            own_other_backrow = own_backrow - int(source_is_set)
+            if (selected.parameters.get("code") == MYSTICAL_SPACE_TYPHOON
+                    and own_other_backrow > 0 and enemy_backrow == 0):
+                found.append(("mst_idle_only_own_backrow",
+                              {"own_other_backrow": own_other_backrow}))
+            if (selected.parameters.get("code") == RAIGEKI_BREAK
+                    and own_other_backrow + len(own_monsters) > 0
+                    and enemy_backrow + len(enemy_monsters) == 0):
+                found.append(("raigeki_break_idle_only_own_field",
+                              {"own_field_targets": own_other_backrow
+                               + len(own_monsters)}))
         if (_is_action(selected, "chain", SAKURETSU_ARMOR) and can_pass
                 and any(c.zone == "spell_trap" and c.position == "faceup"
                         and c.code == ROYAL_DECREE for c in obs.field)):

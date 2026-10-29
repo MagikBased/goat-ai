@@ -2527,6 +2527,12 @@ chained to a resolving one-shot Spell; this narrower behavioral improvement
 does not imply a general card-advantage model. The small sample scored 3/16
 guarded wins against Tactical versus 4/16 unguarded; use the larger 256-duel
 study for the existing guard's strength estimate.
+The [idle own-only removal audit](evaluation.md#idle-own-only-removal-activation-audit-29-october-2026)
+now counts optional MST and Raigeki Break activations before their target
+prompts. In the same paired replay set it found one parent MST own-only
+activation and none in four guarded opportunities; neither set offered an
+idle own-only Raigeki Break opportunity. Broader source duels and independent
+activation reviews remain necessary before claiming general material judgment.
 An [opt-in one-shot response ablation](evaluation.md#one-shot-response-guard-ablation-29-october-2026)
 defers MST on an isolated activated Normal Spell/Trap using only the public
 chain source and static printed Type. It removed the remaining one-shot MST

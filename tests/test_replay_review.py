@@ -49,6 +49,32 @@ def test_visible_faceup_age_review_filter_uses_only_public_field_cards():
     assert visible_faceup_age(view(hidden, turn=5), 72302403, 0) is None
 
 
+def test_review_flags_idle_own_only_removal_before_target_prompt():
+    own_mst = CardView(0, "spell_trap", "facedown", 5318639, 0)
+    own_other = CardView(0, "spell_trap", "facedown", 456, 1)
+    own_monster = CardView(0, "monster", "faceup", 123, 0)
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 0)
+    mst = Action("mst", "chain", 0,
+                 {"code": 5318639, "location": 8, "sequence": 0})
+    break_card = Action("break", "chain", 0,
+                        {"code": 4178474, "location": 2, "sequence": 0})
+    wait = Action("pass", "pass", 0)
+    replay = policy(
+        record(view(own_mst, own_other), mst, wait),
+        record(view(own_mst), mst, wait),
+        record(view(own_monster), break_card, wait),
+        record(view(own_mst, enemy_set), mst, wait),
+        record(view(own_monster, enemy_set), break_card, wait),
+    )
+    flags = {(item.decision_index, item.category)
+             for item in review_candidates(replay)}
+    assert (0, "mst_idle_only_own_backrow") in flags
+    assert (2, "raigeki_break_idle_only_own_field") in flags
+    assert not any(index in (1, 3, 4) and category in (
+        "mst_idle_only_own_backrow", "raigeki_break_idle_only_own_field")
+                   for index, category in flags)
+
+
 def test_sampled_self_play_provenance_cannot_be_mistaken_for_greedy_choices():
     sampled = replace(
         policy(record(view(), Action("pass", "pass", 0))),

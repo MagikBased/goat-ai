@@ -1,5 +1,35 @@
 # Baseline evaluation log
 
+## Idle own-only removal activation audit (29 October 2026)
+
+The player-visible review audit now flags an optional, unchained MST or
+Raigeki Break activation on the policy's own turn when the only field targets
+are friendly cards. It excludes the activated Set card itself from the target
+count. These are review candidates, since a specific own-card interaction
+could still make an unusual activation worthwhile. The denominator counts
+distinct legal opportunities per duel, category, turn, and phase; it does not
+count every repeated priority prompt.
+
+The 16 unguarded and 16 v1-guarded seed-99900–99907 policy-versus-Tactical-v14
+duels were checked again against the pinned native engine. All 32 complete
+trajectories replay-verified, passed visibility inspection, and reproduced
+their recorded policy choices. The parent had **one MST own-only activation
+in one opportunity**; the guarded policy had **zero in four opportunities**.
+The parent also had five own-only Nobleman activations and one Breaker target
+choice; the guarded set had none of those flags. Neither set offered an idle
+own-only Raigeki Break activation opportunity under this audit, so the sample
+does not test that case. The policies visit different states, and these counts
+do not estimate a general card-advantage error rate or an incremental win rate.
+
+The ignored reports are
+`.cache/goat-ai/own_card_parent_review_99900_99907/audit_v27_own_only.json`
+(SHA-256 `ad84c12cc7b4adb0e4e9a4c7acbdfc9ffdabb176e0876762cdd1c5061b11ab2e`)
+and
+`.cache/goat-ai/own_loss_guard_matched_99900_99907/audit_v27_own_only.json`
+(SHA-256 `47c44e715db20afd35b375555b717f8555db56c441b82fcf123895d75f4c9ef8`).
+Reproduce either with `scripts/audit_policy_replays.py` using its `seed_*.json`
+files and the selected `fv23_current_tactical_broader_33000_33031.pt` checkpoint.
+
 ## One-shot response guard ablation (29 October 2026)
 
 The guarded v23 replay at seed 99906, policy seat 0, chained MST to an
