@@ -543,6 +543,29 @@ experimental and seek contextual human labels or a learned value estimate.
 
 ## Optional own-card effect activation ablation (29 October 2026)
 
+### Larger verified upstream-opportunity scan
+
+The existing 128-duel `greedy_own_loss_guard_v1` batch was re-audited after
+adding activation-level Breaker and owned Chaos boss review checks. All
+37,132 policy decisions were reproduced from the frozen checkpoint; every
+complete trajectory passed native replay and visibility verification. The
+player-visible audit found 18 distinct turn/phase opportunities to activate
+Breaker with only friendly back row and 15 to activate an owned Black Luster
+Soldier or Chaos Sorcerer with no opposing monster. The guarded policy took
+none. This demonstrates coverage of those visited states, not a learned
+card-advantage concept or a comparison against an unguarded arm on the same
+states. The same report found 14 idle own-only Ring activations among 22
+opportunities, 11 targets on resolving one-shot Spells/Traps, and two negative
+visible Heavy Storm trades. Those are the more frequent residual review
+cases in this batch. The ignored report is
+`.cache/goat-ai/ring_guard_blind_104400_104407/audit_upstream_128.json`
+(SHA-256 `603b3c61a97ee1bcfe156b05a7300fcfa95509aaca9050855ada2eeee7244ec6`).
+The Ring and own-card queues linked in [replay audit](replay_audit.md) contain
+the Ring and Heavy Storm decisions for independent human review. A separate
+[one-shot response queue](replay_audit.md#resolving-one-shot-spelltrap-response-review-29-october-2026)
+now contains all 11 flagged cases; one forced target is represented by its
+earlier optional activation. No new training labels are inferred from the scan.
+
 The selected v23 policy still activates removal when its own cards are the
 only available victims. `visible_optional_own_loss_v6` extends the automated
 v5 preference derivation to the **optional activation**, before a forced

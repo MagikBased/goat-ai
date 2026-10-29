@@ -2558,3 +2558,23 @@ must not be treated as an expert teacher. Open the combined queue with:
 ```bash
 ./start_review_viewer.sh .cache/goat-ai/ring_guard_blind_104400_104407/own_card_review_queue.json
 ```
+
+### Resolving one-shot Spell/Trap response review (29 October 2026)
+
+The ignored queue
+`.cache/goat-ai/one_shot_review_104400_104407/queue.json` contains 11
+selected-policy decisions where removal targeted an activated one-shot Spell
+or Trap that was already resolving. The 11 source duels and 7,083 decisions
+were exact-replay-verified and visibility-audited during queue construction;
+the queue file has SHA-256
+`760fd1989217a4bfb933ff62478b76e0e32b17e68bd3fe0474b6b180dc06318e`.
+One forced target was moved to its preceding optional activation, allowing a
+reviewer to choose Pass. The other ten items retain their target-choice
+prompts. The offered Tactical alternative is a comparison, not a correctness
+label. An activated one-shot effect usually still resolves when its card is
+destroyed, but the removal may matter for another field card or a chained
+effect; inspect the complete position before labeling. Open the queue with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/one_shot_review_104400_104407/queue.json
+```
