@@ -1,5 +1,37 @@
 # Baseline evaluation log
 
+## Own-card risk diagnostic for the v6-versus-v1 changed games (29 October 2026)
+
+`scripts/audit_own_card_risks.py` now checks selected policy decisions for
+three visible patterns: idle Ring of Destruction with only owned face-up
+targets and no visible lethal damage; Mystical Space Typhoon against its own
+resolving one-shot card when that is the only other back row; and choosing an
+owned removal target while an opposing target is offered. It verifies native
+replay and observation visibility first. For a flagged activation it reports
+material after chain closure separately from the flag; later activations and
+unclosed chains are separate counts. The flags are diagnostic, not training
+labels or a complete definition of bad play.
+
+On the twelve previously recorded v6-versus-v1 changed-outcome games, v1 had
+**5 flagged idle own-only Ring activations in 686 multi-action policy
+decisions**; v6 had **0 in 808**. Four of the five v1 activations closed
+without another activation and each had a negative visible material delta
+(one or two cards). One had another activation before closure, so its delta
+cannot be assigned to Ring alone. This set was selected *because* the match
+outcome changed, and trajectories differ after the first divergence. These
+numbers are a failure-case audit, not an unbiased mistake-rate estimate or
+evidence of a win-rate gain. The direct 128-game match above remained tied.
+
+The ignored report is
+`.cache/goat-ai/own_card_risks_changed_v1_v6_105200_105207.json` (SHA-256
+`f175246795a4563ef556f6cefa65fd23f235c31d6916b05808b8b8a1c9397e0d`).
+Reproduce it with `python -m scripts.audit_own_card_risks` over both
+`case_*_v1.json` and `case_*_v6.json` under
+`.cache/goat-ai/own_loss_v6_v1_changed_105200_105207/`, supplying `--output`.
+The next evaluation should run this diagnostic on a prespecified fresh
+schedule, then use human-reviewed action labels and competitive match results
+to decide whether a policy change improves play.
+
 ## Wider own-loss filter versus the selected policy (29 October 2026)
 
 The optional v6 own-loss inference filter defers more own-only activations and

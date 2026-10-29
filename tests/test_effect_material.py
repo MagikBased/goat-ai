@@ -10,6 +10,7 @@ from goat_ai.evaluation.effect_material import (
 )
 from goat_ai.observations import CardView, ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory
+from scripts.audit_own_card_risks import own_card_risk_rows
 from scripts.audit_review_material import material_review_rows
 
 MONSTER = 100
@@ -115,3 +116,48 @@ def test_paired_outcome_uses_duels_with_both_seats_and_single_activations():
     assert result["spell_trap_effect"]["paired_games"] == 0
     assert result["spell_trap_effect"]["bootstrap_95_interval"] is None
     assert result == paired_outcome_association(games, bootstrap_samples=100, seed=3)
+
+
+def test_own_card_risk_audit_counts_resolved_idle_ring_without_calling_it_value():
+    ring = 511000824
+    own = CardView(0, "monster", "faceup", MONSTER, sequence=0,
+                   attack=1600, defense=1000)
+    set_ring = CardView(0, "spell_trap", "facedown", ring, sequence=0)
+    activation = Action("ring", "activate", 0,
+                        {"code": ring, "location": 8, "sequence": 0})
+    wait = Action("wait", "pass", 0, {})
+    pending = (ChainLinkView(1, ring, 0, 8, 0),)
+    trajectory = Trajectory("goat", ("a", "b"), 1, (
+        DecisionRecord(view(hand=0, field=(own, set_ring)),
+                       (activation, wait), activation),
+        record(view(hand=0, field=(own, set_ring), chain=pending), "pass"),
+        record(view(hand=0), "pass"),
+    ), winner=None, source="policy_evaluation",
+        skill_metadata={"demonstrator_seat": 0})
+    rows, counts = own_card_risk_rows(trajectory, FACTS | {ring: (4, 0, 0)})
+    assert len(rows) == 1
+    assert rows[0]["flags"] == ["idle_own_only_ring"]
+    assert rows[0]["material_delta"] == -2
+    assert counts["flagged_single_activations_negative_material"] == 1
+    assert counts["policy_decisions"] == 3
+
+
+def test_own_card_risk_audit_flags_ability_self_target_without_material_label():
+    bls = 504700118
+    own = CardView(0, "monster", "faceup", bls, sequence=0, owner=0)
+    enemy = CardView(1, "monster", "faceup", MONSTER, sequence=0, owner=1)
+    chain = (ChainLinkView(1, bls, 0, 4, 0),)
+    self_target = Action("self", "select_card", 0,
+                         {"controller": 0, "location": 4, "sequence": 0})
+    enemy_target = Action("enemy", "select_card", 0,
+                          {"controller": 1, "location": 4, "sequence": 0})
+    trajectory = Trajectory("goat", ("a", "b"), 1, (
+        DecisionRecord(view(field=(own, enemy), chain=chain),
+                       (self_target, enemy_target), self_target),
+    ), winner=None, source="policy_evaluation",
+        skill_metadata={"demonstrator_seat": 0})
+    rows, counts = own_card_risk_rows(trajectory, FACTS)
+    assert rows[0]["flags"] == ["own_removal_target_with_enemy_option"]
+    assert rows[0]["material_delta"] is None
+    assert counts["flagged_decisions"] == 1
+    assert counts["flagged_single_activations_negative_material"] == 0
