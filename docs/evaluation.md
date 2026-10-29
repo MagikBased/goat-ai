@@ -13169,3 +13169,29 @@ changing `--rule-set` to `visible_material_avoidance_v5`, using the three
 v5 manifests above as `--case` sources, and setting the fresh seed blocks
 to 99700, 99708, and 99716 respectively. The v5 label reader requires
 schema-v2 `automated_rule` provenance and the exact rule-set identifier.
+
+### Reviewed own-card MST chain decision (29 October 2026)
+
+Three newly saved local review choices from the seed-104400–104407 one-shot
+queue passed queue-membership, legal-action, complete native replay, and
+visibility validation. Two retained the recorded MST target **after** MST had
+already been activated; these are conditional target approvals, not approval
+of the earlier activation. One changed the earlier decision at zero-based
+decision 301 of `ring_guard_blind_104400_104407/matchup_01_seed_104405_seat_1.json`:
+chain a Set Mystical Space Typhoon while the player's own Mirror Force is
+active, or Pass. The reviewer selected Pass. The validated preference file
+SHA-256 is `700589b6aa98ab44762bbc8b3f7e7abad3f9c4b59d32646e8ccd0098fa7f7af9`.
+The original selected feature-v23 checkpoint ranked MST first; its Pass-minus-
+MST logit margin was **−3.774** at this replay-verified state. Neither the
+exact replay nor its seed was used in that checkpoint's training metadata.
+
+An offline exact-state branch used the recorded activation versus Pass with
+the same frozen checkpoint and `greedy_own_loss_guard_v1` continuations. Both
+branches ended in a loss for the reviewed player; they ran for 630 and 1,010
+decisions respectively. All decisions in both trajectories replay-verified
+and passed the visibility audit. The ignored branch report is
+`.cache/goat-ai/one_shot_review_branch_104405_d301/report.json`. This one
+branch establishes neither the reviewer's reason nor a competitive benefit
+from changing the action. It does establish an actionable disagreement with
+the selected model. The reviewed preference is preserved locally for later
+training, but one changed label is insufficient to promote a new policy.
