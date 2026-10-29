@@ -1,5 +1,28 @@
 # Baseline evaluation log
 
+## Chained own-back-row MST branch (29 October 2026)
+
+The selected feature-v23 policy with its v1 own-loss guard still made a clear
+own-card trade in a new, replay-verified case. At zero-based decision 266 of
+`.cache/goat-ai/mst_review_source_107600_107607/max_theeresak_seed107607_seat0.json`,
+it chained Set Mystical Space Typhoon to an opponent's monster-effect chain
+and targeted its own Set Scapegoat, while the opponent had no Spell/Trap card
+on the field. After that chain closed, the acting player's visible hand-plus-
+field material margin fell by **2** cards. The current v1 guard checks this
+own-only MST pattern only with an empty chain, so it does not catch this case.
+
+An exact-prefix offline branch compared the recorded activation with the
+offered Pass, continuing both with the same frozen policy and Tactical-v14
+opponent. The recorded branch lost (1,276 decisions); Pass won (861 decisions).
+Both complete branches replay-verified in the pinned native engine and passed
+the player-visibility audit. The ignored report is
+`.cache/goat-ai/mst_branch_107607_d266/report.json`; its source replay SHA-256
+is `90a6a8b64f9184d75e4749e63aec8f450a9063cfb8666ac21018ba763dde03d8`.
+The original hidden deal is fixed in both branches. This single outcome
+difference is evidence of a consequential failure, not a population win-rate
+estimate or a training label. The case is already in the local MST opportunity
+review queue for an explicit human judgment before training on it.
+
 ## Fresh tactical whitelist/Fusion protocol sample (29 October 2026)
 
 An independent `probe_random_decks.py` run sampled 20 whitelist-legal Main
