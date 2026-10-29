@@ -11897,6 +11897,18 @@ Spell/Trap effects. Tokens are excluded using their printed Token type, and
 unknown face-down opponent identities remain unknown. Every input duel is
 exactly replay-verified and visibility-audited first.
 
+The current count is
+`(own hand size + own non-token field cards) − (opponent hand size + opponent non-token field cards)`.
+The reported `material_delta` is that margin **after chain closure minus before
+activation**. Both face-up and face-down controlled cards count as one, even
+when their identity is hidden from the acting player. For example, Pot of
+Greed activated from the hand and resolving without another effect changes
+the margin by +1: one card is spent and two are drawn. Raigeki Break activated
+from a Set field card, discarding one own hand card and destroying one
+opposing field card, changes it by −1. A monster ability that removes one
+opposing field card without spending another card changes it by +1. These are
+observed board-and-hand counts, not automatic judgments of play quality.
+
 On the already recorded 64 current-core self-play duels from seeds
 97000–97063, all **27,511 decisions** passed those checks. The diagnostic
 found **228 selected monster-ability activations** and **849 selected
