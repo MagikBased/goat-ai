@@ -2544,3 +2544,17 @@ Nobleman, and 26 idle own-only MST opportunities, with no chosen activations
 in those three categories. These are narrow visible-state measurements; they
 do not establish a general card-advantage understanding or improved match
 strength.
+
+For a single review pass, the ignored
+`.cache/goat-ai/ring_guard_blind_104400_104407/own_card_review_queue.json`
+combines the **14** idle own-Ring choices, **two** negative visible Heavy Storm
+trades, and **one** own-monster Ring target. All **17** source duels and
+**10,659** total decisions were exact-replay-verified and visibility-audited
+during queue generation. The 17 queue items then passed the independent
+source-hash and legal-action validator. No item is pre-labeled as correct or
+incorrect; the suggestions mix the visible v3 guard and Tactical-v14 and
+must not be treated as an expert teacher. Open the combined queue with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/ring_guard_blind_104400_104407/own_card_review_queue.json
+```

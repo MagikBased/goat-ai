@@ -2582,3 +2582,7 @@ than the v3 control over 128 matched, unseen-Main-Deck direct games. In the
 changed game the own-target line won and the opposing-target line lost. This
 shows why a visible one-card trade cannot be promoted as general action value;
 v4 remains experimental, and the learned-policy strength gate stays open.
+The [combined outcome-blind own-card review queue](replay_audit.md#idle-own-ring-coverage-and-outcome-blind-review-29-october-2026)
+now puts 17 verified Ring and Heavy Storm decisions in one place. Review
+choices or explicit rejections from that queue are the next usable human
+signal; its suggested alternatives and offline branch winners are not labels.
