@@ -5,9 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 RING = 511000824  # pre-errata GOAT variant
 BOOK = 14087893
@@ -36,6 +39,7 @@ def test_book_chained_to_ring_protects_face_up_monster(tmp_path, chain_book):
         obs = env.reset()
         summoned = book_set = ring_set = ring_used = ring_targeted = False
         book_chained = book_targeted = False
+        resolved = False
         for _ in range(80):
             actions = env.legal_actions()
             action = None
@@ -96,5 +100,18 @@ def test_book_chained_to_ring_protects_face_up_monster(tmp_path, chain_book):
                 assert f"pre-errata/c{RING}.lua" in loaded
                 if chain_book:
                     assert f"official/c{BOOK}.lua" in loaded
-                return
-    pytest.fail("Ring / Book response did not resolve")
+                resolved = True
+                break
+        assert resolved, "Ring / Book response did not resolve"
+        agents = (RandomAgent(316), RandomAgent(317))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            action = agents[obs.acting_player].select_action(obs, env.legal_actions())
+            obs = env.step(action)
+        assert env.is_terminal(), "Ring / Book continuation did not finish"
+        path = tmp_path / f"ring_book_{chain_book}.json"
+        write_trajectory(path, env.trajectory())
+        saved = read_trajectory(path)
+        assert verify_trajectory(saved, ExperimentalOcgcoreEngine(root)) == len(saved.decisions)
+        audit_trajectory_visibility(saved)
