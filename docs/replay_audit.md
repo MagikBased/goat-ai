@@ -2600,3 +2600,38 @@ the new queue. The earlier target approvals in the source queue do not imply
 approval of MST activation. The new queue is a reproducible transformation of
 the saved notes: run `scripts/create_noted_upstream_queue.py` on the source
 queue with `--include-context-notes` and `--output` set to the path above.
+
+### Combined own-card activation review (29 October 2026)
+
+The 17-item own-card queue and seven earlier MST activation prompts now have
+one save-enabled review session. The combined queue contains **24 distinct
+decisions** from **23 source duels**. Its builder rechecked the exact source
+bytes, queue metadata and legal actions, native replay, and visibility for
+all **14,028** decisions before writing the queue. It requires one checkpoint
+and rejects duplicate decision identities. Existing labels in either source
+queue are not transferred or interpreted as approvals; the seven context
+notes remain explanatory text, not preference labels.
+
+Open the combined queue with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/own_card_activation_review_20261029.json
+```
+
+The ignored queue SHA-256 is
+`759559e604d8b87b1bfd707fe467d3a2dd3328f86df8815a77f33f715a6ec737`.
+To rebuild it, run:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/combine_review_queues.py \
+  .cache/goat-ai/ring_guard_blind_104400_104407/own_card_review_queue.json \
+  .cache/goat-ai/one_shot_review_104400_104407/context_upstream_20261029.json \
+  --output .cache/goat-ai/own_card_activation_review_20261029.json \
+  --native-root .cache/goat-ai
+```
+
+For a clearly poor activation with several plausible replacements, the
+reviewer can use **Reject the AI's recorded action**. The existing
+`convert_rejected_review_notes.py` checks the saved finding against the
+combined queue and exact replay before producing a negative-only training
+preference. The queue's suggested alternatives are not human judgments.
