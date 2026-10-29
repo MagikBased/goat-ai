@@ -526,6 +526,26 @@ and `.cache/goat-ai/combined_guard_v3_control_104700_104715.json`
 This combination has no measured strength gain and remains experimental. It
 does not address the broader learned action-value problem or close M4.
 
+On the separate, already replay-verified and visibility-audited 128-duel
+v1-guarded batch at seeds 104400–104407, a fixed-state mask comparison
+examined 12,707 policy decisions with at least two legal actions. The
+recorded v1 choice was removed by the v5 mask **23** times: **14** by the
+idle own-only Ring condition and **9** by the isolated one-shot MST response
+condition. V5 narrowed the v1 action set at **56** decisions, removing one
+additional action at each. This comparison uses the same recorded
+observations and offered actions; it does not play the v5 alternatives or
+measure how often the same states arise in a v5 duel. In particular, the
+independent review audit's 11 one-shot removal flags include cards beyond
+the nine MST responses covered here. It demonstrates local error coverage,
+while the direct 63–65 result above remains the competitive strength test.
+Reproduce the mask count from the verified audit manifest with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_guard_mask_delta.py \
+  .cache/goat-ai/ring_guard_blind_104400_104407/audit_upstream_128.json \
+  --native-root .cache/goat-ai
+```
+
 ### Own-Ring target filter ablation (29 October 2026)
 
 An opt-in v4 inference guard extends v3. At a Ring target prompt controlled
