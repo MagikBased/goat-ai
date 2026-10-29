@@ -55,6 +55,10 @@ def main() -> None:
     parser.add_argument("--parent-kl-weight", type=float, default=1.0)
     parser.add_argument("--recorded-bad-weight", type=float, default=1.0,
                         help="relative loss weight when the replay chose a disfavored action")
+    parser.add_argument("--objective", choices=("pairwise_mean", "masked_parent"),
+                        default="pairwise_mean",
+                        help="masked_parent removes disfavored action mass while preserving "
+                             "the parent's ranking among remaining actions; automated rules only")
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", type=Path, required=True)
@@ -97,6 +101,8 @@ def main() -> None:
         verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
         preferences = read_decision_preferences(preferences_path, replay_hash, trajectory)
+        if args.objective == "masked_parent" and preferences.authorization != "automated_rule":
+            raise ValueError("masked_parent objective requires automated-rule preferences")
         if preferences.authorization == "automated_rule":
             if weak_flip_attacks is None:
                 weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
@@ -171,7 +177,8 @@ def main() -> None:
         steps=args.steps, preservation_batch=args.preserve_batch,
         preservation_weight=args.parent_kl_weight,
         learning_rate=args.learning_rate, rng=rng,
-        recorded_bad_weight=args.recorded_bad_weight)
+        recorded_bad_weight=args.recorded_bad_weight,
+        objective=args.objective)
     sources = dict(metadata.get("source_decisions", {}))
     for game in training_games:
         source = game["source"]
@@ -199,6 +206,7 @@ def main() -> None:
             "preserve_batch": args.preserve_batch,
             "parent_kl_weight": args.parent_kl_weight,
             "recorded_bad_weight": args.recorded_bad_weight,
+            "objective": args.objective,
             "learning_rate": args.learning_rate, "seed": args.seed,
         },
         "preference_loss_first": preference_losses[0],

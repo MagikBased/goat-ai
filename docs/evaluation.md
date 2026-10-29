@@ -1,5 +1,70 @@
 # Baseline evaluation log
 
+## Masked-parent bad-action training pilot (28 October 2026)
+
+The v5 pairwise loss averaged the scores of all alternatives to a flagged
+activation. That need not reduce the **total probability** assigned to the
+bad action. An opt-in `masked_parent` preference objective now computes the
+frozen parent's legal-action distribution at each verified, player-visible
+review state, sets the disfavored actions' probability to zero, renormalizes
+the remaining actions, and fits the student to that target. This preserves
+the parent's relative ranking among the remaining moves. The CLI accepts
+this objective only for automated-rule preferences; ordinary human choices
+continue to use the existing pairwise objective. Separate current-core
+preservation states still receive parent KL.
+
+A pilot started from the unchanged selected feature-v23 checkpoint and used
+the **85** `visible_material_avoidance_v5` comparisons in **31** verified
+self-play replays from seeds 97000–97063. Four current-core greedy replays on
+seeds 99800–99801 supplied **64** separate preservation states. The fit used
+20 steps, recorded-bad weight 2, learning rate 0.0001, parent-KL weight 1,
+and seed 74. Preference loss fell from **0.8577** to **0.7612**; final sampled
+preservation KL was **0.00392**. The ignored checkpoint
+`.cache/goat-ai/fv23_masked_parent_97000_97063.pt` has SHA-256
+`aa704252322eedc96ae2f3ce38372cc7fa26e2a1c9f67bc521716e0a75fe1be0`.
+The v5 labels remain automated tactical hypotheses, not human-reviewed
+optimal moves.
+
+On four separate, replay-verified greedy trajectories from seeds 99802–99803,
+v5 generated **16** held-out comparisons. The parent ranked a disfavored
+action first on **2/16** states and the child on **0/16**. Neither the replay
+hashes nor seeds occur in the child's training provenance. These are fixed
+states visited by the parent, not complete child games. The ignored parent
+and child score reports have SHA-256
+`30ef66c1162e409b7eb8e67b82fe735c1d98768065d7d941f1359ab083c87293`
+and `9431111f8adb3bbb5bfe1b19982e97a1b4edbf4c98dea2e05ae1b393eb33507a`.
+
+On unseen Phoenix/Dimension Fusion and Ryan Hayakawa/Bryan Coronel Main Deck
+matchups, both deck assignments and policy seats, the child scored **19–13**
+directly against the parent on seeds 99824–99827. On different unseen
+Theeresak/Phoenix and Bryan Coronel/Dimension Fusion pairings at seeds
+99828–99835, it scored **36–28**. The latter 64-game paired interval was
+**46.9%–65.6%**, so that block alone does not establish a gain. The ignored
+direct report SHA-256 values are
+`b565d7f57a1a5796b9c69921aee72e692d100fb7054a613930dbe16d533f3288`
+and `eddc280d82bdd56e7d5dfde52eb5a5aeaff1673ff3b2ad937e338a2f42b9bd2f`.
+
+Against Tactical-v14 on matched seeds 99820–99823, the child scored
+**11–21** and the parent **7–25**; the paired score difference was **+12.5
+percentage points** (95% interval **+3.1 to +25.0**). A second matched block
+on different pairings and seeds 99844–99851 gave **24–40** versus **25–39**,
+a **−1.6 point** difference (interval **−14.1 to +12.5**). Both blocks passed
+the unseen-Main-Deck and provenance comparator. The second block's child and
+parent report SHA-256 values are
+`9b4da633f481e238ab836798e6ff06c850323e0b818012a17d9c96588c5b289c`
+and `53e101d678c3b309c0c5dbfc82522629f20a98d45d3c2016b887754f4aab0ca4`.
+
+Eight further complete greedy replays on fresh seeds 99840–99843 gave the
+child **one** own-card-loss flag over 2,174 policy choices, versus the
+parent's **three** over 2,477. The child still chose own-only Nobleman once
+in four visited opportunities; the parent did so twice in four. These are
+small, different-policy trajectories, so the flag counts do not isolate a
+causal effect. The ignored child and parent audit reports have SHA-256
+`cb4df450213a0a757d649fc07c224933e3817e74ba3898071f24731aa410e0a4`
+and `c660fa68dfd92d9b3467792e6692de1d917df55993dbbb042e5ef1b4773b28ec`.
+Keep the selected v23 checkpoint unchanged: the targeted error improved on
+these samples, but the Tactical transfer did not replicate.
+
 ## Visible own-card losses in the selected policy (28 October 2026)
 
 The weak average material association and the v5 preference trial do **not**

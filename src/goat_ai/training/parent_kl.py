@@ -12,6 +12,20 @@ from goat_ai.replay import DecisionRecord, ReviewedPreference
 from .policy import CardVocabulary, LegalActionPolicy, encode_decision
 
 
+def masked_parent_distribution(parent_logits: torch.Tensor,
+                               disfavored: Sequence[int]) -> torch.Tensor:
+    """Keep the parent's relative ranking of allowed actions and drop bad ones."""
+    if (parent_logits.ndim != 1 or not disfavored
+            or len(set(disfavored)) != len(disfavored)
+            or any(type(index) is not int or not 0 <= index < len(parent_logits)
+                   for index in disfavored)
+            or len(disfavored) == len(parent_logits)):
+        raise ValueError("masked parent needs a proper subset of legal actions")
+    masked = parent_logits.detach().clone()
+    masked[list(disfavored)] = -torch.inf
+    return nn.functional.softmax(masked, dim=0)
+
+
 def fit_with_parent_kl(
     model: LegalActionPolicy,
     parent: LegalActionPolicy,
@@ -96,6 +110,7 @@ def fit_preferences_with_parent_kl(
     learning_rate: float,
     rng: random.Random,
     recorded_bad_weight: float = 1.0,
+    objective: str = "pairwise_mean",
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """Raise preferred legal actions above disfavored ones with parent KL.
 
@@ -109,6 +124,8 @@ def fit_preferences_with_parent_kl(
         raise ValueError("preference KL needs records and positive finite settings")
     if not isfinite(recorded_bad_weight) or recorded_bad_weight <= 0:
         raise ValueError("recorded bad-choice weight must be finite and positive")
+    if objective not in ("pairwise_mean", "masked_parent"):
+        raise ValueError("unsupported preference objective")
     if parent is model or parent.feature_version != model.feature_version:
         raise ValueError("preference KL needs a separate compatible reference policy")
     device = next(model.parameters()).device
@@ -135,13 +152,19 @@ def fit_preferences_with_parent_kl(
     with torch.no_grad():
         parent_probabilities = [nn.functional.softmax(parent(features.to(device)), dim=0)
                                 for features in preserve_features]
+        reviewed_targets = (
+            [masked_parent_distribution(parent(features.to(device)), bad)
+             for features, _, bad, _ in examples]
+            if objective == "masked_parent" else None)
     optimizer = torch.optim.Adam((parameter for parameter in model.parameters()
                                   if parameter.requires_grad), lr=learning_rate)
     preference_losses = []
     preservation_losses = []
 
-    def preference_term(features, good, bad):
+    def preference_term(features, good, bad, target):
         logits = model(features.to(device))
+        if target is not None:
+            return -(target * nn.functional.log_softmax(logits, dim=0)).sum()
         good_score = torch.logsumexp(logits[list(good)], dim=0) - log(len(good))
         bad_score = torch.logsumexp(logits[list(bad)], dim=0) - log(len(bad))
         return nn.functional.softplus(bad_score - good_score)
@@ -149,8 +172,11 @@ def fit_preferences_with_parent_kl(
     for _ in range(steps):
         model.train()
         optimizer.zero_grad()
-        preference_loss = sum(weight * preference_term(features, good, bad)
-                              for features, good, bad, weight in examples
+        preference_loss = sum(weight * preference_term(features, good, bad, target)
+                              for (features, good, bad, weight), target in zip(
+                                  examples,
+                                  reviewed_targets if reviewed_targets is not None
+                                  else [None] * len(examples))
                               ) / total_preference_weight
         picks = rng.sample(range(len(preserve_features)), preservation_batch)
         preservation_loss = sum(

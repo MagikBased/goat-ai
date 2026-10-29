@@ -2445,3 +2445,12 @@ broadened each negative activation comparison to all other offered actions.
 It fit 783 verified comparisons but split 32–32 with v4 and did not show a
 reliable gain against the parent or Tactical. Its held-out top-action mistake
 count was unchanged from v4. Keep this rule and checkpoint experimental.
+The [masked-parent pilot](evaluation.md#masked-parent-bad-action-training-pilot-28-october-2026)
+instead removes probability from flagged bad actions while keeping the frozen
+parent's relative ranking of other legal moves. The 85-comparison child
+avoided both flagged top choices on 16 held-out fixed states and won 55–41
+across two direct parent blocks, but the larger matched Tactical block was
+24–40 versus the parent's 25–39. The selected v23 reference remains unchanged.
+The next M4 trial needs broader reviewed activation and target decisions,
+fresh deck families, and repeatable own-card opportunity rates alongside
+held-out competitive strength.
