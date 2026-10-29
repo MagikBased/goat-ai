@@ -1329,6 +1329,44 @@ activation from forced target prompts, and reserve fresh seeds for testing
 generalization. Neither a simple card-count heuristic nor these few labels
 establishes whether a play is strategically good in every position.
 
+### V12 own-MST preference trial (29 October 2026)
+
+`visible_selected_own_loss_with_own_mst_v12` adds a narrow automated
+comparison to V11: when the recorded policy chooses MST and the only other
+back row card is its own face-up printed Normal/Quick-Play Spell or Normal
+Trap, prefer an actually offered pass. The rule skips Set cards, other
+visible back row, forced target prompts, and positions without a pass. It is
+an experimental training label, not a legality restriction or a universal
+claim about using MST on one's own card. The parser and trainer validate its
+rule-set ID and recompute the label from the player-visible replay.
+
+The V12 generator native-replayed and visibility-audited all 128 control PPO
+training trajectories from seeds 106800–106927. It wrote **34 selected-error
+comparisons from 30 replays**, including **three** new own-face-up-MST cases.
+The ignored manifest SHA-256 is
+`2b410cb3d76e817c3f99cae6ddb1f54b6023b4e538f8c7313f04fff47043faba`.
+An experimental 40-step child of V11 used these 34 comparisons, four separate
+current-core preservation trajectories (64 states), masked-parent objective,
+recorded-bad weight 10, parent KL weight 1, learning rate 0.0001, and seed 83.
+Its preference loss fell **1.1317 → 0.8977**; final sampled preservation KL
+was **0.01356**. Checkpoint SHA-256:
+`82e707470ffbf9e0f8a50e36cf377597d358a5d7b55b0064dd5085325ee157a9`.
+
+The preservation trajectories included the Theeresak Seattle deck. The
+unseen-Main-Deck gate correctly rejected a first proposed comparison that
+included it. The valid comparison used only the Max Suffridge and Jonathan
+Labounty 2005 Nationals Main Decks, both deck orders and both policy seats.
+On new seeds 107320–107335, V12 scored **30–34** directly against V11. On
+matched seeds 107336–107351 against Tactical-v14, V12 scored **14–50** and V11
+**21–43**. The paired V12-minus-V11 Tactical score difference was **−10.9
+percentage points**, 95% paired bootstrap interval **−21.9 to −1.6 points**.
+The report comparator verified equal assets, scripts, source, schedule, and
+unseen Main Decks. This trial did not improve full-game strength. The small
+MST label addition is entangled with 31 other selected-error comparisons, so
+the match difference cannot be attributed to MST labels alone. Keep V12
+experimental; the selected v23 checkpoint remains unchanged. Ignored reports
+are under `.cache/goat-ai/v12_heldout_107320_107351/`.
+
 ## Selected own-loss preference trial (29 October 2026)
 
 The versioned `visible_selected_own_loss_v10` rule retains only V9 decisions

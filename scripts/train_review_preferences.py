@@ -123,14 +123,16 @@ def main() -> None:
             if weak_flip_attacks is None:
                 weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
             if (preferences.rule_set_id in ("visible_residual_guard_distillation_v8",
-                                            "visible_selected_own_loss_with_responses_v11")
+                                            "visible_selected_own_loss_with_responses_v11",
+                                            "visible_selected_own_loss_with_own_mst_v12")
                     and residual_card_facts is None):
                 residual_card_facts = load_card_facts(args.native_root)
             validate_automated_preferences(
                 trajectory, preferences, weak_flip_attacks,
                 residual_card_facts if preferences.rule_set_id in (
                     "visible_residual_guard_distillation_v8",
-                    "visible_selected_own_loss_with_responses_v11") else None)
+                    "visible_selected_own_loss_with_responses_v11",
+                    "visible_selected_own_loss_with_own_mst_v12") else None)
         reviewed.extend((trajectory.decisions[item.decision_index], item)
                         for item in preferences.preferences)
         new_hashes[str(replay_path)] = replay_hash

@@ -188,6 +188,36 @@ def test_v3_resource_pairs_use_visible_legal_options_and_recorded_safe_choice():
     assert only_nobleman[0]["disfavored_action_indices"] == [0]
 
 
+def test_v12_labels_selected_mst_with_only_own_faceup_spell():
+    swords = CardView(0, "spell_trap", "faceup", 72302403, 0)
+    view = Observation(
+        viewer=0, acting_player=0, turn=1, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(swords,),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=5,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=0)
+    mst = Action("mst", "chain", 0, {"code": 5318639, "location": 2})
+    passing = Action("pass", "pass", 0)
+    record = DecisionRecord(view, (mst, passing), mst)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1,
+                        source="policy_evaluation",
+                        skill_metadata={"demonstrator_seat": 0})
+    expected = ([{"decision_index": 0, "preferred_action_indices": [1],
+                  "disfavored_action_indices": [0]}],
+                {"selected_own_loss": 0, "selected_ring_or_mst_response": 0,
+                 "selected_own_faceup_mst": 1})
+    facts = {72302403: (2, 0, 0)}
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V12,
+                  card_facts=facts) == expected
+    own_set = replace(swords, position="facedown")
+    assert derive(replace(replay, decisions=(replace(record, observation=replace(
+        view, field=(own_set,))),)), (), rule_set_id=rules.RULE_SET_V12,
+        card_facts=facts)[0] == []
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 0)
+    assert derive(replace(replay, decisions=(replace(record, observation=replace(
+        view, field=(swords, enemy_set))),)), (), rule_set_id=rules.RULE_SET_V12,
+        card_facts=facts)[0] == []
+
+
 def test_v3_set_heavy_storm_does_not_count_itself_as_collateral():
     source = CardView(0, "spell_trap", "facedown", 19613556, 0)
     enemy = CardView(1, "spell_trap", "facedown", None, 0)
