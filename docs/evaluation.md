@@ -817,6 +817,37 @@ and `c660fa68dfd92d9b3467792e6692de1d917df55993dbbb042e5ef1b4773b28ec`.
 Keep the selected v23 checkpoint unchanged: the targeted error improved on
 these samples, but the Tactical transfer did not replicate.
 
+### Full-choice Ring branch diagnostic (29 October 2026)
+
+A flagged own-only Ring of Destruction decision in the verified
+`ring_guard_blind_104400_104407/matchup_01_seed_104406_seat_0.json` replay
+was branched at zero-based decision **89**. The selected v23 policy activated
+Ring on turn 3 at 8000–8000 LP, then targeted its own 1900-ATK monster;
+that recorded branch lost. Reconstructing the exact seed and action prefix,
+then continuing with the same v23 policy and Tactical-v14 opponent, produced
+these terminal outcomes:
+
+| Initial action | Policy-seat outcome | Verified decisions |
+| --- | --- | ---: |
+| Activate Ring (recorded action index 4) | Loss | 670 |
+| Enter Battle Phase (index 5) | Loss | 561 |
+| Enter End Phase (index 6) | Win | 468 |
+
+The recorded-action branch reproduced the source replay exactly. All three
+complete branches passed native replay and player-visibility verification.
+The ignored report is
+`.cache/goat-ai/ring_full_choice_branch_104406_d89/report.json` (SHA-256
+`bf7484d1ece96d5ce1b30738cb99c407e42bc8c1b64837e1f41a88bf9c885e8f`);
+its branch trajectory SHA-256 values are recorded there. Reproduce with
+`scripts/evaluate_decision_branches.py` using the source replay, selected
+`fv23_current_tactical_broader_33000_33031.pt` checkpoint, `--decision-index
+89 --action-index 4 --action-index 5 --action-index 6` and an empty output
+directory. This is an offline, full-state, single-seed diagnostic: its win
+reversal does not establish expected action value or an online search method.
+It does show why a target-only correction is insufficient. The avoidable
+choice was activating Ring; the better tested branch held it and ended the
+turn.
+
 ## Visible own-card losses in the selected policy (28 October 2026)
 
 The weak average material association and the v5 preference trial do **not**
