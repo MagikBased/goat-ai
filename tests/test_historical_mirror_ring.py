@@ -5,9 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 MIRROR = 44095762
 RING = 511000824
@@ -38,6 +41,7 @@ def test_ring_chained_to_mirror_removes_attacker_but_not_other_monster(tmp_path)
         mirror_set = ring_set = attacked = mirror_chained = ring_chained = False
         target_selected = False
         attacker_code = other_code = attacker_attack = None
+        resolved = False
         for _ in range(90):
             actions = env.legal_actions()
             action = None
@@ -102,5 +106,18 @@ def test_ring_chained_to_mirror_removes_attacker_but_not_other_monster(tmp_path)
                 assert obs.life_points == (8000 - attacker_attack,
                                            8000 - attacker_attack)
                 assert set(scripts) <= env.engine.probe.loaded_script_sha256.keys()
-                return
-    pytest.fail("Ring / Mirror Force chain did not resolve")
+                resolved = True
+                break
+        assert resolved, "Ring / Mirror Force chain did not resolve"
+        agents = (RandomAgent(52), RandomAgent(53))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            obs = env.step(agents[obs.acting_player].select_action(
+                obs, env.legal_actions()))
+        assert env.is_terminal(), "Ring / Mirror Force duel did not finish"
+        path = tmp_path / "mirror_ring.json"
+        write_trajectory(path, env.trajectory())
+        saved = read_trajectory(path)
+        assert verify_trajectory(saved, ExperimentalOcgcoreEngine(root)) == len(saved.decisions)
+        audit_trajectory_visibility(saved)

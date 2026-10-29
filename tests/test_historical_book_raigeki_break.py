@@ -5,9 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 BREAK = 4178474
 BOOK = 14087893
@@ -38,6 +41,7 @@ def test_book_chained_to_break_does_not_save_target(tmp_path, respond):
         break_set = summoned = book_set = activated = discarded = targeted = False
         response_made = book_chained = book_targeted = False
         monster_code = None
+        resolved = False
         for _ in range(100):
             actions = env.legal_actions()
             action = None
@@ -103,5 +107,18 @@ def test_book_chained_to_break_does_not_save_target(tmp_path, respond):
                 assert not any(c.controller == 1 and c.zone == "monster" for c in obs.field)
                 assert (BOOK in {c.code for c in obs.graveyards[1]}) == respond
                 assert obs.life_points == (8000, 8000)
-                return
-    pytest.fail("Book / Raigeki Break chain did not resolve")
+                resolved = True
+                break
+        assert resolved, "Book / Raigeki Break chain did not resolve"
+        agents = (RandomAgent(15), RandomAgent(16))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            obs = env.step(agents[obs.acting_player].select_action(
+                obs, env.legal_actions()))
+        assert env.is_terminal(), "Book / Raigeki Break duel did not finish"
+        path = tmp_path / f"book_break_{respond}.json"
+        write_trajectory(path, env.trajectory())
+        saved = read_trajectory(path)
+        assert verify_trajectory(saved, ExperimentalOcgcoreEngine(root)) == len(saved.decisions)
+        audit_trajectory_visibility(saved)

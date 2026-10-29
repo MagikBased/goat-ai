@@ -5,9 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 DUST = 60082869
 BOOK = 14087893
@@ -39,6 +42,7 @@ def test_dust_chained_to_book_destroys_it_without_negating_flip(tmp_path,
         dust_set = summoned = book_used = book_targeted = dust_chained = False
         dust_targeted = set_chosen = set_placed = False
         monster_code = None
+        resolved = False
         for _ in range(90):
             actions = env.legal_actions()
             action = None
@@ -109,5 +113,18 @@ def test_dust_chained_to_book_destroys_it_without_negating_flip(tmp_path,
                 assert any(c.code == BOOK for c in opponent.field
                            if c.controller == 0 and c.zone == "spell_trap") == set_from_hand
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
-                return
-    pytest.fail("Dust / Book response did not resolve")
+                resolved = True
+                break
+        assert resolved, "Dust / Book response did not resolve"
+        agents = (RandomAgent(52), RandomAgent(53))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            obs = env.step(agents[obs.acting_player].select_action(
+                obs, env.legal_actions()))
+        assert env.is_terminal(), "Dust / Book duel did not finish"
+        path = tmp_path / f"dust_book_{set_from_hand}.json"
+        write_trajectory(path, env.trajectory())
+        saved = read_trajectory(path)
+        assert verify_trajectory(saved, ExperimentalOcgcoreEngine(root)) == len(saved.decisions)
+        audit_trajectory_visibility(saved)

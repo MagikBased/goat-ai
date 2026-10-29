@@ -503,6 +503,14 @@ Phoenix cases are recorded in [GOAT rules](goat_rules.md).
 
 A paired native Ring of Destruction and Book of Moon fixture checks target validity at resolution, the no-damage outcome when Book sets the target, and the opponent's hidden field view. The preserved historical Book ruling states this interaction explicitly. Both branches now finish, replay-verify, and pass the visibility audit; see [GOAT rules](goat_rules.md).
 
+Four more source-backed response fixtures now continue through terminal duels:
+both Book of Moon versus Raigeki Break branches, Ring chained to Mirror Force,
+Call of the Haunted chained to Heavy Storm before Sangan searches, and both
+Dust Tornado versus an activated Book of Moon branches. All six complete
+trajectories replay-verify and pass player-visibility audits. These checks
+extend full-duel coverage for common cards without certifying every response
+ordering or the complete historical ruleset; see [GOAT rules](goat_rules.md).
+
 A paired Ceasefire fixture now distinguishes a Set Magician of Faith from a
 Set Normal Monster. Both turn face-up in Defense Position, but only Faith
 counts toward Ceasefire's 500 damage, and its Flip Effect does not recover the

@@ -5,9 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 GRACEFUL = 79571449
 CALL = 97077563
@@ -37,6 +40,7 @@ def test_call_chained_to_heavy_revives_sangan_then_searches(tmp_path):
         obs = env.reset()
         assert {GRACEFUL, CALL, SANGAN, MAD_DOG} <= {c.code for c in obs.hand}
         graceful = discarded = call_set = heavy = call_chained = targeted = searched = False
+        resolved = False
         for _ in range(75):
             actions = env.legal_actions()
             action = None
@@ -91,7 +95,21 @@ def test_call_chained_to_heavy_revives_sangan_then_searches(tmp_path):
                 assert [c.code for c in opponent.private_reveals[-1].cards] == [MYSTICAL_ELF]
                 assert not owner.private_reveals
                 assert scripts <= env.engine.probe.loaded_script_sha256.keys()
-                return
-        pytest.fail(f"Heavy/Call/Sangan line stalled at turn {obs.turn}; "
-                    f"Graceful={graceful}/{discarded} Call={call_set}/{call_chained}/{targeted} "
-                    f"Heavy={heavy} searched={searched}")
+                resolved = True
+                break
+        assert resolved, (f"Heavy/Call/Sangan line stalled at turn {obs.turn}; "
+                          f"Graceful={graceful}/{discarded} "
+                          f"Call={call_set}/{call_chained}/{targeted} "
+                          f"Heavy={heavy} searched={searched}")
+        agents = (RandomAgent(100), RandomAgent(101))
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            obs = env.step(agents[obs.acting_player].select_action(
+                obs, env.legal_actions()))
+        assert env.is_terminal(), "Heavy/Call/Sangan duel did not finish"
+        path = tmp_path / "heavy_call_sangan.json"
+        write_trajectory(path, env.trajectory())
+        saved = read_trajectory(path)
+        assert verify_trajectory(saved, ExperimentalOcgcoreEngine(root)) == len(saved.decisions)
+        audit_trajectory_visibility(saved)
