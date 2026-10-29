@@ -50,6 +50,8 @@ RULE_SET_V10 = "visible_selected_own_loss_v10"
 RULE_SET_V11 = "visible_selected_own_loss_with_responses_v11"
 RULE_SET_V12 = "visible_selected_own_loss_with_own_mst_v12"
 RULE_SET_V13 = "visible_selected_own_loss_with_idle_ring_v13"
+RULE_SET_V14 = "visible_audit_no_weak_flip_v14"
+DEFAULT_RULE_SET = RULE_SET_V14
 SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -61,6 +63,9 @@ SUPPORTED_CATEGORIES_V1 = frozenset({
 SUPPORTED_CATEGORIES_V2 = SUPPORTED_CATEGORIES_V1 | {
     "nobleman_only_own_set_monster",
     "raigeki_break_targets_own_card_with_enemy_option",
+}
+SUPPORTED_CATEGORIES_V14 = SUPPORTED_CATEGORIES_V2 - {
+    "weak_flip_normal_summon_with_set_available",
 }
 
 
@@ -242,7 +247,8 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID,
         return sorted(resource + target, key=lambda item: item["decision_index"]), (
             resource_counts + target_counts)
     categories = {RULE_SET_ID: SUPPORTED_CATEGORIES_V1,
-                  RULE_SET_V2: SUPPORTED_CATEGORIES_V2}.get(rule_set_id)
+                  RULE_SET_V2: SUPPORTED_CATEGORIES_V2,
+                  RULE_SET_V14: SUPPORTED_CATEGORIES_V14}.get(rule_set_id)
     if categories is None:
         raise ValueError("unsupported visible audit rule set")
     result = []
@@ -549,8 +555,8 @@ def main() -> None:
                                                RULE_SET_V7, RULE_SET_V8,
                                                RULE_SET_V9, RULE_SET_V10,
                                                RULE_SET_V11, RULE_SET_V12,
-                                               RULE_SET_V13),
-                        default=RULE_SET_ID)
+                                               RULE_SET_V13, RULE_SET_V14),
+                        default=DEFAULT_RULE_SET)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
         parser.error("output directory must be empty")
@@ -586,7 +592,7 @@ def main() -> None:
                                                      RULE_SET_V7, RULE_SET_V8,
                                                      RULE_SET_V9, RULE_SET_V10,
                                                      RULE_SET_V11, RULE_SET_V12,
-                                                     RULE_SET_V13)
+                                                     RULE_SET_V13, RULE_SET_V14)
             else 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",

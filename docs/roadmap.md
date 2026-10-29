@@ -2675,6 +2675,13 @@ first. The next M4 training set needs more varied, independent activation and
 target judgments; fitting a small review set more tightly has not produced
 transfer or a demonstrated strength gain.
 
+The synthetic preference generator now defaults to
+`visible_audit_no_weak_flip_v14`: weak Flip Normal Summons remain human-review
+questions after exact-state Magical Merchant branches disagreed with a blanket
+Set label. Old v1/v2 rule IDs still reproduce historical experiments. This
+removes seven uncertain labels from the six fresh flagged source replays; it
+does not count as a learned-policy gain. See the [evaluation entry](evaluation.md#weak-flip-synthetic-label-correction-29-october-2026).
+
 The [eight-case own-loss fit](evaluation.md#eight-case-own-loss-preference-transfer-29-october-2026)
 removed the disfavored action from first place on all eight source positions,
 but scored 55–73 against its parent over 128 fresh, unseen-deck duels (95%

@@ -178,6 +178,11 @@ def test_automated_rule_preferences_have_distinct_provenance(tmp_path):
                          rule_set_id="visible_audit_v2", reviewed_seat=0)
     assert read_decision_preferences(v2, "a" * 64, base).rule_set_id == (
         "visible_audit_v2")
+    v14 = preference_file(tmp_path, schema_version=2,
+                          authorization="automated_rule",
+                          rule_set_id="visible_audit_no_weak_flip_v14", reviewed_seat=0)
+    assert read_decision_preferences(v14, "a" * 64, base).rule_set_id == (
+        "visible_audit_no_weak_flip_v14")
     for rule_set in (None, "unreviewed_v2"):
         invalid = preference_file(tmp_path, authorization="automated_rule",
                                   rule_set_id=rule_set)

@@ -82,7 +82,8 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
                     "visible_selected_own_loss_v10",
                     "visible_selected_own_loss_with_responses_v11",
                     "visible_selected_own_loss_with_own_mst_v12",
-                    "visible_selected_own_loss_with_idle_ring_v13"))):
+                    "visible_selected_own_loss_with_idle_ring_v13",
+                    "visible_audit_no_weak_flip_v14"))):
             raise ValueError("automated preferences require a supported visible audit rule set")
         seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
                             else "demonstrator_seat")

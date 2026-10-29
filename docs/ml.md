@@ -503,15 +503,26 @@ results before using an oversampled checkpoint by default.
 
 `scripts/derive_visible_rule_preferences.py` can turn six conservative replay
 audit flags into pairwise legal-action preferences. It verifies each complete
-native replay and audits hidden-information isolation first. The output uses
-`authorization=automated_rule` and `rule_set_id=visible_audit_v1`; it is
-explicitly **synthetic feedback**, not a human annotation. The rules cover
+native replay and audits hidden-information isolation first. Historical v1
+output uses `authorization=automated_rule` and
+`rule_set_id=visible_audit_v1`; it is **synthetic feedback**, not a human
+annotation. The v1 rules cover
 self-banish with an opposing target, empty Thunder Dragon searches, weak Flip
 monsters Summoned face up when a Set is available, Pot of Greed before an
 available Thunder Dragon activation, and Ring of Destruction on an own monster
 with a safe opposing target. The generator selects only alternatives present
 in that decision's recorded legal-action set. It does not claim those
 alternatives are always optimal.
+
+The CLI now defaults to versioned rule set `visible_audit_no_weak_flip_v14`.
+It keeps the other v2 visible-audit comparisons but leaves weak Flip Normal
+Summons for human review: seven exact-state Magical Merchant branch checks
+included one where Normal Summon won and Set lost. The older v1 and v2 rule
+sets remain available explicitly, so existing synthetic files continue to
+validate against their recorded semantics. A v14 preference file has schema
+version 2 and distinct rule-set provenance. Removing an uncertain label is a
+training-data correction, not evidence of a stronger policy; any child still
+needs held-out match evaluation.
 
 `scripts/train_review_preferences.py` accepts these files alongside its
 existing human-review formats, records their distinct provenance, and

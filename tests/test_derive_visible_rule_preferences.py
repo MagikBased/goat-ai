@@ -77,6 +77,37 @@ def test_derive_staged_thunder_search_prefers_offered_deck_copy():
         {"thunder_empty_search_with_copies_available": 1})
 
 
+def test_v14_keeps_weak_flip_for_review_without_rewriting_v1(monkeypatch):
+    assert rules.DEFAULT_RULE_SET == rules.RULE_SET_V14
+    merchant = 32362575
+    observation = Observation(
+        viewer=0, acting_player=0, turn=2, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(), graveyards=((), ()),
+        banished=((), ()), opponent_hand_count=4,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0),
+    )
+    summon = Action("summon", "normal_summon", 0,
+                    {"code": merchant, "location": 2, "controller": 0, "sequence": 0})
+    set_card = Action("set", "set_monster", 0,
+                      {"code": merchant, "location": 2, "controller": 0, "sequence": 0})
+    record = DecisionRecord(observation, (summon, set_card), summon)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1)
+    candidate = ReviewCandidate(0, "weak_flip_normal_summon_with_set_available",
+                                2, "main1", 0, {})
+    assert derive(replay, (candidate,), rule_set_id=rules.RULE_SET_V14) == ([], {})
+    assert derive(replay, (candidate,), rule_set_id=rules.RULE_SET_ID) == (
+        [{"decision_index": 0, "preferred_action_indices": [1],
+          "disfavored_action_indices": [0]}],
+        {"weak_flip_normal_summon_with_set_available": 1})
+    monkeypatch.setattr(rules, "review_candidates", lambda *args, **kwargs: (candidate,))
+    rules.validate_automated_preferences(
+        replay, SimpleNamespace(rule_set_id=rules.RULE_SET_V14, preferences=()), {})
+    with pytest.raises(ValueError, match="do not match visible_audit_no_weak_flip_v14"):
+        rules.validate_automated_preferences(
+            replay, SimpleNamespace(rule_set_id=rules.RULE_SET_V14,
+                                    preferences=(ReviewedPreference(0, (1,), (0,)),)), {})
+
+
 def test_automated_labels_must_match_recomputed_visible_rule(monkeypatch):
     view = Observation(
         viewer=0, acting_player=0, turn=2, phase="main1",

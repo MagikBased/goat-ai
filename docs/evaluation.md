@@ -1,5 +1,30 @@
 # Baseline evaluation log
 
+## Weak Flip synthetic-label correction (29 October 2026)
+
+The existing `visible_audit_v1` and `visible_audit_v2` rule IDs automatically
+preferred Set whenever a weak Flip monster was Normal Summoned with Set legal.
+The [seven Magical Merchant branches](#seven-magical-merchant-set-versus-summon-branches-29-october-2026)
+showed that this is not a reliable blanket preference: on one exact hidden
+deal, Normal Summon won and Set lost. Those fixed-deal outcomes are not labels
+either. The preference CLI now defaults to `visible_audit_no_weak_flip_v14`,
+which excludes this category and retains the other v2 comparisons. The v1/v2
+semantics remain available for replaying and validating old experiments.
+
+The generator replay-verified and visibility-audited the six fresh source
+replays containing the seven weak Flip flags. Its default v14 output contained
+**zero preferences**; explicit v1 derivation on those same six replays would
+produce seven weak Flip preferences. The ignored v14 manifest is
+`.cache/goat-ai/visible_audit_no_weak_flip_v14_fresh_126000_126007/manifest.json`
+with SHA-256
+`b222c642d104efd92a78b70493fcef2a0634b5359c30931766ae1bf7bc0e189e`.
+Direct derivation across all 64 previously audited source replays found ten
+v1 comparisons (seven weak Flip, two Thunder Dragon search, one Ring target)
+and three v14 comparisons (the two Thunder Dragon and one Ring target).
+This removes an uncertain automatic training target; it does not establish a
+new policy gain. Human review of each context and a held-out competitive
+evaluation remain necessary.
+
 ## Seven idle own-only Ring activation branches (29 October 2026)
 
 The [fresh policy review queue](replay_audit.md#fresh-policy-versus-tactical-review-queue-29-october-2026)
