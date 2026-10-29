@@ -2641,3 +2641,11 @@ own-card flags, including two negative-material idle Ring activations. Those
 four decisions have been added to the single 55-item local review queue.
 Human choices in that queue, followed by held-out replay-error and duel-win
 checks, are the next M4 evidence needed; the flags alone are not labels.
+The [varied-deck baseline](evaluation.md#varied-deck-own-card-baseline-29-october-2026)
+adds 64 complete games across four 2005 pairings and still finds four idle
+own-only Ring activations, three negative visible Heavy Storm trades, and an
+MST chain to its own resolving one-shot card. These eight cases are in the
+63-item local review queue. The next M4 policy candidate should be trained
+only from authorized reviewed choices, then compared against the unchanged
+selected checkpoint on fresh decks and seeds; the queue itself does not
+demonstrate improvement.

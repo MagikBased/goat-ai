@@ -1,5 +1,51 @@
 # Baseline evaluation log
 
+## Varied-deck own-card baseline (29 October 2026)
+
+A separate, prespecified seed-124900–124907 batch recorded the unchanged
+selected feature-v23 checkpoint with its v1 own-loss guard against Tactical
+v14. Four 2005 Main Deck pairings covered Goat versus Beastdown, Chaos versus
+Goat, Zombie versus Warrior, and Phoenix versus Chaos; each seed used both
+policy seats. All **64** duels terminated below the 3,000-decision cap, and
+their **33,995** decisions passed exact native replay and player-visibility
+checks. The audit reproduced all **16,979** selected-policy choices, including
+**5,783** multi-action choices.
+
+Eight distinct visible review flags remained: **four** optional Ring
+activations with only friendly face-up targets, **three** Heavy Storm plays
+with a negative visible material trade, and **one** MST chained to its own
+resolving one-shot Spell/Trap. The four Ring activations each had a −2 card
+observed material change after the chain closed, with no intervening
+activation. The MST chain's observed change was zero; chain-closure material
+is diagnostic and does not measure the counterfactual value of Pass. The
+three Heavy Storm flags come from the visible trade audit rather than the
+narrow chain-closure report. These flags are review candidates, not optimal-
+play labels or evidence of a win-rate gain.
+
+The same games offered 54 distinct turn/phase opportunities for Nobleman
+against only friendly Set monsters, 48 for Heavy Storm against only friendly
+back row, ten for idle own-only Ring, six for an owned Chaos boss effect with
+no opposing monster, five each for idle own-only MST and Breaker with only
+friendly back row, and two for MST chained to its own resolving one-shot.
+The guarded policy chose four of ten Ring and one of two own-one-shot MST
+opportunities; the other own-only activation categories had no flagged choice
+in this batch. This is broader than the earlier single-pair sample but still
+a finite set of decks and seeds. The remaining Ring and Storm cases support
+the user's concern that conspicuous own-card losses have not been solved.
+
+Ignored manifest `.cache/goat-ai/own_card_broad_baseline_124900_124907/manifest.json`
+(SHA-256 `2817858c1da6c8d9b1e2d7eeed030d13bb49b99114b2792afc080f1a2f4a2cc6`);
+audits `.cache/goat-ai/own_card_broad_full_audit_124900_124907.json`
+(SHA-256 `68678571b8f98c0186022ab05efcfa67518b0aa19368b9f0497d32975ed57890`)
+and `.cache/goat-ai/own_card_broad_risks_124900_124907.json`
+(SHA-256 `edef6bcfe6d56f73ea679857f062d073cddaaf205cf9295769f466008dac3760`).
+Reproduce with `scripts/collect_policy_matches.py` using the named Deck pairs,
+`--opponent tactical --seed 124900 --seeds 8 --own-loss-guard
+--own-loss-guard-version 1`, then `scripts/audit_policy_replays.py` and
+`scripts/audit_own_card_risks.py` over the recorded trajectories. See the
+[updated review queue](replay_audit.md#varied-deck-own-card-review-additions-29-october-2026)
+for the eight flagged decisions.
+
 ## Fresh own-card decision baseline (29 October 2026)
 
 We independently audited the 64 complete selected-v23/v1-guarded policy

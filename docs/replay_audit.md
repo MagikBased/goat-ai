@@ -1,5 +1,32 @@
 # Early replay decision audit
 
+## Varied-deck own-card review additions (29 October 2026)
+
+The [latest combined local queue](../.cache/goat-ai/own_removal_combined_queue_20261029_v3.html)
+has **63** distinct decisions: the previous 55 and eight fresh flags from the
+four-matchup seed-124900–124907 baseline. The additions include four idle
+own-only Ring activations, three negative visible Heavy Storm trades, and one
+MST chain to its own resolving one-shot card. The component queue is
+`.cache/goat-ai/own_card_broad_review_124900_124907/queue.json` (SHA-256
+`465f56552f510db49f56d1a1c712ea7e5392cb1d7d3f8c47d99e3b27c5ab6f93`).
+All eight component source replays and 3,916 decisions replay-verified.
+The combined builder verified **54** source replays and **35,899** decisions,
+with no duplicate decision. Combined queue SHA-256:
+`8f4ae31968981242e1d38dea7fe1a5a58f89937241fd035d097ea01fda29fdb3`.
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/own_removal_combined_queue_20261029_v3.json
+```
+
+The prior v2 queue had no saved labels when v3 was built. Labels are not
+silently imported from source queues; all new alternatives remain suggestions
+until reviewed. To rebuild v3, pass
+`own_removal_combined_queue_20261029_v2.json` and
+`own_card_broad_review_124900_124907/queue.json` to
+`scripts/combine_review_queues.py` with the v3 output path. The fresh
+component queue came from `scripts/shortlist_policy_disagreements.py` with
+the three categories named above as `--focus-audit-category` filters.
+
 ## Fresh own-card cases added to the combined queue (29 October 2026)
 
 The [updated local review queue](../.cache/goat-ai/own_removal_combined_queue_20261029_v2.html)
