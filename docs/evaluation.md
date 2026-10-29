@@ -2,6 +2,34 @@
 
 ## Fresh own-card effects: resolved material versus decision value (29 October 2026)
 
+### Same-state activation branches across the varied-deck flags
+
+The other seven activation flags from this eight-case queue were branched at
+the exact recorded native position. Each arm compared the recorded Ring or
+Heavy Storm activation with an offered Battle Phase transition, then used the
+same selected v23 checkpoint with v1 own-loss inference and Tactical-v14
+opponent to terminal. All **14** complete branch trajectories replay-verified
+and passed player-visibility checks. The recorded arm reproduced its source
+duel in every case. Each paired arm had the **same winner**: seven of seven
+unchanged. This small, selected set gives no evidence of a match outcome gain
+from the phase choice.
+
+In **three of the four Ring cases**, the Battle Phase arm activated Ring later
+in the **same turn** (once in Battle Start, twice in Main Phase 2). This
+explains why a one-decision alternative need not fix the behavior: subsequent
+policy decisions can repeat the activation. None of the three Heavy Storm
+Battle Phase arms activated Heavy Storm again that turn. The phase choice is
+an offered legal action, not a human judgment that it was the best move. These
+branches use the recorded hidden deal for offline analysis; a playing agent
+receives only its legal observation. The ignored per-case reports and manifest
+are under `.cache/goat-ai/own_card_broad_branches_124900_124907/`; manifest
+SHA-256 `bfa675eaaff1ee4096cfe0da6756c43928539f307ccf4ddfc700d9b84c5718d9`.
+Future training or guards should be measured over the full decision sequence,
+including later chances to repeat a flagged activation, as well as held-out
+duel outcomes.
+
+### Observed material and the Delinquent Duo exception
+
 The eight source duels in the varied-deck own-card review addition were
 independently rechecked with `scripts/audit_review_material.py`. All **3,916**
 decisions replay-verified against the pinned native core and passed the
