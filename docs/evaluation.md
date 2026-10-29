@@ -23,6 +23,42 @@ difference is evidence of a consequential failure, not a population win-rate
 estimate or a training label. The case is already in the local MST opportunity
 review queue for an explicit human judgment before training on it.
 
+### Opt-in v7 guard and fresh head-to-head check
+
+An opt-in `own_loss_guard_version=7` extends v1 only for MST chained when
+the field has no opposing Spell/Trap and contains another friendly Spell/Trap
+besides MST's source slot. It defers that optional activation, retains forced
+choices, and uses only the actor's visible field and legal actions. The exact
+seed-107607 replay now chooses Pass at decision 266, reproduces the previously
+branched 861-decision win, passes native replay and visibility checks, and
+reproduces its saved-policy choices in `audit_policy_replays.py`.
+
+A separate, prespecified direct comparison used seeds 123000–123007, two
+unseen Main Deck pairs (Max/Theeresak New Jersey and Rhymus/Roberto), both
+Deck assignments, and both policy seats: **64** complete experimental-core
+duels. The unchanged v23 checkpoint with v7 scored **32–32** versus the same
+checkpoint with v1. A matched v1-versus-v1 control also scored **32–32**.
+Only one game differed in duration: seed 123005, policy seat 0, with v7 versus
+v1. Both versions lost that game. Its first divergent action was on turn 2,
+draw phase: v1 chained MST with only friendly back row; v7 passed. Both
+recorded versions replay-verified and passed visibility auditing. The fixed
+schedule exposed this guard difference too rarely to measure a strength gain.
+Keep v7 experimental; retain v1 as the selected inference mode.
+
+The ignored direct and control reports are
+`.cache/goat-ai/own_loss_v7_vs_v1_123000_123007.json` (SHA-256
+`5ddfe0f3bd341996ce20e67ea62b4340389884cb0832cc62451a4799d28ee1a0`)
+and `.cache/goat-ai/own_loss_v1_control_123000_123007.json` (SHA-256
+`a9a8914debfa64fe315b7c23d9920bb58c3d320c86a9141377a74deddfff58d2`).
+Reproduce with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --seed 123000 --seeds 8
+--workers 4 --own-loss-guard --own-loss-guard-version 7
+--opponent-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt
+--opponent-own-loss-guard --opponent-own-loss-guard-version 1`, the checkpoint
+as positional argument and the two `--matchup` Deck pairs above. Use v1 for
+the candidate guard in the control. Reproducing the reported hashes also
+requires the pinned native assets and project source at this experiment.
+
 ## Fresh tactical whitelist/Fusion protocol sample (29 October 2026)
 
 An independent `probe_random_decks.py` run sampled 20 whitelist-legal Main

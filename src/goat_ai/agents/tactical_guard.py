@@ -113,6 +113,39 @@ def safe_own_one_shot_response_indices(observation: Observation,
     return kept or indices
 
 
+def safe_chained_own_only_mst_indices(observation: Observation,
+                                      legal_actions: Sequence[Action],
+                                      admissible: Sequence[int]) -> tuple[int, ...]:
+    """Defer an optional MST chain when only friendly back row can be hit.
+
+    This extends the idle own-only MST preference to a response window. It
+    uses card zones, not the identities of opposing hidden cards. A forced
+    action stays available, and any opposing back row keeps MST available.
+    """
+    indices = tuple(admissible)
+    if not observation.chain:
+        return indices
+    own = observation.viewer
+    if any(card.controller != own and card.zone == "spell_trap"
+           for card in observation.field):
+        return indices
+
+    def own_only_mst(index: int) -> bool:
+        action = legal_actions[index]
+        if (action.kind != "chain"
+                or action.parameters.get("code") != MYSTICAL_SPACE_TYPHOON):
+            return False
+        source_slot = (action.parameters.get("sequence")
+                       if action.parameters.get("location") == 8 else None)
+        return any(card.controller == own and card.zone == "spell_trap"
+                   and not (card.sequence == source_slot
+                            and card.code == MYSTICAL_SPACE_TYPHOON)
+                   for card in observation.field)
+
+    kept = tuple(index for index in indices if not own_only_mst(index))
+    return kept or indices
+
+
 def safe_optional_own_loss_indices(observation: Observation,
                                    legal_actions: Sequence[Action],
                                    admissible: Sequence[int]) -> tuple[int, ...]:

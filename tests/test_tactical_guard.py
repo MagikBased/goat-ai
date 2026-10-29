@@ -6,6 +6,7 @@ from goat_ai.actions import Action
 from goat_ai.agents import TacticalHeuristicAgent
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
+    safe_chained_own_only_mst_indices,
     safe_idle_own_ring_indices,
     safe_one_shot_response_indices,
     safe_optional_own_loss_indices,
@@ -131,6 +132,24 @@ def test_opt_in_own_loss_guard_defers_uncontested_own_removal_but_keeps_chain_re
     assert safe_optional_own_loss_indices(
         board(source, own_set, chain=chain),
         (break_card, wait), range(2)) == (0, 1)
+
+
+def test_chained_own_only_mst_ablation_keeps_opposing_and_forced_targets():
+    mst = Action("mst", "chain", 0,
+                 {"code": 5318639, "location": 8, "sequence": 0})
+    wait = Action("wait", "pass", 0)
+    chain = (ChainLinkView(1, 34853266, 1, 4, 0),)
+    own_mst = CardView(0, "spell_trap", "facedown", 5318639, 0)
+    own_goat = CardView(0, "spell_trap", "facedown", 504700123, 3)
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 2)
+    snapshot = board(own_mst, own_goat, chain=chain)
+    assert safe_optional_own_loss_indices(snapshot, (mst, wait), range(2)) == (0, 1)
+    assert safe_chained_own_only_mst_indices(snapshot, (mst, wait), range(2)) == (1,)
+    assert safe_chained_own_only_mst_indices(snapshot, (mst,), (0,)) == (0,)
+    assert safe_chained_own_only_mst_indices(
+        board(own_mst, enemy_set, chain=chain), (mst, wait), range(2)) == (0, 1)
+    assert safe_chained_own_only_mst_indices(
+        board(own_mst, chain=chain), (mst, wait), range(2)) == (0, 1)
 
 
 def test_opt_in_own_loss_guard_preserves_borrowed_boss_and_hidden_opponent():

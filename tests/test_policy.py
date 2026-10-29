@@ -2987,6 +2987,40 @@ def test_optional_own_loss_v3_defers_idle_own_ring_without_changing_v1():
         replace(snapshot, life_points=(8000, 1900)), (ring, wait)) == ring
 
 
+def test_optional_own_loss_v7_defers_chained_own_only_mst_without_ring_filter():
+    class FavorFirst(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, features):
+            return -torch.arange(len(features.action_cards)).float() + self.dummy
+
+    mst_code = 5318639
+    mst = Action("mst", "chain", 0,
+                 {"code": mst_code, "location": 8, "sequence": 0})
+    wait = Action("wait", "pass", 0)
+    own_mst = CardView(0, "spell_trap", "facedown", mst_code, 0)
+    own_goat = CardView(0, "spell_trap", "facedown", 504700123, 3)
+    snapshot = replace(view(), field=(own_mst, own_goat),
+                       chain=(ChainLinkView(1, 34853266, 1, 4, 0),))
+    model = FavorFirst()
+    vocabulary = CardVocabulary(tuple(sorted((mst_code, 504700123, 34853266))))
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                       own_loss_guard_version=1).select_action(
+        snapshot, (mst, wait)) == mst
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                       own_loss_guard_version=7).select_action(
+        snapshot, (mst, wait)) == wait
+    ring = Action("ring", "chain", 0, {"code": 511000824})
+    own_monster = CardView(0, "monster", "faceup", 71413901, 0,
+                           "attack", 1900, 1000)
+    ring_state = replace(view(), field=(own_monster,), turn_player=0)
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                       own_loss_guard_version=7).select_action(
+        ring_state, (ring, wait)) == ring
+
+
 def test_optional_own_loss_v4_prefers_safe_enemy_ring_target_except_own_lethal():
     class FavorFirst(torch.nn.Module):
         def __init__(self):
