@@ -2,7 +2,9 @@
 
 This is a diagnostic, not an online search agent. The native engine reconstructs
 the source position from its seed and exact action prefix. Continuation agents
-receive only their own observations and legal actions.
+receive only their own observations and legal actions. An optional different
+checkpoint evaluates a changed policy without claiming to reproduce the
+recorded suffix.
 """
 
 import argparse
@@ -43,7 +45,8 @@ def recorded_policy_options(inference: str, native_root: Path) -> dict:
 
 def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                       decision_index: int, action_indices: tuple[int, ...],
-                      output_dir: Path, max_decisions: int = 3000) -> dict:
+                      output_dir: Path, max_decisions: int = 3000,
+                      continuation_checkpoint: Path | None = None) -> dict:
     """Replay a common prefix, then continue each offered action to terminal."""
     source = read_trajectory(source_path)
     metadata = source.skill_metadata or {}
@@ -72,7 +75,9 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
         raise ValueError("output directory must be empty")
     verified_source = verify_trajectory(source, ExperimentalOcgcoreEngine(native_root))
     audit_trajectory_visibility(source)
-    policy = load_policy_agent(checkpoint, **policy_options)
+    continuation_path = continuation_checkpoint or checkpoint
+    continuation_options = {} if continuation_checkpoint else policy_options
+    policy = load_policy_agent(continuation_path, **continuation_options)
     if policy.model.feature_version != metadata.get("policy_feature_version"):
         raise ValueError("source and checkpoint policy feature versions differ")
     tactical = TacticalHeuristicAgent(
@@ -109,11 +114,14 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                     "source_decision_index": decision_index,
                     "branch_action_index": action_index,
                     "policy_seat": seat,
-                    "policy_checkpoint_sha256": sha256_file(checkpoint),
-                    "continuation": f"{inference}_policy_vs_tactical_v14",
+                    "source_policy_checkpoint_sha256": sha256_file(checkpoint),
+                    "policy_checkpoint_sha256": sha256_file(continuation_path),
+                    "continuation": ("greedy" if continuation_checkpoint else inference)
+                    + "_policy_vs_tactical_v14",
                     "offline_diagnostic_only": True,
                 })
-            if (offered[action_index] == record.selected_action
+            if (continuation_checkpoint is None
+                    and offered[action_index] == record.selected_action
                     and (trajectory.decisions != source.decisions
                          or trajectory.winner != source.winner)):
                 raise ValueError("recorded-action continuation does not reproduce source")
@@ -133,6 +141,8 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
     report = {"source": str(source_path), "source_sha256": sha256_file(source_path),
               "verified_source_decisions": verified_source,
               "checkpoint_sha256": sha256_file(checkpoint),
+              "source_checkpoint_sha256": sha256_file(checkpoint),
+              "continuation_checkpoint_sha256": sha256_file(continuation_path),
               "decision_index": decision_index, "policy_seat": seat,
               "policy_inference": inference,
               "scope": "offline_single_seed_full_state_branch_not_online_search",
@@ -150,11 +160,14 @@ def main() -> None:
     parser.add_argument("--decision-index", type=int, required=True)
     parser.add_argument("--action-index", type=int, action="append", required=True)
     parser.add_argument("--max-decisions", type=int, default=3000)
+    parser.add_argument("--continuation-checkpoint", type=Path,
+                        help="use a different greedy policy after the verified branch point")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     report = evaluate_branches(args.source, args.checkpoint, args.native_root,
                                args.decision_index, tuple(args.action_index),
-                               args.output_dir, args.max_decisions)
+                               args.output_dir, args.max_decisions,
+                               args.continuation_checkpoint)
     print(json.dumps({"decision_index": report["decision_index"],
                       "policy_seat": report["policy_seat"],
                       "branches": report["branches"]}, indent=2))

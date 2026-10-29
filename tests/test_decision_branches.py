@@ -84,6 +84,17 @@ def test_native_branch_reproduces_source_and_alternate(tmp_path, monkeypatch,
     assert read_trajectory(recorded["trajectory"]).decisions == source.decisions
     assert read_trajectory(alternate["trajectory"]).decisions[index].selected_action \
         == source.decisions[index].legal_actions[1]
+    if inference == "greedy":
+        child = tmp_path / "other_policy.pt"
+        child.write_bytes(b"different policy checkpoint")
+        changed = branches.evaluate_branches(
+            source_path, checkpoint, root, index, (0, 1),
+            tmp_path / "changed_policy_branches", continuation_checkpoint=child)
+        assert changed["source_checkpoint_sha256"] == sha256_file(checkpoint)
+        assert changed["continuation_checkpoint_sha256"] == sha256_file(child)
+        assert read_trajectory(changed["branches"][0]["trajectory"]).skill_metadata[
+            "policy_checkpoint_sha256"] == sha256_file(child)
+        assert options == [{}, {}]
     with pytest.raises(ValueError, match="include the recorded action"):
         branches.evaluate_branches(source_path, checkpoint, root, index,
                                    (1,), tmp_path / "rejected")

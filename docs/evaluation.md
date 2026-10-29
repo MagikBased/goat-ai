@@ -871,6 +871,22 @@ PYTHONPATH=src:. OMP_NUM_THREADS=1 .venv/bin/python \
   --phase-action end_phase --output-dir .cache/goat-ai/NEW_EMPTY_DIRECTORY
 ```
 
+The experimental residual-v8 child ranks Ring below another action in all
+**14** flagged states, but every source replay is in that child's training
+provenance. Its top alternatives are Battle Phase in ten cases, Normal Summon
+in three, and Set a Spell/Trap in one; it does not necessarily learn to hold
+Ring until a good target appears. At decision 89 above, the child chooses a
+Normal Summon. Using that child for both the branch action and subsequent
+policy decisions wins the continuation, whereas forcing the recorded Ring
+activation before continuing with the same child loses. Both branches passed
+replay and visibility verification. The ignored report is
+`.cache/goat-ai/ring_v8_child_branch_104406_d89/report.json` (SHA-256
+`01bfb8bfdcc5032a31ea834e6e82062b47212691bebd131a92f9e49deff3ef73`).
+`scripts/evaluate_decision_branches.py --continuation-checkpoint` now supports
+this paired changed-policy diagnostic. This trained-state example does not
+establish generalization; the earlier fresh 64-duel direct comparison remains
+**31–33** for the child against its parent.
+
 ## Visible own-card losses in the selected policy (28 October 2026)
 
 The weak average material association and the v5 preference trial do **not**
