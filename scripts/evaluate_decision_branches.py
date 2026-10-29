@@ -96,7 +96,8 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                       decision_index: int, action_indices: tuple[int, ...],
                       output_dir: Path, max_decisions: int = 3000,
                       continuation_checkpoint: Path | None = None,
-                      continuation_use_source_inference: bool = False) -> dict:
+                      continuation_use_source_inference: bool = False,
+                      continuation_guard_version: int | None = None) -> dict:
     """Replay a common prefix, then continue each offered action to terminal."""
     source = read_trajectory(source_path)
     metadata = source.skill_metadata or {}
@@ -123,12 +124,24 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
         raise ValueError("max_decisions must be positive")
     if continuation_use_source_inference and continuation_checkpoint is None:
         raise ValueError("source inference option requires a continuation checkpoint")
+    if (continuation_guard_version is not None
+            and (type(continuation_guard_version) is not int
+                 or continuation_guard_version not in range(1, 8)
+                 or continuation_use_source_inference)):
+        raise ValueError("continuation guard version must be 1..7 and distinct "
+                         "from source-inference override")
     if output_dir.exists() and any(output_dir.iterdir()):
         raise ValueError("output directory must be empty")
     verified_source = verify_trajectory(source, ExperimentalOcgcoreEngine(native_root))
     audit_trajectory_visibility(source)
     continuation_path = continuation_checkpoint or checkpoint
-    continuation_options = (policy_options if continuation_checkpoint is None
+    continuation_inference = (f"greedy_own_loss_guard_v{continuation_guard_version}"
+                              if continuation_guard_version is not None else
+                              inference if continuation_checkpoint is None
+                              or continuation_use_source_inference else "greedy")
+    continuation_options = (recorded_policy_options(continuation_inference, native_root)
+                            if continuation_guard_version is not None else
+                            policy_options if continuation_checkpoint is None
                             or continuation_use_source_inference else {})
     policy = load_policy_agent(continuation_path, **continuation_options)
     if policy.model.feature_version != metadata.get("policy_feature_version"):
@@ -170,11 +183,10 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                     "policy_seat": seat,
                     "source_policy_checkpoint_sha256": sha256_file(checkpoint),
                     "policy_checkpoint_sha256": sha256_file(continuation_path),
-                    "continuation": (inference if continuation_options else "greedy")
-                    + "_policy_vs_tactical_v14",
+                    "continuation": continuation_inference + "_policy_vs_tactical_v14",
                     "offline_diagnostic_only": True,
                 })
-            if (continuation_checkpoint is None
+            if (continuation_checkpoint is None and continuation_inference == inference
                     and offered[action_index] == record.selected_action
                     and (trajectory.decisions != source.decisions
                          or trajectory.winner != source.winner)):
@@ -206,7 +218,7 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
               "continuation_checkpoint_sha256": sha256_file(continuation_path),
               "decision_index": decision_index, "policy_seat": seat,
               "policy_inference": inference,
-              "continuation_inference": (inference if continuation_options else "greedy"),
+              "continuation_inference": continuation_inference,
               "scope": "offline_single_seed_full_state_branch_not_online_search",
               "branches": branches}
     (output_dir / "report.json").write_text(
@@ -226,13 +238,16 @@ def main() -> None:
                         help="use a different greedy policy after the verified branch point")
     parser.add_argument("--continuation-use-source-inference", action="store_true",
                         help="apply the recorded policy's inference guard to the new checkpoint")
+    parser.add_argument("--continuation-guard-version", type=int,
+                        help="apply an experimental own-loss guard version after the branch")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     report = evaluate_branches(args.source, args.checkpoint, args.native_root,
                                args.decision_index, tuple(args.action_index),
                                args.output_dir, args.max_decisions,
                                args.continuation_checkpoint,
-                               args.continuation_use_source_inference)
+                               args.continuation_use_source_inference,
+                               args.continuation_guard_version)
     print(json.dumps({"decision_index": report["decision_index"],
                       "policy_seat": report["policy_seat"],
                       "branches": report["branches"]}, indent=2))

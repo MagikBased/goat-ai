@@ -31,6 +31,29 @@ seven branch pairs were rerun and independently replay-verified with this
 field; it reproduced the three Ring and zero Heavy Storm later activations.
 The updated ignored reports are under
 `.cache/goat-ai/own_card_broad_branches_repeat_v2/`.
+The branch tool now also accepts `--continuation-guard-version` to compare
+inference variants from the same replayed prefix and forced branch action.
+With v3 controlling the continuation after the Battle Phase alternative, all
+**four Ring** branch duels completed without another same-code activation
+that turn. Their winners were unchanged from the corresponding v1-continuation
+arms: two policy wins and two losses. All eight v3-continuation trajectories
+replay-verified and passed the visibility audit. The ignored reports are under
+`.cache/goat-ai/own_card_broad_branches_guard_v3/` (manifest SHA-256
+`3c4b9cc2c8f0e87bb1e1d976b3e25547b59d0d04b50546b8db70cead6d7cd0e4`).
+This isolates a local behavioral correction, not a competitive gain; the
+independent 256-duel v3-versus-v1 comparison above remained tied.
+For example, reproduce case 1 with the recorded Ring action index 1 and the
+Battle Phase index 2, writing to a new empty directory:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/evaluate_decision_branches.py \
+  .cache/goat-ai/own_card_broad_baseline_124900_124907/matchup_01_seed_124907_seat_1.json \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --decision-index 220 --action-index 1 --action-index 2 \
+  --continuation-guard-version 3 \
+  --output-dir .cache/goat-ai/own_card_guard_v3_case1_reproduction
+```
+
 Future training or guards should be measured over the full decision sequence,
 including later chances to repeat a flagged activation, as well as held-out
 duel outcomes.

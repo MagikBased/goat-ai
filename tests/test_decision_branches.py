@@ -107,6 +107,12 @@ def test_native_branch_reproduces_source_and_alternate(tmp_path, monkeypatch,
         assert changed["continuation_inference"] == inference
         assert options[-1]["own_loss_guard_version"] == 1
         assert changed["continuation_checkpoint_sha256"] == sha256_file(child)
+        v3 = branches.evaluate_branches(
+            source_path, checkpoint, root, index, (0, 1),
+            tmp_path / "v3_continuation_branches", continuation_guard_version=3)
+        assert v3["continuation_inference"] == "greedy_own_loss_guard_v3"
+        assert options[-1]["own_loss_guard_version"] == 3
+        assert v3["branches"][0]["recorded_action"] is True
     with pytest.raises(ValueError, match="include the recorded action"):
         branches.evaluate_branches(source_path, checkpoint, root, index,
                                    (1,), tmp_path / "rejected")
