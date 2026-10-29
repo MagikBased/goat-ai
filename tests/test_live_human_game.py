@@ -7,6 +7,7 @@ import shutil
 from dataclasses import replace
 from pathlib import Path
 from threading import Thread
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
@@ -60,12 +61,19 @@ def test_live_game_completes_and_saves_human_only_demonstration(tmp_path):
     assert all(card["code"] is None for card in state["observation"]["field"]
                if card["controller"] == 1 and card["position"] == "facedown")
     with pytest.raises(ValueError, match="not legal"):
-        manager.choose(state["id"], len(state["legal_actions"]))
+        manager.choose(state["id"], len(state["legal_actions"]), state["decisions"])
     human = random.Random(100)
+    previous = state
+    state = manager.choose(state["id"], human.randrange(len(state["legal_actions"])),
+                           state["decisions"])
+    with pytest.raises(ValueError, match="stale live decision"):
+        manager.choose(state["id"], 0, previous["decisions"])
+    assert manager.get(state["id"])["decisions"] == state["decisions"]
     for _ in range(3000):
         if state["terminal"]:
             break
-        state = manager.choose(state["id"], human.randrange(len(state["legal_actions"])))
+        state = manager.choose(state["id"], human.randrange(len(state["legal_actions"])),
+                               state["decisions"])
     assert state["terminal"]
     assert state["viewer"].endswith(".html")
     replay = manager.creator.output_dir / f"{state['id']}.json"
@@ -104,8 +112,15 @@ def test_live_http_requests_keep_native_engine_on_its_worker_thread(tmp_path, mo
                                          "human_seat": 1, "opponent": "random",
                                          "seed": 4326})
         assert state["observation"]["viewer"] == 1
-        state = post("/api/live/choice", {"id": state["id"], "action_index": 0})
+        state = post("/api/live/choice", {"id": state["id"], "action_index": 0,
+                                           "expected_decisions": state["decisions"]})
         assert state["decisions"] >= 2
+        with pytest.raises(HTTPError) as stale:
+            post("/api/live/choice", {"id": state["id"], "action_index": 0,
+                                      "expected_decisions": 0})
+        assert stale.value.code == 400
+        with urlopen(f"{base}/api/live/state?id={state['id']}", timeout=5) as response:
+            assert json.load(response)["decisions"] == state["decisions"]
         assert post("/api/live/close", {"id": state["id"]}) == {"closed": True}
     finally:
         server.shutdown()

@@ -2,6 +2,17 @@
 
 ## Record your own local GOAT duel
 
+The local browser server also offers `/games/play` for a game against Random,
+Tactical, or the selected neural policy. Start it with
+`./start_review_viewer.sh --game-creator`, then follow **Play against an AI in
+your browser**. Completed games save a verified `human_web` trajectory in
+`.cache/goat-ai/user_games/`, with `authorization=self_recorded` and only your
+seat admitted as raw imitation data. AI opponent decisions remain in the
+replay for verification but are not treated as human labels. The live choice
+API binds every submitted action to a decision number, rejecting delayed or
+duplicate actions after the game has advanced. Unfinished games are not saved
+across server restarts.
+
 `examples/play_goat.py` accepts two GOAT YDK Decks and records one CLI human
 seat against a RandomAgent, TacticalHeuristicAgent, or saved policy. It shows
 only the acting player's observation and numbered legal actions; long lists

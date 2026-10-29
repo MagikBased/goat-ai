@@ -23,6 +23,7 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 REVIEW_API_VERSION = 5
+LIVE_API_VERSION = 2
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -395,6 +396,9 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 except (ValueError, OSError) as error:
                     self._json(400, {"error": str(error)})
                 return
+            if parsed.path == "/api/live/version":
+                self._json(200, {"api_version": LIVE_API_VERSION})
+                return
             if parsed.path == "/api/games/options":
                 self._json(200, creator.options())
                 return
@@ -482,7 +486,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                                                  "/api/live/close") else
                             {"deck1", "deck2", "human_seat", "opponent", "seed"}
                             if endpoint == "/api/live/start" else
-                            {"id", "action_index"} if endpoint == "/api/live/choice" else
+                            {"id", "action_index", "expected_decisions"}
+                            if endpoint == "/api/live/choice" else
                             {"deck1", "deck2", "agent1", "agent2", "seed"}
                             if endpoint == "/api/games" else
                             {"source", "decision_index", "action_index"}
@@ -498,7 +503,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 elif endpoint == "/api/live/start":
                     result = live.start(data)
                 elif endpoint == "/api/live/choice":
-                    result = live.choose(data["id"], data["action_index"])
+                    result = live.choose(data["id"], data["action_index"],
+                                         data["expected_decisions"])
                 elif endpoint == "/api/live/close":
                     result = live.close(data["id"])
                 elif endpoint == "/api/games":

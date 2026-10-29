@@ -158,7 +158,7 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
         def get(self, _identifier):
             return {"id": "b" * 16, "terminal": False}
 
-        def choose(self, _identifier, _index):
+        def choose(self, _identifier, _index, _expected_decisions):
             return {"id": "b" * 16, "terminal": True}
 
         def close(self, _identifier):
@@ -186,7 +186,8 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
             "opponent": "random", "seed": 42})[1] == {"id": "b" * 16, "terminal": False}
         assert _request(f"{base}/api/live/state?id={'b' * 16}")[1]["id"] == "b" * 16
         assert _request(f"{base}/api/live/choice", {
-            "id": "b" * 16, "action_index": 0})[1]["terminal"]
+            "id": "b" * 16, "action_index": 0,
+            "expected_decisions": 0})[1]["terminal"]
         assert _request(f"{base}/api/live/close", {"id": "b" * 16})[1]["closed"]
         with pytest.raises(HTTPError) as invalid:
             _request(f"{base}/api/live/start", {"seed": 42})
@@ -212,6 +213,7 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
     base = f"http://127.0.0.1:{server.server_port}"
     try:
         assert _request(f"{base}/api/review/version")[1] == {"api_version": 5}
+        assert _request(f"{base}/api/live/version")[1] == {"api_version": 2}
         assert launch_review_server.REVIEW_API_VERSION == serve_review_queue.REVIEW_API_VERSION
         assert server_healthy(server.server_port, digest)
         assert _request(f"{base}/api/review/state?source={digest}")[1] == {

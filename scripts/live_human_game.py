@@ -122,9 +122,11 @@ class LiveGame:
                 "card_names": {str(code): self.names.get(code, f"Card #{code}")
                                for code in codes}}
 
-    def choose(self, index: int) -> dict:
+    def choose(self, index: int, expected_decisions: int) -> dict:
         if self.env.is_terminal():
             raise ValueError("duel has ended")
+        if type(expected_decisions) is not int or expected_decisions != self.decisions:
+            raise ValueError("stale live decision; refresh the game before choosing")
         if type(index) is not int or not 0 <= index < len(self.env.legal_actions()):
             raise ValueError("selected action is not legal")
         if self.decisions >= self.max_decisions:
@@ -236,10 +238,12 @@ class LiveGameManager:
             raise ValueError("unknown live game")
         return self.sessions[identifier].call("snapshot")
 
-    def choose(self, identifier: str, action_index: int) -> dict:
+    def choose(self, identifier: str, action_index: int,
+               expected_decisions: int) -> dict:
         if identifier not in self.sessions:
             raise ValueError("unknown live game")
-        return self.sessions[identifier].call("choose", action_index)
+        return self.sessions[identifier].call("choose", action_index,
+                                              expected_decisions)
 
     def close(self, identifier: str) -> dict:
         with self.lock:

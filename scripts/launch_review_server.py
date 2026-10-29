@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REVIEW_API_VERSION = 5  # Keep in sync with serve_review_queue.py.
+LIVE_API_VERSION = 2
 SEARCH_DIRS = (ROOT / "replays", ROOT / ".cache/goat-ai")
 LOG = ROOT / ".cache/goat-ai/review_server.log"
 PORTS = range(8765, 8865)
@@ -54,6 +55,10 @@ def server_healthy(port: int, source: str | None) -> bool:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/review/version",
                                     timeout=5) as response:
             if response.status != 200 or json.load(response).get("api_version") != REVIEW_API_VERSION:
+                return False
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/live/version",
+                                    timeout=5) as response:
+            if response.status != 200 or json.load(response).get("api_version") != LIVE_API_VERSION:
                 return False
         # Older processes can report the same review API version while lacking
         # the game-audit route added afterward. Probe the route's validation.

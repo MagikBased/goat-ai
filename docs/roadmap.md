@@ -2388,7 +2388,7 @@ agents and Decks. It records complete native duels, replay-verifies them, and
 opens reviewer-only visual replays. Browser human-versus-AI play is available
 at `/games/play` through the local server. A live native duel remains on one
 worker thread across requests, and the browser receives the human seat's
-observation and legal actions. Illegal choices are rejected. A completed duel
+observation and legal actions. Illegal and stale choices are rejected. A completed duel
 is replay-verified, audited for player visibility, and saved as a `human_web`
 self-recording with a separate postgame full-information replay. Unfinished
 games remain in server memory and are lost when the server stops. The terminal

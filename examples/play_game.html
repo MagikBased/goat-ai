@@ -273,7 +273,8 @@
     async function choose(index) {
       if (busy) return;
       busy = true; actions(); byId("message").textContent = "AI is responding…";
-      try { render(await request("/api/live/choice", {id: state.id, action_index: index})); }
+      try { render(await request("/api/live/choice", {id: state.id,
+        action_index: index, expected_decisions: state.decisions})); }
       catch (error) { byId("message").textContent = error.message; byId("message").classList.add("error"); }
       finally { busy = false; actions(); }
     }
