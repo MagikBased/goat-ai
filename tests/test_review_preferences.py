@@ -199,8 +199,16 @@ def test_score_prefers_either_good_target_without_set_size_bonus():
     tied = score_preference(FixedScores([0.0, 0.0, 0.0]),
                             CardVocabulary(()), record, (1, 2), (0,))
     assert tied["preferred_minus_disfavored_log_mean_exp"] == pytest.approx(0.0)
+    assert tied["model_best_is_disfavored"]
     better = score_preference(FixedScores([0.0, 2.0, 1.0]),
                               CardVocabulary(()), record, (1, 2), (0,))
     assert better["model_best_is_preferred"]
+    assert not better["model_best_is_disfavored"]
     assert better["best_preferred_rank"] == 1
     assert better["preferred_minus_disfavored_log_mean_exp"] > 0
+    another = Action("another safe play", "pass", 0)
+    extended = replace(record, legal_actions=(*record.legal_actions, another))
+    third = score_preference(FixedScores([0.0, 1.0, 0.0, 3.0]),
+                             CardVocabulary(()), extended, (1, 2), (0,))
+    assert not third["model_best_is_preferred"]
+    assert not third["model_best_is_disfavored"]

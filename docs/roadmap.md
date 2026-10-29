@@ -2440,3 +2440,8 @@ visible state. The broader 754-comparison child did not show a reliable gain
 against its parent or Tactical on unseen Main Decks. Keep the v23 reference;
 further M4 work needs a value signal that improves complete-duel outcomes
 across opponents, not just its own preference loss.
+The [v5 avoidance experiment](evaluation.md#avoiding-visibly-wasteful-activations-with-all-legal-alternatives-29-october-2026)
+broadened each negative activation comparison to all other offered actions.
+It fit 783 verified comparisons but split 32–32 with v4 and did not show a
+reliable gain against the parent or Tactical. Its held-out top-action mistake
+count was unchanged from v4. Keep this rule and checkpoint experimental.

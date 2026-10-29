@@ -12057,6 +12057,27 @@ Both matched Tactical comparisons passed the unseen-Main-Deck and provenance
 gate. Neither trial establishes a cross-opponent gain, so neither checkpoint
 is promoted. The original v23 reference remains selected.
 
+A separate fixed-state check explains the remaining gap. Sixty-four
+replay-verified, visibility-audited duels at seeds 90300–90363 were excluded
+from both v4 preference fits. Their 25 labeled replays supplied **129** v4
+comparisons, including **nine** where the recorded choice was disfavored.
+These are held-out replay seeds, although their deck compositions overlap
+some training decks. `score_reviewed_preferences.py` now reports whether
+the model's **top legal action is itself disfavored**, since it may choose a
+third safe action rather than the single named preferred phase transition.
+On all 129 states, the unchanged parent chose a disfavored action **7** times
+and the broad child **6** times. Among the nine states where the recorded
+choice was bad, the parent's top action was disfavored **4** times and the
+child's **3** times. All nine recorded mistakes were activation choices; the
+holdout did not test a bad boss target or Tribe Type choice. This one-choice
+difference is too small to claim generalization, and fixed replay states
+cannot substitute for complete duels. The ignored holdout label manifest has
+SHA-256 `010a2dddc505349a5f749a0a145bb167e8bd6927224cfa74287cc9cc31071903`;
+the parent and broad-child score reports have SHA-256
+`6fdb2a3e1f35ec2baf0736ced369430b5ea0f0861ea4bac6a32e9bc1ceb84815`
+and `eea536e19dd1104b94f2e8acc5c8806dd24aa98d4d4d46a742526c62703c96af`.
+Both score reports mark every case as unseen by replay hash and seed.
+
 Reproduce label generation with `scripts/derive_visible_rule_preferences.py`
 on each named `episode_*.json` directory, `--rule-set visible_material_choices_v4`,
 `--native-root .cache/goat-ai`, and a fresh output directory. For each
@@ -12067,3 +12088,68 @@ the settings above, and four unlabeled preservation replays (seeds 97000,
 `scripts/evaluate_policy.py --engine experimental --both-deck-assignments
 --require-unseen-main-decks --workers 4 --seeds 8 --max-decisions 3000` on
 the two named Phoenix/Dimension Fusion matchups and seed blocks above.
+
+### Avoiding visibly wasteful activations with all legal alternatives (29 October 2026)
+
+The v4 held-out action check found that choosing its named preferred phase
+transition was too narrow a measure of avoiding a bad activation: a policy
+could instead Set a card or make another safe play. The opt-in
+`visible_material_avoidance_v5` rule keeps v4's boss-target and Tribe Type
+comparisons but, for own-only Nobleman and negative visible Heavy Storm,
+compares each flagged activation against **every other offered legal action**.
+Other flagged activations at the same prompt remain in the disfavored set.
+This is still a synthetic resource hypothesis, not a label that every other
+action is optimal. It is recomputed during preference validation.
+
+All 368 source duels from the three v4 training collections were independently
+replay-verified and visibility-audited for v5 label generation. The 240-duel
+block produced **636** comparisons from 128 replays, the two 64-duel blocks
+**85** from 31 and **62** from 28. In total, **783** comparisons from 187
+replays included **106** recorded disfavored choices. The ignored manifest
+SHA-256 values for blocks 91000–91239, 97000–97063, and 99000–99063 are
+`8f12963ff748e02e742497fec2103e8f03240c8c10c9b7fb2eb2ed0aad5059e2`,
+`8235ead4fa64fd39b873fc630c924d40cfafbda61cdcec946a714089086a2b88`,
+and `7de9d014b924eaa65550d017d7f479c238bbd953d77cf2a5b5294300a264e850`.
+
+Starting from the unchanged v23 parent, v5 used 20 steps, recorded-bad
+weight 2, learning rate 0.0001, parent KL weight 1, seed 74, and 64
+preservation decisions sampled from the same four separate replay files as
+v4. Preference loss fell from 0.45559 to 0.31828, and final preservation KL
+was 0.00221. Its ignored checkpoint
+`.cache/goat-ai/fv23_visible_material_v5_91000_99063.pt` has SHA-256
+`e200656b8ae344cc6f8f469fdb9f9eaa650d8cb06e0b580a0262ed494fd92ab9`.
+The v4/v5 label groups and numbers of labeled decisions differ, so these are
+closely matched exploratory fits, not an isolated loss-function ablation.
+
+On the v4 held-out fixed states at seeds 90300–90363, v5's top legal action
+was disfavored on **6/129** comparisons, including **3/9** where the
+recorded choice was disfavored. These are the same counts as the broad v4
+child; the parent had 7/129 and 4/9. The v5 score report against those
+unchanged v4 holdout labels has SHA-256
+`b21aad114860775a1a0679e031c236684966b8bbb0c698208f780ff7dd9be5be`.
+
+Fresh unseen Phoenix Control versus two Dimension Fusion Main Decks, both
+assignments and seats, gave v5 **32–32** directly against v4 on seeds
+99700–99707 (paired 95% score interval 45.31–54.69%), and **33–29–2**
+directly against the original v23 parent on seeds 99708–99715 (53.13%
+points, interval 44.53–61.72%). On matched Tactical-v14 seeds 99716–99723,
+v5 scored **20–44**, v4 **19–45**, and the original parent **16–47–1**.
+The v5-minus-parent score difference was **+5.47 points** with a paired 95%
+interval **−7.03 to +18.75**; v5-minus-v4 was **+1.56 points**, interval
+**0 to +4.69**. The comparator verified matching decks, seeds, opponent,
+core assets, and unseen Main Deck compositions. The ignored direct v5/v4,
+direct v5/parent, and matched Tactical report SHA-256 values are
+`462486e9dbb9ec877a1b99e8ef8c1e5b175d11d4dcfc4236ed2d0fa791348bd0`,
+`47a4a43ac981698f1d5dd144fb41d1214e36ae8d052c51500e92984728fa2885`,
+and v5/v4/parent Tactical respectively
+`1bfdaa76d6a7654773001efb0111b6d66f8ff0cf584fcfbc70c210986ada0550`,
+`b37442ffd4b23b6659190f1b36d9b54e22ddf08ad5e1516f2611b7815ae71146`,
+`bfd162e409ed629b3e3fab8cba7259c0fdaa313fde85ef73fd08a1a839e957a7`.
+The evidence does not establish a reliable gain over either checkpoint or
+close M4's competitive gate. Keep the original v23 selected.
+
+Reproduce with the same label, training, and evaluation commands as v4,
+changing `--rule-set` to `visible_material_avoidance_v5`, using the three
+v5 manifests above as `--case` sources, and setting the fresh seed blocks
+to 99700, 99708, and 99716 respectively. The v5 label reader requires
+schema-v2 `automated_rule` provenance and the exact rule-set identifier.

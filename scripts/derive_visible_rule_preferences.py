@@ -30,6 +30,7 @@ RULE_SET_ID = "visible_audit_v1"
 RULE_SET_V2 = "visible_audit_v2"
 RULE_SET_V3 = "visible_resource_v3"
 RULE_SET_V4 = "visible_material_choices_v4"
+RULE_SET_V5 = "visible_material_avoidance_v5"
 SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -93,8 +94,9 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID
     """Keep one unambiguous automated comparison per recorded decision."""
     if rule_set_id == RULE_SET_V3:
         return derive_resource_counterfactuals(trajectory)
-    if rule_set_id == RULE_SET_V4:
-        resource, resource_counts = derive_resource_counterfactuals(trajectory)
+    if rule_set_id in (RULE_SET_V4, RULE_SET_V5):
+        resource, resource_counts = derive_resource_counterfactuals(
+            trajectory, all_safe_alternatives=rule_set_id == RULE_SET_V5)
         target, target_counts = derive_material_choice_counterfactuals(trajectory)
         overlap = {item["decision_index"] for item in resource} & {
             item["decision_index"] for item in target}
@@ -126,7 +128,8 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID
     return result, counts
 
 
-def derive_resource_counterfactuals(trajectory) -> tuple[list[dict], Counter]:
+def derive_resource_counterfactuals(trajectory, *, all_safe_alternatives: bool = False
+                                   ) -> tuple[list[dict], Counter]:
     """Compare a visited safe choice or phase transition with visible resource loss.
 
     The chosen action can be on either side of the comparison. The opponent's
@@ -173,7 +176,9 @@ def derive_resource_counterfactuals(trajectory) -> tuple[list[dict], Counter]:
         if not bad:
             continue
         selected = record.legal_actions.index(record.selected_action)
-        if selected not in bad:
+        if all_safe_alternatives:
+            preferred = [i for i in range(len(record.legal_actions)) if i not in bad]
+        elif selected not in bad:
             preferred = [selected]
         else:
             phase_kind = "battle_phase" if obs.phase == "main1" else "end_phase"
@@ -272,7 +277,8 @@ def derive_material_choice_counterfactuals(trajectory) -> tuple[list[dict], Coun
 def validate_automated_preferences(trajectory, preferences, weak_flip_attacks) -> None:
     """Reject edits that no longer match the declared visible-rule output."""
     rule_set_id = getattr(preferences, "rule_set_id", None) or RULE_SET_ID
-    candidates = (() if rule_set_id in (RULE_SET_V3, RULE_SET_V4) else review_candidates(
+    candidates = (() if rule_set_id in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5)
+                  else review_candidates(
         trajectory, weak_flip_attacks=weak_flip_attacks))
     expected, _ = derive(trajectory, candidates, rule_set_id=rule_set_id)
     actual = [{"decision_index": item.decision_index,
@@ -289,7 +295,8 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--rule-set", choices=(RULE_SET_ID, RULE_SET_V2,
-                                               RULE_SET_V3, RULE_SET_V4),
+                                               RULE_SET_V3, RULE_SET_V4,
+                                               RULE_SET_V5),
                         default=RULE_SET_ID)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
@@ -303,7 +310,7 @@ def main() -> None:
             raise ValueError(f"{path}: expected a policy or self-play replay")
         verified = verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
-        candidates = (() if args.rule_set in (RULE_SET_V3, RULE_SET_V4)
+        candidates = (() if args.rule_set in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5)
                       else review_candidates(
             trajectory, weak_flip_attacks=weak_flip_attacks))
         preferences, categories = derive(trajectory, candidates,
@@ -313,7 +320,8 @@ def main() -> None:
         seat = trajectory.skill_metadata.get("learner_seat" if trajectory.source
                                              == "self_play_rl" else "demonstrator_seat")
         payload = {
-            "schema_version": 2 if args.rule_set in (RULE_SET_V3, RULE_SET_V4)
+            "schema_version": 2 if args.rule_set in (RULE_SET_V3, RULE_SET_V4,
+                                                     RULE_SET_V5)
             else 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",

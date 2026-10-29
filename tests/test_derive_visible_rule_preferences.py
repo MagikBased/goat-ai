@@ -304,3 +304,29 @@ def test_v4_recomputed_comparison_rejects_edited_target_group():
                              preferences=(ReviewedPreference(0, (0,), (1,)),))
     with pytest.raises(ValueError, match="do not match visible_material_choices_v4"):
         rules.validate_automated_preferences(replay, edited, {})
+
+
+def test_v5_compares_bad_activation_with_all_other_legal_actions():
+    own_set = CardView(0, "monster", "facedown", 31560081, 0, "defense")
+    own_spell = CardView(0, "spell_trap", "facedown", 45986603, 1)
+    observation = Observation(
+        viewer=0, acting_player=0, turn=3, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(own_set, own_spell),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=4,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=0)
+    nobleman = Action("nobleman", "activate", 0, {"code": 504700116})
+    storm = Action("storm", "activate", 0, {"code": 19613556})
+    set_spell = Action("set", "set_spell_trap", 0, {"code": 14087893})
+    battle = Action("battle", "battle_phase", 0)
+    record = DecisionRecord(observation, (nobleman, storm, set_spell, battle),
+                            nobleman)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    expected = [{"decision_index": 0, "preferred_action_indices": [2, 3],
+                 "disfavored_action_indices": [0, 1]}]
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V5)[0] == expected
+    chosen_safe = replace(replay, decisions=(replace(record, selected_action=set_spell),))
+    assert derive(chosen_safe, (), rule_set_id=rules.RULE_SET_V5)[0] == expected
+    valid = SimpleNamespace(rule_set_id=rules.RULE_SET_V5,
+                            preferences=(ReviewedPreference(0, (2, 3), (0, 1)),))
+    rules.validate_automated_preferences(replay, valid, {})
