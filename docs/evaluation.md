@@ -276,6 +276,36 @@ interval was **37.5–60.9%**. The ignored direct report SHA-256 is
 The local fixed-state result is encouraging, but this trial establishes no
 competitive gain. Keep the v23 parent selected and v8 experimental.
 
+### Held-out Ring and MST full-choice continuations (29 October 2026)
+
+Three of the eight held-out comparison positions above ranked an action
+removed by v8 highest under the parent: one idle own-only Ring activation
+and two MST responses to a resolving one-shot effect. The child ranks Battle
+Phase or `pass`, respectively, at those exact positions. None of these three
+source replays occurs in the child's training or preservation provenance.
+The branch evaluator now accepts a different continuation checkpoint and can
+apply the recorded `greedy_own_loss_guard_v1` inference mode to it. Both the
+parent and child branches used that mode, the same Tactical-v14 opponent, and
+the exact native source prefix. The recorded parent branch reproduced the
+source; every branch replay-verified and passed the visibility audit.
+
+| Held-out source, decision | Parent: flagged / alternative | Child: flagged / alternative |
+| --- | --- | --- |
+| `matchup_01_seed_105000_seat_0`, 74; Ring 6 / Battle Phase 7 | Win / win | Win / win |
+| `matchup_00_seed_105005_seat_0`, 27; MST 0 / pass 2 | Loss / loss | Loss / loss |
+| `matchup_00_seed_105007_seat_0`, 149; MST 0 / pass 1 | Loss / loss | Loss / loss |
+
+These are three selected decision states, not a match-strength sample. The
+child does avoid the flagged action at the decision, but none of the paired
+outcomes changes. The ignored guarded-child report SHA-256 values in table
+order are `c3c8181ec40a209c2a526dd574f1564aa297fb733291ed5bc54ee1ef81e15d3f`,
+`b5df4e96b54e6a92ed569ce40d008bb3de8d7e0cc0cac0653287292b2cdb77d6`,
+and `ba900e8f47ef75ac56487293ee12e4adeb986c62207a61f37062eb4a23da11ed`.
+Regenerate each with `scripts/evaluate_decision_branches.py` using its source
+replay and the selected v23 checkpoint, the decision and action indices above,
+`--continuation-checkpoint .cache/goat-ai/residual_v8_child_104400_104407.pt`,
+`--continuation-use-source-inference`, and an empty output directory.
+
 ## Exact visible-guard distillation into v23 (29 October 2026)
 
 `visible_guard_distillation_v7` now creates automated masked-parent

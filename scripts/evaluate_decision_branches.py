@@ -46,7 +46,8 @@ def recorded_policy_options(inference: str, native_root: Path) -> dict:
 def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                       decision_index: int, action_indices: tuple[int, ...],
                       output_dir: Path, max_decisions: int = 3000,
-                      continuation_checkpoint: Path | None = None) -> dict:
+                      continuation_checkpoint: Path | None = None,
+                      continuation_use_source_inference: bool = False) -> dict:
     """Replay a common prefix, then continue each offered action to terminal."""
     source = read_trajectory(source_path)
     metadata = source.skill_metadata or {}
@@ -71,12 +72,15 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
         raise ValueError("include the recorded action and distinct offered alternatives")
     if max_decisions < 1:
         raise ValueError("max_decisions must be positive")
+    if continuation_use_source_inference and continuation_checkpoint is None:
+        raise ValueError("source inference option requires a continuation checkpoint")
     if output_dir.exists() and any(output_dir.iterdir()):
         raise ValueError("output directory must be empty")
     verified_source = verify_trajectory(source, ExperimentalOcgcoreEngine(native_root))
     audit_trajectory_visibility(source)
     continuation_path = continuation_checkpoint or checkpoint
-    continuation_options = {} if continuation_checkpoint else policy_options
+    continuation_options = (policy_options if continuation_checkpoint is None
+                            or continuation_use_source_inference else {})
     policy = load_policy_agent(continuation_path, **continuation_options)
     if policy.model.feature_version != metadata.get("policy_feature_version"):
         raise ValueError("source and checkpoint policy feature versions differ")
@@ -116,7 +120,7 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                     "policy_seat": seat,
                     "source_policy_checkpoint_sha256": sha256_file(checkpoint),
                     "policy_checkpoint_sha256": sha256_file(continuation_path),
-                    "continuation": ("greedy" if continuation_checkpoint else inference)
+                    "continuation": (inference if continuation_options else "greedy")
                     + "_policy_vs_tactical_v14",
                     "offline_diagnostic_only": True,
                 })
@@ -145,6 +149,7 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
               "continuation_checkpoint_sha256": sha256_file(continuation_path),
               "decision_index": decision_index, "policy_seat": seat,
               "policy_inference": inference,
+              "continuation_inference": (inference if continuation_options else "greedy"),
               "scope": "offline_single_seed_full_state_branch_not_online_search",
               "branches": branches}
     (output_dir / "report.json").write_text(
@@ -162,12 +167,15 @@ def main() -> None:
     parser.add_argument("--max-decisions", type=int, default=3000)
     parser.add_argument("--continuation-checkpoint", type=Path,
                         help="use a different greedy policy after the verified branch point")
+    parser.add_argument("--continuation-use-source-inference", action="store_true",
+                        help="apply the recorded policy's inference guard to the new checkpoint")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     report = evaluate_branches(args.source, args.checkpoint, args.native_root,
                                args.decision_index, tuple(args.action_index),
                                args.output_dir, args.max_decisions,
-                               args.continuation_checkpoint)
+                               args.continuation_checkpoint,
+                               args.continuation_use_source_inference)
     print(json.dumps({"decision_index": report["decision_index"],
                       "policy_seat": report["policy_seat"],
                       "branches": report["branches"]}, indent=2))
