@@ -26,7 +26,7 @@ class FirstActionAgent:
                     reason="native assets not installed")
 @pytest.mark.parametrize("inference", (
     "greedy", "greedy_own_loss_guard_v1", "greedy_own_loss_guard_v2",
-    "greedy_own_loss_guard_v3"))
+    "greedy_own_loss_guard_v3", "greedy_own_loss_guard_v4"))
 def test_native_branch_reproduces_source_and_alternate(tmp_path, monkeypatch,
                                                        inference):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])

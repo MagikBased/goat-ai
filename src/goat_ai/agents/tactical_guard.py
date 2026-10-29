@@ -176,6 +176,44 @@ def safe_idle_own_ring_indices(observation: Observation,
     return kept or indices
 
 
+def safe_ring_target_indices(observation: Observation,
+                             legal_actions: Sequence[Action],
+                             admissible: Sequence[int]) -> tuple[int, ...]:
+    """Prefer a survivable enemy Ring target over spending an own monster.
+
+    An own target that could end the duel remains available. This uses
+    only the public chain source, face-up monster ATK, LP, and legal choices.
+    """
+    indices = tuple(admissible)
+    own = observation.viewer
+    if (not observation.chain or observation.chain[-1].controller != own
+            or observation.chain[-1].card_code != RING_OF_DESTRUCTION):
+        return indices
+    monsters = {(card.controller, card.sequence): card
+                for card in observation.field
+                if card.zone == "monster" and card.position == "faceup"}
+    enemy_safe = any(
+        legal_actions[index].kind == "select_card"
+        and (action := legal_actions[index]).parameters.get("controller") != own
+        and (target := monsters.get((action.parameters.get("controller"),
+                                    action.parameters.get("sequence")))) is not None
+        and target.attack is not None and target.attack < observation.life_points[own]
+        for index in indices)
+    if not enemy_safe:
+        return indices
+
+    def spend_own(index: int) -> bool:
+        action = legal_actions[index]
+        if action.kind != "select_card" or action.parameters.get("controller") != own:
+            return False
+        target = monsters.get((own, action.parameters.get("sequence")))
+        return (target is not None and target.attack is not None
+                and target.attack < observation.life_points[1 - own])
+
+    kept = tuple(index for index in indices if not spend_own(index))
+    return kept or indices
+
+
 def safe_position_indices(observation: Observation,
                           legal_actions: Sequence[Action],
                           admissible: Sequence[int], *,

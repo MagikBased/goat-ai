@@ -2576,3 +2576,9 @@ three flagged decisions, the recorded and alternate lines had the same winner
 on the recorded hidden deal despite different duel lengths. These branch
 winners are not suitable preference labels; M4 still needs independent review
 and a held-out competitive gain.
+An [opt-in Ring target guard ablation](evaluation.md#own-ring-target-filter-ablation-29-october-2026)
+corrected one conspicuous own-target choice in a fixed state but lost one more
+than the v3 control over 128 matched, unseen-Main-Deck direct games. In the
+changed game the own-target line won and the opposing-target line lost. This
+shows why a visible one-card trade cannot be promoted as general action value;
+v4 remains experimental, and the learned-policy strength gate stays open.

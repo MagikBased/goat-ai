@@ -2959,6 +2959,44 @@ def test_optional_own_loss_v3_defers_idle_own_ring_without_changing_v1():
         replace(snapshot, life_points=(8000, 1900)), (ring, wait)) == ring
 
 
+def test_optional_own_loss_v4_prefers_safe_enemy_ring_target_except_own_lethal():
+    class FavorFirst(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, features):
+            return -torch.arange(len(features.action_cards)).float() + self.dummy
+
+    ring_code = 511000824
+    own_code = 71413901
+    enemy_code = 31560081
+    own = CardView(0, "monster", "faceup", own_code, 0,
+                   "attack", 1900, 1000)
+    enemy = CardView(1, "monster", "faceup", enemy_code, 0,
+                     "attack", 300, 400)
+    own_target = Action("own", "select_card", 0,
+                        {"code": own_code, "controller": 0,
+                         "location": 4, "sequence": 0})
+    enemy_target = Action("enemy", "select_card", 0,
+                          {"code": enemy_code, "controller": 1,
+                           "location": 4, "sequence": 0})
+    snapshot = replace(view(), field=(own, enemy), life_points=(8000, 8000),
+                       chain=(ChainLinkView(1, ring_code, 0, 8, 0),))
+    model = FavorFirst()
+    vocabulary = CardVocabulary(tuple(sorted((ring_code, own_code, enemy_code))))
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                       own_loss_guard_version=3).select_action(
+        snapshot, (own_target, enemy_target)) == own_target
+    v4 = PolicyAgent(model, vocabulary, own_loss_guard=True,
+                     own_loss_guard_version=4)
+    assert v4.select_action(snapshot, (own_target, enemy_target)) == enemy_target
+    assert v4.select_action(replace(snapshot, life_points=(8000, 1800)),
+                            (own_target, enemy_target)) == own_target
+    assert v4.select_action(replace(snapshot, life_points=(200, 8000)),
+                            (own_target, enemy_target)) == own_target
+
+
 def test_optional_position_guard_preserves_defending_sheep_token():
     class FavorFirst(torch.nn.Module):
         def __init__(self):

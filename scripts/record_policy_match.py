@@ -51,8 +51,9 @@ def main() -> None:
                              "attack-to-weaker-defense switches")
     parser.add_argument("--own-loss-guard", action="store_true",
                         help="experimental visible own-card-loss filter")
-    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3), default=1,
-                        help="v2 defers isolated one-shot MST; v3 defers idle own-only Ring")
+    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4), default=1,
+                        help="v2 defers one-shot MST; v3 idle own-only Ring; "
+                             "v4 prefers a safe opposing Ring target")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.max_decisions < 1:
@@ -115,7 +116,7 @@ def main() -> None:
                                              if args.own_loss_guard and args.own_loss_guard_version == 1 else
                                              "greedy_own_loss_guard_v2"
                                              if args.own_loss_guard and args.own_loss_guard_version == 2 else
-                                             "greedy_own_loss_guard_v3"
+                                             f"greedy_own_loss_guard_v{args.own_loss_guard_version}"
                                              if args.own_loss_guard else
                                              "greedy_tactical_guard_v5"
                                              if args.self_target_guard else

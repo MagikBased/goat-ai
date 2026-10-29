@@ -75,7 +75,8 @@ def recorded_policy_options(inference: str, card_facts: dict) -> dict:
         return {}
     versions = {"greedy_own_loss_guard_v1": 1,
                 "greedy_own_loss_guard_v2": 2,
-                "greedy_own_loss_guard_v3": 3}
+                "greedy_own_loss_guard_v3": 3,
+                "greedy_own_loss_guard_v4": 4}
     if inference not in versions:
         raise ValueError(f"unsupported policy inference {inference!r}")
     version = versions[inference]

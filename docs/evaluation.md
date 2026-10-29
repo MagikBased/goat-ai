@@ -485,6 +485,47 @@ Winner equality across these three pairs does not validate the original
 material trade or the alternate move as optimal. Keep the cases in human
 review and do not train from these branch winners alone.
 
+### Own-Ring target filter ablation (29 October 2026)
+
+An opt-in v4 inference guard extends v3. At a Ring target prompt controlled
+by the acting player, it filters nonlethal own face-up targets only when a
+face-up opposing monster would deal less damage than the player's current LP.
+It preserves an own target that could end the duel and leaves all choices
+unchanged if no qualifying opposing target exists. The filter reads only the
+acting player's observation and offered legal actions. It does not change the
+rules engine or the selected neural checkpoint.
+
+On the previously verified seed-104404 fixed state, v3 selected the player's
+own 1900-ATK monster and v4 selected the offered opposing 400-ATK monster.
+The rule therefore addresses the reviewed target pattern on that state. A
+complete v4-versus-Tactical duel on the same seed and decks reached terminal
+in 655 decisions; its replay and visibility audit passed, and
+`audit_policy_replays.py` reproduced every v4 policy choice with zero review
+flags. Its ignored trajectory is `ring_target_v4_tactical_104404.json` under
+`.cache/goat-ai/`.
+However, in **128** direct v4-versus-v3 games on fresh seeds 104500–104515,
+two unseen-Main-Deck pairings, both deck assignments and both policy seats,
+v4 scored **63–65**. A matched v3-versus-v3 control scored **64–64**. The
+provenance-checked paired difference was **−0.78 percentage points**, with a
+95% interval of **−2.34 to 0.00**. The saved direct report SHA-256 is
+`77f1ec49a066e9f02f6443ff073de85058299d53c301f8425f3c43877fa1c9e9`;
+the control report SHA-256 is
+`c62ef679f44e38373d9f6709fb67aad4c36ff92134eddd2a0a7691445c7660d3`.
+Both reports are ignored under `.cache/goat-ai/` with names
+`ring_target_v4_vs_v3_104500_104515.json` and
+`ring_target_v3_control_104500_104515.json`.
+
+Only one matched game changed its winner. In Mary Triatafilidi Warrior versus
+Bryan Coronel Chaos, seed 104513, policy seat 0, v3 won and v4 lost. Complete
+duels under both guards were saved, replay-verified, and visibility-audited as
+ignored `ring_target_104513_v3.json` and `ring_target_104513_v4.json`. The
+first differing decision was **1006**, turn 31 Main Phase 1: v3 selected its
+own face-up 1700-ATK monster for Ring; v4 selected the opponent's 1000-ATK
+monster, with both players at 5300 LP. The remaining lines diverged. One
+outcome does not prove the own target was generally optimal, but it directly
+contradicts promotion of this target filter on the current evidence. Keep v4
+experimental and seek contextual human labels or a learned value estimate.
+
 ## Optional own-card effect activation ablation (29 October 2026)
 
 The selected v23 policy still activates removal when its own cards are the
