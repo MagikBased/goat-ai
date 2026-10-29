@@ -111,3 +111,25 @@ def test_live_http_requests_keep_native_engine_on_its_worker_thread(tmp_path, mo
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_live_game_neural_opponent_reaches_human_decision_without_hidden_cards(tmp_path):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve()
+    checkpoint = native_root / "fv23_current_tactical_broader_33000_33031.pt"
+    if not checkpoint.is_file():
+        pytest.skip("selected neural checkpoint not installed")
+    manager = _manager(tmp_path, native_root)
+    manager.creator.checkpoint = checkpoint
+    state = manager.start({"deck1": DECK1, "deck2": DECK2, "human_seat": 1,
+                           "opponent": "policy", "seed": 4327})
+    try:
+        assert state["terminal"] is False
+        assert state["observation"]["viewer"] == 1
+        assert state["observation"]["acting_player"] == 1
+        assert state["legal_actions"]
+        assert all(card["code"] is None for card in state["observation"]["field"]
+                   if card["controller"] == 0 and card["position"] == "facedown")
+        assert "opponent_hand" not in state["observation"]
+    finally:
+        manager.close(state["id"])

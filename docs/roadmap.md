@@ -2385,11 +2385,14 @@ the queue starts unlabeled and establishes no policy-strength gain.
 
 The local replay server now offers a browser game creator for two selected AI
 agents and Decks. It records complete native duels, replay-verifies them, and
-opens reviewer-only visual replays. Browser human-versus-AI play remains future
-work: the server must keep a duel session alive across requests, expose only
-the human seat's observation and legal actions, reject stale or illegal
-choices, and keep hidden cards inaccessible until a separate postgame replay.
-The existing terminal `HumanAgent` already exercises the same action contract.
+opens reviewer-only visual replays. Browser human-versus-AI play is available
+at `/games/play` through the local server. A live native duel remains on one
+worker thread across requests, and the browser receives the human seat's
+observation and legal actions. Illegal choices are rejected. A completed duel
+is replay-verified, audited for player visibility, and saved as a `human_web`
+self-recording with a separate postgame full-information replay. Unfinished
+games remain in server memory and are lost when the server stops. The terminal
+`HumanAgent` also exercises the same action contract.
 Locally created games can now pass through the existing visible-decision
 review scanner with an explicit seat. Their heuristic flags are linked to
 viewer frames and stored separately from trajectories and human annotations;
