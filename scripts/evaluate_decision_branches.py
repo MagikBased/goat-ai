@@ -20,11 +20,34 @@ from goat_ai.agents import (
 )
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.effect_material import material_margin
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION
+
+
+def open_chain_material_change(trajectory, decision_index: int, seat: int,
+                               card_facts: dict) -> dict | None:
+    """Compare visible material at one open-chain decision and its first closure.
+
+    This is an observed result of the full-state offline branch, not a value
+    estimate available to a playing agent. Later responses may affect it.
+    """
+    before = trajectory.decisions[decision_index].observation
+    if not before.chain:
+        return None
+    for index in range(decision_index + 1, len(trajectory.decisions)):
+        after = trajectory.decisions[index].observation
+        if after.turn != before.turn:
+            return None
+        if not after.chain:
+            start = material_margin(before, seat, card_facts)
+            end = material_margin(after, seat, card_facts)
+            return {"before": start, "after": end, "delta": end - start,
+                    "closed_before_decision": index}
+    return None
 
 
 def recorded_policy_options(inference: str, native_root: Path) -> dict:
@@ -86,9 +109,10 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
     policy = load_policy_agent(continuation_path, **continuation_options)
     if policy.model.feature_version != metadata.get("policy_feature_version"):
         raise ValueError("source and checkpoint policy feature versions differ")
+    card_facts = load_card_facts(native_root)
     tactical = TacticalHeuristicAgent(
         load_flip_monster_codes(native_root), load_card_races(native_root),
-        card_facts=load_card_facts(native_root))
+        card_facts=card_facts)
     agents = (policy, tactical) if seat == 0 else (tactical, policy)
     output_dir.mkdir(parents=True, exist_ok=True)
     branches = []
@@ -142,6 +166,8 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                              "action_code": offered[action_index].parameters.get("code"),
                              "winner": saved.winner,
                              "decisions": verified,
+                             "open_chain_material_change": open_chain_material_change(
+                                 saved, decision_index, seat, card_facts),
                              "trajectory": str(path),
                              "trajectory_sha256": sha256_file(path)})
     report = {"source": str(source_path), "source_sha256": sha256_file(source_path),

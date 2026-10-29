@@ -9,7 +9,9 @@ import pytest
 
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
-from goat_ai.replay import read_trajectory, write_trajectory
+from goat_ai.observations import CardView, ChainLinkView, Observation
+from goat_ai.replay import DecisionRecord, Trajectory, read_trajectory, write_trajectory
+from goat_ai.actions import Action
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION
 from scripts import evaluate_decision_branches as branches
@@ -113,3 +115,29 @@ def test_native_branch_reproduces_source_and_alternate(tmp_path, monkeypatch,
 def test_branch_rejects_unknown_recorded_inference(tmp_path):
     with pytest.raises(ValueError, match="unsupported source policy inference"):
         branches.recorded_policy_options("greedy_unknown", tmp_path)
+
+
+def test_open_chain_material_change_uses_each_players_visible_hand_count():
+    def observation(viewer, hand, opposing_hand, chain):
+        return Observation(
+            viewer=viewer, acting_player=viewer, turn=1, phase="main1",
+            life_points=(8000, 8000),
+            hand=tuple(CardView(viewer, "hand", "faceup", 100)
+                       for _ in range(hand)),
+            field=(), graveyards=((), ()), banished=((), ()),
+            opponent_hand_count=opposing_hand, deck_counts=(35, 35),
+            extra_deck_counts=(0, 0), chain=chain, turn_player=0)
+
+    pending = (ChainLinkView(1, 200, 0, 8, 0),)
+    before = observation(0, 5, 5, pending)
+    after = observation(1, 3, 5, ())
+    wait = Action("pass", "pass", 0, {})
+    opponent_wait = Action("pass", "pass", 1, {})
+    trajectory = Trajectory("goat", ("a", "b"), 1, (
+        DecisionRecord(before, (wait,), wait),
+        DecisionRecord(after, (opponent_wait,), opponent_wait),
+    ), winner=None)
+    result = branches.open_chain_material_change(trajectory, 0, 0, {})
+    assert result == {"before": 0, "after": 2, "delta": 2,
+                      "closed_before_decision": 1}
+    assert branches.open_chain_material_change(trajectory, 1, 0, {}) is None

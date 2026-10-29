@@ -22,15 +22,37 @@ chain deltas directly into supervised labels or an RL reward. The same caution
 applies to monster abilities, whose costs and other chain links can change
 the observed margin independently of whether their target was good.
 
+An exact native branch at that MST decision (zero-based decision **5**, seed
+**124904**, policy seat 0) compared the recorded MST chain with the offered
+Pass. Both branches reconstructed the same verified prefix, then continued
+with the same selected v23/v1 policy and Tactical-v14 opponent. Both complete
+duels replay-verified and passed the visibility audit. At the first chain
+closure, the acting player's material margin was **+0** from MST and **+1**
+from Pass, relative to the shared starting state. Both full continuations
+were wins for the policy seat, after **395** and **348** decisions. The one-card
+immediate difference supports the local diagnosis; a single seed and shared
+win do not establish a win-rate improvement. The branch tool now records this
+open-chain material comparison in each arm's report, using only observations
+legally visible at the decision and closure. It remains an offline exact-state
+diagnostic, not a policy input or online search feature.
+
 The ignored report is
 `.cache/goat-ai/own_card_broad_review_124900_124907/review_material.json`
 (SHA-256 `1c05b9b11aeaf9da21a57e070d93334bb091640fc4ceec79a0d565a506675aae`).
+The ignored branch report is
+`.cache/goat-ai/mst_own_duo_124904_d5_material/report.json` (SHA-256
+`67a2388fa5db0e4fb77176445a5043b7164afd467278492707332631e28761ac`).
 Reproduce it with:
 
 ```bash
 PYTHONPATH=src:. .venv/bin/python scripts/audit_review_material.py \
   .cache/goat-ai/own_card_broad_review_124900_124907/queue.json \
   --output .cache/goat-ai/own_card_broad_review_124900_124907/review_material.json
+PYTHONPATH=src:. .venv/bin/python scripts/evaluate_decision_branches.py \
+  .cache/goat-ai/own_card_broad_baseline_124900_124907/matchup_00_seed_124904_seat_0.json \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --decision-index 5 --action-index 0 --action-index 1 \
+  --output-dir .cache/goat-ai/mst_own_duo_124904_d5_reproduction
 ```
 
 
