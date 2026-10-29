@@ -1,5 +1,48 @@
 # Baseline evaluation log
 
+## Offline action-branch outcome diagnostic (29 October 2026)
+
+`scripts/evaluate_decision_branches.py` now reconstructs a complete
+policy-versus-Tactical duel to one recorded decision, verifies the exact
+source replay and player visibility, then plays the recorded action and
+specified legal alternatives from the same seed and action prefix. The
+recorded-action continuation must reproduce every original decision and the
+winner exactly. Both full branch trajectories are independently replay-
+verified and visibility-audited. Continuation agents receive only their own
+observations and legal actions. The script is an **offline diagnostic**;
+sampling the actual hidden state from a recorded game would give an online
+search agent forbidden information.
+
+Six observed bad-activation contexts from the v6 training set were branched:
+five own-only Nobleman activations and one Breaker activation with only friendly
+back row. The alternate action was Pass, Battle Phase, or End Phase, whichever
+was offered. **Five of six** pairs ended with the same winner. At seed 99901,
+seat 1, decision 424, the original own-target Nobleman line won while the
+Battle Phase and End Phase branches lost under these fixed continuation agents.
+The position had only the player's own Set D.D. Assailant as a Nobleman target;
+this single continuation result does not make that play good. Different
+subsequent actions, native random draws, and a single hidden deal can overwhelm
+the immediate material loss. It is evidence against treating one branch's
+terminal winner as a reliable action label. The ignored report for that pair
+has SHA-256 `927831347aa1966134af09f226c9bf10fb486b9e2fc228c5a1e82db6d5395eae`.
+
+Reproduce one early Nobleman comparison with:
+
+```bash
+.venv/bin/python -m scripts.evaluate_decision_branches \
+  .cache/goat-ai/own_card_parent_review_99900_99907/seed_99902_seat_0.json \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --decision-index 6 --action-index 3 --action-index 4 \
+  --native-root .cache/goat-ai \
+  --output-dir .cache/goat-ai/branch_nobleman_99902_6_reproduced
+```
+
+The paired reconstruction provides a way to test future value and search
+ideas. Before using outcomes for training or online decisions, evaluate
+multiple player-consistent hidden-state samples and continuation policies,
+then compare their predictions on held-out complete duels. No search agent or
+new policy is promoted by this diagnostic.
+
 ## Optional own-card effect activation ablation (29 October 2026)
 
 The selected v23 policy still activates removal when its own cards are the

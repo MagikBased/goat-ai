@@ -1534,6 +1534,14 @@ base teacher version for named Tactical variants; see [evaluation](evaluation.md
 
 ## M5 — Search and other formats
 
+An [offline branch diagnostic](evaluation.md#offline-action-branch-outcome-diagnostic-29-october-2026)
+now reconstructs a verified duel to one decision and plays legal alternatives
+with observation-only continuation agents. Six own-card-loss comparisons show
+that a single terminal outcome can disagree with an immediate material
+assessment. It is a test instrument, not online search; M5 still requires
+player-consistent hidden-state sampling, held-out outcome evidence, and the
+separately validated additional format below.
+
 A [paired MR1 Bottomless/Synchro fixture](edison_research.md#bottomless-trap-hole-after-a-synchro-summon)
 now tests the response window after Junk Warrior is Synchro Summoned. Both
 branches finish, replay-verify, and pass the visibility audit. This is another
