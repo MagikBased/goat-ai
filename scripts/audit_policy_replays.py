@@ -229,7 +229,7 @@ def main() -> None:
                                  "greedy_position_guard_v1", "greedy_position_guard_v2",
                                  "greedy_own_loss_guard_v1", "greedy_own_loss_guard_v2",
                                  "greedy_own_loss_guard_v3",
-                                 "greedy_own_loss_guard_v4"):
+                                 "greedy_own_loss_guard_v4", "greedy_own_loss_guard_v5"):
                 raise ValueError(f"{path}: unsupported policy inference {inference!r}")
             guarded = inference in ("greedy_tactical_guard_v3", "greedy_tactical_guard_v4",
                                     "greedy_tactical_guard_v5")
@@ -242,12 +242,15 @@ def main() -> None:
                 own_loss_guard=inference in ("greedy_own_loss_guard_v1",
                                              "greedy_own_loss_guard_v2",
                                              "greedy_own_loss_guard_v3",
-                                             "greedy_own_loss_guard_v4"),
+                                             "greedy_own_loss_guard_v4",
+                                             "greedy_own_loss_guard_v5"),
                 own_loss_guard_version=(2 if inference == "greedy_own_loss_guard_v2"
+                                        else 5 if inference == "greedy_own_loss_guard_v5"
                                         else 4 if inference == "greedy_own_loss_guard_v4"
                                         else 3 if inference == "greedy_own_loss_guard_v3"
                                         else 1),
-                card_facts=(card_facts if inference == "greedy_own_loss_guard_v2" else None),
+                card_facts=(card_facts if inference in (
+                    "greedy_own_loss_guard_v2", "greedy_own_loss_guard_v5") else None),
                 position_guard=inference in ("greedy_position_guard_v1",
                                              "greedy_position_guard_v2"),
                 position_guard_version=(1 if inference == "greedy_position_guard_v1" else 2))

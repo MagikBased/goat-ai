@@ -32,12 +32,13 @@ def recorded_policy_options(inference: str, native_root: Path) -> dict:
     versions = {"greedy_own_loss_guard_v1": 1,
                 "greedy_own_loss_guard_v2": 2,
                 "greedy_own_loss_guard_v3": 3,
-                "greedy_own_loss_guard_v4": 4}
+                "greedy_own_loss_guard_v4": 4,
+                "greedy_own_loss_guard_v5": 5}
     if inference not in versions:
         raise ValueError(f"unsupported source policy inference {inference!r}")
     version = versions[inference]
     return {"own_loss_guard": True, "own_loss_guard_version": version,
-            "card_facts": load_card_facts(native_root) if version == 2 else None}
+            "card_facts": load_card_facts(native_root) if version in (2, 5) else None}
 
 
 def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,

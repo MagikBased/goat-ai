@@ -500,6 +500,32 @@ Winner equality across these three pairs does not validate the original
 material trade or the alternate move as optimal. Keep the cases in human
 review and do not train from these branch winners alone.
 
+### Combined one-shot response and idle Ring guard ablation (29 October 2026)
+
+The opt-in `own_loss_guard_version=5` combines v2's isolated one-shot MST
+response filter with v3's idle own-only Ring timing filter and the original
+v1 own-loss checks. It deliberately omits v4's Ring target preference, whose
+separate direct comparison favored v3. The filter uses only the acting
+player's observation, printed public card Type, and offered legal actions;
+it does not alter the selected neural checkpoint. A seed-104716 complete
+v5-versus-Tactical duel reached terminal in 882 decisions, replay-verified,
+passed visibility auditing, and reproduced every policy choice.
+
+On seeds 104700–104715, Bryan Chaos versus Mary Warrior and Theeresak Goat
+Control versus Roberto Phoenix Control were played in both Deck assignments
+and both policy seats, for **128** direct v5-versus-v3 complete duels. The
+Main Deck composition holdout, pinned assets, card scripts, checkpoint, and
+source fingerprints were checked. V5 scored **63–65**. A matched v3-versus-v3
+control on the same schedule scored **64–64**. The strict paired comparison
+measured **−0.78 percentage points** for v5, with a 95% interval of **−2.34
+to 0.00 points**. The ignored reports are
+`.cache/goat-ai/combined_guard_v5_vs_v3_104700_104715.json` (SHA-256
+`58359f3678a84e9d302936d246d143a9fb71351e2536df2a181cd69ed0e87010`)
+and `.cache/goat-ai/combined_guard_v3_control_104700_104715.json`
+(SHA-256 `4ea6d54f87358415f40041ff5783dba710a3ba6df8b5cc601a30a7139242fe7d`).
+This combination has no measured strength gain and remains experimental. It
+does not address the broader learned action-value problem or close M4.
+
 ### Own-Ring target filter ablation (29 October 2026)
 
 An opt-in v4 inference guard extends v3. At a Ring target prompt controlled

@@ -140,9 +140,9 @@ def main() -> None:
                         help="avoid observed BLS and MST self-target losses; requires tactical guard")
     parser.add_argument("--own-loss-guard", action="store_true",
                         help="standalone visible own-only removal ablation")
-    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4), default=1,
+    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4, 5), default=1,
                         help="v2 defers one-shot MST; v3 idle own-only Ring; "
-                             "v4 prefers a safe opposing Ring target")
+                             "v4 prefers a safe opposing Ring target; v5 combines v2 and v3")
     parser.add_argument("--position-guard", action="store_true",
                         help="standalone Sheep Token and empty-field position filter")
     parser.add_argument("--opponent-tactical-guard", action="store_true",
@@ -152,7 +152,7 @@ def main() -> None:
     parser.add_argument("--opponent-own-loss-guard", action="store_true",
                         help="apply an own-loss guard to the opponent checkpoint")
     parser.add_argument("--opponent-own-loss-guard-version", type=int,
-                        choices=(1, 2, 3, 4), default=1,
+                        choices=(1, 2, 3, 4, 5), default=1,
                         help="own-loss guard version for the opponent checkpoint")
     opponents = parser.add_mutually_exclusive_group()
     opponents.add_argument("--opponent", choices=("random", "heuristic",
@@ -236,7 +236,7 @@ def main() -> None:
                         own_loss_guard_version=args.opponent_own_loss_guard_version,
                         card_facts=(load_card_facts(args.native_root)
                                     if args.opponent_own_loss_guard
-                                    and args.opponent_own_loss_guard_version == 2 else None),
+                                    and args.opponent_own_loss_guard_version in (2, 5) else None),
                         card_races=(load_card_races(args.native_root)
                                     if args.opponent_tactical_guard else None))
                 if args.opponent_checkpoint else {
@@ -258,7 +258,7 @@ def main() -> None:
                                  own_loss_guard=args.own_loss_guard,
                                  own_loss_guard_version=args.own_loss_guard_version,
                                  card_facts=(load_card_facts(args.native_root)
-                                             if args.own_loss_guard_version == 2 else None),
+                                             if args.own_loss_guard_version in (2, 5) else None),
                                  position_guard=args.position_guard),
         opponent, partial(engine_type, args.native_root), args.max_decisions,
         **({"workers": args.workers} if args.workers > 1 else {}),

@@ -2955,6 +2955,9 @@ def test_optional_own_loss_v3_defers_idle_own_ring_without_changing_v1():
                        own_loss_guard_version=3).select_action(
         snapshot, (ring, wait)) == wait
     assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                       own_loss_guard_version=5, card_facts={}).select_action(
+        snapshot, (ring, wait)) == wait
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True,
                        own_loss_guard_version=3).select_action(
         replace(snapshot, life_points=(8000, 1900)), (ring, wait)) == ring
 
@@ -2995,6 +2998,38 @@ def test_optional_own_loss_v4_prefers_safe_enemy_ring_target_except_own_lethal()
                             (own_target, enemy_target)) == own_target
     assert v4.select_action(replace(snapshot, life_points=(200, 8000)),
                             (own_target, enemy_target)) == own_target
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                       own_loss_guard_version=5, card_facts={}).select_action(
+        snapshot, (own_target, enemy_target)) == own_target
+
+
+def test_optional_own_loss_v5_combines_one_shot_response_with_ring_timing():
+    class FavorFirst(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, features):
+            return -torch.arange(len(features.action_cards)).float() + self.dummy
+
+    pot = 55144522
+    mst = 5318639
+    chain = (ChainLinkView(1, pot, 1, 8, 0),)
+    snapshot = replace(view(), chain=chain)
+    use_mst = Action("mst", "chain", 0, {"code": mst, "location": 2})
+    wait = Action("wait", "pass", 0)
+    model = FavorFirst()
+    vocabulary = CardVocabulary((mst, pot))
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                       own_loss_guard_version=3).select_action(
+        snapshot, (use_mst, wait)) == use_mst
+    with pytest.raises(ValueError, match="requires printed card facts"):
+        PolicyAgent(model, vocabulary, own_loss_guard=True,
+                    own_loss_guard_version=5)
+    assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                       own_loss_guard_version=5,
+                       card_facts={pot: (2, 0, 0)}).select_action(
+        snapshot, (use_mst, wait)) == wait
 
 
 def test_optional_position_guard_preserves_defending_sheep_token():
