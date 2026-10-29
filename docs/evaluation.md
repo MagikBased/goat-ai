@@ -50,6 +50,39 @@ under `.cache/goat-ai/`. Run `scripts/evaluate_policy.py` with
 then compare each block using `scripts/compare_tournament_reports.py
 --require-unseen-main-decks`.
 
+### Direct v3-versus-v1 Ring guard comparison
+
+The evaluator now accepts `--opponent-own-loss-guard` and
+`--opponent-own-loss-guard-version`, applies them to a checkpoint opponent,
+and records both settings in the tournament report. The report comparator
+checks these settings when present while still accepting matching archived
+reports that predate them. This permits a controlled direct ablation of the
+same feature-v23 checkpoint with two inference guards.
+
+On the same four unseen Main Deck pairings, both assignments and both policy
+seats were tested on fresh seeds 104200–104207 and 104300–104307. The
+candidate was v3; the opponent was v1. A matched v1-versus-v1 run on each
+schedule supplied the symmetric control. The comparator verified identical
+opponent settings, assets, source, decks, and held-out Main Decks.
+
+| Seeds | Games per run | v3 versus v1 score | v1 versus v1 score | Paired score difference | 95% paired bootstrap interval |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 104200–104207 | 128 | 63/128 | 64/128 | −0.78 points | −3.13 to +1.56 points |
+| 104300–104307 | 128 | 68.5/128 | 64/128 | +3.52 points | +0.78 to +6.64 points |
+| Combined | 256 | 131.5/256 | 128/256 | +1.37 points | −0.59 to +3.52 points |
+
+The combined interval includes zero and the two seed blocks disagree on the
+sign. The v3 guard therefore has **no established direct competitive gain**
+over v1, despite its narrower positive result against Tactical-v14 above.
+The selected checkpoint and local viewer stay on v1. The four ignored
+reports are `ring_direct_v{1,3}_vs_v1_{104200_104207,104300_104307}.json`
+under `.cache/goat-ai/`. Reproduce with `scripts/evaluate_policy.py` using
+`--opponent-checkpoint` set to the same v23 checkpoint,
+`--opponent-own-loss-guard --opponent-own-loss-guard-version 1`, the candidate
+`--own-loss-guard --own-loss-guard-version 1` or `3`, and the deck and seed
+schedules above. Compare each paired block with
+`scripts/compare_tournament_reports.py --require-unseen-main-decks`.
+
 ## Idle own-only removal activation audit (29 October 2026)
 
 The player-visible review audit now flags an optional, unchained MST or

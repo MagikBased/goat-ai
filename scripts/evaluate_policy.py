@@ -148,6 +148,11 @@ def main() -> None:
                         help="guard the opponent checkpoint for a direct ablation")
     parser.add_argument("--opponent-position-guard", action="store_true",
                         help="apply the position guard to the opponent checkpoint")
+    parser.add_argument("--opponent-own-loss-guard", action="store_true",
+                        help="apply an own-loss guard to the opponent checkpoint")
+    parser.add_argument("--opponent-own-loss-guard-version", type=int,
+                        choices=(1, 2, 3), default=1,
+                        help="own-loss guard version for the opponent checkpoint")
     opponents = parser.add_mutually_exclusive_group()
     opponents.add_argument("--opponent", choices=("random", "heuristic",
                                                   "combat_heuristic", "tactical"),
@@ -184,6 +189,13 @@ def main() -> None:
         parser.error("--opponent-position-guard requires --opponent-checkpoint")
     if args.opponent_position_guard and args.opponent_tactical_guard:
         parser.error("opponent position guard is a standalone ablation")
+    if args.opponent_own_loss_guard and not args.opponent_checkpoint:
+        parser.error("--opponent-own-loss-guard requires --opponent-checkpoint")
+    if args.opponent_own_loss_guard_version != 1 and not args.opponent_own_loss_guard:
+        parser.error("--opponent-own-loss-guard-version requires --opponent-own-loss-guard")
+    if args.opponent_own_loss_guard and (args.opponent_tactical_guard
+                                         or args.opponent_position_guard):
+        parser.error("opponent own-loss guard is a standalone ablation")
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     if not isinstance(checkpoint, dict) or checkpoint.get("schema_version") != 1:
         parser.error("unsupported policy checkpoint schema")
@@ -219,6 +231,11 @@ def main() -> None:
     opponent = (partial(make_policy_agent, checkpoint=str(args.opponent_checkpoint),
                         tactical_guard=args.opponent_tactical_guard,
                         position_guard=args.opponent_position_guard,
+                        own_loss_guard=args.opponent_own_loss_guard,
+                        own_loss_guard_version=args.opponent_own_loss_guard_version,
+                        card_facts=(load_card_facts(args.native_root)
+                                    if args.opponent_own_loss_guard
+                                    and args.opponent_own_loss_guard_version == 2 else None),
                         card_races=(load_card_races(args.native_root)
                                     if args.opponent_tactical_guard else None))
                 if args.opponent_checkpoint else {
@@ -274,6 +291,9 @@ def main() -> None:
         "opponent_tactical_guard": args.opponent_tactical_guard,
         "opponent_position_guard": args.opponent_position_guard,
         "opponent_position_guard_version": 2 if args.opponent_position_guard else None,
+        "opponent_own_loss_guard": args.opponent_own_loss_guard,
+        "opponent_own_loss_guard_version": (args.opponent_own_loss_guard_version
+                                             if args.opponent_own_loss_guard else None),
         "policy_feature_version": checkpoint.get("feature_version", 1),
         "core_commit": "baa3881d0bae48e9994f915f5c931be53c1ba8ef",
         "asset_sha256": assets,

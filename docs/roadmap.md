@@ -2529,8 +2529,10 @@ adds an opt-in v3 inference filter without changing the selected checkpoint or
 local viewer. It defers Ring on the policy's own turn with no chain and no
 opposing face-up monster, while preserving visible lethal damage. Against
 Tactical-v14 it changed five of 256 matched held-out outcomes, all in v3's
-favor, but v3 still lost most games. Keep it experimental and pursue a learned
-general action-value model and independent human review of edge cases.
+favor, but v3 still lost most games. A [direct v3-versus-v1 comparison](evaluation.md#direct-v3-versus-v1-ring-guard-comparison)
+then scored 131.5/256 against a v1-versus-v1 control of 128/256 on two fresh
+blocks; its paired interval crosses zero. Keep it experimental and pursue a
+learned general action-value model and independent human review of edge cases.
 An [exact guard-distillation child](evaluation.md#exact-visible-guard-distillation-into-v23-29-october-2026)
 reduced held-out fixed-state guard violations from seven to four, but scored
 63–65 directly against its v23 parent on 128 unseen-deck games. Its matched

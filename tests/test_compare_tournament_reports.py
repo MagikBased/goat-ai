@@ -27,6 +27,7 @@ def report(deck_a, deck_b, *, candidate):
         "opponent_checkpoint_sha256": None,
         "opponent_tactical_guard": False, "opponent_position_guard": False,
         "opponent_position_guard_version": None,
+        "opponent_own_loss_guard": False, "opponent_own_loss_guard_version": None,
         "training_games": [{"seed": 99}],
         "games": [vars(game) | {"a_outcome": game.a_outcome} for game in games],
         "summary": TournamentReport(games).summary(),
@@ -58,11 +59,28 @@ def test_comparison_checks_local_decks_and_reports_paired_difference(tmp_path):
         compare_reports(a, b, verify_local_decks=True)
 
 
+def test_comparison_accepts_matching_archived_reports_without_opponent_own_loss_fields(
+    tmp_path,
+):
+    a, b, left, right, _ = saved_pair(tmp_path)
+    for report in (left, right):
+        report.pop("opponent_own_loss_guard")
+        report.pop("opponent_own_loss_guard_version")
+    a.write_text(json.dumps(left))
+    b.write_text(json.dumps(right))
+    assert compare_reports(a, b)["games_per_report"] == 2
+    right["opponent_own_loss_guard"] = False
+    b.write_text(json.dumps(right))
+    with pytest.raises(ValueError, match="opponent_own_loss_guard"):
+        compare_reports(a, b)
+
+
 @pytest.mark.parametrize("field,value", [
     ("asset_sha256", {"core_library": "c" * 64}),
     ("opponent", "random"),
     ("evaluation_seeds", [101]),
     ("deck_sha256", {"other.ydk": "d" * 64}),
+    ("opponent_own_loss_guard_version", 3),
 ])
 def test_comparison_rejects_mismatched_controls(tmp_path, field, value):
     a, b, _, right, _ = saved_pair(tmp_path)

@@ -19,6 +19,8 @@ CONTROL_FIELDS = (
     "opponent_checkpoint_sha256", "opponent_tactical_guard",
     "opponent_position_guard", "opponent_position_guard_version",
 )
+OPTIONAL_CONTROL_FIELDS = ("opponent_own_loss_guard",
+                           "opponent_own_loss_guard_version")
 EXTENDED_FINGERPRINTS = ("card_scripts_sha256", "source_code_sha256")
 
 
@@ -110,6 +112,10 @@ def compare_reports(candidate_path: Path, control_path: Path, *,
                                  require_unseen_main_decks=require_unseen_main_decks)
     for key in CONTROL_FIELDS:
         if key not in candidate or key not in control or candidate[key] != control[key]:
+            raise ValueError(f"tournament controls differ: {key}")
+    for key in OPTIONAL_CONTROL_FIELDS:
+        if ((key in candidate) != (key in control)
+                or key in candidate and candidate[key] != control[key]):
             raise ValueError(f"tournament controls differ: {key}")
     for key in EXTENDED_FINGERPRINTS:
         if ((key in candidate) != (key in control)
