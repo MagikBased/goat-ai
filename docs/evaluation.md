@@ -1,5 +1,50 @@
 # Baseline evaluation log
 
+## Narrow visible own-loss guard ablation (29 October 2026)
+
+An opt-in observation-only filter now defers clearly own-only Nobleman,
+Breaker, Tribe, and owned BLS/Chaos Sorcerer activations and prefers an
+opposing target for a small set of removal effects when one is legal. It does
+not alter the native legal-action list or the neural checkpoint. The filter
+uses public field zones, positions, controller, and known original ownership;
+opposing Set-card identities are never read. This is an experimental policy
+ablation, not a universal card-value rule.
+
+On the **16** already native-verified seed-99900–99907 parent replays, the
+filter changed **6 of 4,068** recorded policy decisions. Five were own-only
+Nobleman activations and one was Breaker's activation with only friendly back
+row. Across the **111** `visible_optional_own_loss_v6` comparison states,
+the recorded parent selected a disfavored action **6** times and the filter
+selected one **0** times. These are fixed, previously visited states; the
+six corrections do not measure match outcomes or every possible self-target.
+
+Two New Jersey 2005 deck pairings, both deck assignments and policy seats,
+were held out from the selected feature-v23 checkpoint's Main Deck training
+compositions. On seeds 100400–100407, the guarded policy scored **35–29**
+directly against the *same checkpoint without the filter* over 64 complete
+duels (54.7%; paired 95% interval **48.4%–60.9%**). On matched fresh seeds
+100408–100415 against Tactical-v14, the guarded policy scored **24–40**
+versus the unchanged checkpoint's **23–41**. The strict report comparator
+verified the native assets, card scripts, source code, seeds, deck files,
+Main Deck composition holdout, and opponent. Its paired guarded-minus-parent
+Tactical score difference was **+1.6 percentage points**, interval
+**−3.1 to +6.3 points**. These intervals do not establish a competitive gain.
+The selected neural checkpoint remains unchanged; the guard remains opt-in.
+
+Ignored report SHA-256 values: direct play
+`a717f6682d411f030e7cc644ba81acd80f52774912fe77f7d59fff24192ee14f`,
+guarded/Tactical
+`a927614d65e03408a3985f3e8cbae38b3b971da9366f9174c3cb520a9213ca87`,
+and unchanged/Tactical
+`100f3474b4055884fcf5b8a8f77362cf8705363d8e34ac92c000fb9011d01131`.
+Reproduce the direct comparison with `scripts.evaluate_policy` using
+`--own-loss-guard --opponent-checkpoint` set to the same checkpoint, two
+`--matchup` pairs above, `--both-deck-assignments`, `--seed 100400 --seeds 8`,
+`--engine experimental --require-unseen-main-decks`, and native root
+`.cache/goat-ai`. Run the same schedule without `--opponent-checkpoint` and
+with `--opponent tactical` on seeds 100408–100415 both with and without the
+guard for the matched baseline comparison.
+
 ## Negative-only human review path (29 October 2026)
 
 The local replay viewer now accepts an explicit **Reject the AI's recorded

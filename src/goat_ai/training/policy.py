@@ -14,6 +14,7 @@ from goat_ai.actions import Action
 from goat_ai.agents.card_metadata import FLIP_MONSTER_TYPE, load_card_properties
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
+    safe_optional_own_loss_indices,
     safe_position_indices,
     safe_target_indices,
     weak_flip_set_substitute,
@@ -756,6 +757,7 @@ class PolicyAgent:
                  card_races: Mapping[int, int] | None = None,
                  weak_flip_attacks: Mapping[int, int] | None = None,
                  self_target_guard: bool = False,
+                 own_loss_guard: bool = False,
                  position_guard: bool = False,
                  position_guard_version: int = 2) -> None:
         self.model = model
@@ -764,6 +766,7 @@ class PolicyAgent:
         self.card_races = dict(card_races or {})
         self.weak_flip_attacks = dict(weak_flip_attacks or {})
         self.self_target_guard = self_target_guard
+        self.own_loss_guard = own_loss_guard
         self.position_guard = position_guard
         if position_guard_version not in (1, 2):
             raise ValueError("unknown position guard version")
@@ -784,6 +787,12 @@ class PolicyAgent:
         admissible = (admissible_action_indices(observation, legal_actions,
                                                 self.card_races)
                       if self.tactical_guard else range(len(legal_actions)))
+        if self.own_loss_guard:
+            admissible = safe_optional_own_loss_indices(
+                observation, legal_actions, admissible)
+            admissible = safe_target_indices(
+                observation, legal_actions, admissible,
+                protect_removal_targets=True)
         if self.self_target_guard:
             admissible = safe_target_indices(observation, legal_actions, admissible)
         if self.position_guard:

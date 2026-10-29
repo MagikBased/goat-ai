@@ -6,6 +6,7 @@ from goat_ai.actions import Action
 from goat_ai.agents import TacticalHeuristicAgent
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
+    safe_optional_own_loss_indices,
     safe_position_indices,
     safe_target_indices,
     weak_flip_set_substitute,
@@ -39,6 +40,39 @@ def test_heavy_storm_avoids_solely_damaging_own_backrow():
     # The rule cannot examine the unknown identity of the opponent's Set card.
     assert kept(board(own_set, opponent_set), (storm, wait)) == kept(
         board(own_set, replace(opponent_set, sequence=0)), (storm, wait))
+
+
+def test_opt_in_own_loss_guard_defers_visible_own_only_removal():
+    wait = Action("wait", "end_phase", 0)
+    own_set = CardView(0, "monster", "facedown", 504700178, 0)
+    enemy_set = CardView(1, "monster", "facedown", None, 0)
+    own_backrow = CardView(0, "spell_trap", "facedown", 45986603, 0)
+    enemy_backrow = CardView(1, "spell_trap", "facedown", None, 0)
+    nobleman = Action("nobleman", "activate", 0, {"code": 504700116})
+    breaker = Action("breaker", "activate", 0, {"code": 71413901})
+    for action, own_card, enemy_card in (
+            (nobleman, own_set, enemy_set),
+            (breaker, own_backrow, enemy_backrow)):
+        actions = (action, wait)
+        assert safe_optional_own_loss_indices(board(own_card), actions, range(2)) == (1,)
+        assert safe_optional_own_loss_indices(
+            board(own_card, enemy_card), actions, range(2)) == (0, 1)
+        assert safe_optional_own_loss_indices(board(own_card), (action,), (0,)) == (0,)
+
+
+def test_opt_in_own_loss_guard_preserves_borrowed_boss_and_hidden_opponent():
+    boss = 9596126
+    activate = Action("banish", "activate", 0,
+                      {"code": boss, "sequence": 0})
+    wait = Action("wait", "end_phase", 0)
+    owned = CardView(0, "monster", "faceup", boss, 0, "attack",
+                     2300, 2000, owner=0)
+    borrowed = replace(owned, owner=1)
+    assert safe_optional_own_loss_indices(board(owned), (activate, wait), range(2)) == (1,)
+    assert safe_optional_own_loss_indices(board(borrowed), (activate, wait), range(2)) == (0, 1)
+    assert safe_optional_own_loss_indices(
+        board(owned, CardView(1, "monster", "facedown", None, 0)),
+        (activate, wait), range(2)) == (0, 1)
 
 
 def test_opt_in_heavy_storm_uses_visible_card_advantage():

@@ -34,11 +34,13 @@ def make_policy_agent(_seed: int, checkpoint: str, tactical_guard: bool = False,
                       card_races: dict[int, int] | None = None,
                       weak_flip_attacks: dict[int, int] | None = None,
                       self_target_guard: bool = False,
+                      own_loss_guard: bool = False,
                       position_guard: bool = False):
     return load_policy_agent(checkpoint, tactical_guard=tactical_guard,
                              card_races=card_races,
                              weak_flip_attacks=weak_flip_attacks,
                              self_target_guard=self_target_guard,
+                             own_loss_guard=own_loss_guard,
                              position_guard=position_guard)
 
 
@@ -132,6 +134,8 @@ def main() -> None:
                         help="also prefer setting low-ATK Flip monsters; requires tactical guard")
     parser.add_argument("--self-target-guard", action="store_true",
                         help="avoid observed BLS and MST self-target losses; requires tactical guard")
+    parser.add_argument("--own-loss-guard", action="store_true",
+                        help="standalone visible own-only removal ablation")
     parser.add_argument("--position-guard", action="store_true",
                         help="standalone Sheep Token and empty-field position filter")
     parser.add_argument("--opponent-tactical-guard", action="store_true",
@@ -164,6 +168,8 @@ def main() -> None:
         parser.error("choose one experimental extension of guard v3")
     if args.position_guard and args.tactical_guard:
         parser.error("position guard is a standalone ablation")
+    if args.own_loss_guard and (args.tactical_guard or args.position_guard):
+        parser.error("own-loss guard is a standalone ablation")
     if args.opponent_tactical_guard and not args.opponent_checkpoint:
         parser.error("--opponent-tactical-guard requires --opponent-checkpoint")
     if args.opponent_position_guard and not args.opponent_checkpoint:
@@ -223,6 +229,7 @@ def main() -> None:
                                  card_races=card_races,
                                  weak_flip_attacks=weak_flip_attacks,
                                  self_target_guard=args.self_target_guard,
+                                 own_loss_guard=args.own_loss_guard,
                                  position_guard=args.position_guard),
         opponent, partial(engine_type, args.native_root), args.max_decisions,
         **({"workers": args.workers} if args.workers > 1 else {}),
@@ -245,6 +252,7 @@ def main() -> None:
         "checkpoint_sha256": sha256(args.checkpoint),
         "policy_inference_version": POLICY_INFERENCE_VERSION,
         "tactical_guard": args.tactical_guard,
+        "own_loss_guard": args.own_loss_guard,
         "position_guard": args.position_guard,
         "position_guard_version": 2 if args.position_guard else None,
         "tactical_guard_version": (5 if args.self_target_guard else

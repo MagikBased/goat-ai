@@ -1534,6 +1534,13 @@ tournament. Keep it opt-in; the result does not improve the provisional
 teacher or M4's learned-policy gate. The evaluator now records the correct
 base teacher version for named Tactical variants; see [evaluation](evaluation.md#strict-heavy-storm-card-advantage-ablation-27-october-2026).
 
+An [opt-in, observation-only own-loss guard ablation](evaluation.md#narrow-visible-own-loss-guard-ablation-29-october-2026)
+corrected six own-card-loss choices on fixed parent states, but its 35–29
+direct result and matched Tactical comparison did not establish a competitive
+gain. Keep the selected v23 checkpoint unchanged. The M4 exit still requires
+a learned policy with independently measured cross-deck strength and self-play
+improvement.
+
 ## M5 — Search and other formats
 
 An [offline branch diagnostic](evaluation.md#offline-action-branch-outcome-diagnostic-29-october-2026)

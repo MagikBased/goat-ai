@@ -38,6 +38,54 @@ EFFECT_TYPE = 0x20
 SHEEP_TOKENS = frozenset((73915052, 73915053, 73915054, 73915055))
 
 
+def safe_optional_own_loss_indices(observation: Observation,
+                                   legal_actions: Sequence[Action],
+                                   admissible: Sequence[int]) -> tuple[int, ...]:
+    """Defer a few visible own-only removal activations for an opt-in ablation.
+
+    This is a strategic filter, never a legality ruling. A facedown opposing
+    card is counted only by zone and position; its identity is not inspected.
+    Keep a legal fallback if every offered action matches the filter.
+    """
+    indices = tuple(admissible)
+    own = observation.viewer
+    own_sets = any(c.controller == own and c.zone == "monster"
+                   and c.position == "facedown" for c in observation.field)
+    enemy_sets = any(c.controller != own and c.zone == "monster"
+                     and c.position == "facedown" for c in observation.field)
+    own_backrow = any(c.controller == own and c.zone == "spell_trap"
+                      for c in observation.field)
+    enemy_backrow = any(c.controller != own and c.zone == "spell_trap"
+                        for c in observation.field)
+    enemy_monsters = any(c.controller != own and c.zone == "monster"
+                         for c in observation.field)
+    own_faceup_monsters = any(c.controller == own and c.zone == "monster"
+                              and c.position == "faceup" for c in observation.field)
+
+    def own_only(index: int) -> bool:
+        action = legal_actions[index]
+        if action.kind not in ("activate", "chain"):
+            return False
+        code = action.parameters.get("code")
+        if code == NOBLEMAN_OF_CROSSOUT:
+            return own_sets and not enemy_sets
+        if code == BREAKER_THE_MAGICAL_WARRIOR:
+            return own_backrow and not enemy_backrow
+        if code == TRIBE_INFECTING_VIRUS:
+            return own_faceup_monsters and not any(
+                c.controller != own and c.zone == "monster" and c.position == "faceup"
+                for c in observation.field)
+        if code in (BLACK_LUSTER_SOLDIER, CHAOS_SORCERER) and not enemy_monsters:
+            return any(c.controller == own and c.zone == "monster"
+                       and c.sequence == action.parameters.get("sequence")
+                       and c.code == code and c.owner == own
+                       for c in observation.field)
+        return False
+
+    kept = tuple(index for index in indices if not own_only(index))
+    return kept or indices
+
+
 def safe_position_indices(observation: Observation,
                           legal_actions: Sequence[Action],
                           admissible: Sequence[int], *,
