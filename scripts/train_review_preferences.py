@@ -21,6 +21,7 @@ from goat_ai.replay import (
 )
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import fit_preferences_with_parent_kl, load_policy_agent
+from scripts.convert_rejected_review_notes import validate_rejection_provenance
 from scripts.derive_visible_rule_preferences import validate_automated_preferences
 
 
@@ -114,6 +115,9 @@ def main() -> None:
         audit_trajectory_visibility(trajectory)
         preferences = read_decision_preferences(preferences_path, replay_hash, trajectory)
         validate_preference_objective(preferences, trajectory, args.objective)
+        rejection_hashes = (validate_rejection_provenance(
+            preferences_path, replay_path, trajectory, preferences)
+            if preferences.preference_kind == "reject_recorded" else None)
         if preferences.authorization == "automated_rule":
             if weak_flip_attacks is None:
                 weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
@@ -138,6 +142,9 @@ def main() -> None:
                        "baseline_review": "baseline_preference"}[preferences.authorization],
             "authorization": preferences.authorization,
             "rule_set_id": preferences.rule_set_id,
+            "preference_kind": preferences.preference_kind,
+            "source_review_queue_sha256": rejection_hashes[0] if rejection_hashes else None,
+            "source_review_notes_sha256": rejection_hashes[1] if rejection_hashes else None,
             "reviewer": preferences.reviewer,
             "reviewed_seat": preferences.reviewed_seat,
             "reviewed_agent": reviewed_agent,

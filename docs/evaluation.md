@@ -17,6 +17,11 @@ review and checkpoint were discarded. This verifies the plumbing only; it is
 not a human label or evidence of playing strength. The queue UI now counts
 saved recorded-action rejections as reviewed and hides them from its default
 pending list, while context and upstream notes remain notes.
+The training command now rechecks the original queue, saved reviewer note,
+source hashes, and any conflicting action choice before accepting a rejection.
+Changing a note after conversion invalidates that preference until it is
+converted again. A second temporary native-replay smoke test completed one
+masked-parent update after this provenance check; its checkpoint was discarded.
 
 ## Offline action-branch outcome diagnostic (29 October 2026)
 

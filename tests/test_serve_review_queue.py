@@ -14,7 +14,13 @@ import pytest
 
 from goat_ai.actions import Action
 from goat_ai.observations import Observation
-from goat_ai.replay import DecisionRecord, Trajectory, read_decision_annotations, write_trajectory
+from goat_ai.replay import (
+    DecisionRecord,
+    Trajectory,
+    read_decision_annotations,
+    read_decision_preferences,
+    write_trajectory,
+)
 from goat_ai.replay.fingerprint import sha256_file
 from scripts import convert_rejected_review_notes, launch_review_server, serve_review_queue
 from scripts.launch_review_server import server_healthy
@@ -417,7 +423,7 @@ def test_review_note_marks_upstream_mistake_without_training_label(tmp_path, mon
 
 
 def test_reject_recorded_note_becomes_negative_only_preference(tmp_path, monkeypatch):
-    queue, replay, digest, _ = _queue(tmp_path)
+    queue, replay, digest, trajectory = _queue(tmp_path)
     monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
     monkeypatch.setattr(convert_rejected_review_notes, "ROOT", tmp_path)
     review_dir = tmp_path / "reviews"
@@ -440,6 +446,21 @@ def test_reject_recorded_note_becomes_negative_only_preference(tmp_path, monkeyp
                                        "preferred_action_indices": [1],
                                        "disfavored_action_indices": [0]}]
     assert payload["source_review_notes_sha256"] == sha256_file(store.note_path(digest))
+
+    converted = tmp_path / "preferences" / f"{digest}.preferences.json"
+    payload["source_review_queue_sha256"] = "0" * 64
+    converted.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="provenance changed"):
+        convert_rejected_review_notes.validate_rejection_provenance(
+            converted, replay, trajectory,
+            read_decision_preferences(converted, digest, trajectory))
+    payload["source_review_queue_sha256"] = sha256_file(queue)
+    converted.write_text(json.dumps(payload))
+    store.save_note(digest, 0, "reject_recorded", "A more specific explanation")
+    with pytest.raises(ValueError, match="provenance changed"):
+        convert_rejected_review_notes.validate_rejection_provenance(
+            converted, replay, trajectory,
+            read_decision_preferences(converted, digest, trajectory))
 
     with pytest.raises(ValueError, match="clear the recorded-action rejection"):
         store.choose(digest, 0, 1)

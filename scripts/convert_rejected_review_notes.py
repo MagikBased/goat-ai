@@ -22,6 +22,73 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def validate_rejection_provenance(preferences_path: Path, replay_path: Path,
+                                  trajectory, preferences) -> tuple[str, str]:
+    """Recheck the original saved human finding before a training update."""
+    raw = json.loads(preferences_path.read_text(encoding="utf-8"))
+    digest = sha256_file(replay_path)
+    queue_name = raw.get("source_review_queue_path")
+    notes_name = raw.get("source_review_notes_path")
+    if (preferences.preference_kind != "reject_recorded"
+            or not isinstance(queue_name, str) or not isinstance(notes_name, str)
+            or not Path(queue_name).is_absolute() or not Path(notes_name).is_absolute()):
+        raise ValueError("rejection lacks saved queue and note paths")
+    queue_path = Path(queue_name)
+    notes_path = Path(notes_name)
+    queue_hash = sha256_file(queue_path)
+    notes_hash = sha256_file(notes_path)
+    if (raw.get("source_review_queue_sha256") != queue_hash
+            or raw.get("source_review_notes_sha256") != notes_hash
+            or notes_path.name != f"{digest}.json"
+            or notes_path.parent.name != "notes"
+            or notes_path.parent.parent.name != "_review_state"):
+        raise ValueError("saved rejection provenance changed")
+    queue = json.loads(queue_path.read_text(encoding="utf-8"))
+    sources = queue_sources(queue, queue_path)
+    if digest not in sources or sources[digest][0] != replay_path.resolve():
+        raise ValueError("rejection queue does not offer this replay")
+    verify_queue_items(trajectory, sources[digest][1], queue["checkpoint_sha256"])
+    identity = json.loads((notes_path.parent.parent / "queue_identity.json").read_text(
+        encoding="utf-8"))
+    if (identity.get("schema_version") != 1
+            or identity.get("queue_sha256") != queue_hash
+            or identity.get("queue_path") != str(queue_path.relative_to(ROOT))
+            or identity.get("reviewer") != preferences.reviewer):
+        raise ValueError("saved rejection reviewer or queue identity changed")
+    notes = json.loads(notes_path.read_text(encoding="utf-8"))
+    if (notes.get("schema_version") != 1
+            or notes.get("source_trajectory_sha256") != digest
+            or notes.get("reviewer") != preferences.reviewer
+            or not isinstance(notes.get("notes"), list)):
+        raise ValueError("saved rejection notes do not match this review")
+    rejected = []
+    seen = set()
+    offered = sources[digest][1]
+    for note in notes["notes"]:
+        if (not isinstance(note, dict)
+                or set(note) != {"decision_index", "kind", "text"}
+                or type(note["decision_index"]) is not int
+                or note["decision_index"] not in offered
+                or note["decision_index"] in seen
+                or note["kind"] not in ("context", "upstream_mistake",
+                                        "reject_recorded")
+                or not isinstance(note["text"], str)
+                or len(note["text"]) > 2000):
+            raise ValueError("saved rejection note is invalid or outside the queue")
+        seen.add(note["decision_index"])
+        if note["kind"] == "reject_recorded":
+            rejected.append(note["decision_index"])
+    if set(rejected) != {item.decision_index for item in preferences.preferences}:
+        raise ValueError("preference decisions differ from saved rejections")
+    choice_path = notes_path.parent.parent.parent / f"{digest}.json"
+    if choice_path.is_file():
+        annotations, _ = read_decision_annotations(choice_path, digest, trajectory)
+        if (annotations.reviewer != preferences.reviewer
+                or set(rejected) & {index for index, _ in annotations.choices}):
+            raise ValueError("rejection conflicts with saved action choices")
+    return queue_hash, notes_hash
+
+
 def convert(queue_path: Path, review_dir: Path, output_dir: Path,
             native_root: Path) -> list[dict]:
     """Require queue identity, exact replay bytes, and explicit reviewer notes."""
@@ -107,13 +174,16 @@ def convert(queue_path: Path, review_dir: Path, output_dir: Path,
             "reviewer": identity["reviewer"],
             "reviewed_seat": trajectory.skill_metadata["demonstrator_seat"],
             "preferences": sorted(preferences, key=lambda item: item["decision_index"]),
+            "source_review_queue_path": str(queue_path),
             "source_review_queue_sha256": identity["queue_sha256"],
+            "source_review_notes_path": str(note_path),
             "source_review_notes_sha256": sha256_file(note_path),
         }
         output_dir.mkdir(parents=True, exist_ok=True)
         output = output_dir / f"{digest}.preferences.json"
         output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        read_decision_preferences(output, digest, trajectory)
+        parsed = read_decision_preferences(output, digest, trajectory)
+        validate_rejection_provenance(output, replay_path, trajectory, parsed)
         results.append({"trajectory": str(replay_path), "preferences": str(output),
                         "rejected_decisions": len(preferences)})
     return results

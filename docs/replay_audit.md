@@ -2461,7 +2461,9 @@ The converter checks the queue, exact replay bytes, native replay, and
 player-visible observations. Its preferences exclude only the rejected
 action. Train with `scripts.train_review_preferences --objective masked_parent`
 using each printed replay/preference pair; this preserves the parent's ranking
-among all other legal actions. These labels can support an experiment, but
-they do not establish better playing strength. Compare a trained child on
+among all other legal actions. Training rechecks the saved queue and note
+hashes, so rerun the converter after editing a note. These labels can support
+an experiment, but they do not establish better playing strength. Compare a
+trained child on
 fresh decks and seeds before promotion. Existing upstream/context notes remain
 separate from training.
