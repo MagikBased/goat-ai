@@ -136,8 +136,10 @@ retaining the queue identity and any locally saved labels.
 
 To play a duel yourself in the browser, open `/games/play` on the same local
 server. Choose the human seat, two Decks, and a Random, Tactical, or selected
-neural opponent. Click a card to open icon buttons for its legal actions beside
-the card. Drag a card to a highlighted field zone or opposing monster to choose
+neural opponent. A fresh seed is filled automatically; use the dice button to
+roll another or type a seed to reproduce a duel. Click a card to open icon
+buttons for its legal actions beside the card. Drag a card to a highlighted
+field zone or opposing monster to choose
 a placement or attack target; when the engine offers a matching next choice,
 the dragged destination is used. Empty or occupied zones that cannot accept the
 drag are not highlighted. Visible card faces and card backs load from the local

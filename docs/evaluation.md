@@ -1,5 +1,30 @@
 # Baseline evaluation log
 
+## Fresh distinct-whitelist Fusion protocol probe (29 October 2026)
+
+Twenty fresh seeds, 129000–129019, generated independent legal Main Decks for
+both seats and random 15-card Fusion Extra Decks. Tactical-v14 played both
+seats. All **20/20** native duels reached terminal within 3,000 decisions, with
+**8,590/8,590** decisions replay-verified and visibility-audited. Repeating
+each seed reproduced all 8,590 ordered decisions, terminal observations, and
+outcomes. The audit counted 48 hidden-field and 282 opponent-field legal
+choice contexts. The report records 871 loaded native assets and 1,030
+distinct source-card/action-kind pairs. This is sampled protocol coverage;
+it does not certify arbitrary decks or historical rulings.
+
+The ignored report is `.cache/goat-ai/m1_whitelist_fresh_129000_129019/report.json`
+with SHA-256 `0bbd431205ce1624e360716dd6b2cf379b0e865f515108e93075b3369964abc1`.
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/m1_whitelist_fresh_129000_129019 \
+  --seed 129000 --seeds 20 --max-decisions 3000 --agent tactical \
+  --verify-replays --distinct-opponents --random-extra --repeat-seeds \
+  --count-card-actions --isolate-games
+```
+
 ## Weak Flip synthetic-label correction (29 October 2026)
 
 The existing `visible_audit_v1` and `visible_audit_v2` rule IDs automatically

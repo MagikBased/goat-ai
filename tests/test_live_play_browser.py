@@ -9,6 +9,42 @@ import pytest
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+@pytest.mark.parametrize("width,height", [(1920, 1080), (800, 700)])
+def test_setup_generates_seed_and_dice_replaces_invalid_value(tmp_path, width, height):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      const field = document.getElementById('seed');
+      const initial = Number(field.value);
+      field.value = '-1';
+      document.getElementById('roll-seed').click();
+      const rolled = Number(field.value);
+      const setup = document.getElementById('setup').getBoundingClientRect();
+      const selectsFit = [...document.querySelectorAll('#setup select')].every(select => {
+        const box = select.getBoundingClientRect();
+        return box.left >= setup.left + 10 && box.right <= setup.right - 10;
+      });
+      document.body.dataset.seedProbe = [
+        Number.isInteger(initial) && initial >= 0 && initial <= 4294967295,
+        Number.isInteger(rolled) && rolled >= 0 && rolled <= 4294967295,
+        field.checkValidity(),
+        document.getElementById('roll-seed').type === 'button',
+        selectsFit
+      ].join('|');
+    </script></body>"""
+    path = tmp_path / "live_seed.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", f"--window-size={width},{height}",
+        "--virtual-time-budget=1200", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-seed-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "true|true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_card_actions_phase_and_drag_destination(tmp_path):
     template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
     probe = """<script>
@@ -118,7 +154,7 @@ def test_drag_highlights_only_legal_targets_and_missing_art_keeps_name(tmp_path)
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
-@pytest.mark.parametrize("width,height", [(1920, 1080), (1365, 768)])
+@pytest.mark.parametrize("width,height", [(1920, 1080), (1365, 768), (1920, 600)])
 def test_desktop_board_keeps_both_hands_and_card_art_in_view(tmp_path, width, height):
     template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
     probe = """<script>

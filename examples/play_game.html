@@ -16,7 +16,13 @@
     #setup { max-width: 850px; margin: 20px auto; padding: 20px; background: #142c36;
       border: 1px solid #446873; border-radius: 12px; }
     #setup label { display: grid; gap: 4px; margin: 12px 0; }
-    #setup .seats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+    #setup .seats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+    #setup .seats label { min-width: 0; }
+    #setup select { width: 100%; min-width: 0; }
+    #seed-row { display: flex; align-items: center; gap: 8px; }
+    #seed-row input { min-width: 0; flex: 1; }
+    #roll-seed { width: 42px; height: 40px; display: grid; place-items: center; flex: 0 0 42px; }
+    #roll-seed svg { width: 25px; height: 25px; }
     #game { display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
       gap: 12px; height: calc(100dvh - 24px); min-height: 0; }
     #game[hidden] { display: none; }
@@ -104,7 +110,15 @@
         <label>Your seat<select id="seat"><option value="0">Player 1</option><option value="1">Player 2</option></select></label>
         <label>AI opponent<select id="opponent" required></select></label>
       </div>
-      <label>Seed<input id="seed" type="number" min="0" max="4294967295" step="1" value="42" required></label>
+      <label for="seed">Seed</label>
+      <div id="seed-row"><input id="seed" type="number" min="0" max="4294967295" step="1" required>
+        <button id="roll-seed" type="button" title="Generate a random seed" aria-label="Generate a random seed">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="7" cy="7" r="1" fill="currentColor"/>
+            <circle cx="17" cy="7" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/>
+            <circle cx="7" cy="17" r="1" fill="currentColor"/><circle cx="17" cy="17" r="1" fill="currentColor"/>
+          </svg>
+        </button></div>
       <button id="start" type="submit">Start duel</button>
     </form>
     <p id="setup-status" role="status"></p>
@@ -144,6 +158,15 @@
     let state = null;
     let busy = false;
     let dragSource = null;
+    function randomSeed() {
+      const value = new Uint32Array(1);
+      crypto.getRandomValues(value);
+      return value[0];
+    }
+    byId("seed").value = String(randomSeed());
+    byId("roll-seed").addEventListener("click", () => {
+      byId("seed").value = String(randomSeed());
+    });
     const phaseSteps = [{name:"DP", value:"draw"}, {name:"SP", value:"standby"},
       {name:"M1", value:"main1", action:"main1"},
       {name:"BP", value:"battle", action:"battle_phase"},
