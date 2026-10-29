@@ -1,5 +1,35 @@
 # Early replay decision audit
 
+## Combined own-card decision review (29 October 2026)
+
+A [single local queue](../.cache/goat-ai/own_removal_combined_queue_20261029.html)
+brings together **51 distinct** selected-v23 decisions: 17 Ring and Heavy
+Storm cases, six focused own-card removal cases, and 28 MST activation or
+non-use opportunities. The first group contains 14 idle Ring activations with
+only friendly face-up targets. The focused group contains five Nobleman
+decisions with only friendly Set monsters. The MST group contains 20 chosen
+activations and eight non-uses. Review the optional activation or Pass when
+that is the strategic mistake; a later target prompt may already be forced.
+
+The queue builder rechecked **42** source replays and **29,540** decisions
+against the pinned native engine and player-visibility audit. The JSON SHA-256
+is `0238b3da547938a21493ee6c41ea447ef286ddc9370ed5c48806a96598b78d04`.
+None of these prompts is a training label. The three source queues had no
+saved server labels when combined, and labels in another queue are never
+silently treated as approvals here. Start its save-enabled local review page:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/own_removal_combined_queue_20261029.json
+```
+
+Rebuild from the three source queues with `scripts/combine_review_queues.py`,
+passing `ring_guard_blind_104400_104407/own_card_review_queue.json`,
+`own_card_parent_review_99900_99907/queue.json`, and
+`mst_review_source_107600_107607/mst_opportunity_queue.json` under
+`.cache/goat-ai/`, then `--output
+.cache/goat-ai/own_removal_combined_queue_20261029.json`. The builder rejects
+duplicate decisions and mismatched checkpoint hashes.
+
 ## MST use and non-use review queue (29 October 2026)
 
 The [local opportunity queue](../.cache/goat-ai/mst_review_source_107600_107607/mst_opportunity_queue.html)
