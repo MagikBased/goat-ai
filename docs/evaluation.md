@@ -1,5 +1,42 @@
 # Baseline evaluation log
 
+## Seven idle own-only Ring activation branches (29 October 2026)
+
+The [fresh policy review queue](replay_audit.md#fresh-policy-versus-tactical-review-queue-29-october-2026)
+contains seven decisions where the selected policy activated a Set Ring of
+Destruction in Main Phase 1 with only its own face-up monster targets visible.
+For each exact recorded state, we reconstructed the duel from the verified
+source prefix and compared the selected activation with the queue's legal
+Tactical-v14 alternative: three Battle Phase transitions and four Normal
+Summons. The selected v23 policy continued with its recorded v1 own-loss
+inference mode; Tactical-v14 continued as the opponent. Every one of the 14
+terminal branches replay-verified and passed the player-visibility audit.
+
+**All seven pairs had the same winner:** two pairs were won by the policy
+seat, and five by the Tactical seat. In each selected-activation continuation,
+the policy's next target choice was one of its own monsters. The branch lengths
+often differed, but a single fixed hidden deal and fixed continuation policy
+cannot establish that the activation or alternative has higher expected value.
+These results are offline diagnostics, not preference labels or evidence that
+own-monster Ring activations are generally sound. The next useful signal is an
+independent human judgment at the activation decision, followed by a held-out
+complete-duel comparison of any trained change.
+
+The ignored case reports and summary are in
+`.cache/goat-ai/ring_idle_branch_sweep_126000_126007/`; the summary SHA-256 is
+`0b44c9aaf0219be9c4bdd99889fad0aa7fd0372cc383ea8b8fdd32979f01e7b9`.
+It records the source and checkpoint hashes, decision and action indices,
+winner, and each branch-report hash. Reproduce the first pair with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_decision_branches.py \
+  .cache/goat-ai/own_loss_review_source_126000_126007/matchup_01_seed_126004_seat_1.json \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --native-root .cache/goat-ai --decision-index 394 \
+  --action-index 1 --action-index 2 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/ring_idle_branch_first_reproduction
+```
+
 ## Seven Magical Merchant Set-versus-Summon branches (29 October 2026)
 
 The fresh four-pairing audit below flagged seven selected Normal Summons of

@@ -2654,6 +2654,12 @@ suppressed six fresh idle own-only Ring activations, but a 256-duel direct
 comparison against v1 tied its matched v1 control at 127 wins, 127 losses,
 and two draws. The guard remains experimental; use independent human review
 and wider competitive evidence before selecting it as the default.
+A later [seven-case Ring branch diagnostic](evaluation.md#seven-idle-own-only-ring-activation-branches-29-october-2026)
+reproduced fresh selected-policy activations against legal Tactical
+alternatives. All seven pairs had the same winner on their exact recorded
+hidden deals, despite different continuation lengths. The remaining M4 gate
+is still independent activation review followed by held-out competitive
+evaluation; fixed-deal branch winners cannot supply the training labels.
 The [strict preference-score holdout gate](evaluation.md#strict-reviewed-preference-holdout-gate-29-october-2026)
 now rejects training replays, seeds, and optionally Main Deck compositions
 before fixed-state human-review scores are reported. It validated 11 older

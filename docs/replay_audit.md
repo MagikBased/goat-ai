@@ -30,6 +30,12 @@ found three states where Set led to a win and Normal Summon to a loss, one
 with the reverse result, and three with the same winner. Please assess each
 board state rather than treating Set as an automatic label.
 
+The seven flagged idle own-only Ring activations also have an
+[exact-state branch check](evaluation.md#seven-idle-own-only-ring-activation-branches-29-october-2026).
+The selected Ring activation and the legal Tactical alternative had the same
+winner in all seven fixed states. This does not approve the own-monster target
+or resolve which action is best; review the upstream activation itself.
+
 ## Ring activation before a poor own-card target (29 October 2026)
 
 Combined queue item 55 shows a Ring of Destruction target prompt where the
