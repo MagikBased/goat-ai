@@ -14,10 +14,12 @@ from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import (
     BLACK_LUSTER_SOLDIER,
+    BREAKER_THE_MAGICAL_WARRIOR,
     CHAOS_SORCERER,
     HEAVY_STORM,
     NOBLEMAN_OF_CROSSOUT,
     THUNDER_DRAGON,
+    TORRENTIAL_TRIBUTE,
     TRIBE_INFECTING_VIRUS,
     review_candidates,
     thunder_search_count,
@@ -31,6 +33,7 @@ RULE_SET_V2 = "visible_audit_v2"
 RULE_SET_V3 = "visible_resource_v3"
 RULE_SET_V4 = "visible_material_choices_v4"
 RULE_SET_V5 = "visible_material_avoidance_v5"
+RULE_SET_V6 = "visible_optional_own_loss_v6"
 SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -94,9 +97,11 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID
     """Keep one unambiguous automated comparison per recorded decision."""
     if rule_set_id == RULE_SET_V3:
         return derive_resource_counterfactuals(trajectory)
-    if rule_set_id in (RULE_SET_V4, RULE_SET_V5):
+    if rule_set_id in (RULE_SET_V4, RULE_SET_V5, RULE_SET_V6):
         resource, resource_counts = derive_resource_counterfactuals(
-            trajectory, all_safe_alternatives=rule_set_id == RULE_SET_V5)
+            trajectory, all_safe_alternatives=rule_set_id in (RULE_SET_V5,
+                                                               RULE_SET_V6),
+            optional_own_loss=rule_set_id == RULE_SET_V6)
         target, target_counts = derive_material_choice_counterfactuals(trajectory)
         overlap = {item["decision_index"] for item in resource} & {
             item["decision_index"] for item in target}
@@ -128,7 +133,8 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID
     return result, counts
 
 
-def derive_resource_counterfactuals(trajectory, *, all_safe_alternatives: bool = False
+def derive_resource_counterfactuals(trajectory, *, all_safe_alternatives: bool = False,
+                                   optional_own_loss: bool = False
                                    ) -> tuple[list[dict], Counter]:
     """Compare a visited safe choice or phase transition with visible resource loss.
 
@@ -145,8 +151,10 @@ def derive_resource_counterfactuals(trajectory, *, all_safe_alternatives: bool =
     seen_contexts = set()
     for index, record in enumerate(trajectory.decisions):
         obs = record.observation
-        if (obs.acting_player != seat or obs.turn_player != seat
-                or obs.phase not in ("main1", "main2")):
+        if obs.acting_player != seat:
+            continue
+        own_main = (obs.turn_player == seat and obs.phase in ("main1", "main2"))
+        if not own_main and not optional_own_loss:
             continue
         own_sets = any(card.controller == seat and card.zone == "monster"
                        and card.position == "facedown" for card in obs.field)
@@ -159,13 +167,12 @@ def derive_resource_counterfactuals(trajectory, *, all_safe_alternatives: bool =
         bad = []
         categories = set()
         for action_index, action in enumerate(record.legal_actions):
-            if action.kind != "activate":
-                continue
             code = action.parameters.get("code")
-            if code == NOBLEMAN_OF_CROSSOUT and own_sets and not enemy_sets:
+            if (own_main and action.kind == "activate"
+                    and code == NOBLEMAN_OF_CROSSOUT and own_sets and not enemy_sets):
                 bad.append(action_index)
                 categories.add("nobleman_only_own_set_monster")
-            elif code == HEAVY_STORM:
+            elif own_main and action.kind == "activate" and code == HEAVY_STORM:
                 source_is_set = action.parameters.get("location") == 8 and any(
                     card.sequence == action.parameters.get("sequence")
                     and card.code == HEAVY_STORM for card in own_backrow)
@@ -173,6 +180,35 @@ def derive_resource_counterfactuals(trajectory, *, all_safe_alternatives: bool =
                 if enemy_backrow_count <= own_other_backrow:
                     bad.append(action_index)
                     categories.add("heavy_storm_negative_visible_trade")
+            elif optional_own_loss and action.kind == "chain":
+                if code == BREAKER_THE_MAGICAL_WARRIOR and own_backrow \
+                        and enemy_backrow_count == 0:
+                    bad.append(action_index)
+                    categories.add("breaker_only_own_backrow")
+                elif code in (BLACK_LUSTER_SOLDIER, CHAOS_SORCERER):
+                    own_boss = any(card.controller == seat and card.owner == seat
+                                   and card.zone == "monster" and card.position == "faceup"
+                                   and card.code == code for card in obs.field)
+                    enemy_monsters = any(card.controller != seat
+                                         and card.zone == "monster" for card in obs.field)
+                    if own_boss and not enemy_monsters:
+                        bad.append(action_index)
+                        categories.add("boss_only_own_monsters")
+                elif code == TRIBE_INFECTING_VIRUS:
+                    enemy_faceup = any(card.controller != seat
+                                       and card.zone == "monster"
+                                       and card.position == "faceup" for card in obs.field)
+                    if not enemy_faceup:
+                        bad.append(action_index)
+                        categories.add("tribe_no_visible_enemy")
+                elif code == TORRENTIAL_TRIBUTE:
+                    own_monsters = any(card.controller == seat and card.zone == "monster"
+                                       for card in obs.field)
+                    enemy_monsters = any(card.controller != seat
+                                         and card.zone == "monster" for card in obs.field)
+                    if own_monsters and not enemy_monsters:
+                        bad.append(action_index)
+                        categories.add("torrential_only_own_monsters")
         if not bad:
             continue
         selected = record.legal_actions.index(record.selected_action)
@@ -181,9 +217,13 @@ def derive_resource_counterfactuals(trajectory, *, all_safe_alternatives: bool =
         elif selected not in bad:
             preferred = [selected]
         else:
-            phase_kind = "battle_phase" if obs.phase == "main1" else "end_phase"
-            preferred = [i for i, action in enumerate(record.legal_actions)
-                         if action.kind == phase_kind]
+            if own_main:
+                phase_kind = "battle_phase" if obs.phase == "main1" else "end_phase"
+                preferred = [i for i, action in enumerate(record.legal_actions)
+                             if action.kind == phase_kind]
+            else:
+                preferred = [i for i, action in enumerate(record.legal_actions)
+                             if action.kind == "pass"]
         if not preferred:
             continue
         # Priority passes can revisit a near-identical resource choice many
@@ -277,7 +317,8 @@ def derive_material_choice_counterfactuals(trajectory) -> tuple[list[dict], Coun
 def validate_automated_preferences(trajectory, preferences, weak_flip_attacks) -> None:
     """Reject edits that no longer match the declared visible-rule output."""
     rule_set_id = getattr(preferences, "rule_set_id", None) or RULE_SET_ID
-    candidates = (() if rule_set_id in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5)
+    candidates = (() if rule_set_id in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
+                                       RULE_SET_V6)
                   else review_candidates(
         trajectory, weak_flip_attacks=weak_flip_attacks))
     expected, _ = derive(trajectory, candidates, rule_set_id=rule_set_id)
@@ -296,7 +337,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--rule-set", choices=(RULE_SET_ID, RULE_SET_V2,
                                                RULE_SET_V3, RULE_SET_V4,
-                                               RULE_SET_V5),
+                                               RULE_SET_V5, RULE_SET_V6),
                         default=RULE_SET_ID)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
@@ -310,7 +351,8 @@ def main() -> None:
             raise ValueError(f"{path}: expected a policy or self-play replay")
         verified = verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
-        candidates = (() if args.rule_set in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5)
+        candidates = (() if args.rule_set in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
+                                             RULE_SET_V6)
                       else review_candidates(
             trajectory, weak_flip_attacks=weak_flip_attacks))
         preferences, categories = derive(trajectory, candidates,
@@ -321,7 +363,7 @@ def main() -> None:
                                              == "self_play_rl" else "demonstrator_seat")
         payload = {
             "schema_version": 2 if args.rule_set in (RULE_SET_V3, RULE_SET_V4,
-                                                     RULE_SET_V5)
+                                                     RULE_SET_V5, RULE_SET_V6)
             else 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",

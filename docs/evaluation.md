@@ -1,5 +1,59 @@
 # Baseline evaluation log
 
+## Optional own-card effect activation ablation (29 October 2026)
+
+The selected v23 policy still activates removal when its own cards are the
+only available victims. `visible_optional_own_loss_v6` extends the automated
+v5 preference derivation to the **optional activation**, before a forced
+target prompt: Breaker with only friendly back row, an owned BLS/Chaos
+Sorcerer with no opposing monster, Tribe-Infecting Virus with no visible
+opposing face-up monster, and Torrential Tribute with only friendly monsters.
+It retains the v5 Nobleman, Heavy Storm, boss-target, and Tribe-Type cases.
+The predicates use only the acting player's observation and offered actions;
+the rule set has separate provenance and revalidation. These are conservative
+training hypotheses, not player labels or rules of legal play. A future
+search/value model must still decide exceptions where removing one's own
+card has a strategic payoff.
+
+Sixteen fresh greedy parent-versus-Tactical replays on seeds 99900–99907
+yielded **111** v6 comparisons in 12 replays: 88 negative visible Heavy
+Storm trades, 13 own-only Nobleman opportunities, six own-only Torrential,
+three Breaker, three Tribe activations, and one Tribe-Type choice. Only **six**
+recorded choices were actually disfavored: five Nobleman activations and one
+Breaker activation. All source replays were native replay-verified and
+visibility-audited. The ignored manifest SHA-256 is
+`2804553e5dae829f647c8b7812b256dc5d2765ac0dfea7b301c5d05b116d6045`.
+
+Two children started from the **same unchanged selected v23 parent** with
+64 separate current-core preservation states, masked-parent objective,
+learning rate 0.0001, parent KL weight 1, and seed 74:
+
+| Child | Steps | Recorded-bad weight | Final sampled preservation KL | Ignored checkpoint SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| Standard | 20 | 2 | 0.00312 | `492c976577ac595658aff7c64135ae9b7ae5e6ae20b5d493f7b2fb1a8d33e41e` |
+| High bad-choice weight | 40 | 20 | 0.01367 | `a2c9c2fc98fe1af79ec3f6064cc57da9812358b9731bb536f86abdba2dad733a` |
+
+On **26** fixed held-out v6 positions from parent replays on seeds
+99930–99933, the parent ranked a disfavored action first **4** times,
+the standard child **3** times, and the high-weight child **2** times.
+Complete greedy games on the same fresh seeds, versus Tactical, showed
+own-only Nobleman activation in **3/4** visited opportunities for the
+parent, **3/5** for the standard child, and **1/6** for the high-weight child.
+The different opportunity counts reflect different trajectories, so these
+small samples are not a controlled causal estimate. All 24 duels were
+exactly replay-verified, visibility-audited, and had their policy choices
+reproduced by the saved checkpoints. The high-weight audit SHA-256 is
+`485cc909d78f7aa444f7198ac0bb1c1d16f3103f2a2175e7b59de62e48b6edbc`.
+
+On **32** fresh direct games using four Main Deck compositions absent from
+the child's training provenance, each child scored **15–17** against the
+parent. Against Tactical on another 32 matched-seed games with those unseen
+decks, the high-weight child scored **12–20**, versus **10–22** for the parent.
+These samples do not establish a competitive gain. Neither child replaces
+the selected parent. The next experiment should gather more independently
+reviewed bad activations and evaluate the resulting policy on more fresh
+decks, seeds, and opponents before promotion.
+
 ## Scaling masked-parent preferences to 783 comparisons (29 October 2026)
 
 The 85-comparison masked-parent pilot left open whether its limited training

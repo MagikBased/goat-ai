@@ -2473,3 +2473,8 @@ duels. One forced Breaker target is represented by its earlier optional
 activation, so a reviewer can choose Pass if that was the actual mistake.
 These are review candidates only; wait for independent legal-action choices
 before treating them as training labels.
+The [v6 optional-own-loss ablation](evaluation.md#optional-own-card-effect-activation-ablation-29-october-2026)
+adds upstream Breaker, boss-banish, Tribe, and Torrential activation contexts.
+A higher bad-choice weight reduced own-only Nobleman choices in eight fresh
+games, but both tested children scored 15–17 directly against the parent on
+unseen Main Decks. Keep the selected v23 checkpoint and M4 strength gate open.

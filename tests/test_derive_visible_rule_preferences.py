@@ -330,3 +330,54 @@ def test_v5_compares_bad_activation_with_all_other_legal_actions():
     valid = SimpleNamespace(rule_set_id=rules.RULE_SET_V5,
                             preferences=(ReviewedPreference(0, (2, 3), (0, 1)),))
     rules.validate_automated_preferences(replay, valid, {})
+
+
+def test_v6_declines_breaker_effect_before_forced_own_target():
+    breaker = CardView(0, "monster", "faceup", 71413901, 0, owner=0)
+    own_spell = CardView(0, "spell_trap", "facedown", 19613556, 1)
+    observation = Observation(
+        viewer=0, acting_player=0, turn=3, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(breaker, own_spell),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=4,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=0)
+    use_counter = Action("breaker", "chain", 0, {"code": 71413901})
+    pass_action = Action("pass", "pass", 0)
+    record = DecisionRecord(observation, (use_counter, pass_action), use_counter)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    expected = ([{"decision_index": 0, "preferred_action_indices": [1],
+                  "disfavored_action_indices": [0]}],
+                {"breaker_only_own_backrow": 1})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V6) == expected
+    valid = SimpleNamespace(rule_set_id=rules.RULE_SET_V6,
+                            preferences=(ReviewedPreference(0, (1,), (0,)),))
+    rules.validate_automated_preferences(replay, valid, {})
+    enemy_spell = CardView(1, "spell_trap", "facedown", None, 0)
+    with_enemy = replace(replay, decisions=(replace(record, observation=replace(
+        observation, field=(*observation.field, enemy_spell))),))
+    assert derive(with_enemy, (), rule_set_id=rules.RULE_SET_V6) == ([], {})
+
+
+def test_v6_declines_only_own_boss_banish_and_off_turn_torrential():
+    boss = CardView(0, "monster", "faceup", 504700118, 0, owner=0)
+    observation = Observation(
+        viewer=0, acting_player=0, turn=3, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(boss,),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=4,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=0)
+    banish = Action("banish", "chain", 0, {"code": 504700118})
+    pass_action = Action("pass", "pass", 0)
+    record = DecisionRecord(observation, (banish, pass_action), banish)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V6)[1] == {
+        "boss_only_own_monsters": 1}
+    stolen = replace(replay, decisions=(replace(record, observation=replace(
+        observation, field=(replace(boss, owner=1),))),))
+    assert derive(stolen, (), rule_set_id=rules.RULE_SET_V6) == ([], {})
+    enemy_turn = replace(observation, turn_player=1)
+    torrential = Action("torrential", "chain", 0, {"code": 53582587})
+    off_turn = replace(replay, decisions=(DecisionRecord(
+        enemy_turn, (torrential, pass_action), torrential),))
+    assert derive(off_turn, (), rule_set_id=rules.RULE_SET_V6)[1] == {
+        "torrential_only_own_monsters": 1}
