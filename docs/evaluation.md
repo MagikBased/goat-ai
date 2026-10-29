@@ -1068,6 +1068,70 @@ this paired changed-policy diagnostic. This trained-state example does not
 establish generalization; the earlier fresh 64-duel direct comparison remains
 **31–33** for the child against its parent.
 
+## Self-play continuation from the selected-error child (29 October 2026)
+
+To test whether episodic reinforcement learning improves the V11
+selected-error child, `scripts/train_self_play.py` continued its frozen
+checkpoint for **128 terminal duels** on seeds 106500–106627. The four-role
+schedule trained Jesse Twohig Indianapolis Goat Control/Montague Warrior
+and DingoSig Chaos Return/Weirdchamp Bazoo Return. The rollout used four
+parallel native workers, four-game frozen PPO batches, two epochs, batch
+size 32, per-episode weighting, frozen-rollout learner-deck baseline,
+learning rate 0.00005, parent KL weight 0.5, and a 50% frozen historical-
+snapshot probability with Tactical-v14 otherwise. Independent opponent RNG
+was enabled. All 128 games reached terminal state: **48 wins, 79 losses,
+one draw** against the training mixture, 9,541 sampled learner decisions,
+and **44.80 seconds** measured training wall time. There were no capped or
+unsupported games. The ignored checkpoint
+`.cache/goat-ai/fv23_v11_ppo_128_106500_106627.pt` has SHA-256
+`b7b9b3c6ce7879ed9ef76e4f99fd8ca66f7f2d0261c0798aa19701109e9bd164`;
+the training report SHA-256 is
+`ffc26709a7a3fe7d3137d9d1a1b422d50d5124b28663763dd5b70f1077e3af60`.
+
+All **128** saved self-play trajectories and **57,664** total decisions
+passed exact native replay verification and player-visibility auditing. The
+audit surfaced 99 conservative review candidates, including 17 own-only
+Nobleman, nine own-only Heavy Storm, and four idle-own Ring flags. These
+are sampled training choices, not deterministic checkpoint error rates.
+The ignored audit SHA-256 is
+`6e511f390f247f1c5f17208b2f8d27e183cd04e858d65e0d8d6dad05b69fee77`.
+
+Held-out Nationals Main Deck compositions were absent from both checkpoints'
+training provenance. Across both deck assignments and policy seats on seeds
+106700–106707, the PPO child scored **28–36** directly against V11 and
+**32–32** against the unchanged selected v23 checkpoint, each over 64
+terminal games. On separate matched seeds 106708–106715 against
+Tactical-v14, PPO scored **15–49** and V11 **14–50**. The paired PPO-minus-
+V11 Tactical score difference was **+1.6 percentage points**, 95% interval
+**−4.7 to +7.8**. Direct PPO/V11, direct PPO/v23, and PPO/V11 Tactical
+report SHA-256 values are
+`2bed3ac5de5a11ccc0f37ad4afd1cb56a72caea8c4efcf728eded3d05ddf1f85`,
+`6fb8a794feaef57e9d1dce822ff97a79d381ef8f959ca90f11c0b0df38302f4b`,
+`7f8b7dd12bdcf4314d99c2c95c79b9f11e476b342226fbe270d86cd02f7a112b`,
+and
+`38dc70c79d3babc512f9266ab98272cdfb15d36b8dea18eeff4555bc0fe59c97`,
+respectively, with the last two being matched Tactical reports. Tournament
+reports record terminal outcomes and provenance, not full trajectories.
+
+Eight further PPO and eight V11 Tactical games on fresh seeds 106716–106717
+were serialized. All **16** reached terminal, replay-verified, passed
+visibility audits, and reproduced the saved checkpoint choices. The
+conservative own-card audit flagged **one** V11 own-only Nobleman choice
+across 2,881 policy decisions, versus **two** PPO choices (one own-only
+Nobleman and one idle-own Ring) across 2,511. Ring opportunities differed
+(six V11, three PPO), so this small replay block does not establish an
+error-rate change. Its ignored V11 and PPO audit SHA-256 values are
+`a4c46447735816e0b0c59958444b1da4f3d738c772d493d1df41bca1d770b26a`
+and
+`bbfd6649214494b05371be475f040e02df768aed17d6d78d05b9557f8a27b670`.
+
+The PPO child does **not** satisfy the M4 self-play improvement gate:
+head-to-head score fell below 50%, Tactical transfer was indistinguishable,
+and the targeted mistakes persisted. Keep both PPO and V11 experimental,
+with the selected v23 checkpoint unchanged. A next experiment should
+measure whether retaining verified preference constraints during self-play
+prevents this regression, then test across independent decks and opponents.
+
 ## Independent 2005 Nationals deck check (29 October 2026)
 
 Two additional historical Main Decks are transcribed from the
