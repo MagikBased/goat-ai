@@ -51,7 +51,7 @@ def main() -> None:
                              "attack-to-weaker-defense switches")
     parser.add_argument("--own-loss-guard", action="store_true",
                         help="experimental visible own-card-loss filter")
-    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4, 5), default=1,
+    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4, 5, 6), default=1,
                         help="v2 defers one-shot MST; v3 idle own-only Ring; "
                              "v4 prefers a safe opposing Ring target; v5 combines v2 and v3")
     parser.add_argument("--output", type=Path, required=True)
@@ -78,7 +78,7 @@ def main() -> None:
         "own_loss_guard": args.own_loss_guard,
         "own_loss_guard_version": args.own_loss_guard_version,
         "card_facts": (load_card_facts(args.native_root)
-                       if args.own_loss_guard and args.own_loss_guard_version in (2, 5)
+                       if args.own_loss_guard and args.own_loss_guard_version in (2, 5, 6)
                        else None),
     }
     policy = load_policy_agent(args.checkpoint, **policy_options)

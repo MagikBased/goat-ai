@@ -77,12 +77,13 @@ def recorded_policy_options(inference: str, card_facts: dict) -> dict:
                 "greedy_own_loss_guard_v2": 2,
                 "greedy_own_loss_guard_v3": 3,
                 "greedy_own_loss_guard_v4": 4,
-                "greedy_own_loss_guard_v5": 5}
+                "greedy_own_loss_guard_v5": 5,
+                "greedy_own_loss_guard_v6": 6}
     if inference not in versions:
         raise ValueError(f"unsupported policy inference {inference!r}")
     version = versions[inference]
     return {"own_loss_guard": True, "own_loss_guard_version": version,
-            "card_facts": card_facts if version in (2, 5) else None}
+            "card_facts": card_facts if version in (2, 5, 6) else None}
 
 
 def visible_ring_guard_alternative(observation, legal, scores):

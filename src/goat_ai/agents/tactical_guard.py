@@ -71,6 +71,48 @@ def safe_one_shot_response_indices(observation: Observation,
     return kept or indices
 
 
+def safe_own_one_shot_response_indices(observation: Observation,
+                                       legal_actions: Sequence[Action],
+                                       admissible: Sequence[int],
+                                       card_facts: Mapping[int, tuple[int, int, int]],
+                                       ) -> tuple[int, ...]:
+    """Defer MST when only its own resolving one-shot card can be destroyed.
+
+    The source and MST's Set slot are excluded from other target checks.
+    Unknown opposing back row or another friendly card keeps MST available.
+    This is an opt-in preference, not an effect-negation rule.
+    """
+    indices = tuple(admissible)
+    if not observation.chain:
+        return indices
+    source = observation.chain[-1]
+    own = observation.viewer
+    card_type = card_facts.get(source.card_code, (0, 0, 0))[0]
+    if (source.controller != own or source.location != 8
+            or card_type not in (2, 4, 0x10002)
+            or source.card_code in FIELD_PERSISTENT_NORMAL_SPELLS):
+        return indices
+
+    def only_source_target(action: Action) -> bool:
+        if (action.kind != "chain"
+                or action.parameters.get("code") != MYSTICAL_SPACE_TYPHOON):
+            return False
+        own_mst_slot = (action.parameters.get("sequence")
+                        if action.parameters.get("location") == 8 else None)
+        backrow = [card for card in observation.field if card.zone == "spell_trap"]
+        return (any(card.controller == own and card.sequence == source.sequence
+                    and card.code == source.card_code and card.position == "faceup"
+                    for card in backrow)
+                and all((card.controller, card.sequence) == (own, source.sequence)
+                        or (card.controller == own and card.sequence == own_mst_slot
+                            and card.code == MYSTICAL_SPACE_TYPHOON)
+                        for card in backrow))
+
+    kept = tuple(index for index in indices
+                 if not only_source_target(legal_actions[index]))
+    return kept or indices
+
+
 def safe_optional_own_loss_indices(observation: Observation,
                                    legal_actions: Sequence[Action],
                                    admissible: Sequence[int]) -> tuple[int, ...]:

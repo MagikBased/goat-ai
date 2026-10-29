@@ -27,7 +27,7 @@ class FirstActionAgent:
 @pytest.mark.parametrize("inference", (
     "greedy", "greedy_own_loss_guard_v1", "greedy_own_loss_guard_v2",
     "greedy_own_loss_guard_v3", "greedy_own_loss_guard_v4",
-    "greedy_own_loss_guard_v5"))
+    "greedy_own_loss_guard_v5", "greedy_own_loss_guard_v6"))
 def test_native_branch_reproduces_source_and_alternate(tmp_path, monkeypatch,
                                                        inference):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
@@ -75,7 +75,7 @@ def test_native_branch_reproduces_source_and_alternate(tmp_path, monkeypatch,
     else:
         assert len(options) == 1 and options[0]["own_loss_guard"] is True
         assert options[0]["own_loss_guard_version"] == int(inference[-1])
-        assert isinstance(options[0]["card_facts"], dict) == inference.endswith(("v2", "v5"))
+        assert isinstance(options[0]["card_facts"], dict) == inference.endswith(("v2", "v5", "v6"))
     assert len(report["branches"]) == 2
     recorded, alternate = report["branches"]
     assert recorded["recorded_action"] is True

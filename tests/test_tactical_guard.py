@@ -9,6 +9,7 @@ from goat_ai.agents.tactical_guard import (
     safe_idle_own_ring_indices,
     safe_one_shot_response_indices,
     safe_optional_own_loss_indices,
+    safe_own_one_shot_response_indices,
     safe_position_indices,
     safe_target_indices,
     weak_flip_set_substitute,
@@ -174,6 +175,31 @@ def test_one_shot_response_guard_uses_public_chain_type_and_other_enemy_zones():
     assert safe_one_shot_response_indices(
         board(replace(source, code=61740673), own_set, chain=continuous_chain),
         actions, range(2), facts) == (0, 1)
+
+
+def test_own_one_shot_response_defers_only_own_source_target():
+    mst = Action("mst", "chain", 0,
+                 {"code": 5318639, "location": 8, "sequence": 1})
+    wait = Action("wait", "pass", 0)
+    source = CardView(0, "spell_trap", "faceup", 44095762, 0)
+    own_mst = CardView(0, "spell_trap", "facedown", 5318639, 1)
+    chain = (ChainLinkView(1, 44095762, 0, 8, 0),)
+    facts = {44095762: (4, 0, 0)}
+    state = board(source, own_mst, chain=chain)
+    assert safe_own_one_shot_response_indices(
+        state, (mst, wait), range(2), facts) == (1,)
+    assert safe_own_one_shot_response_indices(
+        state, (mst,), (0,), facts) == (0,)
+    assert safe_own_one_shot_response_indices(
+        state, (mst, wait), range(2), {}) == (0, 1)
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 0)
+    assert safe_own_one_shot_response_indices(
+        board(source, own_mst, enemy_set, chain=chain),
+        (mst, wait), range(2), facts) == (0, 1)
+    own_other = CardView(0, "spell_trap", "facedown", 45986603, 2)
+    assert safe_own_one_shot_response_indices(
+        board(source, own_mst, own_other, chain=chain),
+        (mst, wait), range(2), facts) == (0, 1)
 
 
 def test_opt_in_heavy_storm_uses_visible_card_advantage():

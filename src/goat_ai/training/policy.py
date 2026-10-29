@@ -17,6 +17,7 @@ from goat_ai.agents.tactical_guard import (
     safe_idle_own_ring_indices,
     safe_one_shot_response_indices,
     safe_optional_own_loss_indices,
+    safe_own_one_shot_response_indices,
     safe_position_indices,
     safe_ring_target_indices,
     safe_target_indices,
@@ -772,10 +773,10 @@ class PolicyAgent:
         self.weak_flip_attacks = dict(weak_flip_attacks or {})
         self.self_target_guard = self_target_guard
         self.own_loss_guard = own_loss_guard
-        if own_loss_guard_version not in (1, 2, 3, 4, 5):
+        if own_loss_guard_version not in (1, 2, 3, 4, 5, 6):
             raise ValueError("unknown own-loss guard version")
-        if own_loss_guard and own_loss_guard_version in (2, 5) and card_facts is None:
-            raise ValueError("own-loss guard v2/v5 requires printed card facts")
+        if own_loss_guard and own_loss_guard_version in (2, 5, 6) and card_facts is None:
+            raise ValueError("own-loss guard v2/v5/v6 requires printed card facts")
         self.own_loss_guard_version = own_loss_guard_version
         self.card_facts = dict(card_facts or {})
         self.position_guard = position_guard
@@ -801,8 +802,11 @@ class PolicyAgent:
         if self.own_loss_guard:
             admissible = safe_optional_own_loss_indices(
                 observation, legal_actions, admissible)
-            if self.own_loss_guard_version in (2, 5):
+            if self.own_loss_guard_version in (2, 5, 6):
                 admissible = safe_one_shot_response_indices(
+                    observation, legal_actions, admissible, self.card_facts)
+            if self.own_loss_guard_version == 6:
+                admissible = safe_own_one_shot_response_indices(
                     observation, legal_actions, admissible, self.card_facts)
             if self.own_loss_guard_version >= 3:
                 admissible = safe_idle_own_ring_indices(

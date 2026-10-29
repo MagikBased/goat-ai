@@ -13195,3 +13195,23 @@ branch establishes neither the reviewer's reason nor a competitive benefit
 from changing the action. It does establish an actionable disagreement with
 the selected model. The reviewed preference is preserved locally for later
 training, but one changed label is insufficient to promote a new policy.
+
+An opt-in `own_loss_guard_version=6` adds a narrower response check: when
+the only destroyable back-row card is the player's own already resolving
+one-shot Spell/Trap, defer MST if Pass is available. It excludes MST's own
+Set slot, preserves MST if another field Spell/Trap exists, and consults only
+public chain and field information plus printed card type. The exact reviewed
+state changes from MST under v5 to Pass under v6. This is a strategic
+preference and does not change legal actions or claim MST negates effects.
+
+A fresh direct comparison on seeds 122000–122007 used the unchanged selected
+v23 checkpoint on both sides, v6 versus v5, Phoenix Control against two
+unseen Dimension Fusion Main Decks, both deck assignments and both seats.
+All 64 games finished within the 3,000-decision cap; v6 scored **31–31–2**
+against v5. The ignored report is
+`.cache/goat-ai/own_loss_v6_vs_v5_122000_122007.json` (SHA-256
+`12b966dbe691843bf08d2c0c88a2b3411b5c25850e3ff759566d192f44451faa`).
+This test shows no gain and does not measure how often the new condition was
+reached. The selected checkpoint and inference mode remain unchanged. A
+broader per-opportunity own-card-loss audit and new training evidence are
+still needed to address the reviewer's main concern.

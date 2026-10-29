@@ -34,6 +34,8 @@ def test_review_queue_rebuilds_recorded_guard_versions_without_extra_facts():
         "own_loss_guard": True, "own_loss_guard_version": 4, "card_facts": None}
     assert recorded_policy_options("greedy_own_loss_guard_v5", facts) == {
         "own_loss_guard": True, "own_loss_guard_version": 5, "card_facts": facts}
+    assert recorded_policy_options("greedy_own_loss_guard_v6", facts) == {
+        "own_loss_guard": True, "own_loss_guard_version": 6, "card_facts": facts}
     with pytest.raises(ValueError, match="unsupported policy inference"):
         recorded_policy_options("greedy_unknown", facts)
 
