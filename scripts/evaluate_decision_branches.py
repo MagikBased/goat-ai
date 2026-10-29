@@ -25,6 +25,20 @@ from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION
 
 
+def recorded_policy_options(inference: str, native_root: Path) -> dict:
+    """Continue with the same visible policy mode that produced the replay."""
+    if inference == "greedy":
+        return {}
+    versions = {"greedy_own_loss_guard_v1": 1,
+                "greedy_own_loss_guard_v2": 2,
+                "greedy_own_loss_guard_v3": 3}
+    if inference not in versions:
+        raise ValueError(f"unsupported source policy inference {inference!r}")
+    version = versions[inference]
+    return {"own_loss_guard": True, "own_loss_guard_version": version,
+            "card_facts": load_card_facts(native_root) if version == 2 else None}
+
+
 def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                       decision_index: int, action_indices: tuple[int, ...],
                       output_dir: Path, max_decisions: int = 3000) -> dict:
@@ -34,11 +48,12 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
     seat = metadata.get("demonstrator_seat")
     if (source.source != "policy_evaluation" or seat not in (0, 1)
             or metadata.get("policy_checkpoint_sha256") != sha256_file(checkpoint)
-            or metadata.get("policy_inference") != "greedy"
             or metadata.get("policy_inference_version") != POLICY_INFERENCE_VERSION
             or metadata.get("opponent") != "TacticalHeuristicAgent"
             or metadata.get("opponent_version") != 14):
-        raise ValueError("source must be a matching greedy policy-versus-Tactical replay")
+        raise ValueError("source must be a matching policy-versus-Tactical replay")
+    inference = metadata.get("policy_inference")
+    policy_options = recorded_policy_options(inference, native_root)
     if (not 0 <= decision_index < len(source.decisions)
             or source.decisions[decision_index].observation.acting_player != seat):
         raise ValueError("decision must belong to the recorded policy")
@@ -55,7 +70,7 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
         raise ValueError("output directory must be empty")
     verified_source = verify_trajectory(source, ExperimentalOcgcoreEngine(native_root))
     audit_trajectory_visibility(source)
-    policy = load_policy_agent(checkpoint)
+    policy = load_policy_agent(checkpoint, **policy_options)
     if policy.model.feature_version != metadata.get("policy_feature_version"):
         raise ValueError("source and checkpoint policy feature versions differ")
     tactical = TacticalHeuristicAgent(
@@ -93,7 +108,7 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                     "branch_action_index": action_index,
                     "policy_seat": seat,
                     "policy_checkpoint_sha256": sha256_file(checkpoint),
-                    "continuation": "greedy_policy_vs_tactical_v14",
+                    "continuation": f"{inference}_policy_vs_tactical_v14",
                     "offline_diagnostic_only": True,
                 })
             if (offered[action_index] == record.selected_action
@@ -117,6 +132,7 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
               "verified_source_decisions": verified_source,
               "checkpoint_sha256": sha256_file(checkpoint),
               "decision_index": decision_index, "policy_seat": seat,
+              "policy_inference": inference,
               "scope": "offline_single_seed_full_state_branch_not_online_search",
               "branches": branches}
     (output_dir / "report.json").write_text(

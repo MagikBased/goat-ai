@@ -459,6 +459,32 @@ multiple player-consistent hidden-state samples and continuation policies,
 then compare their predictions on held-out complete duels. No search agent or
 new policy is promoted by this diagnostic.
 
+### Guarded replay branches for own-card losses (29 October 2026)
+
+The branch tool now reproduces the recorded `greedy_own_loss_guard_v1/v2/v3`
+inference mode in its continuation policy, including v2's printed card facts.
+It rejects an unknown mode rather than silently continuing with plain greedy
+inference. A native test checks exact recorded-branch reproduction and a legal
+alternative for both plain and guarded source metadata.
+
+Three fresh outcome-blind, v1-guarded policy-versus-Tactical replay decisions
+were branched. All source and branch trajectories passed exact native replay
+verification and player-visibility auditing. At seed 104404, seat 1, decision
+525, targeting the player's own 1900-ATK monster with Ring and targeting the
+opponent's 400-ATK monster both ended in a policy win; the respective duels
+took 1,044 and 655 decisions. At seed 104403, seat 1, decision 427, activating
+Heavy Storm and entering Battle Phase both won in 445 and 439 decisions.
+At seed 104400, seat 1, decision 149, both Heavy Storm and Battle Phase lost
+in 655 and 508 decisions. Reports and verified trajectories are in ignored
+`branch_ring_target_104404_525`, `branch_heavy_storm_104403_427`, and
+`branch_heavy_storm_104400_149` directories under `.cache/goat-ai/`.
+
+These are exact continuations of each recorded hidden deal, not samples of
+all hands and deck orders consistent with the acting player's information.
+Winner equality across these three pairs does not validate the original
+material trade or the alternate move as optimal. Keep the cases in human
+review and do not train from these branch winners alone.
+
 ## Optional own-card effect activation ablation (29 October 2026)
 
 The selected v23 policy still activates removal when its own cards are the

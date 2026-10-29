@@ -2570,3 +2570,9 @@ own-monster Ring target with a safer opposing target. A separate verified
 review queue now includes these three cases; the Tactical alternative also
 chooses Heavy Storm in both Storm positions, so reviewer rejection should
 target the avoidable activation rather than accept a weak automatic label.
+An [offline branch check](evaluation.md#guarded-replay-branches-for-own-card-losses-29-october-2026)
+now reproduces guarded source inference through terminal continuations. In
+three flagged decisions, the recorded and alternate lines had the same winner
+on the recorded hidden deal despite different duel lengths. These branch
+winners are not suitable preference labels; M4 still needs independent review
+and a held-out competitive gain.
