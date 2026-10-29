@@ -253,6 +253,39 @@ def test_native_inspection_reports_only_conditional_counts_and_hashes(
     assert all(str(code) not in str(report) for code in VANILLA_DECK)
 
 
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_strict_goat_intake_saves_private_summary_and_rejects_failed_deck_screen(
+        native_legacy_responses, tmp_path, monkeypatch, capsys):
+    from scripts import inspect_edopro_replay as inspect
+
+    root, responses, _ = native_legacy_responses
+    path = tmp_path / "source.yrp"
+    path.write_bytes(_legacy_replay(responses, raw=True))
+    report_path = tmp_path / "intake.json"
+    command = ["inspect_edopro_replay.py", str(path),
+               "--native-deck-screen", str(root),
+               "--reconstruct-native", str(root),
+               "--require-goat-candidate", "--report", str(report_path)]
+    monkeypatch.setattr(sys, "argv", command)
+    inspect.main()
+    report = json.loads(report_path.read_text())
+    assert report == json.loads(capsys.readouterr().out)
+    assert report[0]["native_goat_compatibility_candidate"] is True
+    assert report[0]["training_ready"] is False
+    assert all(str(code) not in str(report) for code in VANILLA_DECK)
+
+    monkeypatch.setattr(inspect, "goat_native_deck_screen",
+                        lambda *_args: {"goat_native_deck_screen": "rejected",
+                                        "goat_native_decks_rejected": 1,
+                                        "goat_native_side_decks_checked": False})
+    with pytest.raises(SystemExit) as rejected:
+        inspect.main()
+    assert rejected.value.code == 2
+    assert json.loads(report_path.read_text())[0][
+        "native_goat_compatibility_candidate"] is False
+    capsys.readouterr()
+
+
 def test_reconstruction_rejects_mismatched_yrpx_wrapper():
     legacy = _legacy_replay([b"\xff" * 4], raw=True)
     wrapper = _wrapped_replay(legacy, duel_flags=0)

@@ -122,9 +122,19 @@ def main() -> None:
     parser.add_argument("--reconstruct-native", type=Path,
                         help="conditionally replay saved responses on these pinned native assets; "
                              "never admits replay data to training")
+    parser.add_argument("--require-goat-candidate", action="store_true",
+                        help="exit nonzero unless setup, native Decks, and complete native "
+                             "reconstruction all pass; still not training authorization")
+    parser.add_argument("--report", type=Path,
+                        help="write the same privacy-preserving JSON report to a local file")
     args = parser.parse_args()
     if args.native_deck_screen is not None and args.goat_whitelist is not None:
         parser.error("choose either native deck screening or an explicit GOAT whitelist")
+    if args.require_goat_candidate and (
+            args.native_deck_screen is None or args.reconstruct_native is None
+            or args.native_deck_screen.resolve() != args.reconstruct_native.resolve()):
+        parser.error("strict GOAT intake requires native Deck screening and "
+                     "reconstruction using the same native root")
     try:
         whitelist_path = (args.native_deck_screen / "banlist/GOAT.lflist.conf"
                           if args.native_deck_screen is not None
@@ -179,12 +189,26 @@ def main() -> None:
                     if (isinstance(exc, ReplayReconstructionError)
                             and exc.response_index is not None):
                         report["reconstruction_response_index"] = exc.response_index
+            report["native_goat_compatibility_candidate"] = (
+                report["goat_rules_screen"] == "setup_candidate_only"
+                and report.get("goat_native_deck_screen") == "candidate_only"
+                and report.get("conditional_native_reconstruction") == "matched")
+            report["training_ready"] = False
             summaries.append(report)
         except (OSError, ReplayContainerError) as exc:
             parser.error(f"{path}: {exc}")
-    print(json.dumps(summaries, indent=2))
+    output = json.dumps(summaries, indent=2) + "\n"
+    if args.report is not None:
+        if args.report.resolve() in {path.resolve() for path in args.replays}:
+            parser.error("inspection report cannot overwrite an input replay")
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(output, encoding="utf-8")
+    print(output, end="")
     if reconstruction_failed:
         raise SystemExit(1)
+    if args.require_goat_candidate and not all(
+            item["native_goat_compatibility_candidate"] for item in summaries):
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

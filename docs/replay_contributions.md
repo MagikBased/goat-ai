@@ -71,6 +71,27 @@ the decision visibility audit. It still reports `training_ready: false` even
 when the pinned assets match, because original engine/script provenance and
 recording permission must be established separately.
 
+For automated local intake, the strict mode requires the same pinned native
+root for Deck screening and reconstruction and returns success only when the
+GOAT setup, native Deck checks, and all saved responses match. It saves a
+privacy-preserving report alongside the replay, without admitting decisions
+to training:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/inspect_edopro_replay.py \
+  /path/to/your/replay.yrpX \
+  --native-deck-screen .cache/goat-ai \
+  --reconstruct-native .cache/goat-ai \
+  --require-goat-candidate \
+  --report .cache/goat-ai/replay_samples/intake_report.json
+```
+
+The report's `native_goat_compatibility_candidate` is true only when all three
+checks pass; `training_ready` remains false. Exit status 1 means reconstruction
+failed, and status 2 means the strict candidate screen failed after successful
+reconstruction. A saved report contains the input path and hashes, so keep it
+in ignored local storage with the replay.
+
 If reconstruction fails, the command exits with status 1 and reports a fixed
 `reconstruction_failure_code`. For a divergent saved response, it also reports
 the zero-based `reconstruction_response_index`. These fields help locate a
