@@ -220,6 +220,8 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     html = output.read_text()
     assert "window.DuelAudio" in html
     assert '<script src="/examples/duel_audio.js"></script>' not in html
+    assert "__LOCAL_SOUND_BASE__" not in html
+    assert 'window.GOAT_LOCAL_SOUND_BASE = "' in html
     assert '"10":"Visible Monster"' in html
     assert '"11":"Revealed Monster"' in html
     assert '"12":"Privately Seen Monster"' in html

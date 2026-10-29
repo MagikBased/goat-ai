@@ -87,7 +87,7 @@
     #quick-controls button { flex: 1 1 110px; }
     #quick-controls button.primary { background: #78304c; border-color: #ebbd68; font-weight: 750; }
     #card-actions { position: absolute; z-index: 20; display: flex; align-items: center;
-      gap: 5px; padding: 7px; max-width: min(92%, 650px); overflow-x: auto;
+      gap: 5px; padding: 6px; max-width: min(92%, 650px); overflow-x: auto;
       background: #172e3af5; border: 1px solid #e5c963; border-radius: 10px;
       box-shadow: 0 8px 24px #000c; }
     #card-actions[hidden] { display: none; }
@@ -95,7 +95,6 @@
       min-height: 56px; padding: 4px; font-size: .72rem; white-space: normal; }
     #card-actions button svg { width: 24px; height: 24px; }
     #card-actions .close-actions { flex-basis: 34px; min-height: 34px; align-self: flex-start; }
-    #card-actions .tray-title { flex: 0 0 90px; font-size: .72rem; color: #f4df9a; }
     #sidebar { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
       padding: 12px; background: #142c36; border: 1px solid #446873; border-radius: 12px; }
     #sidebar h1 { font-size: 1.25rem; margin: 0; }
@@ -165,6 +164,7 @@
       <button data-duel-mute type="button" aria-label="Toggle duel sounds">🔊 Sound on</button>
       <button id="quit" type="button">Leave unfinished duel</button>
       <p id="message" role="status" aria-live="polite"></p>
+      <label class="priority-toggle"><input id="hold-priority" type="checkbox"> Hold priority after your activations</label>
       <div id="quick-controls"><button id="pass-action" type="button">Pass</button><button id="end-turn" class="primary" type="button">End turn</button></div>
       <div id="history"></div>
       <details><summary>Visible information</summary><div id="visible-info"></div></details>
@@ -183,6 +183,8 @@
     let state = null;
     let busy = false;
     let dragSource = null;
+    let phaseTraveling = false;
+    let autoOwnChain = false;
     function randomSeed() {
       const value = new Uint32Array(1);
       crypto.getRandomValues(value);
@@ -254,11 +256,9 @@
         zone.classList.remove("drop-ready", "drop-target"));
     }
     function closeCardActions() { byId("card-actions").hidden = true; }
-    function showActionTray(offered, anchor, titleText, destination = null) {
+    function showActionTray(offered, anchor, _titleText, destination = null) {
       if (!offered.length) { closeCardActions(); return; }
       const tray = byId("card-actions"); tray.replaceChildren();
-      const title = document.createElement("span"); title.className = "tray-title";
-      title.textContent = titleText; tray.append(title);
       for (const {action, index} of offered) {
         const button = document.createElement("button"); button.type = "button";
         button.title = actionLabel(action); button.setAttribute("aria-label", actionLabel(action));
@@ -271,9 +271,13 @@
       close.onclick = closeCardActions; tray.append(close);
       const board = byId("board"), bounds = board.getBoundingClientRect();
       const box = anchor.getBoundingClientRect();
+      const hand = anchor.closest(".hand")?.getBoundingClientRect();
+      const visibleBottom = Math.min(box.bottom, hand?.bottom ?? box.bottom);
       tray.hidden = false;
       tray.style.left = `${Math.max(8, Math.min(box.left - bounds.left, bounds.width - tray.offsetWidth - 8))}px`;
-      tray.style.top = `${Math.max(8, Math.min(box.bottom - bounds.top + 5, bounds.height - tray.offsetHeight - 8))}px`;
+      const below = visibleBottom + tray.offsetHeight + 5 <= bounds.bottom - 8;
+      const top = below ? visibleBottom - bounds.top + 5 : box.top - bounds.top - tray.offsetHeight - 5;
+      tray.style.top = `${Math.max(8, Math.min(top, bounds.height - tray.offsetHeight - 8))}px`;
     }
     function contextActions(ref, anchor, destination = null) {
       let offered = refActions(ref);
@@ -480,20 +484,50 @@
       for (const step of phaseSteps) {
         const button = document.createElement("button"); button.type = "button";
         button.textContent = step.name; button.title = step.value.replaceAll("_", " ");
-        const direct = (observation.phase === "draw" && step.value === "standby") ||
-          (observation.phase === "standby" && step.value === "main1")
-          ? "pass" : step.action;
-        const index = direct && (step.action || direct === "pass")
-          ? state.legal_actions.findIndex(action => action.kind === direct) : -1;
-        const reachable = (observation.phase === "draw" && step.value === "standby") ||
-          (observation.phase === "standby" && step.value === "main1") ||
-          (step.value === "battle" && observation.phase === "main1") ||
-          (step.value === "main2" && observation.phase === "battle") ||
-          (step.value === "end" && ["main1", "main2"].includes(observation.phase));
-        button.disabled = busy || index < 0 || !reachable;
+        const current = phaseSteps.findIndex(item => item.value === observation.phase);
+        const target = phaseSteps.indexOf(step);
+        button.disabled = busy || phaseTraveling || target <= current;
         if (observation.phase === step.value) button.classList.add("current");
-        if (index >= 0) button.onclick = () => choose(index);
+        button.onclick = () => travelToPhase(step.value);
         rail.append(button);
+      }
+    }
+    async function travelToPhase(target) {
+      if (phaseTraveling || busy || !state || state.terminal) return;
+      phaseTraveling = true;
+      const startingTurn = state.observation.turn;
+      const targetRank = phaseSteps.findIndex(step => step.value === target);
+      try {
+        for (let count = 0; count < 30 && state && !state.terminal; count++) {
+          const observation = state.observation;
+          const currentRank = phaseSteps.findIndex(step => step.value === observation.phase);
+          if (observation.turn !== startingTurn || currentRank >= targetRank) break;
+          let direct = null;
+          if (observation.phase === "draw" || observation.phase === "standby") direct = "pass";
+          else if (observation.phase === "main1")
+            direct = target === "end" ? "end_phase" : "battle_phase";
+          else if (observation.phase === "battle") direct = "main2";
+          else if (observation.phase === "main2") direct = "end_phase";
+          let index = state.legal_actions.findIndex(action => action.kind === direct);
+          if (index < 0 && observation.phase === "main1" && target === "end")
+            index = state.legal_actions.findIndex(action => action.kind === "battle_phase");
+          if (index < 0) index = state.legal_actions.findIndex(action => action.kind === "pass");
+          if (index < 0) {
+            byId("message").textContent = `Cannot advance to ${target} from this decision; choose a required response first.`;
+            break;
+          }
+          const before = state.decisions;
+          const next = await choose(index);
+          if (!next || next.decisions === before) break;
+          if (byId("hold-priority").checked) break;
+        }
+        if (state && !state.terminal && state.observation.turn === startingTurn &&
+            phaseSteps.findIndex(step => step.value === state.observation.phase) < targetRank &&
+            !byId("hold-priority").checked)
+          byId("message").textContent = `${target} is not reachable from this turn's current choices.`;
+      } finally {
+        phaseTraveling = false;
+        if (state && !state.terminal) renderPhase(state.observation);
       }
     }
     function renderQuickControls() {
@@ -574,6 +608,7 @@
       if (busy) return;
       const oldState = state;
       const played = state.legal_actions[index];
+      if (["activate", "chain"].includes(played?.kind)) autoOwnChain = true;
       const sound = window.DuelAudio?.action(played?.kind);
       if (sound) window.DuelAudio.play(sound);
       busy = true; closeCardActions(); actions(); renderQuickControls();
@@ -591,9 +626,24 @@
             id: next.id, action_index: matching[0].index, expected_decisions: next.decisions});
         }
         render(next);
+        const own = oldState.human_seat;
+        const links = next.observation?.chain || [];
+        const lastLink = links.at(-1);
+        if (autoOwnChain && !next.terminal && !byId("hold-priority").checked &&
+            lastLink?.controller === own && !phaseTraveling) {
+          const pass = next.legal_actions.findIndex(action => action.kind === "pass");
+          if (pass >= 0) setTimeout(() => {
+            if (!byId("hold-priority").checked && state?.decisions === next.decisions)
+              choose(pass);
+          }, 0);
+        }
+        if (!lastLink && !next.legal_actions?.some(action =>
+            ["select_card", "select_option", "select_position", "place"].includes(action.kind)))
+          autoOwnChain = false;
+        if (lastLink?.controller !== own && lastLink) autoOwnChain = false;
         const before = oldState?.observation, after = next?.observation;
         if (before && after) {
-          const own = oldState.human_seat, other = 1 - own;
+          const other = 1 - own;
           if (after.life_points[own] < before.life_points[own] ||
               after.life_points[other] < before.life_points[other])
             window.DuelAudio?.play("damage");
@@ -605,8 +655,10 @@
             window.DuelAudio?.play("move");
           else if (after.hand.length > before.hand.length) window.DuelAudio?.play("draw");
         }
+        return next;
       }
-      catch (error) { byId("message").textContent = error.message; byId("message").classList.add("error"); }
+      catch (error) { byId("message").textContent = error.message;
+        byId("message").classList.add("error"); return null; }
       finally { busy = false; actions(); renderQuickControls();
         if (state && !state.terminal) renderPhase(state.observation); }
     }

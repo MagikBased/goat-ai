@@ -23,7 +23,7 @@ DECK2 = "chaos_bryan_coronel_new_jersey_2005.ydk"
 
 def _manager(tmp_path, native_root=None):
     folder = tmp_path / "examples/decks"
-    folder.mkdir(parents=True)
+    folder.mkdir(parents=True, exist_ok=True)
     for name in (DECK1, DECK2):
         shutil.copyfile(ROOT / "examples/decks" / name, folder / name)
     return LiveGameManager(GameCreator(root=tmp_path, native_root=native_root or tmp_path))
@@ -41,6 +41,44 @@ def test_live_game_rejects_invalid_requests(tmp_path):
         manager.start({**spec, "opponent": "shell"})
     with pytest.raises(FileNotFoundError, match="native GOAT assets"):
         manager.start(spec)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_unfinished_duel_recovers_from_verified_actions_after_server_restart(tmp_path):
+    native = Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve()
+    spec = {"deck1": DECK1, "deck2": DECK2, "human_seat": 1,
+            "opponent": "random", "seed": 4322}
+    manager = _manager(tmp_path, native)
+    state = manager.start(spec)
+    assert state["observation"]["acting_player"] == 1
+    state = manager.choose(state["id"], 0, state["decisions"])
+    journal = manager.creator.output_dir / "_in_progress" / f"{state['id']}.json"
+    saved = json.loads(journal.read_text())
+    assert saved["entries"] and all(set(entry) == {
+        "index", "observation_sha256", "legal_sha256"} for entry in saved["entries"])
+    assert "observation" not in journal.read_text().replace("observation_sha256", "")
+    manager.close_all()
+
+    resumed = _manager(tmp_path, native)
+    try:
+        assert resumed.get(state["id"]) == state
+        next_state = resumed.choose(state["id"], 0, state["decisions"])
+        assert next_state["decisions"] > state["decisions"]
+        assert resumed.close(state["id"]) == {"closed": True}
+        assert not journal.exists()
+    finally:
+        resumed.close_all()
+
+    corrupt = manager.creator.output_dir / "_in_progress" / f"{state['id']}.json"
+    corrupt.parent.mkdir(parents=True, exist_ok=True)
+    saved["entries"][0]["legal_sha256"] = "0" * 64
+    corrupt.write_text(json.dumps(saved), encoding="utf-8")
+    rejected = _manager(tmp_path, native)
+    try:
+        with pytest.raises(ValueError, match="differs at decision"):
+            rejected.get(state["id"])
+    finally:
+        rejected.close_all()
 
 
 def test_local_card_art_is_cached_on_demand(tmp_path, monkeypatch):
@@ -126,6 +164,7 @@ def test_live_game_completes_and_saves_human_only_demonstration(tmp_path):
     assert state["viewer"].endswith(".html")
     replay = manager.creator.output_dir / f"{state['id']}.json"
     assert replay.with_suffix(".html").is_file()
+    assert not (manager.creator.output_dir / "_in_progress" / f"{state['id']}.json").exists()
     trajectory = read_trajectory(replay)
     assert trajectory.source == "human_web"
     assert trajectory.skill_metadata["authorization"] == "self_recorded"

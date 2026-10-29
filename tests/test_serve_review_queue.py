@@ -230,6 +230,9 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
                     page.parent / "play_game.html")
     shutil.copyfile(serve_review_queue.ROOT / "examples/duel_audio.js",
                     page.parent / "duel_audio.js")
+    local_sound = tmp_path / ".cache/goat-ai/duel_sounds/phase.wav"
+    local_sound.parent.mkdir(parents=True)
+    local_sound.write_bytes(b"RIFFpersonal-use")
     def review_queue(self, identifier):
         if identifier != "a" * 16:
             raise ValueError("invalid game ID")
@@ -272,6 +275,11 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
             assert b"Play against GOAT AI" in response.read()
         with urlopen(f"{base}/examples/duel_audio.js", timeout=5) as response:
             assert b"window.DuelAudio" in response.read()
+        with urlopen(f"{base}/local-duel-sounds/phase.wav", timeout=5) as response:
+            assert response.read() == b"RIFFpersonal-use"
+        with pytest.raises(HTTPError) as missing_sound:
+            urlopen(f"{base}/local-duel-sounds/unknown.wav", timeout=5)
+        assert missing_sound.value.code == 404
         assert _request(f"{base}/api/games/options")[1]["decks"] == []
         assert _request(f"{base}/api/live/start", {
             "deck1": "a", "deck2": "b", "human_seat": 0,

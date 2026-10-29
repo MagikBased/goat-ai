@@ -21,6 +21,7 @@ from scripts.create_viewer_game import GameCreator
 from scripts.launch_review_server import launch
 from scripts.live_human_game import LiveGameManager
 from scripts.setup_card_images import cache_card_image, setup_card_backs
+from scripts.setup_local_duel_sounds import HASHES as LOCAL_SOUND_HASHES
 from scripts.validate_review_queue_labels import queue_sources, verify_queue_items
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -396,6 +397,24 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
 
         def do_GET(self) -> None:
             parsed = urlsplit(self.path)
+            sound = re.fullmatch(r"/local-duel-sounds/([a-z]+\.wav)", parsed.path)
+            if sound:
+                name = sound.group(1)
+                target = ROOT / ".cache/goat-ai/duel_sounds" / name
+                if name not in LOCAL_SOUND_HASHES or not target.is_file():
+                    self.send_error(404, "local duel sound unavailable")
+                    return
+                data = target.read_bytes()
+                if len(data) > 2_000_000:
+                    self.send_error(404, "local duel sound invalid")
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/wav")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "private, max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if parsed.path in ("/replays/card_images/cover.png",
                                "/replays/card_images/cover2.png"):
                 with image_locks_lock:

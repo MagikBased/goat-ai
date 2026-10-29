@@ -103,7 +103,7 @@ def test_card_actions_phase_and_drag_destination(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-play-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1200:]
-    assert match.group(1) == "Summon,Set,×|Summon,Set,×|BP,EP|2|true|0,2,0"
+    assert match.group(1) == "Summon,Set,×|Summon,Set,×|BP,M2,EP|2|true|0,2,0"
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
@@ -277,3 +277,101 @@ def test_duel_audio_mute_and_event_mapping_in_browser(tmp_path):
     match = re.search(r'data-audio-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1200:]
     assert match.group(1) == "true|true|true|true|true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_phase_travel_passes_priority_and_hold_stops_after_one_step(tmp_path):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      const base = {viewer:0,acting_player:0,turn_player:0,turn:2,phase:'main1',
+        life_points:[8000,8000],hand:[{code:123,sequence:0}],field:[],
+        graveyards:[[],[]],banished:[[],[]],extra_deck_counts:[0,0],
+        deck_counts:[34,35],opponent_hand_count:5,public_history:[],
+        known_opponent_hand_cards:[],known_opponent_field_cards:[],
+        own_extra_deck:[],restrictions:[],chain:[]};
+      const action = (kind, parameters = {}) => ({id:kind,kind,actor:0,parameters});
+      const make = (decision, phase, kinds) => ({id:'1234567890abcdef',human_seat:0,
+        decisions:decision,terminal:false,card_names:{123:'Test Monster'},
+        observation:{...base,phase},legal_actions:kinds.map(kind => action(kind,
+          kind === 'normal_summon' ? {code:123,location:2,controller:0,sequence:0} : {}))});
+      const snapshots = [make(0,'main1',['normal_summon','pass']),
+        make(1,'main1',['battle_phase']), make(2,'battle',['main2']),
+        make(3,'main2',['end_phase']), make(4,'end',['pass'])];
+      render(snapshots[0]);
+      document.querySelector('#own-hand .card').click();
+      const tray = document.getElementById('card-actions').getBoundingClientRect();
+      const board = document.getElementById('board').getBoundingClientRect();
+      const trayFits = tray.top >= board.top && tray.bottom <= board.bottom &&
+        !document.getElementById('card-actions').textContent.includes('Test Monster');
+      const chosen = [];
+      window.fetch = async (_path, options) => {
+        const request = JSON.parse(options.body);
+        chosen.push(snapshots[request.expected_decisions].legal_actions[request.action_index].kind);
+        return new Response(JSON.stringify(snapshots[request.expected_decisions + 1]));
+      };
+      travelToPhase('end').then(async () => {
+        const reached = state.observation.phase === 'end' &&
+          chosen.join(',') === 'pass,battle_phase,main2,end_phase';
+        chosen.length = 0;
+        render(snapshots[0]);
+        document.getElementById('hold-priority').checked = true;
+        await travelToPhase('end');
+        document.body.dataset.phaseTravelProbe = [trayFits,reached,
+          state.observation.phase === 'main1',chosen.join(',') === 'pass'].join('|');
+      });
+    </script></body>"""
+    path = tmp_path / "phase_travel.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--window-size=1365,768",
+        "--virtual-time-budget=1200", "--dump-dom", path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-phase-travel-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_own_activation_passes_its_chain_unless_priority_is_held(tmp_path):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      const base = {viewer:0,acting_player:0,turn_player:0,turn:2,phase:'main1',
+        life_points:[8000,8000],hand:[],field:[],graveyards:[[],[]],banished:[[],[]],
+        extra_deck_counts:[0,0],deck_counts:[34,35],opponent_hand_count:5,
+        public_history:[],known_opponent_hand_cards:[],known_opponent_field_cards:[],
+        own_extra_deck:[],restrictions:[],chain:[]};
+      const action = kind => ({id:kind,kind,actor:0,parameters:{}});
+      const initial = {id:'1234567890abcdef',human_seat:0,decisions:0,terminal:false,
+        card_names:{},observation:base,legal_actions:[action('activate')]};
+      const chained = {...initial,decisions:1,observation:{...base,chain:[
+        {index:1,controller:0,card_code:123,targets:[]}]},legal_actions:[action('pass')]};
+      const resolved = {...initial,decisions:2,legal_actions:[action('end_phase')]};
+      const chosen = [];
+      window.fetch = async (_path, options) => {
+        const request = JSON.parse(options.body);
+        chosen.push(request.action_index);
+        return new Response(JSON.stringify(request.expected_decisions === 0 ? chained : resolved));
+      };
+      render(initial);
+      choose(0).then(() => setTimeout(() => {
+        const passed = chosen.length === 2 && state.decisions === 2;
+        chosen.length = 0;
+        render(initial);
+        document.getElementById('hold-priority').checked = true;
+        choose(0).then(() => setTimeout(() => {
+          document.body.dataset.priorityProbe = [passed,chosen.length === 1,
+            state.decisions === 1].join('|');
+        }, 30));
+      }, 30));
+    </script></body>"""
+    path = tmp_path / "priority.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=1200", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-priority-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "true|true|true"

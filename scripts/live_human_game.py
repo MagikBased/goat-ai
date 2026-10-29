@@ -1,7 +1,9 @@
 """Local, player-visible browser sessions against the native GOAT engine."""
 
+import hashlib
 import json
 import os
+import re
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, replace
@@ -19,12 +21,18 @@ from scripts.create_viewer_game import GameCreator
 from scripts.render_replay import render_replay
 
 
+def _digest(value) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 class LiveGame:
     def __init__(self, identifier: str, env: GoatEnvironment, human_seat: int,
                  opponent, opponent_name: str, checkpoint_hash: str | None,
                  deck_names: tuple[str, str], output_dir: Path, root: Path,
                  native_root: Path, checkpoint: Path, names: dict[int, str],
-                 max_decisions: int):
+                 max_decisions: int, spec: dict, journal_path: Path,
+                 restore: dict | None = None):
         self.id = identifier
         self.env = env
         self.human_seat = human_seat
@@ -38,9 +46,84 @@ class LiveGame:
         self.checkpoint = checkpoint
         self.names = names
         self.max_decisions = max_decisions
+        self.spec = spec
+        self.journal_path = journal_path
+        self.journal_entries: list[dict] = []
         self.decisions = 0
         self.viewer: str | None = None
-        self._advance_opponent()
+        if restore is None:
+            self._advance_opponent()
+            self._save_journal()
+        else:
+            self._restore(restore)
+
+    def _apply(self, action) -> None:
+        current = self.env._current()
+        actions = current.legal_actions
+        if action not in actions:
+            raise ValueError("action differs from native legal actions")
+        self.journal_entries.append({
+            "index": actions.index(action),
+            "observation_sha256": _digest(asdict(current.observation)),
+            "legal_sha256": _digest([asdict(item) for item in actions]),
+        })
+        self.env.step(action)
+        self.decisions += 1
+
+    def _save_journal(self) -> None:
+        if self.env.is_terminal():
+            return
+        self.journal_path.parent.mkdir(parents=True, exist_ok=True)
+        decks = self.env.decks
+        payload = {
+            "schema_version": 1, "id": self.id, "spec": self.spec,
+            "deck_sha256": [sha256_file(path) for path in decks],
+            "checkpoint_sha256": self.checkpoint_hash,
+            "asset_sha256": self.env.engine.replay_manifest(),
+            "entries": self.journal_entries,
+        }
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8",
+                                         dir=self.journal_path.parent,
+                                         prefix=f".{self.id}.", suffix=".tmp",
+                                         delete=False) as temporary:
+            pending = Path(temporary.name)
+            json.dump(payload, temporary, separators=(",", ":"))
+            temporary.write("\n")
+        try:
+            os.replace(pending, self.journal_path)
+        finally:
+            pending.unlink(missing_ok=True)
+
+    def _restore(self, journal: dict) -> None:
+        if (journal.get("schema_version") != 1 or journal.get("id") != self.id
+                or journal.get("spec") != self.spec
+                or journal.get("deck_sha256") != [sha256_file(path) for path in self.env.decks]
+                or journal.get("checkpoint_sha256") != self.checkpoint_hash
+                or not isinstance(journal.get("entries"), list)):
+            raise ValueError("unfinished duel journal or its inputs changed")
+        for entry in journal["entries"]:
+            if self.env.is_terminal() or not isinstance(entry, dict):
+                raise ValueError("unfinished duel journal ends before its actions")
+            current = self.env._current()
+            actions = current.legal_actions
+            index = entry.get("index")
+            if (type(index) is not int or not 0 <= index < len(actions)
+                    or entry.get("observation_sha256") != _digest(asdict(current.observation))
+                    or entry.get("legal_sha256") != _digest([asdict(item) for item in actions])):
+                raise ValueError(f"unfinished duel differs at decision {self.decisions}")
+            action = actions[index]
+            if (current.observation.acting_player != self.human_seat
+                    and self.opponent.select_action(current.observation, actions) != action):
+                raise ValueError(f"AI choice differs at decision {self.decisions}")
+            self.env.step(action)
+            self.decisions += 1
+        if self.env.engine.replay_manifest() != journal.get("asset_sha256"):
+            raise ValueError("native assets changed since the unfinished duel")
+        if not self.env.is_terminal() and self.env._current().observation.acting_player != self.human_seat:
+            raise ValueError("unfinished duel journal ends before the human decision")
+        self.journal_entries = list(journal["entries"])
+        if self.env.is_terminal():
+            self._finish()
 
     def _advance_opponent(self) -> None:
         while not self.env.is_terminal() and self.env._current().observation.acting_player != self.human_seat:
@@ -48,8 +131,7 @@ class LiveGame:
                 raise RuntimeError("duel exceeded the decision limit")
             observation = self.env._current().observation
             action = self.opponent.select_action(observation, self.env.legal_actions())
-            self.env.step(action)
-            self.decisions += 1
+            self._apply(action)
         if self.env.is_terminal() and self.viewer is None:
             self._finish()
 
@@ -93,6 +175,7 @@ class LiveGame:
                   "policy_review_flags": 0, "viewer": self.viewer}
         path.with_suffix(".info.json").write_text(
             json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        self.journal_path.unlink(missing_ok=True)
         self.env.close()
 
     def snapshot(self) -> dict:
@@ -131,9 +214,9 @@ class LiveGame:
             raise ValueError("selected action is not legal")
         if self.decisions >= self.max_decisions:
             raise RuntimeError("duel exceeded the decision limit")
-        self.env.step(self.env.legal_actions()[index])
-        self.decisions += 1
+        self._apply(self.env.legal_actions()[index])
         self._advance_opponent()
+        self._save_journal()
         return self.snapshot()
 
     def terminal(self) -> bool:
@@ -142,6 +225,9 @@ class LiveGame:
     def close(self) -> None:
         if not self.env.is_terminal():
             self.env.close()
+
+    def discard(self) -> None:
+        self.journal_path.unlink(missing_ok=True)
 
 
 class LiveGameHandle:
@@ -178,7 +264,7 @@ class LiveGameManager:
         self.sessions: dict[str, LiveGameHandle] = {}
         self.lock = Lock()
 
-    def start(self, spec: dict) -> dict:
+    def _validated_decks(self, spec: dict) -> dict[str, Path]:
         if not isinstance(spec, dict) or set(spec) != {
                 "deck1", "deck2", "human_seat", "opponent", "seed"}:
             raise ValueError("live game needs two decks, a human seat, opponent, and seed")
@@ -195,6 +281,42 @@ class LiveGameManager:
             raise ValueError("seed must be an unsigned 32-bit integer")
         if not self.creator.options()["native_ready"]:
             raise FileNotFoundError("native GOAT assets are not installed")
+        return decks
+
+    def _create_handle(self, identifier: str, spec: dict,
+                       decks: dict[str, Path], restore: dict | None = None) -> tuple[LiveGameHandle, dict]:
+        seed = spec["seed"]
+        handle = LiveGameHandle(identifier)
+        journal_path = self.creator.output_dir / "_in_progress" / f"{identifier}.json"
+
+        def factory():
+            opponent = self.creator._agent(spec["opponent"], seed * 2 + 1)
+            checkpoint_hash = (sha256_file(self.creator.checkpoint)
+                               if spec["opponent"] == "policy" else None)
+            env = GoatEnvironment(str(decks[spec["deck1"]]), str(decks[spec["deck2"]]),
+                                  seed, ExperimentalOcgcoreEngine(self.creator.native_root))
+            try:
+                env.reset()
+                return LiveGame(identifier, env, spec["human_seat"], opponent,
+                                spec["opponent"], checkpoint_hash,
+                                (spec["deck1"], spec["deck2"]), self.creator.output_dir,
+                                self.creator.root, self.creator.native_root,
+                                self.creator.checkpoint,
+                                load_card_names(self.creator.native_root), 3000,
+                                spec, journal_path, restore)
+            except BaseException:
+                env.close()
+                raise
+
+        try:
+            state = handle.create(factory)
+            return handle, state
+        except BaseException:
+            handle.close()
+            raise
+
+    def start(self, spec: dict) -> dict:
+        decks = self._validated_decks(spec)
         with self.lock:
             for old_id, handle in list(self.sessions.items()):
                 if len(self.sessions) < self.max_sessions:
@@ -205,51 +327,42 @@ class LiveGameManager:
             if len(self.sessions) >= self.max_sessions:
                 raise RuntimeError("too many live games; finish a game before starting another")
             identifier = uuid4().hex[:16]
-            handle = LiveGameHandle(identifier)
+            handle, state = self._create_handle(identifier, spec, decks)
+            self.sessions[identifier] = handle
+            return state
 
-            def factory():
-                opponent = self.creator._agent(spec["opponent"], seed * 2 + 1)
-                checkpoint_hash = (sha256_file(self.creator.checkpoint)
-                                   if spec["opponent"] == "policy" else None)
-                env = GoatEnvironment(str(decks[spec["deck1"]]), str(decks[spec["deck2"]]),
-                                      seed, ExperimentalOcgcoreEngine(self.creator.native_root))
-                try:
-                    env.reset()
-                    return LiveGame(identifier, env, spec["human_seat"], opponent,
-                                    spec["opponent"], checkpoint_hash,
-                                    (spec["deck1"], spec["deck2"]), self.creator.output_dir,
-                                    self.creator.root, self.creator.native_root,
-                                    self.creator.checkpoint,
-                                    load_card_names(self.creator.native_root), 3000)
-                except BaseException:
-                    env.close()
-                    raise
-
-            try:
-                state = handle.create(factory)
-                self.sessions[identifier] = handle
-                return state
-            except BaseException:
-                handle.close()
-                raise
+    def _handle(self, identifier: str) -> LiveGameHandle:
+        with self.lock:
+            if identifier in self.sessions:
+                return self.sessions[identifier]
+            if not isinstance(identifier, str) or not re.fullmatch(r"[0-9a-f]{16}", identifier):
+                raise ValueError("unknown live game")
+            path = self.creator.output_dir / "_in_progress" / f"{identifier}.json"
+            if not path.is_file():
+                raise ValueError("unknown live game")
+            if len(self.sessions) >= self.max_sessions:
+                raise RuntimeError("too many live games; finish a game before resuming another")
+            journal = json.loads(path.read_text(encoding="utf-8"))
+            spec = journal.get("spec")
+            decks = self._validated_decks(spec)
+            handle, _state = self._create_handle(identifier, spec, decks, journal)
+            self.sessions[identifier] = handle
+            return handle
 
     def get(self, identifier: str) -> dict:
-        if identifier not in self.sessions:
-            raise ValueError("unknown live game")
-        return self.sessions[identifier].call("snapshot")
+        return self._handle(identifier).call("snapshot")
 
     def choose(self, identifier: str, action_index: int,
                expected_decisions: int) -> dict:
-        if identifier not in self.sessions:
-            raise ValueError("unknown live game")
-        return self.sessions[identifier].call("choose", action_index,
-                                              expected_decisions)
+        return self._handle(identifier).call("choose", action_index,
+                                            expected_decisions)
 
     def close(self, identifier: str) -> dict:
         with self.lock:
-            if identifier not in self.sessions:
+            handle = self.sessions.pop(identifier, None)
+            if handle is None:
                 raise ValueError("unknown live game")
-            handle = self.sessions.pop(identifier)
+            handle.call("discard")
             handle.close()
         return {"closed": True}
 

@@ -150,21 +150,28 @@ The live board uses the replay viewer's vertical phase rail. Click a Graveyard
 or banished zone to inspect the visible cards with images; Deck zones display
 card backs and remaining counts while keeping live Deck order hidden. Live play
 and generated replay viewers have a shared **Sound on/off** control that keeps
-its setting in this browser. Short synthesized cues accompany summons, card
-activation, attacks, movement, phase changes, and Life Point changes. Browsers
-may wait for a click before playing audio. No Yu-Gi-Oh! game sound files are
-bundled: [EDOPro's Distribution](https://github.com/ProjectIgnis/Distribution)
-directs redistributors to the individual asset license and credit files.
-Click an available phase button to advance, use **Pass** for response windows,
+its setting in this browser. For local personal use, run
+`python scripts/setup_local_duel_sounds.py` to download pinned EDOPro effects
+into ignored `.cache/goat-ai/duel_sounds/`. Its `CREDITS.md` lists each source
+and license. The viewer uses synthesized cues when local files are unavailable,
+including when opened offline. Browsers may wait for a click before playing
+audio. No game sound files are committed to Git; see
+[EDOPro's sound credits](https://github.com/ProjectIgnis/Distribution/blob/master/sound/CREDITS.md).
+Click a future phase to pass through intermediate priority windows. Enable
+**Hold priority after your activations** to keep the first response window.
+Use **Pass** for individual responses,
 or use **End turn** when that transition is legal. Unusual prompts and every
 legal choice remain available under **All legal actions** in the sidebar.
 The board and controls use only the human player's visible observation and
 native legal actions. On completion the server replay-verifies the duel,
 checks player visibility, and saves a `human_web` self-recording and full
 postgame replay under `.cache/goat-ai/user_games/`. Only the human seat is
-admitted as a raw demonstration. Unfinished games live in server memory and
-are discarded if the server stops; **Leave unfinished duel** releases one
-explicitly. The browser is an experimental local play interface, subject to
+admitted as a raw demonstration. Unfinished games are journaled under ignored
+`.cache/goat-ai/user_games/_in_progress/`. Reopen their `#game=...` URL after
+restarting the server to reconstruct the duel from its seed and recorded
+actions. Changed decks, AI checkpoint, native assets, or decisions fail closed.
+Only completed, replay-verified games enter the `human_web` replay folder;
+**Leave unfinished duel** discards the journal. The browser is an experimental local play interface, subject to
 the same unresolved GOAT ruling coverage as the native adapter.
 The board lists public Graveyard and banished cards, your Extra Deck and known
 opponent cards, and card names in the legal-action menu without exposing the

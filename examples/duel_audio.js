@@ -5,8 +5,14 @@
   try { muted = localStorage.getItem(storageKey) === "1"; } catch (_) { /* file URLs */ }
   let context = null;
   let lastSound = -Infinity;
+  const unavailable = new Set();
+  const files = {summon:"summon.wav", special:"specialsummon.wav", move:"set.wav",
+    activate:"activate.wav", chain:"activate.wav", attack:"attack.wav",
+    damage:"damage.wav", heal:"gainlp.wav", phase:"phase.wav", end:"phase.wav",
+    flip:"flip.wav", draw:"draw.wav"};
   const patterns = {
     summon: [[330, 0, .10, "triangle", 460], [495, .08, .17, "triangle", 620]],
+    special: [[300, 0, .10, "triangle", 600], [640, .08, .18, "sine", 940]],
     activate: [[780, 0, .09, "sine", 980], [1050, .07, .16, "triangle", 680]],
     chain: [[620, 0, .08, "square", 760], [810, .08, .09, "square", 950]],
     move: [[260, 0, .11, "triangle", 170]],
@@ -25,16 +31,13 @@
       button.title = muted ? "Unmute duel sounds" : "Mute duel sounds";
     });
   }
-  function play(kind) {
-    if (muted || !patterns[kind]) return;
+  function synth(kind) {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     try {
       context ||= new AudioContext();
       if (context.state === "suspended") context.resume();
       const now = context.currentTime;
-      if (now - lastSound < .035) return;
-      lastSound = now;
       for (const [start, delay, length, wave, finish] of patterns[kind]) {
         const oscillator = context.createOscillator();
         const volume = context.createGain();
@@ -51,6 +54,30 @@
       }
     } catch (_) { /* An unsupported or blocked audio device must not stop play. */ }
   }
+  function play(kind) {
+    if (muted || !patterns[kind]) return;
+    const now = performance.now();
+    if (now - lastSound < 35) return;
+    lastSound = now;
+    const file = files[kind];
+    const base = /^https?:$/.test(location.protocol) ? "/local-duel-sounds"
+      : location.protocol === "file:" ? window.GOAT_LOCAL_SOUND_BASE : null;
+    if (base && !base.includes("__") && file && !unavailable.has(file)) {
+      try {
+        const clip = new Audio(`${base}/${file}`);
+        let failed = false;
+        const fallback = () => {
+          if (failed) return;
+          failed = true; unavailable.add(file); if (!muted) synth(kind);
+        };
+        clip.volume = .45;
+        clip.onerror = fallback;
+        clip.play().catch(fallback);
+        return;
+      } catch (_) { unavailable.add(file); }
+    }
+    synth(kind);
+  }
   function toggle() {
     muted = !muted;
     try { localStorage.setItem(storageKey, muted ? "1" : "0"); } catch (_) { /* file URLs */ }
@@ -58,12 +85,13 @@
     if (!muted) play("phase");
   }
   function action(kind) {
-    if (["normal_summon", "special_summon", "set_monster"].includes(kind)) return "summon";
+    if (kind === "normal_summon") return "summon";
+    if (kind === "special_summon") return "special";
     if (kind === "flip_summon") return "flip";
     if (["activate", "yes"].includes(kind)) return "activate";
     if (kind === "chain") return "chain";
     if (kind === "attack") return "attack";
-    if (["set_spell_trap", "place", "tribute", "change_position"].includes(kind)) return "move";
+    if (["set_monster", "set_spell_trap", "place", "tribute", "change_position"].includes(kind)) return "move";
     if (["battle_phase", "main2", "end_phase"].includes(kind)) return "phase";
     return null;
   }

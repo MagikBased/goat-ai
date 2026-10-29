@@ -118,7 +118,7 @@ def _local_card_images(output: Path, codes: set[int]) -> dict[int | str, str]:
 
 def _embed_viewer(raw: dict | None, source_sha256: str, names: dict[int, str],
                   options: dict[int, str], images: dict[int | str, str],
-                  reviewer: dict | None = None) -> str:
+                  reviewer: dict | None = None, sound_base: str = "") -> str:
     template = TEMPLATE.read_text(encoding="utf-8")
     template = template.replace(
         '<script src="/examples/duel_audio.js"></script>',
@@ -131,12 +131,19 @@ def _embed_viewer(raw: dict | None, source_sha256: str, names: dict[int, str],
     images_json = json.dumps(images, separators=(",", ":"), ensure_ascii=True)
     reviewer_json = json.dumps(reviewer, separators=(",", ":"), ensure_ascii=True).replace(
         "<", "\\u003c")
+    local_sound_json = json.dumps(sound_base, ensure_ascii=True).replace("<", "\\u003c")
     return (template.replace("__SOURCE_SHA256__", source_sha256)
             .replace("__EMBEDDED_NAMES__", names_json)
             .replace("__EMBEDDED_OPTIONS__", options_json)
             .replace("__EMBEDDED_IMAGES__", images_json)
             .replace("__EMBEDDED_REVIEWER__", reviewer_json)
+            .replace('"__LOCAL_SOUND_BASE__"', local_sound_json)
             .replace("__EMBEDDED_REPLAY__", replay_json))
+
+
+def _local_sound_base(output: Path) -> str:
+    folder = TEMPLATE.parent.parent / ".cache/goat-ai/duel_sounds"
+    return Path(os.path.relpath(folder, output.parent)).as_posix()
 
 
 def _reviewer_frame(engine, *, terminal: bool = False) -> dict:
@@ -242,7 +249,8 @@ def render_replay(source: Path, output: Path, native_root: Path, *,
     names = _card_names(codes, native_root)
     options = _option_texts(codes, native_root)
     html = _embed_viewer(raw, source_sha256, names, options,
-                         _local_card_images(output, codes), reviewer)
+                         _local_card_images(output, codes), reviewer,
+                         _local_sound_base(output))
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(html, encoding="utf-8")
     if reviewer:
@@ -264,7 +272,8 @@ def render_catalog_viewer(output: Path, native_root: Path) -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(_embed_viewer(None, "", names,
                                     _option_texts(codes, native_root),
-                                    _local_card_images(output, codes)), encoding="utf-8")
+                                    _local_card_images(output, codes),
+                                    sound_base=_local_sound_base(output)), encoding="utf-8")
     return len(names)
 
 
