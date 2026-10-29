@@ -1,5 +1,62 @@
 # Baseline evaluation log
 
+## Cross-review transfer check for human preferences (29 October 2026)
+
+We used the new strict replay, seed, and Main Deck holdout gates to test
+whether small batches of explicit human preferences transfer to other
+decisions. The New Jersey snapshot has nine changed choices on Ryan versus
+Theeresak Goat; the broader snapshot has 11 changed choices on Mary/Bryan
+and Zombie/Dimension Fusion. Each preference file was read against its exact
+source trajectory, which passed native replay and player-visibility audits.
+The two groups were kept separate for this experiment.
+
+The existing New Jersey nine-preference children, fit for 120 and 400 steps,
+were scored on the **11 untouched broader** human choices. The selected v23
+parent ranked the reviewed alternative first at 0/11; each child did so at
+1/11. Their mean preferred-minus-recorded logit margins were −4.318,
+−2.649, and −1.706 respectively. The 400-step update moved the score toward
+the human choices without ranking more of them first.
+
+For the reverse direction, two new children were trained **only** on the
+11 broader preferences from the selected v23 checkpoint. Both used four
+separate current-asset parent-policy replays from seeds 107600–107601 as
+64 parent-KL preservation states, learning rate 0.0001, KL weight 0.5,
+and seed 208; one used 120 steps and the other 400. The 120-step preference
+loss fell 4.39494 → 1.21293 (final sampled KL 0.01023). At 400 steps it
+fell 4.39494 → 0.08684 (KL 0.03461), and the child ranked the human action
+first at **11/11 training decisions**. On the **nine untouched New Jersey**
+choices, the parent ranked the human action first at 0/9 and both children
+at only 1/9. Mean preference margins were −3.900, −2.701, and −2.223.
+All four cross-group child scores passed the strict holdout gates, including
+the preservation Main Decks in checkpoint provenance.
+
+The 400-step broader-only child was then tested directly against its parent
+on fresh seeds 125100–125107, Christian Goat/Ramon Beastdown and Jonathan
+Chaos/Roberto Phoenix, both Deck assignments and seats. All four Main Deck
+compositions passed the unseen-training gate for both checkpoints. It scored
+**27 wins, 36 losses, one draw** in 64 complete experimental-core duels;
+its paired-bootstrap score interval was **31.25%–54.69%**. This does not
+establish a strength gain. Do not promote either child. The fit on 11/11
+training decisions alongside 1/9 held-out transfer and weak match score
+supports collecting more varied human judgments and testing generalization
+before extending preference optimization.
+
+Ignored artifacts: `broad11_only_pref_{120,400}step_kl05_seed208.pt` under
+`.cache/goat-ai/broad_parent_review_snapshot_20261028/` (SHA-256
+`e50f3badb4ee56eb5c9c62adc5341173a8b0a3e141af33c7ab0ca31772938687`
+and `675cea84462d8cbd806e637bc53ed5700a1cd0fb74125aa88edeeee78dc654da`),
+their strict score reports under the New Jersey snapshot, and the direct
+report `.cache/goat-ai/broad11_only_400step_vs_parent_125100_125107.json`
+(SHA-256 `60420e0cde09a9cc469d21ba2367f6e2e5bb98ff8ffae8009682002a80b2e1be`).
+Reproduce the new fits with `scripts/train_review_preferences.py` using the
+five nonempty replay/preference pairs in the broader snapshot manifest, the
+four seed-107600/107601 `max_theeresak` preservation replays, and the fit
+settings above. Score with `scripts/score_reviewed_preferences.py
+--require-heldout --require-unseen-main-decks` on the six nonempty New Jersey
+pairs. The direct report uses `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --seed 125100 --seeds 8`,
+the two Deck pairs above, and v1 own-loss guard on both policies.
+
 ## Strict reviewed-preference holdout gate (29 October 2026)
 
 `scripts/score_reviewed_preferences.py` now accepts `--require-heldout` to

@@ -2660,3 +2660,11 @@ before fixed-state human-review scores are reported. It validated 11 older
 reviewed choices as held out for the selected parent and rejected a replay
 used to train a child. Use this gate for M4 diagnostic scores alongside
 fresh complete-duel comparisons; it is not a substitute for them.
+The [cross-review transfer check](evaluation.md#cross-review-transfer-check-for-human-preferences-29-october-2026)
+trained on 11 broader human choices and ranked all 11 first after 400 steps,
+but ranked only one of nine untouched New Jersey choices first and scored
+27–36–1 against its v23 parent in 64 held-out duels. Training on the nine
+New Jersey choices likewise ranked only one of 11 untouched broader choices
+first. The next M4 training set needs more varied, independent activation and
+target judgments; fitting a small review set more tightly has not produced
+transfer or a demonstrated strength gain.
