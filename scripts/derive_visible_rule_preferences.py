@@ -42,6 +42,7 @@ RULE_SET_V5 = "visible_material_avoidance_v5"
 RULE_SET_V6 = "visible_optional_own_loss_v6"
 RULE_SET_V7 = "visible_guard_distillation_v7"
 RULE_SET_V8 = "visible_residual_guard_distillation_v8"
+RULE_SET_V9 = "visible_optional_own_loss_v9"
 SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -112,11 +113,13 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID,
         return derive_residual_guard_distillation(trajectory, card_facts)
     if rule_set_id == RULE_SET_V3:
         return derive_resource_counterfactuals(trajectory)
-    if rule_set_id in (RULE_SET_V4, RULE_SET_V5, RULE_SET_V6):
+    if rule_set_id in (RULE_SET_V4, RULE_SET_V5, RULE_SET_V6, RULE_SET_V9):
         resource, resource_counts = derive_resource_counterfactuals(
             trajectory, all_safe_alternatives=rule_set_id in (RULE_SET_V5,
-                                                               RULE_SET_V6),
-            optional_own_loss=rule_set_id == RULE_SET_V6)
+                                                               RULE_SET_V6,
+                                                               RULE_SET_V9),
+            optional_own_loss=rule_set_id in (RULE_SET_V6, RULE_SET_V9),
+            ability_activate=rule_set_id == RULE_SET_V9)
         target, target_counts = derive_material_choice_counterfactuals(trajectory)
         overlap = {item["decision_index"] for item in resource} & {
             item["decision_index"] for item in target}
@@ -219,7 +222,8 @@ def derive_residual_guard_distillation(trajectory, card_facts) -> tuple[list[dic
 
 
 def derive_resource_counterfactuals(trajectory, *, all_safe_alternatives: bool = False,
-                                   optional_own_loss: bool = False
+                                   optional_own_loss: bool = False,
+                                   ability_activate: bool = False,
                                    ) -> tuple[list[dict], Counter]:
     """Compare a visited safe choice or phase transition with visible resource loss.
 
@@ -265,7 +269,8 @@ def derive_resource_counterfactuals(trajectory, *, all_safe_alternatives: bool =
                 if enemy_backrow_count <= own_other_backrow:
                     bad.append(action_index)
                     categories.add("heavy_storm_negative_visible_trade")
-            elif optional_own_loss and action.kind == "chain":
+            elif optional_own_loss and (action.kind == "chain"
+                                        or (ability_activate and action.kind == "activate")):
                 if code == BREAKER_THE_MAGICAL_WARRIOR and own_backrow \
                         and enemy_backrow_count == 0:
                     bad.append(action_index)
@@ -404,7 +409,8 @@ def validate_automated_preferences(trajectory, preferences, weak_flip_attacks,
     """Reject edits that no longer match the declared visible-rule output."""
     rule_set_id = getattr(preferences, "rule_set_id", None) or RULE_SET_ID
     candidates = (() if rule_set_id in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
-                                       RULE_SET_V6, RULE_SET_V7, RULE_SET_V8)
+                                       RULE_SET_V6, RULE_SET_V7, RULE_SET_V8,
+                                       RULE_SET_V9)
                   else review_candidates(
         trajectory, weak_flip_attacks=weak_flip_attacks))
     expected, _ = derive(trajectory, candidates, rule_set_id=rule_set_id,
@@ -425,7 +431,8 @@ def main() -> None:
     parser.add_argument("--rule-set", choices=(RULE_SET_ID, RULE_SET_V2,
                                                RULE_SET_V3, RULE_SET_V4,
                                                RULE_SET_V5, RULE_SET_V6,
-                                               RULE_SET_V7, RULE_SET_V8),
+                                               RULE_SET_V7, RULE_SET_V8,
+                                               RULE_SET_V9),
                         default=RULE_SET_ID)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
@@ -441,7 +448,8 @@ def main() -> None:
         verified = verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
         candidates = (() if args.rule_set in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
-                                             RULE_SET_V6, RULE_SET_V7, RULE_SET_V8)
+                                             RULE_SET_V6, RULE_SET_V7, RULE_SET_V8,
+                                             RULE_SET_V9)
                       else review_candidates(
             trajectory, weak_flip_attacks=weak_flip_attacks))
         preferences, categories = derive(trajectory, candidates,
@@ -454,7 +462,8 @@ def main() -> None:
         payload = {
             "schema_version": 2 if args.rule_set in (RULE_SET_V3, RULE_SET_V4,
                                                      RULE_SET_V5, RULE_SET_V6,
-                                                     RULE_SET_V7, RULE_SET_V8)
+                                                     RULE_SET_V7, RULE_SET_V8,
+                                                     RULE_SET_V9)
             else 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",

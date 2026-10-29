@@ -460,3 +460,52 @@ def test_v6_declines_only_own_boss_banish_and_off_turn_torrential():
         enemy_turn, (torrential, pass_action), torrential),))
     assert derive(off_turn, (), rule_set_id=rules.RULE_SET_V6)[1] == {
         "torrential_only_own_monsters": 1}
+
+
+def test_v9_covers_activated_boss_ability_without_changing_v6_labels():
+    boss = CardView(0, "monster", "faceup", 504700118, 0, owner=0)
+    obs = Observation(viewer=0, acting_player=0, turn=3, phase="main1",
+                      life_points=(8000, 8000), hand=(), field=(boss,),
+                      graveyards=((), ()), banished=((), ()),
+                      opponent_hand_count=4, deck_counts=(35, 35),
+                      extra_deck_counts=(0, 0), turn_player=0)
+    banish = Action("banish", "activate", 0, {"code": 504700118, "sequence": 0})
+    pass_action = Action("pass", "pass", 0)
+    record = DecisionRecord(obs, (banish, pass_action), banish)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V6) == ([], {})
+    expected = ([{"decision_index": 0, "preferred_action_indices": [1],
+                  "disfavored_action_indices": [0]}],
+                {"boss_only_own_monsters": 1})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V9) == expected
+    valid = SimpleNamespace(rule_set_id=rules.RULE_SET_V9,
+                            preferences=(ReviewedPreference(0, (1,), (0,)),))
+    rules.validate_automated_preferences(replay, valid, {})
+    enemy = CardView(1, "monster", "faceup", 123, 0, owner=1)
+    with_enemy = replace(replay, decisions=(replace(
+        record, observation=replace(obs, field=(boss, enemy))),))
+    assert derive(with_enemy, (), rule_set_id=rules.RULE_SET_V9) == ([], {})
+
+
+@pytest.mark.parametrize(("code", "field", "category"), [
+    (71413901, (CardView(0, "spell_trap", "facedown", 123, 0),),
+     "breaker_only_own_backrow"),
+    (33184167, (CardView(0, "monster", "faceup", 123, 0),),
+     "tribe_no_visible_enemy"),
+])
+def test_v9_covers_activated_breaker_and_tribe(code, field, category):
+    obs = Observation(viewer=0, acting_player=0, turn=3, phase="main1",
+                      life_points=(8000, 8000), hand=(), field=field,
+                      graveyards=((), ()), banished=((), ()),
+                      opponent_hand_count=4, deck_counts=(35, 35),
+                      extra_deck_counts=(0, 0), turn_player=0)
+    activate = Action("ability", "activate", 0, {"code": code})
+    pass_action = Action("pass", "pass", 0)
+    record = DecisionRecord(obs, (activate, pass_action), activate)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V6) == ([], {})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V9) == (
+        [{"decision_index": 0, "preferred_action_indices": [1],
+          "disfavored_action_indices": [0]}], {category: 1})

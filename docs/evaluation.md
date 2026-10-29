@@ -1068,6 +1068,29 @@ this paired changed-policy diagnostic. This trained-state example does not
 establish generalization; the earlier fresh 64-duel direct comparison remains
 **31–33** for the child against its parent.
 
+## Activated abilities in own-loss preference coverage (29 October 2026)
+
+The versioned `visible_optional_own_loss_v9` rule extends the v6 training
+comparison audit to native `activate` actions for Breaker, Black Luster Soldier,
+Chaos Sorcerer, Tribe-Infecting Virus, and Torrential Tribute. V6 considered
+these abilities only when offered as `chain` actions; its earlier outputs remain
+reproducible. The new comparisons use the acting player's visible observation
+and legal alternatives. They are hypotheses about optional material loss, not
+historical legality rulings or evidence that every self-destruction is wrong.
+
+On 16 previously replay-verified and visibility-audited v1-guarded games in
+`.cache/goat-ai/own_card_prospective_105500_105501/`, V6 emitted **79**
+decision comparisons and V9 emitted **85**. V9 covered **eight** decision
+indices absent from V6; context deduplication made the net increase six. The
+recorded agent selected a disfavored action in **zero** V6 or V9 comparisons.
+The V9 output is ignored data in that directory's `v9_preferences/` and its
+manifest has SHA-256
+`c6896a0b0df3187f46eb1db9cefd99c120b157adfea47fc295048b95d8c72b49`.
+This is coverage of safe examples, **not a measured policy improvement**. No
+new checkpoint was trained or promoted. The next experiment needs replay-
+verified *selected* self-loss mistakes and independently reviewed alternatives,
+then a held-out comparison of mistake rates and match results on fresh duels.
+
 ## Visible own-card losses in the selected policy (28 October 2026)
 
 ### Observed material at shortlisted own-card decisions (29 October 2026)
