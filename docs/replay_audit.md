@@ -1,5 +1,41 @@
 # Early replay decision audit
 
+## MST activation review queue (29 October 2026)
+
+The [local MST queue](../.cache/goat-ai/mst_review_source_107600_107607/mst_review_queue.html)
+contains **23** selected MST activations from **32** complete greedy v23
+policy games against Tactical-v14: one own-only, 12 opposing-only, and ten
+mixed visible back-row contexts. It includes both policy seats, seeds
+107600–107607, and the Max Suffridge/Jonathan Labounty and Max
+Suffridge/Theeresak Poonsombat deck pairs. All **21,619** source decisions
+replay-verified; the builder also verified the saved policy's choices and
+rendered separate player-visible and full-information viewers. The queue
+contains **no recommended action or training label**. Each entry shows the
+selected activation and all legal alternatives, so review the MST activation
+itself before judging a later forced target. Its JSON SHA-256 is
+`91f714832b8966da9d342aa6193d62e85daa58d144deabf5e694908086aed8d0`.
+
+Open the save-enabled queue with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/mst_review_source_107600_107607/mst_review_queue.json
+```
+
+To reproduce the queue after recording those greedy games with
+`scripts/record_policy_match.py` and `--own-loss-guard --own-loss-guard-version
+1`, run:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/create_mst_review_queue.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/mst_review_source_107600_107607/*_seed*_seat*.json \
+  --limit 24 --per-replay 2 \
+  --output .cache/goat-ai/mst_review_source_107600_107607/mst_review_queue.json
+```
+
+The queue is ignored local research data; it does not add reviewed labels to
+the repository or change the selected policy.
+
 ## Diverse-deck high-margin parent review (28 October 2026)
 
 The [local queue](../.cache/goat-ai/diverse_parent_review_97000/queue.html)
