@@ -2433,3 +2433,10 @@ The paired 64-duel outcome check found only weak winner associations for
 both ability and Spell/Trap material changes, with game-level bootstrap
 intervals crossing zero. Do not promote raw material delta to a training
 reward on that evidence; see the [outcome analysis](evaluation.md#does-immediate-material-change-track-the-duel-winner).
+An [action-level material preference experiment](evaluation.md#action-level-material-comparisons-29-october-2026)
+now compares own-only Nobleman and negative Heavy Storm activations, boss
+self-banish choices, and Tribe Type choices using only the acting player's
+visible state. The broader 754-comparison child did not show a reliable gain
+against its parent or Tactical on unseen Main Decks. Keep the v23 reference;
+further M4 work needs a value signal that improves complete-duel outcomes
+across opponents, not just its own preference loss.

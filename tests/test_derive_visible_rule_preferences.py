@@ -230,3 +230,77 @@ def test_v3_automated_comparison_rejects_edited_action_group():
         preferences=(ReviewedPreference(0, (0,), (1,)),))
     with pytest.raises(ValueError, match="do not match visible_resource_v3"):
         rules.validate_automated_preferences(replay, edited, {})
+
+
+def test_v4_ranks_boss_self_banish_below_enemy_target_from_visible_field():
+    boss = CardView(0, "monster", "faceup", 504700118, 0, owner=0)
+    enemy = CardView(1, "monster", "faceup", 123, 2, owner=1)
+    view = Observation(
+        viewer=0, acting_player=0, turn=3, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(boss, enemy),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=4,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=0,
+        chain=(ChainLinkView(1, 504700118, 0, 4, 0),))
+    own = Action("self", "select_card", 0,
+                 {"code": 504700118, "controller": 0, "location": 4,
+                  "sequence": 0})
+    other = Action("enemy", "select_card", 0,
+                   {"controller": 1, "location": 4, "sequence": 2})
+    record = DecisionRecord(view, (own, other), own)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    expected = [{"decision_index": 0, "preferred_action_indices": [1],
+                 "disfavored_action_indices": [0]}]
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V4)[0] == expected
+    safe = replace(replay, decisions=(replace(record, selected_action=other),))
+    assert derive(safe, (), rule_set_id=rules.RULE_SET_V4)[0] == expected
+    stolen = replace(replay, decisions=(replace(record, observation=replace(
+        view, field=(replace(boss, owner=1), enemy))),))
+    assert derive(stolen, (), rule_set_id=rules.RULE_SET_V4) == ([], {})
+
+
+def test_v4_tribe_type_choice_counts_visible_friendly_and_enemy_monsters():
+    own = CardView(0, "monster", "faceup", 33184167, 0, race=8)
+    enemy = CardView(1, "monster", "faceup", 123, 0, race=16)
+    hidden = CardView(1, "monster", "facedown", None, 1)
+    view = Observation(
+        viewer=0, acting_player=0, turn=3, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(own, enemy, hidden),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=4,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=0,
+        chain=(ChainLinkView(1, 33184167, 0, 4, 0),))
+    own_race = Action("own", "announce_race", 0, {"race": 8})
+    enemy_race = Action("enemy", "announce_race", 0, {"race": 16})
+    empty_race = Action("empty", "announce_race", 0, {"race": 32})
+    record = DecisionRecord(view, (own_race, enemy_race, empty_race), own_race)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    expected = [{"decision_index": 0, "preferred_action_indices": [1],
+                 "disfavored_action_indices": [0]}]
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V4)[0] == expected
+    assert hidden.code is None  # An opponent's Set monster supplies no Type.
+
+
+def test_v4_recomputed_comparison_rejects_edited_target_group():
+    boss = CardView(0, "monster", "faceup", 9596126, 0, owner=0)
+    enemy = CardView(1, "monster", "faceup", 123, 1, owner=1)
+    observation = Observation(
+        viewer=0, acting_player=0, turn=3, phase="main1",
+        life_points=(8000, 8000), hand=(), field=(boss, enemy),
+        graveyards=((), ()), banished=((), ()), opponent_hand_count=4,
+        deck_counts=(35, 35), extra_deck_counts=(0, 0), turn_player=0,
+        chain=(ChainLinkView(1, 9596126, 0, 4, 0),))
+    own = Action("self", "select_card", 0,
+                 {"controller": 0, "location": 4, "sequence": 0})
+    other = Action("enemy", "select_card", 0,
+                   {"controller": 1, "location": 4, "sequence": 1})
+    record = DecisionRecord(observation, (own, other), own)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    valid = SimpleNamespace(rule_set_id=rules.RULE_SET_V4,
+                            preferences=(ReviewedPreference(0, (1,), (0,)),))
+    rules.validate_automated_preferences(replay, valid, {})
+    edited = SimpleNamespace(rule_set_id=rules.RULE_SET_V4,
+                             preferences=(ReviewedPreference(0, (0,), (1,)),))
+    with pytest.raises(ValueError, match="do not match visible_material_choices_v4"):
+        rules.validate_automated_preferences(replay, edited, {})

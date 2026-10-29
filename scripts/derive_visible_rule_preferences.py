@@ -13,9 +13,12 @@ from pathlib import Path
 from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import (
+    BLACK_LUSTER_SOLDIER,
+    CHAOS_SORCERER,
     HEAVY_STORM,
     NOBLEMAN_OF_CROSSOUT,
     THUNDER_DRAGON,
+    TRIBE_INFECTING_VIRUS,
     review_candidates,
     thunder_search_count,
 )
@@ -26,6 +29,7 @@ from goat_ai.replay.fingerprint import sha256_file
 RULE_SET_ID = "visible_audit_v1"
 RULE_SET_V2 = "visible_audit_v2"
 RULE_SET_V3 = "visible_resource_v3"
+RULE_SET_V4 = "visible_material_choices_v4"
 SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -89,6 +93,15 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID
     """Keep one unambiguous automated comparison per recorded decision."""
     if rule_set_id == RULE_SET_V3:
         return derive_resource_counterfactuals(trajectory)
+    if rule_set_id == RULE_SET_V4:
+        resource, resource_counts = derive_resource_counterfactuals(trajectory)
+        target, target_counts = derive_material_choice_counterfactuals(trajectory)
+        overlap = {item["decision_index"] for item in resource} & {
+            item["decision_index"] for item in target}
+        if overlap:
+            raise ValueError("resource and target comparisons overlap")
+        return sorted(resource + target, key=lambda item: item["decision_index"]), (
+            resource_counts + target_counts)
     categories = {RULE_SET_ID: SUPPORTED_CATEGORIES_V1,
                   RULE_SET_V2: SUPPORTED_CATEGORIES_V2}.get(rule_set_id)
     if categories is None:
@@ -185,10 +198,81 @@ def derive_resource_counterfactuals(trajectory) -> tuple[list[dict], Counter]:
     return result, counts
 
 
+def derive_material_choice_counterfactuals(trajectory) -> tuple[list[dict], Counter]:
+    """Compare clear target or Type choices after an effect was activated.
+
+    These are visible, rule-derived hypotheses. They do not say whether the
+    effect should have been activated in the first place or account for card
+    quality, delayed effects, or a future control change.
+    """
+    metadata = trajectory.skill_metadata or {}
+    seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
+                        else "demonstrator_seat")
+    if type(seat) is not int or seat not in (0, 1):
+        raise ValueError("material comparisons require a recorded policy seat")
+    result = []
+    counts = Counter()
+    for index, record in enumerate(trajectory.decisions):
+        obs = record.observation
+        if obs.acting_player != seat or not obs.chain:
+            continue
+        source = obs.chain[-1]
+        if source.controller != seat:
+            continue
+        chosen = record.legal_actions.index(record.selected_action)
+        category = None
+        preferred = []
+        disfavored = []
+        if source.card_code in (BLACK_LUSTER_SOLDIER, CHAOS_SORCERER):
+            # A stolen boss may deliberately banish itself before returning.
+            boss = next((card for card in obs.field
+                         if card.zone == "monster" and card.controller == seat
+                         and card.sequence == source.sequence), None)
+            if boss is None or boss.owner != seat:
+                continue
+            for choice, action in enumerate(record.legal_actions):
+                if (action.kind != "select_card"
+                        or action.parameters.get("location") != 4):
+                    continue
+                controller = action.parameters.get("controller")
+                if controller == 1 - seat:
+                    preferred.append(choice)
+                elif (controller == seat
+                      and action.parameters.get("sequence") == source.sequence):
+                    disfavored.append(choice)
+            category = "boss_self_banish_vs_enemy"
+        elif source.card_code == TRIBE_INFECTING_VIRUS:
+            faceup = [card for card in obs.field
+                      if card.zone == "monster" and card.position == "faceup"
+                      and card.race is not None]
+            scores = {}
+            for choice, action in enumerate(record.legal_actions):
+                if action.kind != "announce_race":
+                    continue
+                race = action.parameters.get("race")
+                scores[choice] = sum(1 if card.controller != seat else -1
+                                     for card in faceup if card.race == race)
+            if scores:
+                best = max(scores.values())
+                if best >= 0:
+                    preferred = [choice for choice, score in scores.items()
+                                 if score == best]
+                    disfavored = [choice for choice, score in scores.items()
+                                  if score < 0]
+            category = "tribe_avoids_friendly_only_type"
+        if (preferred and disfavored
+                and chosen in (*preferred, *disfavored)):
+            result.append({"decision_index": index,
+                           "preferred_action_indices": preferred,
+                           "disfavored_action_indices": disfavored})
+            counts[category] += 1
+    return result, counts
+
+
 def validate_automated_preferences(trajectory, preferences, weak_flip_attacks) -> None:
     """Reject edits that no longer match the declared visible-rule output."""
     rule_set_id = getattr(preferences, "rule_set_id", None) or RULE_SET_ID
-    candidates = (() if rule_set_id == RULE_SET_V3 else review_candidates(
+    candidates = (() if rule_set_id in (RULE_SET_V3, RULE_SET_V4) else review_candidates(
         trajectory, weak_flip_attacks=weak_flip_attacks))
     expected, _ = derive(trajectory, candidates, rule_set_id=rule_set_id)
     actual = [{"decision_index": item.decision_index,
@@ -204,7 +288,8 @@ def main() -> None:
     parser.add_argument("replays", nargs="+", type=Path)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--rule-set", choices=(RULE_SET_ID, RULE_SET_V2, RULE_SET_V3),
+    parser.add_argument("--rule-set", choices=(RULE_SET_ID, RULE_SET_V2,
+                                               RULE_SET_V3, RULE_SET_V4),
                         default=RULE_SET_ID)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
@@ -218,7 +303,8 @@ def main() -> None:
             raise ValueError(f"{path}: expected a policy or self-play replay")
         verified = verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
-        candidates = (() if args.rule_set == RULE_SET_V3 else review_candidates(
+        candidates = (() if args.rule_set in (RULE_SET_V3, RULE_SET_V4)
+                      else review_candidates(
             trajectory, weak_flip_attacks=weak_flip_attacks))
         preferences, categories = derive(trajectory, candidates,
                                          rule_set_id=args.rule_set)
@@ -227,7 +313,8 @@ def main() -> None:
         seat = trajectory.skill_metadata.get("learner_seat" if trajectory.source
                                              == "self_play_rl" else "demonstrator_seat")
         payload = {
-            "schema_version": 2 if args.rule_set == RULE_SET_V3 else 1,
+            "schema_version": 2 if args.rule_set in (RULE_SET_V3, RULE_SET_V4)
+            else 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",
             "rule_set_id": args.rule_set,

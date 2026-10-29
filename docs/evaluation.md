@@ -11979,3 +11979,91 @@ The ignored schema-v2 report is
 It contains the same per-effect records as the schema-v1 report above; the
 new field is `paired_outcome_association`. Reproduce it with the same command
 above and a `_v2.json` output filename.
+
+### Action-level material comparisons (29 October 2026)
+
+The weak winner-level association above cannot decide whether an obviously
+bad **choice at one prompt** should be discouraged. The `visible_material_choices_v4`
+automated preference rule now keeps v3's own-only Nobleman and negative visible
+Heavy Storm comparisons and adds two post-activation comparisons:
+
+- For GOAT Black Luster Soldier and Chaos Sorcerer, it ranks an offered opposing
+  monster target above banishing the actor's own, self-owned boss. It skips a
+  borrowed boss, whose removal can have a different value when control ends.
+- For Tribe-Infecting Virus, it uses only face-up monsters' current public
+  Types to rank an offered Type with a better immediate opponent-minus-own
+  destruction count above a Type that hits friendly monsters but no opposing
+  ones. Face-down opponent Types are not read.
+
+These are **synthetic pairwise hypotheses**, not expert labels or an assertion
+that the activation was worthwhile. At a target/Type prompt, any activation
+cost is already paid; comparing the remaining choices is narrower than
+calling every negative resolved material change a bad move. The rule
+recomputes during label validation, uses only the acting player's observation
+and legal actions, and requires native replay and visibility verification.
+
+Current-core collections at seeds 97000–97063 and 99000–99063 supplied
+**76** and **59** comparisons from 26 and 27 replays. The first contained 30
+own-only Nobleman, 19 negative Heavy Storm, 19 boss-target, and eight Tribe
+comparisons. The second contained 16, 24, 18, and one respectively. Of the
+combined 135 comparisons, **31** had the recorded choice on the disfavored
+side; three of those were target/Type choices in the second collection. The
+other target/Type decisions were already on the safer side. The ignored
+manifests have SHA-256 `06cc40f27c26d0550912d87764a6cb5b0164a1b1b772a30acc1fae962eaef337`
+and `65eec99dec4d7af7998810d693c07762f07ced38f172d55babd7e242db741baf`.
+
+A 30-step parent-KL fit from the unchanged v23 reference used those 135
+comparisons and 64 preservation decisions from four separate current-core
+replays, learning rate 0.0001, KL weight 1, seed 73. Its preference loss fell
+from 0.29854 to 0.15180; final preservation KL was 0.000896. The ignored
+checkpoint `.cache/goat-ai/fv23_visible_material_v4_97000_99063.pt` has
+SHA-256 `1c836a867430a0c895d39df0c6a5feec6b63c0a05a2040baf57c337474dc5242`.
+On fresh unseen Phoenix Control versus two Dimension Fusion Main Decks,
+both assignments and seats, seeds 99500–99507, it scored **38–25–1** directly
+against the parent over 64 duels (60.16% points; paired 95% interval
+51.56–67.97%). On matched seeds 99508–99515 against Tactical-v14 it scored
+**23–41**, versus the parent's **24–39–1**; child-minus-parent score was
+**−2.34 points** (95% interval −12.5 to +7.03). The direct gain did not
+transfer to this stronger opponent. The ignored direct, child-Tactical, and
+parent-Tactical report SHA-256 values are respectively
+`824a57229b45d6b756c0aee9c89f5ef66ae0798b654bacd8ee6bec82507d5248`,
+`248fa38421e87257760973ef919dcfc4837bc96001470a5f71603008b17515de`,
+and `008f8fbc03ad2a37bdf06dcd5ef96ae4999efc8abffce05deee6f0a98712ea70`.
+
+To broaden source states, 240 additional current-core self-play duels on
+seeds 91000–91239 were replay-verified and visibility-audited. They supplied
+**619** v4 comparisons from 121 replays: 132 Nobleman, 377 Heavy Storm,
+111 boss-target, and 10 Tribe. Of these, 46 recorded choices were disfavored,
+including four target choices and one Type choice. The ignored manifest
+SHA-256 is `fedb71d994ede27d210ae2d2d4938f3d2bd4ee8fea25ce4d37acdf173dda969c`.
+A second fit used all **754** comparisons and sampled 64 preservation decisions
+from the same four replay files,
+20 steps, recorded-bad weight 2, learning rate 0.0001, KL weight 1, seed 74.
+Preference loss fell from 0.28836 to 0.18597; preservation KL ended at
+0.00218. Its ignored checkpoint
+`.cache/goat-ai/fv23_visible_material_v4_broad_91000_99063.pt` has SHA-256
+`f9c8d0637109d212e1b29507277bfae03c6c6af3e3ece907df102b2822bff55f`.
+
+On fresh unseen seeds 99600–99607, this broader child scored **33–30–1**
+directly against the parent over 64 duels (52.34% points; paired 95% interval
+45.31–59.38%). Against Tactical on matched seeds 99608–99615, the child
+scored **18–45–1** and the parent **17–47**. The paired child-minus-parent
+score difference was **+2.34 points**, 95% interval **−6.25 to +10.16**.
+These reports have SHA-256
+`e2860b20ca058da7f38212597cadb329cdda0257a661ee85d1b006dcbb128f4c`,
+`ee4d1998d507079e571e90c3c2e90103159eed882b96f85766b0d16bdf7e033b`,
+and `8f129d821426d8f9427cccd6e316b2f4516d93a70a14b3ad47eca831d6dc4922`.
+Both matched Tactical comparisons passed the unseen-Main-Deck and provenance
+gate. Neither trial establishes a cross-opponent gain, so neither checkpoint
+is promoted. The original v23 reference remains selected.
+
+Reproduce label generation with `scripts/derive_visible_rule_preferences.py`
+on each named `episode_*.json` directory, `--rule-set visible_material_choices_v4`,
+`--native-root .cache/goat-ai`, and a fresh output directory. For each
+manifest row, pass its replay and output preference file as a `--case` pair
+to `scripts/train_review_preferences.py`, together with the parent checkpoint,
+the settings above, and four unlabeled preservation replays (seeds 97000,
+97003, 99000, 99001) via `--preserve-current-trajectory`. Evaluate with
+`scripts/evaluate_policy.py --engine experimental --both-deck-assignments
+--require-unseen-main-decks --workers 4 --seeds 8 --max-decisions 3000` on
+the two named Phoenix/Dimension Fusion matchups and seed blocks above.
