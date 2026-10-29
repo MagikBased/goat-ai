@@ -24,6 +24,13 @@ branches use the recorded hidden deal for offline analysis; a playing agent
 receives only its legal observation. The ignored per-case reports and manifest
 are under `.cache/goat-ai/own_card_broad_branches_124900_124907/`; manifest
 SHA-256 `bfa675eaaff1ee4096cfe0da6756c43928539f307ccf4ddfc700d9b84c5718d9`.
+The branch report now lists later same-turn activations by the policy seat of
+the **same card code** after the branch decision. It does not claim the card
+was the same physical copy or that the later use was necessarily wrong. All
+seven branch pairs were rerun and independently replay-verified with this
+field; it reproduced the three Ring and zero Heavy Storm later activations.
+The updated ignored reports are under
+`.cache/goat-ai/own_card_broad_branches_repeat_v2/`.
 Future training or guards should be measured over the full decision sequence,
 including later chances to repeat a flagged activation, as well as held-out
 duel outcomes.

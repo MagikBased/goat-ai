@@ -50,6 +50,30 @@ def open_chain_material_change(trajectory, decision_index: int, seat: int,
     return None
 
 
+def later_same_code_activations(trajectory, decision_index: int,
+                                seat: int, code: int | None) -> list[dict]:
+    """List later same-turn activations of this card code by the policy seat.
+
+    Card code alone does not prove it was the same physical copy. This is a
+    continuation diagnostic, not a judgment that activation was bad.
+    """
+    if code is None:
+        return []
+    starting_turn = trajectory.decisions[decision_index].observation.turn
+    later = []
+    for index in range(decision_index + 1, len(trajectory.decisions)):
+        record = trajectory.decisions[index]
+        if record.observation.turn != starting_turn:
+            break
+        action = record.selected_action
+        if (record.observation.acting_player == seat
+                and action.kind in ("activate", "chain")
+                and action.parameters.get("code") == code):
+            later.append({"decision_index": index, "phase": record.observation.phase,
+                          "action_kind": action.kind})
+    return later
+
+
 def recorded_policy_options(inference: str, native_root: Path) -> dict:
     """Continue with the same visible policy mode that produced the replay."""
     if inference == "greedy":
@@ -168,6 +192,11 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                              "decisions": verified,
                              "open_chain_material_change": open_chain_material_change(
                                  saved, decision_index, seat, card_facts),
+                             "later_same_code_activations": later_same_code_activations(
+                                 saved, decision_index, seat,
+                                 record.selected_action.parameters.get("code")
+                                 if record.selected_action.kind in ("activate", "chain")
+                                 else None),
                              "trajectory": str(path),
                              "trajectory_sha256": sha256_file(path)})
     report = {"source": str(source_path), "source_sha256": sha256_file(source_path),

@@ -141,3 +141,25 @@ def test_open_chain_material_change_uses_each_players_visible_hand_count():
     assert result == {"before": 0, "after": 2, "delta": 2,
                       "closed_before_decision": 1}
     assert branches.open_chain_material_change(trajectory, 1, 0, {}) is None
+
+
+def test_later_same_code_activations_stops_at_new_turn_and_ignores_opponent():
+    def event(turn, phase, actor, kind, code):
+        observation = Observation(
+            viewer=actor, acting_player=actor, turn=turn, phase=phase,
+            life_points=(8000, 8000), hand=(), field=(), graveyards=((), ()),
+            banished=((), ()), opponent_hand_count=0, deck_counts=(35, 35),
+            extra_deck_counts=(0, 0), turn_player=0)
+        action = Action("choice", kind, actor, {"code": code})
+        return DecisionRecord(observation, (action,), action)
+
+    trajectory = Trajectory("goat", ("a", "b"), 1, (
+        event(1, "main1", 0, "activate", 200),
+        event(1, "battle_start", 1, "chain", 200),
+        event(1, "main2", 0, "activate", 200),
+        event(1, "main2", 0, "set_spell_trap", 200),
+        event(2, "draw", 0, "activate", 200),
+    ), winner=None)
+    assert branches.later_same_code_activations(trajectory, 0, 0, 200) == [
+        {"decision_index": 2, "phase": "main2", "action_kind": "activate"}]
+    assert branches.later_same_code_activations(trajectory, 0, 0, None) == []
