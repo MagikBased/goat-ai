@@ -1,4 +1,4 @@
-"""A second Solemn Judgment negates the first, allowing Pot to draw."""
+"""Paired Solemn-on-Solemn branches around Pot of Greed in GOAT mode."""
 
 import os
 from pathlib import Path
@@ -9,6 +9,7 @@ from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 POT = 55144522
@@ -16,98 +17,112 @@ SOLEMN = 41420027
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_solemn_counters_solemn_and_pot_resolves(tmp_path):
+@pytest.mark.parametrize("counter_first_solemn", [False, True])
+def test_solemn_counter_trap_chain_preserves_pot_when_countered(
+        tmp_path, counter_first_solemn):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = {f"official/c{code}.lua" for code in (POT, SOLEMN)}
     if any(not (root / "scripts" / script).is_file() for script in scripts):
-        pytest.skip("required official card script not installed")
+        pytest.skip("required official card scripts not installed")
+    first_cards = list(VANILLA_DECK)
+    first_cards[0], first_cards[1] = POT, SOLEMN
+    second_cards = list(VANILLA_DECK)
+    second_cards[0] = SOLEMN
     decks = []
-    for name, cards in (("pot_and_solemn", (POT, SOLEMN, *VANILLA_DECK[2:])),
-                        ("solemn", (SOLEMN, *VANILLA_DECK[1:]))):
-        deck = tmp_path / f"{name}.ydk"
-        deck.write_text("#main\n" + "\n".join(map(str, cards)) + "\n#extra\n!side\n")
-        decks.append(deck)
+    for seat, cards in enumerate((first_cards, second_cards)):
+        path = tmp_path / f"solemn_{seat}.ydk"
+        path.write_text("#main\n" + "\n".join(map(str, cards)) + "\n#extra\n!side\n")
+        decks.append(str(path))
 
-    with GoatEnvironment(*(str(deck) for deck in decks), seed=52,
+    with GoatEnvironment(*decks, seed=52,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
-        obs = env.reset()
-        assert {POT, SOLEMN} <= {card.code for card in obs.hand}
+        observation = env.reset()
+        assert {POT, SOLEMN} <= {card.code for card in observation.hand}
         assert SOLEMN in {card.code for card in env.engine.probe.observation(1).hand}
-        own_set = opposing_set = pot_used = first_chained = second_chained = False
+        set_cards = set()
+        pot_activated = first_counter = second_counter = False
         hand_before = deck_before = None
-        for _ in range(75):
+        three_links_seen = False
+        for _ in range(100):
             actions = env.legal_actions()
             action = None
-            if obs.turn == 1 and obs.acting_player == 0 and not own_set:
-                action = next((a for a in actions if a.kind == "set_spell_trap"
-                               and a.parameters.get("code") == SOLEMN), None)
-                own_set = action is not None
-            if obs.turn == 2 and obs.acting_player == 1 and not opposing_set:
-                action = next((a for a in actions if a.kind == "set_spell_trap"
-                               and a.parameters.get("code") == SOLEMN), action)
-                opposing_set |= action is not None and action.kind == "set_spell_trap"
-            if obs.turn == 3 and obs.acting_player == 0 and not pot_used:
-                assert own_set and opposing_set
-                hidden_backrow = [card for card in obs.field
-                                  if card.controller == 1 and card.zone == "spell_trap"]
-                assert len(hidden_backrow) == 1
-                assert hidden_backrow[0].code is None
-                action = next((a for a in actions if a.kind == "activate"
-                               and a.parameters.get("code") == POT), None)
+            if len(observation.chain) == 3:
+                assert counter_first_solemn
+                assert [(link.card_code, link.controller) for link in observation.chain] \
+                    == [(POT, 0), (SOLEMN, 1), (SOLEMN, 0)]
+                three_links_seen = True
+            if observation.acting_player in (0, 1) and observation.turn <= 2 \
+                    and observation.acting_player not in set_cards:
+                action = next((candidate for candidate in actions
+                               if candidate.kind == "set_spell_trap"
+                               and candidate.parameters.get("code") == SOLEMN), None)
                 if action is not None:
-                    pot_used = True
-                    hand_before = len(obs.hand)
-                    deck_before = obs.deck_counts[0]
-            if pot_used and obs.acting_player == 1 and not first_chained:
-                action = next((a for a in actions if a.kind == "chain"
-                               and a.parameters.get("code") == SOLEMN), action)
-                first_chained |= action is not None and action.kind == "chain"
-                if first_chained:
-                    assert [link.card_code for link in obs.chain] == [POT]
-            if first_chained and obs.acting_player == 0 and not second_chained:
-                action = next((a for a in actions if a.kind == "chain"
-                               and a.parameters.get("code") == SOLEMN), action)
-                second_chained |= action is not None and action.kind == "chain"
-                if second_chained:
-                    assert [link.card_code for link in obs.chain] == [POT, SOLEMN]
-                    assert obs.life_points == (8000, 4000)
+                    set_cards.add(observation.acting_player)
+            if observation.turn == 3 and observation.acting_player == 0 \
+                    and len(set_cards) == 2 and not pot_activated:
+                action = next((candidate for candidate in actions
+                               if candidate.kind == "activate"
+                               and candidate.parameters.get("code") == POT), None)
+                if action is not None:
+                    opposing_backrow = [card for card in observation.field
+                                        if card.controller == 1
+                                        and card.zone == "spell_trap"]
+                    assert len(opposing_backrow) == 1
+                    assert opposing_backrow[0].code is None
+                    hand_before = len(observation.hand)
+                    deck_before = observation.deck_counts[0]
+                    pot_activated = True
+            if pot_activated and not first_counter and observation.acting_player == 1:
+                action = next((candidate for candidate in actions
+                               if candidate.kind == "chain"
+                               and candidate.parameters.get("code") == SOLEMN), None)
+                if action is not None:
+                    assert tuple(link.card_code for link in observation.chain) == (POT,)
+                    first_counter = True
+            if first_counter and not second_counter and observation.acting_player == 0 \
+                    and tuple(link.card_code for link in observation.chain) == (POT, SOLEMN):
+                counter = next((candidate for candidate in actions
+                                if candidate.kind == "chain"
+                                and candidate.parameters.get("code") == SOLEMN), None)
+                if counter_first_solemn:
+                    assert counter is not None
+                    action = counter
+                    second_counter = True
+                else:
+                    assert counter is not None
+                    action = next(candidate for candidate in actions
+                                  if candidate.kind == "pass")
+                    second_counter = True
             if action is None:
-                action = next((a for a in actions if a.kind in (
-                    "place", "pass", "end_phase")), actions[0])
-            obs = env.step(action)
-            if second_chained and POT in {c.code for c in obs.graveyards[0]} \
-                    and not obs.chain:
-                own = env.engine.probe.observation(0)
-                assert own.life_points == (4000, 4000)
-                assert len(own.hand) == hand_before + 1
-                assert own.deck_counts[0] == deck_before - 2
-                assert SOLEMN in {c.code for c in own.graveyards[0]}
-                assert SOLEMN in {c.code for c in own.graveyards[1]}
-                assert scripts <= env.engine.probe.loaded_script_sha256.keys()
+                action = next((candidate for candidate in actions if candidate.kind in
+                               ("place", "pass", "end_phase")), actions[0])
+            observation = env.step(action)
+            if pot_activated and second_counter and not observation.chain \
+                    and POT in {card.code for card in observation.graveyards[0]}:
                 break
         else:
-            pytest.fail("Solemn/Solemn/Pot chain did not resolve")
+            pytest.fail("Solemn counter chain did not resolve")
+
+        assert observation.life_points == ((4000, 4000) if counter_first_solemn
+                                           else (8000, 4000))
+        assert three_links_seen == counter_first_solemn
+        assert observation.deck_counts[0] == deck_before - (2 if counter_first_solemn else 0)
+        assert len(observation.hand) == hand_before + (2 if counter_first_solemn else 0) - 1
+        assert sum(card.code == SOLEMN for card in observation.graveyards[0]) \
+            == int(counter_first_solemn)
+        assert sum(card.code == SOLEMN for card in observation.graveyards[1]) == 1
+        assert scripts <= env.engine.probe.loaded_script_sha256.keys()
 
         agents = (RandomAgent(52), RandomAgent(53))
         for _ in range(3000):
             if env.is_terminal():
                 break
-            obs = env.step(agents[obs.acting_player].select_action(obs, env.legal_actions()))
-        else:
-            pytest.fail("Solemn/Solemn duel exceeded 3000 decisions")
-        trajectory = env.trajectory()
-        assert trajectory.winner in (0, 1, None)
-        assert any([link.card_code for link in record.observation.chain] == [POT, SOLEMN]
-                   and record.selected_action.kind == "chain"
-                   and record.selected_action.parameters.get("code") == SOLEMN
-                   for record in trajectory.decisions)
-        assert any([(link.card_code, link.controller)
-                    for link in record.observation.chain] == [
-                        (POT, 0), (SOLEMN, 1), (SOLEMN, 0)]
-                   for record in trajectory.decisions)
-    path = tmp_path / "solemn_counter.json"
-    write_trajectory(path, trajectory)
-    loaded = read_trajectory(path)
-    assert loaded == trajectory
-    assert verify_trajectory(loaded, ExperimentalOcgcoreEngine(root)) == len(
-        trajectory.decisions)
+            observation = env.step(agents[observation.acting_player].select_action(
+                observation, env.legal_actions()))
+        assert env.is_terminal()
+        path = tmp_path / f"solemn_counter_{counter_first_solemn}.json"
+        write_trajectory(path, env.trajectory())
+        trajectory = read_trajectory(path)
+        audit_trajectory_visibility(trajectory)
+        assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) \
+            == len(trajectory.decisions)
