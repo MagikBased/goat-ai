@@ -1,5 +1,26 @@
 # Baseline evaluation log
 
+## Expanded visible own-loss guard audit (29 October 2026)
+
+The optional `own_loss_guard` now defers an activation before a forced target
+prompt when Heavy Storm would destroy only other friendly back row, Torrential
+Tribute would destroy friendly monsters with no opposing monster, or an idle
+Mystical Space Typhoon / Raigeki Break has only friendly field targets. An
+already active chain keeps the latter two options available: destruction in
+response can change how another effect resolves. A Set source is excluded from
+the friendly collateral count. The native legal actions and selected v23
+checkpoint are unchanged.
+
+On the same 16 previously recorded selected-policy replays (4,068 policy
+decisions), the expanded filter excludes 7 recorded choices: the original 5
+Nobleman and 1 Breaker choices, plus 1 idle Mystical Space Typhoon aimed at
+friendly back row. On a separate 64-replay sampled self-play set (12,304
+learner decisions), it excludes 23 recorded choices, including 5 Mystical
+Space Typhoons and 4 own-only Heavy Storms. These are fixed-state diagnostics,
+not new guarded rollouts or a strength estimate. In particular, the guard
+still lacks a general value model for self-targeting, sacrifices, or future
+card advantage. Do not promote it without a fresh held-out match evaluation.
+
 ## Narrow visible own-loss guard ablation (29 October 2026)
 
 An opt-in observation-only filter now defers clearly own-only Nobleman,

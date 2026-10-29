@@ -60,6 +60,54 @@ def test_opt_in_own_loss_guard_defers_visible_own_only_removal():
         assert safe_optional_own_loss_indices(board(own_card), (action,), (0,)) == (0,)
 
 
+def test_opt_in_own_loss_guard_catches_storm_and_torrential_before_targets():
+    wait = Action("wait", "end_phase", 0)
+    storm = Action("storm", "activate", 0, {"code": 19613556})
+    own_set = CardView(0, "spell_trap", "facedown", 45986603, 1)
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 0)
+    assert safe_optional_own_loss_indices(board(own_set), (storm, wait), range(2)) == (1,)
+    assert safe_optional_own_loss_indices(
+        board(own_set, enemy_set), (storm, wait), range(2)) == (0, 1)
+    set_storm = Action("set-storm", "activate", 0,
+                       {"code": 19613556, "location": 8, "sequence": 0})
+    source = CardView(0, "spell_trap", "facedown", 19613556, 0)
+    assert safe_optional_own_loss_indices(
+        board(source), (set_storm, wait), range(2)) == (0, 1)
+    assert safe_optional_own_loss_indices(
+        board(source, own_set), (set_storm, wait), range(2)) == (1,)
+
+    torrential = Action("torrential", "chain", 0, {"code": 53582587})
+    own_monster = CardView(0, "monster", "faceup", 31560081, 0)
+    enemy_monster = CardView(1, "monster", "faceup", 504700178, 0)
+    assert safe_optional_own_loss_indices(
+        board(own_monster), (torrential, wait), range(2)) == (1,)
+    assert safe_optional_own_loss_indices(
+        board(own_monster, enemy_monster),
+        (torrential, wait), range(2)) == (0, 1)
+
+
+def test_opt_in_own_loss_guard_defers_uncontested_own_removal_but_keeps_chain_response():
+    wait = Action("wait", "end_phase", 0)
+    mst = Action("mst", "activate", 0, {"code": 5318639})
+    break_card = Action("break", "chain", 0,
+                        {"code": 4178474, "location": 8, "sequence": 0})
+    own_set = CardView(0, "spell_trap", "facedown", 45986603, 1)
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 0)
+    source = CardView(0, "spell_trap", "facedown", 4178474, 0)
+    for action in (mst, break_card):
+        assert safe_optional_own_loss_indices(
+            board(source, own_set), (action, wait), range(2)) == (1,)
+        assert safe_optional_own_loss_indices(
+            board(source, own_set, enemy_set),
+            (action, wait), range(2)) == (0, 1)
+    assert safe_optional_own_loss_indices(
+        board(source), (break_card, wait), range(2)) == (0, 1)
+    chain = (ChainLinkView(1, 19613556, 1, 8, 0),)
+    assert safe_optional_own_loss_indices(
+        board(source, own_set, chain=chain),
+        (break_card, wait), range(2)) == (0, 1)
+
+
 def test_opt_in_own_loss_guard_preserves_borrowed_boss_and_hidden_opponent():
     boss = 9596126
     activate = Action("banish", "activate", 0,

@@ -61,12 +61,40 @@ def safe_optional_own_loss_indices(observation: Observation,
                          for c in observation.field)
     own_faceup_monsters = any(c.controller == own and c.zone == "monster"
                               and c.position == "faceup" for c in observation.field)
+    own_monsters = any(c.controller == own and c.zone == "monster"
+                       for c in observation.field)
 
     def own_only(index: int) -> bool:
         action = legal_actions[index]
         if action.kind not in ("activate", "chain"):
             return False
         code = action.parameters.get("code")
+        if code == HEAVY_STORM:
+            # A Set Storm is the source being spent, not friendly collateral.
+            source_slot = (action.parameters.get("sequence")
+                           if action.parameters.get("location") == 8 else None)
+            return not enemy_backrow and any(
+                c.controller == own and c.zone == "spell_trap"
+                and not (c.code == HEAVY_STORM and c.sequence == source_slot)
+                for c in observation.field)
+        if code == TORRENTIAL_TRIBUTE:
+            return own_monsters and not enemy_monsters
+        if not observation.chain and code == MYSTICAL_SPACE_TYPHOON:
+            source_slot = (action.parameters.get("sequence")
+                           if action.parameters.get("location") == 8 else None)
+            return not enemy_backrow and any(
+                c.controller == own and c.zone == "spell_trap"
+                and not (c.code == code and c.sequence == source_slot)
+                for c in observation.field)
+        if not observation.chain and code == RAIGEKI_BREAK:
+            source_slot = (action.parameters.get("sequence")
+                           if action.parameters.get("location") == 8 else None)
+            own_other_backrow = any(
+                c.controller == own and c.zone == "spell_trap"
+                and not (c.code == code and c.sequence == source_slot)
+                for c in observation.field)
+            return ((own_monsters or own_other_backrow)
+                    and not (enemy_monsters or enemy_backrow))
         if code == NOBLEMAN_OF_CROSSOUT:
             return own_sets and not enemy_sets
         if code == BREAKER_THE_MAGICAL_WARRIOR:
