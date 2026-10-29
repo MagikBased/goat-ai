@@ -1,5 +1,53 @@
 # Baseline evaluation log
 
+## Eight-case own-loss preference transfer (29 October 2026)
+
+The new token-only Ring condition was offered **once in 96** policy-versus-
+Tactical replayed duels across the seed-124100–124115 and varied-deck
+seed-124900–124907 cohorts; that one offer was selected. This narrow event is
+too rare to expect a one-case fit to move aggregate match results. A broader
+read of the 64 varied-deck source duels found seven selected v12 visible-rule
+preferences: four idle own-only Ring activations and three negative-visible-
+trade Heavy Storm activations. The seven source duels were replay-verified and
+visibility-audited when v12 preference files were generated. These are
+automated hypotheses, not human approvals. The ignored manifest SHA-256 is
+`f8a0e30a59e90a3eb22cd8f33527d2148d08f12e1ee53862a53e091d5812a2b1`.
+
+A combined child used those seven preferences plus the single v13 token-only
+Ring preference, all from policy-seat replays, with 64 sampled current-core
+preservation decisions from four separate duels. Starting from the frozen
+feature-v23 parent, `train_review_preferences.py` used 200 steps, learning
+rate 0.0001, seed 1314, batch 16, and parent KL weight 1.0. Preference loss
+fell from **2.718** to **0.081**; final sampled preservation KL was **0.046**.
+The parent ranked the disfavored action first on **8/8** source positions;
+the child ranked it first on **0/8**, ranked a preferred action first on
+**7/8**, and had a positive preferred-minus-disfavored margin on **8/8**.
+These are training positions, so they measure fit only. The ignored checkpoint
+is `.cache/goat-ai/fv23_own_loss_8case_200step.pt` (SHA-256
+`ff27225bb135f993ca3ca5defcf1fb56878895d8fc0543f88ebe1fc6f6bd1fc6`).
+
+The first proposed evaluation decks were rejected by the strict unseen-Main-
+Deck gate because all four compositions appeared in this child's training
+sources. No result was produced from that rejected run. A fresh schedule used
+Rhymus Goat versus Ryan Goat and Theeresak Goat versus the GOAT Format Guide
+Dimension Fusion Turbo list, both seats and Deck assignments, seeds
+125400–125415. Against the unchanged parent with own-loss guard v1 on both,
+the child scored **55–73** over **128** complete native duels. Its paired
+bootstrap 95% score interval was **34.38%–52.34%**; first-seat score was
+29–35, second-seat score 26–38, and the longest duel had 1,483 decisions
+below the 3,000-decision cap. All four Main Deck compositions passed the
+unseen-training gate. This comparison gives **no evidence of a strength
+improvement** and does not prove the child is weaker. Do not promote it.
+The ignored tournament report is
+`.cache/goat-ai/fv23_own_loss_8case_vs_parent_125400_125415.json`
+(SHA-256 `6da161c702a549bc28a35f547cfe1659d864c78108804788945c8db669cb3964`).
+
+The result supports the next M4 direction: obtain more independent judgments
+on upstream activation choices across distinct card effects and board states,
+then check both local own-card-loss frequency and full-duel outcomes on held-
+out decks. More optimization steps on these eight automatic labels would
+only test fit to the same narrow examples.
+
 ## Own-card losses remain a playing-strength problem (29 October 2026)
 
 The current guard experiments have **not** established a win-rate improvement.

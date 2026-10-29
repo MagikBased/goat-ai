@@ -2669,6 +2669,13 @@ first. The next M4 training set needs more varied, independent activation and
 target judgments; fitting a small review set more tightly has not produced
 transfer or a demonstrated strength gain.
 
+The [eight-case own-loss fit](evaluation.md#eight-case-own-loss-preference-transfer-29-october-2026)
+removed the disfavored action from first place on all eight source positions,
+but scored 55–73 against its parent over 128 fresh, unseen-deck duels (95%
+paired interval 34.38%–52.34%). The token-only Ring condition appeared only
+once in 96 source duels. Keep this child experimental; prioritize diverse,
+independently judged upstream decisions before another M4 policy promotion.
+
 An [opt-in negative-trade Heavy Storm ablation](evaluation.md#negative-visible-heavy-storm-trade-ablation-29-october-2026) now defers three observed activation mistakes before targeting. On fresh unseen Main Decks it scored 65–63 directly against v1, with a matched v1 control of 64–64, tied v1 at 35 wins each against Tactical on the first 128 games, and scored 66 versus v1's 67 wins against Tactical on a further 256 games. A replay-verified changed game illustrates that avoiding an immediate four-own/two-enemy Storm trade need not win that deal. Keep v8 experimental and v1 selected; M4 still needs transferable reviewed choices and a trained complete-duel strength gain.
 
 A paired [Airknight Parshath versus Spirit Reaper fixture](goat_rules.md#airknight-parshath-against-spirit-reaper) now verifies that a Set Reaper survives battle while Airknight pierces for 1,700 damage and draws, or deals no damage and draws nothing when Waboku is chained. Both complete duels replay-verify and pass the visibility audit. This advances M2 correctness; it does not imply learned policy improvement.
