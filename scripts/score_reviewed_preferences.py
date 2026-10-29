@@ -7,12 +7,40 @@ from pathlib import Path
 
 import torch
 
+from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_decision_preferences, read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import encode_decision
+
+
+def validate_review_holdout(metadata: dict, replay_hash: str, seed: int,
+                            main_deck_hashes: tuple[str, str] | None = None) -> None:
+    """Reject review cases used by the scored checkpoint or its training decks."""
+    sources = metadata.get("trajectory_sha256")
+    games = metadata.get("training_games")
+    if not isinstance(sources, dict) or not isinstance(games, list) or not games:
+        raise ValueError("checkpoint lacks training provenance for held-out review")
+    if replay_hash in sources.values():
+        raise ValueError("review replay is in checkpoint training")
+    if any(not isinstance(game, dict) or type(game.get("seed")) is not int
+           for game in games):
+        raise ValueError("checkpoint has invalid training seed provenance")
+    if seed in {game["seed"] for game in games}:
+        raise ValueError("review seed is in checkpoint training")
+    if main_deck_hashes is not None:
+        if any(not isinstance(game.get("main_deck_composition_sha256"), (list, tuple))
+               or len(game["main_deck_composition_sha256"]) != 2
+               or any(not isinstance(digest, str)
+                      for digest in game["main_deck_composition_sha256"])
+               for game in games):
+            raise ValueError("checkpoint lacks Main Deck training provenance")
+        used = {digest for game in games
+                for digest in game["main_deck_composition_sha256"]}
+        if used.intersection(main_deck_hashes):
+            raise ValueError("review Main Deck is in checkpoint training")
 
 
 def score_preference(model, vocabulary, record, preferred: tuple[int, ...],
@@ -57,6 +85,10 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--case", nargs=2, action="append", metavar=("REPLAY", "PREFERENCES"),
                         required=True)
+    parser.add_argument("--require-heldout", action="store_true",
+                        help="reject training replays and seeds from the scored checkpoint")
+    parser.add_argument("--require-unseen-main-decks", action="store_true",
+                        help="also reject Main Deck compositions used in checkpoint training")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     metadata = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
@@ -74,6 +106,12 @@ def main() -> None:
         audit_trajectory_visibility(trajectory)
         replay_hash = sha256_file(replay_path)
         reviewed = read_decision_preferences(preferences_path, replay_hash, trajectory)
+        if args.require_heldout or args.require_unseen_main_decks:
+            compositions = (tuple(main_deck_composition_sha256(read_ydk(deck))
+                                  for deck in trajectory.decks)
+                            if args.require_unseen_main_decks else None)
+            validate_review_holdout(metadata, replay_hash, trajectory.seed,
+                                    compositions)
         decisions = []
         for choice in reviewed.preferences:
             record = trajectory.decisions[choice.decision_index]
@@ -101,6 +139,9 @@ def main() -> None:
             "decisions": decisions,
         })
     report = {"schema_version": 1, "checkpoint": str(args.checkpoint),
+              "heldout_training_replay_and_seed_verified": bool(
+                  args.require_heldout or args.require_unseen_main_decks),
+              "unseen_main_decks_verified": args.require_unseen_main_decks,
               "checkpoint_sha256": sha256_file(args.checkpoint), "cases": cases}
     payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if args.output:

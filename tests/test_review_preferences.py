@@ -8,6 +8,7 @@ import pytest
 from goat_ai.actions import Action
 from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, read_decision_preferences
+from scripts.score_reviewed_preferences import validate_review_holdout
 from scripts.train_review_preferences import validate_preference_objective
 
 
@@ -45,6 +46,22 @@ def preference_file(tmp_path, **changes):
     path = tmp_path / "preferences.json"
     path.write_text(json.dumps(payload))
     return path
+
+
+def test_review_score_holdout_rejects_training_replay_seed_and_main_deck():
+    parent = {"trajectory_sha256": {"old.json": "a" * 64},
+              "training_games": [{"seed": 41,
+                                  "main_deck_composition_sha256": ("deck-a", "deck-b")}]}
+    validate_review_holdout(parent, "b" * 64, 42, ("new-a", "new-b"))
+    with pytest.raises(ValueError, match="review replay"):
+        validate_review_holdout(parent, "a" * 64, 42)
+    with pytest.raises(ValueError, match="review seed"):
+        validate_review_holdout(parent, "b" * 64, 41)
+    with pytest.raises(ValueError, match="review Main Deck"):
+        validate_review_holdout(parent, "b" * 64, 42, ("deck-b", "new-b"))
+    with pytest.raises(ValueError, match="lacks Main Deck"):
+        validate_review_holdout({**parent, "training_games": [{"seed": 41}]},
+                                "b" * 64, 42, ("new-a", "new-b"))
 
 
 def test_preference_accepts_two_enemy_targets_without_picking_one(tmp_path):

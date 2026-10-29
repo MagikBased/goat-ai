@@ -2654,3 +2654,9 @@ suppressed six fresh idle own-only Ring activations, but a 256-duel direct
 comparison against v1 tied its matched v1 control at 127 wins, 127 losses,
 and two draws. The guard remains experimental; use independent human review
 and wider competitive evidence before selecting it as the default.
+The [strict preference-score holdout gate](evaluation.md#strict-reviewed-preference-holdout-gate-29-october-2026)
+now rejects training replays, seeds, and optionally Main Deck compositions
+before fixed-state human-review scores are reported. It validated 11 older
+reviewed choices as held out for the selected parent and rejected a replay
+used to train a child. Use this gate for M4 diagnostic scores alongside
+fresh complete-duel comparisons; it is not a substitute for them.

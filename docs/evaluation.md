@@ -1,5 +1,32 @@
 # Baseline evaluation log
 
+## Strict reviewed-preference holdout gate (29 October 2026)
+
+`scripts/score_reviewed_preferences.py` now accepts `--require-heldout` to
+reject a source replay or seed already used by the scored checkpoint, and
+`--require-unseen-main-decks` to reject any Main Deck multiset in its
+training provenance. The latter also enforces replay and seed holdout.
+Both flags fail closed when the required provenance is missing, and successful
+reports record which gates were checked. This makes a fixed-state preference
+score usable as a separate held-out diagnostic; it remains distinct from
+complete-duel strength.
+
+A current-core smoke scored the selected v23 checkpoint on the five nonempty
+human-review preference files from the broader-parent review snapshot. Exact
+native replay and player-visibility audits passed. All **11** changed
+preferences passed both new holdout gates. The parent ranked the human choice
+first at **0/11** and gave it a positive pairwise margin at **0/11**. This
+repeats the earlier parent baseline with an explicit gate, not a new model
+result. Scoring the 25-preference child on one of its own source replays with
+the same gates failed as intended: `review replay is in checkpoint training`.
+The ignored strict score report is
+`.cache/goat-ai/broad_parent_review_snapshot_20261028/score_parent_strict_holdout.json`
+(SHA-256 `ae320ea3aaa078d06198fcbaeea01d849ad65dba2c2eb88fe38c4e57a4456189`).
+Reproduce with `scripts/score_reviewed_preferences.py --checkpoint` set to
+the selected v23 checkpoint, `--require-heldout --require-unseen-main-decks`,
+and the five nonempty `--case` replay/preference pairs in
+`broad_parent_review_snapshot_20261028/preferences/manifest.json`.
+
 ## Fresh Ring guard direct transfer check (29 October 2026)
 
 The opt-in v3 guard was checked against six new, replay-verified idle
