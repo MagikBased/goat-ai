@@ -1,5 +1,29 @@
 # Early replay decision audit
 
+## Fresh policy versus Tactical review queue (29 October 2026)
+
+The [focused local queue](../.cache/goat-ai/own_loss_review_source_126000_126007/review_queue.html)
+offers **19** decisions from **15** replay-verified duels on four 2005 deck
+pairings. It includes seven idle own-only Ring activations, seven weak Flip
+monster Normal Summons with a Set available, two negative visible Heavy Storm
+trades, two Thunder Dragon zero-copy finishes with a Deck copy offered, and
+one early Metamorphosis that spent a weak Flip monster. Tactical disagrees
+on 15 of the 19; its alternatives are review prompts, not approved labels.
+The other four are still worth examining because Tactical may share the same
+mistake. The queue SHA-256 is
+`22534d847e40d3bbfc6e0a739790e5ef9a33ef3898ef60440f4ae58bdcc36980`.
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/own_loss_review_source_126000_126007/review_queue.json
+```
+
+The source audit covered all **64** duels and **37,301** decisions; the
+selected policy made **18,538** choices, including **6,491** with multiple
+legal actions. [The evaluation entry](evaluation.md#fresh-four-pairing-policy-risk-audit-29-october-2026)
+records the broader findings and reproducible commands. Thunder Dragon's
+zero-copy finish is [historically legal](goat_rules.md), even
+when searching a copy appears strategically preferable.
+
 ## Ring activation before a poor own-card target (29 October 2026)
 
 Combined queue item 55 shows a Ring of Destruction target prompt where the

@@ -1,5 +1,43 @@
 # Baseline evaluation log
 
+## Fresh four-pairing policy risk audit (29 October 2026)
+
+The selected feature-v23 checkpoint with v1 visible own-loss inference played
+Tactical-v14 on four 2005 Main Deck pairings: Max Suffridge Goat Control versus
+Bryan Coronel Chaos, Mary Triatafilidi Warrior versus Daryl Gessler
+Gravekeeper, Cas Stomphorst Flip Control versus Jae Kim Zombie, and Roberto
+Martinez Phoenix Control versus the GOAT guide's Dimension Fusion Turbo.
+Seeds **126000–126007**, both policy seats, produced **64** terminal duels,
+**37,301** native decisions, and a raw policy result of **22 wins, 40 losses,
+2 draws**. This is a development audit, not a held-out strength claim.
+Every complete trajectory replay-verified and passed the player-visibility
+audit; the recorded policy's **18,538** actions reproduced from the exact
+checkpoint and inference mode, including **6,491** multi-action choices.
+
+The visible-risk audit flagged **10** selected own-card-loss instances:
+seven idle own-only Ring activations, two negative visible Heavy Storm trades,
+and one Ring target on an own monster with a safer opposing target. Its broader
+review audit found **34** candidate decisions across ten categories, including
+seven early Metamorphosis spends of weak Flip monsters, seven weak Flip
+Normal Summons with a Set available, and two Thunder Dragon zero-copy finishes
+with a Deck copy offered. These flags identify states for human review; none
+alone proves an optimal alternative. The [19-item focused queue](replay_audit.md#fresh-policy-versus-tactical-review-queue-29-october-2026)
+selects at most two items per replay across five categories. Its 15 source
+replay identities and 19 displayed frames matched their saved hashes and
+legal-action metadata. No queue suggestion has been used as a training label.
+
+The ignored manifest, audit, and review queue under
+`.cache/goat-ai/own_loss_review_source_126000_126007/` have SHA-256 hashes
+`60e30537e175e032b5a3eadabcb784fdd7033647b5a4c602ed645cbe99efe53f`,
+`3e7007164445aad433aef6ddbd66d2601fb1c61a67c3914cc7c1c1cfd26e1fad`,
+and `22534d847e40d3bbfc6e0a739790e5ef9a33ef3898ef60440f4ae58bdcc36980`.
+Reproduce the audit with `scripts/audit_policy_replays.py` over that folder's
+`matchup_*_seed_*_seat_*.json` files, the selected checkpoint
+`fv23_current_tactical_broader_33000_33031.pt`, and the pinned native root.
+Use `scripts/shortlist_policy_disagreements.py` with the five focus categories
+named in the queue to regenerate its review index and player-visible viewers.
+
+
 ## Eight-case own-loss preference transfer (29 October 2026)
 
 The new token-only Ring condition was offered **once in 96** policy-versus-
