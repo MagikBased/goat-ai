@@ -141,6 +141,10 @@ def summarize_visible_own_card_losses(reports: list[dict]) -> dict:
         return {"available": False,
                 "reason": "requires verified policy_evaluation reports"}
     decisions = sum(report["verified_policy_choices"] for report in reports)
+    multi_action = (sum(report["verified_multi_action_policy_choices"]
+                        for report in reports)
+                    if all("verified_multi_action_policy_choices" in report
+                           for report in reports) else None)
     counts = Counter(candidate["category"] for report in reports
                      for candidate in report["candidates"]
                      if candidate["category"] in VISIBLE_OWN_CARD_LOSSES)
@@ -153,14 +157,18 @@ def summarize_visible_own_card_losses(reports: list[dict]) -> dict:
              for category in ACTIVATION_OPPORTUNITY_CATEGORIES}
     return {"available": True, "replays": len(reports),
             "verified_policy_choices": decisions,
+            "verified_multi_action_policy_choices": multi_action,
             "flagged_instances": total,
             "flagged_instances_per_1000_policy_choices": (
                 1000 * total / decisions if decisions else None),
+            "flagged_instances_per_1000_multi_action_choices": (
+                1000 * total / multi_action if multi_action else None),
             "category_counts": dict(sorted(counts.items())),
             "activation_opportunity_counts": dict(sorted(opportunities.items())),
             "flagged_per_activation_opportunity": rates,
             "counting_note": "review flags and activation opportunities deduplicated "
-                             "per category, turn, and phase; not an "
+                             "per category, turn, and phase; multi-action choices "
+                             "exclude forced prompts; neither rate is an "
                              "optimal-play error rate"}
 
 
@@ -258,6 +266,7 @@ def main() -> None:
                 raise ValueError(f"{path}: policy feature version differs")
             policy_seat = metadata["demonstrator_seat"]
             policy_choices = 0
+            multi_action_choices = 0
             for index, decision in enumerate(trajectory.decisions):
                 if decision.observation.acting_player != policy_seat:
                     continue
@@ -266,12 +275,14 @@ def main() -> None:
                 if chosen != decision.selected_action:
                     raise ValueError(f"{path}: policy choice differs at decision {index}")
                 policy_choices += 1
+                multi_action_choices += len(decision.legal_actions) > 1
             provenance = {"policy_seat": policy_seat,
                           "checkpoint_sha256": checkpoint_sha256,
                           "selection_mode": inference,
                           "selection_temperature": None,
                           "choice_verification": "reproduced_greedy",
-                          "verified_policy_choices": policy_choices}
+                          "verified_policy_choices": policy_choices,
+                          "verified_multi_action_policy_choices": multi_action_choices}
             own_card_opportunities = own_card_activation_opportunities(
                 trajectory, policy_seat)
             if opponent_sha256 is not None:

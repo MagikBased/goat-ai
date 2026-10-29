@@ -14,10 +14,12 @@ from scripts.audit_policy_replays import (
 def test_summary_counts_only_policy_review_flags() -> None:
     reports = [
         {"verified_policy_choices": 400,
+         "verified_multi_action_policy_choices": 200,
          "candidates": [{"category": "nobleman_only_own_set_monster"},
                         {"category": "ring_targets_own_with_safe_enemy_option"},
                         {"category": "weak_flip_normal_summon_with_set_available"}]},
         {"verified_policy_choices": 600,
+         "verified_multi_action_policy_choices": 300,
          "candidates": [{"category": "heavy_storm_only_own_backrow"},
                         {"category": "heavy_storm_negative_visible_trade"},
                         {"category": "breaker_targets_only_own_backrow"}]},
@@ -25,8 +27,10 @@ def test_summary_counts_only_policy_review_flags() -> None:
     result = summarize_visible_own_card_losses(reports)
     assert result["available"] is True
     assert result["verified_policy_choices"] == 1000
+    assert result["verified_multi_action_policy_choices"] == 500
     assert result["flagged_instances"] == 4
     assert result["flagged_instances_per_1000_policy_choices"] == 4
+    assert result["flagged_instances_per_1000_multi_action_choices"] == 8
     assert result["category_counts"] == {
         "heavy_storm_only_own_backrow": 1,
         "heavy_storm_negative_visible_trade": 1,
@@ -50,6 +54,20 @@ def test_summary_does_not_blend_sampled_replays_into_greedy_rate() -> None:
          "candidates": [{"category": "nobleman_only_own_set_monster"}]},
     ])
     assert result["available"] is False
+
+
+def test_summary_omits_multi_action_rate_for_legacy_or_mixed_reports() -> None:
+    result = summarize_visible_own_card_losses([
+        {"verified_policy_choices": 4,
+         "verified_multi_action_policy_choices": 2,
+         "candidates": [{"category": "nobleman_only_own_set_monster"}]},
+        {"verified_policy_choices": 6,
+         "candidates": []},
+    ])
+    assert result["verified_policy_choices"] == 10
+    assert result["flagged_instances_per_1000_policy_choices"] == 100
+    assert result["verified_multi_action_policy_choices"] is None
+    assert result["flagged_instances_per_1000_multi_action_choices"] is None
 
 
 def test_activation_opportunities_deduplicate_revisited_priority_prompts() -> None:

@@ -655,6 +655,17 @@ the Ring and Heavy Storm decisions for independent human review. A separate
 now contains all 11 flagged cases; one forced target is represented by its
 earlier optional activation. No new training labels are inferred from the scan.
 
+The audit now also reports a decision denominator that excludes forced
+single-action prompts. Re-running these same 128 verified duels reproduced
+the earlier **17** visible own-card-loss review flags and **37,132** total
+policy choices; **12,707** choices had at least two legal actions. The flag
+count is **0.458 per 1,000 total choices** or **1.338 per 1,000 multi-action
+choices**. Neither rate estimates the frequency of all bad plays: the review
+rules cover a narrow set of visible situations, and candidates are deduplicated
+by category, turn, and phase. The new ignored audit report is
+`.cache/goat-ai/own_card_multi_action_audit_104400_104407.json` (SHA-256
+`939868a09c95fc97f878062b6cbc8f80d1b0c9dcb4b35fd816e7c4929b990f9e`).
+
 The selected v23 policy still activates removal when its own cards are the
 only available victims. `visible_optional_own_loss_v6` extends the automated
 v5 preference derivation to the **optional activation**, before a forced
