@@ -7,6 +7,7 @@ from goat_ai.agents import TacticalHeuristicAgent
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
     safe_optional_own_loss_indices,
+    safe_one_shot_response_indices,
     safe_position_indices,
     safe_target_indices,
     weak_flip_set_substitute,
@@ -121,6 +122,35 @@ def test_opt_in_own_loss_guard_preserves_borrowed_boss_and_hidden_opponent():
     assert safe_optional_own_loss_indices(
         board(owned, CardView(1, "monster", "facedown", None, 0)),
         (activate, wait), range(2)) == (0, 1)
+
+
+def test_one_shot_response_guard_uses_public_chain_type_and_other_enemy_zones():
+    mst = Action("mst", "chain", 0, {"code": 5318639, "location": 8, "sequence": 0})
+    wait = Action("wait", "pass", 0)
+    actions = (mst, wait)
+    normal_spell = 79571449
+    facts = {normal_spell: (2, 0, 0), 72302403: (2, 0, 0),
+             61740673: (0x20002, 0, 0)}
+    source = CardView(1, "spell_trap", "faceup", normal_spell, 0)
+    own_set = CardView(0, "spell_trap", "facedown", 44095762, 1)
+    chain = (ChainLinkView(1, normal_spell, 1, 8, 0),)
+    snapshot = board(source, own_set, chain=chain)
+    assert safe_one_shot_response_indices(snapshot, actions, range(2), facts) == (1,)
+    assert safe_one_shot_response_indices(snapshot, actions[:1], (0,), facts) == (0,)
+    assert safe_one_shot_response_indices(snapshot, actions, range(2), {}) == (0, 1)
+    # An unidentified opposing Set card is a possible useful MST target; its
+    # hidden identity cannot affect the choice.
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 1)
+    assert safe_one_shot_response_indices(
+        board(source, own_set, enemy_set, chain=chain), actions, range(2), facts) == (0, 1)
+    persistent_chain = (ChainLinkView(1, 72302403, 1, 8, 0),)
+    assert safe_one_shot_response_indices(
+        board(replace(source, code=72302403), own_set, chain=persistent_chain),
+        actions, range(2), facts) == (0, 1)
+    continuous_chain = (ChainLinkView(1, 61740673, 1, 8, 0),)
+    assert safe_one_shot_response_indices(
+        board(replace(source, code=61740673), own_set, chain=continuous_chain),
+        actions, range(2), facts) == (0, 1)
 
 
 def test_opt_in_heavy_storm_uses_visible_card_advantage():

@@ -36,6 +36,39 @@ THOUSAND_EYES_RESTRICT = 504700102
 FUSION_TYPE = 0x40
 EFFECT_TYPE = 0x20
 SHEEP_TOKENS = frozenset((73915052, 73915053, 73915054, 73915055))
+FIELD_PERSISTENT_NORMAL_SPELLS = frozenset((72302403, 11961740))
+
+
+def safe_one_shot_response_indices(observation: Observation,
+                                   legal_actions: Sequence[Action],
+                                   admissible: Sequence[int],
+                                   card_facts: Mapping[int, tuple[int, int, int]],
+                                   ) -> tuple[int, ...]:
+    """Defer MST when its only opposing target is an activated one-shot card.
+
+    Destruction does not negate a resolving Normal Spell/Trap or Quick-Play
+    Spell. Printed Type is used only for the publicly identified chain source;
+    the identities of other opposing Set cards are never inspected. Keep the
+    action if any other opposing back row could be a useful target.
+    """
+    indices = tuple(admissible)
+    if not observation.chain:
+        return indices
+    latest = observation.chain[-1]
+    own = observation.viewer
+    card_type = card_facts.get(latest.card_code, (0, 0, 0))[0]
+    if (latest.controller == own or latest.location != 8
+            or card_type not in (2, 4, 0x10002)
+            or latest.card_code in FIELD_PERSISTENT_NORMAL_SPELLS):
+        return indices
+    if any(card.controller != own and card.zone == "spell_trap"
+           and (card.controller, card.sequence) != (latest.controller, latest.sequence)
+           for card in observation.field):
+        return indices
+    kept = tuple(index for index in indices if not (
+        legal_actions[index].kind == "chain"
+        and legal_actions[index].parameters.get("code") == MYSTICAL_SPACE_TYPHOON))
+    return kept or indices
 
 
 def safe_optional_own_loss_indices(observation: Observation,

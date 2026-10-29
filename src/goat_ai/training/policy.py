@@ -15,6 +15,7 @@ from goat_ai.agents.card_metadata import FLIP_MONSTER_TYPE, load_card_properties
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
     safe_optional_own_loss_indices,
+    safe_one_shot_response_indices,
     safe_position_indices,
     safe_target_indices,
     weak_flip_set_substitute,
@@ -758,6 +759,8 @@ class PolicyAgent:
                  weak_flip_attacks: Mapping[int, int] | None = None,
                  self_target_guard: bool = False,
                  own_loss_guard: bool = False,
+                 own_loss_guard_version: int = 1,
+                 card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                  position_guard: bool = False,
                  position_guard_version: int = 2) -> None:
         self.model = model
@@ -767,6 +770,12 @@ class PolicyAgent:
         self.weak_flip_attacks = dict(weak_flip_attacks or {})
         self.self_target_guard = self_target_guard
         self.own_loss_guard = own_loss_guard
+        if own_loss_guard_version not in (1, 2):
+            raise ValueError("unknown own-loss guard version")
+        if own_loss_guard and own_loss_guard_version == 2 and card_facts is None:
+            raise ValueError("own-loss guard v2 requires printed card facts")
+        self.own_loss_guard_version = own_loss_guard_version
+        self.card_facts = dict(card_facts or {})
         self.position_guard = position_guard
         if position_guard_version not in (1, 2):
             raise ValueError("unknown position guard version")
@@ -790,6 +799,9 @@ class PolicyAgent:
         if self.own_loss_guard:
             admissible = safe_optional_own_loss_indices(
                 observation, legal_actions, admissible)
+            if self.own_loss_guard_version == 2:
+                admissible = safe_one_shot_response_indices(
+                    observation, legal_actions, admissible, self.card_facts)
             admissible = safe_target_indices(
                 observation, legal_actions, admissible,
                 protect_removal_targets=True)

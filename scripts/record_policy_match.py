@@ -51,6 +51,8 @@ def main() -> None:
                              "attack-to-weaker-defense switches")
     parser.add_argument("--own-loss-guard", action="store_true",
                         help="experimental visible own-card-loss filter")
+    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2), default=1,
+                        help="v2 also defers MST on an isolated resolving one-shot card")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.max_decisions < 1:
@@ -63,6 +65,8 @@ def main() -> None:
         parser.error("choose one experimental extension of guard v3")
     if sum((args.position_guard, args.tactical_guard, args.own_loss_guard)) > 1:
         parser.error("choose one standalone policy guard")
+    if args.own_loss_guard_version != 1 and not args.own_loss_guard:
+        parser.error("--own-loss-guard-version requires --own-loss-guard")
     policy_options = {
         "tactical_guard": args.tactical_guard,
         "card_races": load_card_races(args.native_root) if args.tactical_guard else None,
@@ -71,6 +75,9 @@ def main() -> None:
         "self_target_guard": args.self_target_guard,
         "position_guard": args.position_guard,
         "own_loss_guard": args.own_loss_guard,
+        "own_loss_guard_version": args.own_loss_guard_version,
+        "card_facts": (load_card_facts(args.native_root)
+                       if args.own_loss_guard and args.own_loss_guard_version == 2 else None),
     }
     policy = load_policy_agent(args.checkpoint, **policy_options)
     flip_codes = (load_flip_monster_codes(args.native_root)
@@ -105,6 +112,8 @@ def main() -> None:
                         "policy_inference": ("greedy_position_guard_v2"
                                              if args.position_guard else
                                              "greedy_own_loss_guard_v1"
+                                             if args.own_loss_guard and args.own_loss_guard_version == 1 else
+                                             "greedy_own_loss_guard_v2"
                                              if args.own_loss_guard else
                                              "greedy_tactical_guard_v5"
                                              if args.self_target_guard else

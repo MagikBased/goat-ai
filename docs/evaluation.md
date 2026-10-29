@@ -1,5 +1,48 @@
 # Baseline evaluation log
 
+## One-shot response guard ablation (29 October 2026)
+
+The guarded v23 replay at seed 99906, policy seat 0, chained MST to an
+opponent's activated Normal Spell with no other opposing Spell/Trap, then
+targeted that Spell. The native fixture already verifies that destroying Pot
+of Greed on the chain does not stop its draw (see [GOAT rules](goat_rules.md));
+the [historical MST rulings](https://beta.goatformat.com/cards/mystical-space-typhoon)
+also distinguish destruction from negation and effects requiring a card to
+remain face-up. An opt-in `own_loss_guard_version=2` now defers that MST
+response only when the publicly identified latest opposing chain source has
+a one-shot printed Type and there is no other opposing back row target. It
+keeps responses to Continuous cards, the two known persistent Normal Spells,
+and unknown opposing Set cards. This is a strategic filter, not a change to
+native legality or the neural checkpoint; it does not estimate the value of
+all chain responses.
+
+All 16 seed-99900–99907 v2 replays reached terminal, passed exact native
+replay and visibility verification, and reproduced every policy choice.
+The earlier v1 guarded set had one one-shot-removal review flag; v2 had zero.
+Both versions won **3/16** against Tactical-v14. On four held-out Main Deck
+pairings with both deck assignments, both seats, and two disjoint eight-seed
+blocks, the paired 256-game comparison was **96 v2 wins versus 95 v1 wins**
+against Tactical-v14. The first block had identical outcomes for all 128
+paired games; the second differed by one win. This does not establish a
+competitive gain, so local viewer play continues to use v1. A learned policy
+and a larger set of verified chain contexts remain needed.
+
+The ignored v2 replay audit is
+`.cache/goat-ai/own_loss_guard_v2_matched_99900_99907/audit.json` (SHA-256
+`90b5ef7ce459201c31c8b1d1ecb5683b59416422a6df2310be6231255bed4305`).
+The two v2 tournament reports are
+`.cache/goat-ai/own_loss_guard_v2_tactical_100500_100507.json` (SHA-256
+`c1696709d323fba35bc37982270a14413e14176e61c39289a2720aaff9b67d8a`)
+and `.cache/goat-ai/own_loss_guard_v2_tactical_100600_100607.json` (SHA-256
+`139b3a5647e77aa6346fc9a1f58b2baec75497c3c453053d506e502bd92f2ce0`).
+The matching v1 reports with the same source fingerprint have prefix
+`own_loss_guard_v1_current_tactical_` and the same seed suffixes. Both
+`scripts.compare_tournament_reports` checks verified unseen Main Deck
+composition, pinned assets, source hashes, and matched schedules. Replay
+generation uses `scripts.record_policy_match --own-loss-guard
+--own-loss-guard-version 2`; tournament generation uses the same flags with
+`scripts.evaluate_policy`.
+
 ## Matched complete-replay own-card-loss audit (29 October 2026)
 
 To test whether the optional visible own-loss guard changes the actual mistakes

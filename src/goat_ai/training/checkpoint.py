@@ -14,6 +14,8 @@ def load_policy_agent(path: str | Path, *, device: str = "cpu",
                       weak_flip_attacks: Mapping[int, int] | None = None,
                       self_target_guard: bool = False,
                       own_loss_guard: bool = False,
+                      own_loss_guard_version: int = 1,
+                      card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                       position_guard: bool = False,
                       position_guard_version: int = 2) -> PolicyAgent:
     checkpoint = torch.load(path, map_location=device, weights_only=True)
@@ -33,5 +35,7 @@ def load_policy_agent(path: str | Path, *, device: str = "cpu",
                        weak_flip_attacks=weak_flip_attacks,
                        self_target_guard=self_target_guard,
                        own_loss_guard=own_loss_guard,
+                       own_loss_guard_version=own_loss_guard_version,
+                       card_facts=card_facts,
                        position_guard=position_guard,
                        position_guard_version=position_guard_version)

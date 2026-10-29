@@ -2513,3 +2513,10 @@ chained to a resolving one-shot Spell; this narrower behavioral improvement
 does not imply a general card-advantage model. The small sample scored 3/16
 guarded wins against Tactical versus 4/16 unguarded; use the larger 256-duel
 study for the existing guard's strength estimate.
+An [opt-in one-shot response ablation](evaluation.md#one-shot-response-guard-ablation-29-october-2026)
+defers MST on an isolated activated Normal Spell/Trap using only the public
+chain source and static printed Type. It removed the remaining one-shot MST
+review flag in 16 matched verified games, but scored 96 rather than 95 wins
+against Tactical-v14 over 256 held-out paired games. This is too little
+strength evidence to replace the current local-play guard or count as learned
+improvement.
