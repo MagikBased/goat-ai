@@ -1,5 +1,35 @@
 # Baseline evaluation log
 
+## Current local review-label consolidation (29 October 2026)
+
+The queue-bound multi-queue converter revalidated 24 saved label files against
+their exact source queues and native replays, including player-visibility
+audits. The ignored combined manifest
+`.cache/goat-ai/combined_review_20261029/manifest.json` (SHA-256
+`b1c5ea567812132047d5a13a38ee52aec1198dccc6075c4a1268636d713da326`)
+contains 52 input choices, 14 agreeing duplicates, and 38 distinct reviewed
+decisions. Of those, 26 choose a different legal action from the policy's
+recorded action; the 12 matches are not converted into preferences because
+some saved matches may be bookmarks rather than endorsements.
+
+All 26 changed decision keys are already in the earlier New Jersey,
+broader-deck, and one-shot preference manifests (14, 11, and one). A new
+training fit on this combined manifest would add no independently reviewed
+choice. The eight-case varied-deck own-card queue has no saved labels as of
+this audit; it remains the targeted source of new activation and timing
+judgments. Neither consolidation nor queue availability is a strength gain.
+
+`scripts/consolidate_local_reviews.py` now discovers the save-server folders,
+checks each queue hash and reviewer identity, and delegates full native replay
+validation to the queue converter. A fresh reproduction skipped two legacy
+folders without queue identities and regenerated the same 26 decision
+preferences. Its discovery and converter tests passed 18/18. Reproduce with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/consolidate_local_reviews.py \
+  --output-dir .cache/goat-ai/combined_review_reproduction
+```
+
 ## Opt-in Chaos Sorcerer target-scope guard v9 (29 October 2026)
 
 The selected v1 guard treats any opposing monster as a possible
