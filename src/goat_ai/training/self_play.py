@@ -17,7 +17,8 @@ from goat_ai.agents import Agent, RandomAgent, TacticalHeuristicAgent
 from goat_ai.engine import RulesEngine
 from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
-from goat_ai.replay import DecisionRecord, Trajectory
+from goat_ai.replay import DecisionRecord, ReviewedPreference, Trajectory
+from goat_ai.training.parent_kl import masked_parent_distribution
 from goat_ai.training.policy import (
     CHAIN_TARGET_FEATURE_VERSIONS,
     PHASES,
@@ -29,6 +30,41 @@ from goat_ai.training.policy import (
     encode_decision,
 )
 from goat_ai.training.resource_value import FrozenResourceRidge
+
+
+@dataclass(frozen=True)
+class PreferenceAnchor:
+    """Frozen visible decision and masked starting-policy distribution."""
+
+    features: DecisionFeatures
+    target: torch.Tensor
+
+
+def prepare_preference_anchors(
+        model: LegalActionPolicy, vocabulary: CardVocabulary,
+        reviewed: Sequence[tuple[DecisionRecord, ReviewedPreference]],
+        ) -> tuple[PreferenceAnchor, ...]:
+    """Encode caller-verified selected mistakes for retention during PPO."""
+    if not reviewed:
+        raise ValueError("preference retention requires reviewed decisions")
+    device = next(model.parameters()).device
+    anchors = []
+    model.eval()
+    with torch.no_grad():
+        for record, preference in reviewed:
+            legal = record.legal_actions
+            bad = preference.disfavored_action_indices
+            good = preference.preferred_action_indices
+            if (not good or not bad or set(good) & set(bad)
+                    or any(type(index) is not int or not 0 <= index < len(legal)
+                           for index in (*good, *bad))
+                    or legal.index(record.selected_action) not in bad):
+                raise ValueError("preference anchor requires a selected bad legal action")
+            features = encode_decision(record.observation, legal, vocabulary,
+                                       model.feature_version).to(device)
+            anchors.append(PreferenceAnchor(
+                features, masked_parent_distribution(model(features), bad)))
+    return tuple(anchors)
 
 
 class VisibleStateValue(nn.Module):
@@ -563,6 +599,9 @@ def ppo_clipped_update(
     advantages: Sequence[float] | None = None,
     sample_weights: Sequence[float] | None = None,
     encoded_features: Sequence[DecisionFeatures] | None = None,
+    preference_anchors: Sequence[PreferenceAnchor] = (),
+    preference_weight: float = 0.0,
+    preference_batch_size: int = 8,
 ) -> float:
     """Reuse on-policy visible decisions with a clipped objective.
 
@@ -573,7 +612,10 @@ def ppo_clipped_update(
             or entropy_coefficient < 0 or max_gradient_norm <= 0
             or not isfinite(reward) or not isfinite(baseline)
             or not isfinite(parent_kl_weight) or parent_kl_weight < 0
-            or parent_kl_weight > 0 and parent_model is None):
+            or parent_kl_weight > 0 and parent_model is None
+            or not isfinite(preference_weight) or preference_weight < 0
+            or preference_batch_size < 1
+            or preference_weight > 0 and not preference_anchors):
         raise ValueError("PPO update needs valid decisions, rewards, and regularization")
     if (model.feature_version < 10 or model.feature_version in (14, 15)):
         raise ValueError("PPO batching requires a supported v10+ feature version")
@@ -623,6 +665,7 @@ def ppo_clipped_update(
                     parent_prob_rows.append(trimmed.exp())
     model.train()
     rng = random.Random(random_seed)
+    anchor_rng = random.Random(random_seed ^ 0x6A17C4)
     total_loss = 0.0
     updates = 0
     for _ in range(epochs):
@@ -661,6 +704,17 @@ def ppo_clipped_update(
                 loss = loss + parent_kl_weight * (
                     weights * (parent_probs * (
                         parent_log_probs - log_probs)).sum(1)).mean()
+            if preference_weight:
+                anchor_indices = anchor_rng.sample(
+                    range(len(preference_anchors)),
+                    min(preference_batch_size, len(preference_anchors)))
+                anchor_loss = torch.stack([
+                    nn.functional.kl_div(
+                        nn.functional.log_softmax(model(
+                            preference_anchors[index].features), dim=0),
+                        preference_anchors[index].target, reduction="sum")
+                    for index in anchor_indices]).mean()
+                loss = loss + preference_weight * anchor_loss
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_gradient_norm)
@@ -731,6 +785,9 @@ def train_against_snapshot_pool(
     value_learning_rate: float = 1e-3,
     policy_gradient_reduction: str = "sum",
     parent_kl_weight: float = 0.0,
+    preference_anchors: Sequence[PreferenceAnchor] = (),
+    preference_weight: float = 0.0,
+    preference_batch_size: int = 8,
     policy_update: str = "reinforce",
     reinforce_batch_size: int = 1,
     ppo_epochs: int = 2,
@@ -765,6 +822,10 @@ def train_against_snapshot_pool(
             or policy_gradient_reduction not in ("sum", "mean")
             or value_learning_rate <= 0
             or not isfinite(parent_kl_weight) or parent_kl_weight < 0
+            or not isfinite(preference_weight) or preference_weight < 0
+            or preference_batch_size < 1
+            or preference_weight > 0 and (not preference_anchors
+                                          or policy_update != "clipped_ppo")
             or (baseline_scope == "state_value") != (value_model is not None)
             or (baseline_scope == "resource_ridge") != (resource_value_model is not None)
             or not callable(baseline_opponent_factory)
@@ -988,6 +1049,9 @@ def train_against_snapshot_pool(
                                 if ppo_gae_lambda is not None else None),
                             parent_model=parent_model,
                             parent_kl_weight=parent_kl_weight,
+                            preference_anchors=preference_anchors,
+                            preference_weight=preference_weight,
+                            preference_batch_size=preference_batch_size,
                             random_seed=random_seed + seed,
                             encoded_features=(episode.learner_features
                                               if reuse_rollout_features else None))
@@ -1073,6 +1137,9 @@ def train_against_snapshot_pool(
                         temperature=learner_temperature,
                         parent_model=parent_model,
                         parent_kl_weight=parent_kl_weight,
+                        preference_anchors=preference_anchors,
+                        preference_weight=preference_weight,
+                        preference_batch_size=preference_batch_size,
                         random_seed=random_seed + seed,
                         advantages=rollout_advantages, sample_weights=weights,
                         encoded_features=(rollout_features if reuse_rollout_features else None))

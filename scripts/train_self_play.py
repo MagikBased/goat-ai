@@ -5,6 +5,7 @@ import hashlib
 import json
 from dataclasses import replace
 from functools import partial
+from math import isfinite
 from pathlib import Path
 from time import perf_counter
 
@@ -14,15 +15,23 @@ from goat_ai.agents import RandomAgent, load_card_facts, load_card_races, load_f
 from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
-from goat_ai.replay import write_trajectory
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import (
+    read_decision_preferences,
+    read_trajectory,
+    verify_trajectory,
+    write_trajectory,
+)
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
 from goat_ai.training.resource_value import load_frozen_resource_ridge
 from goat_ai.training.self_play import (
     VisibleStateValue,
     make_tactical_opponent,
+    prepare_preference_anchors,
     train_against_snapshot_pool,
 )
+from scripts.derive_visible_rule_preferences import validate_automated_preferences
 
 
 def sha256(path: Path) -> str:
@@ -57,6 +66,46 @@ def checked_replay_hashes(terminal_reports: list[dict],
     return new_hashes
 
 
+def load_retained_preferences(manifest_path: Path, parent: dict,
+                              native_root: Path) -> list:
+    """Revalidate only preferences already present in the starting checkpoint."""
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if (manifest.get("rule_set_id") != "visible_selected_own_loss_with_responses_v11"
+            or manifest.get("labels_are_human_reviewed") is not False
+            or not isinstance(manifest.get("replays"), list)
+            or not manifest["replays"]):
+        raise ValueError("retention requires a nonempty V11 automated-rule manifest")
+    old_replays = parent.get("trajectory_sha256", {})
+    old_preferences = parent.get("preference_sha256", {})
+    if not isinstance(old_replays, dict) or not isinstance(old_preferences, dict):
+        raise TypeError("starting checkpoint lacks preference provenance")
+    facts = load_card_facts(native_root)
+    seen = set()
+    reviewed = []
+    for row in manifest["replays"]:
+        if not isinstance(row, dict):
+            raise TypeError("invalid retention manifest row")
+        replay_path = Path(row["replay"])
+        preference_path = Path(row["output"])
+        pair = (str(replay_path), str(preference_path))
+        replay_hash = sha256_file(replay_path)
+        preference_hash = sha256_file(preference_path)
+        if (pair in seen or old_replays.get(str(replay_path)) != replay_hash
+                or old_preferences.get(str(preference_path)) != preference_hash
+                or row.get("replay_sha256") != replay_hash
+                or row.get("output_sha256") != preference_hash):
+            raise ValueError("retained preference differs from parent provenance")
+        seen.add(pair)
+        trajectory = read_trajectory(replay_path)
+        verify_trajectory(trajectory, ExperimentalOcgcoreEngine(native_root))
+        audit_trajectory_visibility(trajectory)
+        preference = read_decision_preferences(preference_path, replay_hash, trajectory)
+        validate_automated_preferences(trajectory, preference, {}, facts)
+        reviewed.extend((trajectory.decisions[item.decision_index], item)
+                        for item in preference.preferences)
+    return reviewed
+
+
 def main() -> None:
     started = perf_counter()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -86,6 +135,10 @@ def main() -> None:
                         help="REINFORCE only: batch visible decisions for fewer forward/backward calls")
     parser.add_argument("--parent-kl-weight", type=float, default=0.0,
                         help="penalize divergence from the frozen starting policy on learner decisions")
+    parser.add_argument("--retain-preferences-manifest", type=Path,
+                        help="revalidate starting-checkpoint V11 preferences as PPO anchors")
+    parser.add_argument("--retain-preference-weight", type=float, default=0.0)
+    parser.add_argument("--retain-preference-batch-size", type=int, default=8)
     parser.add_argument("--policy-update", choices=("reinforce", "clipped_ppo"),
                         default="reinforce",
                         help="clipped_ppo reuses each on-policy duel for minibatch updates")
@@ -153,6 +206,13 @@ def main() -> None:
             or args.max_snapshots < 1 or args.max_decisions < 1
             or args.entropy_coefficient < 0
             or not 0 <= args.parent_kl_weight < float("inf")
+            or not isfinite(args.retain_preference_weight)
+            or args.retain_preference_weight < 0
+            or args.retain_preference_batch_size < 1
+            or (args.retain_preferences_manifest is None)
+            != (args.retain_preference_weight == 0)
+            or args.retain_preference_weight > 0
+            and args.policy_update != "clipped_ppo"
             or args.learner_temperature <= 0
             or args.value_width < 1 or args.value_learning_rate <= 0
             or args.reinforce_batch_size < 1
@@ -186,6 +246,11 @@ def main() -> None:
     except ValueError as exc:
         parser.error(str(exc))
     agent = load_policy_agent(args.checkpoint)
+    retained = (load_retained_preferences(args.retain_preferences_manifest,
+                                          parent, args.native_root)
+                if args.retain_preferences_manifest else [])
+    preference_anchors = (prepare_preference_anchors(
+        agent.model, agent.vocabulary, retained) if retained else ())
     value_model = None
     resource_value_model = None
     resource_artifact = None
@@ -254,6 +319,9 @@ def main() -> None:
         policy_gradient_reduction=args.policy_gradient_reduction,
         reinforce_batch_size=args.reinforce_batch_size,
         parent_kl_weight=args.parent_kl_weight,
+        preference_anchors=preference_anchors,
+        preference_weight=args.retain_preference_weight,
+        preference_batch_size=args.retain_preference_batch_size,
         policy_update=args.policy_update,
         ppo_epochs=args.ppo_epochs,
         ppo_batch_size=args.ppo_batch_size,
@@ -314,6 +382,13 @@ def main() -> None:
               "reinforce_batch_size": (args.reinforce_batch_size
                                        if args.policy_update == "reinforce" else None),
               "parent_kl_weight": args.parent_kl_weight,
+              "retain_preferences_manifest_sha256": (
+                  sha256_file(args.retain_preferences_manifest)
+                  if args.retain_preferences_manifest else None),
+              "retain_preference_weight": args.retain_preference_weight,
+              "retain_preference_batch_size": (
+                  args.retain_preference_batch_size if preference_anchors else None),
+              "retained_preference_decisions": len(preference_anchors),
               "policy_update": args.policy_update,
               "ppo_epochs": args.ppo_epochs if args.policy_update == "clipped_ppo" else None,
               "ppo_batch_size": (args.ppo_batch_size

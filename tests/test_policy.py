@@ -62,6 +62,7 @@ from goat_ai.training.self_play import (
     policy_gradient_update,
     ppo_clipped_update,
     predict_state_values,
+    prepare_preference_anchors,
     sample_legal_action,
     state_value_update,
     terminal_gae_advantages,
@@ -2059,6 +2060,30 @@ def test_ppo_update_accepts_mixed_rollout_advantages():
     ppo_clipped_update(policy, vocabulary, records, 0.0, 0.0, optimizer,
                        epochs=2, batch_size=2, advantages=(1.0, -1.0))
     assert torch.softmax(policy(features), 0)[1].item() > before
+
+
+def test_ppo_preference_anchor_reduces_recorded_bad_action_probability():
+    vocabulary = CardVocabulary((10, 20))
+    legal = actions()[:2]
+    record = DecisionRecord(view(), legal, legal[1])
+    torch.manual_seed(51)
+    policy = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    anchors = prepare_preference_anchors(
+        policy, vocabulary, ((record, ReviewedPreference(0, (0,), (1,))),))
+    features = encode_decision(record.observation, legal, vocabulary, 10)
+    before = torch.softmax(policy(features), dim=0)[1].item()
+    optimizer = torch.optim.SGD(policy.parameters(), lr=0.01)
+    ppo_clipped_update(policy, vocabulary, (record,), 0.0, 0.0, optimizer,
+                       epochs=2, batch_size=1, entropy_coefficient=0,
+                       preference_anchors=anchors, preference_weight=1.0)
+    after = torch.softmax(policy(features), dim=0)[1].item()
+    assert after < before
+    with pytest.raises(ValueError, match="selected bad"):
+        prepare_preference_anchors(
+            policy, vocabulary, ((record, ReviewedPreference(0, (1,), (0,))),))
+    with pytest.raises(ValueError, match="regularization"):
+        ppo_clipped_update(policy, vocabulary, (record,), 0.0, 0.0, optimizer,
+                           preference_weight=1.0)
 
 
 def test_ppo_update_reuses_identical_visible_rollout_features(monkeypatch):

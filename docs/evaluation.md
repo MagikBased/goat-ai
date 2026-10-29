@@ -1259,6 +1259,52 @@ while Tactical transfer did not improve. Keep V11 experimental and the v23
 checkpoint selected. The next evaluation needs more diverse unseen decks,
 new seeds, and enough Ring/MST opportunities to estimate fresh error rates.
 
+### Retaining own-loss preferences during PPO (29 October 2026)
+
+The self-play trainer now optionally revalidates the 49 native-replayed V11
+source trajectories and their 55 automated selected-mistake preferences against
+the starting checkpoint's file hashes. During PPO, a small auxiliary KL term
+keeps the policy near its starting distribution after the recorded bad actions
+are masked out. It uses only the recorded acting player's observation. This is
+an experimental training signal, not a rule that prohibits self-targeting;
+some self-targeting plays are correct. The manifest hash is
+`dea6e23d04534b115f76135ac080c87dd41068a46f0a019f26cc7939ff576aa2`.
+
+Two children started from the same V11 checkpoint and played the same 128
+training seeds, 106800–106927, against the same mixed Tactical and historical
+snapshot pool. Both used clipped PPO, a 0.5 parent KL weight, and the same
+optimizer and rollout schedule. The retention arm additionally used preference
+weight 0.1 and eight anchors per PPO minibatch. Their first four replay hashes
+matched exactly before the first update. Both runs reached 128 terminal games
+without a decision cap or unsupported game. The retention run took **87.03 s**
+and the control **40.03 s** on this machine. These are training wall times, not
+simulator throughput benchmarks. The retained checkpoint SHA-256 is
+`bc57217f0ba7c7e7316a02f6c06651469cf5c48d46080326aef709dc38e5d054`;
+the control SHA-256 is
+`ba46349d86cd4761cb03dd78bad7fef8fd20ee91c5242d8681f938b3bd625975`.
+
+On 26 untouched verified own-loss decisions, the control ranked a recorded bad
+action first **2/26** times and retention **1/26**. On five untouched Ring/MST
+decisions, the counts were **2/5** and **1/5**. These fixed-state checks show a
+small reduction on sampled mistakes; they do not estimate fresh in-game error
+frequency. The retention arm's 128 saved training trajectories passed native
+replay and visibility audit.
+
+For full-game evaluation, both children used the 2005 Nationals Max Suffridge
+and Jonathan Labounty Main Decks, plus the Theeresak Poonsombat Seattle list;
+the exact Main Deck compositions were absent from training. Both deck orders
+and policy seats were tested. Retention scored **32–32** directly against the
+matched control on seeds 107000–107007. Against Tactical-v14 on separate
+matched seeds 107008–107015, **both scored 16–48**. The paired retention-minus-
+control Tactical score difference was **0 percentage points**, with a 95%
+paired bootstrap interval of **−9.4 to +9.4 points**. The report comparator
+verified equal native assets, scripts, source, schedules, and unseen Main Decks.
+These results do not establish a competitive improvement, and the added
+training cost is substantial. Keep both PPO children experimental and retain
+the v23 selected checkpoint. The ignored reports and trajectories are under
+`.cache/goat-ai/v11_ppo_retention_heldout_107000_107015/` and
+`.cache/goat-ai/fv23_v11_ppo_{retain,control}_128_106800_106927*`.
+
 ## Selected own-loss preference trial (29 October 2026)
 
 The versioned `visible_selected_own_loss_v10` rule retains only V9 decisions
