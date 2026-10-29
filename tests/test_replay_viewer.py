@@ -218,6 +218,8 @@ def test_render_replay_embeds_visible_cards_and_escapes_html(tmp_path):
     write_trajectory(source, trajectory)
     assert render_replay(source, output, tmp_path / "native") == (1, 5)
     html = output.read_text()
+    assert "window.DuelAudio" in html
+    assert '<script src="/examples/duel_audio.js"></script>' not in html
     assert '"10":"Visible Monster"' in html
     assert '"11":"Revealed Monster"' in html
     assert '"12":"Privately Seen Monster"' in html

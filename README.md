@@ -146,6 +146,15 @@ drag are not highlighted. Visible card faces and card backs load from the local
 server's art cache; missing artwork displays the card name instead.
 On desktop, the field fits both players' zones and hands in the viewport; the
 sidebar scrolls independently when its details are expanded.
+The live board uses the replay viewer's vertical phase rail. Click a Graveyard
+or banished zone to inspect the visible cards with images; Deck zones display
+card backs and remaining counts while keeping live Deck order hidden. Live play
+and generated replay viewers have a shared **Sound on/off** control that keeps
+its setting in this browser. Short synthesized cues accompany summons, card
+activation, attacks, movement, phase changes, and Life Point changes. Browsers
+may wait for a click before playing audio. No Yu-Gi-Oh! game sound files are
+bundled: [EDOPro's Distribution](https://github.com/ProjectIgnis/Distribution)
+directs redistributors to the individual asset license and credit files.
 Click an available phase button to advance, use **Pass** for response windows,
 or use **End turn** when that transition is legal. Unusual prompts and every
 legal choice remain available under **All legal actions** in the sidebar.

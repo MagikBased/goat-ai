@@ -27,20 +27,25 @@
       gap: 12px; height: calc(100dvh - 24px); min-height: 0; }
     #game[hidden] { display: none; }
     #board { min-width: 0; min-height: 0; overflow: hidden; position: relative; display: grid;
-      grid-template-rows: minmax(28px, auto) clamp(60px, 10dvh, 95px)
-        minmax(0, 1fr) minmax(0, 1fr) minmax(36px, auto)
-        minmax(0, 1fr) minmax(0, 1fr) clamp(60px, 10dvh, 95px)
-        minmax(28px, auto);
-      gap: 6px; padding: 10px; border: 1px solid #386873; border-radius: 12px;
-      background: repeating-linear-gradient(35deg, #071923, #071923 70px, #0d2d37 72px); }
+      grid-template-columns: minmax(0, 1fr) 50px;
+      grid-template-rows: 32px 48px repeat(4, minmax(0, 1fr)) 48px 32px;
+      gap: 5px; padding: 10px; border: 1px solid #537884; border-radius: 12px;
+      background: radial-gradient(circle at 50% 50%, #17424eaa, transparent 55%),
+        repeating-linear-gradient(24deg, transparent 0 54px, #3477773a 55px 57px, transparent 58px 108px),
+        repeating-linear-gradient(-24deg, transparent 0 66px, #33767629 67px 68px, transparent 69px 132px), #071520; }
+    #opp-name, #own-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .player, .hand, .row { grid-column: 1; }
+    #opp-spell { grid-row: 3; } #opp-monster { grid-row: 4; }
+    #own-monster { grid-row: 5; } #own-spell { grid-row: 6; }
+    #own-hand { grid-row: 7; } #own-header { grid-row: 8; }
     .player { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
     .player strong { font-size: 1.2rem; }
     .lp { border: 2px solid #e5c963; border-radius: 30px; padding: 3px 12px;
       background: linear-gradient(90deg, #a42f45, #2878bd); font-weight: 800; }
-    .hand { display: flex; justify-content: center; gap: 5px; min-height: 0;
+    .hand { display: flex; justify-content: safe center; gap: 5px; min-height: 0;
       overflow: hidden; }
-    .hand .card { width: auto; height: 96%; max-width: 72px; flex: 0 0 auto; }
-    .row { display: grid; grid-template-columns: 65px repeat(5, minmax(0, 1fr)) 65px;
+    .hand .card { width: 62px; height: 90px; max-width: none; max-height: none; flex: 0 0 62px; }
+    .row { display: grid; grid-template-columns: minmax(60px, 10%) repeat(5, minmax(0, 1fr)) minmax(60px, 10%);
       gap: 5px; min-height: 0; overflow: hidden; }
     .zone { border: 2px solid #6dc827; border-radius: 7px; min-width: 0; min-height: 0;
       display: grid; place-items: center; position: relative; overflow: hidden; }
@@ -48,7 +53,10 @@
     .zone.drop-ready { background: #2d6b6b99; outline: 2px solid #f9e589; }
     .zone.drop-target { background: #275d6280; outline: 2px dashed #f9e589; }
     .self .zone { border-color: #e833a9; }
-    .pile { border-color: #b681d7; font-size: .8rem; text-align: center; }
+    .pile { border-color: #b681d7; font-size: .8rem; text-align: center; cursor: pointer; }
+    .pile:focus-visible { outline: 3px solid #f5dc83; outline-offset: -3px; }
+    .field-zone { border-color: #ce9c52 !important; }
+    .pile .card { pointer-events: none; }
     .zone small { position: absolute; right: 2px; bottom: 1px; background: #071923bb;
       padding: 1px 4px; border-radius: 4px; z-index: 1; }
     .card { max-width: 92%; max-height: 96%; aspect-ratio: 0.69; display: grid;
@@ -62,10 +70,18 @@
     .card .fallback.art-missing { background: #684044; font-weight: 700; }
     .card[draggable=true] { cursor: grab; }
     .card img { z-index: 1; }
-    .phase { display: flex; justify-content: center; align-items: center; gap: 8px;
+    .phase { grid-column: 2; grid-row: 3 / 7; min-height: 0; display: flex;
+      flex-direction: column; justify-content: center; align-items: center; gap: min(1.2dvh, 7px);
+      border-left: 1px solid #678a86; background: #071923ba;
       color: #a8d6da; font-weight: 700; }
-    .phase button { min-width: 43px; padding: 5px 7px; border-radius: 22px; font-size: .82rem; }
-    .phase button.current { background: #a31f56; border-color: #f5dc83; color: white; }
+    .phase .turn-label { width: 40px; padding: 4px 2px; border-radius: 6px;
+      background: #133342; text-align: center; line-height: 1.1; font-size: .72rem; }
+    .phase .turn-label span { display: block; }
+    .phase button { flex: 0 1 37px; width: 37px; min-height: 30px; padding: 2px;
+      border: 3px solid #718d94; border-radius: 50%;
+      background: radial-gradient(circle, #133853, #061123); font-size: .7rem; }
+    .phase button.current { background: radial-gradient(circle, #d80d58, #830526);
+      border-color: #faf4b1; color: white; box-shadow: 0 0 15px #fb2c77; }
     .phase button:disabled { cursor: default; opacity: .45; }
     #quick-controls { display: flex; gap: 6px; flex-wrap: wrap; }
     #quick-controls button { flex: 1 1 110px; }
@@ -90,8 +106,15 @@
     #action-list button:hover { background: #256757; }
     #search { width: 100%; }
     #history { font-size: .85rem; color: #afc7c9; max-height: 120px; overflow: auto; }
-    dialog { color: inherit; background: #142c36; border: 1px solid #628b95;
-      border-radius: 10px; max-height: 75vh; overflow: auto; }
+    dialog { color: inherit; background: #172731; border: 1px solid #739283;
+      border-radius: 12px; width: min(760px, calc(100vw - 24px)); max-height: 82dvh; overflow: auto; }
+    #pile-list { list-style: none; padding: 0; display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+    #pile-list li { min-width: 0; padding: 6px; border: 1px solid #4c6970;
+      border-radius: 7px; background: #20333c; }
+    #pile-list .card { width: 100%; height: 145px; margin: 0 auto 6px; }
+    #pile-list button { width: 100%; text-align: left; font-size: .8rem; overflow-wrap: anywhere; }
+    #pile-list button:disabled { opacity: 1; cursor: default; }
     dialog::backdrop { background: #000a; }
     @media (max-width: 850px) { #game { height: auto; display: block; }
       #board { height: 720px; } #sidebar { margin-top: 12px; height: 400px; }
@@ -133,12 +156,13 @@
       <div id="own-monster" class="row self"></div>
       <div id="own-spell" class="row self"></div>
       <div id="own-hand" class="hand"></div>
-      <div class="player"><strong id="own-name">You</strong><span id="own-lp" class="lp"></span></div>
+      <div id="own-header" class="player"><strong id="own-name">You</strong><span id="own-lp" class="lp"></span></div>
       <div id="card-actions" hidden aria-label="Card actions"></div>
     </section>
     <aside id="sidebar">
       <h1>GOAT AI · live duel</h1>
       <a href="/games/new">Create an AI replay</a>
+      <button data-duel-mute type="button" aria-label="Toggle duel sounds">🔊 Sound on</button>
       <button id="quit" type="button">Leave unfinished duel</button>
       <p id="message" role="status" aria-live="polite"></p>
       <div id="quick-controls"><button id="pass-action" type="button">Pass</button><button id="end-turn" class="primary" type="button">End turn</button></div>
@@ -153,6 +177,7 @@
   </main>
   <dialog id="pile-dialog"><h2 id="pile-title"></h2><ul id="pile-list"></ul>
     <button id="close-pile" type="button">Close</button></dialog>
+  <script src="/examples/duel_audio.js"></script>
   <script>
     const byId = id => document.getElementById(id);
     let state = null;
@@ -302,8 +327,8 @@
       const element = document.createElement("div"); element.className = "card";
       if (card?.orientation === "defense") element.classList.add("defense");
       const code = hidden ? null : card?.code;
-      const faceDown = hidden || card?.position === "facedown";
-      element.title = cardName(code);
+      const faceDown = hidden || card?.position === "facedown" || code == null;
+      element.title = faceDown ? "Face-down card" : cardName(code);
       const fallback = document.createElement("span"); fallback.className = "fallback";
       fallback.textContent = faceDown ? "Face-down card" : cardName(code); element.append(fallback);
       const image = document.createElement("img");
@@ -328,7 +353,7 @@
       }
       if (count != null) element.classList.add("pile");
       if (card) element.append(cardElement(card, false, ref));
-      else if (count != null) element.textContent = label;
+      else if (count != null && label != null) element.textContent = label;
       if (count != null) {
         const badge = document.createElement("small"); badge.textContent = count;
         element.append(badge);
@@ -350,9 +375,12 @@
     function boardRow(id, observation, player, zoneName, leftLabel, leftCount,
                       rightLabel, rightCount) {
       const row = byId(id); row.replaceChildren();
-      if (leftLabel === "Field") row.append(zone(fieldCard(observation, player, "spell_trap", 5),
-        null, null, {location:8, controller:player, sequence:5,
-          code:fieldCard(observation, player, "spell_trap", 5)?.code}));
+      if (leftLabel === "Field") {
+        const field = zone(fieldCard(observation, player, "spell_trap", 5),
+          null, null, {location:8, controller:player, sequence:5,
+            code:fieldCard(observation, player, "spell_trap", 5)?.code});
+        field.classList.add("field-zone"); field.title = "Field Spell Zone"; row.append(field);
+      }
       else row.append(pileZone(player, leftLabel, leftCount));
       for (let index = 0; index < 5; index++)
         row.append(zone(fieldCard(observation, player, zoneName, index), null, null,
@@ -362,20 +390,23 @@
     }
     function pileZone(player, label, count) {
       const location = label === "GY" ? 16 : label === "Banished" ? 32 : label === "Deck" ? 1 : 64;
-      const element = zone(null, label, count,
-        {location, controller:player, sequence:0});
+      const element = zone(null, null, count);
+      element.setAttribute("role", "button"); element.tabIndex = 0;
+      element.setAttribute("aria-label", `View Player ${player + 1} ${label}`);
+      element.title = `View Player ${player + 1} ${label}`;
+      const cards = label === "GY" ? state.observation.graveyards[player] :
+        label === "Banished" ? state.observation.banished[player] : [];
+      if (label === "Deck") element.append(cardElement(null, true));
+      else if (cards.length) element.append(cardElement(cards[cards.length - 1], false));
       if (label === "GY" || label === "Banished") {
-        element.style.cursor = "pointer";
-        element.title = `View Player ${player + 1} ${label}`;
         element.onclick = () => {
-          const cards = label === "GY" ? state.observation.graveyards[player] :
-            state.observation.banished[player];
           byId("pile-title").textContent = `Player ${player + 1} · ${label}`;
           byId("pile-list").replaceChildren(...cards.map(card => {
             const item = document.createElement("li");
             const ref = {location, controller:player, sequence:card.sequence, code:card.code};
             const button = document.createElement("button"); button.type = "button";
-            button.textContent = cardName(card.code);
+            item.append(cardElement(card, false));
+            button.textContent = card.code == null ? "Face-down card" : cardName(card.code);
             const offered = refActions(ref);
             button.disabled = !offered.length;
             button.onclick = () => { byId("pile-dialog").close();
@@ -385,7 +416,21 @@
           }));
           byId("pile-dialog").showModal();
         };
+      } else if (label === "Deck") {
+        element.onclick = () => {
+          byId("pile-title").textContent = `Player ${player + 1} · Deck`;
+          byId("pile-list").replaceChildren();
+          const note = document.createElement("li");
+          note.textContent = `${count} cards remain. Their order is hidden during a live duel.`;
+          byId("pile-list").append(note);
+          byId("pile-dialog").showModal();
+        };
       }
+      element.onkeydown = event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault(); element.click();
+        }
+      };
       return element;
     }
     function actionLabel(action) {
@@ -429,7 +474,8 @@
     function renderPhase(observation) {
       const rail = byId("phase"); rail.replaceChildren();
       const turn = document.createElement("span");
-      turn.textContent = `T${observation.turn} · P${observation.turn_player + 1}`;
+      turn.className = "turn-label";
+      turn.innerHTML = `<span>T${observation.turn}</span><span>P${observation.turn_player + 1}</span>`;
       rail.append(turn);
       for (const step of phaseSteps) {
         const button = document.createElement("button"); button.type = "button";
@@ -526,6 +572,10 @@
     }
     async function choose(index, destination = null) {
       if (busy) return;
+      const oldState = state;
+      const played = state.legal_actions[index];
+      const sound = window.DuelAudio?.action(played?.kind);
+      if (sound) window.DuelAudio.play(sound);
       busy = true; closeCardActions(); actions(); renderQuickControls();
       byId("message").textContent = "AI is responding…";
       try {
@@ -541,12 +591,28 @@
             id: next.id, action_index: matching[0].index, expected_decisions: next.decisions});
         }
         render(next);
+        const before = oldState?.observation, after = next?.observation;
+        if (before && after) {
+          const own = oldState.human_seat, other = 1 - own;
+          if (after.life_points[own] < before.life_points[own] ||
+              after.life_points[other] < before.life_points[other])
+            window.DuelAudio?.play("damage");
+          else if (after.life_points[own] > before.life_points[own] ||
+                   after.life_points[other] > before.life_points[other])
+            window.DuelAudio?.play("heal");
+          else if (after.phase !== before.phase) window.DuelAudio?.play("phase");
+          else if (JSON.stringify(after.field) !== JSON.stringify(before.field))
+            window.DuelAudio?.play("move");
+          else if (after.hand.length > before.hand.length) window.DuelAudio?.play("draw");
+        }
       }
       catch (error) { byId("message").textContent = error.message; byId("message").classList.add("error"); }
       finally { busy = false; actions(); renderQuickControls();
         if (state && !state.terminal) renderPhase(state.observation); }
     }
     byId("search").addEventListener("input", actions);
+    byId("sidebar").querySelector("[data-duel-mute]").addEventListener("click", () =>
+      window.DuelAudio?.toggle());
     byId("close-pile").addEventListener("click", () => byId("pile-dialog").close());
     byId("quit").addEventListener("click", async () => {
       if (!state || state.terminal || !confirm("Leave this unfinished duel? It will not be saved as a replay.")) return;

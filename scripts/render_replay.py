@@ -12,6 +12,7 @@ from goat_ai.replay import read_trajectory
 from goat_ai.replay.verify import verify_trajectory
 
 TEMPLATE = Path(__file__).resolve().parent.parent / "examples/replay_viewer.html"
+AUDIO_SCRIPT = TEMPLATE.with_name("duel_audio.js")
 
 
 def _card_codes(value) -> set[int]:
@@ -119,6 +120,9 @@ def _embed_viewer(raw: dict | None, source_sha256: str, names: dict[int, str],
                   options: dict[int, str], images: dict[int | str, str],
                   reviewer: dict | None = None) -> str:
     template = TEMPLATE.read_text(encoding="utf-8")
+    template = template.replace(
+        '<script src="/examples/duel_audio.js"></script>',
+        f"<script>{AUDIO_SCRIPT.read_text(encoding='utf-8')}</script>")
     # Escaping '<' prevents replay or database text from closing a script element.
     replay_json = json.dumps(raw, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")
     names_json = json.dumps(names, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")

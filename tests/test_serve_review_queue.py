@@ -22,8 +22,12 @@ from goat_ai.replay import (
     write_trajectory,
 )
 from goat_ai.replay.fingerprint import sha256_file
-from scripts import (convert_rejected_review_notes, create_upstream_review,
-                     launch_review_server, serve_review_queue)
+from scripts import (
+    convert_rejected_review_notes,
+    create_upstream_review,
+    launch_review_server,
+    serve_review_queue,
+)
 from scripts.launch_review_server import server_healthy
 from scripts.render_replay import render_replay
 from scripts.shortlist_policy_disagreements import write_review_index
@@ -224,6 +228,8 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
     shutil.copyfile(serve_review_queue.ROOT / "examples/create_game.html", page)
     shutil.copyfile(serve_review_queue.ROOT / "examples/play_game.html",
                     page.parent / "play_game.html")
+    shutil.copyfile(serve_review_queue.ROOT / "examples/duel_audio.js",
+                    page.parent / "duel_audio.js")
     def review_queue(self, identifier):
         if identifier != "a" * 16:
             raise ValueError("invalid game ID")
@@ -264,6 +270,8 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
         with urlopen(f"{base}/games/play", timeout=5) as response:
             assert response.url.endswith("/examples/play_game.html")
             assert b"Play against GOAT AI" in response.read()
+        with urlopen(f"{base}/examples/duel_audio.js", timeout=5) as response:
+            assert b"window.DuelAudio" in response.read()
         assert _request(f"{base}/api/games/options")[1]["decks"] == []
         assert _request(f"{base}/api/live/start", {
             "deck1": "a", "deck2": "b", "human_seat": 0,

@@ -200,6 +200,7 @@
           <button id="previous" title="Left arrow">Previous</button>
           <button id="play">Play</button>
           <button id="next" title="Right arrow">Next</button>
+          <button id="mute" data-duel-mute type="button" aria-label="Toggle duel sounds">🔊 Sound on</button>
           <button id="previous-common" type="button">Prev common</button>
           <button id="next-common" type="button">Next common</button>
           <span id="common-count" class="muted" title="Reviewable decisions involving cards in at least five of six sourced tournament Main Decks"></span>
@@ -281,6 +282,7 @@
   <script id="embedded-images" type="application/json">__EMBEDDED_IMAGES__</script>
   <script id="embedded-reviewer" type="application/json">__EMBEDDED_REVIEWER__</script>
   <script id="embedded-sha256" type="application/json">"__SOURCE_SHA256__"</script>
+  <script src="/examples/duel_audio.js"></script>
   <script>
     "use strict";
     let replay = null;
@@ -1137,6 +1139,21 @@
       for (const timeout of travelTimers) clearTimeout(timeout);
       travelTimers = [];
       const beforeObservation = previousObservation;
+      if (animateNext && previousFrame >= 0 && index > previousFrame && beforeObservation) {
+        const changedLife = observation.life_points.some((life, player) =>
+          life !== beforeObservation.life_points[player]);
+        const lostLife = observation.life_points.some((life, player) =>
+          life < beforeObservation.life_points[player]);
+        const prior = decisions.slice(previousFrame, index).map(decision =>
+          decision.selected_action?.kind).filter(Boolean);
+        const active = prior.findLast(kind => window.DuelAudio?.action(kind));
+        const sound = changedLife ? (lostLife ? "damage" : "heal")
+          : active ? window.DuelAudio?.action(active)
+          : observation.phase !== beforeObservation.phase ? "phase"
+          : JSON.stringify(observation.field) !== JSON.stringify(beforeObservation.field)
+            ? "move" : observation.hand.length > beforeObservation.hand.length ? "draw" : null;
+        if (sound) window.DuelAudio?.play(sound);
+      }
       const oldVisuals = new Map([...board.querySelectorAll("[data-field-key]")].map(element => [
         element.dataset.fieldKey, {card: element.cloneNode(true), rect: element.getBoundingClientRect()}]));
       hidePreview();
@@ -1504,6 +1521,7 @@
     });
     byId("previous").addEventListener("click", () => move(-1));
     byId("next").addEventListener("click", () => move(1));
+    byId("mute").addEventListener("click", () => window.DuelAudio?.toggle());
     byId("previous-common").addEventListener("click", () => moveCommon(-1));
     byId("next-common").addEventListener("click", () => moveCommon(1));
     byId("legal-more").addEventListener("click", () => { legalShown += 100; render(); });

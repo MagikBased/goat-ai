@@ -506,9 +506,10 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                    and target.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
             creator_html = target in (ROOT / "examples/create_game.html",
                                       ROOT / "examples/play_game.html")
+            duel_audio = target == ROOT / "examples/duel_audio.js"
             game_html = (target.is_relative_to(creator.output_dir)
                          and target.suffix == ".html")
-            if not (queue_html or art or creator_html or game_html):
+            if not (queue_html or art or creator_html or duel_audio or game_html):
                 self.send_error(404, "Only review, game, and card-art pages are served")
                 return
             super().do_GET()

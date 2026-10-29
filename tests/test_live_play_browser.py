@@ -182,7 +182,7 @@ def test_desktop_board_keeps_both_hands_and_card_art_in_view(tmp_path, width, he
         Math.round(ownHand.bottom) <= Math.round(board.bottom),
         card.height > 20 && card.height <= zoneRect.height,
         card.width > 10 && card.width <= zoneRect.width,
-        handCard.height > 20 && handCard.bottom <= ownHand.bottom,
+        handCard.height > ownHand.height && handCard.top >= ownHand.top,
         rowHeights.every((height,index) => Math.abs(height-emptyHeights[index]) < 1),
         document.documentElement.scrollHeight <= window.innerHeight + 1
       ].join('|');
@@ -197,3 +197,83 @@ def test_desktop_board_keeps_both_hands_and_card_art_in_view(tmp_path, width, he
     match = re.search(r'data-layout-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1200:]
     assert match.group(1) == "true|true|true|true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_live_piles_show_visible_cards_and_deck_back_without_hidden_identity(tmp_path):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      render({id:'1234567890abcdef',human_seat:0,decisions:0,terminal:false,
+        card_names:{123:'Public Monster',456:'Private Card'},
+        observation:{viewer:0,acting_player:0,turn_player:0,turn:2,phase:'main1',
+          life_points:[8000,8000],hand:[],field:[],graveyards:[
+            [{code:123,sequence:0,position:'faceup'}],[]],
+          banished:[[],[{code:null,sequence:0,position:'facedown'}]],
+          extra_deck_counts:[0,0],deck_counts:[34,35],opponent_hand_count:0,
+          public_history:[],known_opponent_hand_cards:[],known_opponent_field_cards:[],
+          own_extra_deck:[],restrictions:[],chain:[]},legal_actions:[]});
+      const board = document.getElementById('board');
+      const phase = document.getElementById('phase').getBoundingClientRect();
+      const field = document.getElementById('own-monster').getBoundingClientRect();
+      const deck = document.querySelector('#own-monster .pile');
+      const deckBack = deck.querySelector('img')?.getAttribute('src')?.endsWith('/cover.png');
+      const ownGY = document.querySelector('#own-spell .pile:last-child');
+      ownGY.click();
+      const graveOk = document.getElementById('pile-dialog').open &&
+        document.getElementById('pile-list').textContent.includes('Public Monster') &&
+        document.querySelector('#pile-list img')?.getAttribute('src')?.endsWith('/123.jpg');
+      document.getElementById('pile-dialog').close();
+      const oppBanished = document.querySelector('#opp-spell .pile:first-child');
+      oppBanished.click();
+      const hiddenOk = document.getElementById('pile-list').textContent.includes('Face-down card') &&
+        !document.getElementById('pile-list').textContent.includes('Private Card') &&
+        document.querySelector('#pile-list img')?.getAttribute('src')?.endsWith('/cover.png');
+      document.body.dataset.pileProbe = [deckBack,graveOk,hiddenOk,
+        phase.left >= field.right,board.scrollHeight <= board.clientHeight].join('|');
+    </script></body>"""
+    path = tmp_path / "live_piles.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--window-size=1365,768",
+        "--virtual-time-budget=1200", "--dump-dom", path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-pile-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "true|true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_duel_audio_mute_and_event_mapping_in_browser(tmp_path):
+    examples = Path(__file__).resolve().parents[1] / "examples"
+    template = (examples / "play_game.html").read_text()
+    audio = (examples / "duel_audio.js").read_text()
+    template = template.replace('<script src="/examples/duel_audio.js"></script>',
+                                f"<script>{audio}</script>")
+    probe = """<script>
+      const button = document.querySelector('[data-duel-mute]');
+      const initial = window.DuelAudio.muted;
+      button.click();
+      const flipped = window.DuelAudio.muted;
+      button.click();
+      document.body.dataset.audioProbe = [
+        initial !== flipped,
+        window.DuelAudio.muted === initial,
+        button.getAttribute('aria-pressed') === String(!initial),
+        window.DuelAudio.action('normal_summon') === 'summon',
+        window.DuelAudio.action('activate') === 'activate',
+        window.DuelAudio.action('attack') === 'attack',
+        window.DuelAudio.action('change_position') === 'move',
+        window.DuelAudio.action('end_phase') === 'phase'
+      ].join('|');
+    </script></body>"""
+    path = tmp_path / "live_audio.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=1200", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-audio-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "true|true|true|true|true|true|true|true"
