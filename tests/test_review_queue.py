@@ -5,11 +5,14 @@ import json
 import re
 import shutil
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
+from goat_ai.actions import Action
 from scripts.refresh_review_queue import refresh_review_queue
 from scripts.shortlist_policy_disagreements import (
+    optional_upstream_activation,
     select_diverse_candidates,
     write_review_index,
 )
@@ -43,6 +46,42 @@ def test_review_queue_puts_visible_audit_before_confidence_margin():
     ]
     chosen = select_diverse_candidates(candidates, 1, 1)
     assert chosen[0]["decision_index"] == 2
+
+
+def test_focused_review_keeps_distinct_contexts_for_same_card_action():
+    cases = [
+        {"trajectory": "a", "decision_index": 10, "probability_margin": 0.9,
+         "audit_flags": ["nobleman_only_own_set_monster"],
+         "_fingerprint": ("activate", 504700116)},
+        {"trajectory": "b", "decision_index": 20, "probability_margin": 0.8,
+         "audit_flags": ["nobleman_only_own_set_monster"],
+         "_fingerprint": ("activate", 504700116)},
+    ]
+    assert len(select_diverse_candidates(cases, 2, 1)) == 1
+    focused = select_diverse_candidates(cases, 2, 1, dedupe_fingerprints=False)
+    assert [(item["trajectory"], item["decision_index"]) for item in focused] == [
+        ("a", 10), ("b", 20)]
+
+
+def test_forced_own_target_review_returns_to_optional_activation():
+    breaker = 71413901
+    pass_action = Action("pass", "pass", 1)
+    activate = Action("breaker", "chain", 1, {"code": breaker})
+    target = Action("own trap", "select_card", 1, {"controller": 1})
+    prior_view = SimpleNamespace(turn=4, acting_player=1)
+    forced_view = SimpleNamespace(
+        turn=4, acting_player=1,
+        chain=(SimpleNamespace(card_code=breaker),),
+    )
+    replay = SimpleNamespace(decisions=(
+        SimpleNamespace(observation=prior_view, selected_action=activate,
+                        legal_actions=(activate, pass_action)),
+        SimpleNamespace(observation=forced_view, selected_action=target,
+                        legal_actions=(target,)),
+    ))
+    assert optional_upstream_activation(replay, 1) == 0
+    replay.decisions[0].legal_actions = (activate,)
+    assert optional_upstream_activation(replay, 1) is None
 
 
 def test_review_queue_can_rank_raw_logit_gaps_without_changing_default():

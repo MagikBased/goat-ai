@@ -2411,3 +2411,36 @@ The three P2 decisions are offered, without preset labels, in the ignored
 recorded action and legal alternatives come from the native-verified,
 visibility-audited replay. The queue does not change the original replay or
 previous review choices.
+
+## Focused own-card removal review queue (29 October 2026)
+
+Sixteen fresh greedy v23-versus-Tactical duels on seeds 99900–99907,
+alternating policy seats across Theeresak/Phoenix and Ryan Hayakawa/Bryan
+Coronel New Jersey pairings, completed and passed exact native replay and
+player-visibility checks (**8,275** decisions). The policy's **4,068**
+reproduced choices included five own-only Nobleman of Crossout activations
+and one Breaker target on its own back row. The audit saw 12 distinct
+turn/phase opportunities for own-only Nobleman and the agent activated it in
+five. These are visible review flags, not claims about every line's optimal
+play. The ignored audit is
+`.cache/goat-ai/own_card_parent_review_99900_99907/audit.json` (SHA-256
+`e6963138e2cafc4dc61cf00c26b5323b2c58e944ff4a13211bde406b58cdcc58`).
+
+The focused queue contains **all six** flagged contexts. Its Breaker target
+prompt had only one legal target, so that item instead opens the earlier
+optional Breaker activation where **Pass** was legal. This allows the reviewer
+to label the avoidable activation rather than choose another forced target.
+The queue gives no preset training labels; Tactical and Pass are suggestions
+for inspection. All six queue items and their four exact source replays passed
+the queue provenance and legal-action validator. The ignored queue is
+`.cache/goat-ai/own_card_parent_review_99900_99907/queue.json` (SHA-256
+`f8da8c20b22052b31d4606e4b3b8c10f1e16edb6c81bbf98b922b90eec16a9a1`).
+Open it with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/own_card_parent_review_99900_99907/queue.json
+```
+
+The review server saves selected legal actions locally. A reviewer can also
+mark an item as an upstream mistake or leave it unlabeled; neither action is
+silently converted into a training preference.

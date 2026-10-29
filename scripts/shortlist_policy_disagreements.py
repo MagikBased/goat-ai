@@ -32,7 +32,8 @@ from scripts.render_replay import _card_names, _option_texts, render_replay
 
 
 def select_diverse_candidates(candidates: list[dict], limit: int,
-                              per_replay: int, *, rank_by: str = "probability"
+                              per_replay: int, *, rank_by: str = "probability",
+                              dedupe_fingerprints: bool = True,
                               ) -> list[dict]:
     """Take confident disagreements without letting one prompt dominate."""
     if limit < 1 or per_replay < 1 or rank_by not in ("probability", "logit"):
@@ -46,7 +47,8 @@ def select_diverse_candidates(candidates: list[dict], limit: int,
             item["trajectory"], item["decision_index"])):
         fingerprint = candidate["_fingerprint"]
         replay = candidate["trajectory"]
-        if fingerprint in fingerprints or replay_counts[replay] >= per_replay:
+        if ((dedupe_fingerprints and fingerprint in fingerprints)
+                or replay_counts[replay] >= per_replay):
             continue
         fingerprints.add(fingerprint)
         replay_counts[replay] += 1
@@ -84,6 +86,24 @@ def disagreement_fingerprint(record, teacher_action) -> tuple:
     return (phase, chain_source,
             selected.kind, selected.parameters.get("code"),
             teacher_action.kind, teacher_action.parameters.get("code"))
+
+
+def optional_upstream_activation(trajectory, forced_index: int) -> int | None:
+    """Find the avoidable activation behind a forced effect-choice prompt."""
+    forced = trajectory.decisions[forced_index]
+    if len(forced.legal_actions) != 1 or not forced.observation.chain:
+        return None
+    source = forced.observation.chain[-1]
+    for prior_index in range(forced_index - 1, max(-1, forced_index - 65), -1):
+        prior = trajectory.decisions[prior_index]
+        if prior.observation.turn != forced.observation.turn:
+            break
+        if (prior.observation.acting_player == forced.observation.acting_player
+                and prior.selected_action.kind in ("activate", "chain")
+                and prior.selected_action.parameters.get("code") == source.card_code
+                and any(action.kind == "pass" for action in prior.legal_actions)):
+            return prior_index
+    return None
 
 
 def write_review_index(selected: list[dict], output: Path,
@@ -400,6 +420,9 @@ def main() -> None:
     parser.add_argument("--min-logit-margin", type=float, default=0.0,
                         help="keep only disagreements where the raw model favors its action "
                              "over Tactical by at least this score gap")
+    parser.add_argument("--focus-audit-category", action="append", default=[],
+                        help="keep only these visible review-flag categories; allow distinct "
+                             "game contexts for the same card and action")
     parser.add_argument("--visible-faceup-card", type=int,
                         help="review decisions while this known face-up card is on the field")
     parser.add_argument("--review-option-prompts", action="store_true",
@@ -445,6 +468,7 @@ def main() -> None:
             v12_guards=True, v13_guards=True, v14_guards=True)
     candidates = []
     replay_report = []
+    unresolved_forced_prompts = 0
     for path in args.replays:
         source_hash = sha256_file(path)
         trajectory = read_trajectory(path)
@@ -474,8 +498,20 @@ def main() -> None:
                     raise ValueError(f"{path}: recorded comparison policy differs at {index}")
                 comparison_choices_verified += 1
         audit_by_index: dict[int, list[str]] = {}
+        upstream_by_index: dict[int, int] = {}
         for finding in review_candidates(trajectory, card_races, weak_flip_attacks,
                                          card_facts=card_facts):
+            if (args.focus_audit_category
+                    and finding.category in args.focus_audit_category
+                    and len(trajectory.decisions[finding.decision_index].legal_actions) == 1):
+                upstream = optional_upstream_activation(
+                    trajectory, finding.decision_index)
+                if upstream is None:
+                    unresolved_forced_prompts += 1
+                    continue
+                audit_by_index.setdefault(upstream, []).append(finding.category)
+                upstream_by_index[upstream] = finding.decision_index
+                continue
             audit_by_index.setdefault(finding.decision_index, []).append(finding.category)
         disagreements = 0
         policy_choices = 0
@@ -503,7 +539,9 @@ def main() -> None:
                 logits = model(features.to(next(model.parameters()).device))
                 probabilities = torch.softmax(logits, 0).cpu()
             policy_index = legal.index(record.selected_action)
-            alternative = (comparison_agent.select_action(record.observation, legal)
+            alternative = (next(action for action in legal if action.kind == "pass")
+                           if index in upstream_by_index else
+                           comparison_agent.select_action(record.observation, legal)
                            if comparison_agent else
                            fresh_teacher().select_action(record.observation, legal))
             if alternative not in legal:
@@ -537,6 +575,8 @@ def main() -> None:
                 "logit_margin": round(logit_margin, 6),
                 "audit_flags": audit_flags,
                 "teacher_disagrees": disagreed,
+                **({"upstream_target_decision_index": upstream_by_index[index]}
+                   if index in upstream_by_index else {}),
                 **({"option_source_card": record.observation.chain[-1].card_code}
                    if args.review_option_prompts and record.observation.chain else {}),
                 **({"visible_faceup_card": args.visible_faceup_card,
@@ -559,8 +599,15 @@ def main() -> None:
                               "policy_choices": policy_choices,
                               "disagreements": disagreements,
                               "comparison_choices_verified": comparison_choices_verified})
-    selected = select_diverse_candidates(candidates, args.limit, args.per_replay,
-                                         rank_by=args.rank_by)
+    if args.focus_audit_category:
+        wanted = set(args.focus_audit_category)
+        candidates = [candidate for candidate in candidates
+                      if wanted.intersection(candidate["audit_flags"])]
+        if not candidates:
+            raise ValueError("no verified decisions matched the requested audit categories")
+    selected = select_diverse_candidates(
+        candidates, args.limit, args.per_replay, rank_by=args.rank_by,
+        dedupe_fingerprints=not args.focus_audit_category)
     if args.render_viewers:
         viewer_dir = args.output.parent / (args.output.stem + "_viewers")
         for path in sorted({item["trajectory"] for item in selected}):
@@ -584,24 +631,32 @@ def main() -> None:
                  if comparison_hash else {}),
               "rank_by": args.rank_by,
               "min_logit_margin": args.min_logit_margin,
-              "selection": ("learner_select_option_prompts"
+              "selection": ("focused_visible_audit_distinct_game_contexts"
+                            if args.focus_audit_category else
+                            "learner_select_option_prompts"
                             if args.review_option_prompts else
                             "public_faceup_age_then_model_margin_distinct_prompt"
                             if args.visible_faceup_card is not None else
                             "visible_audit_then_model_margin_distinct_prompt_max_per_replay"),
               **({"review_option_prompts": True} if args.review_option_prompts else {}),
+              **({"focus_audit_categories": sorted(set(args.focus_audit_category))}
+                 if args.focus_audit_category else {}),
               **({"visible_faceup_card": args.visible_faceup_card,
                   "min_faceup_turns": args.min_faceup_turns}
                  if args.visible_faceup_card is not None else {}),
               "replays": replay_report,
               "candidate_count": len(candidates),
+              **({"unresolved_forced_prompts": unresolved_forced_prompts}
+                 if args.focus_audit_category else {}),
               "selected": selected}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
                            encoding="utf-8")
     if args.render_viewers:
         write_review_index(selected, args.output, args.native_root,
-                           comparison_label=comparison_label)
+                           comparison_label=("Legal alternative"
+                                             if args.focus_audit_category else
+                                             comparison_label))
     print(json.dumps({"output": str(args.output), "replays": len(replay_report),
                       "candidate_count": len(candidates), "selected": len(selected),
                       "verified_decisions": sum(item["verified_decisions"]

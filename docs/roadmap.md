@@ -2460,3 +2460,9 @@ child's 0/16 held-out flagged top choices and split 17–15 against that child
 in fresh direct games, with the paired interval crossing even play. Scaling
 the same automated rule has not established a stronger checkpoint; prioritize
 better decision labels and opponent transfer before promotion.
+A [focused own-card removal review queue](replay_audit.md#focused-own-card-removal-review-queue-29-october-2026)
+now offers six independently replay-verified v23 choices across four source
+duels. One forced Breaker target is represented by its earlier optional
+activation, so a reviewer can choose Pass if that was the actual mistake.
+These are review candidates only; wait for independent legal-action choices
+before treating them as training labels.
