@@ -185,3 +185,89 @@ def test_own_set_card_previews_face_without_revealing_opponent_set(tmp_path):
     match = re.search(r'data-preview-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
     assert match.group(1) == "true|true|101|hidden"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_old_server_page_auto_passes_forced_windows_but_stops_for_chain(tmp_path):
+    page = Path(__file__).resolve().parents[1] / "examples/play_game.html"
+    probe = """<script>
+      const observation = {turn:1,turn_player:0,acting_player:0,phase:'draw',
+        life_points:[8000,8000],extra_deck_counts:[0,0],deck_counts:[35,35],
+        hand:[],opponent_hand_count:5,field:[],graveyards:[[],[]],banished:[[],[]],
+        known_opponent_hand_cards:[],known_opponent_field_cards:[],
+        own_extra_deck:[],restrictions:[],chain:[],public_history:[]};
+      const pass = {kind:'pass',parameters:{}};
+      const chain = {kind:'chain',parameters:{code:101}};
+      const wrap = (decisions, legal_actions) => ({id:'old-server',terminal:false,
+        human_seat:0,decisions,observation,legal_actions,card_names:{101:'Quick effect'}});
+      const replies = [wrap(1,[pass]),{
+        ...wrap(2,[chain,pass]),observation:{...observation,turn_player:1}}];
+      const sent = [];
+      window.fetch = async (path, options) => {
+        if (path === '/api/live/choice') {
+          const request = JSON.parse(options.body);
+          sent.push(request.action_index + '@' + request.expected_decisions);
+          return {ok:true,json:async () => replies.shift()};
+        }
+        throw new Error('probe only');
+      };
+      setTimeout(() => render(wrap(0,[pass])), 40);
+      setTimeout(() => { document.body.dataset.forcedPassProbe =
+        [sent.join(','),state.decisions,state.legal_actions.length].join('|'); }, 280);
+    </script></body>"""
+    html = tmp_path / "live.html"
+    html.write_text(page.read_text().replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=700", "--dump-dom",
+        html.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-forced-pass-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "0@0,0@1|2|2"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_own_optional_chain_auto_passes_unless_holding_priority(tmp_path):
+    page = Path(__file__).resolve().parents[1] / "examples/play_game.html"
+    probe = """<script>
+      const observation = {turn:1,turn_player:0,acting_player:0,phase:'main1',
+        life_points:[8000,8000],extra_deck_counts:[0,0],deck_counts:[35,35],
+        hand:[],opponent_hand_count:5,field:[],graveyards:[[],[]],banished:[[],[]],
+        known_opponent_hand_cards:[],known_opponent_field_cards:[],own_extra_deck:[],
+        restrictions:[],chain:[],public_history:[]};
+      const pass = {kind:'pass',parameters:{}};
+      const chain = {kind:'chain',parameters:{code:101}};
+      const wrap = (id, decisions, observation, legal_actions) => ({id,
+        terminal:false,human_seat:0,decisions,observation,legal_actions,
+        card_names:{101:'Quick effect'}});
+      const sent = [];
+      window.fetch = async (path, options) => {
+        if (path !== '/api/live/choice') throw new Error('probe only');
+        const request = JSON.parse(options.body);
+        sent.push(request.id + ':' + request.action_index);
+        return {ok:true,json:async () => wrap(request.id,1,observation,
+          [{kind:'end_phase',parameters:{}}])};
+      };
+      setTimeout(() => render(wrap('own',0,observation,[chain,pass])),40);
+      setTimeout(() => {
+        byId('hold-priority').checked = true;
+        render(wrap('hold',0,observation,[chain,pass]));
+      },120);
+      setTimeout(() => {
+        byId('hold-priority').checked = false;
+        render(wrap('opponent',0,{...observation,turn_player:1,
+          chain:[{controller:1,card_code:102}]},[chain,pass]));
+      },200);
+      setTimeout(() => { document.body.dataset.optionalPassProbe = sent.join(','); },300);
+    </script></body>"""
+    html = tmp_path / "live.html"
+    html.write_text(page.read_text().replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=750", "--dump-dom",
+        html.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-optional-pass-probe="([^"]*)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "own:1"
