@@ -919,6 +919,40 @@ establish generalization; the earlier fresh 64-duel direct comparison remains
 
 ## Visible own-card losses in the selected policy (28 October 2026)
 
+### Observed material at shortlisted own-card decisions (29 October 2026)
+
+The 17 decisions in the outcome-blind [own-card review queue](replay_audit.md#idle-own-ring-coverage-and-outcome-blind-review-29-october-2026)
+were checked again against their exact native replays and player-visibility
+audit: **10,659** source decisions verified. For the **15** selected effect
+activations with a later decision after the chain closed, the acting player's
+visible hand-plus-non-Token-field margin changed by **−1** in one case,
+**−2** in eleven, and **−3** in three. One of the other queue decisions is a
+later Ring target prompt, not an activation. The remaining Ring activation
+ended the duel with an open chain, so no post-chain material result is
+reported for it. None of the 15 measured intervals included another
+selected activation.
+
+This quantifies the recorded material losses in a selected set of suspicious
+plays. It does not estimate the value of an alternative action, hidden
+responses, effect synergies, or how often the same mistakes occur in fresh
+games. The ignored report is
+`.cache/goat-ai/ring_guard_blind_104400_104407/observed_material_at_review_v1.json`
+(SHA-256 `ba327e75daa7a5ca2e281c8346ade7149e98c53f3f26f96c703ddb1cbe48e7dd`).
+Reproduce it with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/audit_review_material.py \
+  .cache/goat-ai/ring_guard_blind_104400_104407/own_card_review_queue.json \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/ring_guard_blind_104400_104407/observed_material_at_review_v1.json
+```
+
+The model already encodes the target's controller and public board counts,
+but those inputs have not produced reliable avoidance of these losses. The
+next checkpoint comparison should measure own-card activation and target
+errors at their *opportunities* in fresh complete games, alongside match
+strength, rather than treating total decision count as the denominator.
+
 The weak average material association and the v5 preference trial do **not**
 show that visibly wasteful self-targeting is rare or harmless. A focused audit
 used 64 sampled, replay-verified and visibility-audited self-play trajectories

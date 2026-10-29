@@ -10,6 +10,7 @@ from goat_ai.evaluation.effect_material import (
 )
 from goat_ai.observations import CardView, ChainLinkView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory
+from scripts.audit_review_material import material_review_rows
 
 MONSTER = 100
 SPELL = 200
@@ -74,6 +75,23 @@ def test_unresolved_activation_is_not_called_a_material_result():
         record(view(), "pass"),
     ), winner=None)
     assert effect_material_changes(trajectory, FACTS) == []
+
+
+def test_review_material_distinguishes_resolved_target_prompt_and_open_chain():
+    pending = (ChainLinkView(1, SPELL, 0, 2, 0),)
+    trajectory = Trajectory("goat", ("a", "b"), 1, (
+        record(view(hand=1), "activate", SPELL, 2),
+        record(view(hand=0, chain=pending), "pass"),
+        record(view(hand=0), "select_card"),
+        record(view(hand=0), "activate", SPELL, 2),
+        record(view(hand=0, chain=pending), "pass"),
+    ), winner=None)
+    offered = {index: {"audit_flags": ["review"]} for index in (0, 2, 3)}
+    rows = material_review_rows(trajectory, offered, FACTS)
+    assert [row["status"] for row in rows] == [
+        "resolved", "not_activation", "no_chain_closure"]
+    assert [row["material_delta"] for row in rows] == [-1, None, None]
+    assert rows[0]["resolved_before_decision"] == 2
 
 
 def test_paired_outcome_uses_duels_with_both_seats_and_single_activations():
