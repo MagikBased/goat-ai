@@ -1,5 +1,25 @@
 # Baseline evaluation log
 
+## Own-card losses remain a playing-strength problem (29 October 2026)
+
+The current guard experiments have **not** established a win-rate improvement.
+In the seed-124112 Ring case below, the v9 automated material labels missed
+the Ring activation at decision 820. The older `visible_audit_v1` target rule
+would prefer either opposing Sheep Token at decision 821 over the own Dekoichi,
+but spending Ring on a zero-ATK token is still a poor trade. Treating the
+target choice as the entire error would teach an incomplete lesson.
+
+The new opt-in `visible_selected_own_loss_with_idle_ring_v13` rule emits a
+preference at the activation decision when the opponent controls only visible
+Sheep Tokens, the actor has a face-up monster, and no visible own Ring target
+could deal lethal damage. On that exact replay it compares the selected Ring
+activation (legal index 7) with the offered Battle Phase and End Phase actions
+(indices 8 and 9). The rule is a visible-state training hypothesis, not a
+winning-move label. It leaves all prior versioned rule sets unchanged and does
+not claim that either phase action wins the duel; the exact branch experiment
+below found that a one-step delay can repeat the same error later. No v13
+checkpoint or competitive evaluation has yet been produced.
+
 ## Ring on own Dekoichi: target information versus learned value (29 October 2026)
 
 At seed 124112, policy seat 0, zero-based decision 820, the selected v23/v1

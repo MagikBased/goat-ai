@@ -13,6 +13,8 @@ from pathlib import Path
 from goat_ai.agents.card_metadata import load_card_facts, load_weak_flip_monster_attack
 from goat_ai.agents.tactical_guard import (
     MYSTICAL_SPACE_TYPHOON,
+    RING_OF_DESTRUCTION,
+    SHEEP_TOKENS,
     safe_idle_own_ring_indices,
     safe_one_shot_response_indices,
     safe_optional_own_loss_indices,
@@ -47,6 +49,7 @@ RULE_SET_V9 = "visible_optional_own_loss_v9"
 RULE_SET_V10 = "visible_selected_own_loss_v10"
 RULE_SET_V11 = "visible_selected_own_loss_with_responses_v11"
 RULE_SET_V12 = "visible_selected_own_loss_with_own_mst_v12"
+RULE_SET_V13 = "visible_selected_own_loss_with_idle_ring_v13"
 SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -109,6 +112,48 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID,
            card_facts=None
            ) -> tuple[list[dict], Counter]:
     """Keep one unambiguous automated comparison per recorded decision."""
+    if rule_set_id == RULE_SET_V13:
+        if card_facts is None:
+            raise ValueError("v13 labels require printed card facts")
+        existing, counts = derive(trajectory, candidates, rule_set_id=RULE_SET_V12,
+                                  card_facts=card_facts)
+        seat = (trajectory.skill_metadata or {}).get(
+            "learner_seat" if trajectory.source == "self_play_rl"
+            else "demonstrator_seat")
+        if type(seat) is not int or seat not in (0, 1):
+            raise ValueError("v13 labels require a recorded policy seat")
+        seen = {item["decision_index"] for item in existing}
+        additions = []
+        for index, record in enumerate(trajectory.decisions):
+            obs, selected = record.observation, record.selected_action
+            if (index in seen or obs.acting_player != seat or obs.chain
+                    or selected.kind != "activate"
+                    or selected.parameters.get("code") != RING_OF_DESTRUCTION
+                    or obs.turn_player != seat or obs.phase not in ("main1", "main2")):
+                continue
+            enemy = [card for card in obs.field
+                     if card.controller != seat and card.zone == "monster"]
+            own = [card for card in obs.field
+                   if card.controller == seat and card.zone == "monster"
+                   and card.position == "faceup"]
+            # This is an idle, token-only board: Ring cannot remove an opposing
+            # non-token card. Preserve unusual lethal own-target opportunities.
+            if (not enemy or any(card.position != "faceup"
+                                 or card.code not in SHEEP_TOKENS for card in enemy)
+                    or not own or any(card.attack is not None
+                                      and card.attack >= obs.life_points[1 - seat]
+                                      for card in own)):
+                continue
+            preferred = [i for i, action in enumerate(record.legal_actions)
+                         if action.kind in ("battle_phase", "end_phase")]
+            if not preferred:
+                continue
+            additions.append({"decision_index": index,
+                              "preferred_action_indices": preferred,
+                              "disfavored_action_indices": [
+                                  record.legal_actions.index(selected)]})
+        counts["selected_idle_ring_token_only"] = len(additions)
+        return sorted(existing + additions, key=lambda item: item["decision_index"]), counts
     if rule_set_id == RULE_SET_V12:
         if card_facts is None:
             raise ValueError("v12 own-MST labels require printed card facts")
@@ -480,7 +525,7 @@ def validate_automated_preferences(trajectory, preferences, weak_flip_attacks,
     candidates = (() if rule_set_id in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
                                        RULE_SET_V6, RULE_SET_V7, RULE_SET_V8,
                                        RULE_SET_V9, RULE_SET_V10, RULE_SET_V11,
-                                       RULE_SET_V12)
+                                       RULE_SET_V12, RULE_SET_V13)
                   else review_candidates(
         trajectory, weak_flip_attacks=weak_flip_attacks))
     expected, _ = derive(trajectory, candidates, rule_set_id=rule_set_id,
@@ -503,7 +548,8 @@ def main() -> None:
                                                RULE_SET_V5, RULE_SET_V6,
                                                RULE_SET_V7, RULE_SET_V8,
                                                RULE_SET_V9, RULE_SET_V10,
-                                               RULE_SET_V11, RULE_SET_V12),
+                                               RULE_SET_V11, RULE_SET_V12,
+                                               RULE_SET_V13),
                         default=RULE_SET_ID)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
@@ -512,7 +558,7 @@ def main() -> None:
     weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
     card_facts = (load_card_facts(args.native_root)
                   if args.rule_set in (RULE_SET_V8, RULE_SET_V11,
-                                       RULE_SET_V12) else None)
+                                       RULE_SET_V12, RULE_SET_V13) else None)
     report = []
     for path in args.replays:
         trajectory = read_trajectory(path)
@@ -523,7 +569,8 @@ def main() -> None:
         candidates = (() if args.rule_set in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
                                              RULE_SET_V6, RULE_SET_V7, RULE_SET_V8,
                                              RULE_SET_V9, RULE_SET_V10,
-                                             RULE_SET_V11, RULE_SET_V12)
+                                             RULE_SET_V11, RULE_SET_V12,
+                                             RULE_SET_V13)
                       else review_candidates(
             trajectory, weak_flip_attacks=weak_flip_attacks))
         preferences, categories = derive(trajectory, candidates,
@@ -538,7 +585,8 @@ def main() -> None:
                                                      RULE_SET_V5, RULE_SET_V6,
                                                      RULE_SET_V7, RULE_SET_V8,
                                                      RULE_SET_V9, RULE_SET_V10,
-                                                     RULE_SET_V11, RULE_SET_V12)
+                                                     RULE_SET_V11, RULE_SET_V12,
+                                                     RULE_SET_V13)
             else 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",

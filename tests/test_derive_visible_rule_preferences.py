@@ -594,3 +594,37 @@ def test_v11_combines_selected_optional_loss_and_ring_response():
                                 preferences=(ReviewedPreference(0, (1,), (0,)),
                                              ReviewedPreference(1, (1,), (0,)))),
         {}, {})
+
+
+def test_v13_flags_idle_ring_activation_against_only_sheep_tokens():
+    own = CardView(0, "monster", "faceup", 87621407, 1,
+                   attack=1400, defense=1400)
+    sheep = CardView(1, "monster", "faceup", 73915054, 3,
+                     attack=0, defense=0)
+    obs = Observation(viewer=0, acting_player=0, turn=3, phase="main1",
+                      life_points=(6200, 7200), hand=(), field=(own, sheep),
+                      graveyards=((), ()), banished=((), ()),
+                      opponent_hand_count=4, deck_counts=(35, 35),
+                      extra_deck_counts=(0, 0), turn_player=0)
+    ring = Action("ring", "activate", 0, {"code": 511000824})
+    battle = Action("battle", "battle_phase", 0)
+    end = Action("end", "end_phase", 0)
+    record = DecisionRecord(obs, (ring, battle, end), ring)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (record,), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    expected = ([{"decision_index": 0, "preferred_action_indices": [1, 2],
+                  "disfavored_action_indices": [0]}],
+                {"selected_own_loss": 0, "selected_ring_or_mst_response": 0,
+                 "selected_own_faceup_mst": 0,
+                 "selected_idle_ring_token_only": 1})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V13,
+                  card_facts={}) == expected
+    rules.validate_automated_preferences(
+        replay, SimpleNamespace(rule_set_id=rules.RULE_SET_V13,
+                                preferences=(ReviewedPreference(0, (1, 2), (0,)),)),
+        {}, {})
+    non_token = replace(sheep, code=12345)
+    other = replace(replay, decisions=(replace(record, observation=replace(
+        obs, field=(own, non_token))),))
+    assert derive(other, (), rule_set_id=rules.RULE_SET_V13,
+                  card_facts={})[0] == []
