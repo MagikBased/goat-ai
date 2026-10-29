@@ -446,14 +446,13 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
-**Open Last Will trigger-order discrepancy:** A seed-18 native regression
-activates pre-errata Last Will, then Tributes GOAT Sangan for Cannon Soldier.
-The pinned engine builds Sangan as Chain Link 1 and Last Will as Chain Link 2
-without offering the controller their historically documented order choice.
-The source-backed regression is a strict expected failure until the GOAT
-script or native trigger scheduler preserves both legal orders. General
-same-time mandatory Flip Effect ordering already passes; this is a separate
-Last Will custom-event case. See [GOAT rules](goat_rules.md).
+A paired seed-18 Last Will/Sangan fixture now verifies the controller's
+historical trigger-order choice after Cannon Soldier Tributes Sangan. A
+checksum-guarded GOAT-only script correction removes the pinned custom-event
+ordering artifact. Both order branches Special Summon and search, finish duels,
+replay-verify, and pass the visibility audit. This resolves the previously
+recorded discrepancy; other Last Will interactions remain open. See
+[GOAT rules](goat_rules.md).
 
 A paired D.D. Survivor fixture now distinguishes a face-up field banishment
 by Bottomless Trap Hole, which produces an End Phase return, from a Set card

@@ -102,6 +102,25 @@ METAMORPHOSIS_COST_FILTER_GOAT = (
 UPSTREAM_BOOK_SHA256 = "25848f596f425817a250bef9038343fbbcd482b40a0312d84c143e927b12083d"
 UPSTREAM_FIREBIRD_SHA256 = "76c351a0006682d2a31449084cb821d43e6fc5f9f0b98931cae1859d632c2600"
 UPSTREAM_GOAT_RIVALRY_SHA256 = "5da97ba11bd10b53817b9812076d51e116415fe3a5aee3d09265f08ead0fb693"
+UPSTREAM_GOAT_LAST_WILL_SHA256 = "9f04ae869083f60d0d94dc98737e878b32d1360e8c0f9caa788c2bb0d7173832"
+LAST_WILL_CUSTOM_EVENT_BRIDGE = b"""	local e1=Effect.CreateEffect(e:GetHandler())
+	e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+	e1:SetCode(EVENT_TO_GRAVE)
+	e1:SetReset(RESET_PHASE+PHASE_END)
+	e1:SetOperation(s.checkop)
+	Duel.RegisterEffect(e1,tp)
+"""
+LAST_WILL_CUSTOM_TRIGGER = b"e2:SetCode(EVENT_CUSTOM+id)"
+LAST_WILL_DIRECT_TRIGGER = b"e2:SetCode(EVENT_TO_GRAVE)"
+LAST_WILL_CUSTOM_CONDITION = b"return re:GetHandler()==e:GetHandler()"
+LAST_WILL_DIRECT_CONDITION = b"return eg:IsExists(s.cfilter,1,nil,tp)"
+LAST_WILL_UNUSED_BRIDGE = b"""function s.checkop(e,tp,eg,ep,ev,re,r,rp)
+	if eg:IsExists(s.cfilter,1,nil,tp) then
+		Duel.RaiseEvent(e:GetHandler(),EVENT_CUSTOM+id,e,0,0,0,0)
+		e:Reset()
+	end
+end
+"""
 UPSTREAM_SINISTER_SHA256 = "92886fb585816f0e4466b682a0858dd3e514b2965b556e8d72c661b1f1337ed1"
 UPSTREAM_DARK_BALTER_SHA256 = "fa1f87eba33a9e87b48ac9d34569dad107e9405ae71320662e491cc658918a8f"
 UPSTREAM_MORALE_BOOST_SHA256 = "4520559566f5d84b72b1d6dbd012b62e0b191f9ff4e1a0705cf5f8f9baf5c3e5"
@@ -676,6 +695,20 @@ class OcgcoreProbe:
                 return 0
             contents = contents.replace(FIREBIRD_BATTLE_CONDITION_OLD,
                                         FIREBIRD_BATTLE_CONDITION_FIXED)
+        if relative_path == "goat/c504700147.lua":
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_LAST_WILL_SHA256 \
+                    or any(contents.count(marker) != 1 for marker in (
+                        LAST_WILL_CUSTOM_EVENT_BRIDGE, LAST_WILL_CUSTOM_TRIGGER,
+                        LAST_WILL_CUSTOM_CONDITION, LAST_WILL_UNUSED_BRIDGE)):
+                self.errors.append("pinned GOAT Last Will script changed; trigger-order patch not applied")
+                return 0
+            # The custom event was enqueued after Sangan's graveyard trigger,
+            # forcing their order. A direct trigger on the same native event
+            # gives the controller the historical same-time order choice.
+            contents = (contents.replace(LAST_WILL_CUSTOM_EVENT_BRIDGE, b"")
+                        .replace(LAST_WILL_CUSTOM_TRIGGER, LAST_WILL_DIRECT_TRIGGER)
+                        .replace(LAST_WILL_CUSTOM_CONDITION, LAST_WILL_DIRECT_CONDITION)
+                        .replace(LAST_WILL_UNUSED_BRIDGE, b""))
         if relative_path == "goat/c504700158.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RIVALRY_SHA256 \
                     or contents.count(RIVALRY_ADJUST_OLD) != 1 \
