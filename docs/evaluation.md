@@ -1,5 +1,42 @@
 # Baseline evaluation log
 
+## Visible own-card losses in the selected policy (28 October 2026)
+
+The weak average material association and the v5 preference trial do **not**
+show that visibly wasteful self-targeting is rare or harmless. A focused audit
+used 64 sampled, replay-verified and visibility-audited self-play trajectories
+on seeds 90300–90363 (24,851 total decisions). The recorded learner made seven
+own-only Nobleman of Crossout activations, four Heavy Storm activations with
+only its own back row present, and one Breaker effect targeting its own back
+row with no opposing back row. The audit also found three Heavy Storm choices
+whose visible back-row trade was nonpositive, two Tribe-Infecting Virus
+activations with no visible enemy monster, and two Tribe Type choices that hit
+only friendly monsters. These are **review flags**, not proof that every
+activation was strategically wrong; a deliberate self-destruction line can
+sometimes have value.
+
+At those flagged states, the frozen selected v23 checkpoint's greedy choice
+reproduced the same category of own-card loss on **5/7** Nobleman, **3/4**
+own-only Heavy Storm, and **1/1** Breaker prompts. This is a fixed-state
+comparison on states visited by a sampled policy, not a fresh greedy rollout
+or an estimate of how often greedy play reaches them. It nevertheless shows
+the failure survives in the selected policy. The earlier v5 preference fit
+covered own-only Nobleman and negative Heavy Storm, plus boss self-banish and
+Tribe Type choices. It did not train a general self-target decision rule or
+establish a strength gain, so the selected checkpoint remains unchanged.
+
+Reproduce with `scripts/audit_policy_replays.py` on
+`.cache/goat-ai/ppo_independent_mixed_90300_90363_replays/episode_*.json`,
+using `--checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt
+--compare-parent-greedy --native-root .cache/goat-ai`. The ignored audit JSON
+has SHA-256
+`444fe4b1f748119bbd104f7ec8c1663fa8b9e00f9159cc95bd8ab60ac94270ca`.
+The next learning experiment should measure activation **and** target/Type
+selection separately for own-card removal, then validate improved mistake
+rates and match results on fresh games. It should compare pass/hold options
+before activation, because choosing a less harmful target after an unnecessary
+activation cannot recover the spent card.
+
 ## Self-play continuation of the 25-preference child (28 October 2026)
 
 To test the next M4 step, `scripts/train_self_play.py` continued the experimental
