@@ -22,6 +22,9 @@ from goat_ai.evaluation.effect_material import effect_material_changes
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
+from goat_ai.training import load_policy_agent
+from goat_ai.training.policy import POLICY_INFERENCE_VERSION
+from scripts.shortlist_policy_disagreements import recorded_policy_options
 
 
 def own_card_risk_rows(trajectory, facts: dict) -> tuple[list[dict], Counter]:
@@ -80,37 +83,55 @@ def own_card_risk_rows(trajectory, facts: dict) -> tuple[list[dict], Counter]:
     return rows, counts
 
 
-def audit_replays(paths: list[Path], native_root: Path) -> dict:
+def audit_replays(paths: list[Path], native_root: Path, checkpoint: Path) -> dict:
     if not paths or len({path.resolve() for path in paths}) != len(paths):
         raise ValueError("provide distinct replay paths")
     facts = load_card_facts(native_root)
+    checkpoint_digest = sha256_file(checkpoint)
     total = Counter()
     games = []
     for path in paths:
         path = path.resolve()
         digest = sha256_file(path)
         trajectory = read_trajectory(path)
+        metadata = trajectory.skill_metadata or {}
+        if (metadata.get("policy_checkpoint_sha256") != checkpoint_digest
+                or metadata.get("policy_inference_version") != POLICY_INFERENCE_VERSION):
+            raise ValueError(f"policy provenance differs from checkpoint: {path}")
         verified = verify_trajectory(trajectory, ExperimentalOcgcoreEngine(native_root))
         audit_trajectory_visibility(trajectory)
         rows, counts = own_card_risk_rows(trajectory, facts)
+        policy = load_policy_agent(checkpoint, **recorded_policy_options(
+            metadata.get("policy_inference"), facts))
+        policy_choices = 0
+        for index, record in enumerate(trajectory.decisions):
+            if record.observation.acting_player != metadata["demonstrator_seat"]:
+                continue
+            if policy.select_action(record.observation,
+                                    record.legal_actions) != record.selected_action:
+                raise ValueError(f"policy choice differs at {path}:{index}")
+            policy_choices += 1
         if sha256_file(path) != digest:
             raise ValueError(f"replay changed during audit: {path}")
         total.update(counts)
         games.append({"trajectory": str(path), "sha256": digest,
                       "inference": (trajectory.skill_metadata or {}).get("policy_inference"),
                       "verified_decisions": verified, "counts": dict(sorted(counts.items())),
+                      "reproduced_policy_choices": policy_choices,
                       "flags": rows})
-    return {"schema_version": 1, "scope": "visible_risk_not_action_value_or_training_labels",
+    return {"schema_version": 2, "scope": "visible_risk_not_action_value_or_training_labels",
+            "checkpoint_sha256": checkpoint_digest,
             "counts": dict(sorted(total.items())), "games": games}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("replays", nargs="+", type=Path)
+    parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    report = audit_replays(args.replays, args.native_root)
+    report = audit_replays(args.replays, args.native_root, args.checkpoint)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
                            encoding="utf-8")

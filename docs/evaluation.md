@@ -24,13 +24,44 @@ evidence of a win-rate gain. The direct 128-game match above remained tied.
 
 The ignored report is
 `.cache/goat-ai/own_card_risks_changed_v1_v6_105200_105207.json` (SHA-256
-`f175246795a4563ef556f6cefa65fd23f235c31d6916b05808b8b8a1c9397e0d`).
+`0ec40e0c26b11d2b27b36313fd72adc89efc23b11f7a698d2352035e71d9887a`).
 Reproduce it with `python -m scripts.audit_own_card_risks` over both
 `case_*_v1.json` and `case_*_v6.json` under
-`.cache/goat-ai/own_loss_v6_v1_changed_105200_105207/`, supplying `--output`.
+`.cache/goat-ai/own_loss_v6_v1_changed_105200_105207/`, supplying
+`--checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt`
+and `--output`. The current audit also reproduces every selected policy choice
+from that checkpoint and recorded inference mode.
 The next evaluation should run this diagnostic on a prespecified fresh
 schedule, then use human-reviewed action labels and competitive match results
 to decide whether a policy change improves play.
+
+### Fresh prospective pilot
+
+Before recording, a fixed plan selected four 2005 Main Deck pairs absent from
+the checkpoint's training games, seeds 105500–105501 absent from training,
+both policy seats, v1 and v6 candidate guards, and a v1 checkpoint opponent.
+The plan is `.cache/goat-ai/own_card_prospective_105500_105501/plan.json`
+(SHA-256 `ff73cd07184210a4569d76aea30c95f90962711d2a5571dab4a489831d1f074f`).
+All **32 complete duels** replay-verified (22,455 total decisions), passed the
+visibility audit, and reproduced all **11,250 policy-seat choices** from the
+saved v23 checkpoint. Sixteen duels used each candidate guard.
+
+V1 made **one** flagged idle own-only Ring activation in 1,919 multi-action
+policy decisions; it had an isolated visible material delta of −2 after
+resolution. V6 made **zero** in 1,993 multi-action decisions. The v6 candidate
+won 9/16 games against the v1 opponent, compared with 8/16 for the v1
+candidate on matched games. Only one paired outcome changed, on the same
+Rhymus/Charlotte game as the flagged v1 activation. This is too small to
+establish a strength gain or a general mistake-rate reduction; the 128-game
+direct comparison above remains the stronger competitive evidence.
+
+The ignored replay audit is
+`.cache/goat-ai/own_card_prospective_105500_105501/risk_report.json`
+(SHA-256 `dc456570945981cb85fa72949b3525c28db74491d1b23ac793e37a474c720f83`).
+Reproduce with `python -m scripts.audit_own_card_risks` over the planned
+`*_v1.json` and `*_v6.json` replays and the same `--checkpoint` argument.
+The three flagged patterns do not cover every kind of wasteful own-card play;
+a broader reviewed diagnostic is still needed.
 
 ## Wider own-loss filter versus the selected policy (29 October 2026)
 
