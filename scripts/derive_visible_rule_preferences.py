@@ -44,6 +44,7 @@ RULE_SET_V7 = "visible_guard_distillation_v7"
 RULE_SET_V8 = "visible_residual_guard_distillation_v8"
 RULE_SET_V9 = "visible_optional_own_loss_v9"
 RULE_SET_V10 = "visible_selected_own_loss_v10"
+RULE_SET_V11 = "visible_selected_own_loss_with_responses_v11"
 SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -113,6 +114,22 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID,
                 item["decision_index"]].selected_action) in item[
                     "disfavored_action_indices"]]
         return selected_bad, Counter({"selected_own_loss": len(selected_bad)})
+    if rule_set_id == RULE_SET_V11:
+        if card_facts is None:
+            raise ValueError("v11 selected response labels require printed card facts")
+        optional, _ = derive(trajectory, candidates, rule_set_id=RULE_SET_V10)
+        response, _ = derive(trajectory, candidates, rule_set_id=RULE_SET_V8,
+                             card_facts=card_facts)
+        seen = {item["decision_index"] for item in optional}
+        selected_response = [item for item in response if item["decision_index"] not in seen
+                             and trajectory.decisions[item["decision_index"]]
+                             .legal_actions.index(trajectory.decisions[
+                                 item["decision_index"]].selected_action)
+                             in item["disfavored_action_indices"]]
+        return sorted(optional + selected_response,
+                      key=lambda item: item["decision_index"]), Counter({
+                          "selected_own_loss": len(optional),
+                          "selected_ring_or_mst_response": len(selected_response)})
     if rule_set_id == RULE_SET_V7:
         return derive_guard_distillation(trajectory)
     if rule_set_id == RULE_SET_V8:
@@ -418,7 +435,7 @@ def validate_automated_preferences(trajectory, preferences, weak_flip_attacks,
     rule_set_id = getattr(preferences, "rule_set_id", None) or RULE_SET_ID
     candidates = (() if rule_set_id in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
                                        RULE_SET_V6, RULE_SET_V7, RULE_SET_V8,
-                                       RULE_SET_V9, RULE_SET_V10)
+                                       RULE_SET_V9, RULE_SET_V10, RULE_SET_V11)
                   else review_candidates(
         trajectory, weak_flip_attacks=weak_flip_attacks))
     expected, _ = derive(trajectory, candidates, rule_set_id=rule_set_id,
@@ -440,14 +457,16 @@ def main() -> None:
                                                RULE_SET_V3, RULE_SET_V4,
                                                RULE_SET_V5, RULE_SET_V6,
                                                RULE_SET_V7, RULE_SET_V8,
-                                               RULE_SET_V9, RULE_SET_V10),
+                                               RULE_SET_V9, RULE_SET_V10,
+                                               RULE_SET_V11),
                         default=RULE_SET_ID)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
         parser.error("output directory must be empty")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)
-    card_facts = load_card_facts(args.native_root) if args.rule_set == RULE_SET_V8 else None
+    card_facts = (load_card_facts(args.native_root)
+                  if args.rule_set in (RULE_SET_V8, RULE_SET_V11) else None)
     report = []
     for path in args.replays:
         trajectory = read_trajectory(path)
@@ -457,7 +476,8 @@ def main() -> None:
         audit_trajectory_visibility(trajectory)
         candidates = (() if args.rule_set in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
                                              RULE_SET_V6, RULE_SET_V7, RULE_SET_V8,
-                                             RULE_SET_V9, RULE_SET_V10)
+                                             RULE_SET_V9, RULE_SET_V10,
+                                             RULE_SET_V11)
                       else review_candidates(
             trajectory, weak_flip_attacks=weak_flip_attacks))
         preferences, categories = derive(trajectory, candidates,
@@ -471,7 +491,8 @@ def main() -> None:
             "schema_version": 2 if args.rule_set in (RULE_SET_V3, RULE_SET_V4,
                                                      RULE_SET_V5, RULE_SET_V6,
                                                      RULE_SET_V7, RULE_SET_V8,
-                                                     RULE_SET_V9, RULE_SET_V10)
+                                                     RULE_SET_V9, RULE_SET_V10,
+                                                     RULE_SET_V11)
             else 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",

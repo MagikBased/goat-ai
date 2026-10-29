@@ -532,3 +532,35 @@ def test_v10_keeps_only_recorded_own_loss_choices():
     rules.validate_automated_preferences(
         replay, SimpleNamespace(rule_set_id=rules.RULE_SET_V10,
                                 preferences=(ReviewedPreference(0, (1,), (0,)),)), {})
+
+
+def test_v11_combines_selected_optional_loss_and_ring_response():
+    monster = CardView(0, "monster", "faceup", 123, 0,
+                       attack=1600, defense=1000)
+    own_set = CardView(0, "monster", "facedown", 456, 1)
+    obs = Observation(viewer=0, acting_player=0, turn=3, phase="main1",
+                      life_points=(8000, 8000), hand=(), field=(monster, own_set),
+                      graveyards=((), ()), banished=((), ()),
+                      opponent_hand_count=4, deck_counts=(35, 35),
+                      extra_deck_counts=(0, 0), turn_player=0)
+    ring = Action("ring", "activate", 0, {"code": 511000824})
+    nobleman = Action("nobleman", "activate", 0, {"code": 504700116})
+    pass_action = Action("pass", "pass", 0)
+    records = (DecisionRecord(obs, (ring, pass_action), ring),
+               DecisionRecord(replace(obs, turn=4), (nobleman, pass_action), nobleman))
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, records, 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    with pytest.raises(ValueError, match="printed card facts"):
+        derive(replay, (), rule_set_id=rules.RULE_SET_V11)
+    expected = ([{"decision_index": 0, "preferred_action_indices": [1],
+                  "disfavored_action_indices": [0]},
+                 {"decision_index": 1, "preferred_action_indices": [1],
+                  "disfavored_action_indices": [0]}],
+                {"selected_own_loss": 1, "selected_ring_or_mst_response": 1})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V11,
+                  card_facts={}) == expected
+    rules.validate_automated_preferences(
+        replay, SimpleNamespace(rule_set_id=rules.RULE_SET_V11,
+                                preferences=(ReviewedPreference(0, (1,), (0,)),
+                                             ReviewedPreference(1, (1,), (0,)))),
+        {}, {})

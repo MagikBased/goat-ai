@@ -1068,6 +1068,80 @@ this paired changed-policy diagnostic. This trained-state example does not
 establish generalization; the earlier fresh 64-duel direct comparison remains
 **31–33** for the child against its parent.
 
+## Selected own-loss plus Ring/MST response trial (29 October 2026)
+
+The versioned `visible_selected_own_loss_with_responses_v11` rule combines
+V10's recorded optional own-loss and target mistakes with V8's recorded
+idle-own Ring of Destruction and own-resolving-one-shot Mystical Space Typhoon
+responses. It retains a comparison only when the replay actually selected
+the disfavored action. Printed card facts are required to identify one-shot
+chain links, and training revalidates the exact visible-state labels. These
+are automated tactical hypotheses, not human reviews or universally bad
+actions.
+
+Across the previously verified 16 unguarded parent-policy, 64 sampled
+self-play, and 128 Ring-audit source replays, V11 emitted **55 selected-error
+comparisons from 49 replays**: 29 optional/target own-loss and 26 Ring/MST
+response cases. Each of the 49 replays was reconstructed with the pinned
+native core and visibility-audited before serialization. The ignored
+manifest at `.cache/goat-ai/selected_own_loss_v11_90300_104407/manifest.json`
+has SHA-256
+`dea6e23d04534b115f76135ac080c87dd41068a46f0a019f26cc7939ff576aa2`.
+
+An experimental child started from the same selected v23 parent as V10. It
+used all 55 comparisons, the same four current-core preservation replays
+(64 states), masked-parent objective, 40 steps, recorded-bad weight 10,
+parent KL weight 1, learning rate 0.0001, and seed 74. Preference loss fell
+**1.9672 → 1.1237**; final sampled preservation KL was **0.00568**. The
+ignored checkpoint `.cache/goat-ai/fv23_selected_own_loss_v11_55pref_40step.pt`
+has SHA-256
+`36fe6eea86280d7e19b66985a5b91cb4b2ec272e7bb66717db6cc39c32a37160`.
+
+Fixed parent-visited held-out states on seeds 99930–99933 had **4/26**
+flagged top choices for the selected parent and **2/26** for both V10 and
+V11. On five separate V8 Ring/MST comparison states from verified v1-guarded
+replays on seeds 105500–105501, the parent and V10 each ranked a flagged
+choice first **2/5** times; V11 did so **1/5** times. No exact replay or seed
+was in V11's training provenance. These small fixed-state results do not
+establish a change in mistake frequency during games.
+
+Complete headless games used Main Deck compositions absent from both
+children's and the parent's training: Theeresak Seattle Goat Control against
+the GoatFormat Guide and WikiFormat Dimension Fusion lists, both deck
+assignments and policy seats. Against the unchanged parent on seeds
+106300–106307, V11 scored **35–29** and V10 scored **28–36**, each across 64
+games. Their matched score difference was **+10.9 percentage points** for
+V11 (paired 95% interval **+1.6 to +20.3**). On separate matched seeds
+106308–106315 against Tactical-v14, the selected parent scored **13–51**,
+V10 **13–51**, and V11 **12–52**. V11's matched score difference versus the
+parent was **−1.6 points** (95% interval **−15.6 to +12.5**). The six reports
+passed the unseen-Main-Deck gate; their provenance and per-game results are
+in the ignored V11 directory. The V11 direct and Tactical report SHA-256
+values are
+`1c87e9dafe2f6790c6464be0e8ff0d49e310e6ea108d2d50871cb80349b70ba3`
+and
+`e4edc41ad7f17e8b996f8e08d296331bce83eee45e73750d50f2dedb4e27b691`.
+These tournaments measure full games but do not serialize exact trajectories.
+
+Eight further V11 and eight parent greedy duels against Tactical-v14 on
+seeds 106316–106317 did serialize complete trajectories. All **16** reached
+terminal, replay-verified, passed the visibility audit, and reproduced the
+saved checkpoint's choices. The conservative own-card review audit flagged
+**one** parent idle-own Ring activation across 1,870 policy decisions and
+**zero** V11 flags across 2,285. The parent had three distinct visited
+idle-own Ring opportunities; V11 had **none**, so this sample cannot show
+that V11 avoids Ring errors when offered. Own-only Nobleman was offered in
+two parent and four V11 turn/phase opportunities without a flag. The ignored
+audit SHA-256 values are
+`8ea8a1c0e28bb93023230e29d13ed2193c266c8bb0704ebc0af2f1284beef365`
+and
+`fa2736f478fc8ebb7fd1acaa38646e47e63969c461e5a8c397dafa598084f778`.
+
+The combined trial improved head-to-head score in this unseen-deck block,
+while Tactical transfer did not improve. Keep V11 experimental and the v23
+checkpoint selected. The next evaluation needs more diverse unseen decks,
+new seeds, and enough Ring/MST opportunities to estimate fresh error rates.
+
 ## Selected own-loss preference trial (29 October 2026)
 
 The versioned `visible_selected_own_loss_v10` rule retains only V9 decisions
