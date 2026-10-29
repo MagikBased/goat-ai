@@ -8,6 +8,7 @@ import pytest
 from goat_ai.actions import Action
 from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, read_decision_preferences
+from scripts.train_review_preferences import validate_preference_objective
 
 
 def trajectory():
@@ -105,6 +106,28 @@ def test_optional_reviewed_seat_must_match_replay_policy_seat(tmp_path):
                                reviewed_seat=wrong)
         with pytest.raises(ValueError, match="reviewed seat"):
             read_decision_preferences(path, "a" * 64, base)
+
+
+def test_rejection_only_review_preserves_all_unspecified_alternatives(tmp_path):
+    base = replace(trajectory(), source="policy_evaluation",
+                   skill_metadata={"demonstrator_seat": 0,
+                                   "policy_checkpoint_sha256": "b" * 64})
+    path = preference_file(tmp_path, authorization="policy_review",
+                           preference_kind="reject_recorded")
+    reviewed = read_decision_preferences(path, "a" * 64, base)
+    assert reviewed.preference_kind == "reject_recorded"
+    validate_preference_objective(reviewed, base, "masked_parent")
+    with pytest.raises(ValueError, match="masked_parent objective"):
+        validate_preference_objective(reviewed, base, "pairwise_mean")
+    incomplete = [{"decision_index": 0, "preferred_action_indices": [1],
+                   "disfavored_action_indices": [0]}]
+    with pytest.raises(ValueError, match="every other legal action"):
+        read_decision_preferences(preference_file(
+            tmp_path, authorization="policy_review",
+            preference_kind="reject_recorded", preferences=incomplete), "a" * 64, base)
+    with pytest.raises(ValueError, match="human preference kind"):
+        read_decision_preferences(preference_file(
+            tmp_path, preference_kind="reject_recorded"), "a" * 64, trajectory())
 
 
 def test_baseline_review_binds_either_recorded_agent_seat(tmp_path):

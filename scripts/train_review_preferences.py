@@ -24,6 +24,18 @@ from goat_ai.training import fit_preferences_with_parent_kl, load_policy_agent
 from scripts.derive_visible_rule_preferences import validate_automated_preferences
 
 
+def validate_preference_objective(preferences, trajectory, objective: str) -> None:
+    """Keep rejection-only reviews from becoming arbitrary best-action labels."""
+    if preferences.preference_kind == "reject_recorded" and objective != "masked_parent":
+        raise ValueError("recorded-action rejections require the masked_parent objective")
+    if objective == "masked_parent" and preferences.authorization != "automated_rule":
+        for item in preferences.preferences:
+            legal_count = len(trajectory.decisions[item.decision_index].legal_actions)
+            if (set(item.preferred_action_indices) |
+                    set(item.disfavored_action_indices)) != set(range(legal_count)):
+                raise ValueError("human masked-parent preference must cover every legal action")
+
+
 def validate_preservation_reference(path: Path, digest: str, seed: int, *,
                                     parent_replay: bool, old_hashes: dict[str, str],
                                     new_hashes: dict[str, str], old_seeds: set[int],
@@ -58,7 +70,7 @@ def main() -> None:
     parser.add_argument("--objective", choices=("pairwise_mean", "masked_parent"),
                         default="pairwise_mean",
                         help="masked_parent removes disfavored action mass while preserving "
-                             "the parent's ranking among remaining actions; automated rules only")
+                             "the parent's ranking among remaining actions")
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", type=Path, required=True)
@@ -101,8 +113,7 @@ def main() -> None:
         verify_trajectory(trajectory, ExperimentalOcgcoreEngine(args.native_root))
         audit_trajectory_visibility(trajectory)
         preferences = read_decision_preferences(preferences_path, replay_hash, trajectory)
-        if args.objective == "masked_parent" and preferences.authorization != "automated_rule":
-            raise ValueError("masked_parent objective requires automated-rule preferences")
+        validate_preference_objective(preferences, trajectory, args.objective)
         if preferences.authorization == "automated_rule":
             if weak_flip_attacks is None:
                 weak_flip_attacks = load_weak_flip_monster_attack(args.native_root)

@@ -2444,3 +2444,24 @@ Open it with:
 The review server saves selected legal actions locally. A reviewer can also
 mark an item as an upstream mistake or leave it unlabeled; neither action is
 silently converted into a training preference.
+
+For an optional activation that is clearly bad but has no obvious best legal
+replacement, choose **Reject the AI's recorded action** under Review finding
+and save the note. This is a negative-only review: it does not assert that Pass,
+Battle Phase, or any other action is optimal. Clear any saved action choice for
+that frame first. After reviewing, convert explicit rejections with:
+
+```bash
+.venv/bin/python -m scripts.convert_rejected_review_notes \
+  .cache/goat-ai/own_card_parent_review_99900_99907/queue.json \
+  REVIEW_LABEL_FOLDER OUTPUT_PREFERENCE_FOLDER --native-root .cache/goat-ai
+```
+
+The converter checks the queue, exact replay bytes, native replay, and
+player-visible observations. Its preferences exclude only the rejected
+action. Train with `scripts.train_review_preferences --objective masked_parent`
+using each printed replay/preference pair; this preserves the parent's ranking
+among all other legal actions. These labels can support an experiment, but
+they do not establish better playing strength. Compare a trained child on
+fresh decks and seeds before promotion. Existing upstream/context notes remain
+separate from training.

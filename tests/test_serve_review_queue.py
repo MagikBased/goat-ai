@@ -16,7 +16,7 @@ from goat_ai.actions import Action
 from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, read_decision_annotations, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
-from scripts import launch_review_server, serve_review_queue
+from scripts import convert_rejected_review_notes, launch_review_server, serve_review_queue
 from scripts.launch_review_server import server_healthy
 from scripts.render_replay import render_replay
 from scripts.shortlist_policy_disagreements import write_review_index
@@ -414,6 +414,39 @@ def test_review_note_marks_upstream_mistake_without_training_label(tmp_path, mon
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_reject_recorded_note_becomes_negative_only_preference(tmp_path, monkeypatch):
+    queue, replay, digest, _ = _queue(tmp_path)
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    monkeypatch.setattr(convert_rejected_review_notes, "ROOT", tmp_path)
+    review_dir = tmp_path / "reviews"
+    assert serve_review_queue.prepare_review_labels(queue, review_dir) == 0
+    store = serve_review_queue.ReviewStore(queue, review_dir)
+    store.save_note(digest, 0, "reject_recorded", "Do not take this action")
+    monkeypatch.setattr(convert_rejected_review_notes, "verify_trajectory",
+                        lambda *_: 1)
+    monkeypatch.setattr(convert_rejected_review_notes, "audit_trajectory_visibility",
+                        lambda *_: None)
+    result = convert_rejected_review_notes.convert(
+        queue, review_dir, tmp_path / "preferences", tmp_path)
+    assert result == [{"trajectory": str(replay),
+                       "preferences": str(tmp_path / "preferences" /
+                                          f"{digest}.preferences.json"),
+                       "rejected_decisions": 1}]
+    payload = json.loads((tmp_path / "preferences" /
+                          f"{digest}.preferences.json").read_text())
+    assert payload["preferences"] == [{"decision_index": 0,
+                                       "preferred_action_indices": [1],
+                                       "disfavored_action_indices": [0]}]
+    assert payload["source_review_notes_sha256"] == sha256_file(store.note_path(digest))
+
+    with pytest.raises(ValueError, match="clear the recorded-action rejection"):
+        store.choose(digest, 0, 1)
+    store.save_note(digest, 0, "context", "")
+    store.choose(digest, 0, 1)
+    with pytest.raises(ValueError, match="clear the saved action choice"):
+        store.save_note(digest, 0, "reject_recorded", "Avoid")
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")

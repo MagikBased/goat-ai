@@ -24,6 +24,7 @@ class DecisionPreferences:
     preferences: tuple[ReviewedPreference, ...]
     rule_set_id: str | None = None
     schema_version: int = 1
+    preference_kind: str | None = None
 
 
 def read_decision_preferences(path: str | Path, trajectory_sha256: str,
@@ -101,6 +102,11 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
     if not isinstance(reviewer, str) or not reviewer.strip():
         raise ValueError("preferences require a reviewer name")
     items = raw.get("preferences")
+    preference_kind = raw.get("preference_kind")
+    if preference_kind is not None and (preference_kind != "reject_recorded"
+                                        or authorization != "policy_review"
+                                        or schema_version != 1):
+        raise ValueError("unsupported human preference kind")
     if not isinstance(items, list) or not items:
         raise ValueError("preferences require at least one decision")
     parsed = []
@@ -136,8 +142,12 @@ def read_decision_preferences(path: str | Path, trajectory_sha256: str,
             raise ValueError("disfavored actions must include the recorded choice")
         if schema_version == 2 and selected_index not in (*preferred, *disfavored):
             raise ValueError("counterfactual comparison must include the recorded choice")
+        if preference_kind == "reject_recorded" and (
+                disfavored != (selected_index,)
+                or set(preferred) != set(range(len(record.legal_actions))) - {selected_index}):
+            raise ValueError("rejection must preserve every other legal action")
         parsed.append(ReviewedPreference(index, preferred, disfavored))
     return DecisionPreferences(trajectory_sha256, reviewer.strip(), authorization,
                                seat, tuple(parsed),
                                raw.get("rule_set_id") if authorization == "automated_rule" else None,
-                               schema_version)
+                               schema_version, preference_kind)

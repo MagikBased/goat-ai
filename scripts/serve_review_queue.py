@@ -196,7 +196,8 @@ class ReviewStore:
                     or note["decision_index"] < 0
                     or offered is not None and note["decision_index"] not in offered
                     or note["decision_index"] in seen
-                    or note["kind"] not in ("context", "upstream_mistake")
+                    or note["kind"] not in ("context", "upstream_mistake",
+                                            "reject_recorded")
                     or not isinstance(note["text"], str)
                     or len(note["text"]) > 2000):
                 raise ValueError("invalid review note or decision outside this queue")
@@ -213,11 +214,18 @@ class ReviewStore:
                   kind: str, content: str) -> dict:
         path = self.note_path(digest)
         with self.lock:
-            _, offered = self._trajectory(digest)
+            trajectory, offered = self._trajectory(digest)
             if (type(decision_index) is not int or decision_index not in offered
-                    or kind not in ("context", "upstream_mistake")
+                    or kind not in ("context", "upstream_mistake",
+                                    "reject_recorded")
                     or not isinstance(content, str) or len(content) > 2000):
                 raise ValueError("invalid review note or decision outside this queue")
+            if kind == "reject_recorded":
+                label_path = self.label_path(digest)
+                if label_path.is_file():
+                    labels, _ = read_decision_annotations(label_path, digest, trajectory)
+                    if any(index == decision_index for index, _ in labels.choices):
+                        raise ValueError("clear the saved action choice before rejecting the recorded action")
             notes = {note["decision_index"]: note for note in
                      self._read_notes(path, digest, offered)}
             text = content.strip()
@@ -314,6 +322,10 @@ class ReviewStore:
             if action_index is None:
                 choices.pop(decision_index, None)
             else:
+                if any(note["decision_index"] == decision_index
+                       and note["kind"] == "reject_recorded"
+                       for note in self._read_notes(self.note_path(digest), digest, offered)):
+                    raise ValueError("clear the recorded-action rejection before choosing an action")
                 choices[decision_index] = action_index
             if not choices:
                 path.unlink(missing_ok=True)

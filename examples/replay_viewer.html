@@ -229,6 +229,7 @@
             <select id="review-note-kind">
               <option value="context">Context or strategy note</option>
               <option value="upstream_mistake">The earlier action was the mistake</option>
+              <option value="reject_recorded">Reject the AI's recorded action; no best alternative chosen</option>
             </select>
             <label for="review-note">Explanation (optional for an earlier mistake)</label>
             <textarea id="review-note" maxlength="2000" placeholder="What should have happened earlier, or why this action is better?"></textarea>
@@ -368,7 +369,9 @@
       }
       byId("review-note-status").textContent = noteError ? "Note save failed; keep this frame open and retry"
         : noteSaving ? "Saving note…" : noteDirty ? "Unsaved note"
-          : reviewNotes.has(index) ? "Review note saved on this computer · separate from training labels"
+          : reviewNotes.has(index) ? (reviewNotes.get(index).kind === "reject_recorded"
+              ? "Recorded action rejected · eligible for preference training after validation"
+              : "Review note saved on this computer · separate from training labels")
             : "Notes do not label an action or enter training";
       byId("clear-note").disabled = noteSaving || (!noteDirty && !reviewNotes.has(index));
       byId("save-note").disabled = noteSaving;

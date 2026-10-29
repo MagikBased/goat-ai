@@ -1,5 +1,15 @@
 # Baseline evaluation log
 
+## Negative-only human review path (29 October 2026)
+
+The local replay viewer now accepts an explicit **Reject the AI's recorded
+action** finding. A replay-bound converter validates the saved review and
+produces a masked-parent preference that removes only that action's probability
+mass. This does not rank the other legal actions or alter game rules. No new
+human rejection labels were present in the local review folders at the time of
+implementation, so there is **no trained child or measured strength gain**
+from this path yet. The previously tested v6 children remain unpromoted.
+
 ## Offline action-branch outcome diagnostic (29 October 2026)
 
 `scripts/evaluate_decision_branches.py` now reconstructs a complete
