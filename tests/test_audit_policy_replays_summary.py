@@ -25,10 +25,9 @@ def test_summary_counts_only_policy_review_flags() -> None:
     result = summarize_visible_own_card_losses(reports)
     assert result["available"] is True
     assert result["verified_policy_choices"] == 1000
-    assert result["flagged_instances"] == 5
-    assert result["flagged_instances_per_1000_policy_choices"] == 5
+    assert result["flagged_instances"] == 4
+    assert result["flagged_instances_per_1000_policy_choices"] == 4
     assert result["category_counts"] == {
-        "breaker_targets_only_own_backrow": 1,
         "heavy_storm_only_own_backrow": 1,
         "heavy_storm_negative_visible_trade": 1,
         "nobleman_only_own_set_monster": 1,
@@ -40,6 +39,8 @@ def test_summary_counts_only_policy_review_flags() -> None:
         "mst_idle_only_own_backrow": None,
         "raigeki_break_idle_only_own_field": None,
         "ring_idle_only_own_faceup": None,
+        "breaker_activates_with_only_own_backrow": None,
+        "owned_chaos_boss_activates_without_enemy_monster": None,
     }
 
 
@@ -134,4 +135,37 @@ def test_idle_own_ring_opportunity_uses_visible_nonlethal_condition() -> None:
     ))
     assert own_card_activation_opportunities(trajectory, 0) == {
         "ring_idle_only_own_faceup": 2,
+    }
+
+
+def test_own_only_ability_opportunities_count_upstream_prompt() -> None:
+    breaker = 71413901
+    bls = 504700118
+    own_set = CardView(0, "spell_trap", "facedown", 123, 0)
+    own_breaker = CardView(0, "monster", "faceup", breaker, 0, owner=0)
+    own_bls = CardView(0, "monster", "faceup", bls, 1, owner=0)
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 0)
+    enemy_monster = CardView(1, "monster", "facedown", None, 0)
+    breaker_action = Action("breaker", "chain", 0,
+                            {"code": breaker, "sequence": 0})
+    boss_action = Action("boss", "chain", 0,
+                         {"code": bls, "sequence": 1})
+    wait = Action("wait", "pass", 0)
+
+    def decision(cards):
+        obs = Observation(viewer=0, acting_player=0, turn=1, phase="main1",
+                          life_points=(8000, 8000), hand=(), field=cards,
+                          graveyards=((), ()), banished=((), ()),
+                          opponent_hand_count=5, deck_counts=(35, 35),
+                          extra_deck_counts=(0, 0), turn_player=0)
+        return DecisionRecord(obs, (breaker_action, boss_action, wait), wait)
+
+    trajectory = SimpleNamespace(decisions=(
+        decision((own_breaker, own_bls, own_set)),
+        decision((own_breaker, own_bls, own_set)),
+        decision((own_breaker, own_bls, own_set, enemy_set, enemy_monster)),
+    ))
+    assert own_card_activation_opportunities(trajectory, 0) == {
+        "breaker_activates_with_only_own_backrow": 1,
+        "owned_chaos_boss_activates_without_enemy_monster": 1,
     }

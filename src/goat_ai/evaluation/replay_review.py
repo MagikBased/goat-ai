@@ -208,6 +208,22 @@ def review_candidates(trajectory: Trajectory,
                           {"own_set_monsters": sum(c.position == "facedown"
                                                    for c in own_monsters),
                            "enemy_set_monsters": 0}))
+        if (selected.kind in ("activate", "chain") and can_pass
+                and selected.parameters.get("code") == BREAKER_THE_MAGICAL_WARRIOR
+                and own_backrow and not enemy_backrow):
+            found.append(("breaker_activates_with_only_own_backrow",
+                          {"own_backrow": own_backrow, "enemy_backrow": 0}))
+        if (selected.kind in ("activate", "chain") and can_pass
+                and selected.parameters.get("code") in (
+                    BLACK_LUSTER_SOLDIER, CHAOS_SORCERER)
+                and not enemy_monsters
+                and any(c.zone == "monster" and c.controller == seat
+                        and c.sequence == selected.parameters.get("sequence")
+                        and c.code == selected.parameters.get("code")
+                        and c.owner == seat for c in own_monsters)):
+            found.append(("owned_chaos_boss_activates_without_enemy_monster",
+                          {"source_card_code": selected.parameters["code"],
+                           "enemy_monsters": 0}))
         if (selected.kind in ("activate", "chain") and not obs.chain
                 and obs.turn_player == seat and len(record.legal_actions) > 1):
             source_is_set = (selected.parameters.get("location") == 8

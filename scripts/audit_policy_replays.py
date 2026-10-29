@@ -12,7 +12,12 @@ from goat_ai.agents import (
     load_flip_monster_codes,
 )
 from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
-from goat_ai.agents.tactical_guard import safe_idle_own_ring_indices
+from goat_ai.agents.tactical_guard import (
+    BLACK_LUSTER_SOLDIER,
+    BREAKER_THE_MAGICAL_WARRIOR,
+    CHAOS_SORCERER,
+    safe_idle_own_ring_indices,
+)
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import (
     HEAVY_STORM,
@@ -34,7 +39,7 @@ VISIBLE_OWN_CARD_LOSSES = frozenset({
     "nobleman_only_own_set_monster",
     "heavy_storm_only_own_backrow",
     "heavy_storm_negative_visible_trade",
-    "breaker_targets_only_own_backrow",
+    # The forced target remains a review prompt; count its optional activation.
     "breaker_targets_own_card_with_enemy_option",
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -46,12 +51,15 @@ VISIBLE_OWN_CARD_LOSSES = frozenset({
     "raigeki_break_idle_only_own_field",
     "ring_idle_only_own_faceup",
     "ring_targets_own_with_safe_enemy_option",
+    "breaker_activates_with_only_own_backrow",
+    "owned_chaos_boss_activates_without_enemy_monster",
 })
 
 ACTIVATION_OPPORTUNITY_CATEGORIES = (
     "nobleman_only_own_set_monster", "heavy_storm_only_own_backrow",
     "mst_idle_only_own_backrow", "raigeki_break_idle_only_own_field",
-    "ring_idle_only_own_faceup")
+    "ring_idle_only_own_faceup", "breaker_activates_with_only_own_backrow",
+    "owned_chaos_boss_activates_without_enemy_monster")
 
 
 def own_card_activation_opportunities(trajectory, seat: int) -> dict[str, int]:
@@ -73,6 +81,7 @@ def own_card_activation_opportunities(trajectory, seat: int) -> dict[str, int]:
                            for card in obs.field)
         enemy_monsters = any(card.controller != seat and card.zone == "monster"
                              for card in obs.field)
+        can_pass = any(action.kind == "pass" for action in record.legal_actions)
         if (len(safe_idle_own_ring_indices(
                 obs, record.legal_actions, range(len(record.legal_actions))))
                 < len(record.legal_actions)):
@@ -84,6 +93,20 @@ def own_card_activation_opportunities(trajectory, seat: int) -> dict[str, int]:
             if (action.kind == "activate" and code == NOBLEMAN_OF_CROSSOUT
                     and own_sets and not enemy_sets):
                 seen.add(("nobleman_only_own_set_monster", obs.turn, obs.phase))
+            elif (action.kind in ("activate", "chain") and can_pass
+                  and code == BREAKER_THE_MAGICAL_WARRIOR
+                  and own_backrow and not enemy_backrow):
+                seen.add(("breaker_activates_with_only_own_backrow",
+                          obs.turn, obs.phase))
+            elif (action.kind in ("activate", "chain") and can_pass
+                  and code in (BLACK_LUSTER_SOLDIER, CHAOS_SORCERER)
+                  and not enemy_monsters
+                  and any(card.controller == seat and card.zone == "monster"
+                          and card.sequence == action.parameters.get("sequence")
+                          and card.code == code and card.owner == seat
+                          for card in obs.field)):
+                seen.add(("owned_chaos_boss_activates_without_enemy_monster",
+                          obs.turn, obs.phase))
             elif action.kind == "activate" and code == HEAVY_STORM and not enemy_backrow:
                 source_is_set = action.parameters.get("location") == 8 and any(
                     card.sequence == action.parameters.get("sequence")

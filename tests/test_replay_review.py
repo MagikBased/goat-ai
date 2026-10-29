@@ -745,6 +745,35 @@ def test_breaker_own_only_backrow_prompt_uses_visible_target_and_field():
     assert not review_candidates(policy(record(with_enemy, own_target)))
 
 
+def test_review_flags_optional_own_only_ability_before_target_prompt():
+    breaker = 71413901
+    bls = 504700118
+    own_set = CardView(0, "spell_trap", "facedown", 64697231, 2)
+    own_breaker = CardView(0, "monster", "faceup", breaker, 0,
+                           "attack", 1900, 1000, owner=0)
+    own_bls = CardView(0, "monster", "faceup", bls, 1,
+                       "attack", 3000, 2500, owner=0)
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 0)
+    enemy_monster = CardView(1, "monster", "facedown", None, 0)
+    breaker_action = Action("breaker", "chain", 0,
+                            {"code": breaker, "sequence": 0})
+    boss_action = Action("bls", "chain", 0,
+                         {"code": bls, "sequence": 1})
+    wait = Action("wait", "pass", 0)
+    saved = policy(
+        record(view(own_breaker, own_set), breaker_action, wait),
+        record(view(own_bls), boss_action, wait),
+        record(view(own_breaker, own_set, enemy_set), breaker_action, wait),
+        record(view(own_bls, enemy_monster), boss_action, wait),
+        record(view(CardView(0, "monster", "faceup", bls, 1,
+                             "attack", 3000, 2500, owner=1)), boss_action, wait),
+    )
+    assert [(item.decision_index, item.category) for item in review_candidates(saved)] == [
+        (0, "breaker_activates_with_only_own_backrow"),
+        (1, "owned_chaos_boss_activates_without_enemy_monster"),
+    ]
+
+
 def test_selfplay_shortlist_requires_learner_seat():
     saved = replace(policy(record(view(), Action("pass", "pass", 0))),
                     source="self_play_rl", skill_metadata={"demonstrator_seat": 0})

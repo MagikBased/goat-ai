@@ -316,6 +316,21 @@ runs. The `scripts/compare_tournament_reports.py
 
 ## Expanded visible own-loss guard audit (29 October 2026)
 
+The replay review audit now records Breaker's optional activation when only
+friendly back row can be targeted, before its forced target prompt. It also
+records a player-owned Black Luster Soldier or Chaos Sorcerer activating its
+banish effect with no opposing monster; borrowed bosses are excluded. The
+corresponding per-category opportunity counters use the same player-visible
+conditions. Native monster abilities appear as `chain` actions, so both
+`activate` and `chain` shapes are accepted. In 16 replay-verified unguarded
+v23 duels on seeds 99900–99907, Breaker had three such distinct turn/phase
+opportunities and took one. The later own-back-row target remains visible in
+the review queue but is not counted a second time in the aggregate loss rate.
+The matched 16 guarded duels had no such Breaker opportunity. No owned-boss
+opportunity appeared in either batch. These are coverage and audit findings,
+not new training labels or a strength result. The refreshed ignored audit is
+`own_card_parent_review_99900_99907/audit_upstream.json` under `.cache/goat-ai`.
+
 The optional `own_loss_guard` now defers an activation before a forced target
 prompt when Heavy Storm would destroy only other friendly back row, Torrential
 Tribute would destroy friendly monsters with no opposing monster, or an idle
