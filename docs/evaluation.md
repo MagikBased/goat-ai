@@ -1068,6 +1068,80 @@ this paired changed-policy diagnostic. This trained-state example does not
 establish generalization; the earlier fresh 64-duel direct comparison remains
 **31–33** for the child against its parent.
 
+## Selected own-loss preference trial (29 October 2026)
+
+The versioned `visible_selected_own_loss_v10` rule retains only V9 decisions
+where the recorded agent **chose** a visibly disfavored own-loss action. It
+compares that choice with actually offered legal alternatives before the
+optional activation, including monster abilities. This avoids filling the
+training batch with states where the agent already avoided the mistake.
+These remain automated, player-visible tactical hypotheses; strategic
+self-removal can be correct in some positions.
+
+From 64 sampled self-play replays on seeds 90300–90363 and 16 unguarded
+parent-policy replays on seeds 99900–99907, V10 retained **27 selected
+mistakes in 23 replays** (21 sampled, six parent). All 23 source replays
+passed exact native reconstruction and visibility auditing before preference
+serialization. The ignored preference manifest at
+`.cache/goat-ai/selected_own_loss_v10_90300_99907/manifest.json` has SHA-256
+`9d4491b8187e999f7e2b0b356679ad5cad411143434144f5d80a696239947a1d`.
+The cases identify visible losses; they are not human judgments of the best
+move.
+
+An experimental child started from the unchanged selected v23 checkpoint.
+`train_review_preferences.py` used all 27 cases, four separate current-core
+preservation replays (64 states), the masked-parent objective, 40 steps,
+recorded-bad weight 10, parent KL weight 1, learning rate 0.0001, and seed 74.
+Training preference loss fell **1.3945 → 0.9124**; final sampled preservation
+KL was **0.00280**. Its ignored checkpoint
+`.cache/goat-ai/fv23_selected_own_loss_v10_27pref_40step.pt` has SHA-256
+`e0c2d8cba1adf6c824d2c711579f27e59a02332ed0366d8a3a02934f6b4610fb`.
+
+On **26** held-out V6 comparison states from parent replays on seeds
+99930–99933, the parent ranked a flagged action first **4** times and the
+child **2** times. Neither replay hash nor seed was in the child's training
+provenance. These are fixed parent-visited states, so the reduction does not
+measure error frequency in child games. The two ignored score reports are
+`holdout_parent.json` and `holdout_child.json` in the V10 directory above.
+
+Complete held-out direct games used Rhymus/Christian and Mary/Dimension
+Fusion Guide Main Deck pairs, both deck assignments and policy seats, on
+seeds 106200–106203. The unseen-Main-Deck gate passed for both checkpoints.
+The child scored **17–15** against the parent across 32 terminal games
+(paired 95% score interval **34.4%–68.8%**). Against Tactical-v14 on matched
+seeds 106204–106207, the child scored **7–24–1** and the parent **6–25–1**;
+the paired score difference was **+3.1 percentage points**, 95% interval
+**−10.9 to +17.2**. The direct report SHA-256 is
+`7b1ad8d868cd5d887eef2e9d809394c002e8fe65137e26246dbd38b734b7dfa6`;
+the Tactical report SHA-256 values are
+`4837cdca6681d96e72c4b25cd0ed8d5ae747a020702f3fda6a1848e74c6b1b37`
+for the child and
+`3cf0e63ac00b46b368b1e714c31ef52c297fba64b16513a998bb7dfc8c4609a6`
+for the parent. These reports measure full games; they are not exact replay
+reconstructions.
+
+For a targeted fresh-replay check, both checkpoints also played eight
+Tactical-v14 duels on seeds 106208–106209 with the same two deck pairs and
+both policy seats. All **16** trajectories reached terminal state, passed
+exact native replay and visibility audits, and reproduced every policy
+choice from its saved checkpoint. The conservative own-card review audit
+flagged **three** instances for the parent (two own-only Heavy Storm, one
+own-only Nobleman) across 1,841 policy decisions and **zero** for the child
+across 2,358 decisions. Heavy Storm was offered in two parent and three
+child distinct turn/phase opportunities; Nobleman in five and eight. The
+different trajectories and small sample limit comparison. The ignored audit
+SHA-256 values are
+`7a94a13d375e89114db5521c13d1cde9d13541539861908593bc4d02719b22fe`
+and
+`ad28d823ce5981a5b175653677c0f75dfb5fb575d9f3cd1441c7268516ad6eb3`.
+
+This is a **targeted pilot improvement**, not established competitive gain
+or a general solution to own-card targeting. The child stays experimental;
+the selected checkpoint remains v23. The next test should enlarge the
+independently reviewed selected-error corpus, include Ring/MST target and
+response mistakes, and run a larger held-out evaluation with own-loss
+opportunity rates and match strength together.
+
 ## Activated abilities in own-loss preference coverage (29 October 2026)
 
 The versioned `visible_optional_own_loss_v9` rule extends the v6 training

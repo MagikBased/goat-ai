@@ -43,6 +43,7 @@ RULE_SET_V6 = "visible_optional_own_loss_v6"
 RULE_SET_V7 = "visible_guard_distillation_v7"
 RULE_SET_V8 = "visible_residual_guard_distillation_v8"
 RULE_SET_V9 = "visible_optional_own_loss_v9"
+RULE_SET_V10 = "visible_selected_own_loss_v10"
 SUPPORTED_CATEGORIES_V1 = frozenset({
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
@@ -105,6 +106,13 @@ def derive(trajectory, candidates, *, rule_set_id: str = RULE_SET_ID,
            card_facts=None
            ) -> tuple[list[dict], Counter]:
     """Keep one unambiguous automated comparison per recorded decision."""
+    if rule_set_id == RULE_SET_V10:
+        comparisons, _ = derive(trajectory, candidates, rule_set_id=RULE_SET_V9)
+        selected_bad = [item for item in comparisons if trajectory.decisions[
+            item["decision_index"]].legal_actions.index(trajectory.decisions[
+                item["decision_index"]].selected_action) in item[
+                    "disfavored_action_indices"]]
+        return selected_bad, Counter({"selected_own_loss": len(selected_bad)})
     if rule_set_id == RULE_SET_V7:
         return derive_guard_distillation(trajectory)
     if rule_set_id == RULE_SET_V8:
@@ -410,7 +418,7 @@ def validate_automated_preferences(trajectory, preferences, weak_flip_attacks,
     rule_set_id = getattr(preferences, "rule_set_id", None) or RULE_SET_ID
     candidates = (() if rule_set_id in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
                                        RULE_SET_V6, RULE_SET_V7, RULE_SET_V8,
-                                       RULE_SET_V9)
+                                       RULE_SET_V9, RULE_SET_V10)
                   else review_candidates(
         trajectory, weak_flip_attacks=weak_flip_attacks))
     expected, _ = derive(trajectory, candidates, rule_set_id=rule_set_id,
@@ -432,7 +440,7 @@ def main() -> None:
                                                RULE_SET_V3, RULE_SET_V4,
                                                RULE_SET_V5, RULE_SET_V6,
                                                RULE_SET_V7, RULE_SET_V8,
-                                               RULE_SET_V9),
+                                               RULE_SET_V9, RULE_SET_V10),
                         default=RULE_SET_ID)
     args = parser.parse_args()
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
@@ -449,7 +457,7 @@ def main() -> None:
         audit_trajectory_visibility(trajectory)
         candidates = (() if args.rule_set in (RULE_SET_V3, RULE_SET_V4, RULE_SET_V5,
                                              RULE_SET_V6, RULE_SET_V7, RULE_SET_V8,
-                                             RULE_SET_V9)
+                                             RULE_SET_V9, RULE_SET_V10)
                       else review_candidates(
             trajectory, weak_flip_attacks=weak_flip_attacks))
         preferences, categories = derive(trajectory, candidates,
@@ -463,7 +471,7 @@ def main() -> None:
             "schema_version": 2 if args.rule_set in (RULE_SET_V3, RULE_SET_V4,
                                                      RULE_SET_V5, RULE_SET_V6,
                                                      RULE_SET_V7, RULE_SET_V8,
-                                                     RULE_SET_V9)
+                                                     RULE_SET_V9, RULE_SET_V10)
             else 1,
             "source_trajectory_sha256": sha256_file(path),
             "authorization": "automated_rule",

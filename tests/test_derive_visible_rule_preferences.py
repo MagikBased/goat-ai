@@ -509,3 +509,26 @@ def test_v9_covers_activated_breaker_and_tribe(code, field, category):
     assert derive(replay, (), rule_set_id=rules.RULE_SET_V9) == (
         [{"decision_index": 0, "preferred_action_indices": [1],
           "disfavored_action_indices": [0]}], {category: 1})
+
+
+def test_v10_keeps_only_recorded_own_loss_choices():
+    own_set = CardView(0, "monster", "facedown", 123, 0)
+    obs = Observation(viewer=0, acting_player=0, turn=3, phase="main1",
+                      life_points=(8000, 8000), hand=(), field=(own_set,),
+                      graveyards=((), ()), banished=((), ()),
+                      opponent_hand_count=4, deck_counts=(35, 35),
+                      extra_deck_counts=(0, 0), turn_player=0)
+    nobleman = Action("nobleman", "activate", 0, {"code": 504700116})
+    battle = Action("battle", "battle_phase", 0)
+    bad = DecisionRecord(obs, (nobleman, battle), nobleman)
+    safe = DecisionRecord(replace(obs, turn=4), (nobleman, battle), battle)
+    replay = Trajectory("goat", ("a.ydk", "b.ydk"), 42, (bad, safe), 1,
+                        source="self_play_rl", skill_metadata={"learner_seat": 0})
+    assert len(derive(replay, (), rule_set_id=rules.RULE_SET_V9)[0]) == 2
+    expected = ([{"decision_index": 0, "preferred_action_indices": [1],
+                  "disfavored_action_indices": [0]}],
+                {"selected_own_loss": 1})
+    assert derive(replay, (), rule_set_id=rules.RULE_SET_V10) == expected
+    rules.validate_automated_preferences(
+        replay, SimpleNamespace(rule_set_id=rules.RULE_SET_V10,
+                                preferences=(ReviewedPreference(0, (1,), (0,)),)), {})
