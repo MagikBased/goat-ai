@@ -1667,6 +1667,42 @@ reference selected and the M4 self-play improvement gate open.
 
 ## Broader-deck human-review preference pilot (28 October 2026)
 
+### Reviewed material-direction check (29 October 2026)
+
+The earlier New Jersey and broader-deck review manifests contain **25 changed
+human choices** in total (14 and 11). Their review-bound preference files were
+read against the exact source trajectories; the four distinct duels relevant
+to this check were replay-verified and visibility-audited again. Five changed
+choices preferred Heavy Storm when its *visible, before-chain* card-count
+margin was **+1**: the opponent had two or three back-row cards, and the
+reviewed player had either a Set Heavy Storm plus zero or one other back-row
+card, or Heavy Storm in hand with no own back row. One changed choice rejected
+Nobleman of Crossout when the only visible Set monster belonged to the acting
+player and no opposing Set monster existed. These six directions agree with a
+simple local material count; actual value may still depend on hidden cards,
+chains, effects, and future turns. They are not six independent games or a
+validated reward function. None of the 25 changed human choices was an MST
+activation, so the new [MST opportunity queue](replay_audit.md#mst-use-and-non-use-review-queue-29-october-2026)
+addresses a current review-data gap rather than repeating existing labels.
+
+As an independent diagnostic, `scripts/score_reviewed_preferences.py`
+replayed and visibility-checked all 13 source trajectories containing these
+25 changed preferences, then scored the selected v23 parent and the earlier
+feature-v25 visible-trade head. None of the source seeds occurred in either
+checkpoint's training provenance. V25 ranked a reviewed alternative first in
+**3/25** decisions versus **0/25** for the parent; all three were among the
+five positive-margin Heavy Storm cases. Across the six material-direction
+cases above, V25 gave the reviewed alternative a positive logit margin in
+**3/6** versus **0/6** for the parent. It still did not rank the reviewed
+alternative first in the Nobleman case. These are off-policy decision scores,
+not proof that V25 is a stronger duelist: its prior held-out tournament
+results in [the feature-v25 trial](#reviewed-nobleman-and-heavy-storm-card-trades)
+did not establish a match gain. Ignored scorer report SHA-256 values are
+`1f5a57f17219667681f2b2d305a0c47decb85e935560a46761b7a3d402a91590`
+for the parent and
+`dc5b6725b7dd989cca7bbb65f5cb5b5c2a413c691ca66cb02774ed8e495f4ccd`
+for V25.
+
 The broader v23-parent review queue reached **14/14 saved choices**. An ignored
 snapshot of its six nonempty label files is
 `.cache/goat-ai/broad_parent_review_snapshot_20261028/snapshot.json` (SHA-256
