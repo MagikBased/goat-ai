@@ -42,7 +42,7 @@ def main() -> None:
     parser.add_argument("--opponent-own-loss-guard", action="store_true",
                         help="apply the experimental own-loss filter to a checkpoint opponent")
     parser.add_argument("--opponent-own-loss-guard-version", type=int,
-                        choices=(1, 2, 3, 4, 5, 6, 7, 8), default=1)
+                        choices=(1, 2, 3, 4, 5, 6, 7, 8, 9), default=1)
     parser.add_argument("--max-decisions", type=int, default=3000)
     parser.add_argument("--tactical-guard", action="store_true",
                         help="apply experimental visible-state action filter to policy")
@@ -55,7 +55,7 @@ def main() -> None:
                              "attack-to-weaker-defense switches")
     parser.add_argument("--own-loss-guard", action="store_true",
                         help="experimental visible own-card-loss filter")
-    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4, 5, 6, 7, 8), default=1,
+    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4, 5, 6, 7, 8, 9), default=1,
                         help="v2 defers one-shot MST; v3 idle own-only Ring; "
                              "v4 prefers a safe opposing Ring target; v5 combines v2 and v3; "
                              "v7 adds chained own-only MST avoidance to v1; "

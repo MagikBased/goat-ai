@@ -148,7 +148,9 @@ def safe_chained_own_only_mst_indices(observation: Observation,
 
 def safe_optional_own_loss_indices(observation: Observation,
                                    legal_actions: Sequence[Action],
-                                   admissible: Sequence[int]) -> tuple[int, ...]:
+                                   admissible: Sequence[int], *,
+                                   require_faceup_chaos_target: bool = False,
+                                   ) -> tuple[int, ...]:
     """Defer a few visible own-only removal activations for an opt-in ablation.
 
     This is a strategic filter, never a legality ruling. A facedown opposing
@@ -167,6 +169,8 @@ def safe_optional_own_loss_indices(observation: Observation,
                         for c in observation.field)
     enemy_monsters = any(c.controller != own and c.zone == "monster"
                          for c in observation.field)
+    enemy_faceup_monsters = any(c.controller != own and c.zone == "monster"
+                                and c.position == "faceup" for c in observation.field)
     own_faceup_monsters = any(c.controller == own and c.zone == "monster"
                               and c.position == "faceup" for c in observation.field)
     own_monsters = any(c.controller == own and c.zone == "monster"
@@ -211,7 +215,9 @@ def safe_optional_own_loss_indices(observation: Observation,
             return own_faceup_monsters and not any(
                 c.controller != own and c.zone == "monster" and c.position == "faceup"
                 for c in observation.field)
-        if code in (BLACK_LUSTER_SOLDIER, CHAOS_SORCERER) and not enemy_monsters:
+        if (code in (BLACK_LUSTER_SOLDIER, CHAOS_SORCERER)
+                and not (enemy_faceup_monsters if code == CHAOS_SORCERER
+                         and require_faceup_chaos_target else enemy_monsters)):
             return any(c.controller == own and c.zone == "monster"
                        and c.sequence == action.parameters.get("sequence")
                        and c.code == code and c.owner == own

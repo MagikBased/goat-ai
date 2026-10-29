@@ -172,19 +172,31 @@ def test_chained_own_only_mst_ablation_keeps_opposing_and_forced_targets():
         board(own_mst, chain=chain), (mst, wait), range(2)) == (0, 1)
 
 
-def test_opt_in_own_loss_guard_preserves_borrowed_boss_and_hidden_opponent():
-    boss = 9596126
-    activate = Action("banish", "activate", 0,
-                      {"code": boss, "sequence": 0})
+def test_opt_in_own_loss_guard_respects_each_boss_effect_target_rule():
     wait = Action("wait", "end_phase", 0)
-    owned = CardView(0, "monster", "faceup", boss, 0, "attack",
-                     2300, 2000, owner=0)
-    borrowed = replace(owned, owner=1)
-    assert safe_optional_own_loss_indices(board(owned), (activate, wait), range(2)) == (1,)
-    assert safe_optional_own_loss_indices(board(borrowed), (activate, wait), range(2)) == (0, 1)
-    assert safe_optional_own_loss_indices(
-        board(owned, CardView(1, "monster", "facedown", None, 0)),
-        (activate, wait), range(2)) == (0, 1)
+    hidden = CardView(1, "monster", "facedown", None, 0)
+    revealed = CardView(1, "monster", "faceup", 46986414, 0, "attack", 1800, 1200)
+    for boss in (9596126, 504700118):
+        activate = Action("banish", "activate", 0,
+                          {"code": boss, "sequence": 0})
+        owned = CardView(0, "monster", "faceup", boss, 0, "attack",
+                         2300, 2000, owner=0)
+        borrowed = replace(owned, owner=1)
+        actions = (activate, wait)
+        assert safe_optional_own_loss_indices(board(owned), actions, range(2)) == (1,)
+        # BLS can banish a Set monster; Chaos Sorcerer needs a face-up target.
+        assert safe_optional_own_loss_indices(board(owned, hidden), actions,
+                                              range(2)) == (0, 1)
+        expected = (0, 1) if boss == 504700118 else (1,)
+        assert safe_optional_own_loss_indices(
+            board(owned, hidden), actions, range(2),
+            require_faceup_chaos_target=True) == expected
+        assert safe_optional_own_loss_indices(board(owned, revealed), actions,
+                                              range(2)) == (0, 1)
+        assert safe_optional_own_loss_indices(board(borrowed, hidden), actions,
+                                              range(2)) == (0, 1)
+        assert safe_optional_own_loss_indices(board(owned, hidden), actions[:1],
+                                              (0,)) == (0,)
 
 
 def test_one_shot_response_guard_uses_public_chain_type_and_other_enemy_zones():

@@ -140,7 +140,7 @@ def main() -> None:
                         help="avoid observed BLS and MST self-target losses; requires tactical guard")
     parser.add_argument("--own-loss-guard", action="store_true",
                         help="standalone visible own-only removal ablation")
-    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4, 5, 6, 7, 8), default=1,
+    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4, 5, 6, 7, 8, 9), default=1,
                         help="v2 defers one-shot MST; v3 idle own-only Ring; "
                              "v4 prefers a safe opposing Ring target; v5 combines v2 and v3; "
                              "v6 also defers own one-shot MST responses; "
@@ -155,7 +155,7 @@ def main() -> None:
     parser.add_argument("--opponent-own-loss-guard", action="store_true",
                         help="apply an own-loss guard to the opponent checkpoint")
     parser.add_argument("--opponent-own-loss-guard-version", type=int,
-                        choices=(1, 2, 3, 4, 5, 6, 7, 8), default=1,
+                        choices=(1, 2, 3, 4, 5, 6, 7, 8, 9), default=1,
                         help="own-loss guard version for the opponent checkpoint")
     opponents = parser.add_mutually_exclusive_group()
     opponents.add_argument("--opponent", choices=("random", "heuristic",

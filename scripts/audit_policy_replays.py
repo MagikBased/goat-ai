@@ -257,7 +257,8 @@ def main() -> None:
                                  "greedy_own_loss_guard_v3",
                                  "greedy_own_loss_guard_v4", "greedy_own_loss_guard_v5",
                                  "greedy_own_loss_guard_v6", "greedy_own_loss_guard_v7",
-                                 "greedy_own_loss_guard_v8"):
+                                 "greedy_own_loss_guard_v8",
+                                 "greedy_own_loss_guard_v9"):
                 raise ValueError(f"{path}: unsupported policy inference {inference!r}")
             guarded = inference in ("greedy_tactical_guard_v3", "greedy_tactical_guard_v4",
                                     "greedy_tactical_guard_v5")
@@ -274,8 +275,10 @@ def main() -> None:
                                              "greedy_own_loss_guard_v5",
                                              "greedy_own_loss_guard_v6",
                                              "greedy_own_loss_guard_v7",
-                                             "greedy_own_loss_guard_v8"),
-                own_loss_guard_version=(8 if inference == "greedy_own_loss_guard_v8"
+                                             "greedy_own_loss_guard_v8",
+                                             "greedy_own_loss_guard_v9"),
+                own_loss_guard_version=(9 if inference == "greedy_own_loss_guard_v9"
+                                        else 8 if inference == "greedy_own_loss_guard_v8"
                                         else 7 if inference == "greedy_own_loss_guard_v7"
                                         else 2 if inference == "greedy_own_loss_guard_v2"
                                         else 6 if inference == "greedy_own_loss_guard_v6"

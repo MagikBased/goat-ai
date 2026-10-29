@@ -85,7 +85,8 @@ def recorded_policy_options(inference: str, native_root: Path) -> dict:
                 "greedy_own_loss_guard_v5": 5,
                 "greedy_own_loss_guard_v6": 6,
                 "greedy_own_loss_guard_v7": 7,
-                "greedy_own_loss_guard_v8": 8}
+                "greedy_own_loss_guard_v8": 8,
+                "greedy_own_loss_guard_v9": 9}
     if inference not in versions:
         raise ValueError(f"unsupported source policy inference {inference!r}")
     version = versions[inference]

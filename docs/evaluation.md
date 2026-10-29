@@ -1,5 +1,30 @@
 # Baseline evaluation log
 
+## Opt-in Chaos Sorcerer target-scope guard v9 (29 October 2026)
+
+The selected v1 guard treats any opposing monster as a possible
+target when deciding whether to defer an owned Chaos Sorcerer's optional
+banish effect. [Chaos Sorcerer's official text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5833&ope=2&request_locale=en)
+requires a face-up target. If the opponent had only Set monsters, the guard
+can permit activation when a friendly face-up monster is the only legal
+target. Experimental v9 requires an opposing face-up monster for that effect
+and leaves v1 unchanged for replay reproducibility. The
+separate [BLS text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5835&ope=2&request_locale=en)
+allows any monster on the field, so an opposing Set monster still keeps BLS's
+banish activation available. The existing target-choice filter prefers an
+offered opposing target over self-banish.
+
+The regression covers v1 and v9, both bosses, owned and borrowed sources, visible
+face-up and hidden Set opponents, and a forced-action fallback. The focused
+policy, guard, replay-queue, and native BLS/Chaos test selection passed 79
+tests. The preexisting seed-124904 policy trajectory was re-audited with its
+original v1 inference mode, reproducing all selected actions and native
+decisions, and passing the visibility check.
+The older 64-duel own-card baseline contained no eligible position with an
+owned boss facing only opposing Set monsters, so v9 has no
+measured duel-strength effect yet. It changes a narrow optional play filter,
+not simulator legality or the checkpoint's learned preferences.
+
 ## Negative visible Heavy Storm trade ablation (29 October 2026)
 
 An opt-in v8 inference variant extends the selected v1 own-loss filter at

@@ -3076,6 +3076,35 @@ def test_optional_own_loss_v7_defers_chained_own_only_mst_without_ring_filter():
         ring_state, (ring, wait)) == ring
 
 
+def test_optional_own_loss_v9_defers_chaos_with_only_set_enemy():
+    class FavorFirst(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, features):
+            return -torch.arange(len(features.action_cards)).float() + self.dummy
+
+    chaos, bls = 9596126, 504700118
+    model = FavorFirst()
+    vocabulary = CardVocabulary((chaos, bls))
+    hidden = CardView(1, "monster", "facedown", None, 0, "defense")
+    wait = Action("wait", "end_phase", 0)
+    for code in (chaos, bls):
+        own = CardView(0, "monster", "faceup", code, 0, "attack",
+                       2300, 2000, owner=0)
+        activate = Action("banish", "activate", 0,
+                          {"code": code, "location": 4, "sequence": 0})
+        snapshot = replace(view(), field=(own, hidden))
+        assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                           own_loss_guard_version=1).select_action(
+            snapshot, (activate, wait)) == activate
+        expected = wait if code == chaos else activate
+        assert PolicyAgent(model, vocabulary, own_loss_guard=True,
+                           own_loss_guard_version=9).select_action(
+            snapshot, (activate, wait)) == expected
+
+
 def test_optional_own_loss_v4_prefers_safe_enemy_ring_target_except_own_lethal():
     class FavorFirst(torch.nn.Module):
         def __init__(self):
