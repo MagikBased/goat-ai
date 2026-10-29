@@ -11884,3 +11884,56 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
   --output .cache/goat-ai/whitelist_coverage_activation_final_120000 \
   --seed 120000 --max-decisions 3000 --workers 4
 ```
+
+## Resolved material changes for monster abilities and card effects (28 October 2026)
+
+The experimental `scripts/audit_effect_material.py` reads only recorded
+player-visible observations and selected legal actions. It counts hand cards
+and controlled non-token field cards relative to the opponent before an
+activation and at the first later decision after its chain resolves. Printed
+card Type identifies monster abilities, including field and hand activations,
+independently of the native action kind (`activate` or `chain`). It also covers
+Spell/Trap effects. Tokens are excluded using their printed Token type, and
+unknown face-down opponent identities remain unknown. Every input duel is
+exactly replay-verified and visibility-audited first.
+
+On the already recorded 64 current-core self-play duels from seeds
+97000–97063, all **27,511 decisions** passed those checks. The diagnostic
+found **228 selected monster-ability activations** and **849 selected
+Spell/Trap activations**. A stable decision after chain closure existed in
+the same turn for **226** and **839**, respectively. The remaining 12
+activations ended without that decision boundary, usually at terminal Ring
+of Destruction resolution; they were not assigned a material delta. Among
+the measured monster abilities, 78 chains had a negative, 55 a zero, and 93
+a positive material change. For Spell/Trap effects the counts were 266, 374,
+and 199. Another selected activation occurred before closure in 9 monster
+and 109 Spell/Trap chains, so those deltas combine multiple selected effects.
+Automatic triggers can also contribute even when that count is zero.
+
+One measured example is Black Luster Soldier's field ability in seed 97002
+at decision 554. The next target choice selects its controller's own monster,
+and the observed chain loses one net non-token card. This demonstrates that
+the new diagnostic includes ability activations; it does **not** establish
+that every negative delta is a bad play. It omits Life Points, Graveyard
+utility, card quality, tempo, delayed effects, future draws, and hidden
+opponent cards. Responses and automatic triggers confound causal attribution.
+It reports the result of the **selected** line, not the expected result of
+every alternative legal action. No automated training labels or policy change
+were made from these numbers.
+
+The ignored report is
+`.cache/goat-ai/effect_material_human14_97000_97063.json` (SHA-256
+`8cf5f7d9aba42eb18db05a188d2930402167327bc61f7e8042e157050a5e6ea7`).
+Reproduce it after native setup with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/audit_effect_material.py \
+  .cache/goat-ai/human14_ppo_mixed_64_97000_97063_replays/episode_*.json \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/effect_material_human14_97000_97063.json
+```
+
+The next training experiment can use this observed signal as a small
+auxiliary value target or carefully constructed reward potential, then
+compare it with the unchanged policy on held-out Main Decks and seeds.

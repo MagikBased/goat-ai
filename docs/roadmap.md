@@ -2423,3 +2423,9 @@ collisions. Its warm start preserves v23 logits, but it has not been trained
 or competitively evaluated. Obtain independent reviewed announcement labels
 and run held-out strength checks before considering promotion. M4's policy
 strength gate remains open.
+
+An [experimental resolved-material diagnostic](evaluation.md#resolved-material-changes-for-monster-abilities-and-card-effects-28-october-2026)
+now measures both monster ability activations and Spell/Trap effects on
+replay-verified, player-visible self-play trajectories. It does not produce
+counterfactual expected card advantage or training labels; candidate reward
+shaping still requires a controlled held-out strength experiment.
