@@ -74,7 +74,10 @@ def create_noted_upstream_queue(queue_path: Path, output: Path, native_root: Pat
                     or prior.selected_action.kind not in ("activate", "chain")
                     or source is not None and not activation_matches_chain_source(
                         prior.selected_action, source)
-                    or sum(action.kind == "pass" for action in prior.legal_actions) != 1):
+                    or not any(action.kind in ("pass", "battle_phase", "main2",
+                                               "end_phase", "phase_transition")
+                               and action != prior.selected_action
+                               for action in prior.legal_actions)):
                 continue
             key = (digest, prior_index)
             if key in seen:
@@ -109,7 +112,8 @@ def create_noted_upstream_queue(queue_path: Path, output: Path, native_root: Pat
     if output.exists() and output.read_text(encoding="utf-8") != rendered:
         raise ValueError("upstream queue already exists with different contents")
     output.write_text(rendered, encoding="utf-8")
-    write_review_index(selected, output, native_root, comparison_label="Pass candidate")
+    write_review_index(selected, output, native_root,
+                       comparison_label="Alternative candidate")
     return output, unmatched
 
 

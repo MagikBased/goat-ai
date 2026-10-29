@@ -1,5 +1,21 @@
 # Early replay decision audit
 
+## Ring activation before a poor own-card target (29 October 2026)
+
+Combined queue item 55 shows a Ring of Destruction target prompt where the
+selected policy chose its own Dekoichi over two opposing Sheep Tokens. The
+more useful review question is the preceding optional Ring activation at
+zero-based decision 820. The [separate upstream review](../.cache/goat-ai/upstream_55_ring_dekoichi.html)
+shows all ten legal actions at that position and initially suggests entering
+Battle Phase. That suggestion is not a label: a native branch found that the
+policy later activated Ring in Battle Phase and targeted Dekoichi again.
+The reviewer may choose any legal alternative or mark the recorded activation
+as rejected. The source target queue and its saved labels are unchanged.
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/upstream_55_ring_dekoichi.json
+```
+
 ## Varied-deck own-card review additions (29 October 2026)
 
 The [latest combined local queue](../.cache/goat-ai/own_removal_combined_queue_20261029_v3.html)

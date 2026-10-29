@@ -77,6 +77,22 @@ def test_upstream_queue_preserves_target_labels_and_offers_pass(tmp_path, monkey
         upstream_store.choose(digest, 1, 0)
 
 
+def test_upstream_candidate_offers_phase_transition_when_pass_is_absent(tmp_path):
+    queue, replay, digest, trajectory = _source_queue(tmp_path)
+    activation = trajectory.decisions[0]
+    battle = Action("battle", "battle_phase", 0)
+    end = Action("end", "end_phase", 0)
+    main_activation = replace(activation, legal_actions=(activation.selected_action,
+                                                         battle, end))
+    trajectory = replace(trajectory, decisions=(main_activation,
+                                                trajectory.decisions[1]))
+    item = json.loads(queue.read_text())["selected"][0]
+    candidate = create_upstream_review.upstream_candidate(
+        trajectory, item, digest, replay, queue, 0)
+    assert candidate["teacher_action"] == {"kind": "battle_phase", "parameters": {}}
+    assert candidate["policy_action"]["kind"] == "chain"
+
+
 def test_upstream_queue_finds_matching_activation_automatically(tmp_path,
                                                                  monkeypatch):
     queue, replay, _, trajectory = _source_queue(tmp_path)

@@ -30,9 +30,15 @@ def upstream_candidate(trajectory, item: dict, digest: str, replay_path: Path,
     target = trajectory.decisions[item["decision_index"]]
     if prior.observation.acting_player != target.observation.acting_player:
         raise ValueError("upstream and target decisions belong to different players")
-    passes = [action for action in prior.legal_actions if action.kind == "pass"]
-    if len(passes) != 1 or prior.selected_action.kind == "pass":
-        raise ValueError("upstream decision must have a distinct legal pass")
+    # Main/Battle decision windows often have no Pass action. Offer a legal
+    # phase transition as the initial comparison; the reviewer can still
+    # choose any listed action, and this suggestion is never a training label.
+    alternatives = [action for kind in ("pass", "battle_phase", "main2",
+                                        "end_phase", "phase_transition")
+                    for action in prior.legal_actions
+                    if action.kind == kind and action != prior.selected_action]
+    if prior.selected_action.kind not in ("activate", "chain") or not alternatives:
+        raise ValueError("upstream activation needs a distinct legal phase or pass action")
     viewer_path, _ = item["viewer"].split("#", 1)
     viewer = Path(viewer_path).resolve()
     if not viewer.is_file() or not viewer.is_relative_to(queue_path.parent):
@@ -44,7 +50,7 @@ def upstream_candidate(trajectory, item: dict, digest: str, replay_path: Path,
         "turn": prior.observation.turn, "phase": prior.observation.phase,
         "legal_action_count": len(prior.legal_actions),
         "policy_action": action_summary(prior.selected_action),
-        "teacher_action": action_summary(passes[0]),
+        "teacher_action": action_summary(alternatives[0]),
         "teacher_disagrees": True,
         "audit_flags": ["review_upstream_activation"],
         "viewer": f"{viewer}#decision={upstream_index + 1}",
@@ -53,7 +59,7 @@ def upstream_candidate(trajectory, item: dict, digest: str, replay_path: Path,
 
 def create_upstream_review(queue_path: Path, item_number: int, upstream_index: int | None,
                            output: Path, native_root: Path) -> Path:
-    """Offer an earlier legal pass as a human-review candidate, not a label."""
+    """Offer an earlier legal alternative as a human-review candidate, not a label."""
     queue_path = queue_path.resolve()
     output = output.resolve()
     if output == queue_path or output.with_suffix(".html") == queue_path.with_suffix(".html"):
@@ -92,7 +98,8 @@ def create_upstream_review(queue_path: Path, item_number: int, upstream_index: i
     if output.exists() and output.read_text(encoding="utf-8") != rendered:
         raise ValueError("upstream queue already exists with different contents")
     output.write_text(rendered, encoding="utf-8")
-    write_review_index([candidate], output, native_root, comparison_label="Pass candidate")
+    write_review_index([candidate], output, native_root,
+                       comparison_label="Alternative candidate")
     return output
 
 

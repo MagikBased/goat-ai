@@ -1,5 +1,39 @@
 # Baseline evaluation log
 
+## Ring on own Dekoichi: target information versus learned value (29 October 2026)
+
+At seed 124112, policy seat 0, zero-based decision 820, the selected v23/v1
+policy activated Set Ring of Destruction with three friendly face-up monsters
+and two opposing Sheep Tokens. Its target prompt encoded each option's
+relative controller explicitly: 0 for friendly, 1 for opposing. The selected
+checkpoint nevertheless scored friendly Dekoichi **+0.412** versus opposing
+Tokens **−0.601** and **−1.514** (raw logits), and targeted Dekoichi. The
+effect closed at a **−2 non-token hand-plus-field material change** for the
+acting player. This is a fixed, replay-verified decision diagnostic: the
+input identifies whose card is targeted, but the learned ranking remains
+poor in this state. The full context may still affect the best alternative.
+
+An exact native branch forced either the recorded Ring activation or the
+offered Battle Phase at that same decision, then continued with the same
+selected policy and Tactical opponent. Both terminal trajectories replay-
+verified and passed player-visibility auditing; **both lost**. In the Battle
+Phase branch, the policy activated Ring later that turn and again targeted
+its own Dekoichi, with the same −2 observed material change. This illustrates
+why delaying one decision does not necessarily fix a repeated own-card
+preference. The ignored branch report and replay files are under
+`.cache/goat-ai/ring_own_dekoichi_branch_124112/`. The Battle Phase action is
+a legal review candidate, not an optimal-play label or a demonstrated
+win-rate gain.
+
+The separate upstream activation review queue
+`.cache/goat-ai/upstream_55_ring_dekoichi.json` (SHA-256
+`a5b98a67401756e9ed39b54e50eb9299cb1569dd733fbe3b48c583397ee94e35`)
+lets the reviewer choose among all ten legal actions before Ring activates.
+The original combined queue's item 55 only asks for a target after activation.
+`create_upstream_review.py` now offers a phase transition where the decision
+has no Pass action, while leaving the reviewer free to choose another legal
+action. No reviewer choice has been saved for this upstream item yet.
+
 ## Current local review-label consolidation (29 October 2026)
 
 The queue-bound multi-queue converter revalidated 24 saved label files against
