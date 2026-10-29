@@ -1,5 +1,44 @@
 # Baseline evaluation log
 
+## Expanded own-loss guard held-out strength check (29 October 2026)
+
+The expanded `own_loss_guard` was compared with the *same* selected feature-v23
+checkpoint without the guard on four unseen 2005 Main Deck pairings:
+Theeresak Goat Control/Phoenix Control, Bryan Chaos/Mary Warrior, Rhymus Goat
+Control/Charlotte Zombie, and Ramon Beastdown/Christian Seattle Goat Control.
+Both Deck assignments and both policy seats were played on two disjoint
+eight-seed blocks, 100500–100507 and 100600–100607. The Main Deck composition
+gate rejected an initially proposed Indianapolis pairing already present in
+the checkpoint's training set; it was removed before any reported run. Native
+assets, scripts, checkpoint, decks, and inference source were fingerprinted.
+
+Directly against the unguarded checkpoint, the guarded version scored
+**144–112** over 256 complete duels, or **56.25%** (paired bootstrap 95%
+interval **52.34%–60.55%**). The independent seed blocks each scored 72–56.
+The pairing splits were 36–28 Beastdown/Seattle Goat, 40–24 Chaos/Warrior,
+32–32 Rhymus/Zombie, and 36–28 Theeresak/Phoenix. Against Tactical-v14 on
+the exact same schedules, the guarded policy won **95/256** while the
+unguarded parent won **81/256**. The strict paired comparator measured a
+guarded-minus-parent score gain of **5.47 percentage points** (95% interval
+**+2.34 to +8.59 points**); both seed blocks separately had positive paired
+intervals. The guarded policy still lost most of its games against Tactical.
+These are two fresh seed blocks on four deck families, not a general claim of
+superhuman play or a learned neural improvement.
+
+The locally created viewer game's `policy` option now uses this measured
+guarded inference mode. Its replay metadata records
+`greedy_own_loss_guard_v1`, and its review queue reproduces choices with the
+same mode. The unguarded checkpoint, evaluation default, and old `greedy`
+replays remain available for controlled comparisons. The reports are ignored
+local artifacts named `own_loss_guard_expanded_direct_*`,
+`own_loss_guard_expanded_tactical_*`, and `own_loss_parent_tactical_*` under
+`.cache/goat-ai/`. Run `scripts/evaluate_policy.py` with
+`--own-loss-guard --opponent-checkpoint <same checkpoint>` for the direct
+schedule, then matched runs with and without `--own-loss-guard --opponent
+tactical`; use `--both-deck-assignments --require-unseen-main-decks` in all
+runs. The `scripts/compare_tournament_reports.py
+--require-unseen-main-decks` check verifies the Tactical difference.
+
 ## Expanded visible own-loss guard audit (29 October 2026)
 
 The optional `own_loss_guard` now defers an activation before a forced target

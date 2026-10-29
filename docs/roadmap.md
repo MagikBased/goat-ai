@@ -2495,3 +2495,9 @@ adds upstream Breaker, boss-banish, Tribe, and Torrential activation contexts.
 A higher bad-choice weight reduced own-only Nobleman choices in eight fresh
 games, but both tested children scored 15–17 directly against the parent on
 unseen Main Decks. Keep the selected v23 checkpoint and M4 strength gate open.
+The [expanded inference guard](evaluation.md#expanded-own-loss-guard-held-out-strength-check-29-october-2026)
+subsequently beat the same unguarded checkpoint 144–112 directly and improved
+matched Tactical-v14 results by 14 wins over 256 held-out games. Local viewer
+games now use the guarded inference mode. The neural checkpoint remains
+unchanged, still loses to Tactical-v14, and M4's learned-strength gate remains
+open.

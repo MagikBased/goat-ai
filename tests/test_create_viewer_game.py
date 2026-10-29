@@ -64,10 +64,11 @@ def test_game_creator_generates_verified_reviewer_replay(tmp_path, agent1, sourc
     assert len(trajectory.decisions) == result["decisions"]
     assert trajectory.source == source
     assert trajectory.skill_metadata["agents"] == [
-        "Neural policy v23" if agent1 == "policy" else "Tactical heuristic", "Random"]
+        "Neural policy v23 + own-card guard" if agent1 == "policy"
+        else "Tactical heuristic", "Random"]
     if agent1 == "policy":
         assert trajectory.skill_metadata["demonstrator_seat"] == 0
-        assert trajectory.skill_metadata["policy_inference"] == "greedy"
+        assert trajectory.skill_metadata["policy_inference"] == "greedy_own_loss_guard_v1"
         assert trajectory.skill_metadata["policy_feature_version"] == 23
     assert "__EMBEDDED_REPLAY__" not in viewer.read_text(encoding="utf-8")
     reveals = json.loads(reviewer.read_text(encoding="utf-8"))
@@ -84,7 +85,7 @@ def test_game_creator_generates_verified_reviewer_replay(tmp_path, agent1, sourc
 def test_policy_game_review_queue_separates_visible_labels_from_reveals(tmp_path, monkeypatch):
     creator = _creator(tmp_path, Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve())
     result = creator.create({"deck1": DECK1, "deck2": DECK2,
-                             "agent1": "policy", "agent2": "tactical", "seed": 6804})
+                             "agent1": "policy", "agent2": "tactical", "seed": 6817})
     assert result["policy_review_flags"] >= 1
     queue = creator.review_queue(result["id"])
     digest = sha256_file(queue)
@@ -106,7 +107,7 @@ def test_policy_game_review_queue_separates_visible_labels_from_reveals(tmp_path
     verify_queue_items(read_trajectory(source), sources[sha256_file(source)][1],
                        report["checkpoint_sha256"])
     with monkeypatch.context() as patch:
-        patch.setattr("scripts.create_viewer_game.load_policy_agent", lambda _: SimpleNamespace(
+        patch.setattr("scripts.create_viewer_game.load_policy_agent", lambda _, **_kwargs: SimpleNamespace(
             model=SimpleNamespace(feature_version=23),
             select_action=lambda _observation, _actions: object()))
         with pytest.raises(ValueError, match="recorded policy choice differs"):

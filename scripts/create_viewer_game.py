@@ -29,7 +29,8 @@ from scripts.validate_review_queue_labels import verify_queue_items
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = {"random": "Random", "tactical": "Tactical heuristic",
-          "policy": "Neural policy v23"}
+          "policy": "Neural policy v23 + own-card guard"}
+POLICY_INFERENCE = "greedy_own_loss_guard_v1"
 
 
 class GameCreator:
@@ -77,9 +78,10 @@ class GameCreator:
         metadata = trajectory.skill_metadata or {}
         seat = metadata.get("demonstrator_seat")
         checkpoint_hash = metadata.get("policy_checkpoint_sha256")
+        inference = metadata.get("policy_inference")
         if (trajectory.source != "policy_evaluation" or seat not in (0, 1)
                 or checkpoint_hash != sha256_file(self.checkpoint)
-                or metadata.get("policy_inference") != "greedy"
+                or inference not in ("greedy", POLICY_INFERENCE)
                 or metadata.get("policy_inference_version") != POLICY_INFERENCE_VERSION):
             raise ValueError("game is not attributed to the selected policy checkpoint")
         flags = [flag for flag in report["flags"] if flag["acting_player"] == seat]
@@ -90,7 +92,8 @@ class GameCreator:
         source_hash = sha256_file(source)
         verify_trajectory(trajectory, ExperimentalOcgcoreEngine(self.native_root))
         audit_trajectory_visibility(trajectory)
-        policy = load_policy_agent(self.checkpoint)
+        policy = load_policy_agent(
+            self.checkpoint, own_loss_guard=inference == POLICY_INFERENCE)
         if metadata.get("policy_feature_version") != policy.model.feature_version:
             raise ValueError("recorded policy feature version differs from the checkpoint")
         for index, record in enumerate(trajectory.decisions):
@@ -159,7 +162,7 @@ class GameCreator:
                 load_card_races(self.native_root),
                 card_facts=load_card_facts(self.native_root))
         if name == "policy" and self.checkpoint.is_file():
-            return load_policy_agent(self.checkpoint)
+            return load_policy_agent(self.checkpoint, own_loss_guard=True)
         raise ValueError("unknown or unavailable AI agent")
 
     def create(self, spec: dict, *, max_decisions: int = 3000) -> dict:
@@ -211,7 +214,7 @@ class GameCreator:
                     metadata.update({
                         "demonstrator_seat": policy_seat,
                         "policy_checkpoint_sha256": checkpoint_hash,
-                        "policy_inference": "greedy",
+                        "policy_inference": POLICY_INFERENCE,
                         "policy_inference_version": POLICY_INFERENCE_VERSION,
                         "policy_feature_version": agents[policy_seat].model.feature_version,
                         "opponent": type(opponent).__name__,
