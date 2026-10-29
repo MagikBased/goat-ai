@@ -1,5 +1,40 @@
 # Baseline evaluation log
 
+## Single-position own-loss branch outcomes (29 October 2026)
+
+The seven recorded selected-policy actions filtered by the expanded own-loss
+guard in the seed-99900–99907 source replays were each paired with the guard's
+highest-scoring surviving legal alternative. `evaluate_decision_branches.py`
+reconstructed every common prefix on the pinned native engine, played the two
+actions from the same complete state, continued with the frozen v23 policy
+versus Tactical-v14, and replay-verified and visibility-audited all fourteen
+terminal branches. The recorded-action branches reproduced the source duels.
+
+Six pairs had the same winner. At seed 99901, policy seat 1, decision 424,
+activating Nobleman on its own Set D.D. Assailant led to a win, while taking
+the guard's Battle Phase alternative led to a loss. The earlier seed-99906
+MST/Pass pair also lost under both actions. This is a **single hidden state
+and one deterministic continuation per choice**, so it does not estimate the
+expected value of either action under hidden-information uncertainty or
+different continuation policies. It also shows why a terminal outcome from
+one branch must not be used as a winning-move label. The guard's separate
+256-duel held-out match gain remains the relevant aggregate evidence for
+local-play inference; neither result justifies a neural training label.
+
+The batch audit now reproduces all seven comparisons in one command. Its
+ignored manifest is `.cache/goat-ai/guard_branch_batch_99900_99907/manifest.json`.
+Each case binds its source replay and checkpoint hash, decision index, both
+action indices, terminal winners, and replay-verified branch trajectory hashes.
+Reproduce it with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_guard_branches.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/own_card_parent_review_99900_99907/seed_*.json \
+  --native-root .cache/goat-ai \
+  --output-dir .cache/goat-ai/guard_branch_batch_99900_99907
+```
+
 ## Exact visible-guard distillation into v23 (29 October 2026)
 
 `visible_guard_distillation_v7` now creates automated masked-parent
