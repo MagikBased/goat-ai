@@ -9,7 +9,12 @@ from types import SimpleNamespace
 import pytest
 
 from goat_ai.actions import Action
-from goat_ai.agents import CombatHeuristicAgent, HeuristicAgent, RandomAgent
+from goat_ai.agents import (
+    CombatHeuristicAgent,
+    FirstActivationProbeAgent,
+    HeuristicAgent,
+    RandomAgent,
+)
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
 from goat_ai.replay import read_trajectory
 from scripts.probe_competitive_card_actions import (
@@ -57,6 +62,7 @@ def test_tournament_probe_pairs_every_sourced_list_and_no_guide_deck():
 
 def test_probe_agent_choice_uses_baseline_public_action_interfaces():
     assert isinstance(make_agent("random", 5), RandomAgent)
+    assert isinstance(make_agent("first_activation", 5), FirstActivationProbeAgent)
     assert isinstance(make_agent("heuristic", 5), HeuristicAgent)
     assert isinstance(make_agent("combat_heuristic", 5), CombatHeuristicAgent)
 
@@ -88,9 +94,12 @@ def test_sourced_deck_probe_records_and_replay_verifies_full_duels(tmp_path):
     assert report["replay_verification"] == {
         "verified_games": 2,
         "verified_decisions": sum(game["decisions"] for game in report["games"]),
+        "visibility_audited_games": 2,
+        "visibility_audited_decisions": sum(game["decisions"] for game in report["games"]),
         "serialized_round_trip": True,
     }
     assert all(game["replay_verified_decisions"] == game["decisions"]
+               and game["visibility_audited_decisions"] == game["decisions"]
                and (tmp_path / "replays" / game["trajectory_file"]).is_file()
                and len(game["trajectory_sha256"]) == 64
                for game in report["games"])

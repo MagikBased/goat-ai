@@ -81,6 +81,12 @@ The second partition reproduced all 22,355 decisions with one and four
 workers. This expands sampled effect paths without certifying unexercised
 cards or historical outcomes; see the [activation probe](evaluation.md#first-offered-activation-probe-29-october-2026).
 
+The same observation-only probe on five pairings of preserved Indianapolis
+2005 decks exercised common effects absent from the random card partitions:
+Scapegoat, Metamorphosis, Mirror Force, and Torrential Tribute. All ten
+seat-swapped duels and 9,546 decisions replay-verified and passed visibility
+audits; see [competitive action coverage](competitive_action_coverage.md#first-activation-probe-on-preserved-2005-decks-29-october-2026).
+
 A tactical-agent Fusion stress sweep now adds 20 complete seeded duels on 40
 independently generated legal Main Decks with Scapegoat, Metamorphosis, and
 sampled Extra Decks containing Thousand-Eyes Restrict. All 12,385 decisions

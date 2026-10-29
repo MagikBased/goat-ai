@@ -15,6 +15,7 @@ from pathlib import Path
 from goat_ai.agents import (
     CombatFlipHeuristicAgent,
     CombatHeuristicAgent,
+    FirstActivationProbeAgent,
     HeuristicAgent,
     RandomAgent,
     TacticalHeuristicAgent,
@@ -31,6 +32,7 @@ from goat_ai.evaluation.card_actions import (
     count_source_actions,
 )
 from goat_ai.evaluation.competitive_corpus import TOURNAMENT_MAIN_DECKS
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 
@@ -58,6 +60,8 @@ def make_agent(name: str, seed: int, flip_codes: frozenset[int] = frozenset(),
     """Construct a baseline using only the public observation/action interface."""
     if name == "random":
         return RandomAgent(seed)
+    if name == "first_activation":
+        return FirstActivationProbeAgent(seed)
     if name == "heuristic":
         return HeuristicAgent()
     if name == "combat_heuristic":
@@ -173,7 +177,11 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
                                 f"game={len(games)}") from error
                         if count != len(trajectory.decisions):
                             raise RuntimeError("replay verifier returned a partial decision count")
+                        visibility = audit_trajectory_visibility(replay)
+                        if visibility["decisions"] != count:
+                            raise RuntimeError("visibility audit returned a partial decision count")
                         game["replay_verified_decisions"] = count
+                        game["visibility_audited_decisions"] = visibility["decisions"]
                         verified_decisions += count
                     if rules_profile is None:
                         rules_profile = trajectory.rules_profile
@@ -241,6 +249,9 @@ def probe(native_root: Path, matchups: tuple[tuple[Path, Path], ...],
     if verify_replays:
         result["replay_verification"] = {
             "verified_games": len(games), "verified_decisions": verified_decisions,
+            "visibility_audited_games": len(games),
+            "visibility_audited_decisions": sum(
+                game["visibility_audited_decisions"] for game in games),
             "serialized_round_trip": record_dir is not None,
         }
     return result
@@ -255,8 +266,8 @@ def main() -> None:
     schedule.add_argument("--tournament-corpus", action="store_true",
                           help="probe all 15 pairs of six sourced tournament decks")
     parser.add_argument("--seed", type=int, default=9700)
-    parser.add_argument("--agent", choices=("random", "heuristic", "combat_heuristic",
-                                            "combat_flip", "tactical"),
+    parser.add_argument("--agent", choices=("random", "first_activation", "heuristic",
+                                            "combat_heuristic", "combat_flip", "tactical"),
                         default="random")
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--max-decisions", type=int, default=3000)

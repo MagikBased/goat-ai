@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from goat_ai.actions import Action
+from goat_ai.agents import FirstActivationProbeAgent
 from scripts.probe_whitelist_coverage import (
-    FirstActivationProbeAgent,
     canonical_pool,
     coverage_decks,
 )

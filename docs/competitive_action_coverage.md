@@ -1,5 +1,39 @@
 # Competitive-deck action coverage probe
 
+## First-activation probe on preserved 2005 decks (29 October 2026)
+
+The `first_activation` agent prefers each card ID's first offered `activate`
+or `chain` action, then falls back to seeded random play. Five pairings among
+the preserved legal Indianapolis 2005 Main Decks, with both seat orders, ran
+as **10 complete duels** at seed 121000. All **9,546** decisions round-tripped
+through JSON, exactly replay-verified against fresh native engines, and passed
+the player-visibility audit. Repeating the schedule produced identical action
+traces, outcomes, source-action counts, and asset hashes. The saved report is
+`.cache/goat-ai/indianapolis_first_activation_121000_verified.json`
+(SHA-256 `5902dc8ffbc5be6c23e19b882109c0408de33f4243d6986f7cf29001a38d744c`).
+
+| Common 2005 card | Offered activations | Selected activations |
+| --- | ---: | ---: |
+| Book of Moon | 58 | 35 |
+| Scapegoat | 29 | 21 |
+| Metamorphosis | 102 | 20 |
+| Swords of Revealing Light | 20 | 18 |
+| Ring of Destruction | 13 | 13 |
+| Torrential Tribute | 12 | 12 |
+| Mirror Force | 6 | 6 |
+
+Counts are legal `activate` and `chain` actions at decision points, so a
+repeated offer can count more than once. The native core handled these
+sampled interactions, but the probe does not establish their 2005 rulings or
+whether the agent played well. It complements the three whitelist partition
+runs, which never offered Scapegoat or Metamorphosis. The five
+pairings were Matt Peddle/Cas Stomphorst, Michael Fukuyama/Daryl Gessler,
+Jesse Twohig/Matt Peddle, Cas Stomphorst/Michael Fukuyama, and Daryl
+Gessler/Jesse Twohig; exact ordered deck paths and hashes are in the report.
+Reproduce with `scripts/probe_competitive_card_actions.py --agent
+first_activation --seed 121000 --seeds 1 --verify-replays --record-dir
+NEW_EMPTY_DIRECTORY --matchup DECK_A DECK_B` repeated for those five pairs.
+
 ## Main Deck priority report
 
 Run `PYTHONPATH=. .venv/bin/python scripts/report_competitive_card_priorities.py

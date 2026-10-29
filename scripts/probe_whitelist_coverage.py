@@ -15,8 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from time import perf_counter
 
-from goat_ai.actions import Action
-from goat_ai.agents import RandomAgent
+from goat_ai.agents import FirstActivationProbeAgent, RandomAgent
 from goat_ai.engine.decks import (
     Decklist,
     read_goat_whitelist,
@@ -31,25 +30,6 @@ from scripts.evaluate_native import card_scripts_sha256, source_code_sha256
 from scripts.probe_random_decks import write_deck
 
 REPO = Path(__file__).resolve().parents[1]
-
-
-class FirstActivationProbeAgent(RandomAgent):
-    """Exercise each offered card activation once, using only legal actions."""
-
-    def __init__(self, seed: int = 0) -> None:
-        super().__init__(seed)
-        self.activated: set[int] = set()
-
-    def select_action(self, observation, legal_actions) -> Action:
-        candidates = [action for action in legal_actions
-                      if action.kind in ("activate", "chain")
-                      and type(action.parameters.get("code")) is int
-                      and action.parameters["code"] not in self.activated]
-        if candidates:
-            selected = self.rng.choice(candidates)
-            self.activated.add(selected.parameters["code"])
-            return selected
-        return super().select_action(observation, legal_actions)
 
 
 def canonical_pool(root: Path) -> tuple[tuple[int, ...], tuple[int, ...]]:
