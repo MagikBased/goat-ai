@@ -127,6 +127,14 @@ coverage, not a historical-correctness or arbitrary-deck guarantee; see the
 
 A paired Pot of Greed fixture swaps the two privately drawn cards while preserving the Deck multiset and public play. The opponent's complete observation and legal actions are identical at the next Main Phase decision; the acting player's drawn hand differs. A Book of Moon / Compulsory native fixture found and fixed lost opponent-hand knowledge when a previously public, now face-down monster returns to hand. A never-revealed Set monster remains unknown in the paired control fixture; the known-card duel serializes and replay-verifies. See [GOAT rules](goat_rules.md).
 
+A paired Different Dimension Capsule fixture now chooses two different
+face-down banished Deck cards and obtains identical opponent observations
+immediately afterward. The owner sees their chosen card; the opponent sees
+only the hidden banished slot. Both full duels replay-verify and pass the
+visibility audit. The observation model independently rejects an opponent
+face-down banished card carrying an identity. This closes one banished-zone
+privacy case, not every hidden-information branch; see [GOAT rules](goat_rules.md).
+
 Schema-v26 observations now count public turn boundaries since each face-up
 field card became face-up. Native Swords expiration and Giant Trunade/replay
 fixtures check the count advancing and resetting across turns, with matching

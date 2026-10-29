@@ -176,7 +176,7 @@ class Observation:
                for card in self.own_extra_deck):
             raise ValueError("own Extra Deck must contain only visible viewer cards")
         if any(card.controller != self.viewer and card.position == "facedown" and card.code is not None
-               for card in self.field):
+               for card in (*self.field, *self.banished[0], *self.banished[1])):
             raise ValueError("opponent facedown identity must be hidden")
         if self.pending_summon is not None:
             pending_card = next((card for card in self.field
