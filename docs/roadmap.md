@@ -2565,3 +2565,8 @@ Ring activations; all 14 are now available for independent review. The next M4
 step is to collect explicit human judgments across own-card activation and
 target decisions, train on reviewed preferences, and require a held-out
 complete-duel strength gain before selecting a new checkpoint.
+The same fixed batch exposed two negative visible Heavy Storm trades and one
+own-monster Ring target with a safer opposing target. A separate verified
+review queue now includes these three cases; the Tactical alternative also
+chooses Heavy Storm in both Storm positions, so reviewer rejection should
+target the avoidable activation rather than accept a weak automatic label.

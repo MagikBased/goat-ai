@@ -15,26 +15,31 @@ def test_summary_counts_only_policy_review_flags() -> None:
     reports = [
         {"verified_policy_choices": 400,
          "candidates": [{"category": "nobleman_only_own_set_monster"},
+                        {"category": "ring_targets_own_with_safe_enemy_option"},
                         {"category": "weak_flip_normal_summon_with_set_available"}]},
         {"verified_policy_choices": 600,
          "candidates": [{"category": "heavy_storm_only_own_backrow"},
+                        {"category": "heavy_storm_negative_visible_trade"},
                         {"category": "breaker_targets_only_own_backrow"}]},
     ]
     result = summarize_visible_own_card_losses(reports)
     assert result["available"] is True
     assert result["verified_policy_choices"] == 1000
-    assert result["flagged_instances"] == 3
-    assert result["flagged_instances_per_1000_policy_choices"] == 3
+    assert result["flagged_instances"] == 5
+    assert result["flagged_instances_per_1000_policy_choices"] == 5
     assert result["category_counts"] == {
         "breaker_targets_only_own_backrow": 1,
         "heavy_storm_only_own_backrow": 1,
+        "heavy_storm_negative_visible_trade": 1,
         "nobleman_only_own_set_monster": 1,
+        "ring_targets_own_with_safe_enemy_option": 1,
     }
     assert result["flagged_per_activation_opportunity"] == {
         "nobleman_only_own_set_monster": None,
         "heavy_storm_only_own_backrow": None,
         "mst_idle_only_own_backrow": None,
         "raigeki_break_idle_only_own_field": None,
+        "ring_idle_only_own_faceup": None,
     }
 
 
@@ -105,4 +110,28 @@ def test_idle_own_only_removal_opportunity_excludes_its_set_source() -> None:
     assert own_card_activation_opportunities(trajectory, 0) == {
         "mst_idle_only_own_backrow": 1,
         "raigeki_break_idle_only_own_field": 1,
+    }
+
+
+def test_idle_own_ring_opportunity_uses_visible_nonlethal_condition() -> None:
+    own = CardView(0, "monster", "faceup", 123, 0, "attack", 1900, 1000)
+    enemy = CardView(1, "monster", "faceup", 456, 0, "attack", 1200, 1000)
+    ring = Action("ring", "activate", 0, {"code": 511000824})
+    pass_action = Action("pass", "pass", 0)
+
+    def decision(cards, opponent_lp=8000, turn=1):
+        obs = Observation(viewer=0, acting_player=0, turn=turn, phase="main1",
+                          life_points=(8000, opponent_lp), hand=(), field=cards,
+                          graveyards=((), ()), banished=((), ()),
+                          opponent_hand_count=5, deck_counts=(35, 35),
+                          extra_deck_counts=(0, 0), turn_player=0)
+        return DecisionRecord(obs, (ring, pass_action), pass_action)
+
+    trajectory = SimpleNamespace(decisions=(
+        decision((own,)), decision((own,)),
+        decision((own,), opponent_lp=1000), decision((own, enemy)),
+        decision((own,), turn=2),
+    ))
+    assert own_card_activation_opportunities(trajectory, 0) == {
+        "ring_idle_only_own_faceup": 2,
     }

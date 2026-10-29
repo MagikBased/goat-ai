@@ -2519,3 +2519,28 @@ position needs a different choice. Open the queue with:
 
 Reviewer reveals remain separate from the policy's player-visible observation.
 No new preference labels or neural checkpoint were promoted from this audit.
+
+The same outcome-blind batch also contained **two** Heavy Storm activations
+with a negative visible back-row trade and **one** Ring target choice on the
+policy's own monster while a visibly safer opposing monster was selectable.
+Those three decisions are in
+`.cache/goat-ai/ring_guard_blind_104400_104407/other_own_card_queue.json`.
+The three source replays passed exact native verification during shortlisting;
+all three queue items passed the legal-action and provenance validator. The
+suggested move comes from Tactical-v14 and may itself be poor: in both Heavy
+Storm positions it also preferred activating Heavy Storm. The reviewer should
+use the queue to evaluate the *activation* and may reject it without endorsing
+a replacement action. Open it with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/ring_guard_blind_104400_104407/other_own_card_queue.json
+```
+
+The own-card audit now includes these categories and Ring's idle activation
+opportunities. Deduplicating repeated prompts by category, turn, and phase
+gives **22** Ring contexts in this batch; the raw count above is 47 prompts.
+The same deduplicated scan counted 96 own-only Heavy Storm, 158 own-only
+Nobleman, and 26 idle own-only MST opportunities, with no chosen activations
+in those three categories. These are narrow visible-state measurements; they
+do not establish a general card-advantage understanding or improved match
+strength.

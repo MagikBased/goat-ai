@@ -12,6 +12,7 @@ from goat_ai.agents import (
     load_flip_monster_codes,
 )
 from goat_ai.agents.card_metadata import load_weak_flip_monster_attack
+from goat_ai.agents.tactical_guard import safe_idle_own_ring_indices
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.evaluation.replay_review import (
     HEAVY_STORM,
@@ -32,7 +33,9 @@ from goat_ai.training.policy import POLICY_INFERENCE_VERSION
 VISIBLE_OWN_CARD_LOSSES = frozenset({
     "nobleman_only_own_set_monster",
     "heavy_storm_only_own_backrow",
+    "heavy_storm_negative_visible_trade",
     "breaker_targets_only_own_backrow",
+    "breaker_targets_own_card_with_enemy_option",
     "bls_targets_itself_with_enemy_option",
     "chaos_sorcerer_targets_itself_with_enemy_option",
     "mst_targets_own_card_with_enemy_option",
@@ -41,11 +44,14 @@ VISIBLE_OWN_CARD_LOSSES = frozenset({
     "tribe_race_hits_only_own_no_enemy_option",
     "mst_idle_only_own_backrow",
     "raigeki_break_idle_only_own_field",
+    "ring_idle_only_own_faceup",
+    "ring_targets_own_with_safe_enemy_option",
 })
 
 ACTIVATION_OPPORTUNITY_CATEGORIES = (
     "nobleman_only_own_set_monster", "heavy_storm_only_own_backrow",
-    "mst_idle_only_own_backrow", "raigeki_break_idle_only_own_field")
+    "mst_idle_only_own_backrow", "raigeki_break_idle_only_own_field",
+    "ring_idle_only_own_faceup")
 
 
 def own_card_activation_opportunities(trajectory, seat: int) -> dict[str, int]:
@@ -67,6 +73,10 @@ def own_card_activation_opportunities(trajectory, seat: int) -> dict[str, int]:
                            for card in obs.field)
         enemy_monsters = any(card.controller != seat and card.zone == "monster"
                              for card in obs.field)
+        if (len(safe_idle_own_ring_indices(
+                obs, record.legal_actions, range(len(record.legal_actions))))
+                < len(record.legal_actions)):
+            seen.add(("ring_idle_only_own_faceup", obs.turn, obs.phase))
         for action in record.legal_actions:
             if action.kind not in ("activate", "chain"):
                 continue
@@ -106,7 +116,7 @@ def summarize_visible_own_card_losses(reports: list[dict]) -> dict:
     if not reports or any("verified_policy_choices" not in report
                           for report in reports):
         return {"available": False,
-                "reason": "requires greedy policy_evaluation replays"}
+                "reason": "requires verified policy_evaluation reports"}
     decisions = sum(report["verified_policy_choices"] for report in reports)
     counts = Counter(candidate["category"] for report in reports
                      for candidate in report["candidates"]
