@@ -136,9 +136,12 @@ retaining the queue identity and any locally saved labels.
 
 To play a duel yourself in the browser, open `/games/play` on the same local
 server. Choose the human seat, two Decks, and a Random, Tactical, or selected
-neural opponent. Click a card to open its legal actions beside the card. Drag a
-card to a field zone or opposing monster to choose a placement or attack target;
-when the engine offers a matching next choice, the dragged destination is used.
+neural opponent. Click a card to open icon buttons for its legal actions beside
+the card. Drag a card to a highlighted field zone or opposing monster to choose
+a placement or attack target; when the engine offers a matching next choice,
+the dragged destination is used. Empty or occupied zones that cannot accept the
+drag are not highlighted. Visible card faces and card backs load from the local
+server's art cache; missing artwork displays the card name instead.
 Click an available phase button to advance, use **Pass** for response windows,
 or use **End turn** when that transition is legal. Unusual prompts and every
 legal choice remain available under **All legal actions** in the sidebar.

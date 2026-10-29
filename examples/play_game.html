@@ -33,8 +33,9 @@
       gap: 5px; min-height: 0; }
     .zone { border: 2px solid #6dc827; border-radius: 7px; min-width: 0; min-height: 0;
       display: grid; place-items: center; position: relative; overflow: hidden; }
-    .zone.available, .hand .card.available { cursor: pointer; box-shadow: inset 0 0 0 2px #e9d88688; }
+    .zone.available, .card.available { cursor: pointer; box-shadow: inset 0 0 0 2px #e9d88688; }
     .zone.drop-ready { background: #2d6b6b99; outline: 2px solid #f9e589; }
+    .zone.drop-target { background: #275d6280; outline: 2px dashed #f9e589; }
     .self .zone { border-color: #e833a9; }
     .pile { border-color: #b681d7; font-size: .8rem; text-align: center; }
     .zone small { position: absolute; right: 2px; bottom: 1px; background: #071923bb;
@@ -46,6 +47,7 @@
     .card.defense { transform: rotate(90deg) scale(.7); }
     .card .fallback { position: absolute; inset: 0; display: grid; place-items: center;
       padding: 3px; overflow-wrap: anywhere; background: #344457; }
+    .card .fallback.art-missing { background: #684044; font-weight: 700; }
     .card[draggable=true] { cursor: grab; }
     .card img { position: relative; z-index: 1; }
     .phase { display: flex; justify-content: center; align-items: center; gap: 8px;
@@ -173,6 +175,30 @@
           p.sequence === ref.sequence;
       });
     }
+    function destinationKinds(source, destination) {
+      if (!destination) return [];
+      if (source.location === 2 && source.controller === destination.controller)
+        return destination.location === 4
+          ? ["normal_summon", "special_summon", "set_monster"]
+          : destination.location === 8 ? ["set_spell_trap", "activate"] : [];
+      if (source.location === 4 && destination.location === 4 &&
+          source.controller !== destination.controller) return ["attack"];
+      return [];
+    }
+    function matchingDestinationActions(source, destination) {
+      const kinds = destinationKinds(source, destination);
+      if (!kinds.length) return [];
+      const occupied = state.observation.field.some(card =>
+        card.controller === destination.controller && card.sequence === destination.sequence &&
+        card.zone === (destination.location === 4 ? "monster" : "spell_trap"));
+      if (source.location === 2 && occupied) return [];
+      if (source.location === 4 && !occupied) return [];
+      return refActions(source).filter(({action}) => kinds.includes(action.kind));
+    }
+    function clearDropTargets() {
+      document.querySelectorAll(".drop-ready, .drop-target").forEach(zone =>
+        zone.classList.remove("drop-ready", "drop-target"));
+    }
     function closeCardActions() { byId("card-actions").hidden = true; }
     function showActionTray(offered, anchor, titleText, destination = null) {
       if (!offered.length) { closeCardActions(); return; }
@@ -197,15 +223,7 @@
     }
     function contextActions(ref, anchor, destination = null) {
       let offered = refActions(ref);
-      if (destination && offered.length) {
-        const kinds = destination.controller !== ref.controller && destination.location === 4
-          ? ["attack", "activate", "chain"]
-          : ref.location === 2 && destination.location === 4
-            ? ["normal_summon", "special_summon", "set_monster"]
-            : ref.location === 2 && destination.location === 8
-              ? ["set_spell_trap", "activate"] : [];
-        if (kinds.length) offered = offered.filter(({action}) => kinds.includes(action.kind));
-      }
+      if (destination) offered = matchingDestinationActions(ref, destination);
       showActionTray(offered, anchor,
         ref.code != null ? cardName(ref.code) : "Choose an action", destination);
     }
@@ -225,9 +243,13 @@
         element.ondragstart = event => {
           dragSource = ref; event.dataTransfer.effectAllowed = "move";
           event.dataTransfer.setData("text/plain", `${ref.controller}:${ref.location}:${ref.sequence}`);
+          document.querySelectorAll(".zone[data-location]").forEach(zone => {
+            const destination = {location:Number(zone.dataset.location),
+              controller:Number(zone.dataset.controller), sequence:Number(zone.dataset.sequence)};
+            if (matchingDestinationActions(ref, destination).length) zone.classList.add("drop-target");
+          });
         };
-        element.ondragend = () => { dragSource = null;
-          document.querySelectorAll(".drop-ready").forEach(zone => zone.classList.remove("drop-ready")); };
+        element.ondragend = () => { dragSource = null; clearDropTargets(); };
       }
     }
     const cardName = code => code == null ? "Face-down card" :
@@ -258,13 +280,23 @@
       const image = document.createElement("img");
       image.src = faceDown || code == null ? "/replays/card_images/cover.png" :
         `/replays/card_images/${code}.jpg`;
-      image.alt = cardName(code); image.onerror = () => image.remove();
+      image.alt = faceDown ? "Card back" : cardName(code);
+      image.onerror = () => {
+        fallback.classList.add("art-missing");
+        fallback.textContent = faceDown ? "Face-down card" : `${cardName(code)} · art unavailable`;
+        image.remove();
+      };
       element.append(image);
       if (ref) makeInteractive(element, ref);
       return element;
     }
     function zone(card, label, count, ref = null) {
       const element = document.createElement("div"); element.className = "zone";
+      if (ref) {
+        element.dataset.location = String(ref.location);
+        element.dataset.controller = String(ref.controller);
+        element.dataset.sequence = String(ref.sequence);
+      }
       if (count != null) element.classList.add("pile");
       if (card) element.append(cardElement(card, false, ref));
       else if (count != null) element.textContent = label;
@@ -274,13 +306,14 @@
       }
       if (ref) {
         if (!card) makeInteractive(element, ref);
-        element.ondragover = event => { if (!dragSource) return;
+        element.ondragover = event => { if (!dragSource || !matchingDestinationActions(dragSource, ref).length) return;
           event.preventDefault(); element.classList.add("drop-ready"); };
         element.ondragleave = () => element.classList.remove("drop-ready");
         element.ondrop = event => {
           event.preventDefault(); element.classList.remove("drop-ready");
-          if (dragSource) contextActions(dragSource, element, ref);
-          dragSource = null;
+          if (dragSource && matchingDestinationActions(dragSource, ref).length)
+            contextActions(dragSource, element, ref);
+          dragSource = null; clearDropTargets();
         };
       }
       return element;
