@@ -25,6 +25,7 @@ from goat_ai.observations import (
     Observation,
     PendingSummonView,
     PrivateRevealView,
+    PublicAttackView,
     PublicRevealView,
     RevealedCardView,
     TargetSlotView,
@@ -411,6 +412,7 @@ class OcgcoreProbe:
         self._chain: list[ChainLinkView] = []
         self._resolving_chain_index: int | None = None
         self._public_history: list[str] = []
+        self._recent_attacks: list[PublicAttackView] = []
         self._pending_summon: PendingSummonView | None = None
         self._known_facedown: dict[tuple[int, int, int], int] = {}
         self._faceup_since: dict[tuple[int, int, int], int] = {}
@@ -1099,6 +1101,27 @@ class OcgcoreProbe:
                 self._phase = phases.get(phase, f"phase_{phase}")
                 self._public_history.append(f"phase:{self._phase}")
             elif message[0] == MSG_ATTACK:
+                if len(message) != 21:
+                    raise ValueError("invalid MSG_ATTACK length")
+                a_player, a_location, a_sequence, _a_position = struct.unpack_from(
+                    "<BBII", message, 1)
+                t_player, t_location, t_sequence, _t_position = struct.unpack_from(
+                    "<BBII", message, 11)
+                if (self._turn < 1 or a_player not in (0, 1)
+                        or a_location != LOCATION_MZONE or a_sequence >= 7):
+                    raise ValueError("invalid MSG_ATTACK attacker")
+                if t_location == 0:
+                    if (t_player, t_sequence, _t_position) != (0, 0, 0):
+                        raise ValueError("invalid MSG_ATTACK direct target")
+                    target = None
+                else:
+                    if (t_player not in (0, 1) or t_location != LOCATION_MZONE
+                            or t_sequence >= 7):
+                        raise ValueError("invalid MSG_ATTACK target")
+                    target = TargetSlotView(t_player, "monster", t_sequence)
+                self._recent_attacks.append(PublicAttackView(
+                    self._turn, TargetSlotView(a_player, "monster", a_sequence), target))
+                del self._recent_attacks[:-32]
                 self._phase = "battle_step"
                 self._public_history.append("attack")
             elif message[0] == MSG_DAMAGE_STEP_START:
@@ -1287,6 +1310,7 @@ class OcgcoreProbe:
                                  if card is not None),
             chain=tuple(self._chain),
             public_history=tuple(self._public_history[-64:]),
+            recent_attacks=tuple(self._recent_attacks),
             known_opponent_cards=tuple(
                 self._known_facedown[(card.controller,
                                       LOCATION_MZONE if card.zone == "monster" else LOCATION_SZONE,

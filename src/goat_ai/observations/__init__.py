@@ -6,12 +6,13 @@ from .model import (
     Observation,
     PendingSummonView,
     PrivateRevealView,
+    PublicAttackView,
     PublicRevealView,
     RevealedCardView,
     TargetSlotView,
 )
 
 __all__ = ["CardView", "ChainLinkView", "DisabledZoneView", "KnownCardView", "Observation",
-           "PendingSummonView", "PrivateRevealView", "PublicRevealView", "RevealedCardView",
+           "PendingSummonView", "PrivateRevealView", "PublicAttackView", "PublicRevealView", "RevealedCardView",
            "TargetSlotView"]
 

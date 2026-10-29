@@ -28,6 +28,15 @@ class TargetSlotView:
 
 
 @dataclass(frozen=True)
+class PublicAttackView:
+    """Public field slots in an announced attack; no target card identity."""
+
+    turn: int
+    attacker: TargetSlotView
+    target: TargetSlotView | None = None  # None for a direct attack.
+
+
+@dataclass(frozen=True)
 class PendingSummonView:
     """Public monster being summoned while a negation response is offered."""
 
@@ -108,6 +117,7 @@ class Observation:
     extra_deck_counts: tuple[int, int]
     chain: tuple[ChainLinkView, ...] = ()
     public_history: tuple[str, ...] = ()
+    recent_attacks: tuple[PublicAttackView, ...] = ()
     known_opponent_cards: tuple[int, ...] = ()
     restrictions: tuple[str, ...] = ()
     own_extra_deck: tuple[CardView, ...] = ()
@@ -151,6 +161,17 @@ class Observation:
                or not 0 <= target.sequence < (7 if target.zone == "monster" else 8)
                for link in self.chain for target in link.targets):
             raise ValueError("chain targets must identify public field slots")
+        if len(self.recent_attacks) > 32 or any(
+               type(attack.turn) is not int or not 1 <= attack.turn <= self.turn
+               or attack.attacker.zone != "monster"
+               or attack.attacker.controller not in (0, 1)
+               or not 0 <= attack.attacker.sequence < 7
+               or attack.target is not None and (
+                   attack.target.zone != "monster"
+                   or attack.target.controller not in (0, 1)
+                   or not 0 <= attack.target.sequence < 7)
+               for attack in self.recent_attacks):
+            raise ValueError("recent attacks must identify public monster slots")
         if any(card.controller != self.viewer or card.zone != "extra" or card.code is None
                for card in self.own_extra_deck):
             raise ValueError("own Extra Deck must contain only visible viewer cards")

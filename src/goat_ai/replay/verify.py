@@ -94,6 +94,9 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             if trajectory.schema_version < 26:
                 compared_observation = without_faceup_age(compared_observation)
                 recorded_observation = without_faceup_age(recorded_observation)
+            if trajectory.schema_version < 27:
+                compared_observation = replace(compared_observation, recent_attacks=())
+                recorded_observation = replace(recorded_observation, recent_attacks=())
             if trajectory.schema_version < 19:
                 compared_observation = without_equips(compared_observation)
             elif trajectory.schema_version == 19:
@@ -164,6 +167,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             terminal_observation = without_summon_context(terminal_observation)
         if trajectory.schema_version < 26:
             terminal_observation = without_faceup_age(terminal_observation)
+        if trajectory.schema_version < 27:
+            terminal_observation = replace(terminal_observation, recent_attacks=())
         if trajectory.schema_version < 21:
             terminal_observation = without_chain_targets(terminal_observation)
         if trajectory.schema_version < 22:
@@ -173,6 +178,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
         recorded_terminal = trajectory.terminal_observation
         if trajectory.schema_version < 26 and recorded_terminal is not None:
             recorded_terminal = without_faceup_age(recorded_terminal)
+        if trajectory.schema_version < 27 and recorded_terminal is not None:
+            recorded_terminal = replace(recorded_terminal, recent_attacks=())
         if trajectory.schema_version < 24 and recorded_terminal is not None:
             recorded_terminal = without_races(recorded_terminal)
         if trajectory.schema_version < 25 and recorded_terminal is not None:

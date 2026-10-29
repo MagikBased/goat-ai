@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -50,6 +51,19 @@ def test_attacked_des_koala_damages_for_attacker_hand_after_battle(tmp_path):
                     loaded.decisions)
                 assert audit_trajectory_visibility(loaded)["decisions"] == len(
                     loaded.decisions)
+                legacy = replace(
+                    loaded, schema_version=26,
+                    decisions=tuple(replace(record, observation=replace(
+                        record.observation, recent_attacks=()))
+                        for record in loaded.decisions),
+                    terminal_observation=replace(
+                        loaded.terminal_observation, recent_attacks=()),
+                )
+                legacy_path = tmp_path / "des_koala_battle_v26.json"
+                write_trajectory(legacy_path, legacy)
+                assert verify_trajectory(
+                    read_trajectory(legacy_path), ExperimentalOcgcoreEngine(root)) == len(
+                        loaded.decisions)
                 return
             actions = env.legal_actions()
             action = None
@@ -78,6 +92,20 @@ def test_attacked_des_koala_damages_for_attacker_hand_after_battle(tmp_path):
             if action is None:
                 action = agents[obs.acting_player].select_action(obs, actions)
             obs = env.step(action)
+            if targeted and not resolved and obs.recent_attacks:
+                attack = obs.recent_attacks[-1]
+                assert attack.turn == 3
+                assert attack.attacker.controller == 0
+                assert attack.attacker.zone == "monster"
+                assert attack.target is not None
+                assert attack.target.controller == 1
+                assert attack.target.zone == "monster"
+                if not trigger_seen:
+                    opposing = env.engine.probe.observation(0)
+                    hidden = next((card for card in opposing.field
+                                   if card.controller == 1 and card.zone == "monster"), None)
+                    if hidden is not None and hidden.position == "facedown":
+                        assert hidden.code is None
             if attacked and any(link.card_code == DES_KOALA for link in obs.chain):
                 visible_attacker_count = (len(obs.hand) if obs.viewer == 0
                                           else obs.opponent_hand_count)

@@ -444,10 +444,10 @@ def main() -> None:
         trajectory = read_trajectory(path, fast_json=args.fast_trajectory_json)
         if hashlib.sha256(path.read_bytes()).digest() != hashlib.sha256(raw).digest():
             raise ValueError(f"{path}: trajectory changed while loading")
-        if trajectory.schema_version not in range(3, 27) or not trajectory.deck_sha256 or not (
+        if trajectory.schema_version not in range(3, 28) or not trajectory.deck_sha256 or not (
             trajectory.asset_sha256
         ):
-            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v26")
+            raise ValueError(f"{path}: training requires replay-fingerprinted schema v3–v27")
         if args.feature_version >= 17 and trajectory.schema_version < 22:
             raise ValueError(f"{path}: feature version {args.feature_version} requires "
                              "schema v22 attack context")

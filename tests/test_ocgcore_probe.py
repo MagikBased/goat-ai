@@ -62,19 +62,35 @@ def test_public_battle_events_update_observed_phase():
     probe._phase = "unknown"
     probe._chain = []
     probe._public_history = []
+    probe._recent_attacks = []
     probe._known_facedown = {}
     probe._update_public_clock([b"\x29\x08\x00"])
     assert probe._phase == "battle_start"
-    probe._update_public_clock([bytes((MSG_ATTACK,))])
+    probe._turn = 1
+    attack = bytes((MSG_ATTACK,)) + struct.pack("<BBII", 0, 4, 1, 1) \
+        + struct.pack("<BBII", 1, 4, 2, 8)
+    probe._update_public_clock([attack])
     assert probe._phase == "battle_step"
+    assert [(item.attacker.controller, item.attacker.sequence,
+             item.target.controller, item.target.sequence)
+            for item in probe._recent_attacks] == [(0, 1, 1, 2)]
+    probe._update_public_clock([bytes((MSG_ATTACK,))
+                                + struct.pack("<BBII", 0, 4, 1, 1)
+                                + bytes(10)])
+    assert probe._recent_attacks[-1].target is None
+    for _ in range(32):
+        probe._update_public_clock([attack])
+    assert len(probe._recent_attacks) == 32
     probe._update_public_clock([bytes((MSG_DAMAGE_STEP_START,))])
     assert probe._phase == "damage_step"
     probe._update_public_clock([bytes((MSG_DAMAGE_STEP_END,))])
     assert probe._phase == "battle_step"
-    assert probe._public_history == ["phase:battle_start", "attack",
-                                     "damage_step:start", "damage_step:end"]
+    assert probe._public_history == (["phase:battle_start"] + ["attack"] * 34
+                                     + ["damage_step:start", "damage_step:end"])
     with pytest.raises(ValueError, match="MSG_DAMAGE_STEP_START"):
         probe._update_public_clock([bytes((MSG_DAMAGE_STEP_START, 0))])
+    with pytest.raises(ValueError, match="MSG_ATTACK length"):
+        probe._update_public_clock([bytes((MSG_ATTACK,))])
 
 
 def test_public_field_disabled_mask_replaces_previous_zones():
@@ -146,6 +162,7 @@ def test_known_facedown_memory_requires_public_flip_and_clears_on_move():
     probe._chain = []
     probe._public_history = []
     probe._known_facedown = {}
+    probe._faceup_since = {}
     code = 12345678
     key = (1, 4, 2)
     probe._update_public_clock([bytes((MSG_POS_CHANGE,))
@@ -171,6 +188,7 @@ def test_known_hand_memory_uses_public_sources_only():
     probe._chain = []
     probe._public_history = []
     probe._known_facedown = {}
+    probe._faceup_since = {}
     probe._known_hand = {0: [], 1: []}
 
     def move(code, old_location, new_location, new_position=1):
@@ -202,6 +220,7 @@ def test_known_facedown_memory_follows_control_change_with_legal_identity():
     probe._chain = []
     probe._public_history = []
     probe._known_facedown = {(0, 4, 2): 12345678}
+    probe._faceup_since = {}
     move = (bytes((MSG_MOVE,)) + struct.pack("<I", 99999999)
             + struct.pack("<BBII", 0, 4, 2, 8)
             + struct.pack("<BBII", 1, 4, 0, 8)
@@ -227,6 +246,7 @@ def test_swap_carries_former_controllers_own_facedown_identity():
     probe._chain = []
     probe._public_history = []
     probe._known_facedown = {(1, 4, 3): 555}
+    probe._faceup_since = {}
     swap = (bytes((MSG_SWAP,))
             + struct.pack("<IBBII", 111, 0, 4, 0, 8)
             + struct.pack("<IBBII", 222, 1, 4, 0, 1))

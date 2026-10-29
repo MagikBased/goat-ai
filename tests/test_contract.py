@@ -22,6 +22,7 @@ from goat_ai.observations import (
     Observation,
     PendingSummonView,
     PrivateRevealView,
+    PublicAttackView,
     PublicRevealView,
     RevealedCardView,
     TargetSlotView,
@@ -556,13 +557,13 @@ def test_replay_verifier_detects_changed_decision_and_outcome():
                           ContractEngine())
 
 
-def test_schema_twenty_six_terminal_observation_round_trip_and_verification(tmp_path):
+def test_schema_twenty_seven_terminal_observation_round_trip_and_verification(tmp_path):
     with GoatEnvironment("a", "b", seed=42, engine=ContractEngine()) as env:
         env.reset()
         final = env.step(env.legal_actions()[0])
         assert env.is_terminal()
         trajectory = env.trajectory()
-    assert trajectory.schema_version == 26
+    assert trajectory.schema_version == 27
     assert trajectory.terminal_observation == final
     path = tmp_path / "terminal.json"
     write_trajectory(path, trajectory)
@@ -575,6 +576,26 @@ def test_schema_twenty_six_terminal_observation_round_trip_and_verification(tmp_
         final, life_points=(100, 200)))
     with pytest.raises(ReplayMismatch, match="terminal observation"):
         verify_trajectory(changed, ContractEngine())
+
+
+def test_schema_twenty_seven_requires_and_round_trips_public_attack_slots(tmp_path):
+    action = Action("0", "pass", 0)
+    attack = PublicAttackView(2, TargetSlotView(0, "monster", 1),
+                              TargetSlotView(1, "monster", 3))
+    snapshot = replace(view(), turn=2, turn_player=0, recent_attacks=(attack,))
+    trajectory = Trajectory("goat", ("a", "b"), 7,
+                            (DecisionRecord(snapshot, (action,), action),), 0,
+                            schema_version=27, terminal_observation=snapshot)
+    path = tmp_path / "attacks.json"
+    write_trajectory(path, trajectory)
+    assert read_trajectory(path) == trajectory
+    with pytest.raises(ValueError, match="schema v27"):
+        write_trajectory(path, replace(trajectory, schema_version=26))
+    raw = json.loads(path.read_text())
+    del raw["decisions"][0]["observation"]["recent_attacks"]
+    path.write_text(json.dumps(raw))
+    with pytest.raises(ValueError, match="schema v27"):
+        read_trajectory(path)
 
 
 def test_turn_player_requires_schema_twenty_three_and_older_replays_stay_readable(tmp_path):

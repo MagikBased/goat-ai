@@ -201,7 +201,8 @@ def test_public_scapegoat_restriction_replays_in_new_and_old_schemas(
         return replace(
             view, restrictions=(), public_reveals=(), disabled_zones=(),
             private_reveals=(), own_main_deck=(), known_opponent_hand_cards=(),
-            pending_attack=None, pending_summon=None, turn_player=None,
+                pending_attack=None, pending_summon=None, turn_player=None,
+                recent_attacks=(),
             chain=tuple(replace(link, targets=()) for link in view.chain),
             hand=old_cards(view.hand), field=old_cards(view.field),
             own_extra_deck=old_cards(view.own_extra_deck),

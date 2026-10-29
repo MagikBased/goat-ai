@@ -13,6 +13,7 @@ from goat_ai.observations import (
     Observation,
     PendingSummonView,
     PrivateRevealView,
+    PublicAttackView,
     PublicRevealView,
     RevealedCardView,
     TargetSlotView,
@@ -58,7 +59,7 @@ def _json_dataclass(value):
 def write_trajectory(path: str | Path, trajectory: Trajectory, *,
                      fast_json: bool = False) -> None:
     version = trajectory.schema_version
-    if version not in range(1, 27):
+    if version not in range(1, 28):
         raise ValueError("unsupported trajectory schema")
     if version >= 18 and trajectory.terminal_observation is None:
         raise ValueError("schema v18 requires a terminal observation")
@@ -107,6 +108,8 @@ def write_trajectory(path: str | Path, trajectory: Trajectory, *,
             raise ValueError("schema v25 requires owner for face-up monsters")
         if version < 26 and any(card.faceup_turns is not None for card in cards):
             raise ValueError("public face-up age requires schema v26")
+        if version < 27 and view.recent_attacks:
+            raise ValueError("public attack slots require schema v27")
     if fast_json:
         try:
             import orjson
@@ -131,7 +134,7 @@ def read_trajectory(path: str | Path, *, fast_json: bool = False) -> Trajectory:
     else:
         raw = json.loads(data)
     version = raw.get("schema_version")
-    if version not in range(1, 27):
+    if version not in range(1, 28):
         raise ValueError("unsupported trajectory schema")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
@@ -208,6 +211,16 @@ def read_trajectory(path: str | Path, *, fast_json: bool = False) -> Trajectory:
             view["pending_summon"] = PendingSummonView(**view["pending_summon"])
         else:
             view.pop("pending_summon", None)
+        if version >= 27:
+            if "recent_attacks" not in view:
+                raise ValueError("schema v27 requires public attack history")
+            view["recent_attacks"] = tuple(PublicAttackView(
+                attack["turn"], TargetSlotView(**attack["attacker"]),
+                TargetSlotView(**attack["target"])
+                if attack["target"] is not None else None)
+                for attack in view["recent_attacks"])
+        else:
+            view.pop("recent_attacks", None)
         if version >= 23:
             if (type(view.get("turn_player")) is not int
                     or view["turn_player"] not in (0, 1)):

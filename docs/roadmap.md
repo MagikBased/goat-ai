@@ -21,6 +21,14 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+Schema v27 now retains the last 32 public attack announcements as attacker
+and target field slots, including direct attacks, without recording a
+face-down target's identity. The pinned native Des Koala battle fixture
+replay-verifies with this observation, checks the hidden target boundary,
+and also verifies a projected v26 recording of the same duel. Existing
+policy encoders do not yet consume the new attack history; a learned benefit
+would require a separate feature ablation and held-out evaluation.
+
 Large card/chain sort prompts now use staged, linear-size legal actions after
 2,048 complete permutations. A synthetic seven-card message exercises the
 bounded menu; a forced staged path on Fruits of Kozaky's Studies finishes a
