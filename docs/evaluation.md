@@ -14916,3 +14916,35 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_native.py \
   --seed 126100 --seeds 16 --max-decisions 3000 --workers 4 \
   --output .cache/goat-ai/tactical_main2_set_vs_v14_126100_126115.json
 ```
+
+## Isolated Fusion stress protocol sweep (29 October 2026)
+
+Eight independently generated, whitelist-legal 40-card Main Decks each
+contained three Scapegoat and three Metamorphosis copies. Each had a legal
+15-card Fusion Deck containing Thousand-Eyes Restrict. Each opponent used a
+different generated Main and Extra Deck. RandomAgent controlled both seats;
+each native duel ran in a separate process so a crash could not erase later
+results. Seeds 127000–127007 produced **8 terminal duels and 8,169 original
+decisions** (642–1,755 per duel). All eight trajectories replay-verified,
+passed the player-visibility audit, and repeated with identical decisions,
+terminal observations, and outcomes. The union of offered native choices had
+29 action kinds, including `sort_cards`, `tribute_cards`, `select_cards`, and
+`announce_card`. The loaded-asset report records 459 native assets; it does
+not imply that every loaded effect was activated or historically audited.
+
+Reproduce the ignored report from the repository root with:
+
+```bash
+.venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/random_fusion_stress_127000_127007 \
+  --seed 127000 --seeds 8 --max-decisions 3000 \
+  --random-extra --fusion-stress --distinct-opponents \
+  --verify-replays --repeat-seeds --isolate-games
+```
+
+The local `report.json` SHA-256 is
+`83cd5f33e15c281fec307052a0f905b620f36e5d063ae19d486ae596a4619943`.
+This is a sampled protocol and determinism check. Random play does not validate
+card-specific 2005 rulings, decision quality, or complete arbitrary-deck
+coverage; M1 and M2 remain open.
