@@ -1367,6 +1367,30 @@ the match difference cannot be attributed to MST labels alone. Keep V12
 experimental; the selected v23 checkpoint remains unchanged. Ignored reports
 are under `.cache/goat-ai/v12_heldout_107320_107351/`.
 
+The policy input already contains separate own and opposing back-row counts,
+and `select_card` actions carry relative controller and field slot. Thus the
+ownership distinction is representable, although the policy may still learn
+a broad MST action bias. To probe that question, we scored the replay-verified
+seed-107100 opening at decision 6 (MST versus pass) under V11 and V12. V11
+assigned MST **67.6%** and V12 **60.5%** in the actual own-Swords position.
+Changing only the visible Swords controller to the opponent in an offline
+diagnostic input yielded **72.9%** and **65.9%**, respectively. The
+own/opponent gap stayed about five points while the overall MST probability
+fell by about seven points. This single synthetic observation is **not** a
+native-verified alternate duel or strength estimate; it suggests the child
+learned a general MST penalty more than the intended ownership relation.
+
+Four additional greedy complete duels per checkpoint on untouched seeds
+107400–107401, Max/Jonathan and both policy seats, passed native replay,
+visibility, and saved-policy choice verification. The conservative own-card
+audit flagged one V11 own-only Nobleman activation and one V12 own-only MST
+activation. The cases differ, and four games per arm cannot establish a
+mistake-rate difference. Ignored trajectories and audits are under
+`.cache/goat-ai/v12_fresh_107400_107401/`. A stronger next experiment needs
+many varied, verified ownership contexts and separate positive examples of
+valuable removal; the fixed-state target should be paired with fresh-game
+error and competitive results before any policy promotion.
+
 ## Selected own-loss preference trial (29 October 2026)
 
 The versioned `visible_selected_own_loss_v10` rule retains only V9 decisions
