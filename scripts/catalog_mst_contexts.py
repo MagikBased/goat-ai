@@ -17,13 +17,50 @@ from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 
 
-def catalog_trajectory(trajectory, card_facts: dict) -> list[dict]:
-    """Use only the acting player's visible board at selected MST decisions."""
+def _policy_seat(trajectory) -> int:
     metadata = trajectory.skill_metadata or {}
     seat = metadata.get("learner_seat" if trajectory.source == "self_play_rl"
                         else "demonstrator_seat")
     if type(seat) is not int or seat not in (0, 1):
         raise ValueError("catalog requires a recorded policy seat")
+    return seat
+
+
+def _mst_context(record, index: int, seat: int, action, card_facts: dict) -> dict:
+    observation = record.observation
+    source_slot = (action.parameters.get("sequence")
+                   if action.parameters.get("location") == 8 else None)
+    backrow = [card for card in observation.field
+               if card.zone == "spell_trap"
+               and not (card.controller == seat
+                        and card.sequence == source_slot
+                        and card.code == MYSTICAL_SPACE_TYPHOON)]
+    own = [card for card in backrow if card.controller == seat]
+    enemy = [card for card in backrow if card.controller != seat]
+    distribution = ("mixed" if own and enemy else "own_only" if own
+                    else "enemy_only" if enemy else "none")
+    return {
+        "decision_index": index,
+        "viewer_frame": index + 1,
+        "turn": observation.turn,
+        "phase": observation.phase,
+        "action_kind": action.kind,
+        "visible_backrow_distribution": distribution,
+        "pass_offered": any(choice.kind == "pass"
+                            for choice in record.legal_actions),
+        "backrow": [{"relative_controller": "own" if card.controller == seat
+                     else "opponent",
+                     "position": card.position,
+                     "code": card.code,
+                     "printed_type": (card_facts.get(card.code, (0, 0, 0))[0]
+                                      if card.code is not None else None)}
+                    for card in backrow],
+    }
+
+
+def catalog_trajectory(trajectory, card_facts: dict) -> list[dict]:
+    """Use only the acting player's visible board at selected MST decisions."""
+    seat = _policy_seat(trajectory)
     rows = []
     for index, record in enumerate(trajectory.decisions):
         observation, action = record.observation, record.selected_action
@@ -31,34 +68,37 @@ def catalog_trajectory(trajectory, card_facts: dict) -> list[dict]:
                 or action.kind not in ("activate", "chain")
                 or action.parameters.get("code") != MYSTICAL_SPACE_TYPHOON):
             continue
-        source_slot = (action.parameters.get("sequence")
-                       if action.parameters.get("location") == 8 else None)
-        backrow = [card for card in observation.field
-                   if card.zone == "spell_trap"
-                   and not (card.controller == seat
-                            and card.sequence == source_slot
-                            and card.code == MYSTICAL_SPACE_TYPHOON)]
-        own = [card for card in backrow if card.controller == seat]
-        enemy = [card for card in backrow if card.controller != seat]
-        distribution = ("mixed" if own and enemy else "own_only" if own
-                        else "enemy_only" if enemy else "none")
-        rows.append({
-            "decision_index": index,
-            "viewer_frame": index + 1,
-            "turn": observation.turn,
-            "phase": observation.phase,
-            "action_kind": action.kind,
-            "visible_backrow_distribution": distribution,
-            "pass_offered": any(choice.kind == "pass"
-                                for choice in record.legal_actions),
-            "backrow": [{"relative_controller": "own" if card.controller == seat
-                         else "opponent",
-                         "position": card.position,
-                         "code": card.code,
-                         "printed_type": (card_facts.get(card.code, (0, 0, 0))[0]
-                                          if card.code is not None else None)}
-                        for card in backrow],
-        })
+        rows.append(_mst_context(record, index, seat, action, card_facts))
+    return rows
+
+
+def catalog_opportunities(trajectory, card_facts: dict) -> list[dict]:
+    """Include offered MST choices, collapsing repeated identical priority windows."""
+    seat = _policy_seat(trajectory)
+    rows = []
+    seen = set()
+    for index, record in enumerate(trajectory.decisions):
+        if record.observation.acting_player != seat or len(record.legal_actions) < 2:
+            continue
+        mst_actions = tuple(action for action in record.legal_actions
+                            if action.kind in ("activate", "chain")
+                            and action.parameters.get("code") == MYSTICAL_SPACE_TYPHOON)
+        if not mst_actions:
+            continue
+        selected_mst = record.selected_action in mst_actions
+        action = record.selected_action if selected_mst else mst_actions[0]
+        row = _mst_context(record, index, seat, action, card_facts)
+        row["selected_mst"] = selected_mst
+        row["selected_action_kind"] = record.selected_action.kind
+        key = (row["turn"], row["phase"], row["selected_action_kind"],
+               row["action_kind"], row["visible_backrow_distribution"],
+               action.parameters.get("location"), action.parameters.get("sequence"),
+               tuple((card["relative_controller"], card["position"], card["code"])
+                     for card in row["backrow"]))
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(row)
     return rows
 
 

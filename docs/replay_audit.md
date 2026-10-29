@@ -1,5 +1,39 @@
 # Early replay decision audit
 
+## MST use and non-use review queue (29 October 2026)
+
+The [local opportunity queue](../.cache/goat-ai/mst_review_source_107600_107607/mst_opportunity_queue.html)
+extends the activation-only queue below to include decisions where MST was
+legal but the AI chose another action. It contains **28** native-replayed,
+player-visible decisions from the same 32 source games: **20** chosen MST
+activations and **eight** non-uses. The visible back-row contexts are nine
+own-only (one activation, eight non-uses), 12 opposing-only activations, and
+seven mixed activations. Repeated priority windows with the same turn, phase,
+selected action kind, MST source, and visible back row are collapsed before
+selection; at most two items come from one replay. These are review prompts,
+not correctness labels or a measured action rate. The queue JSON SHA-256 is
+`0304f0d42be59b4e4a6b828b15cbcad7e15ca45f931a293360f2ad82b329a285`.
+All source duels, visible observations, and saved policy choices were verified
+again while building the queue. The local review server loads all 28 items
+with no saved choices; every item has a player-visible label view and a
+separate full-information inspection view. Open the save-enabled queue with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/mst_review_source_107600_107607/mst_opportunity_queue.json
+```
+
+Rebuild it with the command below after recording the source games. The
+`--include-opportunities` flag adds the unused-MST decisions; without it,
+the script reproduces the activation-only queue below.
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/create_mst_review_queue.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  .cache/goat-ai/mst_review_source_107600_107607/*_seed*_seat*.json \
+  --include-opportunities --limit 32 --per-replay 2 \
+  --output .cache/goat-ai/mst_review_source_107600_107607/mst_opportunity_queue.json
+```
+
 ## MST activation review queue (29 October 2026)
 
 The [local MST queue](../.cache/goat-ai/mst_review_source_107600_107607/mst_review_queue.html)

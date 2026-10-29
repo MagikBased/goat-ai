@@ -12,7 +12,7 @@ from goat_ai.replay import read_trajectory, verify_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.training import load_policy_agent
 from goat_ai.training.policy import POLICY_INFERENCE_VERSION
-from scripts.catalog_mst_contexts import catalog_trajectory
+from scripts.catalog_mst_contexts import catalog_opportunities, catalog_trajectory
 from scripts.render_replay import render_replay
 from scripts.shortlist_policy_disagreements import (
     action_summary,
@@ -23,28 +23,54 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 
 
 def select_mst_items(candidates: list[dict], limit: int,
-                     per_replay: int) -> list[dict]:
+                     per_replay: int, *, balance_opportunities: bool = False) -> list[dict]:
     """Spread review across contexts and games without assigning play labels."""
     if limit < 1 or per_replay < 1:
         raise ValueError("review limits must be positive")
     selected = []
     per_path = Counter()
     order = {"own_only": 0, "enemy_only": 1, "mixed": 2, "none": 3}
-    for item in sorted(candidates, key=lambda x: (
-            order[x["visible_backrow_distribution"]], x["trajectory"],
-            x["decision_index"])):
-        path = item["trajectory"]
-        if per_path[path] >= per_replay:
-            continue
-        selected.append(item)
-        per_path[path] += 1
-        if len(selected) >= limit:
-            break
+    if balance_opportunities:
+        buckets = {}
+        for item in sorted(candidates, key=lambda x: (x["trajectory"],
+                                                       x["decision_index"])):
+            key = (item["visible_backrow_distribution"], item["selected_mst"])
+            buckets.setdefault(key, []).append(item)
+        keys = [(context, selected_mst)
+                for context in order for selected_mst in (True, False)]
+        while len(selected) < limit and any(buckets.values()):
+            progressed = False
+            for key in keys:
+                bucket = buckets.get(key, [])
+                while bucket and per_path[bucket[0]["trajectory"]] >= per_replay:
+                    bucket.pop(0)
+                if not bucket:
+                    continue
+                item = bucket.pop(0)
+                selected.append(item)
+                per_path[item["trajectory"]] += 1
+                progressed = True
+                if len(selected) >= limit:
+                    break
+            if not progressed:
+                break
+    else:
+        for item in sorted(candidates, key=lambda x: (
+                order[x["visible_backrow_distribution"]], x["trajectory"],
+                x["decision_index"])):
+            path = item["trajectory"]
+            if per_path[path] >= per_replay:
+                continue
+            selected.append(item)
+            per_path[path] += 1
+            if len(selected) >= limit:
+                break
     return selected
 
 
 def create_queue(checkpoint: Path, replay_paths: list[Path], output: Path,
-                 native_root: Path, *, limit: int = 24, per_replay: int = 2) -> dict:
+                 native_root: Path, *, limit: int = 24, per_replay: int = 2,
+                 include_opportunities: bool = False) -> dict:
     """Verify exact visible decisions and render a locally reviewable queue."""
     output = output.resolve()
     checkpoint_hash = sha256_file(checkpoint)
@@ -75,7 +101,9 @@ def create_queue(checkpoint: Path, replay_paths: list[Path], output: Path,
                 raise ValueError(f"{path}: saved policy choice differs at {index}")
         source_replays[str(path)] = trajectory
         digest = sha256_file(path)
-        for row in catalog_trajectory(trajectory, facts):
+        rows = (catalog_opportunities(trajectory, facts) if include_opportunities
+                else catalog_trajectory(trajectory, facts))
+        for row in rows:
             index = row["decision_index"]
             record = trajectory.decisions[index]
             if len(record.legal_actions) < 2:
@@ -88,11 +116,18 @@ def create_queue(checkpoint: Path, replay_paths: list[Path], output: Path,
                 "policy_action": action_summary(record.selected_action),
                 "teacher_action": action_summary(record.selected_action),
                 "teacher_disagrees": False,
-                "audit_flags": ["mst_context_" + row["visible_backrow_distribution"]],
+                "audit_flags": ([] if include_opportunities else [
+                    "mst_context_" + row["visible_backrow_distribution"]]),
                 "visible_backrow_distribution": row["visible_backrow_distribution"],
                 "pass_offered": row["pass_offered"],
+                **({"selected_mst": row["selected_mst"],
+                    "review_context": "MST was available; "
+                                      + row["visible_backrow_distribution"].replace("_", " ")
+                                      + " visible back row. Review the AI's choice."}
+                   if include_opportunities else {}),
             })
-    selected = select_mst_items(candidates, limit, per_replay)
+    selected = select_mst_items(candidates, limit, per_replay,
+                                balance_opportunities=include_opportunities)
     if not selected:
         raise ValueError("no reviewable selected MST activation was found")
     viewer_dir = output.parent / (output.stem + "_viewers")
@@ -129,6 +164,8 @@ def create_queue(checkpoint: Path, replay_paths: list[Path], output: Path,
     return {"queue": str(output), "items": len(selected),
             "contexts": dict(sorted(Counter(
                 item["visible_backrow_distribution"] for item in selected).items())),
+            **({"selected_mst": sum(item["selected_mst"] for item in selected)}
+               if include_opportunities else {}),
             "queue_sha256": sha256_file(output)}
 
 
@@ -139,11 +176,14 @@ def main() -> None:
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--limit", type=int, default=24)
     parser.add_argument("--per-replay", type=int, default=2)
+    parser.add_argument("--include-opportunities", action="store_true",
+                        help="also review deduplicated choices where MST was legal but unused")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     print(json.dumps(create_queue(args.checkpoint, args.replays, args.output,
                                   args.native_root, limit=args.limit,
-                                  per_replay=args.per_replay)))
+                                  per_replay=args.per_replay,
+                                  include_opportunities=args.include_opportunities)))
 
 
 if __name__ == "__main__":

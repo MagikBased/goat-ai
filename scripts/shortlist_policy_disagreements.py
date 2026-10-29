@@ -208,13 +208,16 @@ def write_review_index(selected: list[dict], output: Path,
         option_note = (f"Review {names.get(option_code, f'Card {option_code}')} effect choice"
                        if option_code is not None else "")
         upstream_note = item.get("review_note")
-        reason = (f"Earlier activation before review #{item['source_item_number']}"
-                  + (f": {upstream_note[:160]}" if upstream_note else "")
-                  if upstream_note is not None else
-                  ", ".join(flag.replace("_", " ") for flag in item["audit_flags"])
-                  if item["audit_flags"] else age_note
-                  if age_note else option_note
-                  if option_note else f"{comparison_label} suggests another play")
+        if item.get("review_context"):
+            reason = item["review_context"]
+        else:
+            reason = (f"Earlier activation before review #{item['source_item_number']}"
+                      + (f": {upstream_note[:160]}" if upstream_note else "")
+                      if upstream_note is not None else
+                      ", ".join(flag.replace("_", " ") for flag in item["audit_flags"])
+                      if item["audit_flags"] else age_note
+                      if age_note else option_note
+                      if option_note else f"{comparison_label} suggests another play")
         choices = (f'<p><strong>Both agents played:</strong> '
                    f'{action_label(item["policy_action"])}</p>'
                   if teacher_agrees else

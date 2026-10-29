@@ -5,7 +5,7 @@ from dataclasses import replace
 from goat_ai.actions import Action
 from goat_ai.observations import CardView, Observation
 from goat_ai.replay import DecisionRecord, Trajectory
-from scripts.catalog_mst_contexts import catalog_trajectory
+from scripts.catalog_mst_contexts import catalog_opportunities, catalog_trajectory
 
 
 def test_mst_catalog_preserves_hidden_opponent_backrow_and_excludes_source():
@@ -37,3 +37,8 @@ def test_mst_catalog_preserves_hidden_opponent_backrow_and_excludes_source():
         record, observation=replace(view, field=(source, unknown))),))
     assert catalog_trajectory(enemy_only, {})[0]["visible_backrow_distribution"] == (
         "enemy_only")
+    passed = replace(replay, decisions=(replace(record, selected_action=passing),))
+    opportunity, = catalog_opportunities(passed, {72302403: (2, 0, 0)})
+    assert opportunity["selected_mst"] is False
+    assert opportunity["selected_action_kind"] == "pass"
+    assert opportunity["visible_backrow_distribution"] == "mixed"
