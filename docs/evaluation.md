@@ -21,6 +21,19 @@ not new guarded rollouts or a strength estimate. In particular, the guard
 still lacks a general value model for self-targeting, sacrifices, or future
 card advantage. Do not promote it without a fresh held-out match evaluation.
 
+The replay recorder and auditor now recognize `greedy_own_loss_guard_v1`, so
+guarded complete duels can be inspected with exact policy-choice provenance.
+On the seed-99906 Theeresak/Phoenix pairing, the guarded policy's first
+divergence from the recorded parent is decision 330: it passes instead of
+activating an idle Set Mystical Space Typhoon with only its own back row as
+targets. The guarded continuation finished after 596 decisions and lost; the
+parent finished after 374 decisions and also lost. Both recordings passed
+native replay and visibility audits, and the guarded audit reproduced all 300
+policy-seat choices. A separate offline branch from decision 330 likewise
+lost under either choice. This one seed demonstrates the changed behavior,
+not a gain in competitive strength. The ignored guarded trajectory is
+`.cache/goat-ai/own_loss_guard_record_seed_99906.json`.
+
 ## Narrow visible own-loss guard ablation (29 October 2026)
 
 An opt-in observation-only filter now defers clearly own-only Nobleman,

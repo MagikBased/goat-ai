@@ -170,7 +170,8 @@ def main() -> None:
             inference = metadata.get("policy_inference")
             if inference not in ("greedy", "greedy_tactical_guard_v3",
                                  "greedy_tactical_guard_v4", "greedy_tactical_guard_v5",
-                                 "greedy_position_guard_v1", "greedy_position_guard_v2"):
+                                 "greedy_position_guard_v1", "greedy_position_guard_v2",
+                                 "greedy_own_loss_guard_v1"):
                 raise ValueError(f"{path}: unsupported policy inference {inference!r}")
             guarded = inference in ("greedy_tactical_guard_v3", "greedy_tactical_guard_v4",
                                     "greedy_tactical_guard_v5")
@@ -180,6 +181,7 @@ def main() -> None:
                 weak_flip_attacks=(weak_flip_attacks
                                    if inference == "greedy_tactical_guard_v4" else None),
                 self_target_guard=inference == "greedy_tactical_guard_v5",
+                own_loss_guard=inference == "greedy_own_loss_guard_v1",
                 position_guard=inference in ("greedy_position_guard_v1",
                                              "greedy_position_guard_v2"),
                 position_guard_version=(1 if inference == "greedy_position_guard_v1" else 2))
