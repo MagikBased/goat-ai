@@ -222,6 +222,38 @@ def safe_optional_own_loss_indices(observation: Observation,
     return kept or indices
 
 
+def safe_negative_heavy_trade_indices(observation: Observation,
+                                      legal_actions: Sequence[Action],
+                                      admissible: Sequence[int]) -> tuple[int, ...]:
+    """Defer Heavy Storm when visible friendly collateral meets enemy back row.
+
+    This estimates the immediate card trade before a chain can be built. It
+    counts a Set Heavy Storm as the spent source, not its own collateral, and
+    treats opposing face-down cards only as visible occupied slots. It is an
+    experimental preference; a forced legal action remains available.
+    """
+    indices = tuple(admissible)
+    own = observation.viewer
+    own_backrow = [card for card in observation.field
+                   if card.controller == own and card.zone == "spell_trap"]
+    enemy_backrow = sum(card.controller != own and card.zone == "spell_trap"
+                        for card in observation.field)
+
+    def negative_trade(index: int) -> bool:
+        action = legal_actions[index]
+        if (action.kind != "activate"
+                or action.parameters.get("code") != HEAVY_STORM):
+            return False
+        source_is_set = action.parameters.get("location") == 8 and any(
+            card.sequence == action.parameters.get("sequence")
+            and card.code == HEAVY_STORM for card in own_backrow)
+        collateral = len(own_backrow) - int(source_is_set)
+        return enemy_backrow <= collateral
+
+    kept = tuple(index for index in indices if not negative_trade(index))
+    return kept or indices
+
+
 def safe_idle_own_ring_indices(observation: Observation,
                                legal_actions: Sequence[Action],
                                admissible: Sequence[int]) -> tuple[int, ...]:

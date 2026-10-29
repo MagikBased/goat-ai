@@ -1,5 +1,62 @@
 # Baseline evaluation log
 
+## Negative visible Heavy Storm trade ablation (29 October 2026)
+
+An opt-in v8 inference variant extends the selected v1 own-loss filter at
+**activation time**. It defers Heavy Storm when the number of opposing back-row
+cards is no greater than the number of other friendly back-row cards it would
+destroy. A Set Storm source is excluded from friendly collateral. The rule
+uses only visible occupied zones; it cannot inspect an opposing Set card or
+predict responses, tactical payoff, or later turns. It preserves an engine-
+legal fallback and does not alter the neural checkpoint or simulator rules.
+
+At all three previously verified negative-trade Heavy Storm decisions in the
+seed-124900–124907 varied-deck audit, v8 chose a different legal action from
+v1. This is a fixed-state correction of those observed cases, not a held-out
+strength result or proof that its alternatives are best.
+
+Fresh seed-125200–125207 direct play used four unseen 2005 Main Deck pairings,
+both deck assignments and both policy seats. Against the same v1 checkpoint,
+v8 won **65/128** games; the matched v1-versus-v1 control won **64/128**.
+Against Tactical-v14 on the same schedule, both v8 and v1 won **35/128**.
+The strict report comparator verified the unseen Main Decks, checkpoint,
+native assets, scripts, source, seeds, and opponents. Its paired Tactical score
+difference was **0**.
+
+A second prespecified Tactical block on seed-125208–125239 used the two pairings
+where the earlier Heavy Storm errors appeared, again with both deck assignments
+and policy seats. V8 won **66/256** versus v1's **67/256**; the strict paired
+score difference was **−0.39 percentage points**, 95% interval **−1.95 to
++0.78 points**. Three matched winners changed: one in v8's favor and two
+against it, for one net win fewer. The exact changed seed-125220 Chaos/Goat
+game was re-recorded under both
+inference modes: all **625** v8 and **895** v1 decisions replay-verified and
+passed the visibility audit. At decision 86, v1 activated Heavy Storm with four
+other friendly back-row cards and two opposing back-row cards; v8 Set Spirit
+Reaper instead. V1 later won and v8 lost on that fixed deal. Later play
+and draws diverged, so that terminal comparison does not establish the
+original Storm as strategically sound. It demonstrates the danger of treating
+immediate card count as full action value.
+
+Keep v8 experimental and v1 selected. The paired reports are ignored local
+artifacts `heavy_v8_vs_v1_125200_125207.json` (SHA-256
+`dcb8b24cf2ea1f1bd1c284cedfb00fdceaf0c1d7e691ac16fd2e1222d38f043a`),
+`heavy_v1_control_125200_125207.json` (`a8ec4c574b6166377df3a88969218a6a9e5847f691dc7c6c855a88424d46c2a5`),
+`heavy_v8_vs_tactical_125200_125207.json` (`0797b4dcab1fc8fdb6af50f30824cbd48415f33d2e96611e58f9a9c36544fe27`),
+`heavy_v1_vs_tactical_125200_125207.json` (`179912a254848bf1710bfb259498f14f3cc3fde82dec3d98af34b364c91f051f`),
+`heavy_v8_vs_tactical_125208_125239.json` (`18c02b7b4b49a6d326d0ba8bbc528a000093f0a51d4c65bc36531658ca984a32`),
+and `heavy_v1_vs_tactical_125208_125239.json`
+(`3641d533ab5c123bcd37b709557bfabc76cb207c15f540f695366f696cb8221c`).
+The full changed-game replays are `heavy_v8_125220_chaos.json` and
+`heavy_v1_125220_chaos.json` in the same ignored directory. Reproduce the
+comparison with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --own-loss-guard
+--own-loss-guard-version 8` against either `--opponent-checkpoint` with
+`--opponent-own-loss-guard --opponent-own-loss-guard-version 1`, or
+`--opponent tactical`, then compare matched v1 runs using
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.
+
 ## Fresh own-card effects: resolved material versus decision value (29 October 2026)
 
 ### Same-state activation branches across the varied-deck flags

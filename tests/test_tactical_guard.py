@@ -8,6 +8,7 @@ from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
     safe_chained_own_only_mst_indices,
     safe_idle_own_ring_indices,
+    safe_negative_heavy_trade_indices,
     safe_one_shot_response_indices,
     safe_optional_own_loss_indices,
     safe_own_one_shot_response_indices,
@@ -110,6 +111,25 @@ def test_opt_in_own_loss_guard_catches_storm_and_torrential_before_targets():
     assert safe_optional_own_loss_indices(
         board(own_monster, enemy_monster),
         (torrential, wait), range(2)) == (0, 1)
+
+
+def test_negative_heavy_trade_counts_set_source_and_hidden_enemy_slots():
+    source = CardView(0, "spell_trap", "facedown", 19613556, 0)
+    friendly = CardView(0, "spell_trap", "facedown", 45986603, 1)
+    enemy = CardView(1, "spell_trap", "facedown", None, 0)
+    storm = Action("storm", "activate", 0,
+                   {"code": 19613556, "location": 8, "sequence": 0})
+    wait = Action("wait", "battle_phase", 0)
+    actions = (storm, wait)
+    assert safe_negative_heavy_trade_indices(
+        board(source, friendly, enemy), actions, range(2)) == (1,)
+    assert safe_negative_heavy_trade_indices(
+        board(source, friendly, enemy, replace(enemy, sequence=1)),
+        actions, range(2)) == (0, 1)
+    assert safe_negative_heavy_trade_indices(
+        board(source, enemy), actions, range(2)) == (0, 1)
+    assert safe_negative_heavy_trade_indices(
+        board(source, friendly, enemy), (storm,), (0,)) == (0,)
 
 
 def test_opt_in_own_loss_guard_defers_uncontested_own_removal_but_keeps_chain_response():

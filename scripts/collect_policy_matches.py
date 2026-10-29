@@ -115,7 +115,7 @@ def main() -> None:
     parser.add_argument("--max-decisions", type=int, default=3000)
     parser.add_argument("--own-loss-guard", action="store_true",
                         help="record the policy with an experimental visible own-loss guard")
-    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4, 5, 6, 7),
+    parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4, 5, 6, 7, 8),
                         default=1)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
