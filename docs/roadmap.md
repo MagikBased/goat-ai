@@ -2454,3 +2454,9 @@ across two direct parent blocks, but the larger matched Tactical block was
 The next M4 trial needs broader reviewed activation and target decisions,
 fresh deck families, and repeatable own-card opportunity rates alongside
 held-out competitive strength.
+A [larger masked-parent fit](evaluation.md#scaling-masked-parent-preferences-to-783-comparisons-29-october-2026)
+used all 783 verified v5 comparisons from 187 duels. It matched the small
+child's 0/16 held-out flagged top choices and split 17–15 against that child
+in fresh direct games, with the paired interval crossing even play. Scaling
+the same automated rule has not established a stronger checkpoint; prioritize
+better decision labels and opponent transfer before promotion.

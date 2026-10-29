@@ -1,5 +1,38 @@
 # Baseline evaluation log
 
+## Scaling masked-parent preferences to 783 comparisons (29 October 2026)
+
+The 85-comparison masked-parent pilot left open whether its limited training
+sample was the main obstacle. A second child started from the **same unchanged
+selected v23 parent** and used all **783** `visible_material_avoidance_v5`
+comparisons from **187** replay-verified, visibility-audited self-play duels
+across seeds 91000–91239, 97000–97063, and 99000–99063. It used the same
+four current-core preservation replays (64 states), 20 steps, recorded-bad
+weight 2, parent-KL weight 1, learning rate 0.0001, and seed 74. The
+preference loss fell from **0.7841** to **0.7223**; final sampled preservation
+KL was **0.00374**. The ignored checkpoint
+`.cache/goat-ai/fv23_masked_parent_broad_91000_99063.pt` has SHA-256
+`a9a56fa2984d5390f2a0857375af48fa4ccfffafceb5281c06290e4f29074666`.
+
+On the same 16 held-out fixed decision states used for the small pilot, the
+broad child ranked a flagged action first **0/16** times, identical to the
+small child (the selected parent was **2/16**). Its ignored score report has
+SHA-256 `86f97f9858fabad4d33a80100ea1227cc0e412da7547c236137f8a61cf27eee3`.
+These states are held out by replay hash and seed, but they are too few to
+prove a general bad-action gain.
+
+In complete games on fresh seeds 99852–99855, the broad child scored
+**17–15** directly against the small child across Theeresak/Phoenix and Ryan
+Hayakawa/Bryan Coronel pairings, both deck assignments and policy seats.
+The paired 95% score interval was **40.6%–68.8%**. The report passed the
+unseen-Main-Deck provenance check for **both** checkpoints. Its ignored JSON
+has SHA-256 `26eb1df0431c0d181cb8bd7436828804f6a686f8ab2cb41da95877c2974cb4b8`.
+This trial does not establish that adding the 698 extra automated comparisons
+improved competitive play. Neither child replaces the selected v23 parent.
+More data under the same synthetic rule is not the next justified lever;
+broader independently reviewed activation and target decisions remain a
+higher-value M4 input.
+
 ## Masked-parent bad-action training pilot (28 October 2026)
 
 The v5 pairwise loss averaged the scores of all alternatives to a flagged
