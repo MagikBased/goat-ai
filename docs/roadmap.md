@@ -21,6 +21,15 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+A fresh 21-duel first-activation sweep over a shuffled partition of the
+canonical GOAT whitelist reached terminal in every game and replay-verified
+23,381 decisions. It selected activations for 82 card IDs absent from the two
+earlier first-activation partitions, raising their combined observed activation
+set to 562 IDs. A one-worker rerun reproduced all 21 decision streams and
+terminal observations exactly. This extends sampled protocol coverage, while
+historical effects and arbitrary-deck completeness remain open; see the
+[evaluation entry](evaluation.md#third-first-activation-whitelist-partition-29-october-2026).
+
 A further [20-duel Tactical-v14 whitelist/Fusion sample](evaluation.md#fresh-tactical-whitelistfusion-protocol-sample-29-october-2026)
 on seeds 112000–112019 completed and native-replay/visibility-verified all
 9,824 decisions with distinct independently sampled opponent Main Decks and

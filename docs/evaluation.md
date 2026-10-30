@@ -15004,3 +15004,40 @@ The local `report.json` SHA-256 is
 This is a sampled protocol and determinism check. Random play does not validate
 card-specific 2005 rulings, decision quality, or complete arbitrary-deck
 coverage; M1 and M2 remain open.
+
+## Third first-activation whitelist partition (29 October 2026)
+
+On pinned GOAT native assets, `scripts/probe_whitelist_coverage.py` shuffled
+the 1,624 canonical Main Deck IDs into 41 valid decks, distributed the 52
+canonical Fusion IDs among their Extra Decks, and paired those decks for 21
+duels. Both agents preferred a card activation they had not yet selected in
+that duel, then used seeded random legal choices. Seed `20261029`, 3,000-decision
+limit, and eight workers yielded **21/21 terminal duels**, **23,381
+replay-verified decisions**, and passing player-visible trajectory audits.
+The run offered activation choices for 383 distinct IDs and selected 379.
+Compared by card ID with first-activation seeds `120000` and `120001`, this
+partition selected 82 previously unselected IDs; the three-run union is 562.
+
+The ignored report is
+`.cache/goat-ai/whitelist_first_activation_20261029/report.json` (SHA-256
+`dd354e6e6f490eeeb7e98ab4618d711e51382f96ef901317c6dd7fdf376f3a69`).
+Its measured suite wall time was 10.20 seconds. A separate one-worker run in
+`.cache/goat-ai/whitelist_first_activation_20261029_repeat/` took 52.34
+seconds. All 41 generated Deck hashes, all 21 ordered decision streams,
+terminal observations, outcomes, per-game counts, and selected activation
+sets matched exactly. Output-path-dependent trajectory hashes and wall times
+are not expected to match. Reproduce after [native setup](native_setup.md):
+
+```sh
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_whitelist_coverage.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_first_activation_20261029 \
+  --seed 20261029 --max-decisions 3000 --workers 8 \
+  --agent-mode first_activation
+```
+
+This measures sampled protocol completion and deterministic replay on the
+named assets. It does not show that every selected effect resolved, that the
+unselected IDs work, or that all rulings are historically correct. The
+randomized legal decks and activation preference are not evidence of playing
+strength.
