@@ -518,6 +518,13 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired [Call of the Haunted/Necrovalley fixture](goat_rules.md#call-of-the-haunted-under-necrovalley)
+now checks the pinned core's effect-negation timing with and without Mystical
+Space Typhoon removing Necrovalley before Call resolves. Both duels terminate,
+replay-verify, and pass the visibility audit. The preserved FAQ conflicts on
+whether Call may activate into an already active Necrovalley, so this branch
+remains a known historical ambiguity rather than a certified GOAT ruling.
+
 A paired [Appropriate/Graceful Charity fixture](goat_rules.md#appropriate-and-graceful-charity)
 now checks the archived Netrep activation-timing distinction with the pinned
 native scripts. Appropriate draws two only when it was already active before
