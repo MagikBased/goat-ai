@@ -121,6 +121,27 @@ shim for Scapegoat. `python scripts/prepare_edopro_host_token.py
 without overwriting an existing script. The mirror root must point to the
 same core, database and scripts as the host. The default pinned project assets
 are a different revision and cannot be substituted for this comparison.
+To rerun the optional TCP-room regression against that local install:
+
+```bash
+GOAT_AI_EDOPRO_HOST_ROOT=.cache/goat-ai/edopro_probe/ProjectIgnis \
+GOAT_AI_EDOPRO_MIRROR_ROOT=.cache/goat-ai/edopro_probe/official_parity_root \
+PYTHONPATH=src:.:.cache/goat-ai/edopro_probe/ygo_agent_host \
+  .venv/bin/pytest -q tests/test_edopro_policy_room.py
+```
+
+Without these external assets and the AGPL host package, this test skips.
+For a completed saved game, verify that its review JSON exactly matches the
+native EDOPro replay on the same external assets:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/verify_edopro_live_game.py \
+  .cache/goat-ai/edopro_games/game-001-seed-NNN.yrpX \
+  --native-root .cache/goat-ai/edopro_probe/official_parity_root
+```
+
+Replace `NNN` with the seed printed in the saved filename. This checks every
+visible decision and the outcome; it still reports `training_admitted: false`.
 
 ### Local terminal play
 

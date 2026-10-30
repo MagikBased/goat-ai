@@ -48,6 +48,20 @@ resulting records carry `source: edopro_external_unpatched` and
 `training_admitted: false`. Automatic training intake should wait for a
 version-matched historical rules validation, complete human GUI game, and
 independent decision-visibility checks across the collected corpus.
+An opt-in integration regression now repeats the complete TCP-room path with
+an external random client and the project's RandomAgent through the same
+`LiveDuelMirror` and save hooks as the policy launcher. On the local matching
+install it passed in 2.56 seconds, checked the client replay, zero host
+retries/Lua errors, complete mirror metadata, deserialized review trajectory,
+and visibility audit. The test skips unless both external roots and the AGPL
+host package are supplied; it is not a desktop-GUI or historical-rulings test.
+`scripts/verify_edopro_live_game.py` now independently replays the saved
+`.yrpX`, reconstructs every legal player-visible decision on the exact
+external core, and compares it with the review JSON, metadata seed, response
+counts and winner. It matched the 276-response policy-room trial and the
+integration test intentionally changed the metadata winner to confirm that
+the verifier rejects it. This is a file-integrity and same-install
+reconstruction gate; it explicitly returns `training_admitted: false`.
 
 The active [Project Ignis WindBot fork](https://github.com/ProjectIgnis/windbot)
 is an EDOPro-compatible room client. At inspected commit
