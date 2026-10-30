@@ -31,6 +31,17 @@ never assigns a winner or turns an unfinished prefix into a completed replay.
 The snapshot and any fitted checkpoint stay under ignored local cache unless
 a contributor explicitly publishes them.
 
+Retrospective `self_recorded` labels are accepted only for an authorized
+`human_cli` or `human_web` demonstrator seat, or through the separately
+verified EDOPro room path. They must identify the action actually played;
+`human_web` labels must also name a decision recorded as an explicit human
+input. Policy and self-play corrections use their distinct review
+authorizations. The replay viewer now enables human confirmation only on
+those eligible decisions and does not offer alternative-action labels under
+`self_recorded`. This guards the local data pipeline against reclassifying an
+AI-generated trajectory as a human demonstration; it cannot prove who was
+physically at the keyboard.
+
 `RulesProfile` now selects historical Side Deck sizing (0 or 15 cards) by
 default, with an explicit community option for 0–15 cards. Main Decks require
 at least 40 cards and have no project-imposed maximum. The experimental native

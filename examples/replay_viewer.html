@@ -342,7 +342,15 @@
                 (demonstrator == null || demonstrator === learner))
           ? "self_play_review" : null;
       }
-      if (replay.source !== "policy_evaluation") return "self_recorded";
+      if (replay.source === "human_cli" || replay.source === "human_web") {
+        const seat = replay.skill_metadata?.demonstrator_seat;
+        if (replay.skill_metadata?.authorization !== "self_recorded" ||
+            (seat !== 0 && seat !== 1)) return null;
+        if (replay.source === "human_web" &&
+            !Array.isArray(replay.skill_metadata?.explicit_human_decision_indices)) return null;
+        return "self_recorded";
+      }
+      if (replay.source !== "policy_evaluation") return null;
       const seat = replay.skill_metadata?.demonstrator_seat;
       const checkpoint = replay.skill_metadata?.policy_checkpoint_sha256;
       return (Number.isInteger(seat) && (seat === 0 || seat === 1) &&
@@ -359,7 +367,9 @@
           ? observation.acting_player === replay.skill_metadata.demonstrator_seat
           : authorization === "self_play_review"
             ? observation.acting_player === replay.skill_metadata.learner_seat
-            : true);
+            : observation.acting_player === replay.skill_metadata.demonstrator_seat &&
+              (replay.source !== "human_web" ||
+               replay.skill_metadata.explicit_human_decision_indices.includes(index)));
     }
     function renderNotePanel(terminal, observation) {
       const panel = byId("review-note-panel");
@@ -1215,7 +1225,8 @@
       }
       const count = terminal ? 0 : record.legal_actions.length;
       byId("legal-count").textContent = terminal ? "No legal actions" : `${count} legal actions at this decision`;
-      byId("choose-alternative").hidden = terminal || !canAnnotateFrame(observation);
+      const selfRecorded = annotationAuthorization() === "self_recorded";
+      byId("choose-alternative").hidden = terminal || !canAnnotateFrame(observation) || selfRecorded;
       const query = byId("legal-filter").value.trim().toLocaleLowerCase();
       const choices = terminal ? [] : record.legal_actions;
       const matching = query ? choices.map((action, actionIndex) => ({action, actionIndex}))
@@ -1233,14 +1244,18 @@
           const item = node("li");
           const recorded = action.id === record.selected_action.id;
           const button = node("button", `${annotations.get(index) === actionIndex ? "annotated " : ""}${recorded ? "recorded" : ""}`,
-                              `${actionLabel(observation, action, known, actionIndex)}${recorded ? " · AI played" : ""}`);
+                              `${actionLabel(observation, action, known, actionIndex)}${recorded ? (selfRecorded ? " · You played" : " · AI played") : ""}`);
           button.type = "button";
-          button.disabled = !canAnnotateFrame(observation);
-          if (recorded) button.title = "Inspect the recorded play; approve it with the button below";
+          button.disabled = !canAnnotateFrame(observation) || selfRecorded && !recorded;
+          if (recorded) button.title = selfRecorded
+            ? "Confirm this action as one you personally chose"
+            : "Inspect the recorded play; approve it with the button below";
           button.addEventListener("click", () => {
             if (!canAnnotateFrame(observation)) return;
             if (recorded) {
-              byId("review-instructions").textContent = "This is the AI's recorded play. Use Approve AI-played action below to save it as your choice.";
+              byId("review-instructions").textContent = selfRecorded
+                ? "Confirm the recorded action only if you personally chose it."
+                : "This is the AI's recorded play. Use Approve AI-played action below to save it as your choice.";
               byId("label-recorded").focus({preventScroll: true});
             } else setAnnotation(index, actionIndex);
           });
@@ -1256,7 +1271,8 @@
       byId("annotation-status").textContent = `${annotations.size} labeled frame${annotations.size === 1 ? "" : "s"}`
         + (terminal ? " · Final state" : frameLabel == null ? " · This frame is unlabeled"
           : ` · Your choice: ${actionLabel(observation, record.legal_actions[frameLabel], known, frameLabel)}`
-            + (frameLabel === recordedIndex ? " (AI played)" : " (different from AI played)"))
+            + (frameLabel === recordedIndex ? (selfRecorded ? " (you played)" : " (AI played)")
+              : " (different from AI played)"))
         + (localReviewMode && localReviewableFrames && !terminal &&
            !localReviewableFrames.has(index)
           ? " · Outside this review queue; open a queued decision to label it" : "")
@@ -1264,6 +1280,8 @@
           : " · Save failed; click Retry clear"
           : labelsExported ? " · Saved on this computer" : " · Saving…" : "");
       byId("label-recorded").disabled = terminal || !canAnnotateFrame(observation);
+      byId("label-recorded").textContent = selfRecorded
+        ? "Confirm I played this action" : "Approve AI-played action";
       byId("clear-label").disabled = terminal || frameLabel == null && !saveError;
       byId("clear-label").textContent = frameLabel == null && saveError
         ? "Retry clear" : "Clear choice";
@@ -1413,7 +1431,9 @@
         if (sourceSha256 !== hash) return;
         localReviewMode = true; labelsExported = true; saveError = false;
         byId("manual-review-export").hidden = true;
-      byId("review-instructions").textContent = "Choose an alternative action from All legal actions, or use Approve AI-played action to label the recorded play. Your choice saves automatically on this computer; no name or download is needed.";
+      byId("review-instructions").textContent = annotationAuthorization() === "self_recorded"
+        ? "Confirm only actions you personally chose. Your confirmation saves automatically on this computer."
+        : "Choose an alternative action from All legal actions, or use Approve AI-played action to label the recorded play. Your choice saves automatically on this computer; no name or download is needed.";
       } catch (error) {
         if (sourceSha256 === hash) {
           localReviewUnavailable = true;

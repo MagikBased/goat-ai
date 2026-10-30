@@ -22,6 +22,15 @@ def trajectory():
                       (DecisionRecord(observation, (first, second), first),), 0)
 
 
+def human_trajectory():
+    base = trajectory()
+    record = base.decisions[0]
+    return replace(base, source="human_cli",
+                   decisions=(replace(record, selected_action=record.legal_actions[1]),),
+                   skill_metadata={"demonstrator_seat": 0,
+                                   "authorization": "self_recorded"})
+
+
 def annotation_file(tmp_path, **changes):
     payload = {"schema_version": 1, "source_trajectory_sha256": "a" * 64,
                "authorization": "self_recorded", "reviewer": "Reviewer",
@@ -34,13 +43,51 @@ def annotation_file(tmp_path, **changes):
 
 def test_annotations_select_only_reviewed_legal_action(tmp_path):
     labels, records = read_decision_annotations(
-        annotation_file(tmp_path), "a" * 64, trajectory())
+        annotation_file(tmp_path), "a" * 64, human_trajectory())
     assert labels.choices == ((0, 1),)
     assert labels.reviewer == "Reviewer"
     assert labels.authorization == "self_recorded"
     assert len(records) == 1
-    assert records[0].selected_action == trajectory().decisions[0].legal_actions[1]
-    assert records[0].observation == trajectory().decisions[0].observation
+    assert records[0].selected_action == human_trajectory().decisions[0].legal_actions[1]
+    assert records[0].observation == human_trajectory().decisions[0].observation
+
+
+def test_self_recorded_labels_reject_ai_sources_unplayed_choices_and_wrong_seat(tmp_path):
+    human = human_trajectory()
+    for source in ("self_play", "tactical", "offline_branch_evaluation",
+                   "random_native", "local_ai_match"):
+        with pytest.raises(ValueError, match="review authorization"):
+            read_decision_annotations(annotation_file(tmp_path), "a" * 64,
+                                      replace(human, source=source))
+    with pytest.raises(ValueError, match="played action"):
+        read_decision_annotations(annotation_file(
+            tmp_path, choices=[{"decision_index": 0, "action_index": 0}]),
+            "a" * 64, human)
+    with pytest.raises(ValueError, match="authorized human seat"):
+        read_decision_annotations(annotation_file(tmp_path), "a" * 64,
+                                  replace(human, skill_metadata={"demonstrator_seat": 0}))
+    with pytest.raises(ValueError, match="human seat"):
+        read_decision_annotations(annotation_file(tmp_path), "a" * 64,
+                                  replace(human, skill_metadata={
+                                      "demonstrator_seat": 1,
+                                      "authorization": "self_recorded"}))
+
+
+def test_human_web_annotation_requires_explicit_recorded_decision(tmp_path):
+    human = human_trajectory()
+    web = replace(human, source="human_web", skill_metadata={
+        **human.skill_metadata, "explicit_human_decision_indices": [0]})
+    assert read_decision_annotations(annotation_file(tmp_path), "a" * 64, web)[1]
+    with pytest.raises(ValueError, match="explicit human decision indices"):
+        read_decision_annotations(annotation_file(tmp_path), "a" * 64,
+                                  replace(web, skill_metadata={
+                                      **web.skill_metadata,
+                                      "explicit_human_decision_indices": []}))
+    longer = replace(web, decisions=(*web.decisions, *web.decisions),
+                     skill_metadata={**web.skill_metadata,
+                                     "explicit_human_decision_indices": [1]})
+    with pytest.raises(ValueError, match="not an explicit human decision"):
+        read_decision_annotations(annotation_file(tmp_path), "a" * 64, longer)
 
 
 def test_local_ai_match_cannot_be_labeled_as_human_recording(tmp_path):
@@ -92,12 +139,13 @@ def test_edopro_self_recorded_labels_require_authorized_played_human_action(tmp_
 def test_annotations_reject_untrusted_or_invalid_labels(tmp_path, change, message):
     with pytest.raises(ValueError, match=message):
         read_decision_annotations(annotation_file(tmp_path, **change), "a" * 64,
-                                  trajectory())
+                                  human_trajectory())
 
 
 def test_annotations_reject_wrong_source_hash(tmp_path):
     with pytest.raises(ValueError, match="SHA-256"):
-        read_decision_annotations(annotation_file(tmp_path), "b" * 64, trajectory())
+        read_decision_annotations(annotation_file(tmp_path), "b" * 64,
+                                  human_trajectory())
 
 
 def test_scripted_annotations_require_matching_replayed_actions(tmp_path):
