@@ -504,6 +504,12 @@ opponent's MST. The opponent targets an unidentified Set card, Phoenix is
 Summoned at chain link two, then Call and Phoenix are destroyed at chain link
 one; Phoenix returns next Standby and clears a Set Book. The full duel
 replay-verifies and passes the visibility audit.
+A paired [Snatch Steal/Phoenix owner fixture](goat_rules.md#stolen-sacred-phoenix-returns-to-its-owner)
+now distinguishes destruction of Premature Burial from removal of Snatch
+Steal after Phoenix changes control. The former sends Phoenix to its owner's
+Graveyard and revives it on that owner's field; the latter returns the still-
+equipped monster immediately. Both full duels replay-verify and pass the
+visibility audit.
 
 A paired [Limiter Removal Damage Step fixture](goat_rules.md#limiter-removal-during-the-damage-step)
 now checks that the pinned GOAT Quick-Play Spell is offered as a chain response
