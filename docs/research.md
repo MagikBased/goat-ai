@@ -49,6 +49,13 @@ proof that all 2005 rulings are correct. The saved source is
 A complete human match through the desktop GUI on this specific room is the
 next client-path gate. Broader source-backed card and timing audits are still
 needed before EDOPro games can be treated as historically reliable data.
+The room now retains synchronized player-visible decisions before a surrender
+or disconnect as an explicitly interrupted review trajectory. A local TCP
+test surrendered after nine mirrored decisions; the saved `.yrpX` and partial
+review JSON reconstructed exactly on the pinned core, with no native terminal
+winner. The replay viewer labels the last frame "Recording stopped". This
+preserves review evidence from early endings without inventing a complete
+duel or admitting the prefix to training.
 
 **Current experimental policy-seat result.** `scripts/serve_edopro_policy.py`
 connects the project's `PolicyAgent` to the optional external EDOPro LAN host.

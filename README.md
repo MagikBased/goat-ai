@@ -116,8 +116,10 @@ checksum-guarded historical script corrections without modifying the source
 checkout. Its records are marked `edopro_pinned_historical` and **excluded
 from automatic training** until broader historical correctness and the full
 desktop-client path are validated. A surrender or disconnect saves the replay
-and metadata but does
-not produce a complete trajectory. See [the live room research](docs/research.md#edopro-live-client-bridge-probe-2026-10-30).
+and metadata. When the mirrored decisions are synchronized, it also saves
+their player-visible prefix as `.review.json`, marked `interrupted` with no
+native-duel winner. The viewer labels its last frame **Recording stopped**.
+This prefix remains excluded from training. See [the live room research](docs/research.md#edopro-live-client-bridge-probe-2026-10-30).
 
 The external host package remains a separate AGPL dependency and must be on
 `PYTHONPATH`. The locally tested checkout is
@@ -136,8 +138,8 @@ PYTHONPATH=src:.:.cache/goat-ai/edopro_probe/ygo_agent_host \
 ```
 
 Without these external assets and the AGPL host package, this test skips.
-For a completed saved game, verify that its review JSON exactly matches the
-native EDOPro replay on the same external assets:
+For a completed game or interrupted prefix, verify that the review JSON
+matches the saved native EDOPro replay on the same assets:
 
 ```bash
 PYTHONPATH=src:. .venv/bin/python scripts/verify_edopro_live_game.py \
@@ -146,7 +148,8 @@ PYTHONPATH=src:. .venv/bin/python scripts/verify_edopro_live_game.py \
 ```
 
 Replace `NNN` with the seed printed in the saved filename. This checks every
-visible decision and the outcome; it still reports `training_admitted: false`.
+recorded visible decision and, for complete games, the native outcome. It
+still reports `training_admitted: false`.
 
 ### Local terminal play
 

@@ -1,4 +1,4 @@
-"""Check one complete local EDOPro room save against its replay on matching assets."""
+"""Check a complete EDOPro room save or interrupted prefix on matching assets."""
 
 import argparse
 import json

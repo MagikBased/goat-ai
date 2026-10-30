@@ -65,7 +65,11 @@ def validate_pinned_host_assets(engine, native_root: str | Path) -> dict[str, st
     if len(engine.install.lflist_paths) != 1 or not Path(
             engine.install.lflist_paths[0]).samefile(banlist):
         raise ValueError("host GOAT list differs from pinned native list")
-    engine.scripts = HistoricalHostScripts(engine.scripts, root)
+    if isinstance(engine.scripts, HistoricalHostScripts):
+        if engine.scripts._scripts.resolve() != (root / "scripts").resolve():
+            raise ValueError("host already uses a different pinned script source")
+    else:
+        engine.scripts = HistoricalHostScripts(engine.scripts, root)
     return {
         "core_sha256": hashlib.sha256(core.read_bytes()).hexdigest(),
         "goat_list_sha256": hashlib.sha256(banlist.read_bytes()).hexdigest(),

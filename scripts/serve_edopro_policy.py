@@ -140,16 +140,21 @@ class Bridge:
                 if duel.replay is not None:
                     stem.with_suffix(".yrpX").write_bytes(duel.replay.yrpx())
                 mirror = bridge.mirror
-                complete = (mirror is not None and mirror.decision is not None
-                            and mirror.decision.terminal and result.retries == 0
-                            and not result.lua_errors and mirror.response_count == result.responses)
+                synchronized = (mirror is not None and mirror.decision is not None
+                                and mirror.records and result.retries == 0
+                                and not result.lua_errors
+                                and mirror.response_count == result.responses)
+                complete = bool(synchronized and mirror.decision.terminal)
+                prefix = bool(synchronized and not complete)
+                source = ("edopro_pinned_historical" if bridge.historical_patches
+                          else "edopro_external_unpatched")
                 metadata = {
-                    "source": ("edopro_pinned_historical" if bridge.historical_patches
-                               else "edopro_external_unpatched"),
+                    "source": source,
                     "training_admitted": False,
                     "historical_patches": bridge.historical_patches,
                     "checkpoint_sha256": bridge.checkpoint_sha256,
                     "mirror_complete": complete,
+                    "mirror_prefix_valid": prefix,
                     "core_seed": list(duel.core_seed),
                     "seed": duel.seed,
                     "winner_team": None if result.is_draw else result.winner,
@@ -162,18 +167,22 @@ class Bridge:
                 }
                 stem.with_suffix(".meta.json").write_text(
                     json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-                if complete:
+                if complete or prefix:
                     trajectory = Trajectory(
                         ruleset=("goat_pinned_historical" if bridge.historical_patches
                                  else "goat_external_unverified"),
                         decks=tuple(duel.names),
                         seed=duel.seed, decisions=tuple(mirror.records),
-                        winner=metadata["winner_team"], source=metadata["source"],
+                        winner=metadata["winner_team"] if complete else None,
+                        source=source if complete else source + "_partial",
+                        skill_metadata={"recording_status": "complete" if complete
+                                        else "interrupted"},
                         schema_version=28,
                         terminal_observation=mirror.decision.observation,
                     )
                     write_trajectory(stem.with_suffix(".review.json"), trajectory)
-                print(f"Saved {stem} (mirror complete: {complete}; training admitted: no)", flush=True)
+                print(f"Saved {stem} (complete: {complete}; "
+                      f"reviewable prefix: {prefix}; training admitted: no)", flush=True)
 
         return Save()
 

@@ -19,7 +19,8 @@ from scripts.serve_edopro_policy import Bridge
     not (os.getenv("GOAT_AI_EDOPRO_HOST_ROOT") and os.getenv("GOAT_AI_EDOPRO_MIRROR_ROOT")),
     reason="external EDOPro host and exact matching native root not supplied",
 )
-def test_network_room_saves_audited_complete_game(tmp_path):
+@pytest.mark.parametrize("surrender", [False, True])
+def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender):
     pytest.importorskip("ygo_agent")
     from ygo_agent.arena.client import ArenaClient
     from ygo_agent.arena.deck import DeckSizes, find_banlist, load_banlists, load_ydk
@@ -56,6 +57,7 @@ def test_network_room_saves_audited_complete_game(tmp_path):
             str(decks / "gravekeeper_daryl_gessler_indianapolis_2005.ydk"),
             engine.cards).deck,
         policy=lambda prompt: client_policy(prompt, None),
+        respond_delay=0.005 if surrender else 0.0,
     )
     server = ArenaServer(room, "127.0.0.1", 0)
 
@@ -63,6 +65,14 @@ def test_network_room_saves_audited_complete_game(tmp_path):
         await server.start()
         try:
             await client.connect("127.0.0.1", server.port)
+            if surrender:
+                for _ in range(500):
+                    if room.duel is not None and room.duel.responses >= 8:
+                        client.surrender()
+                        break
+                    await asyncio.sleep(0.01)
+                else:
+                    raise AssertionError("room did not reach a reviewable prefix")
             await client.wait(30)
             await server.serve(timeout=5)
         finally:
@@ -77,13 +87,17 @@ def test_network_room_saves_audited_complete_game(tmp_path):
     result = room.games[0][1]
     assert result.retries == 0 and not result.lua_errors
     metadata = json.loads(next(tmp_path.glob("*.meta.json")).read_text())
-    assert metadata["mirror_complete"] is True
+    assert metadata["mirror_complete"] is not surrender
+    assert metadata["mirror_prefix_valid"] is surrender
     assert metadata["training_admitted"] is False
     assert metadata["host_responses"] == result.responses
     trajectory = read_trajectory(next(tmp_path.glob("*.review.json")))
     assert audit_trajectory_visibility(trajectory)["decisions"] == len(trajectory.decisions)
-    assert trajectory.source == ("edopro_pinned_historical" if historical
-                                 else "edopro_external_unpatched")
+    expected_source = ("edopro_pinned_historical" if historical
+                       else "edopro_external_unpatched")
+    assert trajectory.source == expected_source + ("_partial" if surrender else "")
+    assert trajectory.skill_metadata["recording_status"] == (
+        "interrupted" if surrender else "complete")
     assert trajectory.terminal_observation is not None
     assert len(trajectory.decisions) >= result.responses
     replay_path = next(tmp_path.glob("*.yrpX"))
@@ -93,8 +107,12 @@ def test_network_room_saves_audited_complete_game(tmp_path):
     verified = verify_edopro_live_recording(
         replay_path, review_path, metadata_path, mirror_root)
     assert verified["visible_decisions"] == len(trajectory.decisions)
+    assert verified["reviewable_prefix"] is surrender
     assert verified["training_admitted"] is False
-    metadata["winner_team"] = 1 - metadata["winner_team"]
+    if surrender:
+        metadata["core_seed"][0] ^= 1
+    else:
+        metadata["winner_team"] = 1 - metadata["winner_team"]
     metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
     with pytest.raises(ValueError, match="differs from replay"):
         verify_edopro_live_recording(replay_path, review_path,

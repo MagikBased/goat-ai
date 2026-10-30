@@ -277,7 +277,7 @@ def test_render_replay_includes_terminal_frame_and_its_card_names(tmp_path):
     assert '"terminal_observation"' in html
     assert '"life_points":[0,0]' in html
     assert '"99":"Final Card"' in html
-    assert 'terminal ? "Duel ended"' in html
+    assert 'interrupted ? "Recording stopped" : "Duel ended"' in html
 
 
 def test_catalog_viewer_names_all_allowed_cards_without_a_replay(tmp_path):
