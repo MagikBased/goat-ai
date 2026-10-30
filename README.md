@@ -175,14 +175,19 @@ audio. No game sound files are committed to Git; see
 [EDOPro's sound credits](https://github.com/ProjectIgnis/Distribution/blob/master/sound/CREDITS.md).
 Click a future phase to pass through intermediate priority windows. Enable
 **Pause for chain responses** to keep response windows after your activations.
-Use **Pass** for individual responses,
-or use **End turn** when that transition is legal. Unusual prompts and every
+Use **Pass** for individual responses, or use **End turn** to pass through
+intermediate windows and finish the turn. Consecutive automatic Pass choices
+are resolved before the next board decision appears. Unusual prompts and every
 legal choice remain available under **All legal actions** in the sidebar.
 The board and controls use only the human player's visible observation and
 native legal actions. On completion the server replay-verifies the duel,
 checks player visibility, and saves a `human_web` self-recording and full
 postgame replay under `.cache/goat-ai/user_games/`. Only the human seat is
-admitted as a raw demonstration. Unfinished games are journaled under ignored
+admitted as a raw demonstration. The recording marks deliberate human choices;
+automatic passes, phase travel, and automatic zone placements remain in the
+verified replay but are excluded from imitation labels. Older `human_web`
+recordings without this choice provenance are viewable but are not admitted
+to raw imitation training. Unfinished games are journaled under ignored
 `.cache/goat-ai/user_games/_in_progress/`. Reopen their `#game=...` URL after
 restarting the server to reconstruct the duel from its seed and recorded
 actions. Changed decks, AI checkpoint, native assets, or decisions fail closed.

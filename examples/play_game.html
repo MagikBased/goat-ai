@@ -201,26 +201,29 @@
     let busy = false;
     let dragSource = null;
     let phaseTraveling = false;
-    let autoOwnChain = false;
     let previewSource = null;
     let previewHeight = 250;
     let forcedPassTimer = null;
-    function scheduleForcedPass(data) {
-      clearTimeout(forcedPassTimer);
-      if (!data || data.terminal) return;
+    function automaticPassIndex(data) {
+      if (!data || data.terminal) return -1;
       const options = data.legal_actions || [];
       const passIndex = options.findIndex(action => action.kind === "pass");
+      if (passIndex < 0) return -1;
+      if (options.length === 1) return passIndex;
+      if (!byId("hold-priority").checked &&
+          options.every(action => ["pass", "chain"].includes(action.kind)))
+        return passIndex;
+      return -1;
+    }
+    function scheduleForcedPass(data) {
+      clearTimeout(forcedPassTimer);
+      const passIndex = automaticPassIndex(data);
       if (passIndex < 0) return;
-      const forced = options.length === 1;
-      const optionalResponse = !byId("hold-priority").checked &&
-        options.every(action => ["pass", "chain"].includes(action.kind));
-      if (!forced && !optionalResponse) return;
       forcedPassTimer = setTimeout(() => {
         if (!busy && !phaseTraveling && state?.id === data.id &&
             state?.decisions === data.decisions &&
-            (forced || !byId("hold-priority").checked) &&
-            state.legal_actions?.[passIndex]?.kind === "pass")
-          choose(passIndex);
+            automaticPassIndex(state) === passIndex)
+          choose(passIndex, null, false);
       }, 0);
     }
     function previewLimit() {
@@ -643,7 +646,7 @@
             break;
           }
           const before = state.decisions;
-          const next = await choose(index);
+          const next = await choose(index, null, false);
           if (!next || next.decisions === before) break;
           if (byId("hold-priority").checked) break;
         }
@@ -664,7 +667,9 @@
       if (endIndex < 0 && state?.observation?.phase === "end") endIndex = passIndex;
       const pass = byId("pass-action"), end = byId("end-turn");
       pass.disabled = busy || passIndex < 0; pass.onclick = () => choose(passIndex);
-      end.disabled = busy || endIndex < 0; end.onclick = () => choose(endIndex);
+      end.disabled = busy || phaseTraveling || !state || state.terminal ||
+        (endIndex < 0 && passIndex < 0);
+      end.onclick = () => endIndex >= 0 ? choose(endIndex) : travelToPhase("end");
     }
     function renderPromptActions() {
       const kinds = new Set(["yes", "no", "select_position", "announce_race",
@@ -735,18 +740,17 @@
       if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
       return result;
     }
-    async function choose(index, destination = null) {
+    async function choose(index, destination = null, manual = true) {
       if (busy) return;
       const oldState = state;
       const played = state.legal_actions[index];
-      if (["activate", "chain"].includes(played?.kind)) autoOwnChain = true;
       const sound = window.DuelAudio?.action(played?.kind);
       if (sound) window.DuelAudio.play(sound);
       busy = true; closeCardActions(); actions(); renderQuickControls();
       byId("message").textContent = "AI is responding…";
       try {
         let next = await request("/api/live/choice", {id: state.id,
-          action_index: index, expected_decisions: state.decisions});
+          action_index: index, expected_decisions: state.decisions, manual});
         if (destination && !next.terminal) {
           const matching = next.legal_actions.map((action, index) => ({action, index}))
             .filter(({action}) => ["place", "select_card"].includes(action.kind)
@@ -754,7 +758,8 @@
               && action.parameters?.controller === destination.controller
               && action.parameters?.sequence === destination.sequence);
           if (matching.length === 1) next = await request("/api/live/choice", {
-            id: next.id, action_index: matching[0].index, expected_decisions: next.decisions});
+            id: next.id, action_index: matching[0].index,
+            expected_decisions: next.decisions, manual});
         }
         if (byId("auto-place").checked) {
           for (let count = 0; count < 4 && !next.terminal; count++) {
@@ -762,39 +767,18 @@
               .filter(({action}) => action.kind === "place");
             if (!placements.length || placements.length !== next.legal_actions.length) break;
             next = await request("/api/live/choice", {id: next.id,
-              action_index: placements[0].index, expected_decisions: next.decisions});
+              action_index: placements[0].index,
+              expected_decisions: next.decisions, manual: false});
           }
         }
-        if (!byId("hold-priority").checked && !phaseTraveling &&
-            ["set_monster", "set_spell_trap", "normal_summon", "special_summon",
-             "flip_summon", "activate", "chain", "change_position", "place"].includes(played?.kind)) {
-          for (let count = 0; count < 4 && !next.terminal; count++) {
-            const options = next.legal_actions;
-            if (!options.length || !options.every(action => ["pass", "chain"].includes(action.kind))) break;
-            const lastLink = next.observation.chain?.at(-1);
-            if (lastLink && lastLink.controller !== oldState.human_seat) break;
-            const pass = options.findIndex(action => action.kind === "pass");
-            if (pass < 0) break;
-            next = await request("/api/live/choice", {id: next.id,
-              action_index: pass, expected_decisions: next.decisions});
-          }
+        for (let count = 0; count < 32 && !next.terminal; count++) {
+          const pass = automaticPassIndex(next);
+          if (pass < 0) break;
+          next = await request("/api/live/choice", {id: next.id,
+            action_index: pass, expected_decisions: next.decisions, manual: false});
         }
         render(next);
         const own = oldState.human_seat;
-        const links = next.observation?.chain || [];
-        const lastLink = links.at(-1);
-        if (autoOwnChain && !next.terminal && !byId("hold-priority").checked &&
-            lastLink?.controller === own && !phaseTraveling) {
-          const pass = next.legal_actions.findIndex(action => action.kind === "pass");
-          if (pass >= 0) setTimeout(() => {
-            if (!byId("hold-priority").checked && state?.decisions === next.decisions)
-              choose(pass);
-          }, 0);
-        }
-        if (!lastLink && !next.legal_actions?.some(action =>
-            ["select_card", "select_option", "select_position", "place"].includes(action.kind)))
-          autoOwnChain = false;
-        if (lastLink?.controller !== own && lastLink) autoOwnChain = false;
         const before = oldState?.observation, after = next?.observation;
         if (before && after) {
           const other = 1 - own;

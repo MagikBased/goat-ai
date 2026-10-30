@@ -573,7 +573,11 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                             {"source", "decision_index"}
                             if endpoint == "/api/review/upstream" else
                             {"source", "decision_index", "kind", "text"})
-                if not isinstance(data, dict) or set(data) != expected:
+                valid = isinstance(data, dict) and (
+                    set(data) == expected or
+                    (endpoint == "/api/live/choice" and
+                     set(data) == expected | {"manual"}))
+                if not valid:
                     raise ValueError("invalid review payload")
                 if endpoint == "/api/games/review":
                     result = {"url": launch(creator.review_queue(data["id"]),
@@ -582,7 +586,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                     result = live.start(data)
                 elif endpoint == "/api/live/choice":
                     result = live.choose(data["id"], data["action_index"],
-                                         data["expected_decisions"])
+                                         data["expected_decisions"],
+                                         data.get("manual"))
                 elif endpoint == "/api/live/close":
                     result = live.close(data["id"])
                 elif endpoint == "/api/games":

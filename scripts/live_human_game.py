@@ -49,6 +49,7 @@ class LiveGame:
         self.spec = spec
         self.journal_path = journal_path
         self.journal_entries: list[dict] = []
+        self.explicit_human_decisions: list[int] = []
         self.decisions = 0
         self.viewer: str | None = None
         if restore is None:
@@ -57,15 +58,22 @@ class LiveGame:
         else:
             self._restore(restore)
 
-    def _apply(self, action) -> None:
+    def _apply(self, action, origin: str) -> None:
+        if origin not in ("manual", "automatic", "agent", "unknown"):
+            raise ValueError("invalid live decision origin")
         current = self.env._current()
         actions = current.legal_actions
         if action not in actions:
             raise ValueError("action differs from native legal actions")
+        if origin == "manual":
+            if current.observation.acting_player != self.human_seat:
+                raise ValueError("AI decision cannot be a human demonstration")
+            self.explicit_human_decisions.append(self.decisions)
         self.journal_entries.append({
             "index": actions.index(action),
             "observation_sha256": _digest(asdict(current.observation)),
             "legal_sha256": _digest([asdict(item) for item in actions]),
+            "origin": origin,
         })
         self.env.step(action)
         self.decisions += 1
@@ -112,6 +120,13 @@ class LiveGame:
                     or entry.get("legal_sha256") != _digest([asdict(item) for item in actions])):
                 raise ValueError(f"unfinished duel differs at decision {self.decisions}")
             action = actions[index]
+            origin = entry.get("origin", "unknown")
+            if origin not in ("manual", "automatic", "agent", "unknown"):
+                raise ValueError(f"invalid decision origin at decision {self.decisions}")
+            if origin == "manual":
+                if current.observation.acting_player != self.human_seat:
+                    raise ValueError("AI decision marked as human demonstration")
+                self.explicit_human_decisions.append(self.decisions)
             if (current.observation.acting_player != self.human_seat
                     and self.opponent.select_action(current.observation, actions) != action):
                 raise ValueError(f"AI choice differs at decision {self.decisions}")
@@ -141,7 +156,8 @@ class LiveGame:
                 action = actions[0]
             else:
                 action = self.opponent.select_action(observation, actions)
-            self._apply(action)
+            self._apply(action, "automatic" if observation.acting_player == self.human_seat
+                        else "agent")
         if self.env.is_terminal() and self.viewer is None:
             self._finish()
 
@@ -153,6 +169,8 @@ class LiveGame:
                              skill_metadata={
                                  "demonstrator_seat": self.human_seat,
                                  "authorization": "self_recorded",
+                                 "explicit_human_decision_indices":
+                                     self.explicit_human_decisions,
                                  "opponent": type(self.opponent).__name__,
                                  "opponent_version": getattr(self.opponent, "teacher_version", 1),
                                  **({"opponent_checkpoint_sha256": self.checkpoint_hash}
@@ -215,7 +233,8 @@ class LiveGame:
                 "card_names": {str(code): self.names.get(code, f"Card #{code}")
                                for code in codes}}
 
-    def choose(self, index: int, expected_decisions: int) -> dict:
+    def choose(self, index: int, expected_decisions: int,
+               manual: bool | None = True) -> dict:
         if self.env.is_terminal():
             raise ValueError("duel has ended")
         if type(expected_decisions) is not int or expected_decisions != self.decisions:
@@ -224,7 +243,10 @@ class LiveGame:
             raise ValueError("selected action is not legal")
         if self.decisions >= self.max_decisions:
             raise RuntimeError("duel exceeded the decision limit")
-        self._apply(self.env.legal_actions()[index])
+        if manual is not None and type(manual) is not bool:
+            raise ValueError("manual decision flag must be boolean")
+        self._apply(self.env.legal_actions()[index],
+                    "manual" if manual else "automatic" if manual is False else "unknown")
         self._advance_opponent()
         self._save_journal()
         return self.snapshot()
@@ -363,9 +385,9 @@ class LiveGameManager:
         return self._handle(identifier).call("snapshot")
 
     def choose(self, identifier: str, action_index: int,
-               expected_decisions: int) -> dict:
+               expected_decisions: int, manual: bool | None = True) -> dict:
         return self._handle(identifier).call("choose", action_index,
-                                            expected_decisions)
+                                            expected_decisions, manual)
 
     def close(self, identifier: str) -> dict:
         with self.lock:

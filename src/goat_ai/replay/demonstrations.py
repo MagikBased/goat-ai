@@ -55,4 +55,14 @@ def training_demonstrator_records(trajectory: Trajectory) -> tuple[DecisionRecor
         seat = (trajectory.skill_metadata or {}).get("demonstrator_seat")
         if type(seat) is not int or seat not in (0, 1):
             raise ValueError(f"{source} training requires demonstrator_seat 0 or 1")
+    if source == "human_web":
+        indices = (trajectory.skill_metadata or {}).get("explicit_human_decision_indices")
+        if (not isinstance(indices, list) or not indices
+                or any(type(index) is not int or index < 0
+                       or index >= len(trajectory.decisions) for index in indices)
+                or indices != sorted(set(indices))
+                or any(trajectory.decisions[index].observation.acting_player != seat
+                       for index in indices)):
+            raise ValueError("human_web training requires explicit human decision indices")
+        return tuple(trajectory.decisions[index] for index in indices)
     return demonstrator_records(trajectory)

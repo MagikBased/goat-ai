@@ -2879,6 +2879,16 @@ def test_raw_training_source_admission_keeps_unauthorized_replays_out():
     human = replace(base, source="human_cli", skill_metadata={
         "demonstrator_seat": 0, "authorization": "self_recorded"})
     assert training_demonstrator_records(human) == (first,)
+    second = DecisionRecord(view(), actions(), actions()[1])
+    web = replace(base, decisions=(first, second), source="human_web",
+                  skill_metadata={"demonstrator_seat": 0,
+                                  "authorization": "self_recorded",
+                                  "explicit_human_decision_indices": [1]})
+    assert training_demonstrator_records(web) == (second,)
+    for invalid in (None, [], [0, 0], [2], [True]):
+        metadata = {**web.skill_metadata, "explicit_human_decision_indices": invalid}
+        with pytest.raises(ValueError, match="explicit human decision indices"):
+            training_demonstrator_records(replace(web, skill_metadata=metadata))
     for source in ("policy_evaluation", "edopro_conditional", "unknown"):
         with pytest.raises(ValueError, match="not an admitted raw training source"):
             training_demonstrator_records(replace(base, source=source))

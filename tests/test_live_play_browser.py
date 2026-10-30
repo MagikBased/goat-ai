@@ -296,7 +296,8 @@ def test_phase_travel_passes_priority_and_hold_stops_after_one_step(tmp_path):
           kind === 'normal_summon' ? {code:123,location:2,controller:0,sequence:0} : {}))});
       const snapshots = [make(0,'main1',['normal_summon','pass']),
         make(1,'main1',['battle_phase']), make(2,'battle',['main2']),
-        make(3,'main2',['end_phase']), make(4,'end',['pass'])];
+        make(3,'main2',['end_phase']), make(4,'end',['pass']),
+        {...make(5,'draw',['battle_phase']),observation:{...base,turn:3,phase:'draw'}}];
       render(snapshots[0]);
       document.querySelector('#own-hand .card').click();
       const tray = document.getElementById('card-actions').getBoundingClientRect();
@@ -310,8 +311,8 @@ def test_phase_travel_passes_priority_and_hold_stops_after_one_step(tmp_path):
         return new Response(JSON.stringify(snapshots[request.expected_decisions + 1]));
       };
       travelToPhase('end').then(async () => {
-        const reached = state.observation.phase === 'end' &&
-          chosen.join(',') === 'pass,battle_phase,main2,end_phase';
+        const reached = state.observation.turn === 3 &&
+          chosen.join(',') === 'pass,battle_phase,main2,end_phase,pass';
         chosen.length = 0;
         render(snapshots[0]);
         document.getElementById('hold-priority').checked = true;
@@ -351,12 +352,13 @@ def test_own_activation_passes_its_chain_unless_priority_is_held(tmp_path):
       const chosen = [];
       window.fetch = async (_path, options) => {
         const request = JSON.parse(options.body);
-        chosen.push(request.action_index);
+        chosen.push([request.action_index,request.manual]);
         return new Response(JSON.stringify(request.expected_decisions === 0 ? chained : resolved));
       };
       render(initial);
       choose(0).then(() => setTimeout(() => {
-        const passed = chosen.length === 2 && state.decisions === 2;
+        const passed = chosen.length === 2 && state.decisions === 2 &&
+          chosen[0][1] === true && chosen[1][1] === false;
         chosen.length = 0;
         render(initial);
         document.getElementById('hold-priority').checked = true;

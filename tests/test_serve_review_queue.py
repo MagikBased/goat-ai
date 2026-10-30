@@ -251,7 +251,8 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
         def get(self, _identifier):
             return {"id": "b" * 16, "terminal": False}
 
-        def choose(self, _identifier, _index, _expected_decisions):
+        def choose(self, _identifier, _index, _expected_decisions, _manual):
+            assert _manual is None  # Older clients cannot supply demonstration provenance.
             return {"id": "b" * 16, "terminal": True}
 
         def close(self, _identifier):

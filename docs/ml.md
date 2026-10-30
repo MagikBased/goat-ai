@@ -330,7 +330,7 @@ python scripts/evaluate_policy.py checkpoints/heuristic_bc_1000_1003.pt \
   --seed 2000 --seeds 8 --opponent random
 ```
 
-This teacher is the project's generic `HeuristicAgent`, not a human player. The measured results and limits are in [the evaluation log](evaluation.md). The same schema can hold authorized human choices, but card-by-card historical correctness and broad visibility coverage still need expansion before using the experimental adapter for research training.
+This teacher is the project's generic `HeuristicAgent`, not a human player. The measured results and limits are in [the evaluation log](evaluation.md). The same schema can hold authorized human choices, but card-by-card historical correctness and broad visibility coverage still need expansion before using the experimental adapter for research training. Browser-recorded `human_web` trajectories additionally carry explicit human decision indices: automatic passes, phase travel, and zone placement are retained for full-duel replay but excluded from cloning. Earlier browser recordings without these indices are rejected as raw human training data because their automatic choices cannot be distinguished reliably.
 
 To measure a saved checkpoint against RandomAgent on seeds excluded from its training recordings:
 

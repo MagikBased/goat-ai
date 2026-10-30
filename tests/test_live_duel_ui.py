@@ -78,7 +78,8 @@ def test_set_monster_auto_places_and_passes_own_response_window(tmp_path):
       const sent = [];
       window.fetch = async (path, options) => {
         if (path === '/api/live/choice') {
-          sent.push(JSON.parse(options.body).action_index);
+          const request = JSON.parse(options.body);
+          sent.push(request.action_index + ':' + request.manual);
           return {ok:true,json:async () => responses.shift()};
         }
         throw new Error('probe only');
@@ -98,7 +99,7 @@ def test_set_monster_auto_places_and_passes_own_response_window(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-placement-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "0,0,1|3|true"
+    assert match.group(1) == "0:true,0:false,1:false|3|true"
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
@@ -207,7 +208,8 @@ def test_old_server_page_auto_passes_consecutive_response_windows(tmp_path):
       window.fetch = async (path, options) => {
         if (path === '/api/live/choice') {
           const request = JSON.parse(options.body);
-          sent.push(request.action_index + '@' + request.expected_decisions);
+          sent.push(request.action_index + '@' + request.expected_decisions +
+            ':' + request.manual);
           return {ok:true,json:async () => replies.shift()};
         }
         throw new Error('probe only');
@@ -225,7 +227,7 @@ def test_old_server_page_auto_passes_consecutive_response_windows(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-forced-pass-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "0@0,0@1,1@2|3|1"
+    assert match.group(1) == "0@0:false,0@1:false,1@2:false|3|1"
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
@@ -246,7 +248,7 @@ def test_optional_chain_auto_passes_on_both_turns_unless_paused(tmp_path):
       window.fetch = async (path, options) => {
         if (path !== '/api/live/choice') throw new Error('probe only');
         const request = JSON.parse(options.body);
-        sent.push(request.id + ':' + request.action_index);
+        sent.push(request.id + ':' + request.action_index + ':' + request.manual);
         return {ok:true,json:async () => wrap(request.id,1,observation,
           [{kind:'end_phase',parameters:{}}])};
       };
@@ -272,4 +274,44 @@ def test_optional_chain_auto_passes_on_both_turns_unless_paused(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-optional-pass-probe="([^"]*)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "own:1,opponent:1"
+    assert match.group(1) == "own:1:false,opponent:1:false"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_choice_resolves_consecutive_pass_windows_before_showing_board(tmp_path):
+    page = Path(__file__).resolve().parents[1] / "examples/play_game.html"
+    probe = """<script>
+      const observation = {turn:1,turn_player:0,acting_player:0,phase:'main1',
+        life_points:[8000,8000],extra_deck_counts:[0,0],deck_counts:[35,35],
+        hand:[],opponent_hand_count:5,field:[],graveyards:[[],[]],banished:[[],[]],
+        known_opponent_hand_cards:[],known_opponent_field_cards:[],own_extra_deck:[],
+        restrictions:[],chain:[],public_history:[]};
+      const action = kind => ({kind,parameters:{}});
+      const wrap = (decisions, legal_actions) => ({id:'test',terminal:false,
+        human_seat:0,decisions,observation,legal_actions,card_names:{}});
+      const replies = [wrap(1,[action('pass')]),
+        wrap(2,[action('chain'),action('pass')]),
+        wrap(3,[action('pass')]),wrap(4,[action('end_phase')])];
+      const sent = [];
+      window.fetch = async (path, options) => {
+        if (path !== '/api/live/choice') throw new Error('probe only');
+        const request = JSON.parse(options.body);
+        sent.push(request.action_index + ':' + request.manual);
+        return {ok:true,json:async () => replies.shift()};
+      };
+      setTimeout(() => {
+        render(wrap(0,[action('select_card')]));
+        choose(0).then(() => { document.body.dataset.passesProbe =
+          [sent.join(','),state.decisions,state.legal_actions[0].kind].join('|'); });
+      },40);
+    </script></body>"""
+    html = tmp_path / "live.html"
+    html.write_text(page.read_text().replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=650", "--dump-dom",
+        html.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-passes-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "0:true,0:false,1:false,0:false|4|end_phase"

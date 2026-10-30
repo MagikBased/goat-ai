@@ -76,7 +76,8 @@ def test_unfinished_duel_recovers_from_verified_actions_after_server_restart(tmp
     journal = manager.creator.output_dir / "_in_progress" / f"{state['id']}.json"
     saved = json.loads(journal.read_text())
     assert saved["entries"] and all(set(entry) == {
-        "index", "observation_sha256", "legal_sha256"} for entry in saved["entries"])
+        "index", "observation_sha256", "legal_sha256", "origin"}
+        for entry in saved["entries"])
     assert "observation" not in journal.read_text().replace("observation_sha256", "")
     manager.close_all()
 
@@ -171,8 +172,9 @@ def test_live_game_completes_and_saves_human_only_demonstration(tmp_path):
         manager.choose(state["id"], len(state["legal_actions"]), state["decisions"])
     human = random.Random(100)
     previous = state
+    auto_index = state["decisions"]
     state = manager.choose(state["id"], human.randrange(len(state["legal_actions"])),
-                           state["decisions"])
+                           state["decisions"], manual=False)
     with pytest.raises(ValueError, match="stale live decision"):
         manager.choose(state["id"], 0, previous["decisions"])
     assert manager.get(state["id"])["decisions"] == state["decisions"]
@@ -192,6 +194,11 @@ def test_live_game_completes_and_saves_human_only_demonstration(tmp_path):
     assert len(trajectory.decisions) == state["decisions"]
     records = training_demonstrator_records(trajectory)
     assert records and all(record.observation.acting_player == 0 for record in records)
+    explicit = trajectory.skill_metadata["explicit_human_decision_indices"]
+    assert auto_index not in explicit
+    assert len(records) == len(explicit)
+    assert all(records[position] is trajectory.decisions[index]
+               for position, index in enumerate(explicit))
     with pytest.raises(ValueError, match="self_recorded"):
         training_demonstrator_records(replace(
             trajectory, skill_metadata={"demonstrator_seat": 0}))
@@ -221,8 +228,14 @@ def test_live_http_requests_keep_native_engine_on_its_worker_thread(tmp_path, mo
                                          "seed": 4326})
         assert state["observation"]["viewer"] == 1
         state = post("/api/live/choice", {"id": state["id"], "action_index": 0,
-                                           "expected_decisions": state["decisions"]})
+                                           "expected_decisions": state["decisions"],
+                                           "manual": True})
         assert state["decisions"] >= 2
+        with pytest.raises(HTTPError) as invalid_origin:
+            post("/api/live/choice", {"id": state["id"], "action_index": 0,
+                                      "expected_decisions": state["decisions"],
+                                      "manual": "yes"})
+        assert invalid_origin.value.code == 400
         with pytest.raises(HTTPError) as stale:
             post("/api/live/choice", {"id": state["id"], "action_index": 0,
                                       "expected_decisions": 0})
