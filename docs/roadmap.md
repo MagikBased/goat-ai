@@ -498,6 +498,12 @@ The control branch destroys an unrelated Set card and leaves Phoenix equipped.
 Both full duels replay-verify and pass the visibility audit. This expands M2
 coverage for the sourced New Jersey Phoenix Control deck but does not close
 its other card interactions or the broader historical gate.
+A [Call of the Haunted/Phoenix chain fixture](goat_rules.md#sacred-phoenix-revived-by-call-of-the-haunted)
+now checks the corresponding historical ruling when Call is chained to an
+opponent's MST. The opponent targets an unidentified Set card, Phoenix is
+Summoned at chain link two, then Call and Phoenix are destroyed at chain link
+one; Phoenix returns next Standby and clears a Set Book. The full duel
+replay-verifies and passes the visibility audit.
 
 A paired [Limiter Removal Damage Step fixture](goat_rules.md#limiter-removal-during-the-damage-step)
 now checks that the pinned GOAT Quick-Play Spell is offered as a chain response
