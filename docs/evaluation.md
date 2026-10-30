@@ -15103,3 +15103,40 @@ that every 2005 ruling is covered. Reproduce with:
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. OMP_NUM_THREADS=1 \
   .venv/bin/python -m pytest -q tests/test_historical_*.py
 ```
+
+## Distinct current-core human review preference trial (29 October 2026)
+
+The local review exports from four queues were each validated against their
+exact shortlisted decision, replay SHA-256, native action list, and player
+visibility. Their 24 files contained 52 choices, including 14 duplicate
+reviews of the same decision. `convert_multi_queue_reviews.py` retained **38
+distinct decisions** and **26 changed choices** in 14 nonempty preference
+cases. Matching the AI's recorded action was not treated as an approval or a
+preference. The earlier eight-file review group uses the older native binary
+and was excluded from this current-core fit. The ignored combined manifest is
+`.cache/goat-ai/human_current_review_20261029/manifest.json` (SHA-256
+`cb05b51f80a363d1d7af1782026b9be369cdcf07a267f32dd4e04646d366f54d`).
+
+Starting from the unchanged v23 checkpoint, `train_review_preferences.py`
+used those 26 pairwise preferences, 64 parent-KL preservation states from four
+current-core Tactical replays, 120 steps, learning rate 0.0001, KL weight 0.5,
+and seed 209. Preference loss went from **4.0724** to **1.5092**; sampled
+preservation KL ended at **0.02251**. The ignored child checkpoint
+`.cache/goat-ai/human26_pref120_kl05_seed209.pt` has SHA-256
+`77aee238f3f2e705458340f72ba3e945f1896fabff90cd4ed8439673e524ed12`.
+
+On two Main Deck pairings absent from the child and parent training records
+(Rhymus Lizo Goat Control/GoatFormat guide Dimension Fusion and Christian
+Martinez Seattle Goat Control/Jonathan LaBounty Nationals Chaos), both deck
+assignments and seats at seeds 129000–129007, the child scored **30–34**
+directly against the parent over 64 duels: 46.88% points, paired 95% bootstrap
+interval **32.81–59.38%**. On separate matched Tactical-v14 seeds
+129008–129015 it scored **16–48**; the parent scored **15–47–2**. Both had a
+25% score rate. The strict comparator verified matching decks, seeds, native
+assets, source code, opponent, and unseen Main Decks. Child-minus-parent
+paired score difference was **0 points** (95% interval **−15.63 to +14.84**).
+The direct and Tactical report SHA-256 values are respectively
+`e112dec821b760d6ec01e164125168dd1ef2b352e04a3a9efd9aef2903d252b2`,
+`12b255c9cec86f0baed9a2a5f27eb7a92d1b17a2a886156f7d70daea59f9d4f0`,
+and `47df3fecab9175f37b75b979a1bdf8ed5b1ed7c290d3ba1a99a3b6144c18bfb4`.
+This fit does not establish a complete-duel strength gain; keep v23 selected.
