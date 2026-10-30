@@ -251,8 +251,10 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
         def get(self, _identifier):
             return {"id": "b" * 16, "terminal": False}
 
-        def choose(self, _identifier, _index, _expected_decisions, _manual):
+        def choose(self, _identifier, _index, _expected_decisions, _manual,
+                   _hold_priority):
             assert _manual is None  # Older clients cannot supply demonstration provenance.
+            assert _hold_priority is False
             return {"id": "b" * 16, "terminal": True}
 
         def close(self, _identifier):
@@ -314,7 +316,7 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
     base = f"http://127.0.0.1:{server.server_port}"
     try:
         assert _request(f"{base}/api/review/version")[1] == {"api_version": 5}
-        assert _request(f"{base}/api/live/version")[1] == {"api_version": 2}
+        assert _request(f"{base}/api/live/version")[1] == {"api_version": 3}
         assert launch_review_server.REVIEW_API_VERSION == serve_review_queue.REVIEW_API_VERSION
         assert server_healthy(server.server_port, digest)
         assert server_healthy(server.server_port, digest,
