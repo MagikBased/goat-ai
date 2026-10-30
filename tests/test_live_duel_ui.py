@@ -9,6 +9,46 @@ import pytest
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_optional_effect_decline_is_not_labeled_as_pass(tmp_path):
+    page = Path(__file__).resolve().parents[1] / "examples/play_game.html"
+    probe = """<script>
+      const observation = {turn:1,turn_player:0,acting_player:0,phase:'end',
+        life_points:[8000,8000],extra_deck_counts:[0,0],deck_counts:[35,35],
+        hand:[],opponent_hand_count:5,field:[],graveyards:[[],[]],banished:[[],[]],
+        known_opponent_hand_cards:[],known_opponent_field_cards:[],own_extra_deck:[],
+        restrictions:[],chain:[],public_history:[]};
+      const wrap = actions => ({id:'test',terminal:false,human_seat:0,decisions:0,
+        observation,legal_actions:actions,card_names:{}});
+      setTimeout(() => {
+        render(wrap([{kind:'no',parameters:{}},{kind:'yes',parameters:{}}]));
+        const effect = byId('pass-action').hidden && byId('end-turn').disabled &&
+          [...document.querySelectorAll('#card-actions button')].some(button =>
+            button.textContent.includes('No'));
+        render(wrap([{kind:'cancel',parameters:{}},
+          {kind:'select_card',parameters:{code:123,location:2,controller:0,sequence:0}}]));
+        const selection = byId('pass-action').hidden && byId('end-turn').disabled;
+        render(wrap([{kind:'pass',parameters:{}}]));
+        const forced = byId('pass-action').hidden;
+        byId('hold-priority').checked = true;
+        render(wrap([{kind:'chain',parameters:{code:123}},
+          {kind:'pass',parameters:{}}]));
+        document.body.dataset.passLabelProbe =
+          [effect,selection,forced,!byId('pass-action').hidden].join('|');
+      },40);
+    </script></body>"""
+    html = tmp_path / "live.html"
+    html.write_text(page.read_text().replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=650", "--dump-dom",
+        html.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-pass-label-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_graceful_discard_cards_can_be_selected_on_hand(tmp_path):
     page = Path(__file__).resolve().parents[1] / "examples/play_game.html"
     probe = """<script>

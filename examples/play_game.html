@@ -668,11 +668,14 @@
       }
     }
     function renderQuickControls() {
+      // "no" and "cancel" are effect/selection choices, not priority passes.
+      // They remain available through the prompt tray and legal-action list.
       const passIndex = state?.legal_actions?.findIndex(action =>
-        ["pass", "no", "cancel"].includes(action.kind)) ?? -1;
+        action.kind === "pass") ?? -1;
       let endIndex = state?.legal_actions?.findIndex(action => action.kind === "end_phase") ?? -1;
       if (endIndex < 0 && state?.observation?.phase === "end") endIndex = passIndex;
       const pass = byId("pass-action"), end = byId("end-turn");
+      pass.hidden = passIndex < 0 || automaticPassIndex(state) >= 0;
       pass.disabled = busy || passIndex < 0; pass.onclick = () => choose(passIndex);
       end.disabled = busy || phaseTraveling || !state || state.terminal ||
         (endIndex < 0 && passIndex < 0);
