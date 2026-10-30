@@ -787,6 +787,11 @@ audit; the [ruling log](goat_rules.md) records the sources and limits.
 
 A paired Smashing Ground / Book of Moon fixture now checks that this common 2005 removal Spell does not target and determines the highest-DEF face-up opposing monster on resolution. Both branches complete, replay-verify, and pass the visibility audit; the Book branch hides the surviving Set card from the acting player. A second paired fixture offers both tied highest-DEF monsters as legal choices and checks each destruction branch. Protection effects are still open. See [GOAT rules](goat_rules.md).
 
+A paired Spell Shield Type-8 fixture now checks both historical Spell-negation
+modes: a targeted Book of Moon is negated without a discard, while Pot of Greed
+requires a Spell sent from hand as cost before the chain resolves. Both full
+duels replay-verify and pass the visibility audit; see [GOAT rules](goat_rules.md).
+
 ## M3 — Evaluation and data
 
 The local replay server now also supports a browser human-versus-AI duel on
