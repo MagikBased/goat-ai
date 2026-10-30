@@ -304,6 +304,17 @@ capture of this page, so it cannot prove the April status. The candidate
 remains pending until a period North American legality page, policy, or
 sanctioned-play record establishes it. Its 2010 tin reprint is too late.
 
+A [Konami Mexico YCS FAQ archived on 1 November 2010](https://web.archive.org/web/20101101213813id_/http://www.yugioh-card.com/en/events/ycs/YCS-MX_FAQ.html)
+explicitly excludes SHONEN JUMP magazine promotions from Latin American
+tournament play unless the card was released another way there. It also gives
+Latin American restrictions on cards from North American Duel Terminal sets.
+This period official FAQ confirms that an event's territorial rules matter;
+it does **not** decide whether Exodius, the Wicked promotions, or those Duel
+Terminal cards were legal in North America by 20 April. The retrieved HTML is
+kept only in ignored local cache at
+`.cache/goat-ai/edison_ycs_mexico_faq_2010_11_01.html` (SHA-256
+`47c251ea7fa5c2a8e42cf68d4097878ebfc3dcf01134c8c9f1408025e84bf807`).
+
 ## Native engine assessment
 
 The [contemporary Yu-Gi-Oh! 5D's official rulebook](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)

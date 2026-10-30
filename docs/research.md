@@ -46,9 +46,11 @@ with historical patches enabled; the policy won that single random-client
 game. This is integration evidence, not a playing-strength benchmark or
 proof that all 2005 rulings are correct. The saved source is
 `edopro_pinned_historical`, and automatic training admission remains off.
-A complete human match through the desktop GUI on this specific room is the
-next client-path gate. Broader source-backed card and timing audits are still
-needed before EDOPro games can be treated as historically reliable data.
+A seven-turn human match through the EDOPro 41.0.2 desktop GUI has since
+completed on this pinned room and independently reconstructed all 165
+player-visible decisions, as detailed below. Broader desktop prompt coverage
+and source-backed card and timing audits are still needed before EDOPro games
+can be treated as historically reliable data.
 The room now retains synchronized player-visible decisions before a surrender
 or disconnect as an explicitly interrupted review trajectory. A local TCP
 test surrendered after nine mirrored decisions; the saved `.yrpX` and partial
