@@ -16017,3 +16017,40 @@ the preceding section, change the seed to 169000, and run the selected parent
 and child against Tactical plus the child against `--opponent-checkpoint
 "$parent_ckpt"`. Add `--verify-replays` when reproducing the verified Tactical
 reports. Compare the two Tactical reports with the comparator above.
+
+## Larger-step PPO transfer to four New Jersey decks (30 October 2026)
+
+The earlier 240-game PPO child (`ppo_lr5e4_240_131000_131239.pt`) was tested
+on the same four untouched New Jersey 2005 Main Decks and seeds 169000–169007
+used for the selected v23 parent in the verified cross-deck Tactical comparison
+above. Neither checkpoint trained on these exact Main Deck compositions or
+YDK files. Both Deck assignments and both policy seats produced 64 games per
+checkpoint against Tactical-v14, with no optional guard on either policy.
+The child scored **17–46–1** (27.34% points); the parent scored **24–39–1**
+(38.28% points). The strict matched-report comparator measured a child-minus-
+parent difference of **−10.94 percentage points**, paired 95% bootstrap
+interval **−18.75 to −1.56**. Child Deck scores were Beastdown 9–7, Chaos
+2–14, Phoenix Control 2–14, and Warrior 4–11–1. The child worsened both
+Beastdown and Warrior relative to the parent; its Phoenix score remained poor.
+
+All **64/64** child duels, covering **37,581 decisions**, independently
+replay-verified and passed the player-visibility audit. The parent report had
+already verified 64/64 games and 37,024 decisions. The reports share pinned
+core/card-script and source-code hashes, and the comparator checked the exact
+deck files and unseen Main Deck compositions. The child report is
+`.cache/goat-ai/ppo_lr5e4_vs_tactical_nj_169000_verified.json` (SHA-256
+`003f2e1a964ce017161184bb05380c1dc8313e5fffa8ccaf9d6bb36984dfd725`);
+the comparison is
+`.cache/goat-ai/ppo_lr5e4_vs_parent_nj_169000_comparison.json` (SHA-256
+`0a157828ae941b8a225d17a918203eb2997d1b2c93582423bd6e68edb12ac974`).
+Reproduce with `scripts/evaluate_policy.py --engine experimental --opponent
+tactical --both-deck-assignments --seed 169000 --seeds 8 --max-decisions 3000
+--workers 4 --require-unseen-main-decks --reject-training-deck-hashes
+--verify-replays` on the two named New Jersey pairings above, then compare to
+`crossdeck_parent_vs_tactical_169000_verified.json` with
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.
+
+This independently sourced transfer check contradicts promotion of the PPO
+child despite its earlier gains on other decks. Keep the selected v23 parent;
+M4 still needs a learned policy with reliable cross-deck strength.

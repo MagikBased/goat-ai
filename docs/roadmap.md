@@ -1099,6 +1099,12 @@ yet direct cross-deck superiority does not transfer consistently and the
 absolute Tactical score remains weak. Keep the child experimental, v23
 selected, and M4's exit gate open.
 
+A further [four-deck transfer check](evaluation.md#larger-step-ppo-transfer-to-four-new-jersey-decks-30-october-2026)
+on the weak New Jersey holdout found that the PPO child scored 17–46–1
+against Tactical-v14 versus v23's 24–39–1 on the same 64 games. The paired
+difference interval was below zero, and all child games replay-verified.
+This rules out promoting that child as a general cross-deck improvement.
+
 The [batched parent-KL fit](evaluation.md#batched-parent-kl-scoring-pilot-29-october-2026)
 now scores variable-length legal-action sets in padded chunks while preserving
 the full-label optimizer update. On the 244-decision Rhymus pilot it reduced
