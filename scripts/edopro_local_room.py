@@ -257,7 +257,8 @@ class EdoRoomManager:
                 record["review_ready"] = True
                 record["experimental_confirmed_eligible"] = bool(
                     report.get("complete") and report.get("historical_patches")
-                    and report.get("asset_identity_verified"))
+                    and report.get("asset_identity_verified")
+                    and report.get("deck_identity_verified"))
             except (ValueError, OSError, RuntimeError) as exc:
                 record["verification_error"] = str(exc)
             self._verified[directory.name] = (stamp, record)

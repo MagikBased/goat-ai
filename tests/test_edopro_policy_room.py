@@ -239,7 +239,7 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
                 "edopro_human_confirmed_experimental": 1}
             assert checkpoint["training_games"][0]["historical_goat_certified"] is False
         else:
-            with pytest.raises(ValueError, match="asset-fingerprinted pinned room"):
+            with pytest.raises(ValueError, match="fingerprinted pinned room"):
                 load_experimental_edopro_confirmations(copied_replay, mirror_root)
     elif not authorized and not surrender:
         with pytest.raises(ValueError, match="authorized self-recording"):
@@ -280,13 +280,16 @@ def test_experimental_edopro_loader_rejects_incomplete_or_unpatched(tmp_path, mo
                  replay.with_suffix(".meta.json"),
                  replay.with_suffix(".human_labels.json")):
         path.write_bytes(b"fixture")
-    for complete, historical, assets in ((False, True, True),
-                                         (True, False, True),
-                                         (True, True, False)):
+    for complete, historical, assets, decks in ((False, True, True, True),
+                                                (True, False, True, True),
+                                                (True, True, False, True),
+                                                (True, True, True, False)):
         monkeypatch.setattr(
             "scripts.train_behavioral_clone.verify_edopro_human_annotations",
-            lambda *args, complete=complete, historical=historical, assets=assets: {
+            lambda *args, complete=complete, historical=historical,
+            assets=assets, decks=decks: {
                 "complete": complete, "historical_patches": historical,
-                "asset_identity_verified": assets})
-        with pytest.raises(ValueError, match="asset-fingerprinted pinned room"):
+                "asset_identity_verified": assets,
+                "deck_identity_verified": decks})
+        with pytest.raises(ValueError, match="fingerprinted pinned room"):
             load_experimental_edopro_confirmations(replay, tmp_path)

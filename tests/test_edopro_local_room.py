@@ -115,7 +115,8 @@ def test_edopro_web_confirmations_only_label_optional_human_choices(tmp_path, mo
     monkeypatch.setattr("scripts.edopro_local_room.verify_edopro_live_recording",
                         lambda *args: {"complete": True,
                                        "historical_patches": True,
-                                       "asset_identity_verified": True})
+                                       "asset_identity_verified": True,
+                                       "deck_identity_verified": True})
     monkeypatch.setattr("scripts.confirm_edopro_human_actions.verify_edopro_live_recording",
                         lambda *args: {"complete": True})
     monkeypatch.setattr("scripts.edopro_local_room.verify_edopro_human_annotations",
