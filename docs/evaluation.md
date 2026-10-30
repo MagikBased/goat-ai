@@ -16266,3 +16266,26 @@ PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
 
 Use an empty output directory for a rerun. The report includes Deck hashes,
 the pinned native asset fingerprints, per-game decisions, and action counts.
+
+### Fresh 60-card whitelist/Fusion sample (30 October 2026)
+
+A second, independent isolated sample used seeds 176200–176211, 24 distinct
+legal 60-card Main Decks, and random 15-card Fusion Extra Decks. All 12 duels
+ended before the 3,000-decision limit. Every one of the **16,262 decisions**
+replay-verified and passed the visibility audit. The sample offered 32 action
+kinds; the audit counted 138 hidden-field choices, 776 opponent-field choices,
+and 17 opponent-hand choices. No duel reported a native protocol error. This
+widens sampled protocol coverage but does not independently validate card
+rulings or prove that every legal deck can finish.
+
+The ignored report is `.cache/goat-ai/random_probe_60_176200/report.json`
+(SHA-256 `0978a2af6645b62754d61d29288409479e84c8a500b50aae996094c05483ed63`).
+Reproduce from the repository root with an empty output directory:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/random_probe_60_176200 \
+  --seed 176200 --seeds 12 --max-decisions 3000 --main-size 60 \
+  --random-extra --distinct-opponents --verify-replays --isolate-games
+```

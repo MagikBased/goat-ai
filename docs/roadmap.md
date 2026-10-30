@@ -34,6 +34,11 @@ player receives exactly the same observation and legal actions in both native
 duels. This extends the opening privacy regression to a larger repeated-copy
 Deck; later hidden-card transitions still require separate checks.
 
+A [fresh 12-duel 60-card sample](evaluation.md#fresh-60-card-whitelistfusion-sample-30-october-2026)
+on 24 distinct legal Decks ended in 16,262 replay-verified, visibility-audited
+decisions across 32 offered action kinds. This is additional sampled protocol
+coverage; it does not close the arbitrary-deck or historical-ruling gates.
+
 A second [40-duel independent whitelist/Fusion sample](evaluation.md#second-independent-random-whitelistfusion-sample--30-october-2026)
 completed at seeds 166000–166039. All 44,516 decisions passed native replay
 verification and the visibility audit, and repeated seeds reproduced the same
