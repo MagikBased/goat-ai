@@ -124,6 +124,16 @@ a GOAT AI policy seat, historical accuracy, or a training-ready trajectory.
 The test used a Deck without Scapegoat: an earlier desktop trial using it
 stopped on a missing Sheep Token script (`c73915052.lua`) in the downloaded
 package. That asset gap needs to be fixed or checked before broader Deck use.
+For this external host only, `python scripts/prepare_edopro_host_token.py
+/path/to/ProjectIgnis --apply` checks that the database still marks Sheep
+Token `73915052` as a normal Token, then creates a comment-only script if it
+is missing. It never overwrites an existing script or changes GOAT AI's
+pinned assets. With that local workaround, an external-host direct-core
+Chaos-versus-Chaos GOAT duel completed in **48 turns, 1,181 responses, zero
+retries and zero reported Lua errors**. The event log records Scapegoat
+activations and Sheep Token summons for both players. This validates the
+workaround for the tested host and Decks; it does not validate the full
+desktop match path or historical rulings in the external package.
 The host replay SHA-256 was
 `e9cb4f2c5c57adb5b503e205bebe82fb35179a70f66c039dbabd6b7bafdded07`;
 our structural reader accepted it but marked it `training_ready: false`.

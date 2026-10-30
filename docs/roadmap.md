@@ -2928,6 +2928,12 @@ client's separately saved replay has a two-byte post-LZMA trailer; the bounded
 reader now accepts it and finds the same 235 packets and 23 embedded
 responses as the host replay. That structural match does not validate training
 reconstruction.
+The external host's missing Sheep Token script can now be checked and filled
+with a comment-only local shim after validating its normal Token metadata.
+A direct-core Chaos-versus-Chaos probe then completed 48 turns with both
+players summoning Sheep Tokens, zero retries, and zero reported Lua errors.
+This removes one external-host asset blocker; it does not certify a desktop
+client duel or the historical rules in that package.
 An explicit unpatched comparison mode can now reconstruct all 627 responses
 of a complete headless duel on the external install's own core and scripts,
 including a player-visible decision audit. It is excluded from strict GOAT
