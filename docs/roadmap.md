@@ -462,6 +462,13 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A new Gravekeeper's Chief/Premature Burial fixture confirms the documented
+Necrovalley exception through a complete native duel, replay verification,
+and visibility audit. The no-Chief activation gate remains historically
+ambiguous because the archived UDE FAQ and generic Netrep wording differ;
+the simulator has not been changed on that unresolved point. See
+[GOAT rules](goat_rules.md#gravekeepers-chief-exception-to-necrovalley).
+
 A paired seed-18 Last Will/Sangan fixture now verifies the controller's
 historical trigger-order choice after Cannon Soldier Tributes Sangan. A
 checksum-guarded GOAT-only script correction removes the pinned custom-event
