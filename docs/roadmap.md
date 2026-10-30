@@ -2915,6 +2915,11 @@ EDOPro replay exactly on its own bundled core. Its legacy 15-card Extra Deck
 check needs a GOAT-specific fix or an independently validated bypass. Our
 pinned core diverged at response 92, so asset parity, a real desktop-client
 connection, and a policy-seat adapter remain unproven.
+The same host also completed a [private TCP room probe](research.md#edopro-live-client-bridge-probe-2026-10-30)
+with an EDOPro-compatible Python client: 34 turns, 715 legal responses and an
+exactly re-simulated `.yrpX` on its own core. A real EDOPro desktop connection
+and the GOAT AI policy seat are still the next gates; the pinned core diverged
+at response 289 on this second replay.
 
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The
