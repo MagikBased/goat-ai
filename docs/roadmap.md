@@ -21,6 +21,12 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+A second [40-duel independent whitelist/Fusion sample](evaluation.md#second-independent-random-whitelistfusion-sample--30-october-2026)
+completed at seeds 166000–166039. All 44,516 decisions passed native replay
+verification and the visibility audit, and repeated seeds reproduced the same
+decisions and terminal outcomes. This extends sampled protocol evidence;
+historical-ruling and arbitrary-deck completeness remain open.
+
 A fresh [20-duel random whitelist/Fusion sample](evaluation.md#fresh-random-whitelistfusion-protocol-sample--30-october-2026)
 completed on independently generated legal Deck pairs. All 20,315 decisions
 replay-verified and passed the visibility audit; repeating the seeds reproduced

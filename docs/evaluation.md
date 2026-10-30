@@ -15819,3 +15819,36 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
   --agent random --verify-replays --distinct-opponents --count-card-actions \
   --repeat-seeds --random-extra --fusion-stress --isolate-games
 ```
+
+## Second independent random whitelist/Fusion sample — 30 October 2026
+
+Forty further seed pairs, 166000–166039, used independently generated legal
+Main Decks for both seats, random legal 15-card Fusion Extra Decks, and three
+copies each of Scapegoat and Metamorphosis. Both seats used RandomAgent.
+Isolated workers kept one native failure from aborting the rest of the batch.
+All **40/40** games reached terminal under the 3,000-decision cap, with no
+reported errors. Complete native replay verification and the player-visible
+audit each covered **44,516** decisions. Repeating every seed reproduced all
+decision records, terminal observations, and outcomes. Game lengths ranged
+from 458 to 1,529 decisions, mean 1,112.9.
+
+The selected actions included activations from 182 distinct card IDs. This
+is sampled protocol coverage only: it does not establish that those card
+effects follow historical GOAT rulings, nor that arbitrary legal Decks work.
+The visibility audit counted 416 hidden-field choices, 2,673 opponent-field
+choices, and 26 opponent-hand choices within the verified decision stream;
+its leak checks passed. These counts describe audited decisions, not defects.
+
+The ignored report is `.cache/goat-ai/random_whitelist_166000/report.json`,
+SHA-256 `2fc676c0a50a2590b6cc849578d24b1173aff636218a22b7d46f574ec398bb44`.
+It records generated Deck hashes, the pinned rules profile and loaded-asset
+hashes, outcomes, legal/selected card actions, replay verification, visibility,
+and deterministic repeats. Reproduce with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai --output .cache/goat-ai/random_whitelist_166000 \
+  --seed 166000 --seeds 40 --max-decisions 3000 \
+  --verify-replays --distinct-opponents --repeat-seeds \
+  --random-extra --fusion-stress --isolate-games --count-card-actions
+```
