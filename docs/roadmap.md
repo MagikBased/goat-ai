@@ -491,6 +491,14 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired [Phoenix/Premature Burial fixture](goat_rules.md#sacred-phoenix-revived-by-premature-burial)
+checks the historical ruling that destroying Premature destroys its revived
+Phoenix by effect, scheduling Phoenix's next-Standby return and backrow sweep.
+The control branch destroys an unrelated Set card and leaves Phoenix equipped.
+Both full duels replay-verify and pass the visibility audit. This expands M2
+coverage for the sourced New Jersey Phoenix Control deck but does not close
+its other card interactions or the broader historical gate.
+
 A paired [Limiter Removal Damage Step fixture](goat_rules.md#limiter-removal-during-the-damage-step)
 now checks that the pinned GOAT Quick-Play Spell is offered as a chain response
 and reverses Dekoichi's battle against Gemini Elf. Both outcome branches finish,
