@@ -78,6 +78,18 @@ def test_unresolved_activation_is_not_called_a_material_result():
     assert effect_material_changes(trajectory, FACTS) == []
 
 
+def test_activation_material_closes_at_terminal_observation():
+    pending = (ChainLinkView(1, SPELL, 0, 2, 0),)
+    trajectory = Trajectory("goat", ("a", "b"), 1, (
+        record(view(hand=1), "activate", SPELL, 2),
+        record(view(hand=0, chain=pending), "pass"),
+    ), winner=0, schema_version=18,
+        terminal_observation=view(hand=0, opponent_hand=0, chain=pending))
+    change, = effect_material_changes(trajectory, FACTS)
+    assert change["resolved_before_decision"] == len(trajectory.decisions)
+    assert change["material_delta"] == 0
+
+
 def test_review_material_distinguishes_resolved_target_prompt_and_open_chain():
     pending = (ChainLinkView(1, SPELL, 0, 2, 0),)
     trajectory = Trajectory("goat", ("a", "b"), 1, (

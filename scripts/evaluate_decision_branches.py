@@ -38,11 +38,15 @@ def open_chain_material_change(trajectory, decision_index: int, seat: int,
     before = trajectory.decisions[decision_index].observation
     if not before.chain:
         return None
-    for index in range(decision_index + 1, len(trajectory.decisions)):
-        after = trajectory.decisions[index].observation
+    last_endpoint = len(trajectory.decisions) + int(
+        trajectory.terminal_observation is not None)
+    for index in range(decision_index + 1, last_endpoint):
+        after = (trajectory.decisions[index].observation
+                 if index < len(trajectory.decisions)
+                 else trajectory.terminal_observation)
         if after.turn != before.turn:
             return None
-        if not after.chain:
+        if not after.chain or index == len(trajectory.decisions):
             start = material_margin(before, seat, card_facts)
             end = material_margin(after, seat, card_facts)
             return {"before": start, "after": end, "delta": end - start,

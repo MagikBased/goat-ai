@@ -1763,6 +1763,16 @@ assessment. It is a test instrument, not online search; M5 still requires
 player-consistent hidden-state sampling, held-out outcome evidence, and the
 separately validated additional format below.
 
+The [fixed-state review branch diagnostics](evaluation.md#fixed-state-branch-diagnostics-for-two-review-flags-30-october-2026)
+now record the selected activation's visible material change through chain
+closure. Both flagged recorded activations lost one material unit, while
+changing either action left the winner unchanged in the fixed hidden deal.
+The material diagnostic also reads the terminal observation when a resolving
+chain ends the duel, including lethal Ring of Destruction fixtures where the
+native snapshot retains the final public chain link. These are review and
+correctness instruments; they do not
+select an action using the actual hidden deal.
+
 A [paired MR1 Bottomless/Synchro fixture](edison_research.md#bottomless-trap-hole-after-a-synchro-summon)
 now tests the response window after Junk Warrior is Synchro Summoned. Both
 branches finish, replay-verify, and pass the visibility audit. This is another

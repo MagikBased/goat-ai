@@ -15410,7 +15410,14 @@ non-token hand-plus-field material margin through chain closure when the
 selected branch action activates a card or effect. This is a realized material
 change, not a prediction of strategic value; phase and Set branches report
 `null` because they do not start an activation. The existing open-chain
-diagnostic remains separate.
+diagnostic remains separate. Both diagnostics include the terminal
+player-visible snapshot when a chain ends the duel; that snapshot is indexed
+after the final decision in the report. The pinned native engine can retain
+the last public chain link in a lethal terminal snapshot. A seeded pre-errata
+Ring of Destruction fixture confirms that its final chain action is now
+measured at the terminal snapshot: visible material margin changes from +1 to
+0 while the opponent's Life Points fall to zero. This is a diagnostic of the
+completed trajectory, not an inferred value for Ring in other positions.
 
 For the replay-verified weak-sourced review, the recorded Heavy Storm at
 decision 785 in `matchup_00_seed_132001_seat_1.json` lost one visible material

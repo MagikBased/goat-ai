@@ -8,6 +8,7 @@ import pytest
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.effect_material import effect_material_changes
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
@@ -93,6 +94,10 @@ def test_own_ring_is_lethal_when_opponent_has_fewer_life_points(tmp_path):
         assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) \
             == len(replay.decisions)
         assert audit_trajectory_visibility(replay)["decisions"] == len(replay.decisions)
+        ring_effects = [effect for effect in effect_material_changes(
+            replay, {RING: (0, 0, 0)}) if effect["card_code"] == RING]
+        assert any(effect["resolved_before_decision"] == len(replay.decisions)
+                   for effect in ring_effects)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

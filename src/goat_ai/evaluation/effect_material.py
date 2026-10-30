@@ -69,13 +69,20 @@ def effect_material_changes(trajectory: Trajectory,
         seat = record.observation.acting_player
         before = material_margin(record.observation, seat, card_facts)
         saw_chain = bool(record.observation.chain)
-        for end_index in range(index + 1, min(len(decisions),
+        last_endpoint = len(decisions) + int(trajectory.terminal_observation is not None)
+        for end_index in range(index + 1, min(last_endpoint,
                                                 index + max_resolution_decisions + 1)):
-            endpoint = decisions[end_index].observation
+            endpoint = (decisions[end_index].observation
+                        if end_index < len(decisions)
+                        else trajectory.terminal_observation)
             if endpoint.turn != record.observation.turn:
                 break
             saw_chain |= bool(endpoint.chain)
-            if saw_chain and not endpoint.chain:
+            # The native terminal snapshot can retain the last public chain
+            # link after lethal resolution, although no further response can
+            # occur. Treat terminal as the final measurement boundary.
+            terminal_endpoint = end_index == len(decisions)
+            if saw_chain and (not endpoint.chain or terminal_endpoint):
                 after = material_margin(endpoint, seat, card_facts)
                 results.append({
                     "decision_index": index,

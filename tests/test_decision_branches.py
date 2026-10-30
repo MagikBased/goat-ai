@@ -149,6 +149,24 @@ def test_open_chain_material_change_uses_each_players_visible_hand_count():
     assert branches.open_chain_material_change(trajectory, 1, 0, {}) is None
 
 
+def test_open_chain_material_change_can_close_at_terminal_snapshot():
+    pending = (ChainLinkView(1, 200, 0, 8, 0),)
+    before = Observation(
+        viewer=0, acting_player=0, turn=1, phase="main1",
+        life_points=(8000, 8000), hand=(CardView(0, "hand", "faceup", 100),),
+        field=(), graveyards=((), ()), banished=((), ()),
+        opponent_hand_count=1, deck_counts=(35, 35),
+        extra_deck_counts=(0, 0), chain=pending, turn_player=0)
+    passed = Action("pass", "pass", 0, {})
+    terminal = replace(before, opponent_hand_count=0)
+    trajectory = Trajectory("goat", ("a", "b"), 1, (
+        DecisionRecord(before, (passed,), passed),
+    ), winner=0, schema_version=18, terminal_observation=terminal)
+    assert branches.open_chain_material_change(trajectory, 0, 0, {}) == {
+        "before": 0, "after": 1, "delta": 1,
+        "closed_before_decision": len(trajectory.decisions)}
+
+
 def test_selected_activation_material_change_includes_new_chain():
     before = Observation(
         viewer=0, acting_player=0, turn=1, phase="main1",
