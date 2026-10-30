@@ -3134,14 +3134,15 @@ independently verifies them again; and marks its checkpoint as
 historically uncertified. Raw EDOPro replay admission and policy promotion
 still require separate gates.
 
-For training, the bot must log the EDOPro server's decision prompt, the AI's
+For training, the bot logs the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The
-human's decisions require equivalent logging at the server or a validated
-legacy replay reconstruction; the bot's own network view alone cannot supply
-the human's complete legal-action set. Importing an EDOPro replay alone is not
-a substitute for that live log: the current reader has not established exact
-reconstruction or player-knowledge validation for real GOAT EDOPro files.
-Keep the native `.yrpX` for visual playback, and admit a match to training
-only after exact native replay and a visibility audit. Keep the client bridge
-optional so Python training and Stardust-facing policy interfaces remain
-independent of EDOPro's client and license.
+human's decisions require equivalent logging at the server or validated
+reconstruction; the bot's own network view alone cannot supply the human's
+complete legal-action set. The locally tested pinned-room desktop duel now
+reconstructs every decision and passes the visibility audit. Arbitrary
+external `.yrpX` files still lack general asset and knowledge validation, and
+EDOPro's automatically answered prompts still require explicit human-choice
+confirmation before experimental cloning. Keep the native `.yrpX` for visual
+playback. Keep the client bridge optional so Python training and
+Stardust-facing policy interfaces remain independent of EDOPro's client and
+license.

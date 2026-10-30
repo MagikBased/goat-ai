@@ -16198,3 +16198,38 @@ result is inconclusive and does not reverse the poor absolute Tactical
 performance. The corresponding ignored reports are
 `guarded_ppo_direct_parent_175100.json` and
 `plain_ppo_direct_parent_175100.json` under `.cache/goat-ai/`.
+
+## Exact-state branch check of Chaos own-card flags (30 October 2026)
+
+The verified Chaos-versus-Beastdown audit in [replay audit](replay_audit.md) found
+two selected-v23 decisions where Nobleman of Crossout targeted the policy's
+only Set monster. At seed 176000, decision 6, the recorded activation lost two
+visible cards and the policy later won; choosing the offered End Phase action
+instead led to a loss. At seed 176002, decision 46, the same visible two-card
+loss occurred, and both the recorded activation and End Phase branch lost.
+Neither two-branch observation establishes that the activation was good or
+bad in general. It shows that immediate material loss alone cannot be used as
+an outcome label, and that ending the phase is not necessarily the strongest
+available alternative.
+
+A third branch at seed 176002, decision 5, compared chaining Mystical Space
+Typhoon to the policy's own one-shot Spell with passing. The recorded chain
+reduced its visible material margin by one; passing preserved that card through
+chain closure. Both continuations lost to Tactical-v14. These are offline
+diagnostics: the branches reconstruct the same actual hidden deal, while the
+continuation agents receive only player-visible observations. They do not
+constitute an information-safe online search method or a representative
+strength estimate. Every source and branch trajectory was independently
+replayed and visibility-audited. No automatic preference label or checkpoint
+promotion follows from these three cases.
+
+The ignored local reports are
+`.cache/goat-ai/chaos_nobleman_phase_branches_176000_176003/summary.json`
+(SHA-256 `60dccc18a28a100e37b9f4e1dfa77ea1c12e7b5acb6e8527fadb0e5051b2d0f9`)
+and `.cache/goat-ai/chaos_mst_pass_branch_176002/report.json`
+(SHA-256 `6e79446bced2d84e54585b868b260e4c5a61683c097c44218cdaf0b6f678a092`).
+Reproduce the first with `scripts/evaluate_flagged_phase_branches.py` using
+the Chaos audit, selected v23 checkpoint, category
+`nobleman_only_own_set_monster`, and the pinned native root; reproduce the
+second with `scripts/evaluate_decision_branches.py` at decision index 5 and
+action indexes 0 and 1 on the seed-176002 seat-0 replay.
