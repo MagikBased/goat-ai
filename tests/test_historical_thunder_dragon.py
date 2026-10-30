@@ -12,7 +12,7 @@ from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
-THUNDER_DRAGON = 504700054  # GOAT variant permits searching for zero copies.
+THUNDER_DRAGON = 504700054  # GOAT profile interprets Netrep's zero-search ruling literally.
 BANISHER_OF_THE_LIGHT = 61528025
 
 
