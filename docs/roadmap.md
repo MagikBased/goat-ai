@@ -1760,6 +1760,19 @@ gain. Keep the selected v23 checkpoint unchanged. The M4 exit still requires
 a learned policy with independently measured cross-deck strength and self-play
 improvement.
 
+A [240-duel cross-deck PPO continuation](evaluation.md#diverse-deck-ppo-continuation-from-the-larger-step-child-30-october-2026)
+added three sourced training matchups to the experimental larger-step child.
+All 138,789 recorded decisions replay-verified and passed visibility audit.
+On four Main Deck holdout matchups, the continuation split 64–64 directly with
+its starting child and scored 39–89 against Tactical-v14 versus 43–85 for the
+starting child on matched games. The paired Tactical difference was −3.13
+points (95% interval −14.06 to +7.81). One verified losing replay shows the
+continuation taking zero Thunder Dragons with two legal copies while its
+starting child selects both; this is a review case, not proof it caused that
+loss. Keep both children experimental and the selected v23 checkpoint
+unchanged. M4 still needs a transferable decision signal and held-out strength
+gain.
+
 ## M5 — Search and other formats
 
 An [offline branch diagnostic](evaluation.md#offline-action-branch-outcome-diagnostic-29-october-2026)

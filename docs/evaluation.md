@@ -15462,3 +15462,78 @@ now validates incompatible Extra Deck options before spawning workers and
 preserves a short worker-error detail for triage. This sample demonstrates
 native protocol and observation reproducibility for these generated decks;
 it does not validate every historical ruling or arbitrary legal deck.
+
+## Diverse-deck PPO continuation from the larger-step child (30 October 2026)
+
+The experimental larger-step child
+`.cache/goat-ai/ppo_lr5e4_240_131000_131239.pt` continued for 240 more
+terminal duels on three new sourced pairings: Ramon Ciriano Beastdown/Roberto
+Martinez Phoenix Control, Bryan Coronel Chaos/Rhymus Lizo Goat Control, and
+Mary Triatafilidi Warrior/Jae Kim Zombie. The four-role schedule trained both
+Main Decks in both learner seats, starting at seed 134000. Settings matched
+the previous larger-step PPO run: `clipped_ppo`, four-game rollouts, two
+epochs, batch size 32, per-episode weighting, learner-deck baseline,
+Tactical-v14 baseline opponent, historical probability 0.5, parent KL 0.05,
+four rollout workers, independent opponent RNG, and learning rate 0.0005.
+Training took **101.81 wall seconds** on this local run. It recorded 88 learner
+wins and 152 losses; those are training outcomes, not held-out strength.
+
+All **240** saved episodes and **138,789** decisions independently
+replay-verified and passed player-visibility audit, with no unsupported or
+capped duels. The ignored checkpoint is
+`.cache/goat-ai/ppo_diverse_240_134000_134239.pt` (SHA-256
+`78d421249ee6ca5060c8efabd08fe2bbdee2895dfdb0f1bda945fe67329c59ec`);
+the audit is `.cache/goat-ai/ppo_diverse_240_134000_134239_audit.json`
+(SHA-256 `0b3786a8943911f9b4cfebb781ab29432da887b11e25272ed3c1874ca5d48644`).
+The checkpoint retains 624 training-game provenance records, including its
+ancestors. No checkpoint was promoted.
+
+The preselected holdout used four pairings absent from both checkpoints'
+training Main Deck compositions: Jonathan LaBounty Chaos/Max Suffridge Goat
+Control, Christian Martinez Goat Control/Theeresak Poonsombat New Jersey Goat
+Control, Ryan Hayakawa Goat Control/GoatFormat Dimension Fusion Turbo, and
+Theeresak Poonsombat Seattle Goat Control/WikiFormat Dimension Fusion Turbo.
+Seeds 134500–134507, both deck assignments, and both policy seats produced
+**128** direct duels. The new child split **64–64** with its starting child:
+50.00% score, paired 95% interval **42.19–58.59%**. On identical held-out
+Tactical-v14 schedules, the new child scored **39–89** and the starting
+child **43–85**. Their paired score difference was **−3.13 percentage points**
+(95% interval **−14.06 to +7.81**). The two Dimension Fusion assignments
+combined scored 10–22 directly against the starting child. The strict local
+Main Deck holdout and source/deck hash checks passed. These results do not
+establish improved play; the selected v23 checkpoint remains unchanged.
+
+The direct report SHA-256 is
+`80d205dbac99c8306c725ac9590189b1c7149095a894e6d7dcb40671773ca910`.
+The new/starting child Tactical report hashes are
+`5431742c37d11f1fbd5b5ad799b47538c96ff86fc0a1f732595212d660b53ca1`
+and `5ec4abe93492ce45973c6be27ec5638c0bf78d1da30391eb4e1ba4278352d4d7`;
+the paired comparator hash is
+`201fafe4b143a1c0948c69d8d3139757f655b2be6b282dfdd5a218fd28724315`.
+All are ignored local artifacts. Reproduce training with
+`scripts/train_self_play.py` and the settings and pairings above, then run
+`scripts/audit_selfplay_replays.py` on all 240 `episode_*.json` files. Reproduce
+evaluation with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --seed 134500 --seeds 8
+--max-decisions 3000 --workers 2` on the four listed pairs, using either
+`--opponent-checkpoint` for the direct match or `--opponent tactical`; compare
+the two Tactical reports with `scripts/compare_tournament_reports.py
+--verify-local-decks --require-unseen-main-decks`.
+
+A seed-134505, seat-1 direct loss was separately recorded and replay-verified
+as `.cache/goat-ai/ppo_diverse_dimension_loss_seed134505_seat1.json`
+(SHA-256 `512bed8ee51a7c3be7d0317513073152b77e4c6b287836362b6dc1fec6d8e029`).
+At decision 66 the new child finished a Thunder Dragon search with zero cards
+while two copies were available; the starting child selected both. The
+one-item review queue is
+`.cache/goat-ai/ppo_diverse_dimension_loss_seed134505_review.html`.
+The source audit hash is
+`ca35d6fd7427a401d4f0e3be08a07d5175e0781f471422c582e430e42fe2a3a1`;
+the queue JSON hash is
+`b867eae431e38e3871b832aa1f1be844dee5875d746cf819a3a814c71826fcce`.
+This exact disagreement matches the user's earlier Thunder Dragon feedback,
+but a single continuation cannot establish that it caused the loss. The
+selected v23 teacher corpus had 19 two-copy and six zero-copy Thunder search
+labels at observed prompts, so both training-label quality and preference
+preservation need attention before another large run. The teacher-label audit
+hash is `887039d712373fabba87e81e9eb66dd36e890d5a1e78e4e52fb35a2674f73e0c`.
