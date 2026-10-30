@@ -26,6 +26,16 @@ def _digest(value) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _automatic_pass(actions, hold_priority: bool):
+    passes = [action for action in actions if action.kind == "pass"]
+    if len(passes) != 1:
+        return None
+    if len(actions) == 1 or (not hold_priority and
+                             all(action.kind in ("pass", "chain") for action in actions)):
+        return passes[0]
+    return None
+
+
 class LiveGame:
     def __init__(self, identifier: str, env: GoatEnvironment, human_seat: int,
                  opponent, opponent_name: str, checkpoint_hash: str | None,
@@ -144,18 +154,19 @@ class LiveGame:
         self._advance_opponent()
         self._save_journal()
 
-    def _advance_opponent(self) -> None:
+    def _advance_opponent(self, hold_priority: bool = False) -> None:
         while not self.env.is_terminal():
             if self.decisions >= self.max_decisions:
                 raise RuntimeError("duel exceeded the decision limit")
             observation = self.env._current().observation
             actions = self.env.legal_actions()
             if observation.acting_player == self.human_seat:
-                # A sole pass is a forced response, not a strategic human
-                # decision. Record it for deterministic replay and recovery.
-                if len(actions) != 1 or actions[0].kind != "pass":
+                # Skip forced passes and, by default, optional chain windows.
+                # Keep other prompts (including optional yes/no effects) for
+                # the human because declining them can change the play.
+                action = _automatic_pass(actions, hold_priority)
+                if action is None:
                     break
-                action = actions[0]
             else:
                 action = self.opponent.select_action(observation, actions)
             self._apply(action, "automatic" if observation.acting_player == self.human_seat
@@ -256,7 +267,7 @@ class LiveGame:
                                for code in codes}}
 
     def choose(self, index: int, expected_decisions: int,
-               manual: bool | None = True) -> dict:
+               manual: bool | None = True, hold_priority: bool = False) -> dict:
         if self.env.is_terminal():
             raise ValueError("duel has ended")
         if type(expected_decisions) is not int or expected_decisions != self.decisions:
@@ -267,9 +278,11 @@ class LiveGame:
             raise RuntimeError("duel exceeded the decision limit")
         if manual is not None and type(manual) is not bool:
             raise ValueError("manual decision flag must be boolean")
+        if type(hold_priority) is not bool:
+            raise ValueError("hold priority flag must be boolean")
         self._apply(self.env.legal_actions()[index],
                     "manual" if manual else "automatic" if manual is False else "unknown")
-        self._advance_opponent()
+        self._advance_opponent(hold_priority=hold_priority)
         self._save_journal()
         return self.snapshot()
 
@@ -407,9 +420,10 @@ class LiveGameManager:
         return self._handle(identifier).call("snapshot")
 
     def choose(self, identifier: str, action_index: int,
-               expected_decisions: int, manual: bool | None = True) -> dict:
+               expected_decisions: int, manual: bool | None = True,
+               hold_priority: bool = False) -> dict:
         return self._handle(identifier).call("choose", action_index,
-                                            expected_decisions, manual)
+                                            expected_decisions, manual, hold_priority)
 
     def close(self, identifier: str) -> dict:
         with self.lock:

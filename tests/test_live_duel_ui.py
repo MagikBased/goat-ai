@@ -248,7 +248,8 @@ def test_optional_chain_auto_passes_on_both_turns_unless_paused(tmp_path):
       window.fetch = async (path, options) => {
         if (path !== '/api/live/choice') throw new Error('probe only');
         const request = JSON.parse(options.body);
-        sent.push(request.id + ':' + request.action_index + ':' + request.manual);
+        sent.push(request.id + ':' + request.action_index + ':' + request.manual +
+          ':' + request.hold_priority);
         return {ok:true,json:async () => wrap(request.id,1,observation,
           [{kind:'end_phase',parameters:{}}])};
       };
@@ -274,7 +275,7 @@ def test_optional_chain_auto_passes_on_both_turns_unless_paused(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-optional-pass-probe="([^"]*)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "own:1:false,opponent:1:false"
+    assert match.group(1) == "own:1:false:false,opponent:1:false:false"
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")

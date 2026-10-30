@@ -7,6 +7,7 @@ import shutil
 from dataclasses import replace
 from pathlib import Path
 from threading import Thread
+from types import SimpleNamespace
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -15,7 +16,7 @@ import pytest
 from goat_ai.replay import read_trajectory, training_demonstrator_records
 from scripts import serve_review_queue
 from scripts.create_viewer_game import ROOT, GameCreator
-from scripts.live_human_game import LiveGameManager
+from scripts.live_human_game import LiveGameManager, _automatic_pass
 
 DECK1 = "goat_control_rhymus_lizo_new_jersey_2005.ydk"
 DECK2 = "chaos_bryan_coronel_new_jersey_2005.ydk"
@@ -43,8 +44,19 @@ def test_live_game_rejects_invalid_requests(tmp_path):
         manager.start(spec)
 
 
+def test_auto_pass_keeps_optional_effect_choices_and_respects_priority_hold():
+    pass_action = SimpleNamespace(kind="pass")
+    chain_action = SimpleNamespace(kind="chain")
+    no_action = SimpleNamespace(kind="no")
+    yes_action = SimpleNamespace(kind="yes")
+    assert _automatic_pass([pass_action], True) is pass_action
+    assert _automatic_pass([chain_action, pass_action], False) is pass_action
+    assert _automatic_pass([chain_action, pass_action], True) is None
+    assert _automatic_pass([no_action, yes_action], False) is None
+
+
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_live_game_auto_passes_only_forced_human_windows(tmp_path):
+def test_live_game_auto_passes_forced_and_optional_chain_windows(tmp_path):
     manager = _manager(tmp_path, Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve())
     base = {"deck1": DECK1, "deck2": DECK2, "human_seat": 0,
             "opponent": "random"}
@@ -57,9 +69,15 @@ def test_live_game_auto_passes_only_forced_human_windows(tmp_path):
         assert len(json.loads(journal.read_text())["entries"]) == forced["decisions"]
 
         optional = manager.start({**base, "seed": 5})
-        assert optional["decisions"] == 0
-        assert optional["observation"]["phase"] == "draw"
-        assert {action["kind"] for action in optional["legal_actions"]} == {"chain", "pass"}
+        assert optional["decisions"] == 4
+        assert optional["observation"]["phase"] == "main1"
+        assert {action["kind"] for action in optional["legal_actions"]} >= {
+            "normal_summon", "end_phase"}
+        optional_journal = manager.creator.output_dir / "_in_progress" / f"{optional['id']}.json"
+        entries = json.loads(optional_journal.read_text())["entries"]
+        assert len(entries) == optional["decisions"]
+        assert [entry["origin"] for entry in entries] == [
+            "automatic", "agent", "automatic", "automatic"]
     finally:
         manager.close_all()
 
@@ -236,6 +254,11 @@ def test_live_http_requests_keep_native_engine_on_its_worker_thread(tmp_path, mo
                                       "expected_decisions": state["decisions"],
                                       "manual": "yes"})
         assert invalid_origin.value.code == 400
+        with pytest.raises(HTTPError) as invalid_hold:
+            post("/api/live/choice", {"id": state["id"], "action_index": 0,
+                                      "expected_decisions": state["decisions"],
+                                      "hold_priority": "yes"})
+        assert invalid_hold.value.code == 400
         with pytest.raises(HTTPError) as stale:
             post("/api/live/choice", {"id": state["id"], "action_index": 0,
                                       "expected_decisions": 0})

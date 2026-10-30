@@ -576,7 +576,9 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 valid = isinstance(data, dict) and (
                     set(data) == expected or
                     (endpoint == "/api/live/choice" and
-                     set(data) == expected | {"manual"}))
+                     set(data) in (expected | {"manual"},
+                                   expected | {"hold_priority"},
+                                   expected | {"manual", "hold_priority"})))
                 if not valid:
                     raise ValueError("invalid review payload")
                 if endpoint == "/api/games/review":
@@ -587,7 +589,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 elif endpoint == "/api/live/choice":
                     result = live.choose(data["id"], data["action_index"],
                                          data["expected_decisions"],
-                                         data.get("manual"))
+                                         data.get("manual"),
+                                         data.get("hold_priority", False))
                 elif endpoint == "/api/live/close":
                     result = live.close(data["id"])
                 elif endpoint == "/api/games":

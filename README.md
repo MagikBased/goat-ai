@@ -157,8 +157,9 @@ optional chain-response windows on both turns, then returns to the next
 actionable decision. Check **Pause for chain responses** before an opponent
 action you may want to answer with a Trap or quick effect; uncheck it to resume
 automatic passing.
-The server also passes automatically whenever **Pass** is your only native
-legal action, including after an AI move. Such passes stay in the verified
+The server resolves optional Chain/Pass windows by default, so progress does
+not depend on a browser timer. It also passes automatically whenever **Pass**
+is your only native legal action, including after an AI move. Such passes stay in the verified
 trajectory and unfinished-game journal. When response pausing is enabled,
 available Chain responses stop for your choice. Hover or focus a card to enlarge
 it; your own face-down cards preview their known faces, while unknown opponent cards stay

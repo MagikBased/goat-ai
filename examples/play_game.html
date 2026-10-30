@@ -757,7 +757,8 @@
       byId("message").textContent = "AI is responding…";
       try {
         let next = await request("/api/live/choice", {id: state.id,
-          action_index: index, expected_decisions: state.decisions, manual});
+          action_index: index, expected_decisions: state.decisions, manual,
+          hold_priority: byId("hold-priority").checked});
         if (destination && !next.terminal) {
           const matching = next.legal_actions.map((action, index) => ({action, index}))
             .filter(({action}) => ["place", "select_card"].includes(action.kind)
@@ -766,7 +767,8 @@
               && action.parameters?.sequence === destination.sequence);
           if (matching.length === 1) next = await request("/api/live/choice", {
             id: next.id, action_index: matching[0].index,
-            expected_decisions: next.decisions, manual});
+            expected_decisions: next.decisions, manual,
+            hold_priority: byId("hold-priority").checked});
         }
         if (byId("auto-place").checked) {
           for (let count = 0; count < 4 && !next.terminal; count++) {
@@ -775,14 +777,16 @@
             if (!placements.length || placements.length !== next.legal_actions.length) break;
             next = await request("/api/live/choice", {id: next.id,
               action_index: placements[0].index,
-              expected_decisions: next.decisions, manual: false});
+              expected_decisions: next.decisions, manual: false,
+              hold_priority: byId("hold-priority").checked});
           }
         }
         for (let count = 0; count < 32 && !next.terminal; count++) {
           const pass = automaticPassIndex(next);
           if (pass < 0) break;
           next = await request("/api/live/choice", {id: next.id,
-            action_index: pass, expected_decisions: next.decisions, manual: false});
+            action_index: pass, expected_decisions: next.decisions, manual: false,
+            hold_priority: byId("hold-priority").checked});
         }
         render(next);
         const own = oldState.human_seat;
