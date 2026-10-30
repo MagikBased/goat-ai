@@ -20,6 +20,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. The exper
 | PyTorch policy | Visible-state action scorer with opt-in feature versions through v28; replay-verified imitation, preference, and self-play experiments exist. The selected v23 checkpoint remains the neural reference because recent self-play children have not shown a transferable held-out strength gain; see [evaluation](docs/evaluation.md) |
 | Human EDOPro replay intake | Bounded `.yrp`/`.yrpX` parsing and synthetic response reconstruction exist. A real, authorized GOAT replay has not passed exact reconstruction; see [replay contributions](docs/replay_contributions.md) |
 | Experimental EDOPro policy room | Optional local room runs the selected policy against EDOPro and saves native replay plus audited review-only decisions; one complete desktop GUI game has been verified, while the historical training gate remains open |
+| External policy decision API | Version-1 JSON-lines visible-observation/legal-action request and decision-local action-ID response, with a checkpoint-backed standard-I/O server; no Stardust integration yet |
 
 The selected direction is [Project Ignis/edo9300 ocgcore](https://github.com/edo9300/ygopro-core), configured with its `DUEL_MODE_GOAT` flag, historical card data and scripts, and an audited Python-facing decision adapter. A 2005 banlist alone is insufficient. See [research](docs/research.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md).
 

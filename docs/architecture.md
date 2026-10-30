@@ -2,6 +2,27 @@
 
 `GoatEnvironment` validates action membership and delegates every rules transition to a `RulesEngine`. `Decision` returns one acting player's `Observation` and its variable-length legal `Action` tuple. The default engine raises `SimulatorUnavailable` until a caller explicitly supplies an installed native adapter; no custom Yu-Gi-Oh! rules are simulated in Python. `RestrictedOcgcoreEngine` keeps the narrow audited fixture path. `ExperimentalOcgcoreEngine` uses the same [pinned native core](native_setup.md) for sampled sourced GOAT Decks, with more native response types, exact replay verification, and player-scoped visibility audits. These samples do not certify every legal card or historical ruling.
 
+## External policy decision boundary
+
+`goat_ai.interop` provides a version-1 JSON-lines request/response contract for a
+non-Python game client. Each request includes a decision ID, ruleset identifier,
+the acting player's complete `Observation` fields, and its current legal `Action`
+list. Each response contains the same decision ID and one action ID from that
+list. Action IDs are valid only for that decision. The codec rejects mismatched
+players, duplicate legal IDs, opponent face-down identities, stale responses,
+and unknown action IDs. It does not transfer native engine state or shuffled
+Deck order. The caller remains responsible for constructing a correct
+player-visible observation and legal set.
+
+`python scripts/serve_policy_stdio.py CHECKPOINT` loads a trained policy once
+and exchanges one JSON object per line over standard input/output. It exits on
+malformed input and caps requests at 8 MiB. This is an experimental interface,
+separate from trajectory schema v28; its version-1 payload uses the current
+Python observation/action field names. A future Stardust C client would need
+its own rules adapter and card-ID mapping, plus compatibility tests for its
+2009 format before using a GOAT-trained policy. No Stardust integration is
+claimed yet.
+
 The live browser's unfinished-game journal is a separate, private data source.
 Its behavioral-cloning importer freezes the file under a content hash,
 reconstructs every action on the pinned native core, checks saved observation
