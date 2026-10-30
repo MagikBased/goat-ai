@@ -491,6 +491,12 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired [Limiter Removal Damage Step fixture](goat_rules.md#limiter-removal-during-the-damage-step)
+now checks that the pinned GOAT Quick-Play Spell is offered as a chain response
+and reverses Dekoichi's battle against Gemini Elf. Both outcome branches finish,
+replay-verify, and pass the visibility audit. The one-chain-per-substep rule
+still needs a separate test.
+
 A paired [Limiter Removal stacking and Book of Moon reset fixture](goat_rules.md#limiter-removal-stacking-and-face-down-reset)
 now checks 1,400 → 2,800 → 5,600 ATK and both End Phase outcomes against the
 pinned GOAT script. Both complete duels replay-verify and pass the visibility
