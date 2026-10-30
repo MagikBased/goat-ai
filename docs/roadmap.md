@@ -2049,6 +2049,11 @@ returns Stardust at End Phase, while passing lets the wipe destroy all three
 field monsters. Both terminal duels replay-verify and pass visibility checks.
 This validates one interaction between two 2008 Synchro effects without
 establishing a complete Edison rules profile; see [the Edison audit](edison_research.md#stardust-dragon-versus-black-rose-dragon).
+The [Battle Fader MR1 pair](edison_research.md#battle-fader-direct-attack-timing)
+now checks a February 2010 card against Konami's period set ruling sheet:
+Fader ends a direct attack and leaves no post-resolution Torrential window.
+Both complete duels replay-verify and pass visibility checks. This remains a
+narrow historical interaction, not a validated Edison format.
 The existing Exiled Force/Torrential Tribute summon-priority fixture now also
 runs in the MR1 protocol, with both chain and pass branches replay-verified and
 visibility-audited. It checks one rulebook-backed priority interaction while

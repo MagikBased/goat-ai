@@ -474,6 +474,33 @@ entire trajectory before exporting hidden reviewer cards. It rejects unknown
 rulesets. Reviewer reveals stay in the generated HTML and SHA-bound sidecar,
 outside the player-visible training trajectory.
 
+## Battle Fader direct-attack timing
+
+[Konami's *Absolute Powerforce* card catalog](https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=1&pid=11109000&request_locale=en&rp=99999)
+dates Battle Fader's TCG release to 16 February 2010, before the Edison
+cutoff. [Konami's set-specific ruling sheet](https://img.yugioh-card.com/ygo_cms/ygo/all/uploads/RulesABPF_1_1.pdf)
+says its hand effect Special Summons it on an opponent's direct attack, ends
+the Battle Phase, and leaves no Torrential Tribute activation window after
+resolution because ending the Battle Phase is the last event.
+
+Paired seed-100 MR1 duels give the defender Battle Fader in hand and a Set
+Torrential, then have an opposing Normal Monster attack directly on turn 3.
+Passing Fader takes battle damage and leaves it in hand. Activating Fader
+Special Summons it, prevents damage, and moves play to Main Phase 2 without
+offering Torrential or another attack. Torrential remains Set. The defender's
+Set Trap identity is absent from the attacker's observation. Both complete
+duels serialize, replay-verify, and pass the player-visibility audit on the
+pinned official Battle Fader script. Reproduce with:
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_battle_fader.py
+```
+
+The sheet also specifies banishment when a Fader Summoned this way leaves the
+field; that later movement and other attack responses remain untested. This
+fixture does not certify Edison rules or the full card pool.
+
 ## Black Rose Dragon optional trigger
 
 [Konami's Black Rose Dragon card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7898&ope=2&request_locale=en)
