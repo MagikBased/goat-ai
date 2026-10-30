@@ -181,7 +181,8 @@ audio. No game sound files are committed to Git; see
 Click a future phase to pass through intermediate priority windows. Enable
 **Pause for chain responses** to keep response windows after your activations.
 Use **Pass** for individual responses, or use **End turn** to pass through
-intermediate windows and finish the turn. Consecutive automatic Pass choices
+intermediate windows, enter the End Phase, and finish the turn in one click.
+Consecutive automatic Pass choices
 are resolved before the next board decision appears. Unusual prompts and every
 legal choice remain available under **All legal actions** in the sidebar.
 The board and controls use only the human player's visible observation and

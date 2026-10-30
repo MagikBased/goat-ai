@@ -376,6 +376,50 @@ def test_phase_travel_passes_priority_and_hold_stops_after_one_step(tmp_path):
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_end_turn_advances_across_priority_passes_and_end_phase(tmp_path):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      const base = {viewer:0,acting_player:0,turn_player:0,turn:2,phase:'main1',
+        life_points:[8000,8000],hand:[],field:[],graveyards:[[],[]],banished:[[],[]],
+        extra_deck_counts:[0,0],deck_counts:[34,35],opponent_hand_count:5,
+        public_history:[],known_opponent_hand_cards:[],known_opponent_field_cards:[],
+        own_extra_deck:[],restrictions:[],chain:[]};
+      const action = kind => ({id:kind,kind,actor:0,parameters:{}});
+      const wrap = (decisions, observation, legal_actions) => ({
+        id:'1234567890abcdef',human_seat:0,decisions,terminal:false,
+        card_names:{},observation,legal_actions});
+      const snapshots = [
+        wrap(0,base,[action('chain'),action('pass')]),
+        wrap(1,base,[action('end_phase')]),
+        wrap(2,{...base,phase:'end'},[action('chain'),action('pass')]),
+        wrap(3,{...base,phase:'end'},[action('pass')]),
+        wrap(4,{...base,turn:4,phase:'main1'},[action('end_phase')])];
+      const chosen = [];
+      window.fetch = async (_path, options) => {
+        const request = JSON.parse(options.body);
+        chosen.push(snapshots[request.expected_decisions].legal_actions[
+          request.action_index].kind);
+        return new Response(JSON.stringify(snapshots[request.expected_decisions + 1]));
+      };
+      render(snapshots[0]);
+      document.getElementById('end-turn').click();
+      setTimeout(() => { document.body.dataset.endTurnProbe =
+        [chosen.join(','),state.observation.turn,state.decisions,
+         !document.getElementById('end-turn').disabled].join('|'); },120);
+    </script></body>"""
+    path = tmp_path / "end_turn.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=800", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-end-turn-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "pass,end_phase,pass,pass|4|4|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 def test_own_activation_passes_its_chain_unless_priority_is_held(tmp_path):
     template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
     probe = """<script>

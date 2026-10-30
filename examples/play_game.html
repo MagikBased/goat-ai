@@ -631,7 +631,7 @@
         rail.append(button);
       }
     }
-    async function travelToPhase(target) {
+    async function travelToPhase(target, finishTurn = false) {
       if (phaseTraveling || busy || !state || state.terminal) return;
       phaseTraveling = true;
       const startingTurn = state.observation.turn;
@@ -640,13 +640,16 @@
         for (let count = 0; count < 30 && state && !state.terminal; count++) {
           const observation = state.observation;
           const currentRank = phaseSteps.findIndex(step => step.value === observation.phase);
-          if (observation.turn !== startingTurn || currentRank >= targetRank) break;
+          if (observation.turn !== startingTurn ||
+              (currentRank >= targetRank && !(finishTurn && target === "end" &&
+                observation.phase === "end"))) break;
           let direct = null;
           if (observation.phase === "draw" || observation.phase === "standby") direct = "pass";
           else if (observation.phase === "main1")
             direct = target === "end" ? "end_phase" : "battle_phase";
           else if (observation.phase === "battle") direct = "main2";
           else if (observation.phase === "main2") direct = "end_phase";
+          else if (observation.phase === "end") direct = "pass";
           let index = state.legal_actions.findIndex(action => action.kind === direct);
           if (index < 0 && observation.phase === "main1" && target === "end")
             index = state.legal_actions.findIndex(action => action.kind === "battle_phase");
@@ -661,12 +664,14 @@
           if (byId("hold-priority").checked) break;
         }
         if (state && !state.terminal && state.observation.turn === startingTurn &&
-            phaseSteps.findIndex(step => step.value === state.observation.phase) < targetRank &&
+            (phaseSteps.findIndex(step => step.value === state.observation.phase) < targetRank ||
+             (finishTurn && state.observation.phase === "end")) &&
             !byId("hold-priority").checked)
           byId("message").textContent = `${target} is not reachable from this turn's current choices.`;
       } finally {
         phaseTraveling = false;
         if (state && !state.terminal) renderPhase(state.observation);
+        renderQuickControls();
         scheduleForcedPass(state);
       }
     }
@@ -675,14 +680,12 @@
       // They remain available through the prompt tray and legal-action list.
       const passIndex = state?.legal_actions?.findIndex(action =>
         action.kind === "pass") ?? -1;
-      let endIndex = state?.legal_actions?.findIndex(action => action.kind === "end_phase") ?? -1;
-      if (endIndex < 0 && state?.observation?.phase === "end") endIndex = passIndex;
       const pass = byId("pass-action"), end = byId("end-turn");
       pass.hidden = passIndex < 0 || automaticPassIndex(state) >= 0;
       pass.disabled = busy || passIndex < 0; pass.onclick = () => choose(passIndex);
       end.disabled = busy || phaseTraveling || !state || state.terminal ||
-        (endIndex < 0 && passIndex < 0);
-      end.onclick = () => endIndex >= 0 ? choose(endIndex) : travelToPhase("end");
+        !state.legal_actions.some(action => ["end_phase", "battle_phase", "main2", "pass"].includes(action.kind));
+      end.onclick = () => travelToPhase("end", true);
     }
     function renderPromptActions() {
       const kinds = new Set(["yes", "no", "select_position", "announce_race",
