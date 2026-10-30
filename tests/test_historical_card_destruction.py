@@ -16,6 +16,100 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 CARD_DESTRUCTION = 72892473
 NIGHT_ASSAILANT = 16226796  # pre-errata GOAT variant
 BANISHER_OF_THE_LIGHT = 61528025
+SCAPEGOAT = 504700123  # GOAT variant
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("seed,opponent_empty", [(92, False), (1142, True)])
+def test_card_destruction_empty_hand_activation_gate(tmp_path, seed, opponent_empty):
+    """An empty own hand may activate only while the opponent still has cards."""
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{CARD_DESTRUCTION}.lua").is_file():
+        pytest.skip("Card Destruction script not installed")
+    # Set four cards and activate Scapegoat from hand to leave an open
+    # Spell/Trap Zone. The opponent can later empty a monster plus five cards.
+    settable = (
+        *([14087893] * 3), *([46411259] * 3), *([SCAPEGOAT] * 3),
+        *([56120475] * 3), *([64697231] * 3), *([504700116] * 2),
+        44763025, 79571449, 19613556, 5318639, 55144522,
+        45986603, 44095762, 53582587, *([60082869] * 3),
+    )
+    deck = tmp_path / "card_destruction_gate.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        CARD_DESTRUCTION, *VANILLA_DECK[:12], *settable,
+    ))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(deck), str(deck), seed=seed,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        asserted = False
+        activated = False
+        original_decks = None
+        agents = (RandomAgent(seed), RandomAgent(seed + 1))
+        for _ in range(5000):
+            if env.is_terminal():
+                assert asserted
+                trajectory = env.trajectory()
+                path = tmp_path / f"card_destruction_gate_{seed}.json"
+                write_trajectory(path, trajectory)
+                restored = read_trajectory(path)
+                assert verify_trajectory(restored, ExperimentalOcgcoreEngine(root)) == len(
+                    restored.decisions)
+                audit_trajectory_visibility(restored)
+                assert f"official/c{CARD_DESTRUCTION}.lua" in (
+                    env.engine.probe.loaded_script_sha256)
+                return
+            actions = env.legal_actions()
+            action = None
+            if not asserted:
+                if obs.turn == 1 and obs.acting_player == 0:
+                    goats = sum(card.code == SCAPEGOAT for card in obs.hand)
+                    if len(obs.hand) > 2:
+                        action = next((a for a in actions if a.kind == "set_spell_trap"
+                                       and a.parameters.get("code") != CARD_DESTRUCTION
+                                       and (a.parameters.get("code") != SCAPEGOAT
+                                            or goats > 1)), None)
+                    if action is None and goats:
+                        action = next((a for a in actions if a.kind == "activate"
+                                       and a.parameters.get("code") == SCAPEGOAT), None)
+                    offered = next((a for a in actions if a.kind == "activate"
+                                    and a.parameters.get("code") == CARD_DESTRUCTION), None)
+                    if not opponent_empty and len(obs.hand) == 1 and not activated \
+                            and offered is not None:
+                        assert obs.hand[0].code == CARD_DESTRUCTION
+                        assert env.engine.probe.observation(1).opponent_hand_count == 1
+                        assert env.engine.probe.observation(0).opponent_hand_count == 5
+                        action = offered
+                        original_decks = obs.deck_counts
+                        activated = True
+                elif obs.turn == 2 and obs.acting_player == 1 and opponent_empty:
+                    action = next((a for a in actions if a.kind == "normal_summon"), None)
+                    if action is None:
+                        action = next((a for a in actions
+                                       if a.kind == "set_spell_trap"), None)
+                elif obs.turn == 3 and obs.acting_player == 0 and opponent_empty:
+                    action = next((a for a in actions if a.kind == "normal_summon"), None)
+                    if len(obs.hand) == 1 and obs.hand[0].code == CARD_DESTRUCTION:
+                        assert env.engine.probe.observation(0).opponent_hand_count == 0
+                        assert sum(card.controller == 0 and card.zone == "spell_trap"
+                                   for card in obs.field) < 5
+                        assert not any(a.kind == "activate" and
+                                       a.parameters.get("code") == CARD_DESTRUCTION
+                                       for a in actions)
+                        asserted = True
+                if action is None:
+                    action = next((a for a in actions if a.kind in (
+                        "place", "pass", "end_phase", "main2")), actions[0])
+            else:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+            if activated and not asserted and not obs.chain and CARD_DESTRUCTION in {
+                    card.code for card in obs.graveyards[0]}:
+                assert original_decks is not None
+                assert obs.deck_counts == (original_decks[0], original_decks[1] - 5)
+                assert obs.hand == ()
+                assert obs.opponent_hand_count == 5
+                asserted = True
+    pytest.fail("Card Destruction empty-hand fixture did not terminate")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

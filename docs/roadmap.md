@@ -471,6 +471,8 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired [Card Destruction empty-hand fixture](goat_rules.md#card-destruction-with-an-empty-hand) now checks the archived FAQ's activation gate with a free Spell/Trap Zone. One branch activates while only the opponent has hand cards and draws zero for its controller; the other suppresses activation after both hands become empty. Both seeded duels reach terminal, replay-verify, and pass the visibility audit. This covers a common card in the sourced tournament corpus; deck-out and chained hand changes remain open.
+
 A new Gravekeeper's Chief/Premature Burial fixture confirms the documented
 Necrovalley exception through a complete native duel, replay verification,
 and visibility audit. The no-Chief activation gate remains historically
