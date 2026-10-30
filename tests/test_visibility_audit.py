@@ -66,6 +66,17 @@ def test_audit_rejects_choice_identity_leaks(parameters, reason):
         audit_decision_visibility(_record(_observation(), parameters))
 
 
+@pytest.mark.parametrize("kind", ["chain", "activate", "special_summon"])
+def test_audit_checks_direct_card_references_for_every_action_kind(kind):
+    observation = _observation()
+    hidden = {"controller": 1, "location": 8, "sequence": 3, "code": 789}
+    with pytest.raises(VisibilityViolation, match="face-down"):
+        audit_decision_visibility(_record(observation, hidden, kind))
+    public = {"controller": 1, "location": 8, "sequence": 1, "code": 789}
+    assert audit_decision_visibility(_record(observation, public, kind)) == {
+        "opponent_field_choices": 1}
+
+
 @pytest.mark.parametrize("kind,parameters", [
     ("select_card", {"controller": 0, "location": 1, "sequence": 17, "code": 123}),
     ("select_card", {"controller": 0, "location": 64, "sequence": 2, "code": 123}),

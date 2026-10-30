@@ -12,7 +12,10 @@ class VisibilityViolation(ValueError):
 
 
 def _choice_cards(action: Action) -> Iterable[dict]:
-    if action.kind in ("select_card", "unselect_card", "tribute"):
+    # A card reference can be the action's source as well as a selection
+    # payload. Check both: an unlisted action kind must not become a route for
+    # exposing the identity of an opponent's hidden card.
+    if "controller" in action.parameters and "location" in action.parameters:
         yield action.parameters
     if action.kind in ("select_card", "select_cards", "finish_selection",
                        "tribute_cards", "sort_cards", "select_counters"):

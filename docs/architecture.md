@@ -77,6 +77,13 @@ numbers in single-card, multi-card, and sorting choices. A native Fruits of
 Kozaky's Studies sorting prompt passes this check. It guards the action
 boundary against a shuffled-slot leak; other hidden-information paths still
 need their own audits.
+The auditor also checks a direct `controller`/`location` card reference on
+every action kind, including activations and chain responses, against the
+acting player's visible field, hand knowledge, and public piles. Previously
+only selection and tribute actions received that direct-reference check.
+Synthetic hidden-card injections and native EDOPro room and historical chain
+fixtures exercise the expanded check. It does not prove that every native
+message is correctly redacted before the action is built.
 
 ## Adapter boundary and remaining work
 
