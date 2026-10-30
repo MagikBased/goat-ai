@@ -89,6 +89,8 @@
       <p>To train experimentally on these confirmed choices, run this from the
          project directory. The resulting checkpoint is not historically certified.</p>
       <pre id="edopro-training-command"></pre>
+      <p><a id="edopro-bundle" href="#">Download confirmed training bundle</a>
+         (requires the same pinned native assets to train elsewhere).</p>
     </div>
     <button id="edopro-save" type="button">Save confirmations</button>
     <button id="edopro-close" type="button">Close</button>
@@ -211,6 +213,8 @@
       box.hidden = !(count > 0 && review.experimental_confirmed_eligible);
       if (box.hidden) return;
       const session = review.id;
+      byId("edopro-bundle").href =
+        "/api/edopro/confirmed-bundle?id=" + encodeURIComponent(session);
       byId("edopro-training-command").textContent =
         `PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py ` +
         `--experimental-edopro-confirmed ${review.native_replay} ` +

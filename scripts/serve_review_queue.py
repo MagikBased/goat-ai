@@ -29,7 +29,7 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 REVIEW_API_VERSION = 5
-LIVE_API_VERSION = 11
+LIVE_API_VERSION = 12
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -496,6 +496,21 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                     with replay.open("rb") as source:
                         shutil.copyfileobj(source, self.wfile)
                 except (ValueError, OSError) as error:
+                    self._json(400, {"error": str(error)})
+                return
+            if parsed.path == "/api/edopro/confirmed-bundle":
+                try:
+                    identifier = parse_qs(parsed.query).get("id", [""])[0]
+                    bundle = edo_room.confirmed_bundle(identifier)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/zip")
+                    self.send_header("Content-Disposition",
+                                     f'attachment; filename="edopro-{identifier}-confirmed.zip"')
+                    self.send_header("Content-Length", str(len(bundle)))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    self.wfile.write(bundle)
+                except (ValueError, OSError, RuntimeError) as error:
                     self._json(400, {"error": str(error)})
                 return
             if parsed.path == "/api/edopro/choices":

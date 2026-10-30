@@ -7,9 +7,12 @@ import socket
 import subprocess
 import sys
 import tempfile
+from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from goat_ai.agents.card_metadata import load_card_names
 from goat_ai.replay import read_decision_annotations, read_trajectory
@@ -69,6 +72,39 @@ class EdoRoomManager:
         if not replay.is_file() or replay.is_symlink() or replay.stat().st_size == 0:
             raise ValueError("EDOPro native replay is unavailable")
         return replay
+
+    def confirmed_bundle(self, identifier: str) -> bytes:
+        """Export a verified local human game and its replay-bound confirmations."""
+        with self.lock:
+            replay, review, metadata = self._verified_game(identifier)
+            labels = replay.with_suffix(".human_labels.json")
+            if not labels.is_file():
+                raise ValueError("Confirm human choices before exporting a training bundle")
+            report = verify_edopro_human_annotations(
+                replay, review, metadata, labels, self.creator.native_root)
+            if not (report["complete"] and report["historical_patches"]
+                    and report["asset_identity_verified"]
+                    and report["deck_identity_verified"]
+                    and report["confirmed_human_choices"] > 0):
+                raise ValueError("Only complete, fingerprinted games with confirmed choices qualify")
+            files = (replay, review, metadata, labels)
+            if sum(path.stat().st_size for path in files) > 64_000_000:
+                raise ValueError("EDOPro training bundle exceeds the local size limit")
+            contents = {path.name: path.read_bytes() for path in files}
+        hashes = {name: sha256(data).hexdigest() for name, data in contents.items()}
+        payload = BytesIO()
+        with ZipFile(payload, "w", compression=ZIP_DEFLATED) as archive:
+            for name, data in contents.items():
+                archive.writestr(name, data)
+            archive.writestr("bundle_manifest.json", json.dumps({
+                "schema_version": 1, "source": "edopro_human_confirmed_experimental",
+                "historical_goat_certified": False,
+                "confirmed_human_choices": report["confirmed_human_choices"],
+                "sha256": hashes,
+                "note": "Training requires the same pinned native assets; unzip all files "
+                        "into one directory before using --experimental-edopro-confirmed.",
+            }, indent=2) + "\n")
+        return payload.getvalue()
 
     def choices(self, identifier: str) -> dict:
         replay, review, metadata = self._verified_game(identifier)

@@ -1,12 +1,15 @@
 """Optional real TCP room regression against an installed external EDOPro host."""
 
 import asyncio
+import hashlib
 import json
 import os
 import shutil
 import subprocess
 import sys
+from io import BytesIO
 from pathlib import Path
+from zipfile import ZipFile
 
 import pytest
 import torch
@@ -204,6 +207,17 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
             manager.native_replay("../other")
         assert copied_replay.with_suffix(".human_labels.json").is_file()
         if historical:
+            with ZipFile(BytesIO(manager.confirmed_bundle(session_id))) as bundle:
+                assert set(bundle.namelist()) == {
+                    copied_replay.name,
+                    copied_replay.with_suffix(".review.json").name,
+                    copied_replay.with_suffix(".meta.json").name,
+                    copied_replay.with_suffix(".human_labels.json").name,
+                    "bundle_manifest.json"}
+                manifest = json.loads(bundle.read("bundle_manifest.json"))
+                assert manifest["confirmed_human_choices"] == 1
+                for name, digest in manifest["sha256"].items():
+                    assert digest == hashlib.sha256(bundle.read(name)).hexdigest()
             _, training_records, main_hashes, training_report, hashes = (
                 load_experimental_edopro_confirmations(copied_replay, mirror_root))
             assert len(training_records) == 1

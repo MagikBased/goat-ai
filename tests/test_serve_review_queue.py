@@ -346,6 +346,11 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
             replay.write_bytes(b"yrpX-test")
             return replay
 
+        def confirmed_bundle(self, identifier):
+            if identifier != "a" * 16:
+                raise ValueError("invalid EDOPro session ID")
+            return b"PK-test"
+
     monkeypatch.setattr(serve_review_queue, "EdoRoomManager", FakeRoom)
     server = serve_review_queue.make_server(None, None, port=0)
     thread = Thread(target=server.serve_forever, daemon=True)
@@ -366,6 +371,10 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
         with pytest.raises(HTTPError) as invalid_replay:
             _request(f"{base}/api/edopro/replay?id=../../outside")
         assert invalid_replay.value.code == 400
+        with urlopen(f"{base}/api/edopro/confirmed-bundle?id={'a' * 16}",
+                     timeout=5) as response:
+            assert response.read() == b"PK-test"
+            assert response.headers["Content-Type"] == "application/zip"
         with pytest.raises(HTTPError) as bad_payload:
             _request(f"{base}/api/edopro/start", {"ai_deck": "ai.ydk", "port": 9999})
         assert bad_payload.value.code == 400

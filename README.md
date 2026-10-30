@@ -109,7 +109,11 @@ experimental trainer described below; the dialog shows its exact command.
 The session also offers **Download EDOPro replay** for its native `.yrpX`
 file, including when a saved replay has not passed independent reconstruction.
 Only complete, verified recordings can supply confirmed choices to the
-experimental trainer.
+experimental trainer. Once choices are confirmed, the dialog can download a
+ZIP containing the native replay, verified review trajectory, metadata,
+human confirmations, and SHA-256 manifest. Unzip all files together before
+using `--experimental-edopro-confirmed`; training still needs the same pinned
+native assets and remains experimental.
 
 You can play the selected PyTorch policy through an EDOPro LAN room using the
 optional external `mostwanted7/ygo-agent` host. The host is AGPL-3.0-or-later,
