@@ -17,6 +17,173 @@ CARD_DESTRUCTION = 72892473
 NIGHT_ASSAILANT = 16226796  # pre-errata GOAT variant
 BANISHER_OF_THE_LIGHT = 61528025
 SCAPEGOAT = 504700123  # GOAT variant
+PROTECTOR = 24221739
+EXTRA_VANILLAS = (
+    32864, 549481, 1184620, 1761063, 1784619, 2118022, 2311603, 2468169,
+    2483611, 2863439, 2964201, 3134241, 3170832, 3573512, 3797883,
+    4035199, 4042268, 4179849, 4920010, 5265750,
+)
+PATCHED_CARD_DESTRUCTION_SHA256 = (
+    "b58db8925866782d8b1876fe2965888e5bdf77b2d693351b60ba1413d1403b07"
+)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_card_destruction_overdraw_patch_keeps_draw_prohibition(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    deck = tmp_path / "card_destruction_protector.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        CARD_DESTRUCTION, PROTECTOR, *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {CARD_DESTRUCTION, PROTECTOR} <= {card.code for card in obs.hand}
+        summoned = checked = False
+        agents = (RandomAgent(100), RandomAgent(101))
+        for _ in range(5000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / "card_destruction_protector.json"
+                write_trajectory(path, env.trajectory())
+                trajectory = read_trajectory(path)
+                assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
+                audit_trajectory_visibility(trajectory)
+                assert env.engine.probe.loaded_script_sha256[
+                    f"official/c{CARD_DESTRUCTION}.lua"] == PATCHED_CARD_DESTRUCTION_SHA256
+                return
+            actions = env.legal_actions()
+            if not checked and obs.acting_player == 0 and obs.phase == "main1":
+                if not summoned:
+                    action = next((candidate for candidate in actions
+                                   if candidate.kind == "normal_summon" and
+                                   candidate.parameters.get("code") == PROTECTOR), None)
+                    if action is not None:
+                        summoned = True
+                else:
+                    action = None
+                    if (any(card.code == PROTECTOR and card.zone == "monster"
+                            for card in obs.field)
+                            and any(candidate.kind == "end_phase" for candidate in actions)):
+                        assert CARD_DESTRUCTION in {card.code for card in obs.hand}
+                        assert not any(candidate.kind == "activate" and
+                                       candidate.parameters.get("code") == CARD_DESTRUCTION
+                                       for candidate in actions)
+                        checked = True
+                if action is None:
+                    action = next((candidate for candidate in actions
+                                   if candidate.kind in ("place", "pass", "end_phase")),
+                                  actions[0])
+            else:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+    pytest.fail("Protector draw-prohibition fixture did not finish")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("draw_shortfall", [0, 5])
+def test_card_destruction_near_empty_deck_draw_result(tmp_path, draw_shortfall):
+    """A short draw loses immediately; exactly enough cards loses next Draw Phase."""
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    script = f"official/c{CARD_DESTRUCTION}.lua"
+    if not (root / "scripts" / script).is_file():
+        pytest.skip(f"script {script} not installed")
+    own = tmp_path / "card_destruction_40.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        CARD_DESTRUCTION, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    other = tmp_path / "vanilla_60.ydk"
+    other.write_text("#main\n" + "\n".join(map(str, (
+        *VANILLA_DECK, *EXTRA_VANILLAS))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(own), str(other), seed=52,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert CARD_DESTRUCTION in {card.code for card in obs.hand}
+        activated = resolved = False
+        for _ in range(800):
+            if env.is_terminal():
+                assert activated and resolved
+                assert env.result() == 1
+                assert obs.deck_counts[0] == 0 < obs.deck_counts[1]
+                assert obs.life_points == (8000, 8000)
+                assert obs.phase == ("main1" if draw_shortfall else "draw")
+                path = tmp_path / f"card_destruction_deckout_{draw_shortfall}.json"
+                write_trajectory(path, env.trajectory())
+                trajectory = read_trajectory(path)
+                assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
+                audit_trajectory_visibility(trajectory)
+                assert env.engine.probe.loaded_script_sha256[script] == (
+                    PATCHED_CARD_DESTRUCTION_SHA256)
+                return
+            actions = env.legal_actions()
+            action = None
+            if (obs.acting_player == 0 and obs.phase == "main1" and not activated
+                    and any(candidate.kind == "end_phase" for candidate in actions)
+                    and obs.deck_counts[0] == len(obs.hand) - 1 - draw_shortfall):
+                action = next((candidate for candidate in actions
+                               if candidate.kind == "activate" and
+                               candidate.parameters.get("code") == CARD_DESTRUCTION), None)
+                assert action is not None
+                activated = True
+            if action is None and actions[0].kind == "select_card":
+                action = next((candidate for candidate in actions
+                               if candidate.parameters.get("code") != CARD_DESTRUCTION),
+                              actions[0])
+            if action is None:
+                action = next((candidate for candidate in actions
+                               if candidate.kind in ("end_phase", "pass")), actions[0])
+            obs = env.step(action)
+            if activated and not resolved and obs.deck_counts[0] == 0:
+                resolved = True
+                assert env.is_terminal() == bool(draw_shortfall)
+    pytest.fail("Card Destruction did not reach the expected draw boundary")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_card_destruction_opponent_empty_deck_draw_result(tmp_path):
+    """The opponent may be the first player unable to complete the redraw."""
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    own = tmp_path / "card_destruction_60.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        CARD_DESTRUCTION, *VANILLA_DECK[1:], *EXTRA_VANILLAS))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(own), "examples/decks/vanilla_probe.ydk", seed=5,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert CARD_DESTRUCTION in {card.code for card in obs.hand}
+        activated = False
+        for _ in range(800):
+            if env.is_terminal():
+                assert activated and env.result() == 0
+                assert obs.deck_counts[0] > 0 and obs.deck_counts[1] == 0
+                assert obs.phase == "main1"
+                path = tmp_path / "card_destruction_opponent_deckout.json"
+                write_trajectory(path, env.trajectory())
+                trajectory = read_trajectory(path)
+                assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
+                audit_trajectory_visibility(trajectory)
+                assert env.engine.probe.loaded_script_sha256[
+                    f"official/c{CARD_DESTRUCTION}.lua"] == PATCHED_CARD_DESTRUCTION_SHA256
+                return
+            actions = env.legal_actions()
+            action = None
+            if (not activated and obs.acting_player == 0 and obs.phase == "main1"
+                    and obs.deck_counts[1] == 0
+                    and any(candidate.kind == "end_phase" for candidate in actions)):
+                action = next((candidate for candidate in actions
+                               if candidate.kind == "activate" and
+                               candidate.parameters.get("code") == CARD_DESTRUCTION), None)
+                assert action is not None
+                activated = True
+            if action is None and actions[0].kind == "select_card":
+                action = next((candidate for candidate in actions
+                               if candidate.parameters.get("code") != CARD_DESTRUCTION),
+                              actions[0])
+            if action is None:
+                action = next((candidate for candidate in actions
+                               if candidate.kind in ("end_phase", "pass")), actions[0])
+            obs = env.step(action)
+    pytest.fail("opponent did not reach the empty-Deck draw boundary")
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

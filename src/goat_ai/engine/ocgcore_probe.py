@@ -85,6 +85,15 @@ POT_DRAW_CHECK_GOAT = b"return Duel.IsPlayerCanDraw(tp,0) end"
 UPSTREAM_GRACEFUL_SHA256 = "12b5a5730b6dea2c1bf3eb379f0d436263786c1ac882e197580e4c72dede3eb5"
 GRACEFUL_DRAW_CHECK_OLD = b"return Duel.IsPlayerCanDraw(tp,3) end"
 GRACEFUL_DRAW_CHECK_GOAT = b"return Duel.IsPlayerCanDraw(tp,0) end"
+UPSTREAM_CARD_DESTRUCTION_SHA256 = "087e5964a6158051bb44fa0685192c9d9ed6a029005bd0a2536d5b9177be340e"
+CARD_DESTRUCTION_DRAW_CHECK_OLD = (
+    b"return (h1+h2>0) and (Duel.IsPlayerCanDraw(tp,h1) or h1==0) "
+    b"and (Duel.IsPlayerCanDraw(1-tp) or h2==0)"
+)
+CARD_DESTRUCTION_DRAW_CHECK_GOAT = (
+    b"return (h1+h2>0) and (Duel.IsPlayerCanDraw(tp,0) or h1==0) "
+    b"and (Duel.IsPlayerCanDraw(1-tp,0) or h2==0)"
+)
 UPSTREAM_DEKOICHI_SHA256 = "567bbe75ff84936c93419f54fa2f5cea8ba311921403fb5b85f3ea23263c24ba"
 DEKOICHI_DRAW_OLD = b"Duel.Draw(p,d,REASON_EFFECT)"
 DEKOICHI_DRAW_HISTORICAL = (
@@ -666,6 +675,15 @@ class OcgcoreProbe:
                 return 0
             contents = contents.replace(GRACEFUL_DRAW_CHECK_OLD,
                                         GRACEFUL_DRAW_CHECK_GOAT)
+        if relative_path == "official/c72892473.lua":
+            if hashlib.sha256(contents).hexdigest() != UPSTREAM_CARD_DESTRUCTION_SHA256 \
+                    or contents.count(CARD_DESTRUCTION_DRAW_CHECK_OLD) != 1:
+                self.errors.append("pinned Card Destruction script changed; GOAT overdraw patch not applied")
+                return 0
+            # A failed draw loses the Duel. Keep draw-prohibition effects,
+            # but do not require enough cards in either Deck to complete it.
+            contents = contents.replace(CARD_DESTRUCTION_DRAW_CHECK_OLD,
+                                        CARD_DESTRUCTION_DRAW_CHECK_GOAT)
         if relative_path == "official/c87621407.lua":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_DEKOICHI_SHA256 \
                     or contents.count(DEKOICHI_DRAW_OLD) != 1:
