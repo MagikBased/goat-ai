@@ -1003,6 +1003,20 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+The [larger-step PPO continuation](evaluation.md#larger-step-ppo-continuation-on-mixed-goat-decks-30-october-2026)
+trained for 240 complete, replay-verified duels and changed 23 of 322
+multi-option greedy choices on separate parent-policy states. Against
+Tactical-v14, two unseen-Main-Deck blocks gave a pooled matched score gain
+of 7.42 percentage points (paired interval +1.56 to +13.28); an independent
+CombatHeuristicAgent block gained 7.03 points (interval 0 to +14.84).
+Direct parent play was 105–87 on the first eight sourced holdout decks with
+an interval crossing 50%, then 144–110–2 on 16 synthetic Main Deck mixes
+with an interval above 50%, but a further six sourced tournament decks
+reversed to 93–98–1. This is a promising mixed-deck self-play signal,
+yet direct cross-deck superiority does not transfer consistently and the
+absolute Tactical score remains weak. Keep the child experimental, v23
+selected, and M4's exit gate open.
+
 The [batched parent-KL fit](evaluation.md#batched-parent-kl-scoring-pilot-29-october-2026)
 now scores variable-length legal-action sets in padded chunks while preserving
 the full-label optimizer update. On the 244-decision Rhymus pilot it reduced

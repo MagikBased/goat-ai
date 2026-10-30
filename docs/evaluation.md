@@ -15281,3 +15281,116 @@ output path. Use `scripts/audit_policy_agreement.py --engine experimental
 `seattle_parent_review_99200_99201/matchup_01_seed_99201_seat_{0,1}.json`
 trajectories. The `--batch-size` flag controls scoring chunk size for
 parent-KL; all labels still contribute to each update.
+
+## Larger-step PPO continuation on mixed GOAT decks (30 October 2026)
+
+An experimental continuation of the selected feature-v23 policy used 240
+self-play duels on three tournament-deck pairings: Jesse Twohig Goat
+Control/Warrior Montague, Dingosig Chaos Return/Weirdchamp Bazoo Return,
+and Insids Chaos Control/Cas Stomphorst Flip Control. The four-role schedule
+included both deck assignments and learner seats. PPO used four-game frozen
+rollouts, two epochs, batch size 32, per-episode weighting, a learner-deck
+baseline, 0.5 historical-opponent probability, Tactical-v14 as the other
+opponent, parent KL weight 0.05, and independent opponent RNG. This trial
+raised the learning rate from the earlier 0.00005 experiments to **0.0005**.
+It also ran after the historical Card Destruction script correction, so the
+earlier lower-rate experiments are **not** a controlled same-core learning-rate
+ablation. The parent checkpoint is
+`.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt` (SHA-256
+`975d06284b3035bc8bf8dbafa041a8a25a80195574d1ff695f2fbd25d1c7ff45`);
+the ignored child is `.cache/goat-ai/ppo_lr5e4_240_131000_131239.pt`
+(SHA-256 `22ec1c1ac3089fcec07d6c4de9644c4da8b9fea1f0931f2f66dfcdd86ad677d7`).
+
+All **240 terminal** training trajectories, covering **134,869 decisions**,
+independently replay-verified and passed the player-visibility audit. There
+were no decision-cap or unsupported-card episodes. The audit report is
+`.cache/goat-ai/ppo_lr5e4_240_131000_131239_audit.json` (SHA-256
+`1e6a90786bf5d6024fc7e3a4939776abb2390040a273d7b9b8cd2607613cc293`).
+On four separate current-core parent-policy trajectories, the child changed
+23 of 322 multi-option greedy choices (15 action kinds). Those are fixed-state
+off-policy comparisons, not a strength measure. The agreement report SHA-256
+is `44560a0d7acab1d92c9bbb3648bfeea09be7a4ad63e6968a1c943970aa2e47ab`.
+
+The evaluator verified local deck bytes, Main Deck compositions absent from
+both checkpoints' training provenance, common native assets and source code,
+identical matched schedules, both deck assignments, and both policy seats.
+All evaluations below used complete native duels with 3,000-decision caps;
+none reached the cap. Each row's interval is the paired matchup-seed
+bootstrap interval for the child-minus-parent **score** difference.
+
+| Held-out schedule | Opponent | Child | Parent | Paired difference (95% interval) |
+| --- | --- | ---: | ---: | ---: |
+| Phoenix/Zombie and Rhymus/Dimension Fusion; seeds 131308–131323 | Tactical-v14 | 46–81–1 | 36–91–1 | +7.81 points (+0.78 to +14.84) |
+| Beastdown/Warrior and Chaos/Goat Control; seeds 131400–131415 | Tactical-v14 | 45–83 | 36–92 | +7.03 points (−3.13 to +15.63) |
+| Same latter four decks; seeds 131600–131615 | CombatHeuristicAgent | 99–29 | 90–38 | +7.03 points (0.00 to +14.84) |
+
+Pooling the two preexisting Tactical blocks gives **91.5/256** child points
+versus **72.5/256** parent points: +7.42 percentage points, paired 95%
+interval **+1.56 to +13.28**. This pooled interval is descriptive because
+the second block was added after inspecting the first. Combat was not a
+training opponent and provides a separate, weaker-baseline check; its interval
+still touches zero. Direct child-versus-parent games on the two Tactical
+holdout deck sets were **36–28** on seeds 131300–131307 and **69–59** on
+seeds 131416–131431. Pooled direct score was **105/192 = 54.69%**, paired
+95% interval **48.96–60.42%**. The child still scored only about 36% against
+Tactical in the combined holdout.
+
+To test transfer, the child then played the parent on eight distinct pairs
+of 16 legal synthetic Main Deck mixes generated for an earlier policy test.
+The deck manifest SHA-256 is
+`b6d65833d4be77d88b38413a8917513ba04d242722216fdec492fd4515d45c4b`.
+On fresh seeds **131700–131707**, both assignments and seats, the child
+scored **144–110–2** in 256 complete games: **56.64%** points, paired 95%
+interval **51.17–61.91%**. A subsequent sourced-deck check used Jonathan
+LaBounty Chaos/Max Suffridge Goat Control, Christian Martinez Goat
+Control/Theeresak Poonsombat New Jersey Goat Control, and Theeresak
+Poonsombat Seattle Goat Control/GoatFormat guide Dimension Fusion.
+On seeds **131900–131915**, both assignments and seats, the child scored
+**93–98–1** in 192 games: **48.70%** points, paired 95% interval
+**42.19–54.95%**. The deck split ranged from 11–21 with Christian Martinez's
+list to 25–7 with Theeresak's New Jersey list. Both reports passed local-deck
+hash and strict unseen-Main-Deck verification. Their SHA-256 values are
+`a81a00213a147c36b711bcaa41a02bc393d3bfe5e25920c6a1d5b463a9344357`
+and `c3f08bb602345ebfa3ad895151c21b1f14270ac7f3dab317765473e7821547a3`.
+Pooling all 640 direct games gives **342–295–3** (53.67% points, paired
+interval 50.31–57.03%), but those blocks were added sequentially after
+inspecting earlier results and mix human-designed decks with synthetic ones.
+The later sourced-deck reversal is the relevant caution: direct cross-deck
+superiority is not established. Keep the selected v23 checkpoint unchanged
+and M4 open.
+
+The child/Tactical and parent/Tactical report SHA-256 pairs are
+`1e1431207eeb24b630ad24607c0dbb020c6c19140cee4a1dcd55f32553aa0d7d` /
+`3359f7079d209b8ada1986c8b150eac73ff3e75f3e9975f4904deda1cd34cb1d`
+for the first block, and
+`765702ee6c6fafecda6e376b35e229846a643f066716f5890bbb93da56ccdde2` /
+`05f27a8fadb79af6b356cf7a46fe8a18290ef4e857307617b562649fbf6ddbac`
+for the second. The child/Combat and parent/Combat report SHA-256 values are
+`51cc7e4f26b61c46e0ccbd35d6f82c5b71ae2a1e25f12c89476e864595856e72` /
+`d3ef158e34144197489beca3f1d3dc3a039b92c1a90635dd7a8f5a4e21ba1954`.
+The two direct-report SHA-256 values are
+`b9204f38090d9323a6e17b5c1df2636f37accbb4c05d87fb5d9b7e651acce869` and
+`262d139ebe3667e5a64873093222984fe054374296f995f04c4595aa2865f657`.
+
+To reproduce training, run `scripts/train_self_play.py` from the repository
+root with `PYTHONPATH=src:.`, `GOAT_AI_NATIVE_ROOT=.cache/goat-ai`, the
+parent checkpoint above, `--engine experimental`, the three named matchup
+YDK pairs, `--schedule-mode four_roles --seed 131000 --games 240
+--max-decisions 3000 --policy-update clipped_ppo --ppo-rollout-games 4
+--ppo-epochs 2 --ppo-batch-size 32 --ppo-rollout-weighting per_episode
+--baseline-scope learner_deck --snapshot-every 4 --parent-kl-weight 0.05
+--historical-probability 0.5 --baseline-opponent tactical --rollout-workers 4
+--independent-opponent-rng --learning-rate 0.0005`, and an ignored output and
+record directory. Run `scripts/audit_selfplay_replays.py` on the recorded
+episodes. For each evaluation arm, use `scripts/evaluate_policy.py` with
+`--native-root .cache/goat-ai --engine experimental --both-deck-assignments
+--require-unseen-main-decks --max-decisions 3000 --workers 2`, the listed
+seeds and matchups, and either `--opponent tactical`,
+`--opponent combat_heuristic`, or `--opponent-checkpoint` for direct play.
+Run `scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks` on each matched baseline report pair.
+For the direct transfer checks, use the existing
+`v11_fresh_mix_130000_130007/decks_manifest.json` paths with
+`--opponent-checkpoint` and `--seed 131700 --seeds 8`, then the three sourced
+pairs above with `--seed 131900 --seeds 16`; keep the same native root,
+four-role scheduling, strict Main Deck holdout, and 3,000-decision limit.
