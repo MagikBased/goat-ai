@@ -3057,6 +3057,17 @@ An [opt-in feature-v32 PPO pilot](evaluation.md#feature-v32-ppo-action-choice-pi
 
 ### Future EDOPro human client
 
+The installed pinned-host integration suite was rerun on 30 October 2026:
+`GOAT_AI_EDOPRO_HOST_ROOT=.cache/goat-ai/edopro_pinned_host
+GOAT_AI_EDOPRO_MIRROR_ROOT=.cache/goat-ai
+GOAT_AI_EDOPRO_HISTORICAL=1
+PYTHONPATH=src:.:.cache/goat-ai/edopro_probe/ygo_agent_host
+.venv/bin/pytest -q tests/test_edopro_policy_room.py` passed all six tests in
+21.29 seconds. These include complete and interrupted TCP-room games, exact
+reconstruction, human-seat confirmation, and a one-choice opt-in clone. They
+use a protocol client, so they do not expand desktop GUI prompt coverage or
+certify historical rules broadly.
+
 The local EDOPro room launcher now records its child process ID and, on Linux,
 recovers an existing room after the review server restarts by checking the
 process command, session directory, and port. A separate TCP listener test
