@@ -1040,6 +1040,14 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A fresh [64-duel held-out comparison](evaluation.md#selected-v23-versus-tactical-on-four-unseen-historical-main-decks--30-october-2026)
+put the selected v23 policy at 11–53 against Tactical-v14 across four sourced
+Main Deck compositions absent from its training provenance. Both deck
+assignments and both seats were covered. This supplies a new baseline and
+confirms that the current policy does not meet M4's competitive-strength exit
+on these decks. The next training attempt should address cross-deck play,
+especially the 0–16 Phoenix Control result, before further promotion tests.
+
 Unfinished browser duels can now contribute explicit human choices to
 behavioral cloning through a read-only, native-verified journal importer. It
 freezes a private content-addressed snapshot and records the partial source

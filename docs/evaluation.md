@@ -15852,3 +15852,40 @@ PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
   --verify-replays --distinct-opponents --repeat-seeds \
   --random-extra --fusion-stress --isolate-games --count-card-actions
 ```
+
+## Selected v23 versus Tactical on four unseen historical Main Decks — 30 October 2026
+
+The selected feature-v23 checkpoint (`975d06284b3035bc8bf8dbafa041a8a25a80195574d1ff695f2fbd25d1c7ff45`)
+faced Tactical-v14 on two sourced pairings: Ramon Ciriano's New Jersey 2005
+Beastdown versus Bryan Coronel's New Jersey 2005 Chaos, and Roberto Martinez's
+New Jersey 2005 Phoenix Control versus Mary Triatafilidi's New Jersey 2005
+Warrior. The evaluation gate rejected both exact YDK bytes and Main Deck
+compositions seen in the checkpoint's training provenance. Seeds
+167000–167007 covered both deck assignments and both policy seats for each
+pairing, totaling 64 native duels with a 3,000-decision cap.
+
+V23 scored **11–53** with no draws, a score rate of **17.19%** (paired seed
+bootstrap 95% interval **7.81–26.56%**). It scored 5–27 as first player and
+6–26 as second player. By policy Deck, the results were Beastdown 1–15,
+Chaos 5–11, Phoenix Control 0–16, and Warrior 5–11. The tournament recorded
+31,493 decisions. This is evidence of a substantial gap to Tactical-v14 on
+these held-out Decks, not a ranking against human players or proof that every
+card interaction in those duels follows 2005 rulings. The evaluator did not
+independently replay-verify each game in this run.
+
+The ignored report is `.cache/goat-ai/fv23_vs_tactical_unseen_167000_167007.json`,
+SHA-256 `3a7deea6e48b51be7d884582facb111c40d38457aaa29844ec532e9c2bc17f39`.
+It includes checkpoint, native assets, source, and Deck composition hashes,
+the exact game schedule, outcomes, confidence intervals, and measured runtime.
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --native-root .cache/goat-ai --engine experimental --opponent tactical \
+  --matchup examples/decks/beastdown_ramon_ciriano_new_jersey_2005.ydk examples/decks/chaos_bryan_coronel_new_jersey_2005.ydk \
+  --matchup examples/decks/phoenix_control_roberto_martinez_new_jersey_2005.ydk examples/decks/warrior_mary_triatafilidi_new_jersey_2005.ydk \
+  --both-deck-assignments --seed 167000 --seeds 8 --max-decisions 3000 \
+  --workers 4 --require-unseen-main-decks --reject-training-deck-hashes \
+  --output .cache/goat-ai/fv23_vs_tactical_unseen_167000_167007.json
+```
