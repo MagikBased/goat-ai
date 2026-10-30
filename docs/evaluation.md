@@ -14821,6 +14821,44 @@ v5 manifests above as `--case` sources, and setting the fresh seed blocks
 to 99700, 99708, and 99716 respectively. The v5 label reader requires
 schema-v2 `automated_rule` provenance and the exact rule-set identifier.
 
+### Resource-v5 child on two fresh tournament pairings (29 October 2026)
+
+The existing visible-material-v5 child was compared with the unchanged
+selected v23 policy on Ramon Ciriano Beastdown versus Rhymus Lizo Goat
+Control, and Mary Triatafilidi Warrior versus Jonathan Labounty Chaos. All
+four published Main Deck compositions were absent from both checkpoints'
+recorded training games. The test used the experimental pinned GOAT core,
+both deck assignments and policy seats, eight fresh seeds per pairing, four
+workers, and a 3,000-decision limit. All 64 direct duels reached terminal.
+The child scored **30–34** directly against the parent on seeds
+128000–128007; its paired 95% score interval was **40.6–53.1%**. It won
+14/16 when assigned Beastdown but only 3/16 with Rhymus Goat Control,
+showing why the aggregate alone is insufficient.
+
+Against Tactical-v14 on matched seeds 128008–128015, the child scored
+**22–42** and the parent **20–44**. The report comparator verified equal
+decks, seats, seeds, opponent, pinned assets, and unseen Main Decks; the
+child-minus-parent paired score difference was **+3.125 points**, with a
+95% interval of **−4.6875 to +10.9375 points**. The child gained three
+Warrior-assigned wins and lost one Chaos-assigned win; the other two deck
+assignments were unchanged. This does not establish an improvement across
+decks. Keep v23 selected and use independently reviewed decisions in these
+weak assignments before fitting another child.
+
+The ignored direct, child/Tactical, and parent/Tactical reports are
+`.cache/goat-ai/v5_vs_parent_fresh_128000_128007.json`,
+`.cache/goat-ai/v5_vs_tactical_fresh_128008_128015.json`, and
+`.cache/goat-ai/v23_vs_tactical_fresh_128008_128015.json`; their SHA-256
+digests are respectively
+`52c94414aa542a38e2f7d88c1a1b2236ac309def5c97f97097a9020aae26dfb4`,
+`cb27e7d3086818f082b5bf79d435eff2d35af1f38c3972477f4a69a8a9a86a55`,
+and `f2d5bdbb25c8199e3b6851a6d5586b28836974c9210dd720c17c627c4e8213e6`.
+Reproduce with `scripts/evaluate_policy.py` using the two deck pairs above,
+`--engine experimental --both-deck-assignments --require-unseen-main-decks
+--workers 4 --seeds 8 --max-decisions 3000`, seed 128000 for direct
+child/parent and seed 128008 for each Tactical report. Compare the latter
+two with `scripts/compare_tournament_reports.py --require-unseen-main-decks`.
+
 ### Reviewed own-card MST chain decision (29 October 2026)
 
 Three newly saved local review choices from the seed-104400–104407 one-shot

@@ -986,6 +986,15 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A fresh 64-duel, both-deck-assignment held-out check of the experimental
+visible-material-v5 child against selected v23 scored 30–34 on two previously
+unseen tournament pairings. Against Tactical-v14 on separate matched seeds,
+the child scored 22–42 and the parent 20–44; the paired difference interval
+includes zero. The result and large assigned-deck splits are in the
+[evaluation log](evaluation.md#resource-v5-child-on-two-fresh-tournament-pairings-29-october-2026).
+Keep v23 selected. M4 still needs independently reviewed decisions that
+generalize across the weak deck assignments and a measured self-play gain.
+
 A [Seattle and Rhymus review queue](replay_audit.md#seattle-and-rhymus-parent-policy-review-queue-28-october-2026)
 now offers 22 further high-margin selected-v23/Tactical disagreements from
 eight replay-verified, visibility-audited duels on four Main Deck compositions
