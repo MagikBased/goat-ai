@@ -41,6 +41,9 @@ those eligible decisions and does not offer alternative-action labels under
 `self_recorded`. This guards the local data pipeline against reclassifying an
 AI-generated trajectory as a human demonstration; it cannot prove who was
 physically at the keyboard.
+The cloning checkpoint retains the verified human seat for a `self_recorded`
+annotation alongside its hash and authorization. Corrections to AI replays
+retain their separate review source and do not claim a human demonstrator seat.
 
 `RulesProfile` now selects historical Side Deck sizing (0 or 15 cards) by
 default, with an explicit community option for 0–15 cards. Main Decks require

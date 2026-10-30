@@ -4,7 +4,10 @@ import json
 import os
 import random
 import shutil
+import subprocess
+import sys
 from dataclasses import replace
+from hashlib import sha256
 from pathlib import Path
 from threading import Thread
 from types import SimpleNamespace
@@ -12,6 +15,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
+import torch
 
 from goat_ai.replay import read_trajectory, training_demonstrator_records
 from scripts import serve_review_queue
@@ -276,6 +280,32 @@ def test_live_game_completes_and_saves_human_only_demonstration(tmp_path):
     assert len(records) == len(explicit)
     assert all(records[position] is trajectory.decisions[index]
                for position, index in enumerate(explicit))
+    reviewed_index = next(index for index in explicit
+                          if len(trajectory.decisions[index].legal_actions) > 1)
+    reviewed_record = trajectory.decisions[reviewed_index]
+    action_index = reviewed_record.legal_actions.index(reviewed_record.selected_action)
+    labels = tmp_path / "human_choice.json"
+    labels.write_text(json.dumps({
+        "schema_version": 1,
+        "source_trajectory_sha256": sha256(replay.read_bytes()).hexdigest(),
+        "authorization": "self_recorded", "reviewer": "test human",
+        "choices": [{"decision_index": reviewed_index, "action_index": action_index}],
+    }), encoding="utf-8")
+    output = tmp_path / "human_reviewed.pt"
+    trained = subprocess.run([
+        sys.executable, str(ROOT / "scripts/train_behavioral_clone.py"), str(replay),
+        "--annotation", str(labels), "--native-root",
+        str(Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve()),
+        "--engine", "experimental", "--output", str(output),
+        "--feature-version", "23", "--width", "16", "--epochs", "1",
+    ], check=False, cwd=ROOT,
+       env={**os.environ, "PYTHONPATH": f"{ROOT / 'src'}:{ROOT}"},
+       capture_output=True, text=True, timeout=60)
+    assert trained.returncode == 0, trained.stderr[-2000:]
+    checkpoint = torch.load(output, map_location="cpu", weights_only=True)
+    assert checkpoint["source_decisions"] == {"human_annotation": 1}
+    assert checkpoint["training_games"][0]["demonstrator_seat"] == 0
+    assert checkpoint["training_games"][0]["authorization"] == "self_recorded"
     with pytest.raises(ValueError, match="self_recorded"):
         training_demonstrator_records(replace(
             trajectory, skill_metadata={"demonstrator_seat": 0}))

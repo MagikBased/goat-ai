@@ -639,8 +639,10 @@ def main() -> None:
                                    main_deck_composition_sha256(read_ydk(deck))
                                    for deck in trajectory.decks),
                                "source": source,
-                               "demonstrator_seat": (None if annotation is not None
-                                                     else demonstrator_seat(trajectory)),
+                               "demonstrator_seat": (
+                                   demonstrator_seat(trajectory)
+                                   if annotation is None or annotation.authorization == "self_recorded"
+                                   else None),
                                "annotation_sha256": (hashlib.sha256(
                                    label_path.read_bytes()).hexdigest()
                                    if annotation is not None else None),
