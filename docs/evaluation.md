@@ -15646,3 +15646,62 @@ named held-out pairs and compare the matched Tactical reports with
 
 This larger same-schedule experiment does not support normalization as a
 strength improvement. Keep it opt-in, retain selected v23, and keep M4 open.
+
+## Feature-v32 PPO action-choice pilot (30 October 2026)
+
+The selected feature-v23 policy cannot distinguish some public
+`select_option` alternatives: in 16 already verified recent PPO replays,
+3,987 multi-action decisions and 15,311 legal actions contained six
+distinct-choice collision groups at v23. Re-encoding those same decisions
+with the existing opt-in feature v31 or v32 removes those six groups. This
+checks action representation, not whether either policy chooses well. The
+audit read only player-visible trajectory records. A new `scripts/train_self_play.py
+--upgrade-feature-23-to-32` option uses the existing, validated zero-extension
+loader to start v32 PPO from a provenance-bearing v23 checkpoint. The starting
+model keeps all v23 weights; new inputs contribute zero initially.
+
+A matched 48-duel pilot compared v32 with unchanged v23, both starting from
+selected v23. Training used Jesse Twohig Goat Control/Montague Warrior,
+Dingosig Chaos Return/Weirdchamp Bazoo Return, and Insids Chaos Control/Cas
+Stomphorst Flip Control, with four roles, seeds 153000–153047, four-game frozen
+rollouts, four workers, two PPO epochs, batch 32, learning rate 0.0005,
+Tactical-v14 baseline opponent, half historical opponents, learner-deck
+baseline, per-episode weighting, parent KL 0.05, and a 3,000-decision cap.
+The first four pre-update trajectories were byte-identical across arms. All
+96 training duels finished, replay-verified, and passed the visibility audit:
+the v23 arm recorded 26,592 decisions, 17 learner wins, 29 losses, and two
+draws in 23.66 seconds; v32 recorded 26,562 decisions, 19 wins, 27 losses,
+and two draws in 24.24 seconds. Training outcomes are not strength evidence.
+
+On previously unseen Roberto Martinez Phoenix/Jae Kim Zombie and Rhymus Lizo
+Goat Control/GoatFormat-guide Dimension Fusion Main Decks, both assignments
+and seats, seeds 153200–153207, v32 scored **30–33–1** directly against the
+matched v23 child (47.66% score, paired 95% interval **38.28–57.81%**).
+Against Tactical-v14 on identical holdout schedules, seeds 153300–153307,
+v32 scored **21–42–1** versus v23's **26–38**. The strict report comparator
+verified local Deck bytes, unseen Main Deck compositions, source code, native
+assets, seeds, assignments, seats, and opponent, then measured a v32-minus-v23
+paired score difference of **−7.03 points** (95% interval **−19.53 to +3.13**).
+The v32 child lost Phoenix and Zombie assignments; Dimension Fusion was
+unchanged. This short pilot does not establish that v32 is intrinsically worse,
+but it gives no reason to promote it. Keep the feature upgrade opt-in and the
+selected v23 policy unchanged.
+
+The ignored v23 and v32 checkpoint SHA-256 values are respectively
+`1b07bc999af0cb49407879ab38b69f92ae2c59f2ec4fe318e7e24bd2eed662ab`
+and `24751ed0a7d53e71d5d7260eb6338542b806bedd46d4ae26c0ff3502d9a0294e`.
+Their replay-audit report hashes are `b9a9e574d4b8f71547959308313e21c9ffbf7f56daf90a5bd014007910f2d1c0`
+and `37d97359a0ea5596fa6043548d2b9145d4c1a2a38d57eee4486b687c89eea27b`.
+The direct, v32/Tactical, v23/Tactical, and strict comparison report hashes
+are `19bbd9f14074739a741003747e6ff12e9dde7fd2c304fbd05d96e1936ef54bd3`,
+`2c2143e0be520b5e5528e93acef70cfffafc78a5d5d58f7453a9afe3ed12a694`,
+`cad30655d3b99a3d09e224618ba9c62fc00cc70f08547527d1d1fcc71934317d`,
+and `276620ca4c168e232536b6184dede1418d4f676ad413a94f84d1e221885edbd3`.
+Reproduce with `scripts/train_self_play.py` using the schedule and settings
+above, adding the upgrade flag only for v32, then run
+`scripts/audit_selfplay_replays.py` on every episode. Evaluate with
+`scripts/evaluate_policy.py --engine experimental --both-deck-assignments
+--require-unseen-main-decks --max-decisions 3000` using the named holdout
+Decks and seed blocks; compare the Tactical reports with
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.

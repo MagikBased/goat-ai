@@ -23,7 +23,7 @@ from goat_ai.replay import (
     write_trajectory,
 )
 from goat_ai.replay.fingerprint import sha256_file
-from goat_ai.training import load_policy_agent
+from goat_ai.training import LegalActionPolicy, PolicyAgent, load_policy_agent
 from goat_ai.training.resource_value import load_frozen_resource_ridge
 from goat_ai.training.self_play import (
     VisibleStateValue,
@@ -32,6 +32,7 @@ from goat_ai.training.self_play import (
     train_against_snapshot_pool,
 )
 from scripts.derive_visible_rule_preferences import validate_automated_preferences
+from scripts.train_behavioral_clone import load_parent_checkpoint
 
 
 def sha256(path: Path) -> str:
@@ -50,6 +51,22 @@ def replay_directory(output: Path, requested: Path | None) -> Path:
                                            or any(directory.iterdir()))):
         raise ValueError("self-play replay directory must be empty and distinct from output")
     return directory
+
+
+def load_training_agent(checkpoint: Path, *, upgrade_feature_23_to_32: bool = False
+                        ) -> PolicyAgent:
+    """Warm-start an experimental feature-v32 PPO policy from selected v23."""
+    agent = load_policy_agent(checkpoint)
+    if not upgrade_feature_23_to_32:
+        return agent
+    if agent.model.feature_version != 23:
+        raise ValueError("feature-v32 self-play upgrade requires a v23 checkpoint")
+    model = LegalActionPolicy(agent.vocabulary.size,
+                              width=agent.model.card.embedding_dim,
+                              feature_version=32)
+    load_parent_checkpoint(checkpoint, model, agent.vocabulary,
+                           allow_v23_to_v32=True)
+    return PolicyAgent(model.eval(), agent.vocabulary)
 
 
 def checked_replay_hashes(terminal_reports: list[dict],
@@ -111,6 +128,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("checkpoint", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--upgrade-feature-23-to-32", action="store_true",
+                        help="zero-extend a v23 checkpoint for opt-in v32 self-play")
     parser.add_argument("--native-root", type=Path, default=Path(".cache/goat-ai"))
     parser.add_argument("--engine", choices=("restricted", "experimental"), default="restricted")
     parser.add_argument("--matchup", nargs=2, action="append", metavar=("DECK_A", "DECK_B"))
@@ -249,7 +268,8 @@ def main() -> None:
         record_dir = replay_directory(args.output, args.record_dir)
     except ValueError as exc:
         parser.error(str(exc))
-    agent = load_policy_agent(args.checkpoint)
+    agent = load_training_agent(args.checkpoint,
+                                upgrade_feature_23_to_32=args.upgrade_feature_23_to_32)
     retained = (load_retained_preferences(args.retain_preferences_manifest,
                                           parent, args.native_root)
                 if args.retain_preferences_manifest else [])
@@ -403,6 +423,8 @@ def main() -> None:
               "ppo_rollout_games": (args.ppo_rollout_games
                                     if args.policy_update == "clipped_ppo" else None),
               "rollout_workers": args.rollout_workers,
+              "parent_feature_upgrade": ("v23_to_v32"
+                                         if args.upgrade_feature_23_to_32 else None),
               "rollout_batch_inference": args.rollout_batch_inference,
               "trace_rollout_inference": args.trace_rollout_inference,
               "reuse_rollout_features": args.reuse_rollout_features,
