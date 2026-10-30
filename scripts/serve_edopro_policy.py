@@ -158,6 +158,7 @@ class Bridge:
                           else "edopro_external_unpatched")
                 deck_hashes = tuple(deck_composition_sha256(main, extra)
                                     for main, extra in duel._insertion)
+                asset_sha256 = mirror.asset_manifest() if complete or prefix else None
                 metadata = {
                     "source": source,
                     "training_admitted": False,
@@ -175,6 +176,7 @@ class Bridge:
                     "lua_errors": result.lua_errors,
                     "names": list(duel.names),
                     "deck_sha256": list(deck_hashes),
+                    "asset_sha256": asset_sha256,
                     "human_client_seat": 1,
                     "human_authorization": bridge.human_authorization,
                 }
@@ -195,6 +197,7 @@ class Bridge:
                         },
                         schema_version=28,
                         deck_sha256=deck_hashes,
+                        asset_sha256=asset_sha256,
                         terminal_observation=mirror.decision.observation,
                     )
                     write_trajectory(stem.with_suffix(".review.json"), trajectory)

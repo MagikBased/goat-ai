@@ -96,3 +96,7 @@ class LiveDuelMirror:
         self._engine.close()
         self.decision = None
         self._local_response = None
+
+    def asset_manifest(self) -> dict[str, str]:
+        """Fingerprint the core assets and effective scripts used by this duel."""
+        return self._engine.replay_manifest()

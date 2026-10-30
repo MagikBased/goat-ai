@@ -132,7 +132,10 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
     assert verified["visible_decisions"] == len(trajectory.decisions)
     assert verified["reviewable_prefix"] is surrender
     assert verified["deck_identity_verified"] is True
+    assert verified["asset_identity_verified"] is True
     assert verified["training_admitted"] is False
+    assert metadata["asset_sha256"] == trajectory.asset_sha256
+    assert "build/libocgcore.so" in trajectory.asset_sha256
     if authorized and not surrender:
         human_index = next(index for index, record in enumerate(trajectory.decisions)
                            if record.observation.acting_player == 1)
@@ -203,7 +206,7 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
                 "edopro_human_confirmed_experimental": 1}
             assert checkpoint["training_games"][0]["historical_goat_certified"] is False
         else:
-            with pytest.raises(ValueError, match="complete pinned historical"):
+            with pytest.raises(ValueError, match="asset-fingerprinted pinned room"):
                 load_experimental_edopro_confirmations(copied_replay, mirror_root)
     elif not authorized and not surrender:
         with pytest.raises(ValueError, match="authorized self-recording"):
@@ -215,6 +218,13 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
         verify_edopro_live_recording(replay_path, review_path,
                                      metadata_path, mirror_root)
     metadata["human_authorization"] = "self_recorded" if authorized else None
+    original_assets = metadata["asset_sha256"]
+    metadata["asset_sha256"] = {**original_assets, "build/libocgcore.so": "0" * 64}
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    with pytest.raises(ValueError, match="differs from replay"):
+        verify_edopro_live_recording(replay_path, review_path,
+                                     metadata_path, mirror_root)
+    metadata["asset_sha256"] = original_assets
     metadata["deck_sha256"][0] = "0" * 64
     metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
     with pytest.raises(ValueError, match="differs from replay"):
@@ -237,10 +247,13 @@ def test_experimental_edopro_loader_rejects_incomplete_or_unpatched(tmp_path, mo
                  replay.with_suffix(".meta.json"),
                  replay.with_suffix(".human_labels.json")):
         path.write_bytes(b"fixture")
-    for complete, historical in ((False, True), (True, False)):
+    for complete, historical, assets in ((False, True, True),
+                                         (True, False, True),
+                                         (True, True, False)):
         monkeypatch.setattr(
             "scripts.train_behavioral_clone.verify_edopro_human_annotations",
-            lambda *args, complete=complete, historical=historical: {
-                "complete": complete, "historical_patches": historical})
-        with pytest.raises(ValueError, match="complete pinned historical"):
+            lambda *args, complete=complete, historical=historical, assets=assets: {
+                "complete": complete, "historical_patches": historical,
+                "asset_identity_verified": assets})
+        with pytest.raises(ValueError, match="asset-fingerprinted pinned room"):
             load_experimental_edopro_confirmations(replay, tmp_path)

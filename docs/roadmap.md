@@ -3023,7 +3023,8 @@ decision numbers, verifies the replay, rejects AI-seat and forced responses,
 and atomically saves the authorized human-action annotation. The local game
 page now provides the same explicit confirmations. An opt-in experimental
 clone path accepts only complete pinned-room recordings with those confirmed
-choices, independently verifies them again, and marks its checkpoint as
+choices and recorded core, database, list, and effective-script hashes;
+independently verifies them again; and marks its checkpoint as
 historically uncertified. Raw EDOPro replay admission and policy promotion
 still require separate gates.
 

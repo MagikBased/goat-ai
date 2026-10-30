@@ -150,7 +150,11 @@ result. This validates that specific path, not every possible EDOPro prompt.
 New room recordings also store a SHA-256 identifier for each Deck's sorted
 Main and Extra Deck composition. Verification checks those identifiers against
 the Decks embedded in the EDOPro replay; it does not expose shuffled Deck order.
-Older recordings without identifiers still verify their decisions and outcome.
+They also record hashes of the native core, three card databases, GOAT list,
+and each effective script loaded during that duel. Verification matches this
+asset manifest during reconstruction. Older recordings without these
+identifiers still verify their decisions and outcome, but cannot enter the
+experimental confirmed-choice trainer.
 Use `--human-authorization self_recorded` only for your own authorized games.
 It records the human client's seat and permission in the replay metadata and
 review trajectory. EDOPro can answer some prompts automatically, so this does
@@ -172,9 +176,9 @@ PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
   --output .cache/goat-ai/edopro_confirmed_pilot.pt
 ```
 
-It rechecks the native replay, human seat, annotation, and embedded Deck
-identities, trains only the confirmed optional choices, and marks the
-checkpoint `edopro_human_confirmed_experimental` with
+It rechecks the native replay, human seat, annotation, embedded Deck
+identities, and effective asset hashes. It trains only the confirmed optional
+choices and marks the checkpoint `edopro_human_confirmed_experimental` with
 `historical_goat_certified=false`. Incomplete, unpatched, unconfirmed, and
 arbitrary external replays remain excluded. This path is for controlled
 experiments, not policy promotion or a historical correctness claim. Replace

@@ -100,8 +100,10 @@ def load_experimental_edopro_confirmations(replay: Path, native_root: Path):
     before = tuple(hashlib.sha256(path.read_bytes()).hexdigest() for path in paths)
     report = verify_edopro_human_annotations(
         replay, review, metadata, labels, native_root)
-    if not report["complete"] or not report["historical_patches"]:
-        raise ValueError(f"{replay}: only complete pinned historical room duels qualify")
+    if (not report["complete"] or not report["historical_patches"]
+            or not report["asset_identity_verified"]):
+        raise ValueError(f"{replay}: only complete asset-fingerprinted pinned room "
+                         "duels qualify")
     trajectory = read_trajectory(review)
     annotations, selected = read_decision_annotations(
         labels, before[1], trajectory)

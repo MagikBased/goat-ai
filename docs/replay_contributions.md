@@ -126,6 +126,7 @@ Until these gates pass, an arbitrary external file remains a compatibility
 fixture and its decisions are excluded from policy training and strength
 claims. The behavioral-clone command rejects raw EDOPro-derived trajectories.
 The separate `--experimental-edopro-confirmed` path requires a complete pinned
-local room, exact replay verification, and explicit human-seat confirmations;
+local room, an exact asset manifest and replay verification, and explicit
+human-seat confirmations;
 it marks resulting checkpoints historically uncertified and does not establish
 the general admission or policy-strength gates.

@@ -60,6 +60,8 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         raise ValueError("unexpected human client seat")
     has_deck_hashes = ("deck_sha256" in metadata
                        or trajectory.deck_sha256 is not None)
+    has_asset_hashes = (metadata.get("asset_sha256") is not None
+                        or trajectory.asset_sha256 is not None)
     status = provenance.get("recording_status")
     if (trajectory.source != (base_source if complete else base_source + "_partial")
             or trajectory.ruleset != ruleset
@@ -71,6 +73,9 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
             or provenance.get("human_client_seat") != human_seat
             or has_deck_hashes and (trajectory.deck_sha256 != deck_hashes
                                     or metadata.get("deck_sha256") != list(deck_hashes))
+            or has_asset_hashes and (
+                trajectory.asset_sha256 != reconstructed.asset_sha256
+                or metadata.get("asset_sha256") != reconstructed.asset_sha256)
             or trajectory.seed != metadata.get("seed")
             or reconstructed.native_terminal is not complete
             or trajectory.winner != reconstructed.winner
@@ -92,6 +97,7 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         "historical_patches": historical,
         "historical_goat_certified": False,
         "deck_identity_verified": has_deck_hashes,
+        "asset_identity_verified": has_asset_hashes,
         "training_admitted": False,
     }
 
