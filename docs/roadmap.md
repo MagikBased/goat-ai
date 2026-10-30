@@ -2909,6 +2909,13 @@ working bridge. A prototype should first join a private local GOAT room as a
 bot, complete one duel using recorded native responses, and verify both
 clients use the same GOAT rule flags, card IDs, database, and scripts.
 
+An [external headless host probe](research.md#edopro-live-client-bridge-probe-2026-10-30)
+now completes a random-versus-random GOAT-flag duel and re-simulates its
+EDOPro replay exactly on its own bundled core. Its legacy 15-card Extra Deck
+check needs a GOAT-specific fix or an independently validated bypass. Our
+pinned core diverged at response 92, so asset parity, a real desktop-client
+connection, and a policy-seat adapter remain unproven.
+
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The
 human's decisions require equivalent logging at the server or a validated
