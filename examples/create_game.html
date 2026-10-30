@@ -29,6 +29,8 @@
     #edopro-choices { max-height: 50vh; overflow-y: auto; padding-left: 20px; }
     #edopro-choices label { display: inline; margin: 0; }
     #edopro-choices input { width: auto; margin: 0 8px 0 0; }
+    #edopro-training-command { white-space: pre-wrap; overflow-wrap: anywhere;
+      background: #0c2029; padding: 12px; border-radius: 8px; user-select: all; }
     @media (max-width: 650px) { .seats { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -42,8 +44,9 @@
        <strong>LAN → Host address</strong>, enter <strong>127.0.0.1</strong> and
        port <strong>7911</strong>, select your deck, and ready up. The AI is
        Player 2. This page saves a native replay and, when independently
-       verified, a player-visible replay for review. EDOPro games are not yet
-       admitted to automatic training.</p>
+       verified, a player-visible replay for review. Confirmed human choices
+       from complete pinned games can enter the opt-in experimental trainer;
+       raw replays are not automatically used for training.</p>
     <label>AI deck<select id="edopro-deck"></select></label>
     <button id="edopro-start" type="button">Start EDOPro room</button>
     <p id="edopro-status" role="status" aria-live="polite"></p>
@@ -78,9 +81,15 @@
   <dialog id="edopro-dialog"><h2>Confirm your EDOPro choices</h2>
     <p>Check only actions you remember choosing yourself. EDOPro can answer
        some prompts automatically. Each saved choice is checked against the
-       native replay and remains excluded from automatic training for now.</p>
+       native replay. Confirmed choices from complete pinned games can be used
+       by the opt-in experimental trainer; they are not used automatically.</p>
     <ul id="edopro-choices"></ul>
     <p id="edopro-review-status" role="status" aria-live="polite"></p>
+    <div id="edopro-training" hidden>
+      <p>To train experimentally on these confirmed choices, run this from the
+         project directory. The resulting checkpoint is not historically certified.</p>
+      <pre id="edopro-training-command"></pre>
+    </div>
     <button id="edopro-save" type="button">Save confirmations</button>
     <button id="edopro-close" type="button">Close</button>
   </dialog>
@@ -190,6 +199,17 @@
       }
     });
     let currentEdoReview = null;
+    function showEdoTrainingCommand(review, count) {
+      const box = byId("edopro-training");
+      box.hidden = !(count > 0 && review.experimental_confirmed_eligible);
+      if (box.hidden) return;
+      const session = review.id;
+      byId("edopro-training-command").textContent =
+        `PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py ` +
+        `--experimental-edopro-confirmed ${review.native_replay} ` +
+        `--native-root .cache/goat-ai ` +
+        `--output .cache/goat-ai/edopro_games/${session}/confirmed_pilot.pt`;
+    }
     byId("edopro-recordings").addEventListener("click", async event => {
       const button = event.target.closest("button[data-edopro-id]");
       if (!button) return;
@@ -216,6 +236,7 @@
         }
         if (!review.candidates.length) list.textContent = "No optional human-seat decisions in this recording.";
         byId("edopro-review-status").textContent = `${review.confirmed} confirmed choices saved.`;
+        showEdoTrainingCommand(review, review.confirmed);
         byId("edopro-dialog").showModal();
       } catch (error) {
         byId("edopro-status").textContent = error.message;
@@ -234,7 +255,8 @@
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Could not save choices");
-        byId("edopro-review-status").textContent = `${result.confirmed} choices saved and verified. Training admission remains closed.`;
+        byId("edopro-review-status").textContent = `${result.confirmed} choices saved and verified. No automatic training occurs.`;
+        showEdoTrainingCommand(currentEdoReview, result.confirmed);
       } catch (error) {
         byId("edopro-review-status").textContent = error.message;
       } finally { button.disabled = false; }

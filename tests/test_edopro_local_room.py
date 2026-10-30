@@ -70,6 +70,7 @@ def test_edopro_room_launch_and_verified_viewer(tmp_path, monkeypatch):
     assert record["verified"] is True
     assert record["complete"] is True
     assert record["training_admitted"] is False
+    assert record["experimental_confirmed_eligible"] is False
     assert record["viewer"].endswith("/game-001-seed-42.html")
     assert (directory / "game-001-seed-42.html").is_file()
 
@@ -112,7 +113,9 @@ def test_edopro_web_confirmations_only_label_optional_human_choices(tmp_path, mo
     review = replay.with_suffix(".review.json")
     write_trajectory(review, trajectory)
     monkeypatch.setattr("scripts.edopro_local_room.verify_edopro_live_recording",
-                        lambda *args: {"complete": True})
+                        lambda *args: {"complete": True,
+                                       "historical_patches": True,
+                                       "asset_identity_verified": True})
     monkeypatch.setattr("scripts.confirm_edopro_human_actions.verify_edopro_live_recording",
                         lambda *args: {"complete": True})
     monkeypatch.setattr("scripts.edopro_local_room.verify_edopro_human_annotations",
@@ -129,11 +132,15 @@ def test_edopro_web_confirmations_only_label_optional_human_choices(tmp_path, mo
     assert [item["frame"] for item in choices["candidates"]] == [2]
     assert choices["candidates"][0]["card"] == "Dekoichi"
     assert choices["training_admitted"] is False
+    assert choices["experimental_confirmed_eligible"] is True
+    assert choices["native_replay"].endswith("game-001-seed-42.yrpX")
     with pytest.raises(ValueError, match="optional human-seat"):
         room.save_choices("a" * 16, [1])
     with pytest.raises(ValueError, match="optional human-seat"):
         room.save_choices("a" * 16, [3])
-    assert room.save_choices("a" * 16, [2])["confirmed"] == 1
+    saved = room.save_choices("a" * 16, [2])
+    assert saved["confirmed"] == 1
+    assert saved["experimental_confirmed_eligible"] is True
     labels = replay.with_suffix(".human_labels.json")
     annotations, records = read_decision_annotations(
         labels, sha256_file(review), trajectory)

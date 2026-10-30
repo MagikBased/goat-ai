@@ -103,7 +103,9 @@ their viewer frames. Check only actions you personally chose; EDOPro may answer
 some prompts automatically. **Save confirmations** writes and verifies
 `<game>.human_labels.json` beside the recording. Reopening the dialog restores
 the saved checkmarks, and unchecking one removes that confirmation. These
-annotations remain review-only while EDOPro training admission is closed.
+annotations are excluded from automatic training. A complete, pinned,
+asset-fingerprinted game with confirmed choices can enter the opt-in
+experimental trainer described below; the dialog shows its exact command.
 
 You can play the selected PyTorch policy through an EDOPro LAN room using the
 optional external `mostwanted7/ygo-agent` host. The host is AGPL-3.0-or-later,
@@ -201,7 +203,8 @@ Replace `NNN` with your saved seed and `12 37` with decisions you personally
 confirm choosing. The script independently verifies the replay, rejects AI
 turns and forced choices, and writes a checked `.human_labels.json` beside it.
 It will not replace a different existing label file. This is a review aid;
-the EDOPro training gate remains closed.
+only complete, pinned, asset-fingerprinted games with confirmed choices can
+enter the opt-in experimental training path above.
 
 The external host package remains a separate AGPL dependency and must be on
 `PYTHONPATH`. The locally tested checkout is

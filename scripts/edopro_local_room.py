@@ -85,7 +85,11 @@ class EdoRoomManager:
                                "action": action.kind.replace("_", " "),
                                "card": card,
                                "confirmed": index + 1 in confirmed})
-        return {"id": identifier, "viewer": self._recording(replay.parent)["viewer"],
+        recording = self._recording(replay.parent)
+        return {"id": identifier, "viewer": recording["viewer"],
+                "native_replay": recording["native_replay"],
+                "experimental_confirmed_eligible": recording.get(
+                    "experimental_confirmed_eligible", False),
                 "candidates": candidates, "confirmed": len(confirmed),
                 "training_admitted": False}
 
@@ -116,6 +120,8 @@ class EdoRoomManager:
                                    pending)
                     pending.replace(output)
             return {"id": identifier, "confirmed": len(frames),
+                    "experimental_confirmed_eligible": self._recording(
+                        replay.parent).get("experimental_confirmed_eligible", False),
                     "training_admitted": False}
 
     def readiness(self) -> tuple[bool, str]:
@@ -202,6 +208,9 @@ class EdoRoomManager:
                 record["viewer"] = "/" + viewer.relative_to(self.root).as_posix()
                 record["verified"] = True
                 record["review_ready"] = True
+                record["experimental_confirmed_eligible"] = bool(
+                    report.get("complete") and report.get("historical_patches")
+                    and report.get("asset_identity_verified"))
             except (ValueError, OSError, RuntimeError) as exc:
                 record["verification_error"] = str(exc)
             self._verified[directory.name] = (stamp, record)
