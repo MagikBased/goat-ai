@@ -345,7 +345,8 @@ def test_own_activation_passes_its_chain_unless_priority_is_held(tmp_path):
       const initial = {id:'1234567890abcdef',human_seat:0,decisions:0,terminal:false,
         card_names:{},observation:base,legal_actions:[action('activate')]};
       const chained = {...initial,decisions:1,observation:{...base,chain:[
-        {index:1,controller:0,card_code:123,targets:[]}]},legal_actions:[action('pass')]};
+        {index:1,controller:0,card_code:123,targets:[]}]},
+        legal_actions:[action('chain'),action('pass')]};
       const resolved = {...initial,decisions:2,legal_actions:[action('end_phase')]};
       const chosen = [];
       window.fetch = async (_path, options) => {

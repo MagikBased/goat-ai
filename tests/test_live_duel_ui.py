@@ -188,7 +188,7 @@ def test_own_set_card_previews_face_without_revealing_opponent_set(tmp_path):
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
-def test_old_server_page_auto_passes_forced_windows_but_stops_for_chain(tmp_path):
+def test_old_server_page_auto_passes_consecutive_response_windows(tmp_path):
     page = Path(__file__).resolve().parents[1] / "examples/play_game.html"
     probe = """<script>
       const observation = {turn:1,turn_player:0,acting_player:0,phase:'draw',
@@ -201,7 +201,8 @@ def test_old_server_page_auto_passes_forced_windows_but_stops_for_chain(tmp_path
       const wrap = (decisions, legal_actions) => ({id:'old-server',terminal:false,
         human_seat:0,decisions,observation,legal_actions,card_names:{101:'Quick effect'}});
       const replies = [wrap(1,[pass]),{
-        ...wrap(2,[chain,pass]),observation:{...observation,turn_player:1}}];
+        ...wrap(2,[chain,pass]),observation:{...observation,turn_player:1}},
+        wrap(3,[{kind:'end_phase',parameters:{}}])];
       const sent = [];
       window.fetch = async (path, options) => {
         if (path === '/api/live/choice') {
@@ -224,11 +225,11 @@ def test_old_server_page_auto_passes_forced_windows_but_stops_for_chain(tmp_path
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-forced-pass-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "0@0,0@1|2|2"
+    assert match.group(1) == "0@0,0@1,1@2|3|1"
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
-def test_own_optional_chain_auto_passes_unless_holding_priority(tmp_path):
+def test_optional_chain_auto_passes_on_both_turns_unless_paused(tmp_path):
     page = Path(__file__).resolve().parents[1] / "examples/play_game.html"
     probe = """<script>
       const observation = {turn:1,turn_player:0,acting_player:0,phase:'main1',
@@ -252,7 +253,8 @@ def test_own_optional_chain_auto_passes_unless_holding_priority(tmp_path):
       setTimeout(() => render(wrap('own',0,observation,[chain,pass])),40);
       setTimeout(() => {
         byId('hold-priority').checked = true;
-        render(wrap('hold',0,observation,[chain,pass]));
+        render(wrap('hold',0,{...observation,turn_player:1,
+          chain:[{controller:1,card_code:102}]},[chain,pass]));
       },120);
       setTimeout(() => {
         byId('hold-priority').checked = false;
@@ -270,4 +272,4 @@ def test_own_optional_chain_auto_passes_unless_holding_priority(tmp_path):
     ], capture_output=True, text=True, timeout=20, check=True)
     match = re.search(r'data-optional-pass-probe="([^"]*)"', result.stdout)
     assert match, result.stderr[-1000:]
-    assert match.group(1) == "own:1"
+    assert match.group(1) == "own:1,opponent:1"

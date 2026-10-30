@@ -177,7 +177,7 @@
       <button data-duel-mute type="button" aria-label="Toggle duel sounds">🔊 Sound on</button>
       <button id="quit" type="button">Leave unfinished duel</button>
       <p id="message" role="status" aria-live="polite"></p>
-      <label class="priority-toggle"><input id="hold-priority" type="checkbox"> Hold priority after your activations</label>
+      <label class="priority-toggle"><input id="hold-priority" type="checkbox"> Pause for chain responses (traps and quick effects)</label>
       <label class="priority-toggle"><input id="auto-place" type="checkbox" checked> Automatically choose open card zones</label>
       <div id="card-selection" hidden><div id="card-selection-message"></div>
         <button id="confirm-cards" type="button">Confirm selected cards</button></div>
@@ -212,12 +212,9 @@
       const passIndex = options.findIndex(action => action.kind === "pass");
       if (passIndex < 0) return;
       const forced = options.length === 1;
-      const chain = data.observation?.chain || [];
-      const ownWindow = !byId("hold-priority").checked &&
-        data.observation?.turn_player === data.human_seat &&
-        (!chain.length || chain.at(-1)?.controller === data.human_seat) &&
+      const optionalResponse = !byId("hold-priority").checked &&
         options.every(action => ["pass", "chain"].includes(action.kind));
-      if (!forced && !ownWindow) return;
+      if (!forced && !optionalResponse) return;
       forcedPassTimer = setTimeout(() => {
         if (!busy && !phaseTraveling && state?.id === data.id &&
             state?.decisions === data.decisions &&
@@ -821,6 +818,7 @@
         scheduleForcedPass(state); }
     }
     byId("search").addEventListener("input", actions);
+    byId("hold-priority").addEventListener("change", () => scheduleForcedPass(state));
     document.addEventListener("pointerover", event => {
       const source = event.target instanceof Element
         ? event.target.closest(".card[data-preview-code]") : null;

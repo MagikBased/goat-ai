@@ -149,15 +149,16 @@ discards, click the cards in your hand or on the field, then press **Confirm
 selected cards**. Click a selected card again to undo it. The advanced action
 list remains available for choices outside the board. Open placement zones are
 chosen automatically after a Summon or Set; uncheck **Automatically choose open
-card zones** to select the zone yourself. With **Hold priority** off, the live
-UI also passes through your own immediate chain window after a Set or Summon,
-then returns to the next actionable decision. It stops if the opponent adds a
-chain link that you can answer.
+card zones** to select the zone yourself. By default, the live UI passes through
+optional chain-response windows on both turns, then returns to the next
+actionable decision. Check **Pause for chain responses** before an opponent
+action you may want to answer with a Trap or quick effect; uncheck it to resume
+automatic passing.
 The server also passes automatically whenever **Pass** is your only native
 legal action, including after an AI move. Such passes stay in the verified
-trajectory and unfinished-game journal. If any Chain response is available,
-the game stops for your choice. Hover or focus a card to enlarge it; your own
-face-down cards preview their known faces, while unknown opponent cards stay
+trajectory and unfinished-game journal. When response pausing is enabled,
+available Chain responses stop for your choice. Hover or focus a card to enlarge
+it; your own face-down cards preview their known faces, while unknown opponent cards stay
 concealed. Scroll over the previewed card to resize it.
 On desktop, the field fits both players' zones and hands in the viewport; the
 sidebar scrolls independently when its details are expanded.
@@ -173,7 +174,7 @@ including when opened offline. Browsers may wait for a click before playing
 audio. No game sound files are committed to Git; see
 [EDOPro's sound credits](https://github.com/ProjectIgnis/Distribution/blob/master/sound/CREDITS.md).
 Click a future phase to pass through intermediate priority windows. Enable
-**Hold priority after your activations** to keep the first response window.
+**Pause for chain responses** to keep response windows after your activations.
 Use **Pass** for individual responses,
 or use **End turn** when that transition is legal. Unusual prompts and every
 legal choice remain available under **All legal actions** in the sidebar.
