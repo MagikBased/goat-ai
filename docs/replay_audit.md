@@ -1,5 +1,36 @@
 # Early replay decision audit
 
+## Rhymus Goat Control assignment review (29 October 2026)
+
+The [focused local queue](../.cache/goat-ai/rhymus_weak_review_128016_128017/rhymus_queue.html)
+offers eight high-margin selected-v23/Tactical disagreements from two new
+replay-verified, visibility-audited duels where the policy played Rhymus
+Lizo's 2005 Goat Control against Ramon Ciriano's Beastdown. It includes one
+visible own-only Heavy Storm activation, a passed chain response, and six
+other summon, placement, card-choice, or phase decisions. Tactical's choices
+are review prompts, not correctness labels. The queue SHA-256 is
+`53eee602c797dedebc479b70f126a2c91f7d426e71855e50384e449a9bb84977`.
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/rhymus_weak_review_128016_128017/rhymus_queue.json
+```
+
+The source collection also recorded the opposite policy seat on the same
+two seeds. All four native duels finished, replay-verified, and passed the
+visibility audit, covering 1,727 decisions; the collection manifest SHA-256
+is `369e0f891c58e8285e67a990707a08ca8c60e898b409fde094c96af5986a62a7`.
+The policy lost both Rhymus-assigned games and won both Beastdown-assigned
+games. This tiny sample, and the larger held-out evaluation, show a strong
+deck assignment effect; they do not establish that any queued Tactical
+alternative would change the winner. No human label has been saved for this
+queue yet. Reproduce the four recordings with
+`scripts/collect_policy_matches.py` using the selected v23 checkpoint,
+`--matchup` for the two decks above, `--opponent tactical --seed 128016
+--seeds 2 --workers 2 --max-decisions 3000`, and the local output directory
+named in the link. Run `scripts/shortlist_policy_disagreements.py` on the two
+`seat_0.json` files with `--limit 8 --per-replay 4 --render-viewers` to
+rebuild the focused queue in an empty output directory.
+
 ## Fresh policy versus Tactical review queue (29 October 2026)
 
 The [focused local queue](../.cache/goat-ai/own_loss_review_source_126000_126007/review_queue.html)

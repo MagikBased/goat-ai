@@ -986,6 +986,13 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A [focused Rhymus Goat Control review queue](replay_audit.md#rhymus-goat-control-assignment-review-29-october-2026)
+now offers eight high-margin decisions from two fresh, complete, verified
+selected-v23/Tactical duels in the deck assignment where the held-out
+policy performed poorly. Its Tactical alternatives remain unreviewed
+suggestions; the queue is a route to broader human preference evidence,
+not a strength gain.
+
 A fresh 64-duel, both-deck-assignment held-out check of the experimental
 visible-material-v5 child against selected v23 scored 30–34 on two previously
 unseen tournament pairings. Against Tactical-v14 on separate matched seeds,
