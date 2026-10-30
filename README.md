@@ -101,7 +101,8 @@ PYTHONPATH=src:.cache/goat-ai/edopro_probe/ygo_agent_host \
   --host-root .cache/goat-ai/edopro_pinned_host \
   --mirror-root .cache/goat-ai --historical-pinned \
   --checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
-  --ai-deck examples/decks/warrior_montague_clash.ydk
+  --ai-deck examples/decks/warrior_montague_clash.ydk \
+  --human-authorization self_recorded
 ```
 
 In EDOPro choose **LAN → Host address**, enter `127.0.0.1` and port `7911`,
@@ -130,6 +131,12 @@ New room recordings also store a SHA-256 identifier for each Deck's sorted
 Main and Extra Deck composition. Verification checks those identifiers against
 the Decks embedded in the EDOPro replay; it does not expose shuffled Deck order.
 Older recordings without identifiers still verify their decisions and outcome.
+Use `--human-authorization self_recorded` only for your own authorized games.
+It records the human client's seat and permission in the replay metadata and
+review trajectory. EDOPro can answer some prompts automatically, so this does
+not prove which responses were deliberate clicks; those records remain excluded
+from raw behavioral-cloning intake until that distinction and the historical
+rules gate are resolved.
 
 The external host package remains a separate AGPL dependency and must be on
 `PYTHONPATH`. The locally tested checkout is

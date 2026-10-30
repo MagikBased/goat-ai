@@ -34,6 +34,8 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=None)
     parser.add_argument("--historical-pinned", action="store_true",
                         help="require the pinned core, DBs, list and checksum-guarded GOAT scripts")
+    parser.add_argument("--human-authorization", choices=("self_recorded",),
+                        help="mark the human client's decisions as your authorized self-recording")
     args = parser.parse_args()
     try:
         from ygo_agent.arena.deck import DeckSizes, find_banlist, load_banlists, load_ydk
@@ -60,7 +62,8 @@ def main() -> None:
     bridge = Bridge(args.mirror_root, args.out, policy,
                     hashlib.sha256(args.checkpoint.read_bytes()).hexdigest(),
                     DuelObserver, RoomObserver,
-                    historical_patches=args.historical_pinned)
+                    historical_patches=args.historical_pinned,
+                    human_authorization=args.human_authorization)
     room.add_local(1, bridge.seat(Seat), deck)
     room.duel_observers.append(bridge.duel_observer())
     room.room_observers.append(bridge.room_observer())
@@ -82,12 +85,16 @@ class Bridge:
     """Per-room mirror and recorder; host owns all unrestricted duel state."""
 
     def __init__(self, native_root, out, policy, checkpoint_sha256,
-                 duel_observer_type, room_observer_type, *, historical_patches=False):
+                 duel_observer_type, room_observer_type, *, historical_patches=False,
+                 human_authorization=None):
+        if human_authorization not in (None, "self_recorded"):
+            raise ValueError("unsupported human recording authorization")
         self.native_root = native_root
         self.out = out
         self.policy = policy
         self.checkpoint_sha256 = checkpoint_sha256
         self.historical_patches = historical_patches
+        self.human_authorization = human_authorization
         self.duel_observer_type = duel_observer_type
         self.room_observer_type = room_observer_type
         self.mirror = None
@@ -168,6 +175,8 @@ class Bridge:
                     "lua_errors": result.lua_errors,
                     "names": list(duel.names),
                     "deck_sha256": list(deck_hashes),
+                    "human_client_seat": 1,
+                    "human_authorization": bridge.human_authorization,
                 }
                 stem.with_suffix(".meta.json").write_text(
                     json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
@@ -179,8 +188,11 @@ class Bridge:
                         seed=duel.seed, decisions=tuple(mirror.records),
                         winner=metadata["winner_team"] if complete else None,
                         source=source if complete else source + "_partial",
-                        skill_metadata={"recording_status": "complete" if complete
-                                        else "interrupted"},
+                        skill_metadata={
+                            "recording_status": "complete" if complete else "interrupted",
+                            "human_client_seat": 1,
+                            "authorization": bridge.human_authorization,
+                        },
                         schema_version=28,
                         deck_sha256=deck_hashes,
                         terminal_observation=mirror.decision.observation,

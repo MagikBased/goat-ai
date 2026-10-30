@@ -49,15 +49,24 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         replay, native_root, historical_patches=historical,
         allow_incomplete=prefix)
     trajectory = read_trajectory(review_path)
+    provenance = trajectory.skill_metadata or {}
+    authorization = metadata.get("human_authorization")
+    if authorization not in (None, "self_recorded"):
+        raise ValueError("unsupported human recording authorization")
+    human_seat = metadata.get("human_client_seat")
+    if human_seat is not None and (type(human_seat) is not int or human_seat != 1):
+        raise ValueError("unexpected human client seat")
     has_deck_hashes = ("deck_sha256" in metadata
                        or trajectory.deck_sha256 is not None)
-    status = (trajectory.skill_metadata or {}).get("recording_status")
+    status = provenance.get("recording_status")
     if (trajectory.source != (base_source if complete else base_source + "_partial")
             or trajectory.ruleset != ruleset
             or trajectory.schema_version != 28
             or (status not in (None, "complete") if complete
                 else status != "interrupted")
             or trajectory.decks != tuple(metadata.get("names", ()))
+            or provenance.get("authorization") != authorization
+            or provenance.get("human_client_seat") != human_seat
             or has_deck_hashes and (trajectory.deck_sha256 != deck_hashes
                                     or metadata.get("deck_sha256") != list(deck_hashes))
             or trajectory.seed != metadata.get("seed")

@@ -20,7 +20,8 @@ from scripts.serve_edopro_policy import Bridge
     reason="external EDOPro host and exact matching native root not supplied",
 )
 @pytest.mark.parametrize("surrender", [False, True])
-def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender):
+@pytest.mark.parametrize("authorized", [False, True])
+def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authorized):
     pytest.importorskip("ygo_agent")
     from ygo_agent.arena.client import ArenaClient
     from ygo_agent.arena.deck import DeckSizes, find_banlist, load_banlists, load_ydk
@@ -46,7 +47,8 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender):
     decks = Path(__file__).parents[1] / "examples/decks"
     bridge = Bridge(mirror_root, tmp_path, RandomAgent(9302),
                     "0" * 64, DuelObserver, RoomObserver,
-                    historical_patches=historical)
+                    historical_patches=historical,
+                    human_authorization="self_recorded" if authorized else None)
     room.add_local(1, bridge.seat(Seat), load_ydk(
         str(decks / "warrior_montague_clash.ydk"), engine.cards).deck)
     room.duel_observers.append(bridge.duel_observer())
@@ -90,10 +92,16 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender):
     assert metadata["mirror_complete"] is not surrender
     assert metadata["mirror_prefix_valid"] is surrender
     assert metadata["training_admitted"] is False
+    assert metadata["human_client_seat"] == 1
+    assert metadata["human_authorization"] == (
+        "self_recorded" if authorized else None)
     trajectory_deck_hashes = list(metadata["deck_sha256"])
     assert len(trajectory_deck_hashes) == 2
     assert metadata["host_responses"] == result.responses
     trajectory = read_trajectory(next(tmp_path.glob("*.review.json")))
+    assert trajectory.skill_metadata["human_client_seat"] == 1
+    assert trajectory.skill_metadata["authorization"] == (
+        "self_recorded" if authorized else None)
     assert list(trajectory.deck_sha256) == trajectory_deck_hashes
     assert audit_trajectory_visibility(trajectory)["decisions"] == len(trajectory.decisions)
     expected_source = ("edopro_pinned_historical" if historical
@@ -113,6 +121,12 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender):
     assert verified["reviewable_prefix"] is surrender
     assert verified["deck_identity_verified"] is True
     assert verified["training_admitted"] is False
+    metadata["human_authorization"] = "unauthorized"
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    with pytest.raises(ValueError, match="unsupported human recording authorization"):
+        verify_edopro_live_recording(replay_path, review_path,
+                                     metadata_path, mirror_root)
+    metadata["human_authorization"] = "self_recorded" if authorized else None
     metadata["deck_sha256"][0] = "0" * 64
     metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
     with pytest.raises(ValueError, match="differs from replay"):

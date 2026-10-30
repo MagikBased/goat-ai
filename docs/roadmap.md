@@ -2979,6 +2979,10 @@ remain open; this match is review-only.
 New room recordings now carry replay-checked Main/Extra Deck composition hashes
 in metadata and the review trajectory, so evaluation can group games by Deck
 without mistaking player names for Deck identifiers. Draw order is omitted.
+An explicit `--human-authorization self_recorded` room option now records the
+human client seat and self-recording permission alongside those identifiers.
+EDOPro can generate automatic responses, so the record cannot yet isolate
+deliberate human choices; raw cloning admission remains off.
 
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The
