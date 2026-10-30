@@ -18,6 +18,7 @@ from goat_ai.agents.card_metadata import load_card_names
 from goat_ai.replay import read_decision_annotations, read_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from scripts.create_viewer_game import GameCreator
+from scripts.edopro_local_room import EdoRoomManager
 from scripts.launch_review_server import launch
 from scripts.live_human_game import LiveGameManager
 from scripts.setup_card_images import cache_card_image, setup_card_backs
@@ -27,7 +28,7 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 REVIEW_API_VERSION = 5
-LIVE_API_VERSION = 7
+LIVE_API_VERSION = 8
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -365,6 +366,7 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
     store = ReviewStore(queue, output_dir, reviewer_alias) if queue is not None else None
     creator = GameCreator(root=ROOT)
     live = LiveGameManager(creator)
+    edo_room = EdoRoomManager(creator)
     image_locks_lock = Lock()
     image_locks: dict[int, Lock] = {}
     try:
@@ -472,6 +474,12 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
             if parsed.path == "/api/games/options":
                 self._json(200, creator.options())
                 return
+            if parsed.path == "/api/edopro/status":
+                try:
+                    self._json(200, edo_room.status())
+                except (ValueError, OSError, RuntimeError) as error:
+                    self._json(400, {"error": str(error)})
+                return
             if parsed.path == "/api/games/audit":
                 identifier = parse_qs(parsed.query).get("id", [""])[0]
                 try:
@@ -526,7 +534,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
             creator_html = target in (ROOT / "examples/create_game.html",
                                       ROOT / "examples/play_game.html")
             duel_audio = target == ROOT / "examples/duel_audio.js"
-            game_html = (target.is_relative_to(creator.output_dir)
+            game_html = ((target.is_relative_to(creator.output_dir)
+                          or target.is_relative_to(edo_room.folder))
                          and target.suffix == ".html")
             if not (queue_html or art or creator_html or duel_audio or game_html):
                 self.send_error(404, "Only review, game, and card-art pages are served")
@@ -538,11 +547,12 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
             if endpoint not in ("/api/review/choice", "/api/review/bookmark",
                                 "/api/review/note", "/api/review/upstream",
                                 "/api/games", "/api/games/review",
+                                "/api/edopro/start",
                                 "/api/live/start", "/api/live/choice",
                                 "/api/live/close"):
                 self._json(404, {"error": "unknown endpoint"})
                 return
-            if endpoint not in ("/api/games", "/api/games/review",
+            if endpoint not in ("/api/games", "/api/games/review", "/api/edopro/start",
                                 "/api/live/start", "/api/live/choice",
                                 "/api/live/close") and store is None:
                 self._json(404, {"error": "no review queue is open"})
@@ -566,6 +576,7 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                             if endpoint == "/api/live/choice" else
                             {"deck1", "deck2", "agent1", "agent2", "seed"}
                             if endpoint == "/api/games" else
+                            {"ai_deck"} if endpoint == "/api/edopro/start" else
                             {"source", "decision_index", "action_index"}
                             if endpoint == "/api/review/choice" else
                             {"source", "decision_index", "bookmarked"}
@@ -595,6 +606,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                     result = live.close(data["id"])
                 elif endpoint == "/api/games":
                     result = creator.create(data)
+                elif endpoint == "/api/edopro/start":
+                    result = edo_room.start(data["ai_deck"])
                 elif endpoint == "/api/review/choice":
                     result = store.choose(data["source"], data["decision_index"],
                                           data["action_index"])

@@ -284,6 +284,12 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
             urlopen(f"{base}/local-duel-sounds/unknown.wav", timeout=5)
         assert missing_sound.value.code == 404
         assert _request(f"{base}/api/games/options")[1]["decks"] == []
+        edo_status = _request(f"{base}/api/edopro/status")[1]
+        assert edo_status["training_admitted"] is False
+        assert edo_status["available"] is False
+        with pytest.raises(HTTPError) as bad_edo_deck:
+            _request(f"{base}/api/edopro/start", {"ai_deck": "../../outside.ydk"})
+        assert bad_edo_deck.value.code == 400
         assert _request(f"{base}/api/live/start", {
             "deck1": "a", "deck2": "b", "human_seat": 0,
             "opponent": "random", "seed": 42})[1] == {"id": "b" * 16, "terminal": False}
@@ -306,6 +312,42 @@ def test_game_creator_starts_without_a_review_queue(tmp_path, monkeypatch):
         thread.join(timeout=5)
 
 
+def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch):
+    monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
+    launched = []
+
+    class FakeRoom:
+        folder = tmp_path / ".cache/goat-ai/edopro_games"
+
+        def __init__(self, _creator):
+            pass
+
+        def status(self):
+            return {"available": True, "room_running": bool(launched),
+                    "training_admitted": False, "sessions": []}
+
+        def start(self, deck):
+            launched.append(deck)
+            return self.status()
+
+    monkeypatch.setattr(serve_review_queue, "EdoRoomManager", FakeRoom)
+    server = serve_review_queue.make_server(None, None, port=0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        assert _request(f"{base}/api/edopro/status")[1]["training_admitted"] is False
+        assert _request(f"{base}/api/edopro/start", {"ai_deck": "ai.ydk"})[1]["room_running"]
+        assert launched == ["ai.ydk"]
+        with pytest.raises(HTTPError) as bad_payload:
+            _request(f"{base}/api/edopro/start", {"ai_deck": "ai.ydk", "port": 9999})
+        assert bad_payload.value.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, monkeypatch):
     queue, replay, digest, trajectory = _queue(tmp_path)
     monkeypatch.setattr(serve_review_queue, "ROOT", tmp_path)
@@ -316,12 +358,12 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
     base = f"http://127.0.0.1:{server.server_port}"
     try:
         assert _request(f"{base}/api/review/version")[1] == {"api_version": 5}
-        assert _request(f"{base}/api/live/version")[1] == {"api_version": 7}
+        assert _request(f"{base}/api/live/version")[1] == {"api_version": 8}
         assert launch_review_server.REVIEW_API_VERSION == serve_review_queue.REVIEW_API_VERSION
         assert launch_review_server.LIVE_API_VERSION == serve_review_queue.LIVE_API_VERSION
         assert server_healthy(server.server_port, digest)
         with monkeypatch.context() as patch:
-            patch.setattr(launch_review_server, "LIVE_API_VERSION", 8)
+            patch.setattr(launch_review_server, "LIVE_API_VERSION", 9)
             assert not server_healthy(server.server_port, digest)
         assert server_healthy(server.server_port, digest,
                               queue_hash=sha256_file(queue))

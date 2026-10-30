@@ -87,6 +87,17 @@ from the engine and assets used for the replay.
 
 ### Experimental EDOPro room
 
+The local game creation page now has **Play in EDOPro**. Start it with
+`start_review_viewer.sh` or `python scripts/launch_review_server.py --game-creator`.
+Choose a published AI Deck and press **Start EDOPro room**. When the page says
+the room is running, join `127.0.0.1:7911` through EDOPro's LAN host-address
+screen. The page shows the latest room sessions and links a recording only
+after independent replay reconstruction succeeds. Each session stays in the
+ignored `.cache/goat-ai/edopro_games/<session-id>/` folder. The room process
+continues if you close the browser tab. Start another room after the first
+duel ends. The local page needs the optional host and pinned assets described
+below; it reports a missing prerequisite instead of starting an unpatched room.
+
 You can play the selected PyTorch policy through an EDOPro LAN room using the
 optional external `mostwanted7/ygo-agent` host. The host is AGPL-3.0-or-later,
 installed separately; it is not included in this MIT repository. The EDOPro

@@ -2913,6 +2913,12 @@ An [opt-in feature-v32 PPO pilot](evaluation.md#feature-v32-ppo-action-choice-pi
 
 ### Future EDOPro human client
 
+Update (2026-10-30): The local game creation page can start a private pinned
+EDOPro policy room and list its saved native replay. It links the GOAT AI
+viewer only after independent replay reconstruction succeeds. This removes
+the manual host command from the usual play path; recordings remain excluded
+from automatic training pending the source and historical-rules gates below.
+
 Pinned-host update (2026-10-30): The optional room now supports the project's
 own pinned native core and checksum-guarded historical script corrections.
 The selected v23 checkpoint completed a 20-turn, 485-response TCP-room duel

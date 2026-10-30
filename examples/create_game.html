@@ -33,6 +33,19 @@
   <p><a href="/">← Review queue</a></p>
   <h1>Create a GOAT AI game</h1>
   <p><a href="/games/play">Play against an AI in your browser</a></p>
+  <section class="panel" aria-labelledby="edopro-heading">
+    <h2 id="edopro-heading">Play in EDOPro</h2>
+    <p>Start a private room against the selected policy. In EDOPro, choose
+       <strong>LAN → Host address</strong>, enter <strong>127.0.0.1</strong> and
+       port <strong>7911</strong>, select your deck, and ready up. The AI is
+       Player 2. This page saves a native replay and, when independently
+       verified, a player-visible replay for review. EDOPro games are not yet
+       admitted to automatic training.</p>
+    <label>AI deck<select id="edopro-deck"></select></label>
+    <button id="edopro-start" type="button">Start EDOPro room</button>
+    <p id="edopro-status" role="status" aria-live="polite"></p>
+    <ul id="edopro-recordings"></ul>
+  </section>
   <p>Choose two published decks and AI agents. The server runs a complete native
      duel, verifies its replay, and opens it in the replay viewer. A seed makes
      the same setup reproducible.</p>
@@ -98,11 +111,37 @@
       byId("status").textContent = message;
       byId("status").classList.toggle("error", error);
     };
+    async function refreshEdoRoom() {
+      const response = await fetch("/api/edopro/status");
+      const room = await response.json();
+      if (!response.ok) throw new Error(room.error || "Could not check the EDOPro room");
+      byId("edopro-start").disabled = !room.available || room.room_running;
+      byId("edopro-status").textContent = !room.available ? room.unavailable_reason :
+        room.listening ? "Room running. Join 127.0.0.1:7911 in EDOPro." :
+        room.room_running ? "Starting the room…" :
+        "Room ready. Start one game at a time.";
+      const list = byId("edopro-recordings"); list.replaceChildren();
+      for (const session of room.sessions) {
+        const item = document.createElement("li");
+        const record = session.recording;
+        item.append(`${deckLabel(session.ai_deck)} · `);
+        if (session.running) item.append("waiting for the duel to finish");
+        else if (record?.viewer) {
+          const link = document.createElement("a");
+          link.href = record.viewer; link.textContent = "Open verified replay";
+          item.append(link);
+        } else if (record) item.append(`native replay saved; review unavailable${record.verification_error ? `: ${record.verification_error}` : ""}`);
+        else item.append(session.error || "no replay saved");
+        list.append(item);
+      }
+    }
     async function load() {
       const response = await fetch("/api/games/options");
       if (!response.ok) throw new Error("Could not load game options");
       const options = await response.json();
       const decks = options.decks.map(name => [name, deckLabel(name)]);
+      addOptions(byId("edopro-deck"), decks);
+      byId("edopro-deck").value = decks.find(([name]) => name.includes("goat_control"))?.[0] || decks[0]?.[0];
       const agents = Object.entries(options.agents);
       for (const seat of [1, 2]) {
         addOptions(byId(`deck${seat}`), decks);
@@ -115,7 +154,24 @@
       byId("create").disabled = !options.native_ready || !decks.length;
       if (!options.native_ready) status("Native GOAT assets are missing. Run the setup instructions in README.md.", true);
       renderRecent(options.recent);
+      await refreshEdoRoom();
     }
+    byId("edopro-start").addEventListener("click", async () => {
+      const button = byId("edopro-start"); button.disabled = true;
+      byId("edopro-status").textContent = "Starting the EDOPro room…";
+      try {
+        const response = await fetch("/api/edopro/start", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ai_deck: byId("edopro-deck").value}),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not start room");
+        await refreshEdoRoom();
+      } catch (error) {
+        byId("edopro-status").textContent = error.message;
+        button.disabled = false;
+      }
+    });
     byId("game-form").addEventListener("submit", async event => {
       event.preventDefault();
       const button = byId("create"); button.disabled = true;
@@ -175,6 +231,9 @@
     });
     byId("close-audit").addEventListener("click", () => byId("audit-dialog").close());
     load().catch(error => status(error.message, true));
+    setInterval(() => refreshEdoRoom().catch(error => {
+      byId("edopro-status").textContent = error.message;
+    }), 3000);
   </script>
 </body>
 </html>
