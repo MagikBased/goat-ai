@@ -549,6 +549,19 @@ run started; both test files then passed separately, **7 tests in 13.25s**.
 This is regression coverage for the tested fixtures, not a blanket claim
 that every GOAT ruling is historical.
 
+The current native-enabled local suite on 2026-10-29 passed **1,650 tests**
+in **1,464.57 seconds** with six PyTorch `TracerWarning`s from the GRU
+trace tests. Those tests include varying action counts, chain sizes, and
+field sizes, but the warnings still limit any claim that tracing generalizes
+to every shape. The ignored full-run log is
+`.cache/goat-ai/native_full_20261029.log` (SHA-256
+`4c411075f4b14a948b3ae035181f4ab31c148e4ced1dde7748708b8140e3a2f1`).
+Reproduce with `OMP_NUM_THREADS=1 PYTHONPATH=src:.
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai .venv/bin/python -m pytest -q` after
+[native setup](native_setup.md). This passes the current regression suite;
+it does not establish complete historical correctness or arbitrary-deck
+support.
+
 Prioritize rulings by observed GOAT tournament play. The reproducible
 `python -m scripts.report_competitive_card_priorities --native-root .cache/goat-ai`
 report ranks cards in six sourced tournament Main Decks by deck presence and
