@@ -490,15 +490,17 @@ Special Summons it, prevents damage, and moves play to Main Phase 2 without
 offering Torrential or another attack. Torrential remains Set. The defender's
 Set Trap identity is absent from the attacker's observation. Both complete
 duels serialize, replay-verify, and pass the player-visibility audit on the
-pinned official Battle Fader script. Reproduce with:
+pinned official Battle Fader script. The positive branch continues to turn 5:
+the original attacker battles Fader, which goes to the face-up banished zone
+rather than its owner's Graveyard, as the same ruling sheet specifies.
+Reproduce with:
 
 ```sh
 GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_battle_fader.py
 ```
 
-The sheet also specifies banishment when a Fader Summoned this way leaves the
-field; that later movement and other attack responses remain untested. This
+Removal by other effects and other attack responses remain untested. This
 fixture does not certify Edison rules or the full card pool.
 
 ## Black Rose Dragon optional trigger

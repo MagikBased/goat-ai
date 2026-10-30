@@ -42,7 +42,7 @@ def test_battle_fader_ends_direct_attack_without_torrential_window(tmp_path, use
         assert {BATTLE_FADER, TORRENTIAL_TRIBUTE} <= {
             card.code for card in env.engine.probe.observation(1).hand}
         summoned = set_torrential = attacked = answered = checked = False
-        fader_on_field = False
+        fader_on_field = fader_attack_started = fader_banished = False
         agents = (RandomAgent(200), RandomAgent(201))
         for _ in range(4000):
             if env.is_terminal():
@@ -99,15 +99,36 @@ def test_battle_fader_ends_direct_attack_without_torrential_window(tmp_path, use
                     assert BATTLE_FADER in {
                         card.code for card in env.engine.probe.observation(1).hand}
                     checked = True
+            if use_fader and checked and not fader_banished:
+                if view.turn == 5 and view.acting_player == 0:
+                    if view.phase == "main1":
+                        action = next((candidate for candidate in actions
+                                       if candidate.kind == "battle_phase"), None)
+                    elif view.phase == "battle_start" and not fader_attack_started:
+                        action = next((candidate for candidate in actions
+                                       if candidate.kind == "attack"), None)
+                        fader_attack_started |= action is not None
+                    elif fader_attack_started and actions[0].kind == "select_card":
+                        action = next((candidate for candidate in actions
+                                       if candidate.parameters.get("controller") == 1
+                                       and candidate.parameters.get("code") == BATTLE_FADER),
+                                      None)
+                if fader_attack_started and any(
+                        card.code == BATTLE_FADER for card in view.banished[1]):
+                    assert BATTLE_FADER not in {
+                        card.code for card in view.graveyards[1]}
+                    assert not any(card.code == BATTLE_FADER for card in view.field)
+                    fader_banished = True
             if action is None:
                 action = (next((candidate for candidate in actions
                                 if candidate.kind in ("place", "select_position",
                                                       "pass", "end_phase")), None)
-                          if not checked else None)
+                          if not checked or use_fader and not fader_banished else None)
             if action is None:
                 action = agents[view.acting_player].select_action(view, actions)
             view = env.step(action)
         assert summoned and set_torrential and attacked and answered and checked
+        assert not use_fader or fader_attack_started and fader_banished
         assert env.is_terminal()
         trajectory = env.trajectory()
         assert trajectory.ruleset == "mr1-synchro-protocol"
