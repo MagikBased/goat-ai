@@ -21,6 +21,13 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+A fresh [20-duel random whitelist/Fusion sample](evaluation.md#fresh-random-whitelistfusion-protocol-sample--30-october-2026)
+completed on independently generated legal Deck pairs. All 20,315 decisions
+replay-verified and passed the visibility audit; repeating the seeds reproduced
+the same streams and outcomes. Eleven selected activation IDs were absent from
+the earlier first-activation partitions. This expands sampled protocol
+coverage while arbitrary-Deck and historical-ruling completeness remain open.
+
 A fresh 21-duel first-activation sweep over a shuffled partition of the
 canonical GOAT whitelist reached terminal in every game and replay-verified
 23,381 decisions. It selected activations for 82 card IDs absent from the two

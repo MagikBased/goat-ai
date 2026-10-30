@@ -15784,3 +15784,38 @@ with `--opponent-checkpoint` pointing to v23 and add
 `--opponent-own-loss-guard`. Compare matched reports with
 `scripts/compare_tournament_reports.py --verify-local-decks
 --require-unseen-main-decks`.
+
+## Fresh random whitelist/Fusion protocol sample — 30 October 2026
+
+Twenty independently seeded legal Main Decks, each against a distinct legal
+opponent Main Deck, were generated from the pinned GOAT whitelist at seeds
+165000–165019. Both seats used RandomAgent. Each Deck included a random legal
+15-card Fusion Extra Deck and three Scapegoat/Metamorphosis copies to exercise
+the Fusion route. Games ran in isolated workers with a 3,000-decision cap.
+All **20/20** reached terminal without a reported error; complete replay
+verification and player-visible audits covered **20,315** decisions. The
+same seeds reproduced all 20 decision streams, terminal states, and outcomes.
+Observed game lengths ranged from 172 to 1,630 decisions, mean 1,015.75.
+
+The sample selected activations from 95 distinct card IDs. Eleven of them
+were absent from the selected-activation sets of the three prior first-
+activation whitelist partitions: Spiritualism, Burning Spear, Dragonic Attack,
+Wave-Motion Cannon, Timidity, Metamorphosis, Remove Trap, Sword of Dragon's
+Soul, Buster Rancher, GOAT Limiter Removal, and GOAT Thousand-Eyes Restrict.
+These IDs extend sampled protocol coverage; some already have individual
+historical fixtures. The duels do not certify the rulings of those cards or
+arbitrary legal Decks.
+
+The ignored report is `.cache/goat-ai/random_whitelist_165000/report.json`,
+SHA-256 `242251c909e4f277f4ea7c9132299d08f4475436b00031cd878203a07df46334`.
+It records the pinned asset hashes, generated Deck hashes, outcomes, action
+counts, replay checks, visibility checks, and deterministic repeats. Reproduce
+with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai --output .cache/goat-ai/random_whitelist_165000 \
+  --seed 165000 --seeds 20 --max-decisions 3000 --card-pool whitelist \
+  --agent random --verify-replays --distinct-opponents --count-card-actions \
+  --repeat-seeds --random-extra --fusion-stress --isolate-games
+```
