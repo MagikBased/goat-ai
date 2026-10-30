@@ -2924,7 +2924,10 @@ the AI's turn before the human surrendered on turn 3. Its host log contains
 23 responses with no retries or reported Lua errors. The missing Sheep Token
 script in an earlier trial, exact asset parity, full-match GUI verification,
 the policy seat, and a training-safe human trajectory are still open. The
-client's separately saved replay currently fails our structural reader.
+client's separately saved replay has a two-byte post-LZMA trailer; the bounded
+reader now accepts it and finds the same 235 packets and 23 embedded
+responses as the host replay. That structural match does not validate training
+reconstruction.
 
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The

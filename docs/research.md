@@ -127,9 +127,11 @@ package. That asset gap needs to be fixed or checked before broader Deck use.
 The host replay SHA-256 was
 `e9cb4f2c5c57adb5b503e205bebe82fb35179a70f66c039dbabd6b7bafdded07`;
 our structural reader accepted it but marked it `training_ready: false`.
-The EDOPro client's separately saved `.yrpX` failed the current structural
-reader's compressed-size/end-marker check, so client-side replay compatibility
-also remains open. The client's file and the host's file are different bytes.
+The EDOPro client's separately saved `.yrpX` appends two bytes after the raw
+LZMA end marker. The bounded structural reader now accepts that trailer; it
+read **235 packets and 23 embedded responses** from each file, with the
+packets and responses exactly equal. The two files have different hashes, and
+this structural result does not validate legal-choice or visibility recovery.
 The event log and replay remain in ignored local cache; no third-party assets
 or demonstrations were added to the repository.
 

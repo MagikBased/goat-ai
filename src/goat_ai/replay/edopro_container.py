@@ -26,6 +26,7 @@ EXTENSION = struct.Struct("<5Q")  # header version, four native RNG words
 MAX_FILE_BYTES = 32 * 1024 * 1024
 MAX_PAYLOAD_BYTES = 128 * 1024 * 1024
 MAX_LZMA_PADDING_BYTES = 8
+MAX_LZMA_TRAILER_BYTES = 2
 MAX_PLAYERS = 16
 MAX_CARDS_PER_ZONE = 255
 OLD_REPLAY_MODE = 231
@@ -182,7 +183,10 @@ def _payload(data: bytes, flags: int, expected_size: int, properties: bytes) -> 
             or len(result) > expected_size + MAX_LZMA_PADDING_BYTES
             or any(result[expected_size:])
             or (not decoder.eof and not decoder.needs_input)
-            or decoder.unused_data):
+            # The desktop client's saved yrpX can append two bytes after an
+            # otherwise complete raw LZMA stream. The host copy of the same
+            # replay ends at EOS; both decode to identical declared payloads.
+            or len(decoder.unused_data) > MAX_LZMA_TRAILER_BYTES):
         raise ReplayContainerError("compressed replay size or end marker mismatch")
     return result[:expected_size]
 

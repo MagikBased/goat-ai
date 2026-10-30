@@ -165,6 +165,17 @@ def test_yrpx_accepts_bounded_zero_padding_without_lzma_end_marker():
         parse_edopro_container(packed(b"\x00" * 9))
 
 
+def test_desktop_yrpx_accepts_only_bounded_bytes_after_lzma_eos():
+    payload = _prefix(YRPX) + bytes((40,)) + struct.pack("<I", 1) + b"A"
+    packed = _container(YRPX, payload, compressed=True, extended=True)
+    base = parse_edopro_container(packed)
+    desktop = parse_edopro_container(packed + b" M")
+    assert desktop.packets == base.packets
+    assert desktop.header.payload_size == base.header.payload_size
+    with pytest.raises(ReplayContainerError, match="compressed replay"):
+        parse_edopro_container(packed + b" M!")
+
+
 def test_inspection_cli_outputs_only_structural_summary(tmp_path, monkeypatch, capsys):
     from scripts.inspect_edopro_replay import main
 
