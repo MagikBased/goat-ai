@@ -151,7 +151,7 @@
       }
       byId("edopro-start").disabled = !room.available || room.room_running;
       byId("edopro-status").textContent = !room.available ? room.unavailable_reason :
-        room.listening ? "Room running. Join 127.0.0.1:7911 in EDOPro." :
+        room.listening ? `Room running. Join ${room.host}:${room.port} in EDOPro.` :
         room.room_running ? "Starting the room…" :
         "Room ready. Start one game at a time.";
       const list = byId("edopro-recordings"); list.replaceChildren();
@@ -162,13 +162,16 @@
         if (session.running) item.append("waiting for the duel to finish");
         else if (record?.viewer) {
           const link = document.createElement("a");
-          link.href = record.viewer; link.textContent = "Open verified replay";
+          link.href = record.viewer;
+          link.textContent = record.complete ? "Open verified replay" : "Open interrupted replay";
           item.append(link);
-          const button = document.createElement("button");
-          button.type = "button"; button.className = "audit-button";
-          button.dataset.edoproId = session.id;
-          button.textContent = "Confirm my choices";
-          item.append(button);
+          if (record.experimental_confirmed_eligible) {
+            const button = document.createElement("button");
+            button.type = "button"; button.className = "audit-button";
+            button.dataset.edoproId = session.id;
+            button.textContent = "Confirm my choices";
+            item.append(button);
+          }
         } else if (record) item.append(`native replay saved; review unavailable${record.verification_error ? `: ${record.verification_error}` : ""}`);
         else item.append(session.error || "no replay saved");
         if (record) {

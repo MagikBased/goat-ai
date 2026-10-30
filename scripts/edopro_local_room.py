@@ -88,8 +88,8 @@ class EdoRoomManager:
     def _verified_game(self, identifier: str) -> tuple[Path, Path, Path]:
         directory = self._session_directory(identifier)
         record = self._recording(directory)
-        if not record or not record["review_ready"]:
-            raise ValueError("EDOPro recording has not passed replay verification")
+        if not record or not record.get("experimental_confirmed_eligible"):
+            raise ValueError("EDOPro recording is not a complete, fingerprinted pinned duel")
         replay = self.root / record["native_replay"]
         stem = replay.with_suffix("")
         metadata = stem.with_suffix(".meta.json")

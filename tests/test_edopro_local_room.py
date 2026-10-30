@@ -233,3 +233,15 @@ def test_edopro_web_confirmations_only_label_optional_human_choices(tmp_path, mo
     assert room.choices("a" * 16)["candidates"][0]["confirmed"] is True
     assert room.save_choices("a" * 16, [])["confirmed"] == 0
     assert not labels.exists()
+    monkeypatch.setattr("scripts.edopro_local_room.verify_edopro_live_recording",
+                        lambda *args: {"complete": False,
+                                       "historical_patches": True,
+                                       "asset_identity_verified": True,
+                                       "deck_identity_verified": True})
+    interrupted = EdoRoomManager(GameCreator(root=tmp_path, native_root=native))
+    assert interrupted.status()["sessions"][0]["recording"]["review_ready"] is True
+    assert interrupted.status()["sessions"][0]["recording"]["experimental_confirmed_eligible"] is False
+    with pytest.raises(ValueError, match="complete, fingerprinted pinned duel"):
+        interrupted.choices("a" * 16)
+    with pytest.raises(ValueError, match="complete, fingerprinted pinned duel"):
+        interrupted.save_choices("a" * 16, [2])
