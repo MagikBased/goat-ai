@@ -520,10 +520,12 @@ completeness unproven; see
 
 A paired [Call of the Haunted/Necrovalley fixture](goat_rules.md#call-of-the-haunted-under-necrovalley)
 now checks the pinned core's effect-negation timing with and without Mystical
-Space Typhoon removing Necrovalley before Call resolves. Both duels terminate,
-replay-verify, and pass the visibility audit. The preserved FAQ conflicts on
-whether Call may activate into an already active Necrovalley, so this branch
-remains a known historical ambiguity rather than a certified GOAT ruling.
+Space Typhoon removing Necrovalley before Call resolves. A third branch
+reproduces a March 2005 discussion of Call chained to Heavy Storm while
+Necrovalley is active. All three duels terminate, replay-verify, and pass the
+visibility audit. The contemporary discussion supports the pinned result,
+while the preserved FAQ conflicts on whether Call may activate into an
+already active Necrovalley. This remains a known historical ambiguity.
 
 A paired [Appropriate/Graceful Charity fixture](goat_rules.md#appropriate-and-graceful-charity)
 now checks the archived Netrep activation-timing distinction with the pinned
