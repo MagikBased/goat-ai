@@ -65,6 +65,23 @@ def test_adjudication_rejects_unrecognized_assessment(tmp_path):
         adjudicate(report, dt01, other, community)
 
 
+def test_promo_inclusion_requires_pre_cutoff_north_american_release(tmp_path):
+    report, dt01, other, community = _inputs(tmp_path)
+    header = "card_id\tassessment\trelease_date\trelease_region\n"
+    for release_date, region in (("2010-04-21", "north_america"),
+                                 ("2006-08-01", "europe"),
+                                 ("unknown", "north_america")):
+        other.write_text(header + "2\tinclude_pre_cutoff_booster\t\t\n"
+                         + f"3\tinclude_pre_cutoff_promo\t{release_date}\t{region}\n")
+        with pytest.raises(ValueError, match="promotional inclusion"):
+            adjudicate(report, dt01, other, community)
+    other.write_text(header + "2\tinclude_pre_cutoff_booster\t\t\n"
+                     "3\tinclude_pre_cutoff_promo\t2006-08-01\tnorth_america\n")
+    result = adjudicate(report, dt01, other, community)
+    assert result["api_only_included_ids"] == [2, 3]
+    assert result["complete_release_pool"] is False
+
+
 def test_adjudication_requires_community_evidence(tmp_path):
     report, dt01, other, community = _inputs(tmp_path)
     community.write_text("card_id\tassessment\n5\tpending_north_america_subscription_promo\n")
@@ -112,3 +129,16 @@ def test_community_only_ledger_preserves_promotional_provenance():
     assert rows[31038159]["event_region"] == "north_america"
     assert rows[31038159]["primary_evidence"].startswith(
         "https://yugiohblog.konami.com/2010/sjc/")
+
+
+def test_yu_jo_friendship_partial_inclusion_keeps_release_provenance():
+    path = (Path(__file__).resolve().parents[1] / "configs/historical"
+            / "edison_non_dt01_candidate_discrepancies_2010_04_20.tsv")
+    with path.open(encoding="utf-8", newline="") as stream:
+        rows = {int(row["card_id"]): row for row in csv.DictReader(stream, delimiter="\t")}
+    card = rows[81332143]
+    assert card["assessment"] == "include_pre_cutoff_promo"
+    assert card["release_date"] == "2006-08-01"
+    assert card["release_region"] == "north_america"
+    assert "Duelist volume 16" in card["pre_cutoff_record"]
+    assert card["primary_evidence"].startswith("https://www.db.yugioh-card.com/")

@@ -15091,3 +15091,15 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_action_
   --feature-version 32 --output \
   .cache/goat-ai/effect_option_cas_20261029/feature32_alias_audit.json
 ```
+
+## Full historical native fixture run (29 October 2026)
+
+On the pinned `.cache/goat-ai` native assets, all **794** tests selected by
+`tests/test_historical_*.py` passed in **1,101.48 seconds**. This is the full
+historical fixture suite at this commit, not a performance benchmark or proof
+that every 2005 ruling is covered. Reproduce with:
+
+```bash
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. OMP_NUM_THREADS=1 \
+  .venv/bin/python -m pytest -q tests/test_historical_*.py
+```

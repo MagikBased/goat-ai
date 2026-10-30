@@ -21,9 +21,9 @@ the regional distinction, although its governing organization and events are
 European. The [current Konami Europe card-legality page](https://www.yugioh-card.com/eu/play/card-legality/)
 still lists Yu-Jo Friendship (`81332143`, `JUMP-EN007`) as unavailable for
 European tournament play. Its [official card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5754&ope=2)
-shows a 2006 promotional printing. Therefore a bare first-print date cannot
-adjudicate this card across TCG territories. Its North American status at the
-Edison cutoff still needs a territory-specific source check.
+shows a 2006 promotional printing. A bare first-print date cannot adjudicate
+this card across TCG territories. The North American release evidence and
+provisional decision are recorded below; Europe remains a separate case.
 
 Another API-only candidate, Restructer Revolution (`99518961`), has a
 [documented 2005 English TCG printing](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4871&ope=2&request_locale=en)
@@ -173,13 +173,12 @@ does not itself prove it was ineligible there in April 2010: its
 is dated November 2008. The European rule is not a North American ruling;
 Darkness Destroyer remains unresolved pending a period North American policy
 or event ruling. The
-[Wicked Dreadroot](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6405&ope=2&request_locale=en),
-[Wicked Eraser](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7092&ope=2&request_locale=en),
-and [Yu-Jo Friendship](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5754&ope=2&request_locale=en)
+[Wicked Dreadroot](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6405&ope=2&request_locale=en)
+and [Wicked Eraser](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7092&ope=2&request_locale=en)
 have older promotional records, but their period North American legal dates
-have not been proved. Thus 29 of the 34 named API-only discrepancies have a
-source-backed exclusion, one has a dated-booster inclusion, and four await a
-promotional-card or cross-territory check. One of the two community-only
+remain unproved. Thus 29 of the 34 named API-only discrepancies have a
+source-backed exclusion, two have provisional pre-cutoff inclusions, and
+three await a promotional-card or cross-territory check. One of the two community-only
 promotions remains open, and so does the wider release pool.
 
 A later [official Konami Central America WCQ FAQ](https://www.yugioh-card.com/en/events-item/2025-ca-wcq/)
@@ -188,10 +187,18 @@ SHONEN JUMP subscription promos were available to US or Canadian residents,
 with legal dates applying to sanctioned North American events. The FAQ calls
 it `JUMP-EN007`, while the [official card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5754&ope=2&request_locale=en)
 calls its 1 August 2006 graphic-novel printing `JMP-EN007`; the identifier
-disagrees. This reinforces the need for regional verification, but the 2025
-FAQ does **not** establish the card's North American tournament-legal date by
-20 April 2010. Keep its ledger status pending until a period legality list
-or sanctioned event record resolves that cutoff.
+disagrees. [VIZ's publisher page](https://www.viz.com/manga-books/manga/yu-gi-oh-duelist-volume-16-0/product/1009)
+dates the paperback *Yu-Gi-Oh!: Duelist*, volume 16, to 1 August 2006,
+states that an exclusive trading card was included, and lists US and Canadian
+retailers. The official card record identifies that book's card as Yu-Jo
+Friendship. The [February 2010 KDE tournament policy](https://www.etcg.de/uploads/pdf/KDE_YuGiOh_Policy.pdf)
+says a promotional card becomes legal on official release in territories
+where it was released. Combining those primary records supports a
+**provisional North American inclusion** by the April 2010 cutoff. The
+territory conclusion is an inference from VIZ's North American retailer
+listing, not a located April 2010 event card-legality ruling. The 2025 FAQ
+alone does not establish the historical date; the `JMP`/`JUMP` prefix
+discrepancy remains recorded.
 
 An [archived official card-legality page captured 6 November
 2010](https://web.archive.org/web/20101106023610id_/http://www.yugioh-card.com/en/gameplay/cardlegality.html)
@@ -235,14 +242,14 @@ API-only named differences in the candidate comparison, and that the
 covers the opposite difference, with no duplicate or conflicting IDs. It
 rejects a DT01 exclusion if its first listed ordinary
 printing precedes the cutoff. Against the cached comparison above, it reports
-29 excluded IDs, one provisionally included API-only ID (Restructer
-Revolution), four pending API-only promotions, one included community-only
+29 excluded IDs, two provisionally included API-only IDs (Restructer
+Revolution and Yu-Jo Friendship), three pending API-only promotions, one included community-only
 ID (Genesis Dragon), and one pending community-only promotion. Its
 `complete_release_pool` field is always false: neither candidate source nor
 this reconciliation establishes every eligible North American card. The
 ignored local output is
-`.cache/goat-ai/edison_partial_adjudication_20261027.json` (SHA-256
-`e2d1681179348b18a323da64df9a8a438a9936a7f154440e8b779a9206758d17`).
+`.cache/goat-ai/edison_partial_adjudication_20261029.json` (SHA-256
+`d2b618b7e1f1ca8264863bdd283b0128369f2d31266177b6b43f0ae42f6157de`).
 
 ```sh
 PYTHONPATH=src:. .venv/bin/python scripts/adjudicate_edison_pool_disagreements.py \
@@ -250,7 +257,7 @@ PYTHONPATH=src:. .venv/bin/python scripts/adjudicate_edison_pool_disagreements.p
   configs/historical/edison_dt01_new_card_exclusions_2010_04_20.tsv \
   configs/historical/edison_non_dt01_candidate_discrepancies_2010_04_20.tsv \
   configs/historical/edison_community_only_candidate_discrepancies_2010_04_20.tsv \
-  --output .cache/goat-ai/edison_partial_adjudication_20261027.json
+  --output .cache/goat-ai/edison_partial_adjudication_20261029.json
 ```
 
 [Konami's Exodius record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7392&ope=2&request_locale=en)

@@ -62,10 +62,18 @@ def adjudicate(report_path: Path, dt01_path: Path,
     for row in other_rows:
         assessment = row["assessment"]
         if assessment not in {
-            "include_pre_cutoff_booster", "exclude_north_america",
+            "include_pre_cutoff_booster", "include_pre_cutoff_promo",
+            "exclude_north_america",
             "pending_north_america_promo", "pending_cross_territory_video_promo",
         }:
             raise ValueError(f"unknown evidence assessment: {assessment}")
+        if assessment == "include_pre_cutoff_promo":
+            try:
+                release_date = date.fromisoformat(row["release_date"])
+            except (KeyError, TypeError, ValueError) as error:
+                raise ValueError("promotional inclusion requires a release date") from error
+            if release_date > CUTOFF or row.get("release_region") != "north_america":
+                raise ValueError("promotional inclusion must predate the North American cutoff")
         category = assessment.split("_", 1)[0]
         decisions[category].add(int(row["card_id"]))
 
