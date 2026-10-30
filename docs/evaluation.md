@@ -2193,6 +2193,62 @@ while Tactical transfer did not improve. Keep V11 experimental and the v23
 checkpoint selected. The next evaluation needs more diverse unseen decks,
 new seeds, and enough Ring/MST opportunities to estimate fresh error rates.
 
+### Fresh tournament-card mix holdout for V11 (29 October 2026)
+
+To test whether V11's favorable direct result above transfers beyond the
+Theeresak/Dimension Fusion pairings, eight new deck pairs were sampled from
+the sourced tournament-card corpus with `generate_tournament_mix` in
+`scripts/probe_random_decks.py`. Source seeds were **130000–130007**; each
+opponent deck used source seed plus 1,000,000. The resulting 16 legal Main
+Deck compositions were distinct and absent from both checkpoints' recorded
+training decks. These synthetic mixes broaden card combinations, but are not
+representative tournament archetypes or human-designed decks. Their ignored
+YDK files and composition hashes are in
+`.cache/goat-ai/v11_fresh_mix_130000_130007/decks_manifest.json` (SHA-256
+`b6d65833d4be77d88b38413a8917513ba04d242722216fdec492fd4515d45c4b`).
+
+The experimental native engine played both deck assignments and both policy
+seats for all eight pairs, with two duel seeds per assignment: **64 complete
+games per arm**, a 3,000-decision limit, and four workers. On seeds
+131000–131001, V11 scored **31–33** directly against the unchanged v23 parent
+(48.44% score; paired bootstrap 95% interval 37.5–57.81%). On separate,
+matched seeds 131002–131003 against Tactical-v14, V11 scored **18–45–1**
+(28.91% score) and the parent **24–39–1** (38.28% score). The saved-report
+comparator checked the deck files, unseen Main Deck compositions, paired
+schedule, opponent, native assets, and source fingerprint. Its paired
+V11-minus-parent score difference was **−9.38 percentage points**, with a
+95% interval of **−21.88 to +1.56 points**. The interval includes no
+difference. The direct result also does not establish a gain. Keep the v23
+parent selected; this is not evidence that V11 improved competitive play or
+that M4's strength gate is closed.
+
+The ignored direct, V11-versus-Tactical, and parent-versus-Tactical reports
+have SHA-256 values respectively
+`a5df04ef9716d76b95c246cdff9d2f9ec0dd6fe47a8d6b17c28a42e5ab1d0396`,
+`216e8e8f69443e83d76fd2f0641fd9d89091914c3c7fb13365004737bdfce10d`,
+and `95075a1c93ff9d478ad1b139bd9b1c2c60fcb29e6786d9bd314c4c251f48b8b3`.
+Each report passed `load_report(..., verify_local_decks=True,
+require_unseen_main_decks=True)`. The Tactical pair also passed:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/compare_tournament_reports.py \
+  .cache/goat-ai/v11_fresh_mix_130000_130007/v11_tactical.json \
+  .cache/goat-ai/v11_fresh_mix_130000_130007/parent_tactical.json \
+  --verify-local-decks --require-unseen-main-decks
+```
+
+Recreate the deck files with `generate_tournament_mix(root, seed)` and
+`write_deck(path, deck)` for each source seed above, writing `130000_a.ydk`
+through `130007_a.ydk`, and use `seed + 1000000` for the matching `_b.ydk`.
+Evaluate V11 with `scripts/evaluate_policy.py` using `--engine experimental
+--both-deck-assignments --require-unseen-main-decks --workers 4 --seeds 2
+--max-decisions 3000` and eight `--matchup A.ydk B.ydk` arguments. Use
+`--seed 131000 --opponent-checkpoint` with the selected parent for the direct
+arm; use `--seed 131002 --opponent tactical` for both V11 and parent arms.
+The checkpoints are the two SHA-256-pinned files named above. Tournament
+reports contain outcomes and provenance, not complete serialized trajectories;
+this trial therefore does not independently replay-verify all 192 duels.
+
 ### Retaining own-loss preferences during PPO (29 October 2026)
 
 The self-play trainer now optionally revalidates the 49 native-replayed V11
