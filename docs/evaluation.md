@@ -15705,3 +15705,45 @@ above, adding the upgrade flag only for v32, then run
 Decks and seed blocks; compare the Tactical reports with
 `scripts/compare_tournament_reports.py --verify-local-decks
 --require-unseen-main-decks`.
+
+## Unfinished human-duel prefix pilot — 30 October 2026
+
+The new journal importer replays every saved action on the pinned native core,
+checks the stored observation and legal-choice digests, and retains only
+explicit non-forced human decisions. A local read-only audit found **41** such
+decisions in five unfinished browser games; a sixth had none. The trainer
+froze the five source journals under private SHA-256-named snapshots in
+ignored `.cache/goat-ai/human_journal_snapshots/`. No outcome was assigned to
+any prefix, and the checkpoint marks each game as partial. These sources are
+the player's own local recordings; none is committed or redistributed.
+
+An exploratory one-epoch behavioral-cloning update started from the selected
+feature-v23 checkpoint, used all 41 decisions with width 32, batch size 8,
+learning rate 0.0001, seed 30990, and a batched forward pass. Verification
+took **0.95 s**, fitting **0.57 s**, and training-choice greedy agreement moved
+from **20/41** for the parent to **21/41** for the child; only **2/41** greedy
+actions changed. Agreement on the fitted choices is not held-out skill.
+
+The child played the selected parent directly with the same v1 visible
+own-loss guard on both sides. Max Suffridge's 2005 Goat Control and Jae Kim's
+2005 Zombie Main Decks were unseen in both checkpoints' training provenance.
+Across both Deck assignments and seats on seeds 162000–162007, the child
+scored **16–16** in 32 complete native duels. The 95% Wilson interval for its
+decisive win rate is **33.63–66.37%**. The small prefix signal neither shows a
+competitive gain nor justifies promoting the child; the selected v23 policy
+remains unchanged. This pilot also does not validate the human quality of all
+41 choices.
+
+The ignored pilot checkpoint is
+`.cache/goat-ai/human_prefix_41_pilot.pt` (SHA-256
+`5fea3912bd6f62c33479c4f358f9b8bcf77b6d325f0f6fb650420e9a9f8315d2`).
+The direct report is
+`.cache/goat-ai/human_prefix_41_pilot_direct_162000.json` (SHA-256
+`f68015f1f3f0fb314228c953109485ccb1b046eeedafeac7e64db2b728bf00bb`).
+Reproduce the fit with `scripts/train_behavioral_clone.py --human-journal`
+for the five frozen local journals and the parameters above. Reproduce the
+direct comparison with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --own-loss-guard
+--opponent-own-loss-guard --seed 162000 --seeds 8 --max-decisions 3000
+--workers 2` and the named Decks. Reproduction requires the private journals;
+their paths and bytes are intentionally absent from Git.

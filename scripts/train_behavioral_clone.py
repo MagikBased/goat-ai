@@ -33,6 +33,7 @@ from goat_ai.replay import (
     training_demonstrator_records,
     verify_trajectory,
 )
+from goat_ai.replay.live_journal import read_live_journal_prefix, snapshot_live_journal
 from goat_ai.training import (
     CardVocabulary,
     LegalActionPolicy,
@@ -268,7 +269,10 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
 def main() -> None:
     started = perf_counter()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("trajectories", nargs="+", type=Path)
+    parser.add_argument("trajectories", nargs="*", type=Path)
+    parser.add_argument("--human-journal", type=Path, action="append", default=[],
+                        help="include explicit human choices from an unfinished local duel; "
+                             "the journal is snapshotted and replay-verified, with no outcome label")
     parser.add_argument("--annotation", type=Path, action="append", default=[],
                         help="self-recorded, scripted-scenario, policy-review, or "
                              "self-play-review labels, "
@@ -364,6 +368,8 @@ def main() -> None:
                         help="sample rare selected action kinds more often in cloning; "
                              "weight their loss in parent-KL training")
     args = parser.parse_args()
+    if not args.trajectories and not args.human_journal:
+        parser.error("provide a trajectory or --human-journal")
     if (args.epochs < 1 or args.width < 1 or args.learning_rate <= 0
             or args.batch_size < 1 or args.verification_workers < 1
             or not 1 <= args.focus_weight < float("inf")
@@ -420,6 +426,10 @@ def main() -> None:
     if args.synthetic_thunder_search_correction and (
             args.on_policy_teacher or args.annotation or args.annotation_for):
         parser.error("synthetic Thunder correction requires raw Tactical trajectories")
+    if args.human_journal and (args.on_policy_teacher
+                               or args.synthetic_thunder_search_correction
+                               or args.parent_kl_steps):
+        parser.error("unfinished human journals require ordinary behavioral cloning")
     if args.on_policy_teacher_activation_focus_only and (
             not args.on_policy_teacher or not args.focus_card):
         parser.error("activation focus requires --on-policy-teacher and --focus-card")
@@ -595,6 +605,40 @@ def main() -> None:
                                "selected_decisions": len(selected)})
         if args.synthetic_thunder_search_correction:
             training_games[-1]["synthetic_thunder_search_corrections"] = corrections
+    if args.human_journal:
+        snapshot_dir = (Path(__file__).resolve().parents[1] /
+                        ".cache/goat-ai/human_journal_snapshots")
+        deck_root = Path(__file__).resolve().parents[1] / "examples/decks"
+        for journal_path in args.human_journal:
+            verification_started = perf_counter()
+            snapshot = snapshot_live_journal(journal_path, snapshot_dir)
+            prefix = read_live_journal_prefix(snapshot, deck_root, args.native_root)
+            verification_seconds += perf_counter() - verification_started
+            if str(snapshot) in trajectory_hashes:
+                raise ValueError(f"duplicate human journal snapshot: {snapshot}")
+            records.extend(prefix.records)
+            record_sources.extend(["human_live_prefix"] * len(prefix.records))
+            record_disagreements.extend([False] * len(prefix.records))
+            sources["human_live_prefix"] += len(prefix.records)
+            trajectory_hashes[str(snapshot)] = prefix.journal_sha256
+            training_games.append({
+                "seed": prefix.seed,
+                "deck_sha256": prefix.deck_sha256,
+                "main_deck_composition_sha256": tuple(
+                    main_deck_composition_sha256(read_ydk(deck))
+                    for deck in prefix.decks),
+                "source": "human_live_prefix",
+                "demonstrator_seat": prefix.human_seat,
+                "authorization": "self_recorded",
+                "journal_sha256": prefix.journal_sha256,
+                "opponent_checkpoint_sha256": prefix.opponent_checkpoint_sha256,
+                "manual_decision_indices": prefix.manual_indices,
+                "partial_duel": True,
+                "outcome": None,
+                "automated_teacher_disagreements": None,
+                "verified_decisions": prefix.verified_decisions,
+                "selected_decisions": len(prefix.records),
+            })
     vocabulary = CardVocabulary.from_goat_whitelist(
         args.native_root / "banlist/GOAT.lflist.conf",
         native_root=args.native_root if args.feature_version >= 22 else None)

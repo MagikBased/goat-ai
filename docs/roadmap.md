@@ -1013,6 +1013,14 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+Unfinished browser duels can now contribute explicit human choices to
+behavioral cloning through a read-only, native-verified journal importer. It
+freezes a private content-addressed snapshot and records the partial source
+without an outcome label. A local 30 October 2026 audit found 41 usable,
+non-forced choices across five unfinished games; one other saved game had no
+human choice to import. These are data-pipeline evidence, not a policy-strength
+result. The M4 held-out competitive gate remains open.
+
 A [new 12-item PPO-child review queue](replay_audit.md#experimental-ppo-child-on-weak-sourced-deck-assignments-30-october-2026)
 comes from eight replay-verified, visibility-audited Tactical duels on two
 sourced pairings where direct parent play was weak. It includes a negative
@@ -2893,13 +2901,22 @@ An [opt-in feature-v32 PPO pilot](evaluation.md#feature-v32-ppo-action-choice-pi
 ### Future EDOPro human client
 
 An EDOPro bot connection could let a human play this policy in the EDOPro
-client. A local GOAT duel server would need to translate EDOPro's bot protocol
-to this project's action interface and log the human's complete legal-action
-set, player-visible observation, and chosen response at each decision. Importing
-an EDOPro replay alone is not a substitute for that live log: the current
-replay reader has not established complete decision reconstruction or
-player-knowledge validation for real EDOPro files. Before any EDOPro match is
-used for training, verify core/script/card-ID parity against the pinned GOAT
-engine, replay the match exactly, and pass the visibility audit. Keep the
-client bridge optional so the Python training and Stardust-facing policy
-interfaces remain independent of EDOPro's client and license.
+client. Project Ignis's current WindBot fork is an EDOPro-compatible bot
+client, but its [FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html)
+says built-in bot play supports Master Rule 3 and later, and forcing older
+rules is unsupported. We therefore cannot treat its GOAT behavior as a
+working bridge. A prototype should first join a private local GOAT room as a
+bot, complete one duel using recorded native responses, and verify both
+clients use the same GOAT rule flags, card IDs, database, and scripts.
+
+For training, the bot must log the EDOPro server's decision prompt, the AI's
+player-visible state and legal responses, and the response it sends. The
+human's decisions require equivalent logging at the server or a validated
+legacy replay reconstruction; the bot's own network view alone cannot supply
+the human's complete legal-action set. Importing an EDOPro replay alone is not
+a substitute for that live log: the current reader has not established exact
+reconstruction or player-knowledge validation for real GOAT EDOPro files.
+Keep the native `.yrpX` for visual playback, and admit a match to training
+only after exact native replay and a visibility audit. Keep the client bridge
+optional so Python training and Stardust-facing policy interfaces remain
+independent of EDOPro's client and license.

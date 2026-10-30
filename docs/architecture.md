@@ -2,6 +2,14 @@
 
 `GoatEnvironment` validates action membership and delegates every rules transition to a `RulesEngine`. `Decision` returns one acting player's `Observation` and its variable-length legal `Action` tuple. The default engine raises `SimulatorUnavailable` until a caller explicitly supplies an installed native adapter; no custom Yu-Gi-Oh! rules are simulated in Python. `RestrictedOcgcoreEngine` keeps the narrow audited fixture path. `ExperimentalOcgcoreEngine` uses the same [pinned native core](native_setup.md) for sampled sourced GOAT Decks, with more native response types, exact replay verification, and player-scoped visibility audits. These samples do not certify every legal card or historical ruling.
 
+The live browser's unfinished-game journal is a separate, private data source.
+Its behavioral-cloning importer freezes the file under a content hash,
+reconstructs every action on the pinned native core, checks saved observation
+and legal-choice digests, and audits the explicit human decision records. It
+never assigns a winner or turns an unfinished prefix into a completed replay.
+The snapshot and any fitted checkpoint stay under ignored local cache unless
+a contributor explicitly publishes them.
+
 `RulesProfile` now selects historical Side Deck sizing (0 or 15 cards) by
 default, with an explicit community option for 0–15 cards. Main Decks require
 at least 40 cards and have no project-imposed maximum. The experimental native

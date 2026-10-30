@@ -203,6 +203,22 @@ actions. Changed decks, AI checkpoint, native assets, or decisions fail closed.
 Only completed, replay-verified games enter the `human_web` replay folder;
 **Leave unfinished duel** discards the journal. The browser is an experimental local play interface, subject to
 the same unresolved GOAT ruling coverage as the native adapter.
+An unfinished journal can also supply explicit human decisions to behavioral
+cloning without pretending the duel ended. For example:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  --human-journal .cache/goat-ai/user_games/_in_progress/GAME_ID.json \
+  --native-root .cache/goat-ai --engine experimental \
+  --feature-version 23 --output .cache/goat-ai/human_prefix_pilot.pt
+```
+
+The trainer copies the private journal into ignored
+`.cache/goat-ai/human_journal_snapshots/`, replays every saved action on the
+pinned native core, checks each saved observation and legal-action digest, and
+trains only explicit, non-forced human choices. The checkpoint records the
+snapshot hash and marks the duel as partial with no outcome. Keep the
+checkpoint experimental until separate held-out play shows a strength gain.
 The board lists public Graveyard and banished cards, your Extra Deck and known
 opponent cards, and card names in the legal-action menu without exposing the
 opponent's private hand or Deck order. Missing card images are fetched from the
