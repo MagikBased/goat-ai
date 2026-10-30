@@ -504,6 +504,13 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired [Appropriate/Graceful Charity fixture](goat_rules.md#appropriate-and-graceful-charity)
+now checks the archived Netrep activation-timing distinction with the pinned
+native scripts. Appropriate draws two only when it was already active before
+Graceful resolves; a Set copy receives no activation from that draw. Both
+complete duels replay-verify and pass the visibility audit. The broader
+historical timing and card-interaction gate remains open.
+
 A paired [Phoenix/Premature Burial fixture](goat_rules.md#sacred-phoenix-revived-by-premature-burial)
 checks the historical ruling that destroying Premature destroys its revived
 Phoenix by effect, scheduling Phoenix's next-Standby return and backrow sweep.
