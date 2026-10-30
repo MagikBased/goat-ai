@@ -15589,3 +15589,60 @@ reports have SHA-256, respectively,
 `3a6ebedd7d1acd06259ea56756627370b186252664acb56a999d4cc55d9cbb5c`,
 `85af1b05dd6cc035d1169aebbcfa7371b96926ee0eb6c2e3f6d9bc57b4f48720`,
 and `00207fc83dbb7d1afd6b6ba0465d703823a7e1b2f824218cdc6d5ec55a9fda51`.
+
+### 240-duel normalization transfer against the preserved larger-step control
+
+The 32-duel pilot above was followed by a matched 240-duel ablation of the
+previous larger-step PPO run. Both arms started from selected v23 and used
+the same three training pairings, seeds 131000–131239, four-role schedule,
+four-game rollouts, Tactical-v14 baseline opponent, half historical opponents,
+learner-deck baseline, per-episode weighting, two epochs, batch 32, parent KL
+0.05, four workers, independent opponent RNG, and learning rate 0.0005.
+The candidate added only `--ppo-normalize-advantages`; its control checkpoint
+is the preserved `ppo_lr5e4_240_131000_131239.pt` above. The first four
+pre-update duels had identical decision observations, selected actions,
+decision counts, and outcomes across the arms.
+
+The new arm finished 240 terminal games, with 93 learner wins, 146 losses,
+one draw, 25,864 learner decisions, and 121.93 seconds of CLI training wall.
+All 240 saved trajectories and **143,902 decisions** independently
+replay-verified and passed the player-visibility audit; no duel exceeded the
+3,000-decision cap. Its ignored checkpoint SHA-256 is
+`915dda251fcae62565c70cec272b44b3a5176d6178ef5568dbe4b95b92f39675`;
+the audit report SHA-256 is
+`0dc3603173b9de0f87b8d113faeb616623d773f568c264f6bc6074f9afbaa040`.
+
+On previously unseen Phoenix/Zombie and Rhymus/GoatFormat-guide Dimension
+Fusion Main Decks, both assignments and seats, seeds 131308–131323, the
+normalized child scored **58–68–2** directly against the unnormalized
+control over 128 duels (paired 95% score interval 39.06–53.13%). For a
+baseline comparison, both checkpoints were rerun on the *same* Phoenix/Zombie
+and Rhymus/WikiFormat-reference Dimension Fusion lists, seeds 131308–131323,
+under the current evaluation code. The candidate scored **43–84–1** against
+Tactical-v14 versus the control's **46–81–1**. The strict matched-report
+comparator accepted both reports, verified unseen Main Deck compositions,
+and measured a candidate-minus-control paired score difference of **−2.34
+percentage points** (95% interval −10.55 to +5.86). The candidate improved
+Rhymus by 12.5 points but lost 9.38 points on Dimension Fusion and 12.5 on
+Phoenix; Zombie was unchanged. A first attempt mistakenly paired the
+GoatFormat guide list against the preserved WikiFormat control report; the
+validator rejected that unequal-deck comparison. The final comparison uses
+new reports from both arms on identical deck files and source code.
+
+The direct, candidate/Tactical, control/Tactical, and paired-comparison
+report SHA-256 values are respectively
+`1640eeb1dbd7a69c5056bb8b534ef736465059d70962e73c34e1370009a7a7d6`,
+`3ad278a3fb7596202daed7895fec91247e534da21c860345ac62dc0404e4d0cd`,
+`2699f9b9c390fb4c6d640bd70a3cc5624642acaae25e51b3ea22faea8dc546f1`,
+and `644cbadde86099cb15658384eb7bb5e3b0f9f0b912d25d35c8fec18dfdf4a608`.
+Reproduce candidate training using the larger-step command above and adding
+`--ppo-normalize-advantages` with a separate ignored output and record
+directory. Run `scripts/audit_selfplay_replays.py` on all 240 recordings,
+then `scripts/evaluate_policy.py --both-deck-assignments
+--require-unseen-main-decks --seed 131308 --seeds 16 --workers 8` on the
+named held-out pairs and compare the matched Tactical reports with
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.
+
+This larger same-schedule experiment does not support normalization as a
+strength improvement. Keep it opt-in, retain selected v23, and keep M4 open.
