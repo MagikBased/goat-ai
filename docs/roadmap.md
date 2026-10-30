@@ -1971,6 +1971,10 @@ A [paired MR1 Bottomless/Synchro fixture](edison_research.md#bottomless-trap-hol
 now tests the response window after Junk Warrior is Synchro Summoned. Both
 branches finish, replay-verify, and pass the visibility audit. This is another
 isolated protocol/ruling check; it does not certify an Edison simulator.
+The [Book response pair](edison_research.md#book-of-moon-chained-to-the-synchro-response)
+adds a second chain link after Bottomless: Book protects the face-down Junk
+Warrior, while passing leaves it banished. Both complete MR1 duels replay-verify
+and pass visibility checks; the additional Edison profile gates remain open.
 
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

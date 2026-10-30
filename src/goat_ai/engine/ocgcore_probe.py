@@ -45,6 +45,7 @@ MR1_SYNCHRO_CARDS = frozenset({
     74131780,  # Exiled Force
     53582587,  # Torrential Tribute
     29401950,  # Bottomless Trap Hole; Synchro Summon response probe
+    14087893,  # Book of Moon; chained protection for the Synchro probe
     87621407,  # Dekoichi the Battlechanted Locomotive
     24317029,  # Gravekeeper's Spy
     93747864,  # Desert Sunlight

@@ -675,6 +675,35 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_bottomless_synchro.py
 ```
 
+### Book of Moon chained to the Synchro response
+
+A [Konami November 2010 feature match](https://yugiohblog.konami.com/2010/ycs/10-11-atlanta/round-10-feature-match-brian-jones-vs-james-quick/)
+records Book of Moon being chained to Bottomless Trap Hole to protect a
+Summoned monster. That official event record postdates the April cutoff and
+shows a Normal Summon, so it does not independently establish the precise
+April rule or every Synchro interaction. The MR1 probe uses the pinned
+unmodified official Book and Bottomless scripts to test this additional
+response path after Junk Warrior's successful Synchro Summon.
+
+In paired seed-52 duels, Book is Set before Junk Warrior is Summoned. Bottomless
+is chosen at decision 40 in both branches. The Synchro controller is then
+offered Book as a chain response. Chaining Book and selecting Junk Warrior
+leaves Warrior face-down on the field and unbanished; passing Book banishes
+Warrior and leaves Book Set. Before activation, the opposing player sees an
+unidentified Set Spell/Trap. The two duels terminate after 1,638 and 1,404
+decisions respectively; both serialize, replay-verify, and pass the
+player-visibility audit. This verifies the native MR1 chain and information
+boundary for these cards, not a complete Edison rules profile.
+
+```sh
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_bottomless_synchro_probe.py \
+  --chain-book --output replays/mr1_bottomless_book_seed52.json
+PYTHONPATH=src:. .venv/bin/python scripts/record_mr1_bottomless_synchro_probe.py \
+  --pass-book --output replays/mr1_bottomless_pass_book_seed52.json
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_bottomless_book_synchro.py
+```
+
 ## Same-time trigger ordering
 
 The [2009 official rulebook's simultaneous-effects section](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
