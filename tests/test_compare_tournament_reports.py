@@ -143,6 +143,43 @@ def test_comparison_rejects_tampered_outcome_and_training_seed(tmp_path):
         compare_reports(a, b)
 
 
+def test_comparison_rejects_matching_reports_with_incomplete_schedule(tmp_path):
+    a, b, left, right, _ = saved_pair(tmp_path)
+    complete = (deepcopy(left), deepcopy(right))
+    for saved in (left, right):
+        games = tuple(GameResult(*(entry[key] for key in (
+            "deck_a", "deck_b", "seed", "a_seat", "winner", "decisions")))
+            for entry in saved["games"][:1])
+        saved["games"] = saved["games"][:1]
+        saved["summary"] = TournamentReport(games).summary()
+    a.write_text(json.dumps(left))
+    b.write_text(json.dumps(right))
+    with pytest.raises(ValueError, match="missing or duplicate games"):
+        compare_reports(a, b)
+
+    left, right = complete
+    for saved in (left, right):
+        saved["games"].append(saved["games"][0])
+        saved["summary"] = TournamentReport(tuple(GameResult(*(
+            entry[key] for key in ("deck_a", "deck_b", "seed", "a_seat",
+                                   "winner", "decisions")))
+            for entry in saved["games"])).summary()
+    a.write_text(json.dumps(left))
+    b.write_text(json.dumps(right))
+    with pytest.raises(ValueError, match="missing or duplicate games"):
+        compare_reports(a, b)
+
+
+def test_comparison_requires_reverse_decks_when_declared(tmp_path):
+    a, b, left, right, _ = saved_pair(tmp_path)
+    for saved in (left, right):
+        saved["both_deck_assignments"] = True
+    a.write_text(json.dumps(left))
+    b.write_text(json.dumps(right))
+    with pytest.raises(ValueError, match="reverse deck assignment"):
+        compare_reports(a, b)
+
+
 def test_comparison_requires_matching_extended_fingerprints_when_recorded(tmp_path):
     a, b, left, right, _ = saved_pair(tmp_path)
     left["card_scripts_sha256"] = "a" * 64

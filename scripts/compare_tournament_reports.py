@@ -58,6 +58,19 @@ def load_report(path: Path, *, verify_local_decks: bool = False,
     games = tuple(games)
     if set(seeds) != {game.seed for game in games}:
         raise ValueError(f"{path}: game seeds differ from declared evaluation seeds")
+    assignments = raw.get("both_deck_assignments")
+    if type(assignments) is not bool:
+        raise ValueError(f"{path}: missing deck-assignment setting")
+    pairs = {(game.deck_a, game.deck_b) for game in games}
+    if assignments and any((deck_b, deck_a) not in pairs for deck_a, deck_b in pairs):
+        raise ValueError(f"{path}: reverse deck assignment is missing")
+    actual_schedule = {(game.deck_a, game.deck_b, game.seed, game.a_seat)
+                       for game in games}
+    expected_schedule = {(deck_a, deck_b, seed, seat)
+                         for deck_a, deck_b in pairs for seed in seeds
+                         for seat in (0, 1)}
+    if len(actual_schedule) != len(games) or actual_schedule != expected_schedule:
+        raise ValueError(f"{path}: tournament schedule has missing or duplicate games")
     if {game.seed for game in games} & {
             item["seed"] for item in raw.get("training_games", ())}:
         raise ValueError(f"{path}: training and evaluation seeds overlap")

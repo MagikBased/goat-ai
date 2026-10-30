@@ -1,5 +1,16 @@
 # Baseline evaluation log
 
+## Saved tournament schedule integrity
+
+`scripts/compare_tournament_reports.py` now checks the full Cartesian
+schedule in each saved policy report before calculating a paired result. Each
+observed ordered deck matchup must have both candidate seats for every
+declared evaluation seed, with no duplicate game. A report declaring both
+deck assignments must also contain each reverse matchup. Two reports that
+both omit the same game are rejected even if their summaries match. This
+validates recorded schedule completeness; it does not establish that the
+sample size is sufficient or that a learned policy is stronger.
+
 ## Fresh distinct-whitelist Fusion protocol probe (29 October 2026)
 
 Twenty fresh seeds, 129000–129019, generated independent legal Main Decks for
