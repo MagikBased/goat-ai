@@ -1,23 +1,23 @@
 # GOAT AI
 
-Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. A restricted native adapter runs complete duels with 40-card normal-monster decks and selected scripted cards: Pot of Greed, Book of Moon, the GOAT variant of Nobleman of Crossout, and Cannon Soldier. General effect-card support and historical rules validation are unfinished. No competitive playing strength is claimed.
+Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. The experimental adapter runs complete, seeded, headless duels with sourced GOAT Decks through a pinned native rules engine. It exposes player-visible observations and legal actions, and records replay-verifiable trajectories. Historical ruling coverage and competitive playing strength remain incomplete.
 
 ## Status
 
 | Component | Status |
 | --- | --- |
 | Engine selection and source review | Initial research complete |
-| Native GOAT-mode startup | First decision reached with pinned core/assets; historical correctness unverified |
-| Complete headless duel | Restricted native adapter reaches terminal through `GoatEnvironment`; general card support unfinished |
+| Native GOAT-mode startup | Pinned core and assets reach the first decision; reproducible setup and first-turn draw checks |
+| Complete headless duel | Experimental adapter completes sampled sourced-deck duels; arbitrary legal Decks and every historical ruling are not certified |
 | Environment contract and illegal-action validation | Implemented |
 | Player-visible observation schema | Own hand, initial Main Deck composition, and Extra Deck; public zones, battle position, face-up field-card age, face-up monster ATK/DEF/counters/current Type/original owner, pending public summon, chain links, bounded public events, known opponent field and hand cards, public Deck-top reveals, recipient-scoped card reveals, disabled zones, and the public Scapegoat summon restriction; broader reveal and restriction coverage pending |
-| Random, heuristic, CLI human agents | Implemented; random agent completes vanilla native duels |
-| JSON trajectory round trip | Schema v26 adds public face-up field-card age to v25's original owner and pending summon fields; earlier schemas remain readable. Publicly known opponent hand cards and set-monster control memory are also tracked. Affected old recordings may need re-recording for exact replay verification |
+| Random, heuristic, and CLI human agents; browser human play | Implemented; sampled sourced-deck games finish through the same observation/action boundary |
+| JSON trajectory round trip | Schema v28 records player-visible decisions, public effect choices, terminal observation, Deck and native-asset hashes; older schemas remain readable, but changed native assets may require re-recording for exact verification |
 | Tournaments | Seeded, seat-swapped sequential and spawned-process runners; paired score intervals and Wilson intervals for supported decks |
 | Native throughput benchmark | Measures complete vanilla or sourced-deck duels, reset time, and single-process peak RSS; see `docs/benchmarks.md` |
 | Allowed-card asset inventory | All 1,685 pinned whitelist IDs have metadata and a candidate script path; runtime coverage unverified |
-| Experimental control probe | One seeded 40-card synthetic control-style deck reaches a native terminal state with full scripts; behavior and visibility unaudited |
-| PyTorch policy | Visible-state action scorer with versioned features through v25; replay-verified imitation, preference, and self-play experiments exist. The v23 imitation checkpoint is the current neural reference. No post-patch self-play child has established a held-out competitive gain over it; see [evaluation](docs/evaluation.md) |
+| Experimental GOAT adapter | Sourced-deck protocol sweeps, source-backed ruling fixtures, exact replay checks, and bounded hidden-information audits exist; broad historical correctness remains an open gate |
+| PyTorch policy | Visible-state action scorer with opt-in feature versions through v28; replay-verified imitation, preference, and self-play experiments exist. The selected v23 checkpoint remains the neural reference because recent self-play children have not shown a transferable held-out strength gain; see [evaluation](docs/evaluation.md) |
 | Human EDOPro replay intake | Bounded `.yrp`/`.yrpX` parsing and synthetic response reconstruction exist. A real, authorized GOAT replay has not passed exact reconstruction; see [replay contributions](docs/replay_contributions.md) |
 
 The selected direction is [Project Ignis/edo9300 ocgcore](https://github.com/edo9300/ygopro-core), configured with its `DUEL_MODE_GOAT` flag, historical card data and scripts, and an audited Python-facing decision adapter. A 2005 banlist alone is insufficient. See [research](docs/research.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md).
@@ -38,11 +38,11 @@ PyTorch is an optional training dependency: `python -m pip install -e '.[ml]'`. 
 
 Tests are run locally; this repository does not use GitHub Actions. After native setup, run `GOAT_AI_NATIVE_ROOT=.cache/goat-ai python -m pytest -q` for the full native suite and `ruff check .` for lint.
 
-The API is `GoatEnvironment(player1_deck, player2_deck, seed, engine=...)`; `reset()`, `legal_actions()`, `step()`, `is_terminal()`, `result()`, and `trajectory()` are defined. Pass `RestrictedOcgcoreEngine` for the restricted native path. The default engine raises `SimulatorUnavailable` because general GOAT support is unfinished.
+The API is `GoatEnvironment(player1_deck, player2_deck, seed, engine=...)`; `reset()`, `legal_actions()`, `step()`, `is_terminal()`, `result()`, and `trajectory()` are defined. Pass `ExperimentalOcgcoreEngine` for sourced GOAT Decks or `RestrictedOcgcoreEngine` for the narrow audited fixture subset. The default raises `SimulatorUnavailable` until the caller explicitly selects an installed engine.
 
 ## Native setup (Linux)
 
-The M0 probe calls a real, pinned ocgcore build with `DUEL_MODE_GOAT`. Its raw messages stay inside the adapter. The restricted adapter uses player-visible queries and redacts hidden card identities in observations and action parameters. Visibility tests now include a targeted set opponent monster.
+The native adapters call a pinned ocgcore build with `DUEL_MODE_GOAT`. Raw core messages remain inside the adapter. The experimental adapter uses player-scoped queries, redacts hidden card identities in observations and action parameters, and has differential visibility and exact replay tests. These tests cover sampled interactions, not every legal GOAT card.
 
 ```bash
 python -m pip install -e '.[dev,native]'

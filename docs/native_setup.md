@@ -1,6 +1,6 @@
 # M0 native GOAT-mode probe
 
-The probe in `goat_ai.engine.ocgcore_probe` calls the native C API through Python `ctypes`. It starts a seeded duel, loads cards and global scripts, processes native messages, and checks public counts. It now decodes a small subset of decisions and constructs a redacted observation for those states. It is **not** the general `GoatEnvironment` adapter. Raw core messages may contain private data and must stay inside the native layer.
+`goat_ai.engine.ocgcore_probe` calls the native C API through Python `ctypes`. It starts seeded duels, loads cards and scripts, processes native messages, and constructs player-scoped observations. `RestrictedOcgcoreEngine` and `ExperimentalOcgcoreEngine` connect that probe to `GoatEnvironment`; the former is a narrow audited fixture path, while the latter runs sampled sourced GOAT Decks. Raw core messages may contain private data and stay inside the native layer. Source-backed historical correctness and arbitrary-deck support remain separate validation gates.
 
 ## Pinned external sources
 
@@ -74,9 +74,9 @@ probes. The default keeps the small sparse checkout. Setup uses the Meson
 executable beside the active Python interpreter when present, so an older
 system Meson does not open a newer build directory.
 
-## Protocol findings and next boundary
+## Protocol findings and remaining boundary
 
-Native messages are length-prefixed binary frames. The first processed sequence includes opening draws, turn and phase changes, the first-turn draw, then `MSG_SELECT_CHAIN`. The adapter still must parse more request types and provide complete player-scoped redacted observations. The core's query functions can expose complete internal state, so calling them does not itself enforce information boundaries. Narrow complete-duel throughput has been measured in [the benchmark log](benchmarks.md); state cloning and broad historical card behavior remain unmeasured.
+Native messages are length-prefixed binary frames. The first processed sequence includes opening draws, turn and phase changes, the first-turn draw, then `MSG_SELECT_CHAIN`. The experimental adapter decodes the request types seen in its sourced-deck sweeps and fails explicitly on unsupported messages; new legal interactions can still reveal gaps. The core's query functions can expose complete internal state, so calling them does not itself enforce information boundaries. Player-scoped redaction and differential tests cover sampled states. Complete-duel throughput is measured in [the benchmark log](benchmarks.md); state cloning and broad historical card behavior remain open.
 
 The direct `ctypes` path reaches the first decision with a small binding and no fixed action-list size. A narrow smoke runner now decodes zero-option chain windows, idle actions, and single-card selections, and completes a vanilla-fixture duel by ending turns and discarding at hand limit. The fixture has 40 cards, at most three copies each, and passes the pinned Project Ignis GOAT whitelist. Seed 42 terminates after 350 decisions with player 1 winning by deck-out. This is a real native duel; it does not cover arbitrary cards, full legal-action enumeration, or an agent-facing environment. Raw native choices remain internal. The smoke runner is a protocol regression, not a performance benchmark.
 
