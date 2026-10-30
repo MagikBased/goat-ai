@@ -2995,6 +2995,10 @@ mistake an AI response or retrospective alternative for a human demonstration.
 A separate `verify_edopro_human_labels.py` command replays the EDOPro room
 recording before validating specific confirmed choices and reports their exact
 annotation hash. It remains a review artifact, not an admitted training set.
+The `confirm_edopro_human_actions.py` command accepts the viewer's one-based
+decision numbers, verifies the replay, rejects AI-seat and forced responses,
+and atomically saves the authorized human-action annotation. A browser review
+queue and training admission still require separate gates.
 
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The

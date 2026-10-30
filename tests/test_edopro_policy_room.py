@@ -16,6 +16,7 @@ from goat_ai.replay.edopro_live_verify import (
     verify_edopro_live_recording,
 )
 from goat_ai.replay.fingerprint import sha256_file
+from scripts.confirm_edopro_human_actions import confirm_frames
 from scripts.serve_edopro_policy import Bridge
 
 
@@ -141,6 +142,26 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
             replay_path, review_path, metadata_path, label_path, mirror_root)
         assert confirmed["confirmed_human_choices"] == 1
         assert confirmed["training_admitted"] is False
+        reviewed_index = next(index for index, candidate in
+                              enumerate(trajectory.decisions)
+                              if candidate.observation.acting_player == 1
+                              and len(candidate.legal_actions) > 1)
+        generated_path = tmp_path / "human_confirmed.json"
+        generated = confirm_frames(replay_path, [reviewed_index + 1],
+                                   mirror_root, generated_path)
+        assert generated["confirmed_human_choices"] == 1
+        assert confirm_frames(replay_path, [reviewed_index + 1],
+                              mirror_root, generated_path) == generated
+        ai_index = next(index for index, candidate in
+                        enumerate(trajectory.decisions)
+                        if candidate.observation.acting_player == 0)
+        with pytest.raises(ValueError, match="AI seat"):
+            confirm_frames(replay_path, [ai_index + 1], mirror_root,
+                           tmp_path / "invalid_ai.json")
+    elif not authorized and not surrender:
+        with pytest.raises(ValueError, match="authorized self-recording"):
+            confirm_frames(replay_path, [1], mirror_root,
+                           tmp_path / "unauthorized.json")
     metadata["human_authorization"] = "unauthorized"
     metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
     with pytest.raises(ValueError, match="unsupported human recording authorization"):

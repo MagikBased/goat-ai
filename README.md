@@ -112,7 +112,9 @@ The script prints the save location, defaulting to ignored
 `.cache/goat-ai/edopro_games/`. It writes EDOPro's `.yrpX` and a metadata file;
 if every host response matches the native mirror and the duel reaches a native
 terminal, it also writes a player-visible `.review.json` trajectory. Open that
-JSON in the local replay viewer. The pinned room loads the project's
+JSON in the local replay viewer. You can also render a standalone local viewer
+with `python scripts/render_replay.py <game>.review.json --native-root .cache/goat-ai --output <game>.html`.
+The pinned room loads the project's
 checksum-guarded historical script corrections without modifying the source
 checkout. Its records are marked `edopro_pinned_historical` and **excluded
 from automatic training** until broader historical correctness and more
@@ -148,6 +150,19 @@ the review JSON's SHA-256. Check it with
 `python scripts/verify_edopro_human_labels.py <game>.yrpX <labels>.json --native-root .cache/goat-ai`.
 The checker independently reconstructs the duel before accepting the label;
 its output remains review-only.
+To create that annotation after watching your own authorized duel, use the
+one-based **Decision** numbers shown in the viewer:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/confirm_edopro_human_actions.py \
+  .cache/goat-ai/edopro_games/game-001-seed-NNN.yrpX 12 37
+```
+
+Replace `NNN` with your saved seed and `12 37` with decisions you personally
+confirm choosing. The script independently verifies the replay, rejects AI
+turns and forced choices, and writes a checked `.human_labels.json` beside it.
+It will not replace a different existing label file. This is a review aid;
+the EDOPro training gate remains closed.
 
 The external host package remains a separate AGPL dependency and must be on
 `PYTHONPATH`. The locally tested checkout is
