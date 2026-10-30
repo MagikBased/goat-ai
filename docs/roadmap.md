@@ -791,6 +791,11 @@ A paired Spell Shield Type-8 fixture now checks both historical Spell-negation
 modes: a targeted Book of Moon is negated without a discard, while Pot of Greed
 requires a Spell sent from hand as cost before the chain resolves. Both full
 duels replay-verify and pass the visibility audit; see [GOAT rules](goat_rules.md).
+Schema v28 now retains a public effect-option index when one card offers
+multiple effects at the same decision. The live controls display the pinned
+effect wording, and opt-in policy feature v32 represents the distinction.
+Older v27 replays still verify after projection; no playing-strength benefit
+has been measured for v32.
 
 ## M3 — Evaluation and data
 

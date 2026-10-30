@@ -99,6 +99,7 @@
     #card-actions[hidden] { display: none; }
     #card-actions button { display: grid; justify-items: center; gap: 2px; flex: 0 0 70px;
       min-height: 56px; padding: 4px; font-size: .72rem; white-space: normal; }
+    #card-actions button.effect-choice { flex-basis: 128px; }
     #card-actions button svg { width: 24px; height: 24px; }
     #card-actions .close-actions { flex-basis: 34px; min-height: 34px; align-self: flex-start; }
     #card-preview { position: fixed; z-index: 40; padding: 3px; border: 2px solid #e5c963;
@@ -379,7 +380,11 @@
       for (const {action, index} of offered) {
         const button = document.createElement("button"); button.type = "button";
         button.title = actionLabel(action); button.setAttribute("aria-label", actionLabel(action));
-        button.append(actionIcon(action.kind), document.createTextNode(shortAction[action.kind] || action.kind.replaceAll("_", " ")));
+        const effect = state.action_effect_texts?.[action.id];
+        if (effect) button.classList.add("effect-choice");
+        const short = shortAction[action.kind] || action.kind.replaceAll("_", " ");
+        button.append(actionIcon(action.kind), document.createTextNode(effect
+          ? `${short} · ${effect.slice(0, 42)}${effect.length > 42 ? "…" : ""}` : short));
         button.onclick = () => choose(index, destination);
         tray.append(button);
       }
@@ -585,6 +590,8 @@
       if (params.race != null) parts.push(`Type ${params.race}`);
       if (params.attribute != null) parts.push(`Attribute ${params.attribute}`);
       if (params.counter_total != null) parts.push(`${params.counter_total} counters`);
+      if (params.effect_option != null) parts.push(
+        state?.action_effect_texts?.[action.id] || `Effect option ${params.effect_option + 1}`);
       if (parts.length === 1 && Object.keys(params).length) parts.push(JSON.stringify(params));
       return parts.join(" · ");
     }

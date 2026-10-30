@@ -147,7 +147,10 @@ server's art cache; missing artwork displays the card name instead.
 When an effect asks for multiple cards, such as Graceful Charity's two
 discards, click the cards in your hand or on the field, then press **Confirm
 selected cards**. Click a selected card again to undo it. The advanced action
-list remains available for choices outside the board. Open placement zones are
+list remains available for choices outside the board. When one card offers
+multiple effect modes, its action buttons show distinct descriptions from the
+pinned card database; the full text appears on hover and in the advanced list.
+Open placement zones are
 chosen automatically after a Summon or Set; uncheck **Automatically choose open
 card zones** to select the zone yourself. By default, the live UI passes through
 optional chain-response windows on both turns, then returns to the next

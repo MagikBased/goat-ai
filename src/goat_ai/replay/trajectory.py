@@ -59,8 +59,12 @@ def _json_dataclass(value):
 def write_trajectory(path: str | Path, trajectory: Trajectory, *,
                      fast_json: bool = False) -> None:
     version = trajectory.schema_version
-    if version not in range(1, 28):
+    if version not in range(1, 29):
         raise ValueError("unsupported trajectory schema")
+    if version < 28 and any("effect_option" in action.parameters
+                            for record in trajectory.decisions
+                            for action in (*record.legal_actions, record.selected_action)):
+        raise ValueError("effect options require schema v28")
     if version >= 18 and trajectory.terminal_observation is None:
         raise ValueError("schema v18 requires a terminal observation")
     if version < 18 and trajectory.terminal_observation is not None:
@@ -134,8 +138,13 @@ def read_trajectory(path: str | Path, *, fast_json: bool = False) -> Trajectory:
     else:
         raw = json.loads(data)
     version = raw.get("schema_version")
-    if version not in range(1, 28):
+    if version not in range(1, 29):
         raise ValueError("unsupported trajectory schema")
+    if version < 28 and any("effect_option" in action.get("parameters", {})
+                            for record in raw.get("decisions", ())
+                            for action in (*record.get("legal_actions", ()),
+                                           record.get("selected_action", {}))):
+        raise ValueError("effect options require schema v28")
 
     def cards(items: list[dict]) -> tuple[CardView, ...]:
         result = []

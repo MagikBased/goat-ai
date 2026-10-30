@@ -21,6 +21,28 @@ def load_card_names(native_root: str | Path) -> dict[int, str]:
     return names
 
 
+def load_card_effect_texts(native_root: str | Path,
+                           codes: set[int]) -> dict[tuple[int, int], str]:
+    """Read printed, card-scoped effect labels for public action choices."""
+    if not codes:
+        return {}
+    root = Path(native_root)
+    descriptions: dict[tuple[int, int], str] = {}
+    columns = ", ".join(f"str{index}" for index in range(1, 17))
+    for name in CARD_DATABASES:
+        path = root / "database" / name
+        if not path.is_file():
+            raise FileNotFoundError(f"card database missing: {path}")
+        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as database:
+            for code in codes:
+                row = database.execute(f"SELECT {columns} FROM texts WHERE id=?",
+                                       (code,)).fetchone()
+                if row is not None:
+                    descriptions.update(((code, index), text) for index, text in
+                                        enumerate(row) if text)
+    return descriptions
+
+
 def load_card_properties(native_root: str | Path,
                          codes: set[int]) -> dict[int, tuple[int, int]]:
     """Read printed Type and ATK for allowed cards from pinned databases.

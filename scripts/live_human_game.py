@@ -11,7 +11,7 @@ from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 
-from goat_ai.agents.card_metadata import load_card_names
+from goat_ai.agents.card_metadata import load_card_effect_texts, load_card_names
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
@@ -45,6 +45,8 @@ class LiveGame:
         self.native_root = native_root
         self.checkpoint = checkpoint
         self.names = names
+        self.effect_texts: dict[tuple[int, int], str] = {}
+        self.effect_codes_loaded: set[int] = set()
         self.max_decisions = max_decisions
         self.spec = spec
         self.journal_path = journal_path
@@ -227,9 +229,29 @@ class LiveGame:
         codes.update(action.parameters["code"] for action in actions
                      if type(action.parameters.get("code")) is int)
         codes.update(link.card_code for link in observation.chain)
+        described_codes = {action.parameters["code"] for action in actions
+                           if type(action.parameters.get("effect_option")) is int
+                           and type(action.parameters.get("code")) is int}
+        fresh_codes = described_codes - self.effect_codes_loaded
+        if fresh_codes:
+            self.effect_texts.update(load_card_effect_texts(self.native_root, fresh_codes))
+            self.effect_codes_loaded.update(fresh_codes)
+        effect_labels = {}
+        for index, action in enumerate(actions):
+            option = action.parameters.get("effect_option")
+            code = action.parameters.get("code")
+            if type(option) is not int or type(code) is not int:
+                continue
+            native_description = self.env.engine._choices[index].effect_description
+            documented = (native_description is not None
+                          and native_description >> 20 == code
+                          and native_description & 0xfffff == option)
+            effect_labels[str(index)] = (self.effect_texts.get((code, option))
+                                         if documented else None) or f"Effect option {option + 1}"
         return {"id": self.id, "terminal": False, "decisions": self.decisions,
                 "human_seat": self.human_seat, "observation": asdict(observation),
                 "legal_actions": [asdict(action) for action in actions],
+                "action_effect_texts": effect_labels,
                 "card_names": {str(code): self.names.get(code, f"Card #{code}")
                                for code in codes}}
 

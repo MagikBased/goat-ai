@@ -100,7 +100,7 @@ def test_spy_deck_search_hides_native_order_and_recruits_guard(tmp_path):
                     observation = env.step(action)
                     if env.is_terminal():
                         trajectory = env.trajectory()
-                        assert trajectory.schema_version == 27
+                        assert trajectory.schema_version == 28
                         path = tmp_path / "spy.json"
                         write_trajectory(path, trajectory)
                         assert verify_trajectory(read_trajectory(path),

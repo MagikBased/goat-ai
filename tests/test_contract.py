@@ -563,7 +563,7 @@ def test_schema_twenty_seven_terminal_observation_round_trip_and_verification(tm
         final = env.step(env.legal_actions()[0])
         assert env.is_terminal()
         trajectory = env.trajectory()
-    assert trajectory.schema_version == 27
+    assert trajectory.schema_version == 28
     assert trajectory.terminal_observation == final
     path = tmp_path / "terminal.json"
     write_trajectory(path, trajectory)

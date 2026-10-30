@@ -33,6 +33,12 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
             raise VisibilityViolation("legal action actor differs from acting player")
         if action.parameters.get("location") in (1, 64) and "sequence" in action.parameters:
             raise VisibilityViolation("Deck choice exposes native slot")
+        if "effect_option" in action.parameters and (
+                action.kind not in ("activate", "chain")
+                or type(action.parameters.get("code")) is not int
+                or type(action.parameters["effect_option"]) is not int
+                or not 0 <= action.parameters["effect_option"] < (1 << 20)):
+            raise VisibilityViolation("effect option lacks a visible card or valid index")
         if action.kind == "select_counters":
             cards = action.parameters.get("cards", ())
             counter_type = action.parameters.get("counter_type")

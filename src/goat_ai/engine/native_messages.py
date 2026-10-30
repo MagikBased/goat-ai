@@ -41,6 +41,7 @@ class NativeChoice:
     counter_type: int | None = None
     counter_total: int | None = None
     counter_allocations: tuple[int, ...] = ()
+    effect_description: int | None = None
 
 
 @dataclass(frozen=True)
@@ -498,10 +499,11 @@ def decode_decision(message: bytes,
             location = reader.integer(1)
             sequence = reader.integer(4)
             reader.integer(4)  # position
-            reader.integer(8)  # effect description
+            description = reader.integer(8)
             reader.integer(1)  # response flag
             choices.append(NativeChoice("chain", index, code, controller,
-                                        location, sequence))
+                                        location, sequence,
+                                        effect_description=description))
         if not forced:
             choices.append(NativeChoice("pass", -1))
         reader.finish()
@@ -752,10 +754,11 @@ def decode_decision(message: bytes,
             controller = reader.integer(1)
             location = reader.integer(1)
             sequence = reader.integer(4)
-            reader.integer(8)  # effect description
+            description = reader.integer(8)
             reader.integer(1)  # response flag
             choices.append(NativeChoice("activate", index << 16, code, controller,
-                                        location, sequence))
+                                        location, sequence,
+                                        effect_description=description))
         attack_count = reader.integer(4)
         for index in range(attack_count):
             code = reader.integer(4)
@@ -794,10 +797,11 @@ def decode_decision(message: bytes,
             location = reader.integer(1)
             sequence = reader.integer(sequence_width)
             if has_effect:
-                reader.integer(8)  # effect description
+                description = reader.integer(8)
                 reader.integer(1)  # response flag
             choices.append(NativeChoice(action_kind, (index << 16) | command,
-                                        code, controller, location, sequence))
+                                        code, controller, location, sequence,
+                                        effect_description=description if has_effect else None))
     if reader.integer(1):
         choices.append(NativeChoice("battle_phase", 6))
     if reader.integer(1):

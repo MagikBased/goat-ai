@@ -62,6 +62,13 @@ and [evaluation](evaluation.md) track the measured follow-up.
 
 This is a first representation, not a validated strong architecture. It does not yet model public event history, recipient-scoped reveals, other restrictions, changes to the Deck since duel start, or individual Damage Step substeps. Unknown card IDs share one embedding. Target context is pooled and may still lose relationships among cards. The model does not infer hidden hands or deck order. Ordinary inference scores one decision at a time; behavioral cloning can optionally pad variable-length decisions and score a minibatch together with `--batched-forward`. Batched inference across live duels, recurrent memory, and action-set attention remain open experiments. The original batch size 1 remains the default because faster training has not demonstrated stronger play. See [the measured training comparison](evaluation.md) and [throughput benchmark](benchmarks.md).
 
+Feature v32 is an opt-in action feature for schema-v28 decisions where one
+visible card offers multiple effects. It encodes the public effect-option
+index, distinguishing choices that earlier encoders represented identically.
+The behavioral-cloning command can zero-extend a v23 parent with
+`--upgrade-feature-23-to-32`; its initial logits remain those of the parent.
+No v32 playing-strength result is available yet.
+
 Feature v27 is an opt-in action-to-visible-card attention branch from v23.
 It uses the same player-visible input and starts with identical v23 logits.
 The first matched 437-label experiment split 32–32 against its v23 control

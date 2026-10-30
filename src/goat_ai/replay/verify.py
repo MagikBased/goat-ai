@@ -149,6 +149,10 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                                       if action.kind == "flip_summon" else action
                                       for action in current_actions)
                                 if trajectory.schema_version < 8 else current_actions)
+            if trajectory.schema_version < 28:
+                compared_actions = tuple(replace(action, parameters={
+                    key: value for key, value in action.parameters.items()
+                    if key != "effect_option"}) for action in compared_actions)
             if compared_actions != record.legal_actions:
                 raise ReplayMismatch(f"decision {index}: legal actions differ")
             observation = env.step(current_actions[record.legal_actions.index(

@@ -9,6 +9,48 @@ import pytest
 
 
 @pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_multiple_card_effect_modes_have_distinct_live_labels(tmp_path):
+    page = Path(__file__).resolve().parents[1] / "examples/play_game.html"
+    probe = """<script>
+      const spell = {code:38275183,controller:0,location:8,sequence:0};
+      const choices = [0,1].map(option => ({id:String(option),kind:'chain',actor:0,
+        parameters:{...spell,effect_option:option}}));
+      const observation = {turn:3,turn_player:1,acting_player:0,phase:'main1',
+        life_points:[8000,8000],extra_deck_counts:[0,0],deck_counts:[30,30],
+        hand:[],opponent_hand_count:5,field:[{code:38275183,controller:0,
+          zone:'spell_trap',sequence:0,position:'facedown'}],
+        graveyards:[[],[]],banished:[[],[]],known_opponent_hand_cards:[],
+        known_opponent_field_cards:[],own_extra_deck:[],restrictions:[],
+        chain:[{index:1,controller:1,card_code:14087893}],public_history:[]};
+      setTimeout(() => {
+        try {
+          render({id:'test',terminal:false,decisions:0,human_seat:0,observation,
+            legal_actions:choices,card_names:{38275183:'Spell Shield Type-8'},
+            action_effect_texts:{0:'Negate a Spell targeting one monster',
+              1:'Send a Spell from hand to negate a Spell'}});
+          document.querySelector('#own-spell .card').click();
+          const tray = [...document.querySelectorAll('#card-actions button.effect-choice')];
+          const advanced = [...document.querySelectorAll('#action-list button')];
+          document.body.dataset.effectProbe = [tray.length,
+            tray[0].textContent.includes('targeting one monster'),
+            tray[1].textContent.includes('Send a Spell'),
+            advanced[0].textContent !== advanced[1].textContent].join('|');
+        } catch(error) { document.body.dataset.effectProbe = error.message; }
+      },60);
+    </script></body>"""
+    html = tmp_path / "effect_modes.html"
+    html.write_text(page.read_text().replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=500", "--dump-dom",
+        html.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-effect-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1000:]
+    assert match.group(1) == "2|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
 @pytest.mark.parametrize("width,height", [(1920, 1080), (800, 700)])
 def test_setup_generates_seed_and_dice_replaces_invalid_value(tmp_path, width, height):
     template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()

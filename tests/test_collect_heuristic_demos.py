@@ -36,7 +36,7 @@ def test_tactical_teacher_against_combat_baseline_records_verified_seats(
     assert len(report["games"]) == 2
     for seat, game in enumerate(report["games"]):
         replay = read_trajectory(game["path"])
-        assert replay.schema_version == 27
+        assert replay.schema_version == 28
         assert replay.source == "tactical"
         assert replay.skill_metadata == {
             "demonstrator_seat": seat,

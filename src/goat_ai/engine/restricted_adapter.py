@@ -260,6 +260,27 @@ class RestrictedOcgcoreEngine:
                 raise SimulatorUnavailable("native choice references an unobserved card")
             return visible.code
 
+        effect_groups: dict[tuple, list[int]] = {}
+        for choice_index, choice in enumerate(native.choices):
+            if choice.effect_description is not None:
+                key = (choice.kind, choice.code, choice.controller,
+                       choice.location, choice.sequence)
+                effect_groups.setdefault(key, []).append(choice_index)
+        effect_options: dict[int, int] = {}
+        for indices in effect_groups.values():
+            if len(indices) < 2:
+                continue
+            descriptions = [native.choices[index].effect_description for index in indices]
+            codes = [native.choices[index].code for index in indices]
+            decoded = [description & 0xfffff for description in descriptions]
+            if (all(description >> 20 == code for description, code in
+                    zip(descriptions, codes, strict=True))
+                    and len(set(decoded)) == len(decoded)):
+                effect_options.update(zip(indices, decoded, strict=True))
+            else:
+                effect_options.update((index, ordinal)
+                                      for ordinal, index in enumerate(indices))
+
         actions = []
         for index, choice in enumerate(native.choices):
             kind = choice.kind
@@ -278,6 +299,8 @@ class RestrictedOcgcoreEngine:
                                    choice.location, choice.sequence)
                 if code is not None:
                     parameters["code"] = code
+            if index in effect_options and "code" in parameters:
+                parameters["effect_option"] = effect_options[index]
             if choice.cards:
                 cards = []
                 for card_index, (code, controller, location, sequence) in enumerate(choice.cards):

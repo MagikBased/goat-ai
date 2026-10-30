@@ -1840,6 +1840,43 @@ def test_v30_distinguishes_adjacent_native_option_ids_and_warm_starts(tmp_path):
     assert child(new)[1] > child(new)[0] + 0.1
 
 
+def test_v32_distinguishes_public_effect_modes_without_hidden_cards(tmp_path):
+    from scripts.audit_policy_action_aliases import feature_aliases
+
+    vocabulary = CardVocabulary((38275183,), ((38275183, 0, 0),))
+    choices = (Action("0", "chain", 0, {"code": 38275183,
+               "controller": 0, "location": 8, "sequence": 0, "effect_option": 0}),
+               Action("1", "chain", 0, {"code": 38275183,
+               "controller": 0, "location": 8, "sequence": 0, "effect_option": 1}))
+    visible = view()
+    old = encode_decision(visible, choices, vocabulary, 31)
+    new = encode_decision(visible, choices, vocabulary, 32)
+    assert feature_aliases(old, choices) == [(0, 1)]
+    assert feature_aliases(new, choices) == []
+    assert new.action_numbers.shape[1] == 138
+    assert new.action_numbers[0, -1] < new.action_numbers[1, -1]
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=32)
+    assert torch.isfinite(model(new)).all()
+    torch.manual_seed(32)
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    path = tmp_path / "parent.pt"
+    torch.save({"schema_version": 1, "model_state": parent.state_dict(),
+                "vocabulary_codes": vocabulary.codes,
+                "vocabulary_card_properties": vocabulary.card_properties,
+                "width": 8, "feature_version": 23,
+                "trajectory_sha256": {"training.json": "a" * 64},
+                "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                                    "main_deck_composition_sha256": ("c", "d")}]}, path)
+    load_parent_checkpoint(path, model, vocabulary, allow_v23_to_v32=True)
+    assert torch.count_nonzero(model.action_numbers[0].weight[:, -37:]) == 0
+    with torch.no_grad():
+        assert torch.allclose(model(new), parent(encode_decision(
+            visible, choices, vocabulary, 23)), atol=1e-6)
+    with pytest.raises(ValueError, match="effect option"):
+        encode_decision(visible, (replace(choices[0], parameters={
+            **choices[0].parameters, "effect_option": -1}),), vocabulary, 32)
+
+
 def test_v31_distinguishes_unknown_announced_cards_and_warm_starts(tmp_path):
     from scripts.audit_policy_action_aliases import feature_aliases
 

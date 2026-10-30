@@ -1,11 +1,13 @@
 """Spell Shield Type-8's two historical Spell-negation modes."""
 
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from goat_ai.agents import RandomAgent
+from goat_ai.agents.card_metadata import load_card_effect_texts
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
@@ -25,6 +27,9 @@ def test_spell_shield_negation_modes_and_cost_visibility(tmp_path, spell):
     scripts = {f"official/c{code}.lua" for code in (BOOK, POT, SHIELD, UPSTART)}
     if any(not (root / "scripts" / script).is_file() for script in scripts):
         pytest.skip("required official card script not installed")
+    texts = load_card_effect_texts(root, {SHIELD})
+    assert "targets 1 monster" in texts[(SHIELD, 0)]
+    assert "Spell Card from your hand" in texts[(SHIELD, 1)]
     own = tmp_path / "spells.ydk"
     own.write_text("#main\n" + "\n".join(map(str, (
         BOOK, POT, *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
@@ -55,6 +60,25 @@ def test_spell_shield_negation_modes_and_cost_visibility(tmp_path, spell):
                 assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) == len(
                     replay.decisions)
                 audit_trajectory_visibility(replay)
+                if spell == BOOK:
+                    with pytest.raises(ValueError, match="schema v28"):
+                        write_trajectory(tmp_path / "invalid_v27.json",
+                                         replace(replay, schema_version=27))
+                    def old_action(action):
+                        return replace(action, parameters={
+                            key: value for key, value in action.parameters.items()
+                            if key != "effect_option"})
+
+                    old_records = tuple(replace(record,
+                        legal_actions=tuple(old_action(action)
+                                            for action in record.legal_actions),
+                        selected_action=old_action(record.selected_action))
+                        for record in replay.decisions)
+                    old = replace(replay, schema_version=27, decisions=old_records)
+                    old_path = tmp_path / "spell_shield_v27.json"
+                    write_trajectory(old_path, old)
+                    assert verify_trajectory(read_trajectory(old_path),
+                                             ExperimentalOcgcoreEngine(root)) == len(old_records)
                 return
             actions = env.legal_actions()
             action = None
@@ -88,6 +112,9 @@ def test_spell_shield_negation_modes_and_cost_visibility(tmp_path, spell):
                 if shield_choices:
                     assert [link.card_code for link in obs.chain] == [spell]
                     assert len(shield_choices) == (2 if spell == BOOK else 1)
+                    if spell == BOOK:
+                        assert [candidate.parameters.get("effect_option")
+                                for candidate in shield_choices] == [0, 1]
                     assert spell != BOOK or target_chosen
                     assert UPSTART in {card.code for card in obs.hand}
                     assert not obs.known_opponent_hand_cards
