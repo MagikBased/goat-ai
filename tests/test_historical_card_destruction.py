@@ -22,7 +22,7 @@ SCAPEGOAT = 504700123  # GOAT variant
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("seed,opponent_empty", [(92, False), (1142, True)])
 def test_card_destruction_empty_hand_activation_gate(tmp_path, seed, opponent_empty):
-    """An empty own hand may activate only while the opponent still has cards."""
+    """At least one player needs another hand card at activation."""
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     if not (root / f"scripts/official/c{CARD_DESTRUCTION}.lua").is_file():
         pytest.skip("Card Destruction script not installed")
@@ -43,6 +43,7 @@ def test_card_destruction_empty_hand_activation_gate(tmp_path, seed, opponent_em
         obs = env.reset()
         asserted = False
         activated = False
+        own_card_gate_checked = False
         original_decks = None
         agents = (RandomAgent(seed), RandomAgent(seed + 1))
         for _ in range(5000):
@@ -88,7 +89,16 @@ def test_card_destruction_empty_hand_activation_gate(tmp_path, seed, opponent_em
                                        if a.kind == "set_spell_trap"), None)
                 elif obs.turn == 3 and obs.acting_player == 0 and opponent_empty:
                     action = next((a for a in actions if a.kind == "normal_summon"), None)
+                    if action is not None and not own_card_gate_checked:
+                        assert len(obs.hand) == 2
+                        assert CARD_DESTRUCTION in {card.code for card in obs.hand}
+                        assert env.engine.probe.observation(0).opponent_hand_count == 0
+                        assert any(a.kind == "activate" and
+                                   a.parameters.get("code") == CARD_DESTRUCTION
+                                   for a in actions)
+                        own_card_gate_checked = True
                     if len(obs.hand) == 1 and obs.hand[0].code == CARD_DESTRUCTION:
+                        assert own_card_gate_checked
                         assert env.engine.probe.observation(0).opponent_hand_count == 0
                         assert sum(card.controller == 0 and card.zone == "spell_trap"
                                    for card in obs.field) < 5
