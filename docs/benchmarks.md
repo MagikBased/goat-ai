@@ -1307,6 +1307,59 @@ SHA-256 values for A1, A2, B1, B2 are
 `9b30644563291ce6a83767a75faf7b21673c5fff9b3f17bbb5512f52f97c5376`,
 and `5697fe19401f2649d16e1436e5d0c357054fe43064a2a12c5a7dbe5beb4763ca`.
 
+### PPO process-tree memory on the same mixed Decks (2026-10-30)
+
+`scripts/benchmark_process_tree.py` samples Linux `/proc` every 0.1 seconds,
+following a training command and its descendants. One 8-worker run and one
+16-worker run used the selected feature-v23 checkpoint, the two matchups and
+PPO settings above, four-role scheduling, and seeds 152100–152131:
+
+| Rollout workers | CLI training wall | Wrapper wall | Maximum sampled tree RSS | Sum of worker high-water RSS |
+| --- | ---: | ---: | ---: | ---: |
+| 8 | 13.562 s | 15.049 s | 2,485,760 KiB | 2,083,496 KiB |
+| 16 | 14.480 s | 15.912 s | 4,514,784 KiB | 4,125,072 KiB |
+
+The sample saw the requested 8 or 16 rollout workers plus Python's resource
+tracker (9 or 17 child processes). Sixteen workers used 1.82 times the
+maximum sampled tree RSS and were 6.8% slower by CLI training wall in this
+single matched schedule. Sampling can miss a peak between polls; the sum of
+individual high-water marks is not simultaneous memory use. All 32 trajectory
+JSON files were byte-identical between arms, all 38 saved model tensors
+matched, and both runs recorded 3,200 learner decisions and 14–18 self-play
+results. The 8-worker arm's 32 complete duels and 19,470 decisions
+independently replay-verified and passed the player-visibility audit. This
+measures resource use, not a competitive-strength difference.
+
+To reproduce, wrap the command in the preceding section, changing the seed
+to 152100 and `--rollout-workers` to 8 or 16. Use separate `--output` and
+`--record-dir` paths per arm:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/benchmark_process_tree.py \
+  --output .cache/goat-ai/ppo_memory_152100/8w.json \
+  --stdout .cache/goat-ai/ppo_memory_152100/8w.stdout --interval 0.1 -- \
+  .venv/bin/python scripts/train_self_play.py \
+  .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --engine experimental --native-root .cache/goat-ai \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk \
+            examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/warrior_montague_clash.ydk \
+            examples/decks/beastdown_ramon_ciriano_new_jersey_2005.ydk \
+  --schedule-mode four_roles --seed 152100 --games 32 --max-decisions 3000 \
+  --historical-probability 1 --independent-opponent-rng \
+  --policy-update clipped_ppo --ppo-rollout-games 16 --ppo-epochs 2 \
+  --ppo-batch-size 32 --snapshot-every 16 --parent-kl-weight 0.5 \
+  --rollout-workers 8 --output .cache/goat-ai/ppo_memory_152100/8w.pt \
+  --record-dir .cache/goat-ai/ppo_memory_152100/8w_records
+```
+
+The ignored local reports have SHA-256
+`c285b9cff0036ed3900e4ad41d4299f397ff0bda0a07992238cde5b2a8aa7f2c`
+(8 workers) and
+`2dfa860ece37fcab244d96d692cbf7ececda1f21fca1776ce5afa7bbd80aae8b`
+(16 workers). The checkpoint files differ in stored run metadata and paths;
+their model tensors were compared separately.
+
 ## Sixteen versus thirty-two native workers (2026-10-28)
 
 At commit `584b819`, 64 RandomAgent duels paired Matt Peddle's 2005 Goat
