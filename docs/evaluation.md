@@ -15178,3 +15178,64 @@ The direct and Tactical report SHA-256 values are respectively
 `12b255c9cec86f0baed9a2a5f27eb7a92d1b17a2a886156f7d70daea59f9d4f0`,
 and `47df3fecab9175f37b75b979a1bdf8ed5b1ed7c290d3ba1a99a3b6144c18bfb4`.
 This fit does not establish a complete-duel strength gain; keep v23 selected.
+
+## Rhymus and Beastdown on-policy Tactical pilot (29 October 2026)
+
+Four selected-v23/Tactical-v14 games on Rhymus Lizo Goat Control versus Ramon
+Ciriano Beastdown, seeds 128016–128017 with both policy seats, were collected
+as complete native-replay-verified, visibility-audited trajectories. The
+collection manifest is
+`.cache/goat-ai/rhymus_weak_review_128016_128017/manifest.json` (SHA-256
+`369e0f891c58e8285e67a990707a08ca9c60e898b409fde094c96af5986a62a7`).
+The on-policy Tactical teacher supplied **244 multi-option decisions**, of
+which **42** differed from the recorded policy choice. These are synthetic
+teacher labels, not human review choices. Starting from selected v23, a
+120-step parent-KL fit used learning rate 0.0001, seed 128016, preservation
+weight 1, and **64** states sampled from four separate current-core,
+checkpoint-attributed Seattle parent-policy games. The final sampled labeled
+loss was **0.2711** and sampled preservation KL **0.01870**; fit time was
+**86.66 seconds** on this machine. An earlier attempt to use the parent's
+original Tactical training files correctly stopped because those files have
+a different native core binary hash. The ignored child checkpoint is
+`.cache/goat-ai/fv23_rhymus_beast_tactical_kl120_128016.pt` (SHA-256
+`8a9e2b6d7e4589cbf6600939b8976ffea6114df467654b117ef34b7354f96146`).
+
+On fresh seeds **128108–128111** in the same Rhymus/Beastdown deck family,
+both deck assignments and seats, the child split **8–8** directly against
+the parent: Beastdown 5–3, Rhymus 3–5. This is a familiar-deck diagnostic,
+not a deck holdout. On two separate strict unseen-Main-Deck pairings, Mary
+Triatafilidi Warrior/Jonathan LaBounty Chaos and Roberto Martinez Phoenix
+Control/GoatFormat guide Dimension Fusion, both assignments and seats, seeds
+**128100–128103**, the child scored **14–17–1** directly against v23 over
+32 terminal duels: **45.31%** points, paired bootstrap 95% score interval
+**39.06–50.00%**. The strict unseen-Main-Deck gate accepted all four lists.
+
+Against Tactical-v14 on matched unseen-deck seeds **128104–128107**, the
+child scored **13–18–1** and the parent **13–19**. The report comparator
+verified equal decks, seeds, opponent, current native assets, source code,
+and unseen Main Decks. Its child-minus-parent paired score difference was
+**+1.56 percentage points**, 95% interval **−14.06 to +15.63 points**.
+The ignored familiar direct, unseen direct, child/Tactical, and
+parent/Tactical report SHA-256 values are respectively
+`3ce03f21a4dab183107c4d789b507e634e181ffa833f4f927c0a481504729490`,
+`21fed075dd4df831bf397a2c855154ab88142b6fb033ebd4204985d1ab81c0f8`,
+`16fc5077c7faf8e8a4f8f1ba46184a5dedba4d7b4f88666c93200c04ae478cbe`,
+and `8601acb9c6731b21ce4a0ee345555433559af8be460c3a785858a86e4d48948e`.
+This pilot does not establish a familiar-deck or cross-deck gain. Keep v23
+selected; the eight open Rhymus review prompts still need independent labels.
+
+To reproduce the fit, run `scripts/train_behavioral_clone.py` on the four
+`matchup_00_seed_12801{6,7}_seat_{0,1}.json` files in the collection above
+with `--engine experimental --on-policy-teacher tactical_v14
+--init-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt
+--feature-version 23 --width 32 --seed 128016 --learning-rate 0.0001
+--parent-kl-steps 120 --allow-policy-preservation --preserve-per-trajectory 16
+--preserve-batch 16 --parent-kl-weight 1`. Supply
+`--preserve-trajectories` with Seattle parent-review files
+`matchup_01_seed_99201_seat_0.json`, `matchup_01_seed_99201_seat_1.json`,
+`matchup_01_seed_99200_seat_1.json`, and `matchup_00_seed_99201_seat_1.json`.
+Use `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --workers 4 --seeds 4 --max-decisions 3000` with the
+named pairs and seeds; add `--require-unseen-main-decks` to the two unseen
+arms, then compare matched Tactical reports with
+`scripts/compare_tournament_reports.py --require-unseen-main-decks`.

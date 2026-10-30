@@ -999,6 +999,13 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A [fresh Rhymus/Beastdown on-policy Tactical pilot](evaluation.md#rhymus-and-beastdown-on-policy-tactical-pilot-29-october-2026)
+re-labeled 244 player-visible policy decisions from four verified duels and
+fit a 120-step, parent-KL child. It split 8–8 directly against v23 on new
+seeds of the training deck family and scored 14–17–1 on four unseen Main Decks.
+Its matched Tactical difference was +1.56 percentage points with a wide
+interval crossing zero. Keep v23 selected; this fit does not close M4.
+
 A [focused Rhymus Goat Control review queue](replay_audit.md#rhymus-goat-control-assignment-review-29-october-2026)
 now offers eight high-margin decisions from two fresh, complete, verified
 selected-v23/Tactical duels in the deck assignment where the held-out
