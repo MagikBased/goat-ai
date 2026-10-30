@@ -16139,3 +16139,57 @@ v23 checkpoint, `--engine experimental`, the two named Main Decks,
 The next gate is a larger, balanced, held-out comparison against both the
 unguarded parent and Tactical on unrelated deck families, with the guard
 disabled at evaluation time to test learned improvement.
+
+## Guarded PPO versus matched unguarded training (30 October 2026)
+
+Two 64-duel continuations started from the same selected v23 checkpoint and
+used the same four-role schedule, seeds 174100–174163, Phoenix Control versus
+Warrior and Matt Peddle Goat Control versus Bryan Coronel Chaos, Tactical-v14
+and historical-snapshot opponents, two PPO epochs per four-game rollout, and
+a 5e-5 learning rate. The sole configuration difference was the learner's
+visible own-loss guard v1 during rollout and update. Both runs finished all
+64 duels without decision caps or unsupported prompts. The guarded learner
+scored 24–38–2 during training, while the unguarded learner scored 29–34–1;
+these training scores are not independent strength estimates. Independent
+native reconstruction and the visibility audit verified all 128 trajectories:
+39,936 decisions in guarded play and 34,643 in unguarded play. The guarded
+action mask excluded at least one option at 431 of 6,364 learner decisions
+with multiple choices, and no excluded action was selected. The unguarded
+run encountered 193 maskable states among 5,379 such learner decisions.
+
+With **the guard disabled at evaluation time**, each child and the parent
+played 64 verified, visibility-audited Tactical-v14 duels on two distinct
+held-out pairings: Max Suffridge Goat Control versus Jae Kim Zombie, and Ramon
+Ciriano Beastdown versus Jonathan LaBounty Chaos. Both Deck assignments and
+both policy seats were covered at seeds 175000–175007. Both children scored
+**18–46**, compared with the parent's **19–45**. The strict paired
+child-minus-parent score difference was **−1.56 percentage points** for each:
+95% paired interval **[−10.94, +7.81]** for the guarded child and
+**[−7.81, +4.69]** for the unguarded child. The guarded-minus-unguarded
+difference was **0.00 points** with interval **[−10.94, +10.94]**.
+The Chaos deck scored 0/16 for both children. This experiment does not
+establish a learned competitive improvement or warrant promoting either child.
+
+The ignored checkpoints are
+`.cache/goat-ai/guarded_ppo_mixed_174100_174163.pt` (SHA-256
+`0eb7045547af28e85344676fc1d16ffbcb216d2491595b3141a880cd6a3cf0ed`)
+and `.cache/goat-ai/plain_ppo_mixed_174100_174163.pt` (SHA-256
+`b646631c1c59b8fbcc61853285337b895daa842293ebc617f58565c537cec175`).
+The three ignored Tactical reports are `parent_ppo_mixed_holdout_175000.json`,
+`guarded_ppo_mixed_holdout_175000.json`, and
+`plain_ppo_mixed_holdout_175000.json` under `.cache/goat-ai/`.
+They record the exact assets, source hash, Main Deck compositions, seed
+schedule, per-game outcomes, and replay-verification counts. The paired
+comparisons were checked using `scripts/compare_tournament_reports.py` with
+`--verify-local-decks --require-unseen-main-decks`.
+
+A separate 64-duel direct match against the starting parent at seeds
+175100–175107, with the same two held-out pairings and unguarded inference,
+gave the guarded child **34–29–1** and the plain child **31–32–1**. Every
+game replay-verified and passed the visibility audit (35,570 and 35,158
+decisions respectively). The matched guarded-minus-plain score difference
+was **+4.69 points**, 95% paired interval **[−4.69, +12.50]**. This direct
+result is inconclusive and does not reverse the poor absolute Tactical
+performance. The corresponding ignored reports are
+`guarded_ppo_direct_parent_175100.json` and
+`plain_ppo_direct_parent_175100.json` under `.cache/goat-ai/`.

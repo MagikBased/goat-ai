@@ -1108,6 +1108,13 @@ It is an implementation check, not a policy promotion. Next, compare a
 substantially larger guarded-training child with its parent on unrelated
 decks, including unguarded inference to test whether the neural policy
 learned from those decisions.
+That [matched 64-duel training comparison](evaluation.md#guarded-ppo-versus-matched-unguarded-training-30-october-2026)
+is now complete: all 128 training trajectories independently verified, but
+both children scored 18–46 against Tactical on a 64-game unrelated-deck
+schedule with the guard disabled, versus 19–45 for their parent. The guarded
+training mode alone has not closed M4's learned-strength gate. Focus next on
+the weak Chaos assignment and better independently reviewed decision data,
+then re-test any new policy on separate decks and seeds.
 
 The matched-report comparator now exposes one paired score difference and
 interval per candidate Main Deck alongside the overall result. This makes
