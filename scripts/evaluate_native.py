@@ -209,6 +209,8 @@ def main() -> None:
     parser.add_argument("--max-decisions", type=int, default=5000)
     parser.add_argument("--workers", type=int, default=1,
                         help="spawn independent native duel processes")
+    parser.add_argument("--verify-replays", action="store_true",
+                        help="replay-verify and visibility-audit every terminal duel")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.seeds < 1 or args.workers < 1 or args.max_decisions < 1:
@@ -229,6 +231,7 @@ def main() -> None:
         matchups, seeds, agent_factory(args.agent_a, args.native_root),
         agent_factory(args.agent_b, args.native_root),
         partial(engine_type, args.native_root), args.max_decisions,
+        verify_replays=args.verify_replays,
         **({"workers": args.workers} if args.workers > 1 else {}),
     )
     wall_seconds = perf_counter() - started
@@ -264,6 +267,16 @@ def main() -> None:
         },
         "source_code_sha256": source_code_sha256(Path(__file__).resolve().parents[1]),
         "card_scripts_sha256": card_scripts_sha256(args.native_root),
+        "replay_verification": ({
+            "verified_games": sum(game.replay_verified_decisions is not None
+                                  for game in report.games),
+            "verified_decisions": sum(game.replay_verified_decisions or 0
+                                      for game in report.games),
+            "visibility_audited_games": sum(game.visibility_audited_decisions is not None
+                                            for game in report.games),
+            "visibility_audited_decisions": sum(
+                game.visibility_audited_decisions or 0 for game in report.games),
+        } if args.verify_replays else None),
         "seeds": seeds, "both_deck_assignments": args.both_deck_assignments,
         "tournament_corpus": args.tournament_corpus,
         "indianapolis_2005_corpus": args.indianapolis_2005,

@@ -1115,6 +1115,12 @@ schedule with the guard disabled, versus 19–45 for their parent. The guarded
 training mode alone has not closed M4's learned-strength gate. Focus next on
 the weak Chaos assignment and better independently reviewed decision data,
 then re-test any new policy on separate decks and seeds.
+The [Chaos assignment audit](replay_audit.md#jonathan-labounty-chaos-versus-beastdown-30-october-2026)
+now supplies eight verified duels and a 16-item local review queue with no
+human labels. A Tactical mirror won only 4/16 Chaos games on the earlier
+holdout seeds, so the policy's 0/16 split mixes a difficult pairing with
+its own recorded mistakes. Human review of the specific flagged decisions,
+followed by a separate deck-family evaluation, is the next data-quality step.
 
 The matched-report comparator now exposes one paired score difference and
 interval per candidate Main Deck alongside the overall result. This makes

@@ -16169,6 +16169,11 @@ child-minus-parent score difference was **−1.56 percentage points** for each:
 difference was **0.00 points** with interval **[−10.94, +10.94]**.
 The Chaos deck scored 0/16 for both children. This experiment does not
 establish a learned competitive improvement or warrant promoting either child.
+A later [deck-pair audit](replay_audit.md#jonathan-labounty-chaos-versus-beastdown-30-october-2026)
+found that Tactical itself won only 4/16 with that Chaos deck against
+Beastdown on the same seeds and both seats; the policy split therefore also
+reflects matchup difficulty. The audit independently verifies all mirror
+games and separately records concrete policy own-card losses.
 
 The ignored checkpoints are
 `.cache/goat-ai/guarded_ppo_mixed_174100_174163.pt` (SHA-256
