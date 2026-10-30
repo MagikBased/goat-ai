@@ -420,3 +420,46 @@ def test_own_activation_passes_its_chain_unless_priority_is_held(tmp_path):
     match = re.search(r'data-priority-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1200:]
     assert match.group(1) == "true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_turning_off_chain_pause_resumes_automatic_pass(tmp_path):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      const observation = {turn:2,turn_player:1,acting_player:0,phase:'main1',
+        life_points:[8000,8000],hand:[],field:[],graveyards:[[],[]],banished:[[],[]],
+        extra_deck_counts:[0,0],deck_counts:[35,35],opponent_hand_count:5,
+        known_opponent_hand_cards:[],known_opponent_field_cards:[],own_extra_deck:[],
+        restrictions:[],chain:[{index:1,controller:1,card_code:123}],public_history:[]};
+      const action = kind => ({kind,id:kind,actor:0,parameters:{}});
+      const initial = {id:'1234567890abcdef',decisions:0,human_seat:0,terminal:false,
+        observation,legal_actions:[action('chain'),action('pass')],card_names:{}};
+      const next = {...initial,decisions:1,legal_actions:[action('end_phase')]};
+      const chosen = [];
+      window.fetch = async (_path, options) => {
+        const request = JSON.parse(options.body);
+        chosen.push([request.action_index,request.manual]);
+        return new Response(JSON.stringify(next));
+      };
+      const pause = document.getElementById('hold-priority');
+      const defaultOff = !pause.checked && pause.autocomplete === 'off';
+      pause.checked = true;
+      render(initial);
+      const explained = document.getElementById('message').textContent.includes(
+        'Turn off the pause');
+      pause.checked = false;
+      pause.dispatchEvent(new Event('change'));
+      setTimeout(() => { document.body.dataset.resumeProbe = [defaultOff,explained,
+        chosen.length === 1,chosen[0]?.[0] === 1,chosen[0]?.[1] === false,
+        state.decisions === 1].join('|'); },80);
+    </script></body>"""
+    path = tmp_path / "resume_pass.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=900", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-resume-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "true|true|true|true|true|true"

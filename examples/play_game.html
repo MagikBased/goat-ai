@@ -178,7 +178,7 @@
       <button data-duel-mute type="button" aria-label="Toggle duel sounds">🔊 Sound on</button>
       <button id="quit" type="button">Leave unfinished duel</button>
       <p id="message" role="status" aria-live="polite"></p>
-      <label class="priority-toggle"><input id="hold-priority" type="checkbox"> Pause for chain responses (traps and quick effects)</label>
+      <label class="priority-toggle"><input id="hold-priority" type="checkbox" autocomplete="off"> Pause at each chain response (turn off to continue automatically)</label>
       <label class="priority-toggle"><input id="auto-place" type="checkbox" checked> Automatically choose open card zones</label>
       <div id="card-selection" hidden><div id="card-selection-message"></div>
         <button id="confirm-cards" type="button">Confirm selected cards</button></div>
@@ -198,6 +198,9 @@
   <script src="/examples/duel_audio.js"></script>
   <script>
     const byId = id => document.getElementById(id);
+    // Firefox can restore checkbox state after reload. Each visit starts with
+    // automatic chain passing unless the player explicitly pauses it again.
+    byId("hold-priority").checked = false;
     let state = null;
     let busy = false;
     let dragSource = null;
@@ -735,7 +738,12 @@
       ];
       for (const fact of facts) { const line = document.createElement("p"); line.textContent = fact;
         visibleInfo.append(line); }
-      byId("message").textContent = `Your choice · decision ${data.decisions + 1}`;
+      const pausedChain = byId("hold-priority").checked &&
+        data.legal_actions.some(action => action.kind === "pass") &&
+        data.legal_actions.some(action => action.kind === "chain");
+      byId("message").textContent = pausedChain
+        ? `Chain response paused · decision ${data.decisions + 1}. Turn off the pause to pass automatically.`
+        : `Your choice · decision ${data.decisions + 1}`;
       byId("message").classList.remove("error");
       actions();
       renderCardSelection();
@@ -816,7 +824,9 @@
         scheduleForcedPass(state); }
     }
     byId("search").addEventListener("input", actions);
-    byId("hold-priority").addEventListener("change", () => scheduleForcedPass(state));
+    byId("hold-priority").addEventListener("change", () => {
+      if (state && !state.terminal) render(state);
+    });
     document.addEventListener("pointerover", event => {
       const source = event.target instanceof Element
         ? event.target.closest(".card[data-preview-code]") : null;
@@ -864,7 +874,7 @@
     (async () => {
       try {
         const liveVersion = await request("/api/live/version");
-        if (liveVersion.api_version !== 3)
+        if (liveVersion.api_version !== 4)
           throw new Error("This duel server is outdated. Reopen the game creator shortcut to start the current server, then reload your duel there.");
         const options = await request("/api/games/options");
         const decks = options.decks.map(name => [name, name.replace(/\.ydk$/, "").replaceAll("_", " ")]);
