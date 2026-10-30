@@ -26,6 +26,12 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
         raise VisibilityViolation("decision observation is not for the acting player")
     field = {(card.controller, card.zone, card.sequence): card
              for card in observation.field}
+    public_piles = {
+        (card.controller, location, card.sequence): card
+        for location, pile in ((16, observation.graveyards[1 - observation.viewer]),
+                               (32, observation.banished[1 - observation.viewer]))
+        for card in pile
+    }
     known_hand = Counter(observation.known_opponent_hand_cards)
     counts: Counter[str] = Counter()
     for action in record.legal_actions:
@@ -108,6 +114,16 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
                     if hand_choices[code] > known_hand[code]:
                         raise VisibilityViolation(
                             "opponent hand choice exceeds known copies")
+            elif location in (16, 32):
+                card = public_piles.get((controller, location, choice.get("sequence")))
+                if card is None:
+                    raise VisibilityViolation("opponent pile choice has no visible slot")
+                if card.position == "facedown":
+                    if "code" in choice or any(
+                            key in choice for key in ("attack", "defense", "counters")):
+                        raise VisibilityViolation("face-down opponent pile choice reveals card data")
+                elif "code" in choice and choice["code"] != card.code:
+                    raise VisibilityViolation("opponent pile choice disagrees with observation")
     return counts
 
 

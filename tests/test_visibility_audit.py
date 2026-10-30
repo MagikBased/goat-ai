@@ -148,6 +148,26 @@ def test_audit_limits_duplicate_opponent_hand_choices_per_action():
         "opponent_hand_choices": 2}
 
 
+def test_audit_matches_opponent_graveyard_and_banished_choices_to_visible_piles():
+    observation = replace(_observation(),
+                          graveyards=((), (CardView(1, "graveyard", "faceup", 123, 0),)),
+                          banished=((), (CardView(1, "banished", "faceup", 456, 0),
+                                         CardView(1, "banished", "facedown", None, 1))))
+    for choice in ({"controller": 1, "location": 16, "sequence": 0, "code": 123},
+                   {"controller": 1, "location": 32, "sequence": 0, "code": 456},
+                   {"controller": 1, "location": 32, "sequence": 1}):
+        assert audit_decision_visibility(_record(observation, choice)) == {}
+    for choice, reason in (
+            ({"controller": 1, "location": 16, "sequence": 0, "code": 999},
+             "disagrees"),
+            ({"controller": 1, "location": 32, "sequence": 1, "code": 456},
+             "face-down"),
+            ({"controller": 1, "location": 32, "sequence": 2, "code": 456},
+             "visible slot")):
+        with pytest.raises(VisibilityViolation, match=reason):
+            audit_decision_visibility(_record(observation, choice))
+
+
 def test_legacy_trajectory_cannot_claim_complete_hand_audit():
     observation = _observation()
     record = _record(observation, {"controller": 1, "location": 2, "code": 321})

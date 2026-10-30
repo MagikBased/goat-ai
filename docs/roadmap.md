@@ -38,6 +38,11 @@ A [fresh 12-duel 60-card sample](evaluation.md#fresh-60-card-whitelistfusion-sam
 on 24 distinct legal Decks ended in 16,262 replay-verified, visibility-audited
 decisions across 32 offered action kinds. This is additional sampled protocol
 coverage; it does not close the arbitrary-deck or historical-ruling gates.
+The visibility auditor now also checks opponent Graveyard and banished target
+choices against visible pile slots. A face-down banished card may be targeted
+by its visible slot without disclosing its identity. A 1,616-decision saved
+trajectory with an opponent-Graveyard selection passes the expanded audit;
+other pile interactions and broader hidden-state differentials remain open.
 
 A second [40-duel independent whitelist/Fusion sample](evaluation.md#second-independent-random-whitelistfusion-sample--30-october-2026)
 completed at seeds 166000–166039. All 44,516 decisions passed native replay
