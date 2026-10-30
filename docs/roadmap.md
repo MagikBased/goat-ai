@@ -1125,6 +1125,13 @@ against Tactical-v14 versus v23's 24–39–1 on the same 64 games. The paired
 difference interval was below zero, and all child games replay-verified.
 This rules out promoting that child as a general cross-deck improvement.
 
+A [matched guarded-v23 check](evaluation.md#guarded-v23-on-new-jersey-2005-holdout-30-october-2026)
+on the same four New Jersey holdout decks scored 33–31 against Tactical-v14,
+versus 24–39–1 for unguarded v23. The paired gain interval was above zero;
+all guarded games replay-verified. The guarded mode already serves browser
+and EDOPro games, but this does not teach the neural policy the underlying
+card-advantage decision or close M4's learned-strength gate.
+
 The [batched parent-KL fit](evaluation.md#batched-parent-kl-scoring-pilot-29-october-2026)
 now scores variable-length legal-action sets in padded chunks while preserving
 the full-label optimizer update. On the 244-decision Rhymus pilot it reduced

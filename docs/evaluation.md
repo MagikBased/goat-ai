@@ -16054,3 +16054,52 @@ tactical --both-deck-assignments --seed 169000 --seeds 8 --max-decisions 3000
 This independently sourced transfer check contradicts promotion of the PPO
 child despite its earlier gains on other decks. Keep the selected v23 parent;
 M4 still needs a learned policy with reliable cross-deck strength.
+
+## Guarded v23 on New Jersey 2005 holdout (30 October 2026)
+
+Two replay-verified, unguarded v23/Tactical-v14 duels on Roberto Martinez's
+Phoenix Control versus Mary Triatafilidi's Warrior list were recorded at
+seeds 172000–172001 with the policy in the Phoenix seat. The policy lost both.
+At decision 16 in seed 172000 it Set Magician of Faith, then activated
+Nobleman of Crossout targeting that own Set monster while the opponent had no
+Set monster. The existing policy replay auditor flagged this as its sole
+visible own-card-loss instance among 407 policy decisions in those two duels.
+This is a concrete example of a failure already covered by the optional
+visible own-loss guard; the two-game sample cannot estimate its frequency.
+The ignored collector manifest is
+`.cache/goat-ai/phoenix_policy_audit_172000/manifest.json`; all four
+seat-swapped collection duels (1,951 decisions total) replay-verified. The
+policy-seat Phoenix audit is in the same folder as `audit.json`.
+
+To measure the guarded inference mode on a broader schedule, the selected
+feature-v23 checkpoint was rerun against Tactical-v14 on the exact four New
+Jersey Main Decks and seeds 169000–169007 used for the verified unguarded
+parent report above. Both Deck assignments and both policy seats were covered.
+The guarded policy scored **33–31**, versus **24–39–1** unguarded, across
+64 games each. The strict matched comparator measured a **+13.28 percentage
+point** score difference (paired 95% interval **+5.47 to +21.88**). Guarded
+Deck scores were Beastdown 13–3, Chaos 4–12, Phoenix Control 4–12, and
+Warrior 12–4; Phoenix remains a weak assignment despite improving from 3–13.
+All **64/64** guarded games and **37,201 decisions** independently
+replay-verified and passed the player-visibility audit; the unguarded control
+had previously verified 64 games and 37,024 decisions. The reports share the
+same checkpoint, native assets, card scripts, source code, decks, and seeds.
+
+The ignored guarded report is
+`.cache/goat-ai/fv23_own_loss_guard_nj_169000_verified.json` (SHA-256
+`114696750c0caa5484ba59a9deaf84e2eb283d03d65c06715fe34a8c00ca82ba`);
+the comparison is
+`.cache/goat-ai/fv23_guard_vs_plain_nj_169000_comparison.json` (SHA-256
+`2d8e7d0b61e71f9ca0adae89f5be9c51bd0f5982dfe30c2890998567a14e6255`).
+Reproduce with `scripts/evaluate_policy.py --engine experimental --opponent
+tactical --own-loss-guard --both-deck-assignments --seed 169000 --seeds 8
+--max-decisions 3000 --workers 4 --require-unseen-main-decks
+--reject-training-deck-hashes --verify-replays` on the same two New Jersey
+pairings, then compare the guarded and unguarded reports using
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.
+
+The browser game and local EDOPro policy room already use this guarded mode.
+This is measured inference-time error prevention, not a learned improvement
+to the neural checkpoint. M4 still requires stronger unguarded cross-deck
+learning and independent human-quality evidence.
