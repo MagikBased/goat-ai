@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from goat_ai.engine.decks import Decklist
+from goat_ai.engine.historical_host_scripts import validate_pinned_host_assets
 from goat_ai.replay.live_mirror import LiveDuelMirror
 from goat_ai.replay.trajectory import Trajectory, write_trajectory
 from goat_ai.training import load_policy_agent
@@ -30,6 +31,8 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=7911)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--timeout", type=float, default=None)
+    parser.add_argument("--historical-pinned", action="store_true",
+                        help="require the pinned core, DBs, list and checksum-guarded GOAT scripts")
     args = parser.parse_args()
     try:
         from ygo_agent.arena.deck import DeckSizes, find_banlist, load_banlists, load_ydk
@@ -43,17 +46,20 @@ def main() -> None:
     if not args.mirror_root.is_dir():
         parser.error("mirror root is missing")
     engine = Engine.load(str(args.host_root))
+    if args.historical_pinned:
+        validate_pinned_host_assets(engine, args.mirror_root)
     banlist = find_banlist(load_banlists(engine.install.lflist_paths), "2005.4 GOAT")
     policy = load_policy_agent(args.checkpoint, own_loss_guard=True)
     config = RoomConfig(name="GOAT AI experimental", duel=DuelConfig(rules="goat"),
                         banlist=banlist, seed=args.seed, max_matches=1, rematch=False,
-                        deck_sizes=DeckSizes(extra=(0, 999)),
+                        deck_sizes=DeckSizes(main=(40, 999), extra=(0, 999)),
                         lan_discovery=False, host_client=False)
     room = Room(engine, config)
     deck = load_ydk(str(args.ai_deck), engine.cards).deck
     bridge = Bridge(args.mirror_root, args.out, policy,
                     hashlib.sha256(args.checkpoint.read_bytes()).hexdigest(),
-                    DuelObserver, RoomObserver)
+                    DuelObserver, RoomObserver,
+                    historical_patches=args.historical_pinned)
     room.add_local(1, bridge.seat(Seat), deck)
     room.duel_observers.append(bridge.duel_observer())
     room.room_observers.append(bridge.room_observer())
@@ -75,11 +81,12 @@ class Bridge:
     """Per-room mirror and recorder; host owns all unrestricted duel state."""
 
     def __init__(self, native_root, out, policy, checkpoint_sha256,
-                 duel_observer_type, room_observer_type):
+                 duel_observer_type, room_observer_type, *, historical_patches=False):
         self.native_root = native_root
         self.out = out
         self.policy = policy
         self.checkpoint_sha256 = checkpoint_sha256
+        self.historical_patches = historical_patches
         self.duel_observer_type = duel_observer_type
         self.room_observer_type = room_observer_type
         self.mirror = None
@@ -104,7 +111,8 @@ class Bridge:
             def on_start(self, duel):
                 if bridge.mirror is not None:
                     bridge.mirror.close()
-                bridge.mirror = LiveDuelMirror(bridge.native_root, historical_patches=False)
+                bridge.mirror = LiveDuelMirror(
+                    bridge.native_root, historical_patches=bridge.historical_patches)
                 decks = tuple(Decklist(tuple(main), tuple(extra))
                               for main, extra in duel._insertion)
                 bridge.mirror.start(duel.core_seed, decks)
@@ -136,8 +144,10 @@ class Bridge:
                             and mirror.decision.terminal and result.retries == 0
                             and not result.lua_errors and mirror.response_count == result.responses)
                 metadata = {
-                    "source": "edopro_external_unpatched",
+                    "source": ("edopro_pinned_historical" if bridge.historical_patches
+                               else "edopro_external_unpatched"),
                     "training_admitted": False,
+                    "historical_patches": bridge.historical_patches,
                     "checkpoint_sha256": bridge.checkpoint_sha256,
                     "mirror_complete": complete,
                     "core_seed": list(duel.core_seed),
@@ -154,9 +164,11 @@ class Bridge:
                     json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
                 if complete:
                     trajectory = Trajectory(
-                        ruleset="goat_external_unverified", decks=tuple(duel.names),
+                        ruleset=("goat_pinned_historical" if bridge.historical_patches
+                                 else "goat_external_unverified"),
+                        decks=tuple(duel.names),
                         seed=duel.seed, decisions=tuple(mirror.records),
-                        winner=metadata["winner_team"], source="edopro_external_unpatched",
+                        winner=metadata["winner_team"], source=metadata["source"],
                         schema_version=28,
                         terminal_observation=mirror.decision.observation,
                     )

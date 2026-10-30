@@ -17,7 +17,12 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
     training-admission decision. It detects altered or mismatched local files.
     """
     metadata = json.loads(Path(metadata_path).read_text(encoding="utf-8"))
-    if (metadata.get("source") != "edopro_external_unpatched"
+    historical = metadata.get("historical_patches", False)
+    if type(historical) is not bool:
+        raise ValueError("metadata historical patch mode is invalid")
+    source = "edopro_pinned_historical" if historical else "edopro_external_unpatched"
+    ruleset = "goat_pinned_historical" if historical else "goat_external_unverified"
+    if (metadata.get("source") != source
             or metadata.get("training_admitted") is not False
             or metadata.get("mirror_complete") is not True):
         raise ValueError("metadata is not a complete, excluded EDOPro room recording")
@@ -28,10 +33,10 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
     if metadata.get("core_seed") != list(embedded.header.seed_words):
         raise ValueError("metadata core seed differs from replay")
     reconstructed = reconstruct_legacy_responses(
-        replay, native_root, historical_patches=False)
+        replay, native_root, historical_patches=historical)
     trajectory = read_trajectory(review_path)
-    if (trajectory.source != "edopro_external_unpatched"
-            or trajectory.ruleset != "goat_external_unverified"
+    if (trajectory.source != source
+            or trajectory.ruleset != ruleset
             or trajectory.schema_version != 28
             or trajectory.decks != tuple(metadata.get("names", ()))
             or trajectory.seed != metadata.get("seed")
@@ -49,6 +54,7 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         "responses": reconstructed.saved_response_count,
         "visible_decisions": len(reconstructed.decisions),
         "winner_team": reconstructed.winner,
-        "external_unpatched_comparison_only": True,
+        "historical_patches": historical,
+        "historical_goat_certified": False,
         "training_admitted": False,
     }

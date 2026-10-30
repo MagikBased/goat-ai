@@ -402,6 +402,151 @@ def split_messages(buffer: bytes) -> tuple[bytes, ...]:
     return tuple(messages)
 
 
+def patch_goat_script(relative_path: str, contents: bytes) -> bytes:
+    """Apply the checksum-guarded historical GOAT script corrections.
+
+    Used by both the native probe and an optional external EDOPro host. A
+    changed upstream script fails closed instead of silently losing a ruling.
+    """
+    relative = Path(relative_path)
+    if relative == Path("utility.lua"):
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_UTILITY_SHA256 \
+                or contents.count(GOAT_DECK_CONFIRM_OLD) != 1 \
+                or contents.count(GOAT_FIXED_LP_COST_OLD) != 1:
+            raise ValueError("pinned GOAT utility script changed; historical patches not applied")
+        # Project Ignis' online variant confirms Deck contents to the
+        # searching player. Historical verification addresses the opponent.
+        contents = contents.replace(GOAT_DECK_CONFIRM_OLD,
+                                    GOAT_DECK_CONFIRM_HISTORICAL)
+        # In GOAT a fixed activation cost cannot consume the player's
+        # remaining LP. The modern core's CheckLPCost permits equality.
+        contents = contents.replace(GOAT_FIXED_LP_COST_OLD,
+                                    GOAT_FIXED_LP_COST_HISTORICAL)
+    if relative_path == "goat/c504700102.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RESTRICT_SHA256 \
+                or contents.count(GOAT_RESTRICT_EFFECT_MARKER) != 1 \
+                or contents.count(GOAT_RESTRICT_EQUIP_MARKER) != 1:
+            raise ValueError("pinned GOAT Restrict script changed; historical patches not applied")
+        contents = (contents.replace(GOAT_RESTRICT_EFFECT_MARKER,
+                                     GOAT_RESTRICT_DAMAGE_EFFECT)
+                    .replace(GOAT_RESTRICT_EQUIP_MARKER,
+                             GOAT_RESTRICT_HISTORICAL_EQUIP)
+                    + GOAT_RESTRICT_DAMAGE_FUNCTIONS)
+    if relative_path == "official/c55144522.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_POT_SHA256 \
+                or contents.count(POT_DRAW_CHECK_OLD) != 1:
+            raise ValueError("pinned Pot script changed; GOAT overdraw patch not applied")
+        # Keep draw-prohibition effects, but permit an attempted draw
+        # beyond the Deck, which loses the duel under GOAT rules.
+        contents = contents.replace(POT_DRAW_CHECK_OLD, POT_DRAW_CHECK_GOAT)
+    if relative_path == "official/c79571449.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_GRACEFUL_SHA256 \
+                or contents.count(GRACEFUL_DRAW_CHECK_OLD) != 1:
+            raise ValueError("pinned Graceful script changed; GOAT overdraw patch not applied")
+        contents = contents.replace(GRACEFUL_DRAW_CHECK_OLD,
+                                    GRACEFUL_DRAW_CHECK_GOAT)
+    if relative_path == "official/c72892473.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_CARD_DESTRUCTION_SHA256 \
+                or contents.count(CARD_DESTRUCTION_DRAW_CHECK_OLD) != 1:
+            raise ValueError("pinned Card Destruction script changed; GOAT overdraw patch not applied")
+        # A failed draw loses the Duel. Keep draw-prohibition effects,
+        # but do not require enough cards in either Deck to complete it.
+        contents = contents.replace(CARD_DESTRUCTION_DRAW_CHECK_OLD,
+                                    CARD_DESTRUCTION_DRAW_CHECK_GOAT)
+    if relative_path == "official/c87621407.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_DEKOICHI_SHA256 \
+                or contents.count(DEKOICHI_DRAW_OLD) != 1:
+            raise ValueError("pinned Dekoichi script changed; historical draw patch not applied")
+        # The historical FAQ counts face-up Bokoichi at resolution, not
+        # when Dekoichi's Flip Effect enters the chain.
+        contents = contents.replace(DEKOICHI_DRAW_OLD,
+                                    DEKOICHI_DRAW_HISTORICAL)
+    if relative_path == "official/c46411259.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_METAMORPHOSIS_SHA256 \
+                or contents.count(METAMORPHOSIS_COST_FILTER_OLD) != 1:
+            raise ValueError("pinned Metamorphosis script changed; historical cost patch not applied")
+        contents = contents.replace(METAMORPHOSIS_COST_FILTER_OLD,
+                                    METAMORPHOSIS_COST_FILTER_GOAT)
+    if relative_path == "official/c14087893.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_BOOK_SHA256 \
+                or contents.count(BOOK_TARGET_OLD) != 1:
+            raise ValueError("pinned Book script changed; historical Desert target patch not applied")
+        contents = contents.replace(BOOK_TARGET_OLD, BOOK_TARGET_HISTORICAL)
+    if relative_path == "goat/c504700151.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_FIREBIRD_SHA256 \
+                or contents.count(FIREBIRD_BATTLE_CONDITION_OLD) != 1:
+            raise ValueError("pinned Firebird script changed; battle callback patch not applied")
+        contents = contents.replace(FIREBIRD_BATTLE_CONDITION_OLD,
+                                    FIREBIRD_BATTLE_CONDITION_FIXED)
+    if relative_path == "goat/c504700147.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_LAST_WILL_SHA256 \
+                or any(contents.count(marker) != 1 for marker in (
+                    LAST_WILL_CUSTOM_EVENT_BRIDGE, LAST_WILL_CUSTOM_TRIGGER,
+                    LAST_WILL_CUSTOM_CONDITION, LAST_WILL_UNUSED_BRIDGE)):
+            raise ValueError("pinned GOAT Last Will script changed; trigger-order patch not applied")
+        # The custom event was enqueued after Sangan's graveyard trigger,
+        # forcing their order. A direct trigger on the same native event
+        # gives the controller the historical same-time order choice.
+        contents = (contents.replace(LAST_WILL_CUSTOM_EVENT_BRIDGE, b"")
+                    .replace(LAST_WILL_CUSTOM_TRIGGER, LAST_WILL_DIRECT_TRIGGER)
+                    .replace(LAST_WILL_CUSTOM_CONDITION, LAST_WILL_DIRECT_CONDITION)
+                    .replace(LAST_WILL_UNUSED_BRIDGE, b""))
+    if relative_path == "goat/c504700158.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RIVALRY_SHA256 \
+                or contents.count(RIVALRY_ADJUST_OLD) != 1 \
+                or contents.count(RIVALRY_SEND_OLD) != 1:
+            raise ValueError("pinned GOAT Rivalry script changed; adjust guard not applied")
+        # Sending a mismatched Type during EVENT_ADJUST re-enters this
+        # still-running effect on the pinned core. Suppress that re-entry
+        # for this effect only; the explicit readjust then applies normally.
+        contents = (contents.replace(RIVALRY_ADJUST_OLD, RIVALRY_ADJUST_GUARDED)
+                    .replace(RIVALRY_SEND_OLD, RIVALRY_SEND_GUARDED)
+                    + RIVALRY_ADJUST_CONDITION)
+    if relative_path == "pre-errata/c511000818.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_SINISTER_SHA256 \
+                or contents.count(SINISTER_STANDBY_CONDITION_OLD) != 1:
+            raise ValueError("pinned pre-errata Serpent script changed; battle-negation patch not applied")
+        # Dark Balter and Dark Ruler Ha Des negate a battle-destroyed
+        # Serpent even in the Graveyard. The upstream script otherwise
+        # offers a futile optional return repeatedly in one Standby Phase.
+        contents = contents.replace(SINISTER_STANDBY_CONDITION_OLD,
+                                    SINISTER_STANDBY_CONDITION_HISTORICAL)
+    if relative_path == "official/c80071763.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_DARK_BALTER_SHA256 \
+                or contents.count(BALTER_NEGATE_OLD) != 1:
+            raise ValueError("pinned Dark Balter script changed; Swords correction not applied")
+        contents = contents.replace(BALTER_NEGATE_OLD,
+                                    BALTER_NEGATE_SWORDS_HISTORICAL)
+    if relative_path == "official/c93671934.lua":
+        if hashlib.sha256(contents).hexdigest() != UPSTREAM_MORALE_BOOST_SHA256 \
+                or contents.count(MORALE_BOOST_LEAVE_OLD) != 1:
+            raise ValueError("pinned Morale Boost script changed; leave-field correction not applied")
+        # After an Equip Card leaves the field, its current controller
+        # may be PLAYER_NONE. The printed damage applies to its last
+        # field controller, which the native event retains separately.
+        contents = contents.replace(MORALE_BOOST_LEAVE_OLD,
+                                    MORALE_BOOST_LEAVE_FIXED)
+    return contents
+
+
+GOAT_PATCHED_SCRIPT_PATHS = (
+    "utility.lua",
+    "goat/c504700102.lua",
+    "official/c55144522.lua",
+    "official/c79571449.lua",
+    "official/c72892473.lua",
+    "official/c87621407.lua",
+    "official/c46411259.lua",
+    "official/c14087893.lua",
+    "goat/c504700151.lua",
+    "goat/c504700147.lua",
+    "goat/c504700158.lua",
+    "pre-errata/c511000818.lua",
+    "official/c80071763.lua",
+    "official/c93671934.lua",
+)
+
+
 class OcgcoreProbe:
     # The reference path remains available for a matched native ablation.
     use_field_summary_queries = True
@@ -642,137 +787,12 @@ class OcgcoreProbe:
             # This path cannot certify historical GOAT correctness.
             self.loaded_script_sha256[relative_path] = hashlib.sha256(contents).hexdigest()
             return self.lib.OCG_LoadScript(duel, contents, len(contents), name)
-        if relative == Path("utility.lua") and self.mode == "goat":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_UTILITY_SHA256 \
-                    or contents.count(GOAT_DECK_CONFIRM_OLD) != 1 \
-                    or contents.count(GOAT_FIXED_LP_COST_OLD) != 1:
-                self.errors.append("pinned GOAT utility script changed; historical patches not applied")
+        if self.mode == "goat":
+            try:
+                contents = patch_goat_script(relative_path, contents)
+            except ValueError as exc:
+                self.errors.append(str(exc))
                 return 0
-            # Project Ignis' online variant confirms Deck contents to the
-            # searching player. Historical verification addresses the opponent.
-            contents = contents.replace(GOAT_DECK_CONFIRM_OLD,
-                                        GOAT_DECK_CONFIRM_HISTORICAL)
-            # In GOAT a fixed activation cost cannot consume the player's
-            # remaining LP. The modern core's CheckLPCost permits equality.
-            contents = contents.replace(GOAT_FIXED_LP_COST_OLD,
-                                        GOAT_FIXED_LP_COST_HISTORICAL)
-        if relative_path == "goat/c504700102.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RESTRICT_SHA256 \
-                    or contents.count(GOAT_RESTRICT_EFFECT_MARKER) != 1 \
-                    or contents.count(GOAT_RESTRICT_EQUIP_MARKER) != 1:
-                self.errors.append("pinned GOAT Restrict script changed; historical patches not applied")
-                return 0
-            contents = (contents.replace(GOAT_RESTRICT_EFFECT_MARKER,
-                                         GOAT_RESTRICT_DAMAGE_EFFECT)
-                        .replace(GOAT_RESTRICT_EQUIP_MARKER,
-                                 GOAT_RESTRICT_HISTORICAL_EQUIP)
-                        + GOAT_RESTRICT_DAMAGE_FUNCTIONS)
-        if relative_path == "official/c55144522.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_POT_SHA256 \
-                    or contents.count(POT_DRAW_CHECK_OLD) != 1:
-                self.errors.append("pinned Pot script changed; GOAT overdraw patch not applied")
-                return 0
-            # Keep draw-prohibition effects, but permit an attempted draw
-            # beyond the Deck, which loses the duel under GOAT rules.
-            contents = contents.replace(POT_DRAW_CHECK_OLD, POT_DRAW_CHECK_GOAT)
-        if relative_path == "official/c79571449.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_GRACEFUL_SHA256 \
-                    or contents.count(GRACEFUL_DRAW_CHECK_OLD) != 1:
-                self.errors.append("pinned Graceful script changed; GOAT overdraw patch not applied")
-                return 0
-            contents = contents.replace(GRACEFUL_DRAW_CHECK_OLD,
-                                        GRACEFUL_DRAW_CHECK_GOAT)
-        if relative_path == "official/c72892473.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_CARD_DESTRUCTION_SHA256 \
-                    or contents.count(CARD_DESTRUCTION_DRAW_CHECK_OLD) != 1:
-                self.errors.append("pinned Card Destruction script changed; GOAT overdraw patch not applied")
-                return 0
-            # A failed draw loses the Duel. Keep draw-prohibition effects,
-            # but do not require enough cards in either Deck to complete it.
-            contents = contents.replace(CARD_DESTRUCTION_DRAW_CHECK_OLD,
-                                        CARD_DESTRUCTION_DRAW_CHECK_GOAT)
-        if relative_path == "official/c87621407.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_DEKOICHI_SHA256 \
-                    or contents.count(DEKOICHI_DRAW_OLD) != 1:
-                self.errors.append("pinned Dekoichi script changed; historical draw patch not applied")
-                return 0
-            # The historical FAQ counts face-up Bokoichi at resolution, not
-            # when Dekoichi's Flip Effect enters the chain.
-            contents = contents.replace(DEKOICHI_DRAW_OLD,
-                                        DEKOICHI_DRAW_HISTORICAL)
-        if relative_path == "official/c46411259.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_METAMORPHOSIS_SHA256 \
-                    or contents.count(METAMORPHOSIS_COST_FILTER_OLD) != 1:
-                self.errors.append("pinned Metamorphosis script changed; historical cost patch not applied")
-                return 0
-            contents = contents.replace(METAMORPHOSIS_COST_FILTER_OLD,
-                                        METAMORPHOSIS_COST_FILTER_GOAT)
-        if relative_path == "official/c14087893.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_BOOK_SHA256 \
-                    or contents.count(BOOK_TARGET_OLD) != 1:
-                self.errors.append("pinned Book script changed; historical Desert target patch not applied")
-                return 0
-            contents = contents.replace(BOOK_TARGET_OLD, BOOK_TARGET_HISTORICAL)
-        if relative_path == "goat/c504700151.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_FIREBIRD_SHA256 \
-                    or contents.count(FIREBIRD_BATTLE_CONDITION_OLD) != 1:
-                self.errors.append("pinned Firebird script changed; battle callback patch not applied")
-                return 0
-            contents = contents.replace(FIREBIRD_BATTLE_CONDITION_OLD,
-                                        FIREBIRD_BATTLE_CONDITION_FIXED)
-        if relative_path == "goat/c504700147.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_LAST_WILL_SHA256 \
-                    or any(contents.count(marker) != 1 for marker in (
-                        LAST_WILL_CUSTOM_EVENT_BRIDGE, LAST_WILL_CUSTOM_TRIGGER,
-                        LAST_WILL_CUSTOM_CONDITION, LAST_WILL_UNUSED_BRIDGE)):
-                self.errors.append("pinned GOAT Last Will script changed; trigger-order patch not applied")
-                return 0
-            # The custom event was enqueued after Sangan's graveyard trigger,
-            # forcing their order. A direct trigger on the same native event
-            # gives the controller the historical same-time order choice.
-            contents = (contents.replace(LAST_WILL_CUSTOM_EVENT_BRIDGE, b"")
-                        .replace(LAST_WILL_CUSTOM_TRIGGER, LAST_WILL_DIRECT_TRIGGER)
-                        .replace(LAST_WILL_CUSTOM_CONDITION, LAST_WILL_DIRECT_CONDITION)
-                        .replace(LAST_WILL_UNUSED_BRIDGE, b""))
-        if relative_path == "goat/c504700158.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_GOAT_RIVALRY_SHA256 \
-                    or contents.count(RIVALRY_ADJUST_OLD) != 1 \
-                    or contents.count(RIVALRY_SEND_OLD) != 1:
-                self.errors.append("pinned GOAT Rivalry script changed; adjust guard not applied")
-                return 0
-            # Sending a mismatched Type during EVENT_ADJUST re-enters this
-            # still-running effect on the pinned core. Suppress that re-entry
-            # for this effect only; the explicit readjust then applies normally.
-            contents = (contents.replace(RIVALRY_ADJUST_OLD, RIVALRY_ADJUST_GUARDED)
-                        .replace(RIVALRY_SEND_OLD, RIVALRY_SEND_GUARDED)
-                        + RIVALRY_ADJUST_CONDITION)
-        if relative_path == "pre-errata/c511000818.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_SINISTER_SHA256 \
-                    or contents.count(SINISTER_STANDBY_CONDITION_OLD) != 1:
-                self.errors.append("pinned pre-errata Serpent script changed; battle-negation patch not applied")
-                return 0
-            # Dark Balter and Dark Ruler Ha Des negate a battle-destroyed
-            # Serpent even in the Graveyard. The upstream script otherwise
-            # offers a futile optional return repeatedly in one Standby Phase.
-            contents = contents.replace(SINISTER_STANDBY_CONDITION_OLD,
-                                        SINISTER_STANDBY_CONDITION_HISTORICAL)
-        if relative_path == "official/c80071763.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_DARK_BALTER_SHA256 \
-                    or contents.count(BALTER_NEGATE_OLD) != 1:
-                self.errors.append("pinned Dark Balter script changed; Swords correction not applied")
-                return 0
-            contents = contents.replace(BALTER_NEGATE_OLD,
-                                        BALTER_NEGATE_SWORDS_HISTORICAL)
-        if relative_path == "official/c93671934.lua":
-            if hashlib.sha256(contents).hexdigest() != UPSTREAM_MORALE_BOOST_SHA256 \
-                    or contents.count(MORALE_BOOST_LEAVE_OLD) != 1:
-                self.errors.append("pinned Morale Boost script changed; leave-field correction not applied")
-                return 0
-            # After an Equip Card leaves the field, its current controller
-            # may be PLAYER_NONE. The printed damage applies to its last
-            # field controller, which the native event retains separately.
-            contents = contents.replace(MORALE_BOOST_LEAVE_OLD,
-                                        MORALE_BOOST_LEAVE_FIXED)
         if relative_path == "official/c7391448.lua" and self.mode == "mr1_synchro_probe":
             if (hashlib.sha256(contents).hexdigest() != UPSTREAM_GOYO_SHA256
                     or contents.count(GOYO_TUNER_REQUIREMENT_CURRENT) != 1):

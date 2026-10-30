@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from goat_ai.agents import RandomAgent
+from goat_ai.engine.historical_host_scripts import validate_pinned_host_assets
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory
 from goat_ai.replay.edopro_live_verify import verify_edopro_live_recording
@@ -30,16 +31,21 @@ def test_network_room_saves_audited_complete_game(tmp_path):
 
     root = Path(os.environ["GOAT_AI_EDOPRO_HOST_ROOT"])
     mirror_root = Path(os.environ["GOAT_AI_EDOPRO_MIRROR_ROOT"])
+    historical = os.getenv("GOAT_AI_EDOPRO_HISTORICAL") == "1"
     engine = Engine.load(str(root))
+    if historical:
+        validate_pinned_host_assets(engine, mirror_root)
     banlist = find_banlist(load_banlists(engine.install.lflist_paths), "2005.4 GOAT")
     room = Room(engine, RoomConfig(
         name="GOAT AI test", duel=DuelConfig(rules="goat"), banlist=banlist,
-        deck_sizes=DeckSizes(extra=(0, 999)), seed=9301, max_matches=1,
+        deck_sizes=DeckSizes(main=(40, 999), extra=(0, 999)),
+        seed=9301, max_matches=1,
         rematch=False, lan_discovery=False, host_client=False,
     ))
     decks = Path(__file__).parents[1] / "examples/decks"
     bridge = Bridge(mirror_root, tmp_path, RandomAgent(9302),
-                    "0" * 64, DuelObserver, RoomObserver)
+                    "0" * 64, DuelObserver, RoomObserver,
+                    historical_patches=historical)
     room.add_local(1, bridge.seat(Seat), load_ydk(
         str(decks / "warrior_montague_clash.ydk"), engine.cards).deck)
     room.duel_observers.append(bridge.duel_observer())
@@ -76,7 +82,8 @@ def test_network_room_saves_audited_complete_game(tmp_path):
     assert metadata["host_responses"] == result.responses
     trajectory = read_trajectory(next(tmp_path.glob("*.review.json")))
     assert audit_trajectory_visibility(trajectory)["decisions"] == len(trajectory.decisions)
-    assert trajectory.source == "edopro_external_unpatched"
+    assert trajectory.source == ("edopro_pinned_historical" if historical
+                                 else "edopro_external_unpatched")
     assert trajectory.terminal_observation is not None
     assert len(trajectory.decisions) >= result.responses
     replay_path = next(tmp_path.glob("*.yrpX"))

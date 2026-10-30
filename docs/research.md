@@ -27,6 +27,29 @@ Required regression cases: first-turn draw; summon response and Ignition priorit
 
 ### EDOPro live-client bridge probe (2026-10-30)
 
+**Pinned historical-patch room update.** The optional host can load the
+project's pinned `baa3881` native core, three pinned card databases in the
+same precedence order as the native adapter, and the pinned GOAT list through
+an ignored, symlink-only host layout made by
+`scripts/prepare_pinned_edopro_host.py`. The checksum-guarded script
+corrections are now a shared pure function. A host-side wrapper validates all
+14 patched upstream scripts at startup and sends the same corrected bytes to
+the core as the native adapter; changed sources fail closed. The wrapper and
+asset validator are original project code, while the host remains a separate
+AGPL dependency. A real TCP-room test using this pinned setup completed and
+saved an audited game. The selected v23 PyTorch checkpoint then completed a
+**20-turn, 485-response** pinned-host room duel against the external
+EDOPro-protocol random client, with zero client errors, zero host retries,
+zero reported Lua errors, and 485 mirrored decisions. Its `.yrpX` replay
+independently reconstructed all 485 visible decisions on the same pinned core
+with historical patches enabled; the policy won that single random-client
+game. This is integration evidence, not a playing-strength benchmark or
+proof that all 2005 rulings are correct. The saved source is
+`edopro_pinned_historical`, and automatic training admission remains off.
+A complete human match through the desktop GUI on this specific room is the
+next client-path gate. Broader source-backed card and timing audits are still
+needed before EDOPro games can be treated as historically reliable data.
+
 **Current experimental policy-seat result.** `scripts/serve_edopro_policy.py`
 connects the project's `PolicyAgent` to the optional external EDOPro LAN host.
 Its `LiveDuelMirror` reconstructs the host's exact seed, ordered Decks and raw

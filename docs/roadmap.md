@@ -2900,6 +2900,15 @@ An [opt-in feature-v32 PPO pilot](evaluation.md#feature-v32-ppo-action-choice-pi
 
 ### Future EDOPro human client
 
+Pinned-host update (2026-10-30): The optional room now supports the project's
+own pinned native core and checksum-guarded historical script corrections.
+The selected v23 checkpoint completed a 20-turn, 485-response TCP-room duel
+against an EDOPro-protocol client. Its saved replay reconstructed all 485
+player-visible decisions on the pinned core; there were no retries or reported
+Lua errors. The separate desktop GUI still needs a complete match on this
+specific room, and broad historical correctness and training admission remain
+open. This advances M1/M3 without closing either gate.
+
 Update (2026-10-30): An optional local room launcher now gives EDOPro's human
 seat the selected GOAT AI policy as its opponent. An EDOPro-protocol TCP client
 completed an 8-turn, 276-response match; the mirror saved 276 audited

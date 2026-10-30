@@ -91,13 +91,15 @@ You can play the selected PyTorch policy through an EDOPro LAN room using the
 optional external `mostwanted7/ygo-agent` host. The host is AGPL-3.0-or-later,
 installed separately; it is not included in this MIT repository. The EDOPro
 installation, matching native mirror root, checkpoint and Deck are local files.
-With the locally tested setup:
+After [native setup](docs/native_setup.md), prepare the host's ignored asset
+layout and start the locally tested pinned-core room:
 
 ```bash
+PYTHONPATH=src:. .venv/bin/python scripts/prepare_pinned_edopro_host.py
 PYTHONPATH=src:.cache/goat-ai/edopro_probe/ygo_agent_host \
   .venv/bin/python scripts/serve_edopro_policy.py \
-  --host-root .cache/goat-ai/edopro_probe/ProjectIgnis \
-  --mirror-root .cache/goat-ai/edopro_probe/official_parity_root \
+  --host-root .cache/goat-ai/edopro_pinned_host \
+  --mirror-root .cache/goat-ai --historical-pinned \
   --checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
   --ai-deck examples/decks/warrior_montague_clash.ydk
 ```
@@ -109,23 +111,26 @@ The script prints the save location, defaulting to ignored
 `.cache/goat-ai/edopro_games/`. It writes EDOPro's `.yrpX` and a metadata file;
 if every host response matches the native mirror and the duel reaches a native
 terminal, it also writes a player-visible `.review.json` trajectory. Open that
-JSON in the local replay viewer. These records are marked
-`edopro_external_unpatched` and **excluded from automatic training** because
-the external install's GOAT rulings have not passed the project's historical
-validation. A surrender or disconnect saves the replay and metadata but does
+JSON in the local replay viewer. The pinned room loads the project's
+checksum-guarded historical script corrections without modifying the source
+checkout. Its records are marked `edopro_pinned_historical` and **excluded
+from automatic training** until broader historical correctness and the full
+desktop-client path are validated. A surrender or disconnect saves the replay
+and metadata but does
 not produce a complete trajectory. See [the live room research](docs/research.md#edopro-live-client-bridge-probe-2026-10-30).
 
-The external EDOPro package tested here needed a local Sheep Token script
-shim for Scapegoat. `python scripts/prepare_edopro_host_token.py
-.cache/goat-ai/edopro_probe/ProjectIgnis --apply` validates and creates it
-without overwriting an existing script. The mirror root must point to the
-same core, database and scripts as the host. The default pinned project assets
-are a different revision and cannot be substituted for this comparison.
-To rerun the optional TCP-room regression against that local install:
+The external host package remains a separate AGPL dependency and must be on
+`PYTHONPATH`. The locally tested checkout is
+`https://github.com/mostwanted7/ygo-agent.git` at
+`c017f3c20d78b01e6398a41d33e023cf20236ae1`, placed in the ignored
+`.cache/goat-ai/edopro_probe/ygo_agent_host` directory. The checkpoint is a
+local generated file; substitute another
+compatible checkpoint path if needed. To rerun the TCP-room regression:
 
 ```bash
-GOAT_AI_EDOPRO_HOST_ROOT=.cache/goat-ai/edopro_probe/ProjectIgnis \
-GOAT_AI_EDOPRO_MIRROR_ROOT=.cache/goat-ai/edopro_probe/official_parity_root \
+GOAT_AI_EDOPRO_HOST_ROOT=.cache/goat-ai/edopro_pinned_host \
+GOAT_AI_EDOPRO_MIRROR_ROOT=.cache/goat-ai \
+GOAT_AI_EDOPRO_HISTORICAL=1 \
 PYTHONPATH=src:.:.cache/goat-ai/edopro_probe/ygo_agent_host \
   .venv/bin/pytest -q tests/test_edopro_policy_room.py
 ```
@@ -137,7 +142,7 @@ native EDOPro replay on the same external assets:
 ```bash
 PYTHONPATH=src:. .venv/bin/python scripts/verify_edopro_live_game.py \
   .cache/goat-ai/edopro_games/game-001-seed-NNN.yrpX \
-  --native-root .cache/goat-ai/edopro_probe/official_parity_root
+  --native-root .cache/goat-ai
 ```
 
 Replace `NNN` with the seed printed in the saved filename. This checks every
