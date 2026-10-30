@@ -19,7 +19,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. The exper
 | Experimental GOAT adapter | Sourced-deck protocol sweeps, source-backed ruling fixtures, exact replay checks, and bounded hidden-information audits exist; broad historical correctness remains an open gate |
 | PyTorch policy | Visible-state action scorer with opt-in feature versions through v28; replay-verified imitation, preference, and self-play experiments exist. The selected v23 checkpoint remains the neural reference because recent self-play children have not shown a transferable held-out strength gain; see [evaluation](docs/evaluation.md) |
 | Human EDOPro replay intake | Bounded `.yrp`/`.yrpX` parsing and synthetic response reconstruction exist. A real, authorized GOAT replay has not passed exact reconstruction; see [replay contributions](docs/replay_contributions.md) |
-| Experimental EDOPro policy room | Optional local room runs the selected policy against an EDOPro-compatible client and saves native replay plus audited review-only decisions; full desktop GUI game and historical training gate remain open |
+| Experimental EDOPro policy room | Optional local room runs the selected policy against EDOPro and saves native replay plus audited review-only decisions; one complete desktop GUI game has been verified, while the historical training gate remains open |
 
 The selected direction is [Project Ignis/edo9300 ocgcore](https://github.com/edo9300/ygopro-core), configured with its `DUEL_MODE_GOAT` flag, historical card data and scripts, and an audited Python-facing decision adapter. A 2005 banlist alone is insufficient. See [research](docs/research.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md).
 
@@ -114,12 +114,18 @@ terminal, it also writes a player-visible `.review.json` trajectory. Open that
 JSON in the local replay viewer. The pinned room loads the project's
 checksum-guarded historical script corrections without modifying the source
 checkout. Its records are marked `edopro_pinned_historical` and **excluded
-from automatic training** until broader historical correctness and the full
-desktop-client path are validated. A surrender or disconnect saves the replay
+from automatic training** until broader historical correctness and more
+desktop-client prompts are validated. A surrender or disconnect saves the replay
 and metadata. When the mirrored decisions are synchronized, it also saves
 their player-visible prefix as `.review.json`, marked `interrupted` with no
 native-duel winner. The viewer labels its last frame **Recording stopped**.
 This prefix remains excluded from training. See [the live room research](docs/research.md#edopro-live-client-bridge-probe-2026-10-30).
+
+One EDOPro 41.0.2 desktop duel on this pinned room completed in seven turns.
+The human used the GUI's End Phase and hand-size discard controls; the room
+saved 165 responses with zero retries and zero Lua errors. Independent
+reconstruction matched all 165 player-visible decisions and the terminal
+result. This validates that specific path, not every possible EDOPro prompt.
 
 The external host package remains a separate AGPL dependency and must be on
 `PYTHONPATH`. The locally tested checkout is

@@ -2969,6 +2969,14 @@ while awaiting a hand-size discard on turn 3, leaving full desktop completion
 unproven. The bridge must handle every EDOPro decision prompt before it can
 be considered a complete human match path.
 
+Update (2026-10-30): The pinned policy room now has one complete seven-turn
+EDOPro 41.0.2 desktop GUI match. The human answered hand-size discard prompts;
+the host saved 165 responses, zero retries, and zero reported Lua errors.
+Independent replay verification reconstructed all 165 player-visible decisions
+and the AI's terminal win. This closes the first complete-GUI-match gate.
+Broader prompt coverage, historical rulings validation, and training admission
+remain open; this match is review-only.
+
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The
 human's decisions require equivalent logging at the server or a validated

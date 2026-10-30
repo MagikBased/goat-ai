@@ -47,6 +47,49 @@ class ReconstructedLegacyDuel:
     asset_sha256: dict[str, str]
 
 
+def _canonical_card_response(engine: ExperimentalOcgcoreEngine,
+                             response: bytes) -> bytes:
+    """Convert EDOPro's compact card indices to our type-0 selection encoding.
+
+    The pinned core accepts four wire encodings for card, tribute, and sum
+    selections. Our public actions use the equivalent uint32 index encoding.
+    """
+    prompt = engine.probe._pending_message
+    if not prompt or prompt[0] not in (15, 20, 23) or len(response) < 4:
+        return response
+    kind = struct.unpack_from("<i", response)[0]
+    if kind not in (1, 2, 3):
+        return response
+    if prompt[0] == 23:
+        required = struct.unpack_from("<I", prompt, 15)[0]
+        count = struct.unpack_from("<I", prompt, 19 + required * 18)[0]
+    else:
+        count = struct.unpack_from("<I", prompt, 11)[0]
+    if kind == 3:
+        expected = 4 + (count + 7) // 8
+        if len(response) != expected:
+            return response
+        mask = int.from_bytes(response[4:], "little")
+        if mask >> count:
+            return response
+        indices = tuple(index for index in range(count) if mask & (1 << index))
+    else:
+        if len(response) < 8:
+            return response
+        size = struct.unpack_from("<I", response, 4)[0]
+        width = 2 if kind == 1 else 1
+        if size > count or len(response) != 8 + width * size:
+            return response
+        indices = tuple(int.from_bytes(response[8 + width * index:
+                                                8 + width * (index + 1)], "little")
+                        for index in range(size))
+        if any(index >= count for index in indices) or len(set(indices)) != size:
+            return response
+        indices = tuple(sorted(indices))
+    return struct.pack("<II", 0, len(indices)) + struct.pack(
+        f"<{len(indices)}I", *indices)
+
+
 def advance_recorded_response(engine: ExperimentalOcgcoreEngine, decision: Decision,
                               response: bytes, index: int,
                               ) -> tuple[Decision, tuple[DecisionRecord, ...]]:
@@ -59,6 +102,7 @@ def advance_recorded_response(engine: ExperimentalOcgcoreEngine, decision: Decis
         raise ReplayReconstructionError(
             f"response {index}: native duel ended before saved responses",
             code="extra_saved_response", response_index=index)
+    response = _canonical_card_response(engine, response)
     records: list[DecisionRecord] = []
     try:
         action = engine.action_for_recorded_response(response)

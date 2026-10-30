@@ -244,7 +244,20 @@ discard; the host logged 22 responses and zero Lua errors. It did not
 establish the complete desktop-duel gate. The next desktop run needs a
 reliable way to answer all interactive prompts, including hand-size discard.
 
-[Project Ignis FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html) says old `.yrp` replays re-enact decisions against a matching core and scripts, whereas `.yrpX` stores resulting actions and remains viewable across engine updates. Neither statement guarantees the complete legal action set or each player's knowledge at every choice. The [EDOPro replay header and flags](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.h) and [container reader](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp) define `yrp1` as saved Decks plus engine responses and `yrpX` as a packet stream, with optional LZMA compression and an extended four-word seed. GOAT AI has a bounded structural reader for these two EDOPro containers and conditional native response reconstruction tested on synthetic GOAT duels. The reader prints a privacy-preserving summary by default. A public YGOPro `yrp2` sample from [ygopro-yrp-encode](https://github.com/purerosefallen/ygopro-yrp-encode) is a distinct format and is rejected explicitly. Real EDOPro replay compatibility and player-knowledge validation are **not established**. No EDOPro replay is yet admitted as a training trajectory. DuelingBook data and video-derived trajectories require rights and a separate extraction pipeline.
+Update (2026-10-30): The pinned core's `parse_response_cards` accepts four
+card-selection encodings. EDOPro's desktop GUI sent a type-3 bitset for a
+hand-size discard, while our replay mapper initially recognized only type-0
+32-bit indices. The mapper now canonicalizes type-1, type-2, and type-3
+card/tribute/sum selections before mapping them to visible legal actions.
+In a seven-turn EDOPro 41.0.2 GUI duel against the selected v23 policy, the
+human used two hand-size discards. The room saved a complete `.yrpX` with
+165 responses, zero retries, and zero reported Lua errors. An independent
+`verify_edopro_live_game.py` run reconstructed all 165 visible decisions on
+the pinned core and matched the terminal result (AI victory). The local
+recording is excluded from training. Other GUI prompt encodings and historical
+GOAT correctness still need wider validation.
+
+[Project Ignis FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html) says old `.yrp` replays re-enact decisions against a matching core and scripts, whereas `.yrpX` stores resulting actions and remains viewable across engine updates. Neither statement guarantees the complete legal action set or each player's knowledge at every choice. The [EDOPro replay header and flags](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.h) and [container reader](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp) define `yrp1` as saved Decks plus engine responses and `yrpX` as a packet stream, with optional LZMA compression and an extended four-word seed. GOAT AI has a bounded structural reader for these two EDOPro containers and conditional native response reconstruction tested on synthetic GOAT duels. The reader prints a privacy-preserving summary by default. A public YGOPro `yrp2` sample from [ygopro-yrp-encode](https://github.com/purerosefallen/ygopro-yrp-encode) is a distinct format and is rejected explicitly. One same-install EDOPro desktop replay now reconstructs and passes the player-visible audit as described above; compatibility with arbitrary external EDOPro recordings and their original asset versions is **not established**. No EDOPro replay is yet admitted as a training trajectory. DuelingBook data and video-derived trajectories require rights and a separate extraction pipeline.
 
 Another MIT-licensed [YGOPro/YGOPro2 replay parser](https://github.com/RemarkWang/yrp-parser)
 documents `.yrp2`, embedded `.yrp1`, and `.yrp3d` spectator streams. Its

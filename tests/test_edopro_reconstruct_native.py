@@ -30,6 +30,7 @@ from goat_ai.replay.edopro_container import (
 )
 from goat_ai.replay.edopro_reconstruct import (
     ReplayReconstructionError,
+    _canonical_card_response,
     reconstruct_legacy_responses,
 )
 from goat_ai.replay.live_mirror import LiveDuelMirror
@@ -37,6 +38,48 @@ from scripts.probe_random_decks import generate_deck, write_deck
 
 THUNDER_DRAGON = 504700054
 GROUND_COLLAPSE = 90502999
+
+
+@pytest.mark.parametrize("kind,payload", [
+    (1, struct.pack("<IH", 1, 1)),
+    (2, struct.pack("<IB", 1, 1)),
+    (3, b"\x02"),
+])
+def test_edopro_compact_card_selection_maps_to_public_choice(kind, payload):
+    class Probe:
+        _pending_message = (bytes((15, 1, 0)) + struct.pack("<III", 1, 1, 7))
+
+    class Engine:
+        probe = Probe()
+
+    response = struct.pack("<I", kind) + payload
+    assert _canonical_card_response(Engine(), response) == struct.pack("<III", 0, 1, 1)
+
+
+def test_edopro_compact_card_selection_rejects_out_of_range_bits():
+    class Probe:
+        _pending_message = (bytes((15, 1, 0)) + struct.pack("<III", 1, 1, 7))
+
+    class Engine:
+        probe = Probe()
+
+    response = struct.pack("<I", 3) + b"\x80"
+    assert _canonical_card_response(Engine(), response) == response
+
+
+@pytest.mark.parametrize("prompt", [
+    bytes((20, 1, 0)) + struct.pack("<III", 1, 1, 7),
+    bytes((23, 1, 0)) + struct.pack("<IIII", 4, 1, 1, 0) + struct.pack("<I", 7),
+])
+def test_edopro_compact_tribute_and_sum_selections(prompt):
+    class Probe:
+        _pending_message = prompt
+
+    class Engine:
+        probe = Probe()
+
+    assert _canonical_card_response(Engine(), struct.pack("<I", 3) + b"\x02") \
+        == struct.pack("<III", 0, 1, 1)
 
 
 def _legacy_replay(responses: list[bytes], *, settings=(8000, 5, 1),
