@@ -148,6 +148,16 @@ def write_deck(path: Path, deck: Decklist) -> None:
                     + "!side\n")
 
 
+def validate_probe_options(card_pool: str, random_extra: bool,
+                           fusion_stress: bool) -> None:
+    if card_pool not in ("whitelist", "tournament", "indianapolis-2005"):
+        raise ValueError("unknown card pool")
+    if random_extra and card_pool != "whitelist":
+        raise ValueError("random Extra Decks require the whitelist card pool")
+    if fusion_stress and not random_extra:
+        raise ValueError("Fusion stress requires random Extra Decks")
+
+
 def probe(root: Path, output: Path, first_seed: int, seeds: int,
           max_decisions: int, card_pool: str = "whitelist",
           verify_replays: bool = False,
@@ -157,14 +167,9 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
           random_extra: bool = False,
           fusion_stress: bool = False,
           agent_name: str = "random") -> dict:
-    if card_pool not in ("whitelist", "tournament", "indianapolis-2005"):
-        raise ValueError("unknown card pool")
+    validate_probe_options(card_pool, random_extra, fusion_stress)
     if agent_name not in ("random", "tactical"):
         raise ValueError("unknown probe agent")
-    if random_extra and card_pool != "whitelist":
-        raise ValueError("random Extra Decks require the whitelist card pool")
-    if fusion_stress and not random_extra:
-        raise ValueError("Fusion stress requires random Extra Decks")
     output.mkdir(parents=True, exist_ok=True)
     games = []
     offered: Counter[tuple[int, str]] = Counter()
@@ -356,6 +361,7 @@ def probe_isolated(root: Path, output: Path, first_seed: int, seeds: int,
                    fusion_stress: bool = False,
                    agent_name: str = "random") -> dict:
     """Run each native duel in a child process so one crash does not erase the sweep."""
+    validate_probe_options(card_pool, random_extra, fusion_stress)
     if agent_name not in ("random", "tactical"):
         raise ValueError("unknown probe agent")
     if output.exists() and any(output.iterdir()):
@@ -391,11 +397,15 @@ def probe_isolated(root: Path, output: Path, first_seed: int, seeds: int,
         else:
             deck = directory / f"seed_{seed}.ydk"
             opponent = directory / f"seed_{seed}_opponent.ydk"
+            detail = completed.stderr.strip().splitlines()
+            reason = f"isolated worker exited {completed.returncode}"
+            if detail:
+                reason += f": {detail[-1][:200]}"
             game = {"seed": seed, "deck": str(deck),
                     "deck_sha256": sha256_file(deck) if deck.is_file() else None,
                     "decisions": 0, "terminal": False, "winner": None,
                     "action_kinds": [],
-                    "error": f"isolated worker exited {completed.returncode}"}
+                    "error": reason}
             if distinct_opponents:
                 game["opponent_deck"] = str(opponent)
                 game["opponent_deck_sha256"] = (sha256_file(opponent)
@@ -506,6 +516,10 @@ def main() -> None:
     args = parser.parse_args()
     if args.seeds < 1 or args.max_decisions < 1:
         parser.error("--seeds and --max-decisions must be positive")
+    try:
+        validate_probe_options(args.card_pool, args.random_extra, args.fusion_stress)
+    except ValueError as exc:
+        parser.error(str(exc))
     runner = probe_isolated if args.isolate_games else probe
     report = runner(args.native_root, args.output, args.seed, args.seeds,
                     args.max_decisions, args.card_pool, args.verify_replays,

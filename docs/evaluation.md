@@ -15439,3 +15439,26 @@ All branches reconstructed the source decision, completed, replay-verified,
 and passed the visibility audit. A single fixed hidden deal and continuation
 cannot label the best action or establish a strength gain; the diagnostic
 helps identify activations for further human review and multi-deal evaluation.
+
+## Indianapolis 2005 card-pool protocol sweep (30 October 2026)
+
+`scripts/probe_random_decks.py` sampled legal 40-card Main Decks from the
+published Indianapolis 2005 Top 8 card pool and generated independent
+opponents per seed. On the pinned local GOAT assets, RandomAgent seeds
+133000–133031 completed **32/32** duels in **32,841** decisions; Tactical-v14
+seeds 133100–133115 completed **16/16** in **10,188** decisions. All **43,029**
+decisions replay-verified and passed the player-visibility audit. Every game
+reproduced its decision trace and outcome on a seeded rerun. The Tactical
+probe recorded 194 distinct card/action rows. Reports and generated decks
+are ignored artifacts under `.cache/goat-ai/probe_indy_2005_133000_133031/`
+and `.cache/goat-ai/probe_indy_tactical_133100_133115/`; report SHA-256 values
+are `aed43a2585f662c31cbd9e0de7cad901f7c5ab5463781aebb3ca5ecb4954e670`
+and `0c2b53c8cbf06085428d93349ef6ed57e577c77707fa357a51c2de2bcd73865d`.
+
+Both sweeps used `--card-pool indianapolis-2005 --distinct-opponents
+--max-decisions 3000 --verify-replays --repeat-seeds --isolate-games`, with
+`--agent tactical --count-card-actions` on the second. The isolated runner
+now validates incompatible Extra Deck options before spawning workers and
+preserves a short worker-error detail for triage. This sample demonstrates
+native protocol and observation reproducibility for these generated decks;
+it does not validate every historical ruling or arbitrary legal deck.

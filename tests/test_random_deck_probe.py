@@ -26,6 +26,39 @@ from scripts.probe_random_decks import (
 )
 
 
+def test_isolated_probe_rejects_incompatible_options_before_spawning(tmp_path, monkeypatch):
+    def unexpected_worker(*_args, **_kwargs):
+        pytest.fail("invalid probe options started an isolated worker")
+
+    monkeypatch.setattr("scripts.probe_random_decks.subprocess.run", unexpected_worker)
+    with pytest.raises(ValueError, match="random Extra Decks require"):
+        probe_isolated(tmp_path, tmp_path / "output", 1, 2, 500,
+                       card_pool="indianapolis-2005", random_extra=True)
+    assert not (tmp_path / "output").exists()
+
+
+def test_isolated_probe_reports_worker_error_detail(tmp_path, monkeypatch):
+    monkeypatch.setattr("scripts.probe_random_decks.subprocess.run",
+                        lambda command, **_kwargs: subprocess.CompletedProcess(
+                            command, 1, "", "Traceback\nValueError: unsupported native prompt\n"))
+    report = probe_isolated(tmp_path, tmp_path / "output", 1, 1, 500)
+    assert report["games"][0]["error"] == (
+        "isolated worker exited 1: ValueError: unsupported native prompt")
+
+
+def test_probe_cli_rejects_incompatible_options_without_writing_report(tmp_path):
+    output = tmp_path / "bad_sweep"
+    script = Path(__file__).resolve().parents[1] / "scripts/probe_random_decks.py"
+    result = subprocess.run([
+        sys.executable, str(script), "--output", str(output),
+        "--card-pool", "indianapolis-2005", "--random-extra",
+        "--isolate-games", "--seeds", "32",
+    ], capture_output=True, text=True, check=False)
+    assert result.returncode == 2
+    assert "random Extra Decks require the whitelist card pool" in result.stderr
+    assert not output.exists()
+
+
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_random_fusion_extra_decks_keep_main_seed_and_replay_verify(tmp_path):
     native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
