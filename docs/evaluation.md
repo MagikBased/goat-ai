@@ -16233,3 +16233,36 @@ the Chaos audit, selected v23 checkpoint, category
 `nobleman_only_own_set_monster`, and the pinned native root; reproduce the
 second with `scripts/evaluate_decision_branches.py` at decision index 5 and
 action indexes 0 and 1 on the seed-176002 seat-0 replay.
+
+## Sixty-card repeated-copy whitelist probe (30 October 2026)
+
+The random legal-Deck probe now supports Main Deck sizes 40–60 for the GOAT
+whitelist. For sizes above 40 it preserves the seed's original 40 distinct
+cards and adds legal repeated copies using a separately seeded order; the
+existing 40-card generator is unchanged. A fresh isolated run on seeds
+176101–176108 used 16 independently generated 60-card Main Decks and random
+15-card Fusion Extra Decks. Every Main Deck had 40 unique card IDs and 20
+additional legal copies. All eight duels ended before the 3,000-decision cap;
+all **9,268 decisions** replay-verified and passed the player-visibility
+audit. Repeating each duel with the same seed reproduced all decisions,
+terminal observations, and outcomes. The games exposed 27 action kinds and
+selected activations for 102 distinct card IDs. This expands protocol and
+duplicate-copy coverage; sampled play does not establish every card ruling
+or arbitrary-Deck completeness.
+
+The ignored report is
+`.cache/goat-ai/sixty_card_repeated_whitelist_176101_176108/report.json`
+(SHA-256 `08edf24a8aa6b7ed6a87e9ca7cac1123dee5bfa6d43085925e86d5e3b4668c17`).
+Reproduce from the repository root with:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/sixty_card_repeated_whitelist_176101_176108 \
+  --seed 176101 --seeds 8 --max-decisions 3000 --main-size 60 \
+  --random-extra --distinct-opponents --verify-replays --repeat-seeds \
+  --count-card-actions --isolate-games
+```
+
+Use an empty output directory for a rerun. The report includes Deck hashes,
+the pinned native asset fingerprints, per-game decisions, and action counts.

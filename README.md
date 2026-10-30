@@ -525,6 +525,7 @@ python scripts/probe_control_deck.py --deck examples/decks/goat_control_lolmarcu
 python scripts/probe_control_deck.py --deck examples/decks/warrior_montague_clash.ydk --opponent-deck examples/decks/chaos_turbo_riclar_2020.ydk --seed 1 --seeds 10
 python scripts/probe_control_deck.py --deck examples/decks/flip_control_goatformat_guide.ydk --opponent-deck examples/decks/chaos_turbo_riclar_2020.ydk --seed 31 --seeds 10
 python scripts/probe_random_decks.py --seeds 10 --max-decisions 3000
+python scripts/probe_random_decks.py --main-size 60 --random-extra --distinct-opponents --verify-replays --repeat-seeds --isolate-games --seeds 8 --max-decisions 3000 --output .cache/goat-ai/sixty-card-probe
 ```
 
 The Chaos Turbo Main Deck follows the [Riccardo Lari 2020 championship list](https://www.goatformat.com/chaos-turbo.html), using pinned GOAT/pre-errata card IDs. The published list does not specify an Extra Deck, so this fixture leaves it empty. This probe tests native decision coverage with random play; it does not measure competitive strength or prove every card ruling.

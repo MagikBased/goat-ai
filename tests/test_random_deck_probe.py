@@ -81,6 +81,32 @@ def test_random_fusion_extra_decks_keep_main_seed_and_replay_verify(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_sixty_card_repeated_copy_decks_complete_and_reproduce(tmp_path):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    plain = generate_deck(native_root, 176100)
+    large = generate_deck(native_root, 176100, include_random_extra=True,
+                          main_size=60)
+    assert large.main[:40] == plain.main
+    assert len(large.main) == 60
+    assert len(set(large.main)) < 60
+    assert large == generate_deck(native_root, 176100, include_random_extra=True,
+                                  main_size=60)
+    limits = read_goat_whitelist(native_root / "banlist/GOAT.lflist.conf")
+    assert all(count <= limits[code] for code, count in Counter(large.main).items())
+    report = probe(native_root, tmp_path / "large", 176100, 1, 3000,
+                   verify_replays=True, distinct_opponents=True,
+                   repeat_seeds=True, random_extra=True, main_size=60)
+    game = report["games"][0]
+    assert report["main_size"] == 60
+    assert report["repeat_copy_seed_offset"] == 3_000_000
+    assert len(read_ydk(game["opponent_deck"]).main) == 60
+    assert game["terminal"] and game["error"] is None
+    assert game["replay_verified_decisions"] == game["decisions"]
+    assert game["deterministic_repeat"] is True
+    assert report["visibility_audit"]["decisions"] == game["decisions"]
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_fusion_stress_reaches_extra_deck_card_actions(tmp_path):
     native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     deck = generate_deck(native_root, 10753, include_random_extra=True,

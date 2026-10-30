@@ -21,6 +21,14 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+An [eight-duel 60-card repeated-copy whitelist probe](evaluation.md#sixty-card-repeated-copy-whitelist-probe-30-october-2026)
+completed with independently generated opponents and Fusion Extra Decks.
+All 9,268 decisions replay-verified, passed the visibility audit, and
+reproduced under repeated seeds. The generator now exercises legal repeated
+copies and Main Deck sizes above 40, which earlier distinct-card sweeps did
+not cover. Sampled protocol success still does not prove all legal Decks or
+historical rulings.
+
 A second [40-duel independent whitelist/Fusion sample](evaluation.md#second-independent-random-whitelistfusion-sample--30-october-2026)
 completed at seeds 166000–166039. All 44,516 decisions passed native replay
 verification and the visibility audit, and repeated seeds reproduced the same

@@ -44,8 +44,12 @@ FUSION_STRESS_MAIN = (SCAPEGOAT, METAMORPHOSIS)
 
 
 def generate_deck(root: Path, seed: int, *, include_random_extra: bool = False,
-                  fusion_stress: bool = False) -> Decklist:
-    """Choose distinct whitelist cards, optionally including 15 Fusion cards."""
+                  fusion_stress: bool = False, main_size: int = 40) -> Decklist:
+    """Choose whitelist cards; larger Main Decks add legal repeated copies."""
+    if not 40 <= main_size <= 60:
+        raise ValueError("whitelist probe Main Deck size must be 40..60")
+    if fusion_stress and main_size != 40:
+        raise ValueError("Fusion stress uses a 40-card Main Deck")
     if fusion_stress and not include_random_extra:
         raise ValueError("Fusion stress requires a random Extra Deck")
     limits = read_goat_whitelist(root / "banlist/GOAT.lflist.conf")
@@ -87,6 +91,18 @@ def generate_deck(root: Path, seed: int, *, include_random_extra: bool = False,
         raise ValueError("GOAT card pool lacks Fusion stress Main Deck cards")
     if fusion_stress:
         chosen = [*(code for code in FUSION_STRESS_MAIN for _ in range(3)), *chosen]
+    elif main_size > 40:
+        # Keep the old 40-card prefix stable so the same seed isolates the
+        # effect of additional legal copies. A separate seed shuffles which
+        # eligible printed cards receive those copies.
+        repeated = [code for code in chosen if limits[code] > 1]
+        random.Random(seed + 3_000_000).shuffle(repeated)
+        for code in repeated:
+            chosen.extend([code] * min(limits[code] - 1, main_size - len(chosen)))
+            if len(chosen) == main_size:
+                break
+        if len(chosen) != main_size:
+            raise ValueError("sampled Main Deck cannot supply requested legal copies")
     extra = []
     if include_random_extra:
         random.Random(seed + 2_000_000).shuffle(fusion_candidates)
@@ -149,13 +165,19 @@ def write_deck(path: Path, deck: Decklist) -> None:
 
 
 def validate_probe_options(card_pool: str, random_extra: bool,
-                           fusion_stress: bool) -> None:
+                           fusion_stress: bool, main_size: int = 40) -> None:
     if card_pool not in ("whitelist", "tournament", "indianapolis-2005"):
         raise ValueError("unknown card pool")
     if random_extra and card_pool != "whitelist":
         raise ValueError("random Extra Decks require the whitelist card pool")
     if fusion_stress and not random_extra:
         raise ValueError("Fusion stress requires random Extra Decks")
+    if not 40 <= main_size <= 60:
+        raise ValueError("whitelist probe Main Deck size must be 40..60")
+    if main_size != 40 and card_pool != "whitelist":
+        raise ValueError("larger Main Decks require the whitelist card pool")
+    if main_size != 40 and fusion_stress:
+        raise ValueError("Fusion stress uses a 40-card Main Deck")
 
 
 def probe(root: Path, output: Path, first_seed: int, seeds: int,
@@ -166,8 +188,8 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
           repeat_seeds: bool = False,
           random_extra: bool = False,
           fusion_stress: bool = False,
-          agent_name: str = "random") -> dict:
-    validate_probe_options(card_pool, random_extra, fusion_stress)
+          agent_name: str = "random", main_size: int = 40) -> dict:
+    validate_probe_options(card_pool, random_extra, fusion_stress, main_size)
     if agent_name not in ("random", "tactical"):
         raise ValueError("unknown probe agent")
     output.mkdir(parents=True, exist_ok=True)
@@ -197,7 +219,7 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
     for seed in range(first_seed, first_seed + seeds):
         generator = (lambda deck_seed: generate_deck(
             root, deck_seed, include_random_extra=random_extra,
-            fusion_stress=fusion_stress)
+            fusion_stress=fusion_stress, main_size=main_size)
             if card_pool == "whitelist" else generate_tournament_mix(
                 root, deck_seed, source_names=source_names))
         deck = generator(seed)
@@ -300,6 +322,9 @@ def probe(root: Path, output: Path, first_seed: int, seeds: int,
         report["extra_seed_offset"] = 2_000_000
     if fusion_stress:
         report["fusion_stress"] = True
+    if main_size != 40:
+        report["main_size"] = main_size
+        report["repeat_copy_seed_offset"] = 3_000_000
     if card_pool in ("tournament", "indianapolis-2005") or verify_replays:
         report["rules_profile"] = rules_profile
         report["loaded_asset_sha256"] = dict(sorted(loaded_assets.items()))
@@ -359,9 +384,9 @@ def probe_isolated(root: Path, output: Path, first_seed: int, seeds: int,
                    repeat_seeds: bool = False,
                    random_extra: bool = False,
                    fusion_stress: bool = False,
-                   agent_name: str = "random") -> dict:
+                   agent_name: str = "random", main_size: int = 40) -> dict:
     """Run each native duel in a child process so one crash does not erase the sweep."""
-    validate_probe_options(card_pool, random_extra, fusion_stress)
+    validate_probe_options(card_pool, random_extra, fusion_stress, main_size)
     if agent_name not in ("random", "tactical"):
         raise ValueError("unknown probe agent")
     if output.exists() and any(output.iterdir()):
@@ -374,7 +399,7 @@ def probe_isolated(root: Path, output: Path, first_seed: int, seeds: int,
         command = [sys.executable, str(Path(__file__).resolve()),
                    "--native-root", str(root.resolve()), "--output", str(directory.resolve()),
                    "--seed", str(seed), "--seeds", "1", "--max-decisions", str(max_decisions),
-                   "--card-pool", card_pool]
+                   "--card-pool", card_pool, "--main-size", str(main_size)]
         if agent_name != "random":
             command.extend(("--agent", agent_name))
         for enabled, flag in ((verify_replays, "--verify-replays"),
@@ -426,6 +451,9 @@ def probe_isolated(root: Path, output: Path, first_seed: int, seeds: int,
     if agent_name != "random":
         merged["agent"] = agent_name
         merged["agent_version"] = TacticalHeuristicAgent.teacher_version
+    if main_size != 40:
+        merged["main_size"] = main_size
+        merged["repeat_copy_seed_offset"] = 3_000_000
     if any((report.get("agent", "random") != agent_name
             or agent_name == "tactical" and report.get("agent_version")
             != TacticalHeuristicAgent.teacher_version) for report in reports):
@@ -498,6 +526,8 @@ def main() -> None:
     parser.add_argument("--card-pool", choices=("whitelist", "tournament",
                                                 "indianapolis-2005"),
                         default="whitelist")
+    parser.add_argument("--main-size", type=int, default=40,
+                        help="whitelist Main Deck size, 40..60; larger decks add legal copies")
     parser.add_argument("--agent", choices=("random", "tactical"), default="random",
                         help="visible-observation agent used by both seats")
     parser.add_argument("--verify-replays", action="store_true")
@@ -517,7 +547,8 @@ def main() -> None:
     if args.seeds < 1 or args.max_decisions < 1:
         parser.error("--seeds and --max-decisions must be positive")
     try:
-        validate_probe_options(args.card_pool, args.random_extra, args.fusion_stress)
+        validate_probe_options(args.card_pool, args.random_extra, args.fusion_stress,
+                               args.main_size)
     except ValueError as exc:
         parser.error(str(exc))
     runner = probe_isolated if args.isolate_games else probe
@@ -525,7 +556,7 @@ def main() -> None:
                     args.max_decisions, args.card_pool, args.verify_replays,
                     args.distinct_opponents, args.count_card_actions,
                     args.repeat_seeds, args.random_extra, args.fusion_stress,
-                    args.agent)
+                    args.agent, args.main_size)
     for game in report["games"]:
         status = "error" if game["error"] else "terminal" if game["terminal"] else "limit"
         suffix = f" error={game['error']}" if game["error"] else ""
