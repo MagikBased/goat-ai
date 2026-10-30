@@ -322,9 +322,11 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
         def __init__(self, _creator):
             pass
 
-        def status(self):
+        def status(self, *, offset=0):
             return {"available": True, "room_running": bool(launched),
-                    "training_admitted": False, "sessions": []}
+                    "training_admitted": False, "sessions": [],
+                    "session_offset": offset, "session_limit": 10,
+                    "session_count": 0}
 
         def start(self, deck):
             launched.append(deck)
@@ -358,6 +360,9 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
     base = f"http://127.0.0.1:{server.server_port}"
     try:
         assert _request(f"{base}/api/edopro/status")[1]["training_admitted"] is False
+        assert _request(f"{base}/api/edopro/status?offset=10")[1]["session_offset"] == 10
+        with pytest.raises(HTTPError, match="400"):
+            _request(f"{base}/api/edopro/status?offset=-1")
         assert _request(f"{base}/api/edopro/start", {"ai_deck": "ai.ydk"})[1]["room_running"]
         assert launched == ["ai.ydk"]
         assert _request(f"{base}/api/edopro/choices?id={'a' * 16}")[1]["confirmed"] == 0

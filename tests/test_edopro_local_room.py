@@ -1,6 +1,7 @@
 """The local EDOPro launcher accepts only published decks and keeps recordings review-only."""
 
 import json
+import os
 import socket
 import time
 from pathlib import Path
@@ -84,6 +85,29 @@ def test_edopro_room_reports_missing_optional_host(tmp_path):
     assert room.status()["available"] is False
     with pytest.raises(ValueError, match="host package is missing"):
         room.start("ai.ydk")
+
+
+def test_edopro_room_pages_saved_sessions_without_losing_older_games(tmp_path):
+    creator = GameCreator(root=tmp_path)
+    folder = creator.native_root / "edopro_games"
+    for number in range(12):
+        directory = folder / f"{number:016x}"
+        directory.mkdir(parents=True)
+        (directory / "session.json").write_text(json.dumps({"ai_deck": f"deck-{number}.ydk"}))
+        # The directory timestamp is the session sort key used by the room.
+        os.utime(directory, ns=(number + 1, number + 1))
+    room = EdoRoomManager(creator)
+    first = room.status()
+    second = room.status(offset=10)
+    assert first["session_count"] == second["session_count"] == 12
+    assert [item["ai_deck"] for item in first["sessions"]] == [
+        f"deck-{number}.ydk" for number in range(11, 1, -1)]
+    assert [item["ai_deck"] for item in second["sessions"]] == [
+        "deck-1.ydk", "deck-0.ydk"]
+    with pytest.raises(ValueError, match="session page"):
+        room.status(offset=-1)
+    with pytest.raises(ValueError, match="session page"):
+        room.status(limit=51)
 
 
 @pytest.mark.skipif(not Path("/proc/self/cmdline").is_file(),

@@ -29,7 +29,7 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 REVIEW_API_VERSION = 5
-LIVE_API_VERSION = 13
+LIVE_API_VERSION = 14
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -477,7 +477,10 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 return
             if parsed.path == "/api/edopro/status":
                 try:
-                    self._json(200, edo_room.status())
+                    raw_offset = parse_qs(parsed.query).get("offset", ["0"])[0]
+                    if not raw_offset.isdecimal() or len(raw_offset) > 8:
+                        raise ValueError("invalid EDOPro session page")
+                    self._json(200, edo_room.status(offset=int(raw_offset)))
                 except (ValueError, OSError, RuntimeError) as error:
                     self._json(400, {"error": str(error)})
                 return

@@ -97,7 +97,9 @@ ignored `.cache/goat-ai/edopro_games/<session-id>/` folder. The room process
 continues if you close the browser tab. On Linux, restarting the local review
 server also recovers a still-running room from its saved process ID after
 checking the process command and session directory. Start another room after
-the first duel ends. The local page needs the optional host and pinned assets described
+the first duel ends. Use **Older games** and **Newer games** on the creation page
+to revisit saved rooms beyond the ten most recent sessions. The local page needs
+the optional host and pinned assets described
 below; it reports a missing prerequisite instead of starting an unpatched room.
 After a verified duel, press **Confirm my choices** beside its replay. The
 scrollable list shows optional decisions from the human seat with links to

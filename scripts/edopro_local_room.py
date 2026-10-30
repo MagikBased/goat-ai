@@ -311,18 +311,20 @@ class EdoRoomManager:
             self._verified[directory.name] = (stamp, record)
             return record
 
-    def status(self) -> dict:
+    def status(self, *, offset: int = 0, limit: int = 10) -> dict:
         # The room process is independent of the web server and can finish
         # while the page is closed. Recordings remain discoverable afterward.
+        if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 50:
+            raise ValueError("invalid EDOPro session page")
         ready, reason = self.readiness()
+        directories = (sorted(self.folder.glob("[0-9a-f]" * 16),
+                              key=lambda path: path.stat().st_mtime_ns,
+                              reverse=True) if self.folder.is_dir() else [])
+        directories = [directory for directory in directories
+                       if (directory / "session.json").is_file()]
         sessions = []
-        for directory in sorted(self.folder.glob("[0-9a-f]" * 16),
-                                key=lambda path: path.stat().st_mtime_ns,
-                                reverse=True)[:10] if self.folder.is_dir() else []:
-            metadata = directory / "session.json"
-            if not metadata.is_file():
-                continue
-            session = json.loads(metadata.read_text(encoding="utf-8"))
+        for directory in directories[offset:offset + limit]:
+            session = json.loads((directory / "session.json").read_text(encoding="utf-8"))
             current = directory.name == self.session
             running = current and self._room_running()
             recording = self._recording(directory)
@@ -341,4 +343,6 @@ class EdoRoomManager:
         return {"available": ready, "unavailable_reason": reason,
                 "room_running": self._room_running(), "host": "127.0.0.1",
                 "port": self.port, "listening": listening, "sessions": sessions,
+                "session_offset": offset, "session_limit": limit,
+                "session_count": len(directories),
                 "training_admitted": False}

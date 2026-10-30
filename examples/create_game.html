@@ -51,6 +51,11 @@
     <button id="edopro-start" type="button">Start EDOPro room</button>
     <p id="edopro-status" role="status" aria-live="polite"></p>
     <ul id="edopro-recordings"></ul>
+    <p id="edopro-pages" hidden>
+      <button id="edopro-newer" class="audit-button" type="button">Newer games</button>
+      <span id="edopro-page-label"></span>
+      <button id="edopro-older" class="audit-button" type="button">Older games</button>
+    </p>
   </section>
   <p>Choose two published decks and AI agents. The server runs a complete native
      duel, verifies its replay, and opens it in the replay viewer. A seed makes
@@ -134,10 +139,16 @@
       byId("status").textContent = message;
       byId("status").classList.toggle("error", error);
     };
+    let edoOffset = 0;
     async function refreshEdoRoom() {
-      const response = await fetch("/api/edopro/status");
+      const response = await fetch(`/api/edopro/status?offset=${edoOffset}`);
       const room = await response.json();
       if (!response.ok) throw new Error(room.error || "Could not check the EDOPro room");
+      if (room.session_count && edoOffset >= room.session_count) {
+        edoOffset = Math.max(0, Math.floor((room.session_count - 1) / room.session_limit)
+          * room.session_limit);
+        return refreshEdoRoom();
+      }
       byId("edopro-start").disabled = !room.available || room.room_running;
       byId("edopro-status").textContent = !room.available ? room.unavailable_reason :
         room.listening ? "Room running. Join 127.0.0.1:7911 in EDOPro." :
@@ -169,7 +180,21 @@
         }
         list.append(item);
       }
+      byId("edopro-pages").hidden = room.session_count <= room.session_limit;
+      byId("edopro-newer").disabled = edoOffset === 0;
+      byId("edopro-older").disabled = edoOffset + room.session_limit >= room.session_count;
+      byId("edopro-page-label").textContent = room.session_count
+        ? `${edoOffset + 1}–${edoOffset + room.sessions.length} of ${room.session_count}`
+        : "No saved games";
     }
+    byId("edopro-newer").addEventListener("click", async () => {
+      edoOffset = Math.max(0, edoOffset - 10);
+      await refreshEdoRoom();
+    });
+    byId("edopro-older").addEventListener("click", async () => {
+      edoOffset += 10;
+      await refreshEdoRoom();
+    });
     async function load() {
       const response = await fetch("/api/games/options");
       if (!response.ok) throw new Error("Could not load game options");
@@ -201,6 +226,7 @@
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Could not start room");
+        edoOffset = 0;
         await refreshEdoRoom();
       } catch (error) {
         byId("edopro-status").textContent = error.message;
