@@ -15889,3 +15889,112 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_policy.py \
   --workers 4 --require-unseen-main-decks --reject-training-deck-hashes \
   --output .cache/goat-ai/fv23_vs_tactical_unseen_167000_167007.json
 ```
+
+## Cross-deck Tactical continuation from selected v23 — 30 October 2026
+
+To test whether more Tactical-v14 imitation transfers to the weak held-out
+decks above, two other sourced pairings supplied 16 complete Tactical-versus-
+Tactical demonstrations: Christian Martinez's Seattle 2005 Goat Control
+versus the GoatFormat Dimension Fusion Turbo guide list (seeds 168000–168003),
+and Jae Kim's Charlotte 2005 Zombie versus Jonathan LaBounty's 2005 Nationals
+Chaos (seeds 168100–168103). Both teacher seats were recorded for each seed.
+All **16/16** full duels replay-verified and passed the visibility audit,
+covering 8,136 decisions and **4,054** labeled Tactical decisions. Their
+ignored manifests are `.cache/goat-ai/tactical_crossdeck_168000_a/.manifest.json`
+(SHA-256 `1bb496e5a8e247cc28fb58bd1e72514a09cb88aa3f315c99ed5c7256f8ed04b3`)
+and `.cache/goat-ai/tactical_crossdeck_168100_b/.manifest.json`
+(SHA-256 `5f5fd7e954a07a5136df8b62118f11c5e04a05bae73346c7564b47c47c58e5da`).
+These are synthetic teacher demonstrations, not human play.
+
+An initial parent-KL fit attempt correctly rejected six old parent-source
+preservation trajectories because their recorded core/script hashes differ
+from the current pinned assets. Fresh policy-versus-Tactical preservation
+games were therefore collected on the current assets: four Goat Control/
+Chaos Turbo games at seeds 168300–168301 and four Warrior/Bazoo Return games
+at seeds 168400–168401. The exact selected-v23 checkpoint generated the
+policy actions. All **8/8** games and 5,283 decisions replay-verified; the
+collector manifests are under `.cache/goat-ai/fv23_preserve_168300_a/` and
+`fv23_preserve_168400_b/`, SHA-256
+`e8aad42418db5765a7bb400494e52fd9fd7f86161d2f89ee6742acbe85ae1f07`
+and `4417c7e1d66410cf6bf60bdadd49a151abb2571f15f282b42bf7782520d32426`.
+The trainer's explicit matching-parent preservation gate accepted these
+trajectories, sampled 128 multi-option visible states, and fit a feature-v23,
+width-32 child for 25 batched parent-KL steps at learning rate 0.0001 and KL
+weight 0.5. The child checkpoint is ignored at
+`.cache/goat-ai/fv23_crossdeck_tactical_168200.pt`, SHA-256
+`335904bc65905fc59d4213d22d8f4a887fa21f45cf9a469e4b4b965bb704aef8`.
+Measured fit time was 36.01 seconds of a 49.96-second run; final labeled loss
+was 0.13584 and preservation KL 0.00135. These losses are optimization
+diagnostics, not competitive outcomes.
+
+On fresh seeds 169000–169007 with the four untouched Beastdown, Chaos,
+Phoenix Control, and Warrior Main Decks from the previous section, both deck
+assignments and both policy seats were evaluated against Tactical-v14. The
+child scored **22–41–1** and selected v23 scored **24–39–1** on the same 64-game
+schedule. The checked paired score difference was **−3.13 percentage points**
+(95% interval **−10.94 to +4.69**). Directly against the parent on the same
+deck/seed schedule, the child scored **33–31** (paired score interval
+43.75–60.94%). The child does not demonstrate a competitive improvement;
+keep the original v23 selected. The parent varied from 11–53 on seeds
+167000–167007 to 24–39–1 on 169000–169007, so comparisons across different
+seed blocks must not be mistaken for a training effect. The evaluator did not
+independently replay-verify each tournament game.
+
+The three ignored evaluation reports are
+`.cache/goat-ai/crossdeck_parent_vs_tactical_169000.json` (SHA-256
+`dc85814871ae9c4162903eba3c3550b36c3e4e537840167e6ba72c41919388f1`),
+`crossdeck_child_vs_tactical_169000.json` (SHA-256
+`b0d14c44a076f8e8b8ab1923512a4b3983b5d86619eaf9fa0515e2ba1d81d1ca`),
+and `crossdeck_child_vs_parent_169000.json` (SHA-256
+`d580ef727d7ddc18512ec53ac6bf7c8bfe153bf610b79836625ce01fa08addee`).
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks` checked the matched Tactical reports and their
+training-deck separation. Reproduce the accepted data and fit from the pinned
+native root with these commands; the first rejected attempt used the six old
+parent-source trajectories described above and produced no checkpoint:
+
+```bash
+export OMP_NUM_THREADS=1 PYTHONPATH=src:.
+python_bin=.venv/bin/python
+parent_ckpt=.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt
+
+"$python_bin" scripts/collect_heuristic_demos.py --native-root .cache/goat-ai \
+  --engine experimental --teacher tactical --opponent tactical \
+  --deck-a examples/decks/goat_control_christian_martinez_seattle_2005.ydk \
+  --deck-b examples/decks/dimension_fusion_turbo_goatformat_guide.ydk \
+  --seed 168000 --seeds 4 --max-decisions 3000 --verify-replays \
+  --output-dir .cache/goat-ai/tactical_crossdeck_168000_a
+"$python_bin" scripts/collect_heuristic_demos.py --native-root .cache/goat-ai \
+  --engine experimental --teacher tactical --opponent tactical \
+  --deck-a examples/decks/zombie_jae_kim_charlotte_2005.ydk \
+  --deck-b examples/decks/chaos_jonathan_labounty_nationals_2005.ydk \
+  --seed 168100 --seeds 4 --max-decisions 3000 --verify-replays \
+  --output-dir .cache/goat-ai/tactical_crossdeck_168100_b
+"$python_bin" scripts/collect_policy_matches.py "$parent_ckpt" \
+  --native-root .cache/goat-ai --opponent tactical \
+  --matchup examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --seed 168300 --seeds 2 --workers 2 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/fv23_preserve_168300_a
+"$python_bin" scripts/collect_policy_matches.py "$parent_ckpt" \
+  --native-root .cache/goat-ai --opponent tactical \
+  --matchup examples/decks/warrior_montague_clash.ydk examples/decks/bazoo_return_weirdchamp_worlds.ydk \
+  --seed 168400 --seeds 2 --workers 2 --max-decisions 3000 \
+  --output-dir .cache/goat-ai/fv23_preserve_168400_b
+"$python_bin" scripts/train_behavioral_clone.py \
+  .cache/goat-ai/tactical_crossdeck_168000_a/seed_*.json \
+  .cache/goat-ai/tactical_crossdeck_168100_b/seed_*.json \
+  --native-root .cache/goat-ai --engine experimental \
+  --init-checkpoint "$parent_ckpt" --feature-version 23 --width 32 \
+  --parent-kl-steps 25 --parent-kl-weight 0.5 \
+  --preserve-per-trajectory 16 --preserve-batch 16 \
+  --preserve-trajectories .cache/goat-ai/fv23_preserve_168300_a/matchup_*.json \
+    .cache/goat-ai/fv23_preserve_168400_b/matchup_*.json \
+  --allow-policy-preservation --batched-forward --batch-size 32 \
+  --verification-workers 4 --learning-rate 0.0001 --seed 168200 \
+  --output .cache/goat-ai/fv23_crossdeck_tactical_168200.pt
+```
+
+For the three tournament reports, use the four Decks and evaluator flags in
+the preceding section, change the seed to 169000, and run the selected parent
+and child against Tactical plus the child against `--opponent-checkpoint
+"$parent_ckpt"`. Compare the two Tactical reports with the comparator above.

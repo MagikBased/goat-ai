@@ -1048,6 +1048,14 @@ confirms that the current policy does not meet M4's competitive-strength exit
 on these decks. The next training attempt should address cross-deck play,
 especially the 0–16 Phoenix Control result, before further promotion tests.
 
+A [cross-deck Tactical continuation](evaluation.md#cross-deck-tactical-continuation-from-selected-v23--30-october-2026)
+added 4,054 replay-verified synthetic teacher decisions from four different
+sourced Main Decks and preserved the parent on 128 fresh visible policy states.
+On a matched held-out schedule its child scored 22–41–1 against Tactical-v14
+versus the parent's 24–39–1, with a paired interval crossing zero. Directly it
+split 33–31 against the parent. Keep v23 selected; more Tactical imitation on
+these decks did not close M4's competitive gap.
+
 Unfinished browser duels can now contribute explicit human choices to
 behavioral cloning through a read-only, native-verified journal importer. It
 freezes a private content-addressed snapshot and records the partial source
