@@ -3062,11 +3062,14 @@ The installed pinned-host integration suite was rerun on 30 October 2026:
 GOAT_AI_EDOPRO_MIRROR_ROOT=.cache/goat-ai
 GOAT_AI_EDOPRO_HISTORICAL=1
 PYTHONPATH=src:.:.cache/goat-ai/edopro_probe/ygo_agent_host
-.venv/bin/pytest -q tests/test_edopro_policy_room.py` passed all six tests in
-21.29 seconds. These include complete and interrupted TCP-room games, exact
-reconstruction, human-seat confirmation, and a one-choice opt-in clone. They
-use a protocol client, so they do not expand desktop GUI prompt coverage or
-certify historical rules broadly.
+.venv/bin/pytest -q tests/test_edopro_policy_room.py` passed all seven tests in
+28.07 seconds. These include complete and interrupted TCP-room games, exact
+reconstruction, human-seat confirmation, and a one-choice opt-in clone. The
+new launcher test starts the actual page-managed child process, finishes a
+duel through a protocol client, lists its verified viewer, confirms one human
+choice, and exports the fingerprinted training bundle. The tests use a
+protocol client, so they do not expand desktop GUI prompt coverage or certify
+historical rules broadly.
 
 The local EDOPro room launcher now records its child process ID and, on Linux,
 recovers an existing room after the review server restarts by checking the

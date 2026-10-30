@@ -5,8 +5,11 @@ import hashlib
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
+import tempfile
+import time
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
@@ -44,6 +47,87 @@ def test_room_download_uses_only_known_saved_session(tmp_path):
         manager.native_replay("../other")
     with pytest.raises(ValueError, match="session is unavailable"):
         manager.native_replay("b" * 16)
+
+
+@pytest.mark.skipif(
+    not (os.getenv("GOAT_AI_EDOPRO_HOST_ROOT") and os.getenv("GOAT_AI_EDOPRO_MIRROR_ROOT")
+         and os.getenv("GOAT_AI_EDOPRO_HISTORICAL") == "1"),
+    reason="pinned EDOPro host and exact matching native root not supplied",
+)
+def test_page_room_launcher_completes_and_lists_verified_game():
+    """Exercise the real child process and the room manager used by the page."""
+    pytest.importorskip("ygo_agent")
+    from ygo_agent.arena.client import ArenaClient
+    from ygo_agent.arena.deck import load_ydk
+    from ygo_agent.arena.policies import RandomPolicy
+    from ygo_agent.core import Engine
+
+    project = Path(__file__).resolve().parents[1]
+    native = Path(os.environ["GOAT_AI_EDOPRO_MIRROR_ROOT"]).resolve()
+    host = Path(os.environ["GOAT_AI_EDOPRO_HOST_ROOT"]).resolve()
+    engine = Engine.load(str(host))
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    with tempfile.TemporaryDirectory(dir=native, prefix="edopro-launcher-test-") as scratch:
+        creator = GameCreator(root=project, native_root=native)
+        manager = EdoRoomManager(creator, port=port)
+        manager.folder = Path(scratch) / "sessions"
+        manager.session = None
+        manager.process = None
+        try:
+            launched = manager.start("warrior_montague_clash.ydk")
+            assert launched["room_running"]
+            identifier = launched["sessions"][0]["id"]
+            for _ in range(150):
+                if manager.status()["listening"]:
+                    break
+                if manager.process.poll() is not None:
+                    pytest.fail((manager.folder / identifier / "room.log").read_text())
+                time.sleep(0.1)
+            else:
+                pytest.fail("launched EDOPro room did not start listening")
+
+            deck = load_ydk(str(project / "examples/decks/"
+                                "gravekeeper_daryl_gessler_indianapolis_2005.ydk"),
+                            engine.cards).deck
+            random = RandomPolicy(9303)
+            client = ArenaClient("Protocol human", deck=deck,
+                                 policy=lambda prompt: random(prompt, None))
+
+            async def play() -> None:
+                try:
+                    await client.connect("127.0.0.1", port)
+                    await client.wait(60)
+                finally:
+                    await client.close()
+
+            asyncio.run(play())
+            assert client.log.errors == []
+            for _ in range(100):
+                recording = manager.status()["sessions"][0]["recording"]
+                if recording and recording.get("verified"):
+                    break
+                time.sleep(0.1)
+            else:
+                pytest.fail(f"launched room did not save a verified game: {recording}")
+            assert recording["complete"] is True
+            assert recording["experimental_confirmed_eligible"] is True
+            assert recording["viewer"].endswith(".html")
+            choices = manager.choices(identifier)
+            assert choices["candidates"]
+            assert choices["training_admitted"] is False
+            confirmed = manager.save_choices(
+                identifier, [choices["candidates"][0]["frame"]])
+            assert confirmed["confirmed"] == 1
+            with ZipFile(BytesIO(manager.confirmed_bundle(identifier))) as bundle:
+                manifest = json.loads(bundle.read("bundle_manifest.json"))
+                assert manifest["confirmed_human_choices"] == 1
+                assert manifest["historical_goat_certified"] is False
+        finally:
+            if manager.process is not None and manager.process.poll() is None:
+                manager.process.terminate()
+                manager.process.wait(timeout=10)
 
 
 @pytest.mark.skipif(
