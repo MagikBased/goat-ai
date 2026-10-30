@@ -44,8 +44,11 @@ def test_skilled_tributes_itself_after_three_spells(tmp_path, has_dark_magician)
         assert {SKILLED, POT} <= {card.code for card in obs.hand}
         summoned = activated = checked = False
         spells = 0
+        checked_at = 0
+        checked_observation = None
+        checked_opponent = None
         agents = (RandomAgent(718), RandomAgent(719))
-        for _ in range(5000):
+        for decision_number in range(5000):
             if env.is_terminal():
                 assert checked
                 path = tmp_path / f"skilled_summon_{has_dark_magician}.json"
@@ -54,6 +57,22 @@ def test_skilled_tributes_itself_after_three_spells(tmp_path, has_dark_magician)
                 assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) == len(
                     replay.decisions)
                 audit_trajectory_visibility(replay)
+                if not has_dark_magician:
+                    swapped = cards.copy()
+                    swapped[4], swapped[5] = swapped[5], swapped[4]
+                    assert swapped != cards
+                    reordered = tmp_path / "reordered.ydk"
+                    reordered.write_text("#main\n" + "\n".join(map(str, swapped))
+                                         + "\n#extra\n!side\n")
+                    with GoatEnvironment(str(reordered), str(other), 100,
+                                         ExperimentalOcgcoreEngine(root)) as alternate:
+                        current = alternate.reset()
+                        for record in replay.decisions[:checked_at]:
+                            assert current == record.observation
+                            assert alternate.legal_actions() == record.legal_actions
+                            current = alternate.step(record.selected_action)
+                        assert current == checked_observation
+                        assert alternate.engine.probe.observation(1) == checked_opponent
                 return
             actions = env.legal_actions()
             action = None
@@ -100,5 +119,8 @@ def test_skilled_tributes_itself_after_three_spells(tmp_path, has_dark_magician)
                     assert len(opponent.private_reveals) == 2
                     assert not obs.private_reveals
                 assert f"goat/c{SKILLED}.lua" in env.engine.probe.loaded_script_sha256
+                checked_at = decision_number + 1
+                checked_observation = obs
+                checked_opponent = opponent
                 checked = True
     pytest.fail("Skilled Dark Magician fixture exceeded decision budget")
