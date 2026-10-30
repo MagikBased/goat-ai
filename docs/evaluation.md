@@ -1,5 +1,29 @@
 # Baseline evaluation log
 
+## Third 60-card whitelist/Fusion sample (30 October 2026)
+
+Fresh seeds 177100–177119 generated 40 distinct whitelist-legal 60-card Main
+Decks for 20 isolated random-agent duels, with sampled 15-card Fusion Extra
+Decks. All **20/20** duels reached terminal before the 3,000-decision cap.
+Every **28,173/28,173** decision replay-verified and passed the player-visibility
+audit. The sample offered 30 action kinds and included 246 hidden-field,
+1,331 opponent-field, and 10 opponent-hand legal-choice contexts. Decision
+counts ranged from 439 to 2,201. No game reported a native protocol error.
+This widens sampled 60-card coverage; it does not establish arbitrary-deck
+completeness, historical correctness for every card, or policy strength.
+
+The ignored report is `.cache/goat-ai/random_probe_60_177100/report.json`
+(SHA-256 `065230b8ccd3f6a8b440bcba5a5e37943fd5dfb5877ee07d3bf48c89e6f8115b`).
+Reproduce with an empty output directory:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/random_probe_60_177100 \
+  --seed 177100 --seeds 20 --max-decisions 3000 --main-size 60 \
+  --random-extra --distinct-opponents --verify-replays --isolate-games
+```
+
 ## Saved tournament schedule integrity
 
 `scripts/evaluate_policy.py` now records its intended ordered matchups in
