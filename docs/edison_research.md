@@ -52,6 +52,12 @@ the 135 names resolved to exactly one canonical card. The downloaded PDF had
 SHA-256 `a4eb75169aea3148b1fa10b9fe8b9fe9116a6c321df9a4fd176d7024dfb5c71f`.
 The PDF is kept only in ignored local cache. The TSV is an input to future deck
 validation, **not** a complete Edison whitelist or playable engine profile.
+MR1 Synchro probe trajectories now fingerprint that exact TSV as
+`historical/edison_2010_03_01_advanced_limits.tsv` alongside the core,
+database, and loaded scripts. The replay verifier rejects a different table
+digest, so a recorded probe cannot silently be replayed under changed copy
+limits. This records one deck-admission input; it does not expand the partial
+release pool or certify Edison legality.
 For example, Stardust Dragon is absent from the restriction list, which says
 nothing by itself about release eligibility or simulator correctness.
 

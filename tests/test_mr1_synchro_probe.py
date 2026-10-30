@@ -15,6 +15,8 @@ from goat_ai.engine.mr1_synchro_probe import (
     JUNK_SYNCHRON,
     JUNK_WARRIOR,
     MIRROR_FORCE,
+    RESTRICTION_ASSET,
+    RESTRICTION_TABLE,
     STARDUST_DRAGON,
     Mr1SynchroProbeEngine,
 )
@@ -22,6 +24,7 @@ from goat_ai.engine.ocgcore_probe import MR1_FLAGS
 from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
+from goat_ai.replay.verify import ReplayMismatch
 from scripts.record_mr1_black_rose_probe import GEMINI_ELF, record_probe
 from scripts.record_mr1_goyo_probe import DARK_BLADE, GIANT_SOLDIER
 from scripts.record_mr1_goyo_probe import record_probe as record_goyo_probe
@@ -77,12 +80,17 @@ def test_mr1_junk_warrior_synchro_complete_duel(tmp_path):
     assert len(trajectory.decisions) == 1439
     assert trajectory.winner == 1
     assert trajectory.ruleset == "mr1-synchro-protocol"
+    assert trajectory.asset_sha256[RESTRICTION_ASSET] == hashlib.sha256(
+        RESTRICTION_TABLE.read_bytes()).hexdigest()
     path = tmp_path / "mr1_synchro.json"
     write_trajectory(path, trajectory)
     loaded = read_trajectory(path)
     assert loaded == trajectory
     assert verify_trajectory(loaded, Mr1SynchroProbeEngine(native_root)) == 1439
     assert audit_trajectory_visibility(loaded)["decisions"] == 1439
+    loaded.asset_sha256[RESTRICTION_ASSET] = "0" * 64
+    with pytest.raises(ReplayMismatch, match="edison_2010_03_01_advanced_limits"):
+        verify_trajectory(loaded, Mr1SynchroProbeEngine(native_root))
     output = tmp_path / "mr1_synchro.html"
     assert render_replay(path, output, native_root, reviewer_reveal=True)[0] == 1439
     review = json.loads(output.with_suffix(".review.json").read_text())

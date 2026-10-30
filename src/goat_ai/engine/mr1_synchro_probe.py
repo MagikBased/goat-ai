@@ -7,6 +7,7 @@ from goat_ai.engine.edison_decks import validate_edison_deck
 from goat_ai.engine.mr1_vanilla_adapter import Mr1VanillaEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.engine.protocol import RulesProfile
+from goat_ai.replay.fingerprint import sha256_unchanged_file
 
 JUNK_SYNCHRON = 63977008
 JUNK_WARRIOR = 60800381
@@ -36,6 +37,9 @@ PROBE_ELIGIBLE_IDS = frozenset(VANILLA_DECK) | {
     BOTTOMLESS_TRAP_HOLE,
     DEKOICHI, GRAVEKEEPERS_SPY, DESERT_SUNLIGHT, BOKOICHI,
     SOUL_EXCHANGE, SANGAN, CAIUS, YAMI, UMI, RYKO}
+RESTRICTION_TABLE = (Path(__file__).resolve().parents[3]
+                     / "configs/historical/edison_2010_03_01_advanced_limits.tsv")
+RESTRICTION_ASSET = "historical/edison_2010_03_01_advanced_limits.tsv"
 
 
 class Mr1SynchroProbeEngine(Mr1VanillaEngine):
@@ -57,9 +61,12 @@ class Mr1SynchroProbeEngine(Mr1VanillaEngine):
                              "Black Rose Dragon, Stardust Dragon, Goyo Guardian, "
                              "or Brionac "
                              "in Extra, no Side")
-        restrictions = read_advanced_restrictions(
-            Path(__file__).resolve().parents[3]
-            / "configs/historical/edison_2010_03_01_advanced_limits.tsv")
+        restrictions = read_advanced_restrictions(RESTRICTION_TABLE)
         validate_edison_deck(deck, PROBE_ELIGIBLE_IDS, restrictions,
                              self.root / "database/cards.cdb")
         return deck
+
+    def replay_manifest(self) -> dict[str, str]:
+        """Include the format restrictions used to admit both recorded Decks."""
+        return {**super().replay_manifest(),
+                RESTRICTION_ASSET: sha256_unchanged_file(RESTRICTION_TABLE)}

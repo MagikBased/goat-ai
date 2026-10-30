@@ -2015,6 +2015,10 @@ audited eligible-card set and checks Main, Extra, and Side sizes, Fusion/Synchro
 placement, and shared canonical copy caps. It deliberately does not infer
 release eligibility from the restriction list; the complete dated card pool
 and native 2010 rules profile remain open.
+MR1 Synchro probe replays now fingerprint the March 2010 restriction table
+used for deck admission; replay verification detects a changed table hash.
+This closes one reproducibility gap in the narrow probe, not the Edison
+historical-correctness or release-pool gates.
 
 ### Possible Stardust PC-port integration
 
