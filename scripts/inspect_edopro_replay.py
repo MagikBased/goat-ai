@@ -122,12 +122,20 @@ def main() -> None:
     parser.add_argument("--reconstruct-native", type=Path,
                         help="conditionally replay saved responses on these pinned native assets; "
                              "never admits replay data to training")
+    parser.add_argument("--compare-external-unpatched", action="store_true",
+                        help="with --reconstruct-native, load external scripts unchanged for "
+                             "compatibility comparison only; never a GOAT correctness or "
+                             "training-intake result")
     parser.add_argument("--require-goat-candidate", action="store_true",
                         help="exit nonzero unless setup, native Decks, and complete native "
                              "reconstruction all pass; still not training authorization")
     parser.add_argument("--report", type=Path,
                         help="write the same privacy-preserving JSON report to a local file")
     args = parser.parse_args()
+    if args.compare_external_unpatched and args.reconstruct_native is None:
+        parser.error("external comparison requires --reconstruct-native")
+    if args.compare_external_unpatched and args.require_goat_candidate:
+        parser.error("unpatched external comparison cannot pass strict GOAT intake")
     if args.native_deck_screen is not None and args.goat_whitelist is not None:
         parser.error("choose either native deck screening or an explicit GOAT whitelist")
     if args.require_goat_candidate and (
@@ -164,11 +172,16 @@ def main() -> None:
                     parser.error("native deck screen could not read pinned card databases")
             if args.reconstruct_native is not None:
                 try:
-                    trace = reconstruct_legacy_responses(replay, args.reconstruct_native)
+                    trace = reconstruct_legacy_responses(
+                        replay, args.reconstruct_native,
+                        historical_patches=not args.compare_external_unpatched)
                     manifest = json.dumps(trace.asset_sha256, sort_keys=True,
                                           separators=(",", ":")).encode("ascii")
                     report.update({
                         "conditional_native_reconstruction": "matched",
+                        "reconstruction_asset_mode": (
+                            "external_unpatched_comparison" if args.compare_external_unpatched
+                            else "historical_patched"),
                         "reconstructed_decisions": len(trace.decisions),
                         "saved_response_count": trace.saved_response_count,
                         "embedded_yrp_sha256": trace.embedded_replay_sha256,
@@ -184,13 +197,17 @@ def main() -> None:
                     else:
                         reason = "native_runtime_error"
                     report.update({"conditional_native_reconstruction": "failed",
+                                   "reconstruction_asset_mode": (
+                                       "external_unpatched_comparison" if args.compare_external_unpatched
+                                       else "historical_patched"),
                                    "reconstruction_failure_code": reason,
                                    "training_ready": False})
                     if (isinstance(exc, ReplayReconstructionError)
                             and exc.response_index is not None):
                         report["reconstruction_response_index"] = exc.response_index
             report["native_goat_compatibility_candidate"] = (
-                report["goat_rules_screen"] == "setup_candidate_only"
+                not args.compare_external_unpatched
+                and report["goat_rules_screen"] == "setup_candidate_only"
                 and report.get("goat_native_deck_screen") == "candidate_only"
                 and report.get("conditional_native_reconstruction") == "matched")
             report["training_ready"] = False

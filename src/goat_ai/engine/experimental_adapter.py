@@ -26,7 +26,8 @@ class ExperimentalOcgcoreEngine(RestrictedOcgcoreEngine):
         return deck
 
     def reset_recorded(self, seed_words: tuple[int, int, int, int],
-                       deck1: Decklist, deck2: Decklist):
+                       deck1: Decklist, deck2: Decklist, *,
+                       historical_patches: bool = True):
         """Start a legacy replay with its recorded Deck order and native RNG words."""
         self.close()
         limits = read_goat_whitelist(self.root / "banlist/GOAT.lflist.conf")
@@ -38,7 +39,8 @@ class ExperimentalOcgcoreEngine(RestrictedOcgcoreEngine):
                 self.ruleset.side_deck_policy,
             )
         self.probe = OcgcoreProbe(self.root / "build/libocgcore.so",
-                                  self.root / "database/cards.cdb", self.root / "scripts")
+                                  self.root / "database/cards.cdb", self.root / "scripts",
+                                  historical_patches=historical_patches)
         try:
             self.probe.first_replay_decision(seed_words, deck1.main, deck2.main,
                                              deck1.extra, deck2.extra)

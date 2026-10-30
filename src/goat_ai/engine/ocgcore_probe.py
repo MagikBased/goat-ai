@@ -409,10 +409,12 @@ class OcgcoreProbe:
 
     def __init__(self, library: Path, database: Path, scripts: Path, *,
                  mode: Literal["goat", "mr1_startup", "mr1_vanilla",
-                               "mr1_synchro_probe"] = "goat") -> None:
+                               "mr1_synchro_probe"] = "goat",
+                 historical_patches: bool = True) -> None:
         if mode not in ("goat", "mr1_startup", "mr1_vanilla", "mr1_synchro_probe"):
             raise ValueError("unsupported native startup mode")
         self.mode = mode
+        self.historical_patches = historical_patches
         self.flags = GOAT_FLAGS if mode == "goat" else MR1_FLAGS
         self.lib = c.CDLL(str(library.resolve()))
         self.db_path = database.resolve()
@@ -635,6 +637,11 @@ class OcgcoreProbe:
             self.errors.append(f"MR1 startup probe cannot load {relative}")
             return 0
         contents = path.read_bytes()
+        if self.mode == "goat" and not self.historical_patches:
+            # Comparison only: load the external install's exact scripts.
+            # This path cannot certify historical GOAT correctness.
+            self.loaded_script_sha256[relative_path] = hashlib.sha256(contents).hexdigest()
+            return self.lib.OCG_LoadScript(duel, contents, len(contents), name)
         if relative == Path("utility.lua") and self.mode == "goat":
             if hashlib.sha256(contents).hexdigest() != UPSTREAM_UTILITY_SHA256 \
                     or contents.count(GOAT_DECK_CONFIRM_OLD) != 1 \

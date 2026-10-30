@@ -135,6 +135,24 @@ this structural result does not validate legal-choice or visibility recovery.
 The event log and replay remain in ignored local cache; no third-party assets
 or demonstrations were added to the repository.
 
+For an exact-install comparison, a separate ignored root linked the 41.0.2
+`libocgcore.so`, `expansions/` card databases, `script/`, and GOAT list into
+the adapter's expected directory layout. The strict historical reconstruction
+correctly refused this root because its `utility.lua` differs from the pinned
+script required by our historical patches. An explicit
+`--compare-external-unpatched` option now loads those external scripts unchanged
+and is barred from strict GOAT intake. On a **complete 33-turn, 627-response**
+random duel made by that install without Scapegoat, it reconstructed **all 627
+responses** and passed the player-visible decision audit. This demonstrates
+that the adapter can map a same-install EDOPro response stream; it does not
+establish that the external scripts implement historical GOAT rulings. On the
+desktop human trial, the same comparison reached the end of the saved response
+stream and reported `incomplete_saved_responses`, as expected for the human's
+surrender before a native duel terminal. The host log, rather than the legacy
+response stream, records that surrender. Neither comparison is admitted to
+training. The next data gate is a complete desktop-client duel with a
+version-matched historical core, then a visibility audit of every decision.
+
 [Project Ignis FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html) says old `.yrp` replays re-enact decisions against a matching core and scripts, whereas `.yrpX` stores resulting actions and remains viewable across engine updates. Neither statement guarantees the complete legal action set or each player's knowledge at every choice. The [EDOPro replay header and flags](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.h) and [container reader](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp) define `yrp1` as saved Decks plus engine responses and `yrpX` as a packet stream, with optional LZMA compression and an extended four-word seed. GOAT AI has a bounded structural reader for these two EDOPro containers and conditional native response reconstruction tested on synthetic GOAT duels. The reader prints a privacy-preserving summary by default. A public YGOPro `yrp2` sample from [ygopro-yrp-encode](https://github.com/purerosefallen/ygopro-yrp-encode) is a distinct format and is rejected explicitly. Real EDOPro replay compatibility and player-knowledge validation are **not established**. No EDOPro replay is yet admitted as a training trajectory. DuelingBook data and video-derived trajectories require rights and a separate extraction pipeline.
 
 Another MIT-licensed [YGOPro/YGOPro2 replay parser](https://github.com/RemarkWang/yrp-parser)

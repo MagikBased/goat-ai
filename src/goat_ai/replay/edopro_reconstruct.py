@@ -48,6 +48,7 @@ class ReconstructedLegacyDuel:
 def reconstruct_legacy_responses(replay: EdoReplayContainer,
                                  native_root: str | Path,
                                  *, max_responses: int = 10_000,
+                                 historical_patches: bool = True,
                                  ) -> ReconstructedLegacyDuel:
     """Map each legacy native response to one player-visible legal action.
 
@@ -96,7 +97,9 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
     try:
         deck1, deck2 = (Decklist(deck.main, deck.extra) for deck in replay.decks)
         try:
-            decision = engine.reset_recorded(replay.header.seed_words, deck1, deck2)
+            decision = engine.reset_recorded(
+                replay.header.seed_words, deck1, deck2,
+                historical_patches=historical_patches)
         except (ValueError, RuntimeError) as exc:
             raise ReplayReconstructionError(f"native replay startup failed: {exc}",
                                             code="native_startup_failed") from exc

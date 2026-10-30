@@ -2928,6 +2928,13 @@ client's separately saved replay has a two-byte post-LZMA trailer; the bounded
 reader now accepts it and finds the same 235 packets and 23 embedded
 responses as the host replay. That structural match does not validate training
 reconstruction.
+An explicit unpatched comparison mode can now reconstruct all 627 responses
+of a complete headless duel on the external install's own core and scripts,
+including a player-visible decision audit. It is excluded from strict GOAT
+intake because those external scripts have not passed this project's historical
+patch checks. The short desktop trial ends by surrender, which leaves its
+legacy response sequence nonterminal. A complete desktop duel on a matched,
+historically validated install is the next replay-data gate.
 
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The

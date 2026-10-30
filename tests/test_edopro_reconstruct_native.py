@@ -254,6 +254,29 @@ def test_native_inspection_reports_only_conditional_counts_and_hashes(
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_unpatched_external_comparison_is_never_strict_intake(
+        native_legacy_responses, tmp_path, monkeypatch, capsys):
+    from scripts.inspect_edopro_replay import main
+
+    root, responses, _ = native_legacy_responses
+    path = tmp_path / "source.yrp"
+    path.write_bytes(_legacy_replay(responses, raw=True))
+    command = ["inspect_edopro_replay.py", str(path),
+               "--reconstruct-native", str(root), "--compare-external-unpatched"]
+    monkeypatch.setattr(sys, "argv", command)
+    main()
+    report = json.loads(capsys.readouterr().out)[0]
+    assert report["conditional_native_reconstruction"] == "matched"
+    assert report["reconstruction_asset_mode"] == "external_unpatched_comparison"
+    assert report["training_ready"] is False
+    assert report["native_goat_compatibility_candidate"] is False
+    monkeypatch.setattr(sys, "argv", command + ["--require-goat-candidate"])
+    with pytest.raises(SystemExit) as rejected:
+        main()
+    assert rejected.value.code == 2
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_strict_goat_intake_saves_private_summary_and_rejects_failed_deck_screen(
         native_legacy_responses, tmp_path, monkeypatch, capsys):
     from scripts import inspect_edopro_replay as inspect
