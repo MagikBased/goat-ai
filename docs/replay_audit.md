@@ -2920,3 +2920,32 @@ reviewer can use **Reject the AI's recorded action**. The existing
 `convert_rejected_review_notes.py` checks the saved finding against the
 combined queue and exact replay before producing a negative-only training
 preference. The queue's suggested alternatives are not human judgments.
+
+### Fresh Phoenix Control policy review (30 October 2026)
+
+The unchanged selected v23 policy played Tactical-v14 on Roberto Martinez's
+Phoenix Control versus Mary Triatafilidi's Warrior deck, with both policy
+seats on seeds 172002–172009. All **16 duels** and **9,998 decisions** passed
+exact native replay verification and the player-visibility audit. The policy
+scored 6–10. The visible own-card-loss audit flagged six policy choices:
+three Nobleman activations with only an own Set monster, and one each for
+Breaker with only own backrow, a negative visible Heavy Storm trade, and an
+idle MST with only own backrow. These are review flags, not adjudicated
+mistakes or a measured metagame error rate.
+
+A new **20-item** queue selects from 281 candidate decisions, with at most two
+per replay. It includes the flagged Nobleman, Breaker, Heavy Storm, and MST
+positions plus Scapegoat timing and battle-position choices. Tactical's
+suggestion is shown for comparison; it is not a human label. No human choices
+have been recorded on this queue. Open its save-enabled viewer with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/phoenix_policy_audit_172002_172009/review_queue.json
+```
+
+The ignored collection manifest, audit, and queue in that folder have SHA-256
+`528d7a2d4f50facfdee4bc2146f2651c42cb17bcc28228be27aa67166a948d43`,
+`043a9beedda528c814aa1c05a6000badb9bc3d8ca39ce580a5b6981728a530e0`,
+and `c6fc3393c7ce8dd0f3726a9a1328def615d9c42ce5eed2b2273ca92e2e84d314`,
+respectively. The server was checked to serve this queue at
+`http://127.0.0.1:8811/.cache/goat-ai/phoenix_policy_audit_172002_172009/review_queue.html`.

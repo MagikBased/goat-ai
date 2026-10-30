@@ -1132,6 +1132,13 @@ all guarded games replay-verified. The guarded mode already serves browser
 and EDOPro games, but this does not teach the neural policy the underlying
 card-advantage decision or close M4's learned-strength gate.
 
+A fresh [Phoenix Control review queue](replay_audit.md#fresh-phoenix-control-policy-review-30-october-2026)
+uses 16 replay-verified policy/Tactical duels and presents 20 distinct
+decisions, including own-card-loss flags and Scapegoat timing. It contains no
+new human labels. The earlier exact guard-distillation experiment did not
+establish a neural competitive gain, so review these concrete positions before
+another preference fit.
+
 The [batched parent-KL fit](evaluation.md#batched-parent-kl-scoring-pilot-29-october-2026)
 now scores variable-length legal-action sets in padded chunks while preserving
 the full-label optimizer update. On the 244-decision Rhymus pilot it reduced
