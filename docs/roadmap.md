@@ -578,6 +578,12 @@ freed fifth Monster Zone for the stolen monster, and End Phase return. Its
 complete duel replay-verifies and passes visibility auditing; see
 [GOAT rules](goat_rules.md#scapegoat-token-as-enemy-controller-cost).
 
+A paired Breaker/Dust Tornado fixture checks the common backrow response:
+Breaker spends its Spell Counter as cost, and chaining Dust to destroy a
+different Set Spell leaves Breaker's original target gone at resolution.
+Passing instead lets Breaker destroy Dust. Both complete native duels
+replay-verify and pass the visibility audit; see [GOAT rules](goat_rules.md).
+
 Four more source-backed response fixtures now continue through terminal duels:
 both Book of Moon versus Raigeki Break branches, Ring chained to Mirror Force,
 Call of the Haunted chained to Heavy Storm before Sangan searches, and both
