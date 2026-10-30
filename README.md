@@ -19,6 +19,7 @@ Research foundation for a general-purpose Yu-Gi-Oh! GOAT Format agent. The exper
 | Experimental GOAT adapter | Sourced-deck protocol sweeps, source-backed ruling fixtures, exact replay checks, and bounded hidden-information audits exist; broad historical correctness remains an open gate |
 | PyTorch policy | Visible-state action scorer with opt-in feature versions through v28; replay-verified imitation, preference, and self-play experiments exist. The selected v23 checkpoint remains the neural reference because recent self-play children have not shown a transferable held-out strength gain; see [evaluation](docs/evaluation.md) |
 | Human EDOPro replay intake | Bounded `.yrp`/`.yrpX` parsing and synthetic response reconstruction exist. A real, authorized GOAT replay has not passed exact reconstruction; see [replay contributions](docs/replay_contributions.md) |
+| Experimental EDOPro policy room | Optional local room runs the selected policy against an EDOPro-compatible client and saves native replay plus audited review-only decisions; full desktop GUI game and historical training gate remain open |
 
 The selected direction is [Project Ignis/edo9300 ocgcore](https://github.com/edo9300/ygopro-core), configured with its `DUEL_MODE_GOAT` flag, historical card data and scripts, and an audited Python-facing decision adapter. A 2005 banlist alone is insufficient. See [research](docs/research.md), [architecture](docs/architecture.md), and [roadmap](docs/roadmap.md).
 
@@ -83,6 +84,45 @@ prove that a card interaction is historically correct; it detects divergence
 from the engine and assets used for the replay.
 
 ## Play and record a GOAT duel
+
+### Experimental EDOPro room
+
+You can play the selected PyTorch policy through an EDOPro LAN room using the
+optional external `mostwanted7/ygo-agent` host. The host is AGPL-3.0-or-later,
+installed separately; it is not included in this MIT repository. The EDOPro
+installation, matching native mirror root, checkpoint and Deck are local files.
+With the locally tested setup:
+
+```bash
+PYTHONPATH=src:.cache/goat-ai/edopro_probe/ygo_agent_host \
+  .venv/bin/python scripts/serve_edopro_policy.py \
+  --host-root .cache/goat-ai/edopro_probe/ProjectIgnis \
+  --mirror-root .cache/goat-ai/edopro_probe/official_parity_root \
+  --checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --ai-deck examples/decks/warrior_montague_clash.ydk
+```
+
+In EDOPro choose **LAN → Host address**, enter `127.0.0.1` and port `7911`,
+select your GOAT Deck, then ready up. The AI occupies seat 2. This is a private
+localhost room for one game; `--bind` and `--port` can change its listener.
+The script prints the save location, defaulting to ignored
+`.cache/goat-ai/edopro_games/`. It writes EDOPro's `.yrpX` and a metadata file;
+if every host response matches the native mirror and the duel reaches a native
+terminal, it also writes a player-visible `.review.json` trajectory. Open that
+JSON in the local replay viewer. These records are marked
+`edopro_external_unpatched` and **excluded from automatic training** because
+the external install's GOAT rulings have not passed the project's historical
+validation. A surrender or disconnect saves the replay and metadata but does
+not produce a complete trajectory. See [the live room research](docs/research.md#edopro-live-client-bridge-probe-2026-10-30).
+
+The external EDOPro package tested here needed a local Sheep Token script
+shim for Scapegoat. `python scripts/prepare_edopro_host_token.py
+.cache/goat-ai/edopro_probe/ProjectIgnis --apply` validates and creates it
+without overwriting an existing script. The mirror root must point to the
+same core, database and scripts as the host. The default pinned project assets
+are a different revision and cannot be substituted for this comparison.
+
+### Local terminal play
 
 To play a GOAT Deck yourself in the terminal and save a local demonstration:
 

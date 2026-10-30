@@ -41,6 +41,7 @@ class RestrictedOcgcoreEngine:
         self._last_observation = None
         self._selection_indices: tuple[int, ...] | None = None
         self._counter_prefix: tuple[int, ...] | None = None
+        self._last_native_response: bytes | None = None
 
     def _load_deck(self, path: str) -> Decklist:
         deck = read_ydk(path)
@@ -410,6 +411,7 @@ class RestrictedOcgcoreEngine:
     def step(self, action: Action) -> Decision:
         if self.probe is None or action not in self._actions:
             raise ValueError("illegal action or engine not reset")
+        self._last_native_response = None
         index = self._actions.index(action)
         try:
             choice = self._choices[index]
@@ -473,6 +475,9 @@ class RestrictedOcgcoreEngine:
                 response = choice.response
             self._selection_indices = None
             self._counter_prefix = None
+            self._last_native_response = (
+                struct.pack("<I", response & 0xffffffff)
+                if isinstance(response, int) else bytes(response))
             transition = self.probe.respond(response)
             if transition.terminal:
                 self._choices = ()
@@ -488,6 +493,11 @@ class RestrictedOcgcoreEngine:
             self.close()
             raise
 
+    @property
+    def last_native_response(self) -> bytes | None:
+        """Response emitted by the most recent step, or None for a staged pick."""
+        return self._last_native_response
+
     def close(self) -> None:
         if self.probe is not None:
             self.probe.close()
@@ -496,6 +506,7 @@ class RestrictedOcgcoreEngine:
         self._actions = ()
         self._selection_indices = None
         self._counter_prefix = None
+        self._last_native_response = None
 
     def replay_manifest(self) -> dict[str, str]:
         """Hash native files and every script loaded during the current duel."""

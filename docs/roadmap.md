@@ -2900,6 +2900,16 @@ An [opt-in feature-v32 PPO pilot](evaluation.md#feature-v32-ppo-action-choice-pi
 
 ### Future EDOPro human client
 
+Update (2026-10-30): An optional local room launcher now gives EDOPro's human
+seat the selected GOAT AI policy as its opponent. An EDOPro-protocol TCP client
+completed an 8-turn, 276-response match; the mirror saved 276 audited
+player-visible decisions and an exact same-install replay. A direct-core
+policy-seat trial also completed 397 responses. These establish the policy
+adapter and local room path at the protocol level. A full match played through
+the desktop GUI on this new policy room, historically validated external
+scripts, and admission of those records to training remain open. See
+`scripts/serve_edopro_policy.py` and the current [research](research.md#edopro-live-client-bridge-probe-2026-10-30).
+
 An EDOPro bot connection could let a human play this policy in the EDOPro
 client. Project Ignis's current WindBot fork is an EDOPro-compatible bot
 client, but its [FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html)

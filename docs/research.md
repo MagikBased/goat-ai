@@ -27,6 +27,28 @@ Required regression cases: first-turn draw; summon response and Ignition priorit
 
 ### EDOPro live-client bridge probe (2026-10-30)
 
+**Current experimental policy-seat result.** `scripts/serve_edopro_policy.py`
+connects the project's `PolicyAgent` to the optional external EDOPro LAN host.
+Its `LiveDuelMirror` reconstructs the host's exact seed, ordered Decks and raw
+response stream on a matching core; the policy receives only our
+player-visible `Observation` and legal `Action` values. An in-process direct
+duel with selected v23 weights completed in 9 turns and 397 responses, with
+zero retries and reported Lua errors; the mirror matched all 397 decisions.
+The first full TCP-room test used the same policy seat against the host's
+EDOPro-protocol Python client in the human position. It completed in 8 turns
+and 276 responses, with zero retries, zero reported Lua errors, 276 audited
+mirror decisions, and a terminal winner. Its saved `.yrpX` independently
+reconstructed all 276 responses on the matching unpatched official-install
+core; the read-back `.review.json` contains all 276 player-visible decisions.
+This tests the real room protocol and policy bridge. A desktop-client match
+using this **specific** new policy room has not yet been completed; the
+earlier desktop probe below used an external random seat. Neither test
+measures policy strength or establishes historical GOAT correctness. The
+resulting records carry `source: edopro_external_unpatched` and
+`training_admitted: false`. Automatic training intake should wait for a
+version-matched historical rules validation, complete human GUI game, and
+independent decision-visibility checks across the collected corpus.
+
 The active [Project Ignis WindBot fork](https://github.com/ProjectIgnis/windbot)
 is an EDOPro-compatible room client. At inspected commit
 `bffe6b62679c8b2fafea8f59740e03a132517da4`, its

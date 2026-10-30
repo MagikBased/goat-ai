@@ -40,7 +40,7 @@ def test_native_counter_prompt_maps_allocations_to_visible_actions(tmp_path):
     engine.probe = SimpleNamespace(
         _pending_message=prompt,
         decode_pending=lambda: native,
-        observation=lambda player: _observation())
+        observation=lambda player, *, terminal=False: _observation())
     decision = engine._decision()
     assert [action.kind for action in decision.legal_actions] == [
         "select_counters", "select_counters"]

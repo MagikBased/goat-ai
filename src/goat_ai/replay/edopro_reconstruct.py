@@ -12,6 +12,7 @@ from pathlib import Path
 from goat_ai.engine.decks import Decklist
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.ocgcore_probe import GOAT_FLAGS
+from goat_ai.engine.protocol import Decision
 from goat_ai.evaluation.visibility import VisibilityViolation, audit_decision_visibility
 from goat_ai.observations import Observation
 from goat_ai.replay.edopro_container import (
@@ -44,6 +45,71 @@ class ReconstructedLegacyDuel:
     winner: int | None
     terminal_observation: Observation
     asset_sha256: dict[str, str]
+
+
+def advance_recorded_response(engine: ExperimentalOcgcoreEngine, decision: Decision,
+                              response: bytes, index: int,
+                              ) -> tuple[Decision, tuple[DecisionRecord, ...]]:
+    """Advance one native response, including staged visible selections.
+
+    The same mapping is used by offline replay reconstruction and live room
+    mirrors. It never exposes the native deck order to the returned records.
+    """
+    if decision.terminal:
+        raise ReplayReconstructionError(
+            f"response {index}: native duel ended before saved responses",
+            code="extra_saved_response", response_index=index)
+    records: list[DecisionRecord] = []
+    try:
+        action = engine.action_for_recorded_response(response)
+    except ValueError as exc:
+        native = engine.probe.decode_pending()
+        selection = (native.card_selection or native.sum_selection
+                     or native.zone_selection or native.counter_selection)
+        if selection is None or not selection.accepts(response):
+            raise ReplayReconstructionError(
+                f"response {index}: saved bytes do not map to one legal action",
+                code="illegal_saved_response", response_index=index) from exc
+        if native.counter_selection is not None:
+            indices = struct.unpack(f"<{len(native.counter_selection.cards)}h", response)
+        elif native.zone_selection is not None:
+            zones = native.zone_selection.zones
+            indices = tuple(zones.index(tuple(response[start:start + 3]))
+                            for start in range(0, len(response), 3))
+        else:
+            size = struct.unpack_from("<I", response, 4)[0]
+            indices = struct.unpack_from(f"<{size}I", response, 8)
+        for candidate in indices:
+            try:
+                action = engine.action_for_selection_index(candidate)
+                records.append(DecisionRecord(decision.observation,
+                                              decision.legal_actions, action))
+                decision = engine.step(action)
+            except (ValueError, RuntimeError) as stage_exc:
+                raise ReplayReconstructionError(
+                    f"response {index}: staged selection diverged: {stage_exc}",
+                    code="staged_selection_diverged", response_index=index) from stage_exc
+        if native.zone_selection is None and engine.recorded_selection_in_progress():
+            try:
+                action = engine.action_for_recorded_response(response)
+                if action.kind != "finish_selection":
+                    raise ValueError("selection did not reach a finish action")
+                records.append(DecisionRecord(decision.observation,
+                                              decision.legal_actions, action))
+                decision = engine.step(action)
+            except (ValueError, RuntimeError) as stage_exc:
+                raise ReplayReconstructionError(
+                    f"response {index}: selection finish diverged: {stage_exc}",
+                    code="selection_finish_diverged", response_index=index) from stage_exc
+        return decision, tuple(records)
+    records.append(DecisionRecord(decision.observation, decision.legal_actions, action))
+    try:
+        decision = engine.step(action)
+    except (ValueError, RuntimeError) as exc:
+        raise ReplayReconstructionError(
+            f"response {index}: native transition failed: {exc}",
+            code="native_transition_failed", response_index=index) from exc
+    return decision, tuple(records)
 
 
 def reconstruct_legacy_responses(replay: EdoReplayContainer,
@@ -106,63 +172,9 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
             raise ReplayReconstructionError(f"native replay startup failed: {exc}",
                                             code="native_startup_failed") from exc
         for index, response in enumerate(replay.responses):
-            if decision.terminal:
-                raise ReplayReconstructionError(
-                    f"response {index}: native duel ended before saved responses",
-                    code="extra_saved_response", response_index=index)
-            try:
-                action = engine.action_for_recorded_response(response)
-            except ValueError as exc:
-                native = engine.probe.decode_pending()
-                selection = (native.card_selection or native.sum_selection
-                             or native.zone_selection or native.counter_selection)
-                if selection is None or not selection.accepts(response):
-                    raise ReplayReconstructionError(
-                        f"response {index}: saved bytes do not map to one legal action",
-                        code="illegal_saved_response", response_index=index) from exc
-                if native.counter_selection is not None:
-                    indices = struct.unpack(
-                        f"<{len(native.counter_selection.cards)}h", response)
-                elif native.zone_selection is not None:
-                    zones = native.zone_selection.zones
-                    indices = tuple(zones.index(tuple(response[start:start + 3]))
-                                    for start in range(0, len(response), 3))
-                else:
-                    size = struct.unpack_from("<I", response, 4)[0]
-                    indices = struct.unpack_from(f"<{size}I", response, 8)
-                for candidate in indices:
-                    try:
-                        action = engine.action_for_selection_index(candidate)
-                        records.append(DecisionRecord(decision.observation,
-                                                      decision.legal_actions, action))
-                        decision = engine.step(action)
-                    except (ValueError, RuntimeError) as stage_exc:
-                        raise ReplayReconstructionError(
-                            f"response {index}: staged selection diverged: {stage_exc}",
-                            code="staged_selection_diverged",
-                            response_index=index) from stage_exc
-                if native.zone_selection is None and engine.recorded_selection_in_progress():
-                    try:
-                        action = engine.action_for_recorded_response(response)
-                        if action.kind != "finish_selection":
-                            raise ValueError("selection did not reach a finish action")
-                        records.append(DecisionRecord(decision.observation,
-                                                      decision.legal_actions, action))
-                        decision = engine.step(action)
-                    except (ValueError, RuntimeError) as stage_exc:
-                        raise ReplayReconstructionError(
-                            f"response {index}: selection finish diverged: {stage_exc}",
-                            code="selection_finish_diverged",
-                            response_index=index) from stage_exc
-                continue
-            records.append(DecisionRecord(decision.observation,
-                                          decision.legal_actions, action))
-            try:
-                decision = engine.step(action)
-            except (ValueError, RuntimeError) as exc:
-                raise ReplayReconstructionError(
-                    f"response {index}: native transition failed: {exc}",
-                    code="native_transition_failed", response_index=index) from exc
+            decision, mapped = advance_recorded_response(engine, decision,
+                                                         response, index)
+            records.extend(mapped)
         if not decision.terminal and not allow_incomplete:
             raise ReplayReconstructionError("saved responses ended before native terminal state",
                                             code="incomplete_saved_responses")

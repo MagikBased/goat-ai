@@ -13,7 +13,7 @@ import pytest
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine import native_messages
-from goat_ai.engine.decks import read_ydk
+from goat_ai.engine.decks import Decklist, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.ocgcore_probe import GOAT_FLAGS, OcgcoreProbe
 from goat_ai.engine.probe_deck import VANILLA_DECK
@@ -32,6 +32,7 @@ from goat_ai.replay.edopro_reconstruct import (
     ReplayReconstructionError,
     reconstruct_legacy_responses,
 )
+from goat_ai.replay.live_mirror import LiveDuelMirror
 from scripts.probe_random_decks import generate_deck, write_deck
 
 THUNDER_DRAGON = 504700054
@@ -119,6 +120,37 @@ def test_reconstructs_complete_native_legacy_response_trace(native_legacy_respon
     assert trace.replay_sha256 == replay.sha256
     assert trace.embedded_replay_sha256 is None
     assert "build/libocgcore.so" in trace.asset_sha256
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_live_mirror_tracks_room_responses_and_emits_policy_choice(native_legacy_responses):
+    root, responses, views = native_legacy_responses
+    mirror = LiveDuelMirror(root, historical_patches=True)
+    try:
+        mirror.start((43, 44, 45, 46),
+                     (Decklist(VANILLA_DECK, ()), Decklist(VANILLA_DECK, ())))
+        actor = views[0].viewer
+        prompt_type = mirror._engine.probe._pending_message[0]
+        mirror.verify_prompt(actor, prompt_type)
+        chosen = mirror._engine.action_for_recorded_response(responses[0])
+
+        class FixedAgent:
+            def select_action(self, observation, legal_actions):
+                assert observation.viewer == actor
+                assert all(card.code is None for card in observation.field
+                           if card.controller != actor and card.position == "facedown")
+                assert chosen in legal_actions
+                return chosen
+
+        assert mirror.choose(actor, FixedAgent()) == responses[0]
+        mirror.confirm_response(actor, responses[0])
+        for response, view in zip(responses[1:], views[1:], strict=True):
+            mirror.confirm_response(view.viewer, response)
+        assert mirror.response_count == len(responses)
+        assert mirror.decision.terminal
+        assert len(mirror.records) == len(responses)
+    finally:
+        mirror.close()
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
