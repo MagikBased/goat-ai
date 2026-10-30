@@ -4,9 +4,12 @@ import asyncio
 import json
 import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
+import torch
 
 from goat_ai.agents import RandomAgent
 from goat_ai.engine.historical_host_scripts import validate_pinned_host_assets
@@ -21,6 +24,7 @@ from scripts.confirm_edopro_human_actions import confirm_frames
 from scripts.create_viewer_game import GameCreator
 from scripts.edopro_local_room import EdoRoomManager
 from scripts.serve_edopro_policy import Bridge
+from scripts.train_behavioral_clone import load_experimental_edopro_confirmations
 
 
 @pytest.mark.skipif(
@@ -175,7 +179,32 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
         saved = manager.save_choices(session_id, [reviewed_index + 1])
         assert saved["confirmed"] == 1
         assert manager.choices(session_id)["confirmed"] == 1
-        assert (session_dir / replay_path.with_suffix(".human_labels.json").name).is_file()
+        copied_replay = session_dir / replay_path.name
+        assert copied_replay.with_suffix(".human_labels.json").is_file()
+        if historical:
+            _, training_records, main_hashes, training_report, hashes = (
+                load_experimental_edopro_confirmations(copied_replay, mirror_root))
+            assert len(training_records) == 1
+            assert training_records[0].observation.acting_player == 1
+            assert len(main_hashes) == 2
+            assert len(hashes) == 4
+            assert training_report["training_admitted"] is False
+            output = tmp_path / "experimental_edopro_clone.pt"
+            trained = subprocess.run([
+                sys.executable, str(Path(__file__).parents[1] /
+                                    "scripts/train_behavioral_clone.py"),
+                "--experimental-edopro-confirmed", str(copied_replay),
+                "--native-root", str(mirror_root), "--output", str(output),
+                "--feature-version", "23", "--width", "16", "--epochs", "1",
+            ], check=True, capture_output=True, text=True)
+            assert json.loads(trained.stdout)["decisions"] == 1
+            checkpoint = torch.load(output, map_location="cpu", weights_only=True)
+            assert checkpoint["source_decisions"] == {
+                "edopro_human_confirmed_experimental": 1}
+            assert checkpoint["training_games"][0]["historical_goat_certified"] is False
+        else:
+            with pytest.raises(ValueError, match="complete pinned historical"):
+                load_experimental_edopro_confirmations(copied_replay, mirror_root)
     elif not authorized and not surrender:
         with pytest.raises(ValueError, match="authorized self-recording"):
             confirm_frames(replay_path, [1], mirror_root,
@@ -200,3 +229,18 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
     with pytest.raises(ValueError, match="differs from replay"):
         verify_edopro_live_recording(replay_path, review_path,
                                      metadata_path, mirror_root)
+
+
+def test_experimental_edopro_loader_rejects_incomplete_or_unpatched(tmp_path, monkeypatch):
+    replay = tmp_path / "game.yrpX"
+    for path in (replay, replay.with_suffix(".review.json"),
+                 replay.with_suffix(".meta.json"),
+                 replay.with_suffix(".human_labels.json")):
+        path.write_bytes(b"fixture")
+    for complete, historical in ((False, True), (True, False)):
+        monkeypatch.setattr(
+            "scripts.train_behavioral_clone.verify_edopro_human_annotations",
+            lambda *args, complete=complete, historical=historical: {
+                "complete": complete, "historical_patches": historical})
+        with pytest.raises(ValueError, match="complete pinned historical"):
+            load_experimental_edopro_confirmations(replay, tmp_path)

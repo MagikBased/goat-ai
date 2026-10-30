@@ -3020,8 +3020,12 @@ recording before validating specific confirmed choices and reports their exact
 annotation hash. It remains a review artifact, not an admitted training set.
 The `confirm_edopro_human_actions.py` command accepts the viewer's one-based
 decision numbers, verifies the replay, rejects AI-seat and forced responses,
-and atomically saves the authorized human-action annotation. A browser review
-queue and training admission still require separate gates.
+and atomically saves the authorized human-action annotation. The local game
+page now provides the same explicit confirmations. An opt-in experimental
+clone path accepts only complete pinned-room recordings with those confirmed
+choices, independently verifies them again, and marks its checkpoint as
+historically uncertified. Raw EDOPro replay admission and policy promotion
+still require separate gates.
 
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The

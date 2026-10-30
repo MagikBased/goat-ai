@@ -25,11 +25,12 @@ is an authorized self-recording path, separate from imported EDOPro or
 DuelingBook material. See [README](../README.md#play-and-record-a-goat-duel)
 for the command.
 
-A real, authorized GOAT EDOPro replay is the next data-pipeline fixture. The
-project currently parses `.yrp` and `.yrpX` containers and reconstructs
-synthetic GOAT response traces against pinned native assets. It has **not**
-validated a real GOAT recording end to end, and no EDOPro replay is accepted
-as a training demonstration yet.
+A complete local EDOPro desktop room duel has been reconstructed against the
+matching pinned native assets. The local game page can launch that room and
+save explicitly confirmed human-seat choices. The experimental clone command
+can use only those confirmed choices from a complete pinned-room recording;
+raw or arbitrary external EDOPro replays are still excluded. See the
+[EDOPro room instructions](../README.md#experimental-edopro-room).
 
 ## Useful first sample
 
@@ -121,8 +122,10 @@ Before using a real replay as imitation data, we need all of the following:
 5. Reproducible replay and asset hashes, plus a training/evaluation split that
    keeps that game and its Deck composition out of held-out evaluation.
 
-Until these gates pass, the file remains a compatibility fixture and its
-decisions are excluded from policy training and strength claims.
-The behavioral-clone command rejects EDOPro-derived sources even when native
-response reconstruction succeeds; a future admission path must verify the
-recording's original engine and script provenance and its permissions first.
+Until these gates pass, an arbitrary external file remains a compatibility
+fixture and its decisions are excluded from policy training and strength
+claims. The behavioral-clone command rejects raw EDOPro-derived trajectories.
+The separate `--experimental-edopro-confirmed` path requires a complete pinned
+local room, exact replay verification, and explicit human-seat confirmations;
+it marks resulting checkpoints historically uncertified and does not establish
+the general admission or policy-strength gates.

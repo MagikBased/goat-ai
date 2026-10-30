@@ -20,7 +20,7 @@ from goat_ai.agents import (
     load_card_races,
     load_flip_monster_codes,
 )
-from goat_ai.engine.decks import main_deck_composition_sha256, read_ydk
+from goat_ai.engine.decks import Decklist, main_deck_composition_sha256, read_ydk
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.restricted_adapter import RestrictedOcgcoreEngine
 from goat_ai.evaluation.thunder_search_audit import correct_staged_thunder_search
@@ -33,6 +33,8 @@ from goat_ai.replay import (
     training_demonstrator_records,
     verify_trajectory,
 )
+from goat_ai.replay.edopro_container import read_edopro_container
+from goat_ai.replay.edopro_live_verify import verify_edopro_human_annotations
 from goat_ai.replay.live_journal import read_live_journal_prefix, snapshot_live_journal
 from goat_ai.training import (
     CardVocabulary,
@@ -82,6 +84,38 @@ def verify_training_trajectory(task: tuple[Path, Path, str, bool]) -> tuple[int,
     count = verify_trajectory(trajectory, engine_type(native_root))
     audit_trajectory_visibility(trajectory)
     return count, digest
+
+
+def load_experimental_edopro_confirmations(replay: Path, native_root: Path):
+    """Admit only confirmed human choices from a complete pinned local room.
+
+    This experimental source is separate from certified historical data and
+    never treats the room's automatic responses as human demonstrations.
+    """
+    stem = replay.with_suffix("")
+    review = stem.with_suffix(".review.json")
+    metadata = stem.with_suffix(".meta.json")
+    labels = stem.with_suffix(".human_labels.json")
+    paths = (replay, review, metadata, labels)
+    before = tuple(hashlib.sha256(path.read_bytes()).hexdigest() for path in paths)
+    report = verify_edopro_human_annotations(
+        replay, review, metadata, labels, native_root)
+    if not report["complete"] or not report["historical_patches"]:
+        raise ValueError(f"{replay}: only complete pinned historical room duels qualify")
+    trajectory = read_trajectory(review)
+    annotations, selected = read_decision_annotations(
+        labels, before[1], trajectory)
+    if annotations.authorization != "self_recorded" or not selected:
+        raise ValueError(f"{replay}: explicit human confirmations are required")
+    container = read_edopro_container(replay)
+    embedded = container.embedded_legacy_replay()
+    if embedded is None or len(embedded.decks) != 2:
+        raise ValueError(f"{replay}: embedded Decks are required")
+    if tuple(hashlib.sha256(path.read_bytes()).hexdigest() for path in paths) != before:
+        raise ValueError(f"{replay}: recording or confirmations changed during verification")
+    main_hashes = tuple(main_deck_composition_sha256(Decklist(tuple(deck.main)))
+                        for deck in embedded.decks)
+    return trajectory, selected, main_hashes, report, before
 
 
 def focus_opportunity(record, codes: set[int]) -> bool:
@@ -273,6 +307,10 @@ def main() -> None:
     parser.add_argument("--human-journal", type=Path, action="append", default=[],
                         help="include explicit human choices from an unfinished local duel; "
                              "the journal is snapshotted and replay-verified, with no outcome label")
+    parser.add_argument("--experimental-edopro-confirmed", type=Path,
+                        action="append", default=[], metavar="ROOM.yrpX",
+                        help="opt in confirmed human choices from a complete pinned EDOPro room; "
+                             "experimental historical source, never automatic raw replay intake")
     parser.add_argument("--annotation", type=Path, action="append", default=[],
                         help="self-recorded, scripted-scenario, policy-review, or "
                              "self-play-review labels, "
@@ -368,8 +406,19 @@ def main() -> None:
                         help="sample rare selected action kinds more often in cloning; "
                              "weight their loss in parent-KL training")
     args = parser.parse_args()
-    if not args.trajectories and not args.human_journal:
-        parser.error("provide a trajectory or --human-journal")
+    if not args.trajectories and not args.human_journal and not args.experimental_edopro_confirmed:
+        parser.error("provide a trajectory, --human-journal, or "
+                     "--experimental-edopro-confirmed")
+    if len({path.resolve() for path in args.experimental_edopro_confirmed}) != len(
+            args.experimental_edopro_confirmed):
+        parser.error("duplicate confirmed EDOPro replay path")
+    for replay in args.experimental_edopro_confirmed:
+        stem = replay.with_suffix("")
+        protected = (replay, stem.with_suffix(".review.json"),
+                     stem.with_suffix(".meta.json"),
+                     stem.with_suffix(".human_labels.json"))
+        if args.output.resolve() in {path.resolve() for path in protected}:
+            parser.error("--output must not replace an EDOPro recording or annotation")
     if (args.epochs < 1 or args.width < 1 or args.learning_rate <= 0
             or args.batch_size < 1 or args.verification_workers < 1
             or not 1 <= args.focus_weight < float("inf")
@@ -430,6 +479,9 @@ def main() -> None:
                                or args.synthetic_thunder_search_correction
                                or args.parent_kl_steps):
         parser.error("unfinished human journals require ordinary behavioral cloning")
+    if args.experimental_edopro_confirmed and (
+            args.on_policy_teacher or args.synthetic_thunder_search_correction):
+        parser.error("confirmed EDOPro decisions require ordinary behavioral cloning")
     if args.on_policy_teacher_activation_focus_only and (
             not args.on_policy_teacher or not args.focus_card):
         parser.error("activation focus requires --on-policy-teacher and --focus-card")
@@ -639,6 +691,38 @@ def main() -> None:
                 "verified_decisions": prefix.verified_decisions,
                 "selected_decisions": len(prefix.records),
             })
+    for replay in args.experimental_edopro_confirmed:
+        verification_started = perf_counter()
+        trajectory, selected, main_hashes, report, hashes = (
+            load_experimental_edopro_confirmations(replay, args.native_root))
+        verification_seconds += perf_counter() - verification_started
+        review = replay.with_suffix("").with_suffix(".review.json")
+        review_key = str(review.resolve())
+        if review_key in trajectory_hashes:
+            raise ValueError(f"duplicate confirmed EDOPro trajectory: {review}")
+        source = "edopro_human_confirmed_experimental"
+        records.extend(selected)
+        record_sources.extend([source] * len(selected))
+        record_disagreements.extend([False] * len(selected))
+        sources[source] += len(selected)
+        trajectory_hashes[review_key] = hashes[1]
+        training_games.append({
+            "seed": trajectory.seed,
+            "deck_sha256": trajectory.deck_sha256,
+            "main_deck_composition_sha256": main_hashes,
+            "source": source,
+            "demonstrator_seat": (trajectory.skill_metadata or {}).get("human_client_seat"),
+            "authorization": "self_recorded",
+            "review_sha256": hashes[1],
+            "edopro_replay_sha256": hashes[0],
+            "edopro_metadata_sha256": hashes[2],
+            "annotation_sha256": hashes[3],
+            "historical_goat_certified": False,
+            "training_admission": "experimental_confirmed_only",
+            "automated_teacher_disagreements": None,
+            "verified_decisions": report["visible_decisions"],
+            "selected_decisions": len(selected),
+        })
     vocabulary = CardVocabulary.from_goat_whitelist(
         args.native_root / "banlist/GOAT.lflist.conf",
         native_root=args.native_root if args.feature_version >= 22 else None)

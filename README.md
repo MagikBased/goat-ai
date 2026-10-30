@@ -161,13 +161,30 @@ An explicit `self_recorded` annotation on an EDOPro review trajectory now
 requires that authorization, the human client seat, and the exact action that
 was played. This permits retrospective confirmation of specific human choices
 without labeling the AI's actions or an unplayed alternative as human play.
-The training command still rejects EDOPro sources pending the remaining gates.
+The training command still rejects raw EDOPro trajectories. For a **complete,
+pinned, independently reconstructed** local room duel with explicitly
+confirmed human choices, an opt-in experimental clone path is available:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  --experimental-edopro-confirmed .cache/goat-ai/edopro_games/SESSION_ID/game-001-seed-NNN.yrpX \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/edopro_confirmed_pilot.pt
+```
+
+It rechecks the native replay, human seat, annotation, and embedded Deck
+identities, trains only the confirmed optional choices, and marks the
+checkpoint `edopro_human_confirmed_experimental` with
+`historical_goat_certified=false`. Incomplete, unpatched, unconfirmed, and
+arbitrary external replays remain excluded. This path is for controlled
+experiments, not policy promotion or a historical correctness claim. Replace
+`SESSION_ID` and `NNN` with the saved path shown in the room folder.
 For a manually confirmed choice, put its zero-based `decision_index` and
 recorded legal `action_index` in a schema-v1 `self_recorded` annotation tied to
 the review JSON's SHA-256. Check it with
 `python scripts/verify_edopro_human_labels.py <game>.yrpX <labels>.json --native-root .cache/goat-ai`.
 The checker independently reconstructs the duel before accepting the label;
-its output remains review-only.
+its output remains outside automatic training admission.
 To create that annotation after watching your own authorized duel, use the
 one-based **Decision** numbers shown in the viewer:
 
