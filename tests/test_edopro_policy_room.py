@@ -90,8 +90,11 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender):
     assert metadata["mirror_complete"] is not surrender
     assert metadata["mirror_prefix_valid"] is surrender
     assert metadata["training_admitted"] is False
+    trajectory_deck_hashes = list(metadata["deck_sha256"])
+    assert len(trajectory_deck_hashes) == 2
     assert metadata["host_responses"] == result.responses
     trajectory = read_trajectory(next(tmp_path.glob("*.review.json")))
+    assert list(trajectory.deck_sha256) == trajectory_deck_hashes
     assert audit_trajectory_visibility(trajectory)["decisions"] == len(trajectory.decisions)
     expected_source = ("edopro_pinned_historical" if historical
                        else "edopro_external_unpatched")
@@ -108,7 +111,14 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender):
         replay_path, review_path, metadata_path, mirror_root)
     assert verified["visible_decisions"] == len(trajectory.decisions)
     assert verified["reviewable_prefix"] is surrender
+    assert verified["deck_identity_verified"] is True
     assert verified["training_admitted"] is False
+    metadata["deck_sha256"][0] = "0" * 64
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    with pytest.raises(ValueError, match="differs from replay"):
+        verify_edopro_live_recording(replay_path, review_path,
+                                     metadata_path, mirror_root)
+    metadata["deck_sha256"] = trajectory_deck_hashes
     if surrender:
         metadata["core_seed"][0] ^= 1
     else:

@@ -1,11 +1,19 @@
 """Verify a complete or interrupted EDOPro room record against its replay."""
 
+import hashlib
 import json
 from pathlib import Path
 
 from goat_ai.replay.edopro_container import read_edopro_container
 from goat_ai.replay.edopro_reconstruct import reconstruct_legacy_responses
 from goat_ai.replay.trajectory import read_trajectory
+
+
+def deck_composition_sha256(main, extra) -> str:
+    """Identify a deck by its cards, independent of shuffled draw order."""
+    composition = {"main": sorted(main), "extra": sorted(extra)}
+    encoded = json.dumps(composition, separators=(",", ":")).encode("ascii")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Path,
@@ -35,10 +43,14 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         raise ValueError("EDOPro replay has no embedded seed and responses")
     if metadata.get("core_seed") != list(embedded.header.seed_words):
         raise ValueError("metadata core seed differs from replay")
+    deck_hashes = tuple(deck_composition_sha256(deck.main, deck.extra)
+                        for deck in embedded.decks)
     reconstructed = reconstruct_legacy_responses(
         replay, native_root, historical_patches=historical,
         allow_incomplete=prefix)
     trajectory = read_trajectory(review_path)
+    has_deck_hashes = ("deck_sha256" in metadata
+                       or trajectory.deck_sha256 is not None)
     status = (trajectory.skill_metadata or {}).get("recording_status")
     if (trajectory.source != (base_source if complete else base_source + "_partial")
             or trajectory.ruleset != ruleset
@@ -46,6 +58,8 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
             or (status not in (None, "complete") if complete
                 else status != "interrupted")
             or trajectory.decks != tuple(metadata.get("names", ()))
+            or has_deck_hashes and (trajectory.deck_sha256 != deck_hashes
+                                    or metadata.get("deck_sha256") != list(deck_hashes))
             or trajectory.seed != metadata.get("seed")
             or reconstructed.native_terminal is not complete
             or trajectory.winner != reconstructed.winner
@@ -66,5 +80,6 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         "reviewable_prefix": prefix,
         "historical_patches": historical,
         "historical_goat_certified": False,
+        "deck_identity_verified": has_deck_hashes,
         "training_admitted": False,
     }

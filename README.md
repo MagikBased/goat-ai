@@ -126,6 +126,10 @@ The human used the GUI's End Phase and hand-size discard controls; the room
 saved 165 responses with zero retries and zero Lua errors. Independent
 reconstruction matched all 165 player-visible decisions and the terminal
 result. This validates that specific path, not every possible EDOPro prompt.
+New room recordings also store a SHA-256 identifier for each Deck's sorted
+Main and Extra Deck composition. Verification checks those identifiers against
+the Decks embedded in the EDOPro replay; it does not expose shuffled Deck order.
+Older recordings without identifiers still verify their decisions and outcome.
 
 The external host package remains a separate AGPL dependency and must be on
 `PYTHONPATH`. The locally tested checkout is

@@ -2976,6 +2976,9 @@ Independent replay verification reconstructed all 165 player-visible decisions
 and the AI's terminal win. This closes the first complete-GUI-match gate.
 Broader prompt coverage, historical rulings validation, and training admission
 remain open; this match is review-only.
+New room recordings now carry replay-checked Main/Extra Deck composition hashes
+in metadata and the review trajectory, so evaluation can group games by Deck
+without mistaking player names for Deck identifiers. Draw order is omitted.
 
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The

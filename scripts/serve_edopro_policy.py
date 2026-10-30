@@ -13,6 +13,7 @@ from pathlib import Path
 
 from goat_ai.engine.decks import Decklist
 from goat_ai.engine.historical_host_scripts import validate_pinned_host_assets
+from goat_ai.replay.edopro_live_verify import deck_composition_sha256
 from goat_ai.replay.live_mirror import LiveDuelMirror
 from goat_ai.replay.trajectory import Trajectory, write_trajectory
 from goat_ai.training import load_policy_agent
@@ -148,6 +149,8 @@ class Bridge:
                 prefix = bool(synchronized and not complete)
                 source = ("edopro_pinned_historical" if bridge.historical_patches
                           else "edopro_external_unpatched")
+                deck_hashes = tuple(deck_composition_sha256(main, extra)
+                                    for main, extra in duel._insertion)
                 metadata = {
                     "source": source,
                     "training_admitted": False,
@@ -164,6 +167,7 @@ class Bridge:
                     "retries": result.retries,
                     "lua_errors": result.lua_errors,
                     "names": list(duel.names),
+                    "deck_sha256": list(deck_hashes),
                 }
                 stem.with_suffix(".meta.json").write_text(
                     json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
@@ -178,6 +182,7 @@ class Bridge:
                         skill_metadata={"recording_status": "complete" if complete
                                         else "interrupted"},
                         schema_version=28,
+                        deck_sha256=deck_hashes,
                         terminal_observation=mirror.decision.observation,
                     )
                     write_trajectory(stem.with_suffix(".review.json"), trajectory)
