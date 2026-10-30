@@ -485,6 +485,11 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired [Limiter Removal stacking and Book of Moon reset fixture](goat_rules.md#limiter-removal-stacking-and-face-down-reset)
+now checks 1,400 → 2,800 → 5,600 ATK and both End Phase outcomes against the
+pinned GOAT script. Both complete duels replay-verify and pass the visibility
+audit. This advances one historical card interaction; M2 remains open.
+
 A paired [Card Destruction Deck-out fixture](goat_rules.md#card-destruction-near-an-empty-deck) exposed a modern script gate that wrongly prevented a GOAT player from activating the card when the Deck could not cover the redraw. A checksum-guarded in-memory correction now allows that activation while retaining draw-prohibition checks. On the pinned core, six cards remaining produces a complete redraw and a later Draw Phase loss; one card remaining produces an immediate loss during resolution. A third duel shows the opponent loses when their empty Deck cannot supply Card Destruction's redraw; a fourth confirms Protector of the Sanctuary still prevents activation under a draw prohibition. All four complete duels replay-verify and pass the visibility audit. Simultaneous failures and draw replacements remain open.
 
 A paired [Card Destruction/Scapegoat chain fixture](goat_rules.md#card-destruction-after-chained-scapegoat) checks that Card Destruction counts the hand when its effect resolves: chaining Scapegoat from hand reduces its controller's discard and draw count from five to four, and creates four Sheep Tokens first. Both branches finish, replay-verify, and pass the visibility audit. This covers one common chained hand change; other chains remain open.
