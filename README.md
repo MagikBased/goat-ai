@@ -97,6 +97,13 @@ ignored `.cache/goat-ai/edopro_games/<session-id>/` folder. The room process
 continues if you close the browser tab. Start another room after the first
 duel ends. The local page needs the optional host and pinned assets described
 below; it reports a missing prerequisite instead of starting an unpatched room.
+After a verified duel, press **Confirm my choices** beside its replay. The
+scrollable list shows optional decisions from the human seat with links to
+their viewer frames. Check only actions you personally chose; EDOPro may answer
+some prompts automatically. **Save confirmations** writes and verifies
+`<game>.human_labels.json` beside the recording. Reopening the dialog restores
+the saved checkmarks, and unchecking one removes that confirmation. These
+annotations remain review-only while EDOPro training admission is closed.
 
 You can play the selected PyTorch policy through an EDOPro LAN room using the
 optional external `mostwanted7/ygo-agent` host. The host is AGPL-3.0-or-later,

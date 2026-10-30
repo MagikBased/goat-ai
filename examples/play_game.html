@@ -981,7 +981,7 @@
     (async () => {
       try {
         const liveVersion = await request("/api/live/version");
-        if (liveVersion.api_version !== 8)
+        if (liveVersion.api_version !== 9)
           throw new Error("This duel server is outdated. Reopen the game creator shortcut to start the current server, then reload your duel there.");
         const options = await request("/api/games/options");
         const decks = options.decks.map(name => [name, name.replace(/\.ydk$/, "").replaceAll("_", " ")]);

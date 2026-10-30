@@ -26,6 +26,9 @@
       background: #142c36; color: inherit; border: 1px solid #68949a; border-radius: 12px; }
     dialog::backdrop { background: #0009; }
     .audit-button { width: auto; margin: 0 0 0 8px; padding: 3px 8px; font-size: .85rem; }
+    #edopro-choices { max-height: 50vh; overflow-y: auto; padding-left: 20px; }
+    #edopro-choices label { display: inline; margin: 0; }
+    #edopro-choices input { width: auto; margin: 0 8px 0 0; }
     @media (max-width: 650px) { .seats { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -71,6 +74,15 @@
     <p>These are heuristic flags from player-visible decisions. They are not
        correctness judgments or training labels.</p>
     <ul id="audit-list"></ul><button id="close-audit" type="button">Close</button>
+  </dialog>
+  <dialog id="edopro-dialog"><h2>Confirm your EDOPro choices</h2>
+    <p>Check only actions you remember choosing yourself. EDOPro can answer
+       some prompts automatically. Each saved choice is checked against the
+       native replay and remains excluded from automatic training for now.</p>
+    <ul id="edopro-choices"></ul>
+    <p id="edopro-review-status" role="status" aria-live="polite"></p>
+    <button id="edopro-save" type="button">Save confirmations</button>
+    <button id="edopro-close" type="button">Close</button>
   </dialog>
   <script>
     const byId = id => document.getElementById(id);
@@ -130,6 +142,11 @@
           const link = document.createElement("a");
           link.href = record.viewer; link.textContent = "Open verified replay";
           item.append(link);
+          const button = document.createElement("button");
+          button.type = "button"; button.className = "audit-button";
+          button.dataset.edoproId = session.id;
+          button.textContent = "Confirm my choices";
+          item.append(button);
         } else if (record) item.append(`native replay saved; review unavailable${record.verification_error ? `: ${record.verification_error}` : ""}`);
         else item.append(session.error || "no replay saved");
         list.append(item);
@@ -172,6 +189,57 @@
         button.disabled = false;
       }
     });
+    let currentEdoReview = null;
+    byId("edopro-recordings").addEventListener("click", async event => {
+      const button = event.target.closest("button[data-edopro-id]");
+      if (!button) return;
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/edopro/choices?id=${encodeURIComponent(button.dataset.edoproId)}`);
+        const review = await response.json();
+        if (!response.ok) throw new Error(review.error || "Could not open decisions");
+        currentEdoReview = review;
+        const list = byId("edopro-choices"); list.replaceChildren();
+        for (const choice of review.candidates) {
+          const item = document.createElement("li");
+          const label = document.createElement("label");
+          const input = document.createElement("input");
+          input.type = "checkbox"; input.value = choice.frame;
+          input.checked = choice.confirmed;
+          label.append(input);
+          const link = document.createElement("a");
+          link.href = `${review.viewer}#decision=${choice.frame}`;
+          link.target = "_blank"; link.rel = "noopener";
+          link.textContent = `Decision ${choice.frame}`;
+          label.append(link, ` · T${choice.turn} ${choice.phase} · ${choice.action}${choice.card ? ` · ${choice.card}` : ""}`);
+          item.append(label); list.append(item);
+        }
+        if (!review.candidates.length) list.textContent = "No optional human-seat decisions in this recording.";
+        byId("edopro-review-status").textContent = `${review.confirmed} confirmed choices saved.`;
+        byId("edopro-dialog").showModal();
+      } catch (error) {
+        byId("edopro-status").textContent = error.message;
+      } finally { button.disabled = false; }
+    });
+    byId("edopro-save").addEventListener("click", async () => {
+      if (!currentEdoReview) return;
+      const button = byId("edopro-save"); button.disabled = true;
+      const frames = [...byId("edopro-choices").querySelectorAll("input:checked")]
+        .map(input => Number(input.value));
+      byId("edopro-review-status").textContent = "Verifying replay and saving choices…";
+      try {
+        const response = await fetch("/api/edopro/confirm", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({id: currentEdoReview.id, frames}),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not save choices");
+        byId("edopro-review-status").textContent = `${result.confirmed} choices saved and verified. Training admission remains closed.`;
+      } catch (error) {
+        byId("edopro-review-status").textContent = error.message;
+      } finally { button.disabled = false; }
+    });
+    byId("edopro-close").addEventListener("click", () => byId("edopro-dialog").close());
     byId("game-form").addEventListener("submit", async event => {
       event.preventDefault();
       const button = byId("create"); button.disabled = true;

@@ -28,7 +28,7 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 REVIEW_API_VERSION = 5
-LIVE_API_VERSION = 8
+LIVE_API_VERSION = 9
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -480,6 +480,13 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 except (ValueError, OSError, RuntimeError) as error:
                     self._json(400, {"error": str(error)})
                 return
+            if parsed.path == "/api/edopro/choices":
+                try:
+                    identifier = parse_qs(parsed.query).get("id", [""])[0]
+                    self._json(200, edo_room.choices(identifier))
+                except (ValueError, KeyError, OSError, RuntimeError) as error:
+                    self._json(400, {"error": str(error)})
+                return
             if parsed.path == "/api/games/audit":
                 identifier = parse_qs(parsed.query).get("id", [""])[0]
                 try:
@@ -547,12 +554,13 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
             if endpoint not in ("/api/review/choice", "/api/review/bookmark",
                                 "/api/review/note", "/api/review/upstream",
                                 "/api/games", "/api/games/review",
-                                "/api/edopro/start",
+                                "/api/edopro/start", "/api/edopro/confirm",
                                 "/api/live/start", "/api/live/choice",
                                 "/api/live/close"):
                 self._json(404, {"error": "unknown endpoint"})
                 return
-            if endpoint not in ("/api/games", "/api/games/review", "/api/edopro/start",
+            if endpoint not in ("/api/games", "/api/games/review",
+                                "/api/edopro/start", "/api/edopro/confirm",
                                 "/api/live/start", "/api/live/choice",
                                 "/api/live/close") and store is None:
                 self._json(404, {"error": "no review queue is open"})
@@ -577,6 +585,7 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                             {"deck1", "deck2", "agent1", "agent2", "seed"}
                             if endpoint == "/api/games" else
                             {"ai_deck"} if endpoint == "/api/edopro/start" else
+                            {"id", "frames"} if endpoint == "/api/edopro/confirm" else
                             {"source", "decision_index", "action_index"}
                             if endpoint == "/api/review/choice" else
                             {"source", "decision_index", "bookmarked"}
@@ -608,6 +617,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                     result = creator.create(data)
                 elif endpoint == "/api/edopro/start":
                     result = edo_room.start(data["ai_deck"])
+                elif endpoint == "/api/edopro/confirm":
+                    result = edo_room.save_choices(data["id"], data["frames"])
                 elif endpoint == "/api/review/choice":
                     result = store.choose(data["source"], data["decision_index"],
                                           data["action_index"])

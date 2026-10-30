@@ -2923,6 +2923,11 @@ EDOPro policy room and list its saved native replay. It links the GOAT AI
 viewer only after independent replay reconstruction succeeds. This removes
 the manual host command from the usual play path; recordings remain excluded
 from automatic training pending the source and historical-rules gates below.
+The same page can now save explicit human-seat confirmations for optional
+decisions directly beside the verified replay. It rechecks the selected actions
+against the native response stream before replacing an annotation file. EDOPro
+can still generate automatic responses, so these opt-in confirmations do not
+open the automatic training gate.
 
 Pinned-host update (2026-10-30): The optional room now supports the project's
 own pinned native core and checksum-guarded historical script corrections.

@@ -2,14 +2,23 @@
 
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 
-from goat_ai.replay.edopro_live_verify import verify_edopro_live_recording
+from goat_ai.agents.card_metadata import load_card_names
+from goat_ai.replay import read_decision_annotations, read_trajectory
+from goat_ai.replay.edopro_live_verify import (
+    verify_edopro_human_annotations,
+    verify_edopro_live_recording,
+)
+from goat_ai.replay.fingerprint import sha256_file
+from scripts.confirm_edopro_human_actions import confirm_frames
 from scripts.create_viewer_game import GameCreator
 from scripts.render_replay import render_replay
 
@@ -27,6 +36,87 @@ class EdoRoomManager:
         self.process: subprocess.Popen | None = None
         self.session: str | None = None
         self._verified: dict[str, tuple[int, dict]] = {}
+        self.names: dict[int, str] | None = None
+
+    def _session_directory(self, identifier: str) -> Path:
+        if not isinstance(identifier, str) or not re.fullmatch(r"[0-9a-f]{16}", identifier):
+            raise ValueError("invalid EDOPro session ID")
+        directory = self.folder / identifier
+        if not (directory / "session.json").is_file():
+            raise ValueError("EDOPro session is unavailable")
+        return directory
+
+    def _verified_game(self, identifier: str) -> tuple[Path, Path, Path]:
+        directory = self._session_directory(identifier)
+        record = self._recording(directory)
+        if not record or not record["review_ready"]:
+            raise ValueError("EDOPro recording has not passed replay verification")
+        replay = self.root / record["native_replay"]
+        stem = replay.with_suffix("")
+        metadata = stem.with_suffix(".meta.json")
+        if json.loads(metadata.read_text(encoding="utf-8")).get(
+                "human_authorization") != "self_recorded":
+            raise ValueError("recording lacks self-recording authorization")
+        return replay, stem.with_suffix(".review.json"), metadata
+
+    def choices(self, identifier: str) -> dict:
+        replay, review, metadata = self._verified_game(identifier)
+        trajectory = read_trajectory(review)
+        seat = json.loads(metadata.read_text(encoding="utf-8"))["human_client_seat"]
+        labels = replay.with_suffix(".human_labels.json")
+        confirmed = set()
+        if labels.is_file():
+            verify_edopro_human_annotations(
+                replay, review, metadata, labels, self.creator.native_root)
+            annotations, _ = read_decision_annotations(
+                labels, sha256_file(review), trajectory)
+            confirmed = {index + 1 for index, _ in annotations.choices}
+        if self.names is None:
+            self.names = load_card_names(self.creator.native_root)
+        candidates = []
+        for index, record in enumerate(trajectory.decisions):
+            if record.observation.acting_player != seat or len(record.legal_actions) < 2:
+                continue
+            action = record.selected_action
+            code = action.parameters.get("code")
+            card = self.names.get(code, f"Card #{code}") if type(code) is int else None
+            candidates.append({"frame": index + 1, "turn": record.observation.turn,
+                               "phase": record.observation.phase,
+                               "action": action.kind.replace("_", " "),
+                               "card": card,
+                               "confirmed": index + 1 in confirmed})
+        return {"id": identifier, "viewer": self._recording(replay.parent)["viewer"],
+                "candidates": candidates, "confirmed": len(confirmed),
+                "training_admitted": False}
+
+    def save_choices(self, identifier: str, frames: list[int]) -> dict:
+        if (not isinstance(frames, list) or len(frames) > 1000
+                or any(type(frame) is not int or frame < 1 for frame in frames)
+                or len(set(frames)) != len(frames)):
+            raise ValueError("invalid EDOPro decision numbers")
+        with self.lock:
+            replay, review, metadata = self._verified_game(identifier)
+            trajectory = read_trajectory(review)
+            seat = json.loads(metadata.read_text(encoding="utf-8"))["human_client_seat"]
+            offered = {index + 1 for index, record in enumerate(trajectory.decisions)
+                       if record.observation.acting_player == seat
+                       and len(record.legal_actions) > 1}
+            if not set(frames) <= offered:
+                raise ValueError("a selected decision is not an optional human-seat choice")
+            output = replay.with_suffix(".human_labels.json")
+            if output.is_file():
+                verify_edopro_human_annotations(
+                    replay, review, metadata, output, self.creator.native_root)
+            if not frames:
+                output.unlink(missing_ok=True)
+            else:
+                with tempfile.TemporaryDirectory(dir=output.parent) as temporary:
+                    pending = Path(temporary) / output.name
+                    confirm_frames(replay, frames, self.creator.native_root,
+                                   pending)
+                    pending.replace(output)
+            return {"id": identifier, "confirmed": len(frames),
+                    "training_admitted": False}
 
     def readiness(self) -> tuple[bool, str]:
         if not (self.host_package / "ygo_agent/arena/server.py").is_file():
@@ -105,13 +195,13 @@ class EdoRoomManager:
             try:
                 report = verify_edopro_live_recording(
                     replay, review_path, metadata_path, self.creator.native_root)
-                record["verified"] = True
-                record["review_ready"] = True
                 record["complete"] = report["complete"]
                 viewer = stem.with_suffix(".html")
                 if not viewer.is_file() or viewer.stat().st_mtime_ns < review_path.stat().st_mtime_ns:
                     render_replay(review_path, viewer, self.creator.native_root)
                 record["viewer"] = "/" + viewer.relative_to(self.root).as_posix()
+                record["verified"] = True
+                record["review_ready"] = True
             except (ValueError, OSError, RuntimeError) as exc:
                 record["verification_error"] = str(exc)
             self._verified[directory.name] = (stamp, record)

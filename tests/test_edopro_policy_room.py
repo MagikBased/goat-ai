@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,8 @@ from goat_ai.replay.edopro_live_verify import (
 )
 from goat_ai.replay.fingerprint import sha256_file
 from scripts.confirm_edopro_human_actions import confirm_frames
+from scripts.create_viewer_game import GameCreator
+from scripts.edopro_local_room import EdoRoomManager
 from scripts.serve_edopro_policy import Bridge
 
 
@@ -158,6 +161,21 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
         with pytest.raises(ValueError, match="AI seat"):
             confirm_frames(replay_path, [ai_index + 1], mirror_root,
                            tmp_path / "invalid_ai.json")
+        session_id = "a" * 16
+        session_dir = tmp_path / "sessions" / session_id
+        session_dir.mkdir(parents=True)
+        (session_dir / "session.json").write_text('{"ai_deck":"fixture.ydk"}')
+        for source in (replay_path, review_path, metadata_path):
+            shutil.copy2(source, session_dir / source.name)
+        manager = EdoRoomManager(GameCreator(root=tmp_path, native_root=mirror_root))
+        manager.folder = session_dir.parent
+        choices = manager.choices(session_id)
+        assert reviewed_index + 1 in {item["frame"] for item in choices["candidates"]}
+        assert choices["training_admitted"] is False
+        saved = manager.save_choices(session_id, [reviewed_index + 1])
+        assert saved["confirmed"] == 1
+        assert manager.choices(session_id)["confirmed"] == 1
+        assert (session_dir / replay_path.with_suffix(".human_labels.json").name).is_file()
     elif not authorized and not surrender:
         with pytest.raises(ValueError, match="authorized self-recording"):
             confirm_frames(replay_path, [1], mirror_root,
