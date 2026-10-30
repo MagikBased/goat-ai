@@ -471,7 +471,9 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
-A paired [Card Destruction empty-hand fixture](goat_rules.md#card-destruction-with-an-empty-hand) now checks the archived FAQ's activation gate with a free Spell/Trap Zone. One branch activates while only the opponent has hand cards and draws zero for its controller; the other offers activation while only the controller has another card, then suppresses it after both hands become empty. Both seeded duels reach terminal, replay-verify, and pass the visibility audit. This covers a common card in the sourced tournament corpus; deck-out and chained hand changes remain open.
+A paired [Card Destruction/Scapegoat chain fixture](goat_rules.md#card-destruction-after-chained-scapegoat) now checks that Card Destruction counts the hand when its effect resolves: chaining Scapegoat from hand reduces its controller's discard and draw count from five to four, and creates four Sheep Tokens first. Both branches finish, replay-verify, and pass the visibility audit. This covers one common chained hand change; deck-out and other chains remain open.
+
+A paired [Card Destruction empty-hand fixture](goat_rules.md#card-destruction-with-an-empty-hand) checks the archived FAQ's activation gate with a free Spell/Trap Zone. One branch activates while only the opponent has hand cards and draws zero for its controller; the other offers activation while only the controller has another card, then suppresses it after both hands become empty. Both seeded duels reach terminal, replay-verify, and pass the visibility audit. This covers a common card in the sourced tournament corpus; deck-out remains open.
 
 A new Gravekeeper's Chief/Premature Burial fixture confirms the documented
 Necrovalley exception through a complete native duel, replay verification,

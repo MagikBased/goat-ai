@@ -20,6 +20,76 @@ SCAPEGOAT = 504700123  # GOAT variant
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+@pytest.mark.parametrize("chain_scapegoat", [False, True])
+def test_card_destruction_counts_hand_at_resolution_after_chain(tmp_path, chain_scapegoat):
+    """A Quick-Play card spent as Chain Link 2 is absent from the later discard."""
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for script in (f"official/c{CARD_DESTRUCTION}.lua", f"goat/c{SCAPEGOAT}.lua"):
+        if not (root / "scripts" / script).is_file():
+            pytest.skip(f"script {script} not installed")
+    deck = tmp_path / "card_destruction_goat.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        CARD_DESTRUCTION, SCAPEGOAT, *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=100,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {CARD_DESTRUCTION, SCAPEGOAT} <= {card.code for card in obs.hand}
+        activated = response_chosen = resolved = False
+        deck_counts_before = None
+        agents = (RandomAgent(100), RandomAgent(101))
+        for _ in range(5000):
+            if env.is_terminal():
+                assert resolved
+                path = tmp_path / f"card_destruction_goat_{chain_scapegoat}.json"
+                write_trajectory(path, env.trajectory())
+                trajectory = read_trajectory(path)
+                assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
+                audit_trajectory_visibility(trajectory)
+                loaded = env.engine.probe.loaded_script_sha256
+                assert f"official/c{CARD_DESTRUCTION}.lua" in loaded
+                if chain_scapegoat:
+                    assert f"goat/c{SCAPEGOAT}.lua" in loaded
+                return
+            actions = env.legal_actions()
+            action = None
+            if not activated and obs.acting_player == 0 and obs.phase == "main1":
+                action = next((candidate for candidate in actions
+                               if candidate.kind == "activate" and
+                               candidate.parameters.get("code") == CARD_DESTRUCTION), None)
+                if action is not None:
+                    activated = True
+                    deck_counts_before = obs.deck_counts
+                    assert len(obs.hand) == 6 and obs.opponent_hand_count == 5
+            if activated and not response_chosen and action is None:
+                goat = next((candidate for candidate in actions
+                             if candidate.kind == "chain" and
+                             candidate.parameters.get("code") == SCAPEGOAT), None)
+                if goat is not None:
+                    action = goat if chain_scapegoat else next(
+                        candidate for candidate in actions if candidate.kind == "pass")
+                    response_chosen = True
+            if action is None:
+                action = (agents[obs.acting_player].select_action(obs, actions) if resolved
+                          else next((candidate for candidate in actions if candidate.kind in (
+                              "pass", "place", "end_phase")), actions[0]))
+            obs = env.step(action)
+            if activated and response_chosen and not resolved and not obs.chain and (
+                    CARD_DESTRUCTION in {card.code for card in obs.graveyards[0]}):
+                assert deck_counts_before is not None
+                expected_own_draw = 4 if chain_scapegoat else 5
+                assert obs.deck_counts == (deck_counts_before[0] - expected_own_draw,
+                                           deck_counts_before[1] - 5)
+                assert len(obs.hand) == expected_own_draw
+                assert obs.opponent_hand_count == 5
+                assert sum(card.zone == "monster" and card.controller == 0
+                           for card in obs.field) == (4 if chain_scapegoat else 0)
+                assert not obs.known_opponent_hand_cards
+                resolved = True
+    pytest.fail("Card Destruction/Scapegoat fixture did not finish")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("seed,opponent_empty", [(92, False), (1142, True)])
 def test_card_destruction_empty_hand_activation_gate(tmp_path, seed, opponent_empty):
     """At least one player needs another hand card at activation."""
