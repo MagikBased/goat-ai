@@ -15041,3 +15041,53 @@ named assets. It does not show that every selected effect resolved, that the
 unselected IDs work, or that all rulings are historically correct. The
 randomized legal decks and activation preference are not evidence of playing
 strength.
+
+## Public effect-choice coverage on fresh v28 trajectories (29 October 2026)
+
+The action-alias audit now counts legal actions carrying a public
+`effect_option` and decisions where one was selected. A fresh schema-v28
+first-activation whitelist partition completed **21/21** duels; all **23,381**
+decisions replay-verified and passed the visibility audit. Feature v32 had zero
+distinct-action aliases across **7,265** multi-action decisions, but saw
+**zero** effect-option contexts. Its 33 `select_option` prompts are separate
+choice messages, not simultaneous effects of one visible card. The ignored
+coverage report and alias audit are under
+`.cache/goat-ai/effect_option_coverage_20261029/`, with SHA-256 hashes
+`12a1c89772f24912849b9e440b1dae208450dc198e6ae5cd818bbd8df099d656`
+and `59194b304eec70b3a8cd23a4926c4ea42137315ee5e061fa013f23e9c8ba154a`.
+
+Eight replay-verified Tactical-v14 duels used Cas Stomphorst's published
+Indianapolis 2005 Flip Control deck against Matt Peddle's Indianapolis Goat
+Control deck. Across **7,091** decisions, Spell Shield Type-8 was offered in
+25 decisions and selected for five Chain responses, but no decision offered
+both of its modes at once. Feature v32 had zero distinct-action aliases across
+**2,256** multi-action decisions, one separate `select_option` prompt, and
+zero effect-option contexts. The ignored audit is
+`.cache/goat-ai/effect_option_cas_20261029/feature32_alias_audit.json`
+(SHA-256 `63e0c95435d56690cc8f7f6d70a55e7a8d88938860b167d1296f8740949d3ce1`).
+These samples provide no behavioral-cloning signal for v32 or evidence of a
+playing-strength gain. The targeted Spell Shield fixture still verifies that
+the two modes can be offered. Sampling with synthetic agents is not a human
+play-frequency estimate.
+
+Reproduce after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_whitelist_coverage.py \
+  --native-root .cache/goat-ai --output .cache/goat-ai/effect_option_coverage_20261029 \
+  --seed 20261029 --workers 8 --agent-mode first_activation
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/collect_heuristic_demos.py \
+  --engine experimental --teacher tactical --opponent tactical \
+  --deck-a examples/decks/flip_control_cas_stomphorst_indianapolis_2005.ydk \
+  --deck-b examples/decks/goat_control_matt_peddle_indianapolis_2005.ydk \
+  --seed 20261029 --seeds 4 --verify-replays \
+  --output-dir .cache/goat-ai/effect_option_cas_20261029
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_action_aliases.py \
+  .cache/goat-ai/effect_option_coverage_20261029/duel_*.json \
+  --feature-version 32 --output \
+  .cache/goat-ai/effect_option_coverage_20261029/feature32_alias_audit.json
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/audit_policy_action_aliases.py \
+  .cache/goat-ai/effect_option_cas_20261029/seed_*.json \
+  --feature-version 32 --output \
+  .cache/goat-ai/effect_option_cas_20261029/feature32_alias_audit.json
+```

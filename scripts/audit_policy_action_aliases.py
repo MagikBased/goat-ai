@@ -50,6 +50,9 @@ def main() -> None:
     option_ordinals = Counter()
     option_by_source = Counter()
     option_examples = []
+    effect_option_contexts = 0
+    effect_option_offered = Counter()
+    effect_option_selected = Counter()
     for path in args.trajectories:
         raw = path.read_bytes()
         trajectory = read_trajectory(path)
@@ -61,6 +64,14 @@ def main() -> None:
                         "verified_decisions": verified})
         for decision_index, record in enumerate(trajectory.decisions):
             actions = record.legal_actions
+            effect_actions = [action for action in actions
+                              if type(action.parameters.get("effect_option")) is int]
+            if effect_actions:
+                effect_option_contexts += 1
+                effect_option_offered.update(action.parameters.get("code")
+                                             for action in effect_actions)
+                if type(record.selected_action.parameters.get("effect_option")) is int:
+                    effect_option_selected[record.selected_action.parameters.get("code")] += 1
             if len(actions) < 2:
                 continue
             multi_action += 1
@@ -103,13 +114,23 @@ def main() -> None:
                   for (source, ordinal), count in sorted(option_by_source.items(),
                     key=lambda item: (item[0][0] is None, item[0][0] or 0, item[0][1]))],
               "option_examples": option_examples}
+    report.update({
+        "effect_option_contexts": effect_option_contexts,
+        "effect_option_offered": sum(effect_option_offered.values()),
+        "effect_option_selected": sum(effect_option_selected.values()),
+        "effect_option_by_card": [
+            {"card_code": code, "offered": count,
+             "selected": effect_option_selected[code]}
+            for code, count in sorted(effect_option_offered.items())],
+    })
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
                            encoding="utf-8")
     print(json.dumps({key: report[key] for key in (
         "feature_version", "multi_action_decisions", "aliased_action_pairs",
         "aliased_first_kinds", "multi_option_prompt_count",
-        "selected_option_ordinals")}, sort_keys=True))
+        "selected_option_ordinals", "effect_option_contexts",
+        "effect_option_offered", "effect_option_selected")}, sort_keys=True))
 
 
 if __name__ == "__main__":

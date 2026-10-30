@@ -796,6 +796,11 @@ multiple effects at the same decision. The live controls display the pinned
 effect wording, and opt-in policy feature v32 represents the distinction.
 Older v27 replays still verify after projection; no playing-strength benefit
 has been measured for v32.
+The [fresh v28 coverage audit](evaluation.md#public-effect-choice-coverage-on-fresh-v28-trajectories-29-october-2026)
+found no simultaneous same-card effect-choice contexts in 21 whitelist duels
+or eight sourced-deck Tactical duels. The opt-in feature remains available for
+such decisions, but these samples supply no v32 training signal. Prioritize
+broader independently reviewed play and M4's held-out strength gate.
 
 ## M3 — Evaluation and data
 
