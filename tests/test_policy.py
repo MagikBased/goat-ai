@@ -60,6 +60,7 @@ from goat_ai.training.self_play import (
     _selection_progress_actions,
     clipped_surrogate,
     episode_schedule,
+    normalize_rollout_advantages,
     policy_gradient_update,
     ppo_clipped_update,
     predict_state_values,
@@ -2151,6 +2152,23 @@ def test_ppo_clipped_surrogate_handles_both_advantage_signs():
                           torch.tensor([1.2, -0.8]))
     with pytest.raises(ValueError, match="clip epsilon"):
         clipped_surrogate(ratio, advantage, 0)
+
+
+def test_ppo_rollout_advantage_normalization_respects_episode_weights():
+    values = (2.0, 2.0, -1.0)
+    normalized = normalize_rollout_advantages(values, (0.5, 0.5, 1.0))
+    assert normalized == pytest.approx((1.0, 1.0, -1.0))
+    assert normalize_rollout_advantages((1.0, 1.0)) == (1.0, 1.0)
+    with pytest.raises(ValueError, match="positive weights"):
+        normalize_rollout_advantages(values, (1.0, 0.0, 1.0))
+    with pytest.raises(ValueError, match="finite values"):
+        normalize_rollout_advantages((float("nan"),))
+    policy = LegalActionPolicy(CardVocabulary((10, 20)).size,
+                               width=8, feature_version=10)
+    with pytest.raises(ValueError, match="requires clipped PPO"):
+        train_against_snapshot_pool(policy, CardVocabulary((10, 20)),
+                                    (("a", "b"),), (100,), lambda: None,
+                                    ppo_normalize_advantages=True)
 
 
 def test_ppo_update_uses_visible_variable_action_sets_and_terminal_reward():

@@ -15537,3 +15537,55 @@ selected v23 teacher corpus had 19 two-copy and six zero-copy Thunder search
 labels at observed prompts, so both training-label quality and preference
 preservation need attention before another large run. The teacher-label audit
 hash is `887039d712373fabba87e81e9eb66dd36e890d5a1e78e4e52fb35a2674f73e0c`.
+
+## Weighted PPO advantage normalization pilot (30 October 2026)
+
+An opt-in `--ppo-normalize-advantages` centers and scales frozen-rollout
+advantages using the same per-decision or per-episode weights as the PPO
+update. A constant-advantage rollout keeps its original signal. The default
+update remains unchanged. This is a training ablation, not a tactical rule.
+
+Starting from selected feature-v23, the normalized and control arms each
+played 32 games with eight rollout workers, two sourced pairings (Lolmarcus
+Goat Control/Riclar Chaos Turbo and Montague Warrior/Ciriano Beastdown),
+four-role scheduling, seeds 152100–152131, 16-game frozen PPO batches,
+two epochs, minibatch 32, parent KL 0.5, and a 3,000-decision cap. Both
+recorded 14 wins and 18 losses during self-play. The normalized arm recorded
+3,210 learner decisions versus 3,200 for the control; all first 16 trajectory
+JSON files matched byte-for-byte, before their first updates diverged. The
+normalized arm's 32 complete trajectories and 19,430 decisions independently
+replay-verified and passed the visibility audit. Its checkpoint SHA-256 is
+`05636c36f89c78fba421a77af7764eda8bd6e0e8dd19925a85d30eefde9f6808`;
+the unnormalized control is the 8-worker arm in the [memory benchmark](benchmarks.md#ppo-process-tree-memory-on-the-same-mixed-decks-2026-10-30).
+
+On four previously unseen tournament Main Decks (Bryan Chaos, Rhymus Goat
+Control, Mary Warrior, and Jae Zombie), both Deck assignments and seats,
+seeds 152500–152507, the normalized child scored **35–29** directly against
+the control over 64 games (paired 95% score interval 50.00–59.38%). On fresh
+seeds 152600–152607 both children scored **30–34** against the selected v23
+parent, with the same per-deck win counts. On matched Tactical-v14 seeds
+152700–152707, normalization scored **27–37** versus the control's **25–39**;
+the verified paired difference was +3.13 percentage points, 95% interval
+0.00–7.81 points. Both extra wins were on Mary Warrior; the other three deck
+assignments had identical scores. The candidate therefore has no demonstrated
+gain over the selected parent and no broad transfer across these deck
+families. Keep normalization opt-in and v23 selected.
+
+Reproduce training with the command in the memory benchmark, adding
+`--ppo-normalize-advantages` and separate `--output`/`--record-dir` paths.
+Evaluate with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --workers 8 --seeds 8`
+using the four listed Main Decks: `--seed 152500` and
+`--opponent-checkpoint` for direct child/control play, `--seed 152600`
+against selected v23, and `--seed 152700 --opponent tactical` for matched
+Tactical reports. Compare those reports with
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`. The ignored direct, normalized/parent,
+control/parent, normalized/Tactical, control/Tactical, and paired-comparison
+reports have SHA-256, respectively,
+`a88ffdb766bb7e3d3b57e9dfaf40f3db178f3ddda0dd7bcca48a8bfa6467de58`,
+`b1707e443a998760ad398f31070f82e6011512115933481e88f672a18436517b`,
+`a507b0094624141c80677e45a256dc4eee10e819786268253d337bf654fe15b1`,
+`3a6ebedd7d1acd06259ea56756627370b186252664acb56a999d4cc55d9cbb5c`,
+`85af1b05dd6cc035d1169aebbcfa7371b96926ee0eb6c2e3f6d9bc57b4f48720`,
+and `00207fc83dbb7d1afd6b6ba0465d703823a7e1b2f824218cdc6d5ec55a9fda51`.

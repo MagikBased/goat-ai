@@ -158,6 +158,8 @@ def main() -> None:
     parser.add_argument("--ppo-rollout-weighting", choices=("per_decision", "per_episode"),
                         default="per_decision",
                         help="per_episode equalizes total decision weight across rollout duels")
+    parser.add_argument("--ppo-normalize-advantages", action="store_true",
+                        help="opt-in weighted centering and scaling of each PPO rollout's advantages")
     parser.add_argument("--ppo-baseline-timing",
                         choices=("online", "frozen_rollout", "leave_one_out"),
                         default="online",
@@ -224,6 +226,8 @@ def main() -> None:
         parser.error("invalid training schedule or hyperparameters")
     if (args.baseline_scope == "resource_ridge") != bool(args.resource_ridge_artifact):
         parser.error("resource_ridge baseline requires --resource-ridge-artifact")
+    if args.ppo_normalize_advantages and args.policy_update != "clipped_ppo":
+        parser.error("advantage normalization requires clipped PPO")
     if args.ppo_gae_lambda is not None and (
             args.policy_update != "clipped_ppo"
             or args.baseline_scope != "resource_ridge"
@@ -332,6 +336,7 @@ def main() -> None:
         trace_rollout_inference=args.trace_rollout_inference,
         reuse_rollout_features=args.reuse_rollout_features,
         ppo_rollout_weighting=args.ppo_rollout_weighting,
+        ppo_normalize_advantages=args.ppo_normalize_advantages,
         ppo_baseline_timing=args.ppo_baseline_timing,
         ppo_gae_lambda=args.ppo_gae_lambda,
         schedule_mode=args.schedule_mode,
@@ -403,6 +408,7 @@ def main() -> None:
               "reuse_rollout_features": args.reuse_rollout_features,
               "ppo_rollout_weighting": (args.ppo_rollout_weighting
                                         if args.policy_update == "clipped_ppo" else None),
+              "ppo_normalize_advantages": args.ppo_normalize_advantages,
               "ppo_baseline_timing": (args.ppo_baseline_timing
                                       if args.policy_update == "clipped_ppo" else None),
               "ppo_gae_lambda": args.ppo_gae_lambda,

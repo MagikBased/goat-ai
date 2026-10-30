@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
-from math import isfinite
+from math import isfinite, sqrt
 from multiprocessing import get_context
 
 import torch
@@ -562,6 +562,31 @@ def clipped_surrogate(ratio: torch.Tensor, advantage: torch.Tensor,
                          ratio.clamp(1 - clip_epsilon, 1 + clip_epsilon) * advantage)
 
 
+def normalize_rollout_advantages(
+    advantages: Sequence[float], weights: Sequence[float] | None = None,
+) -> tuple[float, ...]:
+    """Center and scale a frozen PPO rollout using its actual update weights.
+
+    A constant-signal batch retains its original advantages so an all-win or
+    all-loss rollout does not silently lose its learning signal.
+    """
+    if (not advantages or any(not isfinite(value) for value in advantages)
+            or weights is not None and (len(weights) != len(advantages)
+                                        or any(not isfinite(weight) or weight <= 0
+                                               for weight in weights))):
+        raise ValueError("advantage normalization needs finite values and positive weights")
+    effective = weights if weights is not None else (1.0,) * len(advantages)
+    total = sum(effective)
+    mean = sum(value * weight for value, weight in zip(
+        advantages, effective, strict=True)) / total
+    variance = sum(weight * (value - mean) ** 2 for value, weight in zip(
+        advantages, effective, strict=True)) / total
+    if variance < 1e-12:
+        return tuple(advantages)
+    scale = sqrt(variance)
+    return tuple((value - mean) / scale for value in advantages)
+
+
 def terminal_gae_advantages(values: Sequence[float], reward: float,
                             trace_lambda: float) -> tuple[float, ...]:
     """Undiscounted GAE over learner decisions with a terminal-only reward.
@@ -795,6 +820,7 @@ def train_against_snapshot_pool(
     ppo_clip_epsilon: float = 0.2,
     ppo_rollout_games: int = 1,
     ppo_rollout_weighting: str = "per_decision",
+    ppo_normalize_advantages: bool = False,
     ppo_baseline_timing: str = "online",
     ppo_gae_lambda: float | None = None,
     rollout_workers: int = 0,
@@ -844,6 +870,8 @@ def train_against_snapshot_pool(
             or ppo_baseline_timing not in ("online", "frozen_rollout", "leave_one_out")
             or not 0 < ppo_clip_epsilon < 1):
         raise ValueError("invalid self-play policy update")
+    if ppo_normalize_advantages and policy_update != "clipped_ppo":
+        raise ValueError("advantage normalization requires clipped PPO")
     if ppo_baseline_timing in ("frozen_rollout", "leave_one_out") and (
             policy_update != "clipped_ppo" or ppo_rollout_games < 2):
         raise ValueError("rollout baseline requires multi-duel PPO")
@@ -1129,6 +1157,9 @@ def train_against_snapshot_pool(
                     if ppo_rollout_weighting == "per_episode":
                         weights = [len(rollout_records) / (len(rollout_record_counts) * count)
                                    for count in rollout_record_counts for _ in range(count)]
+                    update_advantages = (normalize_rollout_advantages(
+                        rollout_advantages, weights) if ppo_normalize_advantages
+                        else rollout_advantages)
                     rollout_loss = ppo_clipped_update(
                         model, vocabulary, rollout_records, 0.0, 0.0, optimizer,
                         epochs=ppo_epochs, batch_size=ppo_batch_size,
@@ -1141,7 +1172,7 @@ def train_against_snapshot_pool(
                         preference_weight=preference_weight,
                         preference_batch_size=preference_batch_size,
                         random_seed=random_seed + seed,
-                        advantages=rollout_advantages, sample_weights=weights,
+                        advantages=update_advantages, sample_weights=weights,
                         encoded_features=(rollout_features if reuse_rollout_features else None))
                     for report_index in rollout_report_indices:
                         reports[report_index]["policy_loss"] = rollout_loss
