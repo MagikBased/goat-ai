@@ -97,6 +97,10 @@ class RestrictedOcgcoreEngine:
         if self.probe is None:
             raise RuntimeError("native duel is closed")
         observation = self.probe.observation(viewer, terminal=terminal)
+        return self._hide_question_graveyard(observation, viewer)
+
+    @staticmethod
+    def _hide_question_graveyard(observation, viewer: int):
         if any(link.card_code == 38723936 and link.controller != viewer
                for link in observation.chain):
             # Question hides its controller's Graveyard during the answer.
@@ -218,6 +222,7 @@ class RestrictedOcgcoreEngine:
                        and self._last_observation is not None
                        and self._last_observation.viewer == native.player
                        else self.visible_observation(native.player))
+        observation = self._hide_question_graveyard(observation, native.player)
         if pending_attack is not None and native.player == pending_attack.controller \
                 and any(choice.kind == "select_card" and choice.location == 0x04
                         for choice in native.choices):
