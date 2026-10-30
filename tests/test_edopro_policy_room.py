@@ -27,6 +27,22 @@ from scripts.serve_edopro_policy import Bridge
 from scripts.train_behavioral_clone import load_experimental_edopro_confirmations
 
 
+def test_room_download_uses_only_known_saved_session(tmp_path):
+    manager = EdoRoomManager(GameCreator(root=tmp_path, native_root=tmp_path))
+    session = manager.folder / ("a" * 16)
+    session.mkdir(parents=True)
+    (session / "session.json").write_text('{"ai_deck":"fixture.ydk"}')
+    replay = session / "game-001-seed-1.yrpX"
+    with pytest.raises(ValueError, match="no saved native replay"):
+        manager.native_replay("a" * 16)
+    replay.write_bytes(b"yrpX-test")
+    assert manager.native_replay("a" * 16) == replay
+    with pytest.raises(ValueError, match="invalid EDOPro session ID"):
+        manager.native_replay("../other")
+    with pytest.raises(ValueError, match="session is unavailable"):
+        manager.native_replay("b" * 16)
+
+
 @pytest.mark.skipif(
     not (os.getenv("GOAT_AI_EDOPRO_HOST_ROOT") and os.getenv("GOAT_AI_EDOPRO_MIRROR_ROOT")),
     reason="external EDOPro host and exact matching native root not supplied",
@@ -183,6 +199,9 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
         assert saved["confirmed"] == 1
         assert manager.choices(session_id)["confirmed"] == 1
         copied_replay = session_dir / replay_path.name
+        assert manager.native_replay(session_id) == copied_replay
+        with pytest.raises(ValueError, match="invalid EDOPro session ID"):
+            manager.native_replay("../other")
         assert copied_replay.with_suffix(".human_labels.json").is_file()
         if historical:
             _, training_records, main_hashes, training_report, hashes = (

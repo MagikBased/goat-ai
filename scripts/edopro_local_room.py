@@ -59,6 +59,17 @@ class EdoRoomManager:
             raise ValueError("recording lacks self-recording authorization")
         return replay, stem.with_suffix(".review.json"), metadata
 
+    def native_replay(self, identifier: str) -> Path:
+        """Return only a recording inside a known local room session."""
+        directory = self._session_directory(identifier)
+        replays = sorted(directory.glob("game-*.yrpX"))
+        if not replays:
+            raise ValueError("EDOPro session has no saved native replay")
+        replay = replays[-1]
+        if not replay.is_file() or replay.is_symlink() or replay.stat().st_size == 0:
+            raise ValueError("EDOPro native replay is unavailable")
+        return replay
+
     def choices(self, identifier: str) -> dict:
         replay, review, metadata = self._verified_game(identifier)
         trajectory = read_trajectory(review)

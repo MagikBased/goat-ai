@@ -8,6 +8,7 @@ run through full native replay and visibility checks before being displayed.
 import argparse
 import json
 import re
+import shutil
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock
@@ -28,7 +29,7 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 REVIEW_API_VERSION = 5
-LIVE_API_VERSION = 10
+LIVE_API_VERSION = 11
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -478,6 +479,23 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 try:
                     self._json(200, edo_room.status())
                 except (ValueError, OSError, RuntimeError) as error:
+                    self._json(400, {"error": str(error)})
+                return
+            if parsed.path == "/api/edopro/replay":
+                try:
+                    identifier = parse_qs(parsed.query).get("id", [""])[0]
+                    replay = edo_room.native_replay(identifier)
+                    size = replay.stat().st_size
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Disposition",
+                                     f'attachment; filename="{replay.name}"')
+                    self.send_header("Content-Length", str(size))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    with replay.open("rb") as source:
+                        shutil.copyfileobj(source, self.wfile)
+                except (ValueError, OSError) as error:
                     self._json(400, {"error": str(error)})
                 return
             if parsed.path == "/api/edopro/choices":

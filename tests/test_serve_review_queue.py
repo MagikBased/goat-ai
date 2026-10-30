@@ -339,6 +339,13 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
             return {"id": identifier, "confirmed": len(frames),
                     "training_admitted": False}
 
+        def native_replay(self, identifier):
+            if identifier != "a" * 16:
+                raise ValueError("invalid EDOPro session ID")
+            replay = tmp_path / "game-001.yrpX"
+            replay.write_bytes(b"yrpX-test")
+            return replay
+
     monkeypatch.setattr(serve_review_queue, "EdoRoomManager", FakeRoom)
     server = serve_review_queue.make_server(None, None, port=0)
     thread = Thread(target=server.serve_forever, daemon=True)
@@ -352,6 +359,13 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
         assert _request(f"{base}/api/edopro/confirm", {
             "id": "a" * 16, "frames": [1, 3]})[1]["confirmed"] == 2
         assert launched[-1] == ("a" * 16, [1, 3])
+        with urlopen(f"{base}/api/edopro/replay?id={'a' * 16}", timeout=5) as response:
+            assert response.read() == b"yrpX-test"
+            assert response.headers["Content-Disposition"] == (
+                'attachment; filename="game-001.yrpX"')
+        with pytest.raises(HTTPError) as invalid_replay:
+            _request(f"{base}/api/edopro/replay?id=../../outside")
+        assert invalid_replay.value.code == 400
         with pytest.raises(HTTPError) as bad_payload:
             _request(f"{base}/api/edopro/start", {"ai_deck": "ai.ydk", "port": 9999})
         assert bad_payload.value.code == 400
@@ -371,12 +385,14 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
     base = f"http://127.0.0.1:{server.server_port}"
     try:
         assert _request(f"{base}/api/review/version")[1] == {"api_version": 5}
-        assert _request(f"{base}/api/live/version")[1] == {"api_version": 10}
+        assert _request(f"{base}/api/live/version")[1] == {
+            "api_version": serve_review_queue.LIVE_API_VERSION}
         assert launch_review_server.REVIEW_API_VERSION == serve_review_queue.REVIEW_API_VERSION
         assert launch_review_server.LIVE_API_VERSION == serve_review_queue.LIVE_API_VERSION
         assert server_healthy(server.server_port, digest)
         with monkeypatch.context() as patch:
-            patch.setattr(launch_review_server, "LIVE_API_VERSION", 11)
+            patch.setattr(launch_review_server, "LIVE_API_VERSION",
+                          serve_review_queue.LIVE_API_VERSION + 1)
             assert not server_healthy(server.server_port, digest)
         assert server_healthy(server.server_port, digest,
                               queue_hash=sha256_file(queue))

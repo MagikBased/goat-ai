@@ -106,6 +106,10 @@ the saved checkmarks, and unchecking one removes that confirmation. These
 annotations are excluded from automatic training. A complete, pinned,
 asset-fingerprinted game with confirmed choices can enter the opt-in
 experimental trainer described below; the dialog shows its exact command.
+The session also offers **Download EDOPro replay** for its native `.yrpX`
+file, including when a saved replay has not passed independent reconstruction.
+Only complete, verified recordings can supply confirmed choices to the
+experimental trainer.
 
 You can play the selected PyTorch policy through an EDOPro LAN room using the
 optional external `mostwanted7/ygo-agent` host. The host is AGPL-3.0-or-later,

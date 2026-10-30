@@ -158,6 +158,13 @@
           item.append(button);
         } else if (record) item.append(`native replay saved; review unavailable${record.verification_error ? `: ${record.verification_error}` : ""}`);
         else item.append(session.error || "no replay saved");
+        if (record) {
+          const download = document.createElement("a");
+          download.href = "/api/edopro/replay?id=" + encodeURIComponent(session.id);
+          download.textContent = "Download EDOPro replay";
+          download.className = "audit-button";
+          item.append(download);
+        }
         list.append(item);
       }
     }
