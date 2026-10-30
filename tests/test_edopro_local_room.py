@@ -1,5 +1,8 @@
 """The local EDOPro launcher accepts only published decks and keeps recordings review-only."""
 
+import json
+import socket
+import time
 from pathlib import Path
 
 import pytest
@@ -81,6 +84,62 @@ def test_edopro_room_reports_missing_optional_host(tmp_path):
     assert room.status()["available"] is False
     with pytest.raises(ValueError, match="host package is missing"):
         room.start("ai.ydk")
+
+
+@pytest.mark.skipif(not Path("/proc/self/cmdline").is_file(),
+                    reason="room process recovery uses Linux procfs")
+def test_edopro_room_survives_review_server_restart(tmp_path):
+    deck_folder = tmp_path / "examples/decks"
+    deck_folder.mkdir(parents=True)
+    (deck_folder / "ai.ydk").write_text("#main\n")
+    native = tmp_path / ".cache/goat-ai"
+    for relative in ("edopro_probe/ygo_agent_host/ygo_agent/arena/server.py",
+                     "edopro_pinned_host/libocgcore.so",
+                     "edopro_pinned_host/lflists/GOAT.lflist.conf",
+                     "fv23_current_tactical_broader_33000_33031.pt"):
+        path = native / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"test")
+    (native / "edopro_pinned_host/script").mkdir()
+    script = tmp_path / "scripts/serve_edopro_policy.py"
+    script.parent.mkdir()
+    script.write_text(
+        "import socket, sys, time\n"
+        "port = int(sys.argv[sys.argv.index('--port') + 1])\n"
+        "with socket.socket() as listener:\n"
+        "    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)\n"
+        "    listener.bind(('127.0.0.1', port))\n"
+        "    listener.listen()\n"
+        "    time.sleep(20)\n")
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    creator = GameCreator(root=tmp_path, native_root=native)
+    first = EdoRoomManager(creator, port=port)
+    try:
+        started = first.start("ai.ydk")
+        identifier = started["sessions"][0]["id"]
+        directory = first.folder / identifier
+        assert json.loads((directory / "session.json").read_text())["pid"] == first.process.pid
+        for _ in range(100):
+            if first.status()["listening"]:
+                break
+            time.sleep(0.01)
+        else:
+            pytest.fail("test room did not start listening")
+        restarted = EdoRoomManager(creator, port=port)
+        status = restarted.status()
+        assert status["room_running"] is True
+        assert status["listening"] is True
+        assert status["sessions"][0]["id"] == identifier
+        assert status["sessions"][0]["running"] is True
+        with pytest.raises(ValueError, match="already running"):
+            restarted.start("ai.ydk")
+    finally:
+        if first.process is not None:
+            first.process.terminate()
+            first.process.wait(timeout=5)
+    assert EdoRoomManager(creator, port=port).status()["room_running"] is False
 
 
 def test_edopro_web_confirmations_only_label_optional_human_choices(tmp_path, monkeypatch):

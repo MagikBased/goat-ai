@@ -40,6 +40,42 @@ class EdoRoomManager:
         self.session: str | None = None
         self._verified: dict[str, tuple[int, dict]] = {}
         self.names: dict[int, str] | None = None
+        self._recover_session()
+
+    def _owned_pid_running(self, directory: Path, pid: object) -> bool:
+        """Recognize only this session's room process after a server restart.
+
+        On Linux, /proc lets us reject a recycled PID or an unrelated process.
+        Other platforms still retain the port-in-use guard in start().
+        """
+        if type(pid) is not int or pid <= 1:
+            return False
+        try:
+            argv = (Path("/proc") / str(pid) / "cmdline").read_bytes().split(b"\0")
+            args = [os.fsdecode(arg) for arg in argv if arg]
+            script = str(self.root / "scripts/serve_edopro_policy.py")
+            return (len(args) >= 2 and args[1] == script
+                    and args[args.index("--out") + 1] == str(directory)
+                    and args[args.index("--port") + 1] == str(self.port))
+        except (OSError, ValueError, IndexError):
+            return False
+
+    def _recover_session(self) -> None:
+        if not self.folder.is_dir():
+            return
+        for directory in sorted(self.folder.glob("[0-9a-f]" * 16),
+                                key=lambda path: path.stat().st_mtime_ns,
+                                reverse=True):
+            metadata = directory / "session.json"
+            if not metadata.is_file():
+                continue
+            try:
+                pid = json.loads(metadata.read_text(encoding="utf-8")).get("pid")
+            except (OSError, ValueError):
+                continue
+            if self._owned_pid_running(directory, pid):
+                self.session = directory.name
+                return
 
     def _session_directory(self, identifier: str) -> Path:
         if not isinstance(identifier, str) or not re.fullmatch(r"[0-9a-f]{16}", identifier):
@@ -183,7 +219,17 @@ class EdoRoomManager:
         return True, ""
 
     def _room_running(self) -> bool:
-        return self.process is not None and self.process.poll() is None
+        if self.process is not None:
+            return self.process.poll() is None
+        if self.session is None:
+            return False
+        directory = self.folder / self.session
+        try:
+            pid = json.loads((directory / "session.json").read_text(
+                encoding="utf-8")).get("pid")
+        except (OSError, ValueError):
+            return False
+        return self._owned_pid_running(directory, pid)
 
     def start(self, deck_name: str) -> dict:
         with self.lock:
@@ -222,6 +268,7 @@ class EdoRoomManager:
             (output / "session.json").write_text(json.dumps({
                 "schema_version": 1, "ai_deck": deck_name,
                 "checkpoint": self.creator.checkpoint.name,
+                "pid": getattr(self.process, "pid", None),
                 "training_admitted": False,
             }, indent=2) + "\n", encoding="utf-8")
             return self.status()

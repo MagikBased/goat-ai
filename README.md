@@ -94,8 +94,10 @@ the room is running, join `127.0.0.1:7911` through EDOPro's LAN host-address
 screen. The page shows the latest room sessions and links a recording only
 after independent replay reconstruction succeeds. Each session stays in the
 ignored `.cache/goat-ai/edopro_games/<session-id>/` folder. The room process
-continues if you close the browser tab. Start another room after the first
-duel ends. The local page needs the optional host and pinned assets described
+continues if you close the browser tab. On Linux, restarting the local review
+server also recovers a still-running room from its saved process ID after
+checking the process command and session directory. Start another room after
+the first duel ends. The local page needs the optional host and pinned assets described
 below; it reports a missing prerequisite instead of starting an unpatched room.
 After a verified duel, press **Confirm my choices** beside its replay. The
 scrollable list shows optional decisions from the human seat with links to

@@ -2995,6 +2995,13 @@ An [opt-in feature-v32 PPO pilot](evaluation.md#feature-v32-ppo-action-choice-pi
 
 ### Future EDOPro human client
 
+The local EDOPro room launcher now records its child process ID and, on Linux,
+recovers an existing room after the review server restarts by checking the
+process command, session directory, and port. A separate TCP listener test
+checks that the recovered room remains visible and blocks a duplicate launch.
+This improves recording continuity; it does not broaden historical prompt or
+rules coverage.
+
 Update (2026-10-30): The local game creation page can start a private pinned
 EDOPro policy room and list its saved native replay. It links the GOAT AI
 viewer only after independent replay reconstruction succeeds. This removes
