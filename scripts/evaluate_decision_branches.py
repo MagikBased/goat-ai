@@ -20,7 +20,7 @@ from goat_ai.agents import (
 )
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.environments import GoatEnvironment
-from goat_ai.evaluation.effect_material import material_margin
+from goat_ai.evaluation.effect_material import effect_material_changes, material_margin
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
@@ -48,6 +48,21 @@ def open_chain_material_change(trajectory, decision_index: int, seat: int,
             return {"before": start, "after": end, "delta": end - start,
                     "closed_before_decision": index}
     return None
+
+
+def selected_activation_material_change(trajectory, decision_index: int,
+                                        card_facts: dict) -> dict | None:
+    """Describe observed visible material through this branch's chain closure.
+
+    A selected activation or response can initiate a chain after the branch
+    decision, so the open-chain diagnostic above does not cover it. This
+    measures the realized branch only; it is not an action-value estimate.
+    """
+    if trajectory.decisions[decision_index].selected_action.kind not in (
+            "activate", "chain"):
+        return None
+    return next((effect for effect in effect_material_changes(trajectory, card_facts)
+                 if effect["decision_index"] == decision_index), None)
 
 
 def later_same_code_activations(trajectory, decision_index: int,
@@ -206,6 +221,9 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
                              "decisions": verified,
                              "open_chain_material_change": open_chain_material_change(
                                  saved, decision_index, seat, card_facts),
+                             "selected_activation_material_change":
+                                 selected_activation_material_change(
+                                     saved, decision_index, card_facts),
                              "later_same_code_activations": later_same_code_activations(
                                  saved, decision_index, seat,
                                  record.selected_action.parameters.get("code")

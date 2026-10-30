@@ -149,6 +149,32 @@ def test_open_chain_material_change_uses_each_players_visible_hand_count():
     assert branches.open_chain_material_change(trajectory, 1, 0, {}) is None
 
 
+def test_selected_activation_material_change_includes_new_chain():
+    before = Observation(
+        viewer=0, acting_player=0, turn=1, phase="main1",
+        life_points=(8000, 8000), hand=tuple(
+            CardView(0, "hand", "faceup", 100) for _ in range(5)),
+        field=(), graveyards=((), ()), banished=((), ()),
+        opponent_hand_count=5, deck_counts=(35, 35),
+        extra_deck_counts=(0, 0), turn_player=0)
+    pending = replace(before, chain=(ChainLinkView(1, 200, 0, 8, 0),))
+    closed = replace(before, opponent_hand_count=3)
+    activate = Action("spell", "activate", 0, {"code": 200, "location": 8})
+    wait = Action("pass", "pass", 0, {})
+    trajectory = Trajectory("goat", ("a", "b"), 1, (
+        DecisionRecord(before, (activate,), activate),
+        DecisionRecord(pending, (wait,), wait),
+        DecisionRecord(closed, (wait,), wait),
+    ), winner=None)
+    change = branches.selected_activation_material_change(
+        trajectory, 0, {200: (0, 0, 0)})
+    assert change is not None
+    assert change["material_delta"] == 2
+    assert change["resolved_before_decision"] == 2
+    assert branches.selected_activation_material_change(
+        trajectory, 1, {200: (0, 0, 0)}) is None
+
+
 def test_later_same_code_activations_stops_at_new_turn_and_ignores_opponent():
     def event(turn, phase, actor, kind, code):
         observation = Observation(

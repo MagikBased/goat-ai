@@ -15402,3 +15402,33 @@ For the direct transfer checks, use the existing
 `--opponent-checkpoint` and `--seed 131700 --seeds 8`, then the three sourced
 pairs above with `--seed 131900 --seeds 16`; keep the same native root,
 four-role scheduling, strict Main Deck holdout, and 3,000-decision limit.
+
+## Fixed-state branch diagnostics for two review flags (30 October 2026)
+
+`scripts/evaluate_decision_branches.py` now reports the observed, player-visible
+non-token hand-plus-field material margin through chain closure when the
+selected branch action activates a card or effect. This is a realized material
+change, not a prediction of strategic value; phase and Set branches report
+`null` because they do not start an activation. The existing open-chain
+diagnostic remains separate.
+
+For the replay-verified weak-sourced review, the recorded Heavy Storm at
+decision 785 in `matchup_00_seed_132001_seat_1.json` lost one visible material
+unit through resolution. Set, Battle Phase, and End Phase alternatives all
+lost the same fixed-deal duel as the recorded activation. The recorded Breaker
+activation at decision 271 in `matchup_00_seed_132000_seat_0.json` also lost
+one visible material unit; Battle Phase and End Phase alternatives all won the
+same fixed-deal duel. Reports live in the ignored review directory as
+`branch_storm/report.json` (SHA-256
+`4f7beeb878d1f3430383b98e0652073708a7c444752b2baac805eb0419a4d9fa`)
+and `branch_breaker/report.json` (SHA-256
+`1e8d464c2e2416c835140e0782b9e7d7f68cfc08fed77309c279ac66464cdc41`).
+The updated activation-field reports for the recorded and Battle Phase
+branches are `branch_storm_material/report.json` (SHA-256
+`e508ff850f56d7baf7efff2911c8349e3db961acba76d577af176ccda206a431`)
+and `branch_breaker_material/report.json` (SHA-256
+`cefdac1b04a137038a1dd283b01e1c6d638f1cade5e6a97e0507bbd29555e35f`).
+All branches reconstructed the source decision, completed, replay-verified,
+and passed the visibility audit. A single fixed hidden deal and continuation
+cannot label the best action or establish a strength gain; the diagnostic
+helps identify activations for further human review and multi-deal evaluation.
