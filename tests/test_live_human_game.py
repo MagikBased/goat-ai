@@ -107,6 +107,29 @@ def test_setting_monster_returns_to_actionable_turn_without_manual_pass(tmp_path
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_reopening_paused_duel_resumes_past_chain_pass(tmp_path):
+    manager = _manager(tmp_path, Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve())
+    try:
+        state = manager.start({"deck1": DECK1, "deck2": DECK2, "human_seat": 0,
+                               "opponent": "random", "seed": 5})
+        for kind in ("normal_summon", "place"):
+            index = next(index for index, action in enumerate(state["legal_actions"])
+                         if action["kind"] == kind)
+            state = manager.choose(state["id"], index, state["decisions"],
+                                   hold_priority=True)
+        assert {action["kind"] for action in state["legal_actions"]} == {"pass", "chain"}
+        resumed = manager.get(state["id"])
+        assert resumed["decisions"] > state["decisions"]
+        assert "pass" not in {action["kind"] for action in resumed["legal_actions"]}
+        journal = manager.creator.output_dir / "_in_progress" / f"{state['id']}.json"
+        entries = json.loads(journal.read_text())["entries"]
+        assert len(entries) == resumed["decisions"]
+        assert entries[state["decisions"]]["origin"] == "automatic"
+    finally:
+        manager.close_all()
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_unfinished_duel_recovers_from_verified_actions_after_server_restart(tmp_path):
     native = Path(os.environ["GOAT_AI_NATIVE_ROOT"]).resolve()
     spec = {"deck1": DECK1, "deck2": DECK2, "human_seat": 1,

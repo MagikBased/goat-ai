@@ -316,12 +316,12 @@ def test_local_review_saves_and_restores_valid_shortlisted_choices(tmp_path, mon
     base = f"http://127.0.0.1:{server.server_port}"
     try:
         assert _request(f"{base}/api/review/version")[1] == {"api_version": 5}
-        assert _request(f"{base}/api/live/version")[1] == {"api_version": 5}
+        assert _request(f"{base}/api/live/version")[1] == {"api_version": 6}
         assert launch_review_server.REVIEW_API_VERSION == serve_review_queue.REVIEW_API_VERSION
         assert launch_review_server.LIVE_API_VERSION == serve_review_queue.LIVE_API_VERSION
         assert server_healthy(server.server_port, digest)
         with monkeypatch.context() as patch:
-            patch.setattr(launch_review_server, "LIVE_API_VERSION", 6)
+            patch.setattr(launch_review_server, "LIVE_API_VERSION", 7)
             assert not server_healthy(server.server_port, digest)
         assert server_healthy(server.server_port, digest,
                               queue_hash=sha256_file(queue))

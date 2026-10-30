@@ -266,6 +266,14 @@ class LiveGame:
                 "card_names": {str(code): self.names.get(code, f"Card #{code}")
                                for code in codes}}
 
+    def resume_snapshot(self) -> dict:
+        """Clear routine priority windows when a browser reconnects to a duel."""
+        before = self.decisions
+        self._advance_opponent()
+        if self.decisions != before:
+            self._save_journal()
+        return self.snapshot()
+
     def choose(self, index: int, expected_decisions: int,
                manual: bool | None = True, hold_priority: bool = False) -> dict:
         if self.env.is_terminal():
@@ -417,7 +425,7 @@ class LiveGameManager:
             return handle
 
     def get(self, identifier: str) -> dict:
-        return self._handle(identifier).call("snapshot")
+        return self._handle(identifier).call("resume_snapshot")
 
     def choose(self, identifier: str, action_index: int,
                expected_decisions: int, manual: bool | None = True,
