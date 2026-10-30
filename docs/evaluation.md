@@ -15389,6 +15389,14 @@ seeds and matchups, and either `--opponent tactical`,
 `--opponent combat_heuristic`, or `--opponent-checkpoint` for direct play.
 Run `scripts/compare_tournament_reports.py --verify-local-decks
 --require-unseen-main-decks` on each matched baseline report pair.
+The comparator now includes `by_candidate_deck` rows with matched score
+differences and intervals for each assigned candidate Main Deck. In the
+second Tactical block above, the aggregate child gain was +7.03 points,
+but Ryan Hayakawa Goat Control was **28.125% versus 28.125%** and had a
+zero-point difference. This diagnostic keeps deck-specific stalls visible;
+it does not turn a non-significant individual deck result into a claim of
+equality. The sourced direct reversal above remains a separate head-to-head
+check, because a baseline comparator cannot substitute for direct play.
 For the direct transfer checks, use the existing
 `v11_fresh_mix_130000_130007/decks_manifest.json` paths with
 `--opponent-checkpoint` and `--seed 131700 --seeds 8`, then the three sourced

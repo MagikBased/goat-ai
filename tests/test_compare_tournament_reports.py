@@ -54,9 +54,42 @@ def test_comparison_checks_local_decks_and_reports_paired_difference(tmp_path):
     assert result["games_per_report"] == 2
     assert result["paired_score_difference"] == 1.0
     assert result["paired_score_difference_95pct_interval"] == [-1.0, 1.0]
+    assert result["by_candidate_deck"] == [{
+        "deck": str(deck), "games_per_report": 2,
+        "candidate_score_rate": 1.0, "control_score_rate": 0.0,
+        "paired_score_difference": 1.0,
+        "paired_score_difference_95pct_interval": [-1.0, 1.0],
+    }]
     deck.write_text("#main\n3\n")
     with pytest.raises(ValueError, match="local deck differs"):
         compare_reports(a, b, verify_local_decks=True)
+
+
+def test_per_deck_comparison_exposes_reversal_hidden_by_overall_tie(tmp_path):
+    a, b, left, right, deck_a = saved_pair(tmp_path)
+    deck_b = tmp_path / "b.ydk"
+    for report, first_wins in ((left, True), (right, False)):
+        games = (
+            GameResult(str(deck_a), str(deck_b), 100, 0,
+                       0 if first_wins else 1, 12),
+            GameResult(str(deck_a), str(deck_b), 100, 1,
+                       1 if first_wins else 0, 13),
+            GameResult(str(deck_b), str(deck_a), 100, 0,
+                       1 if first_wins else 0, 14),
+            GameResult(str(deck_b), str(deck_a), 100, 1,
+                       0 if first_wins else 1, 15),
+        )
+        report["both_deck_assignments"] = True
+        report["games"] = [vars(game) | {"a_outcome": game.a_outcome}
+                           for game in games]
+        report["summary"] = TournamentReport(games).summary()
+    a.write_text(json.dumps(left))
+    b.write_text(json.dumps(right))
+    result = compare_reports(a, b, verify_local_decks=True)
+    assert result["paired_score_difference"] == 0.0
+    assert [(row["deck"], row["paired_score_difference"])
+            for row in result["by_candidate_deck"]] == [
+                (str(deck_a), 1.0), (str(deck_b), -1.0)]
 
 
 def test_comparison_accepts_matching_archived_reports_without_opponent_own_loss_fields(

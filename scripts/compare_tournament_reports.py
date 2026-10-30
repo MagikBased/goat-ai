@@ -122,6 +122,20 @@ def compare_reports(candidate_path: Path, control_path: Path, *,
                 or key in candidate and candidate[key] != control[key]):
             raise ValueError(f"tournament controls differ: {key}")
     point, low, high = paired_score_difference(left, right)
+    by_candidate_deck = []
+    for deck in sorted({game.deck_a for game in left}):
+        deck_left = tuple(game for game in left if game.deck_a == deck)
+        deck_right = tuple(game for game in right if game.deck_a == deck)
+        deck_point, deck_low, deck_high = paired_score_difference(
+            deck_left, deck_right)
+        by_candidate_deck.append({
+            "deck": deck,
+            "games_per_report": len(deck_left),
+            "candidate_score_rate": TournamentReport(deck_left).summary()["overall"]["score_rate"],
+            "control_score_rate": TournamentReport(deck_right).summary()["overall"]["score_rate"],
+            "paired_score_difference": deck_point,
+            "paired_score_difference_95pct_interval": [deck_low, deck_high],
+        })
     return {
         "candidate_report": str(candidate_path),
         "candidate_report_sha256": sha256_file(candidate_path),
@@ -136,6 +150,7 @@ def compare_reports(candidate_path: Path, control_path: Path, *,
         "control_wins": control["summary"]["overall"]["wins"],
         "paired_score_difference": point,
         "paired_score_difference_95pct_interval": [low, high],
+        "by_candidate_deck": by_candidate_deck,
     }
 
 

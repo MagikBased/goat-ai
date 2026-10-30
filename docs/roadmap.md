@@ -1003,6 +1003,11 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+The matched-report comparator now exposes one paired score difference and
+interval per candidate Main Deck alongside the overall result. This makes
+deck-specific stalls visible during checkpoint selection; direct
+child-versus-parent play remains a separate test.
+
 The [larger-step PPO continuation](evaluation.md#larger-step-ppo-continuation-on-mixed-goat-decks-30-october-2026)
 trained for 240 complete, replay-verified duels and changed 23 of 322
 multi-option greedy choices on separate parent-policy states. Against
