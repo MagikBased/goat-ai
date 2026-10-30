@@ -15747,3 +15747,40 @@ direct comparison with `scripts/evaluate_policy.py --engine experimental
 --opponent-own-loss-guard --seed 162000 --seeds 8 --max-decisions 3000
 --workers 2` and the named Decks. Reproduction requires the private journals;
 their paths and bytes are intentionally absent from Git.
+
+## Human-prefix clone against Tactical on unseen Decks — 30 October 2026
+
+The exploratory 41-choice human-prefix child above and its selected v23 parent
+were evaluated with the same v1 visible own-loss guard against Tactical-v14.
+Both sides of each sourced Deck pairing were assigned to the policy on every
+seed; `--require-unseen-main-decks` passed for both checkpoints. On Max
+Suffridge's Goat Control versus Jae Kim's Zombie Deck (seeds 164000–164007),
+the child won 14/32 and parent 12/32. The matched score difference was +6.25
+percentage points, with paired 95% interval 0 to +15.63. On Ramon Ciriano's
+Beastdown versus Roberto Martinez's Phoenix Control (seeds 164100–164115),
+the child won 24/64 and parent 20/64. The matched difference was again +6.25
+points, with interval +1.56 to +12.50. A separate direct child-versus-parent
+test on the latter pairing and seeds 164200–164215 split 33–31 for the child;
+its paired score interval included 50%.
+
+The second pairing was chosen after inspecting the first block, so these are
+exploratory comparisons. The child still scored below 50% against Tactical
+in both blocks, and the direct result does not establish superiority. Keep
+v23 selected and M4 open; collect more independently confirmed human choices
+before a larger training run. The four matched Tactical reports have SHA-256
+digests `f67829900ce4b7eabb913a7f34d437645c2b7e1bc776fea7b9a8c6f468d31c97`,
+`c29f7bd38fba4868484e273ebed020b5b12f3287a0b61e986008b4d8be79470a`,
+`6d1ab0d0d8dbe9e9ef620edaedaa984a6430e0fa88db6742c13d1245c16ad508`, and
+`2822bae860f224ead8e5a10599e6c3af506fac25181d7ce43ef59ea1320b62f4`
+in child/parent order by seed block. The direct report digest is
+`bcc1da681786042a890a7b04e15ad35b24429c5f23f892bd5b0a8ab593edb6e8`.
+All five reports are ignored local files under `.cache/goat-ai/`; each embeds
+the checkpoint, native asset, source-code, seed, Deck, and game results.
+Reproduce with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --require-unseen-main-decks --own-loss-guard
+--opponent tactical --max-decisions 3000 --workers 2` for each named checkpoint,
+Deck pairing and seed block. For the direct test replace `--opponent tactical`
+with `--opponent-checkpoint` pointing to v23 and add
+`--opponent-own-loss-guard`. Compare matched reports with
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.

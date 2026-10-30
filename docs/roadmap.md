@@ -1020,6 +1020,12 @@ without an outcome label. A local 30 October 2026 audit found 41 usable,
 non-forced choices across five unfinished games; one other saved game had no
 human choice to import. These are data-pipeline evidence, not a policy-strength
 result. The M4 held-out competitive gate remains open.
+An additional held-out Tactical-v14 comparison of that 41-choice human-prefix
+child found +2/32 wins on Max Suffridge Goat Control versus Jae Kim Zombie
+and +4/64 wins on Ramon Ciriano Beastdown versus Roberto Martinez Phoenix.
+The latter matched interval was above zero, but the child won only 24/64
+against Tactical and split a separate direct parent match 33–31. These are
+exploratory results, not a promotion; see [evaluation](evaluation.md#human-prefix-clone-against-tactical-on-unseen-decks--30-october-2026).
 
 A [new 12-item PPO-child review queue](replay_audit.md#experimental-ppo-child-on-weak-sourced-deck-assignments-30-october-2026)
 comes from eight replay-verified, visibility-audited Tactical duels on two
