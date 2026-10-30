@@ -84,8 +84,11 @@ def test_upstream_candidate_offers_phase_transition_when_pass_is_absent(tmp_path
     end = Action("end", "end_phase", 0)
     main_activation = replace(activation, legal_actions=(activation.selected_action,
                                                          battle, end))
-    trajectory = replace(trajectory, decisions=(main_activation,
-                                                trajectory.decisions[1]))
+    target = trajectory.decisions[1]
+    target = replace(target, observation=replace(
+        target.observation, chain=(ChainLinkView(1, 5318639, 0, 8, 0),)))
+    trajectory = replace(trajectory, decisions=(main_activation, target))
+    assert create_upstream_review.matching_upstream_activation(trajectory, 1) == 0
     item = json.loads(queue.read_text())["selected"][0]
     candidate = create_upstream_review.upstream_candidate(
         trajectory, item, digest, replay, queue, 0)

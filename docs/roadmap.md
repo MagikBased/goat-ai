@@ -1003,6 +1003,14 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A [new 12-item PPO-child review queue](replay_audit.md#experimental-ppo-child-on-weak-sourced-deck-assignments-30-october-2026)
+comes from eight replay-verified, visibility-audited Tactical duels on two
+sourced pairings where direct parent play was weak. It includes a negative
+visible Heavy Storm trade and a Breaker own-backrow target. The review UI
+now finds the earlier optional Breaker activation even though its legal
+alternatives are phase transitions, not Pass. These are review candidates,
+not training labels; the queue has no human choices yet.
+
 The matched-report comparator now exposes one paired score difference and
 interval per candidate Main Deck alongside the overall result. This makes
 deck-specific stalls visible during checkpoint selection; direct

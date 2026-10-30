@@ -144,7 +144,9 @@ def matching_upstream_activation(trajectory, target_index: int) -> int | None:
             break
         if (prior.observation.acting_player == forced.observation.acting_player
                 and activation_matches_chain_source(prior.selected_action, source)
-                and any(action.kind == "pass" for action in prior.legal_actions)):
+                and any(action != prior.selected_action and action.kind in (
+                    "pass", "battle_phase", "main2", "end_phase",
+                    "phase_transition") for action in prior.legal_actions)):
             return prior_index
     return None
 

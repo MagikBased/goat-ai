@@ -1,5 +1,39 @@
 # Early replay decision audit
 
+## Experimental PPO child on weak sourced deck assignments (30 October 2026)
+
+Eight complete Tactical-v14 duels were recorded with the experimental
+larger-step PPO child on Christian Martinez Goat Control/Theeresak Poonsombat
+New Jersey Goat Control and Jonathan LaBounty Chaos/Max Suffridge Goat
+Control. Seeds 132000–132001 used both policy seats. All **4,591** decisions
+replay-verified and passed the player-visibility audit. The ignored collection
+manifest is
+`.cache/goat-ai/ppo_lr5e4_weak_sourced_review_132000_132001/manifest.json`
+(SHA-256 `21dd6c63ab40636651c7c43028e19bf842a9d639082d98984fe0d032d2f16021`).
+
+The [12-item local review queue](../.cache/goat-ai/ppo_lr5e4_weak_sourced_review_132000_132001/queue.html)
+compares the child's recorded choices with the frozen selected-v23 parent's
+choices on the **same player-visible states**. It is a diagnostic queue,
+not a claim that the parent made the better play. Item 1 flags a Heavy Storm
+activation with a negative visible Spell/Trap trade. Item 2 flags Breaker
+targeting its controller's own Nobleman of Crossout; both checkpoints chose
+that same target. The earlier optional Breaker effect activation at zero-based
+decision 271 is available through **Review earlier activation**, which now
+recognizes legal Main Phase transitions as alternatives to an activation.
+The local review server returned HTTP 200 and opened the replay-verified
+upstream queue when this button's request was made for item 2.
+The separate upstream queue SHA-256 is
+`a89b3221cf3064a8e32cbdc420d6804cd3837a928845cc1db531330e2cf6adea`.
+Neither flag nor suggested alternative is a training label until independently
+reviewed. The main queue SHA-256 is
+`f7e853197857a627d1565c8fb83bc314cfe52cbfd3696efba812fd949a14b4a1`;
+its saved progress currently contains **zero** human choices or notes.
+
+```bash
+./start_review_viewer.sh \
+  .cache/goat-ai/ppo_lr5e4_weak_sourced_review_132000_132001/queue.json
+```
+
 ## Rhymus Goat Control assignment review (29 October 2026)
 
 The [focused local queue](../.cache/goat-ai/rhymus_weak_review_128016_128017/rhymus_queue.html)
