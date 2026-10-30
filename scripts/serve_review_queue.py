@@ -29,7 +29,7 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 REVIEW_API_VERSION = 5
-LIVE_API_VERSION = 14
+LIVE_API_VERSION = 15
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,

@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -117,6 +118,10 @@ def test_page_room_launcher_completes_and_lists_verified_game():
             choices = manager.choices(identifier)
             assert choices["candidates"]
             assert choices["training_admitted"] is False
+            assert choices["continues_recorded_policy"] is True
+            assert "--init-checkpoint" in choices["training_command"]
+            assert "--feature-version 23 --width 32" in choices["training_command"]
+            assert "confirmed_child.pt" in choices["training_command"]
             confirmed = manager.save_choices(
                 identifier, [choices["candidates"][0]["frame"]])
             assert confirmed["confirmed"] == 1
@@ -124,6 +129,22 @@ def test_page_room_launcher_completes_and_lists_verified_game():
                 manifest = json.loads(bundle.read("bundle_manifest.json"))
                 assert manifest["confirmed_human_choices"] == 1
                 assert manifest["historical_goat_certified"] is False
+            child_run = subprocess.run(
+                shlex.split(choices["training_command"])[1:],
+                cwd=project, env=os.environ, check=True,
+                capture_output=True, text=True)
+            assert json.loads(child_run.stdout)["decisions"] == 1
+            child = torch.load(manager.folder / identifier / "confirmed_child.pt",
+                               map_location="cpu", weights_only=True)
+            assert child["parent_checkpoint_sha256"] == hashlib.sha256(
+                creator.checkpoint.read_bytes()).hexdigest()
+            assert child["new_source_decisions"] == {
+                "edopro_human_confirmed_experimental": 1}
+            creator.checkpoint = Path(scratch) / "missing-parent.pt"
+            fallback = manager.choices(identifier)
+            assert fallback["continues_recorded_policy"] is False
+            assert "--init-checkpoint" not in fallback["training_command"]
+            assert "confirmed_pilot.pt" in fallback["training_command"]
         finally:
             if manager.process is not None and manager.process.poll() is None:
                 manager.process.terminate()

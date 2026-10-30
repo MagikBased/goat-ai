@@ -110,7 +110,10 @@ some prompts automatically. **Save confirmations** writes and verifies
 the saved checkmarks, and unchecking one removes that confirmation. These
 annotations are excluded from automatic training. A complete, pinned,
 asset-fingerprinted game with confirmed choices can enter the opt-in
-experimental trainer described below; the dialog shows its exact command.
+experimental trainer described below. The dialog gives a command to train a
+separate child of the AI used in that duel when its checkpoint hash still
+matches. If that parent has changed, it labels a from-scratch pilot instead.
+Neither result replaces the selected AI without held-out evaluation.
 The session also offers **Download EDOPro replay** for its native `.yrpX`
 file, including when a saved replay has not passed independent reconstruction.
 Only complete, verified recordings can supply confirmed choices to the
@@ -198,6 +201,11 @@ choices and marks the checkpoint `edopro_human_confirmed_experimental` with
 arbitrary external replays remain excluded. This path is for controlled
 experiments, not policy promotion or a historical correctness claim. Replace
 `SESSION_ID` and `NNN` with the saved path shown in the room folder.
+Repeat `--experimental-edopro-confirmed PATH.yrpX` to combine several
+confirmed games in one run. The game page's continuation command includes
+`--init-checkpoint` with the AI used in that room; the standalone example above
+starts a fresh pilot model. Keep the output separate from the selected policy
+until held-out evaluation supports promotion.
 For a manually confirmed choice, put its zero-based `decision_index` and
 recorded legal `action_index` in a schema-v1 `self_recorded` annotation tied to
 the review JSON's SHA-256. Check it with

@@ -3204,6 +3204,14 @@ independently verifies them again; and marks its checkpoint as
 historically uncertified. Raw EDOPro replay admission and policy promotion
 still require separate gates.
 
+The game page now offers an experimental child-training command using the
+recorded AI checkpoint only when its current SHA-256 matches the room metadata.
+It passes that parent's feature version and width, saves a separate child, and
+labels a from-scratch fallback if the parent has changed. The pinned-host
+integration test executed the displayed continuation command on one confirmed
+choice and verified the child's parent hash and source provenance. This
+improves the human-data handoff; it is not evidence of a competitive gain.
+
 For training, the bot logs the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The
 human's decisions require equivalent logging at the server or validated

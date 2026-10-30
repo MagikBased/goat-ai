@@ -91,8 +91,7 @@
     <ul id="edopro-choices"></ul>
     <p id="edopro-review-status" role="status" aria-live="polite"></p>
     <div id="edopro-training" hidden>
-      <p>To train experimentally on these confirmed choices, run this from the
-         project directory. The resulting checkpoint is not historically certified.</p>
+      <p id="edopro-training-note"></p>
       <pre id="edopro-training-command"></pre>
       <p><a id="edopro-bundle" href="#">Download confirmed training bundle</a>
          (requires the same pinned native assets to train elsewhere).</p>
@@ -244,11 +243,10 @@
       const session = review.id;
       byId("edopro-bundle").href =
         "/api/edopro/confirmed-bundle?id=" + encodeURIComponent(session);
-      byId("edopro-training-command").textContent =
-        `PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py ` +
-        `--experimental-edopro-confirmed ${review.native_replay} ` +
-        `--native-root .cache/goat-ai ` +
-        `--output .cache/goat-ai/edopro_games/${session}/confirmed_pilot.pt`;
+      byId("edopro-training-note").textContent = review.continues_recorded_policy
+        ? "From the project directory, train an experimental child of the AI used in this duel. The current AI is not replaced; evaluate the child before using it. Historical GOAT correctness is still uncertified."
+        : "The AI checkpoint used in this duel is no longer available unchanged. This command starts an experimental model from scratch; it does not update the current AI.";
+      byId("edopro-training-command").textContent = review.training_command;
     }
     byId("edopro-recordings").addEventListener("click", async event => {
       const button = event.target.closest("button[data-edopro-id]");

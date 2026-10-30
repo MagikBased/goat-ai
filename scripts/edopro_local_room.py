@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -13,6 +14,8 @@ from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 from zipfile import ZIP_DEFLATED, ZipFile
+
+import torch
 
 from goat_ai.agents.card_metadata import load_card_names
 from goat_ai.replay import read_decision_annotations, read_trajectory
@@ -145,7 +148,8 @@ class EdoRoomManager:
     def choices(self, identifier: str) -> dict:
         replay, review, metadata = self._verified_game(identifier)
         trajectory = read_trajectory(review)
-        seat = json.loads(metadata.read_text(encoding="utf-8"))["human_client_seat"]
+        recording_metadata = json.loads(metadata.read_text(encoding="utf-8"))
+        seat = recording_metadata["human_client_seat"]
         labels = replay.with_suffix(".human_labels.json")
         confirmed = set()
         if labels.is_file():
@@ -169,11 +173,30 @@ class EdoRoomManager:
                                "card": card,
                                "confirmed": index + 1 in confirmed})
         recording = self._recording(replay.parent)
+        command = [str(self.root / ".venv/bin/python"),
+                   "scripts/train_behavioral_clone.py",
+                   "--experimental-edopro-confirmed", str(replay),
+                   "--native-root", str(self.creator.native_root)]
+        continuation = False
+        if (self.creator.checkpoint.is_file()
+                and recording_metadata.get("checkpoint_sha256") == sha256_file(
+                    self.creator.checkpoint)):
+            checkpoint = torch.load(self.creator.checkpoint, map_location="cpu",
+                                    weights_only=True)
+            command += ["--init-checkpoint", str(self.creator.checkpoint),
+                        "--feature-version", str(checkpoint["feature_version"]),
+                        "--width", str(checkpoint["width"]),
+                        "--learning-rate", "0.0001"]
+            continuation = True
+        command += ["--output", str(replay.parent / (
+            "confirmed_child.pt" if continuation else "confirmed_pilot.pt"))]
         return {"id": identifier, "viewer": recording["viewer"],
                 "native_replay": recording["native_replay"],
                 "experimental_confirmed_eligible": recording.get(
                     "experimental_confirmed_eligible", False),
                 "candidates": candidates, "confirmed": len(confirmed),
+                "training_command": "PYTHONPATH=src:. " + shlex.join(command),
+                "continues_recorded_policy": continuation,
                 "training_admitted": False}
 
     def save_choices(self, identifier: str, frames: list[int]) -> dict:
