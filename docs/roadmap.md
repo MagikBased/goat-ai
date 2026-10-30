@@ -2889,3 +2889,17 @@ An [opt-in weighted PPO advantage normalization pilot](evaluation.md#weighted-pp
 The [240-duel normalization transfer](evaluation.md#240-duel-normalization-transfer-against-the-preserved-larger-step-control) replay-verified all 143,902 decisions, then scored 58–68–2 directly against the preserved unnormalized child on unseen decks. On a separate exact matched Tactical schedule it scored 43–84–1 versus the control's 46–81–1; the paired interval includes zero. This stronger ablation leaves the selected checkpoint and M4 gate unchanged. The next policy work needs a more informative decision signal, especially independently reviewed activation and target choices, rather than another scaling-only PPO adjustment.
 
 An [opt-in feature-v32 PPO pilot](evaluation.md#feature-v32-ppo-action-choice-pilot-30-october-2026) removed six distinct-choice `select_option` encoding collisions found in 3,987 multi-action decisions. All 48 training duels in each arm replay-verified, but the v32 child scored 30–33–1 against the matched v23 child and 21–42–1 against Tactical-v14 versus v23's 26–38 on identical held-out schedules. This does not justify promotion. Keep selected v23 and M4's competitive-strength gate unchanged; collect more independent decision feedback before another feature or PPO scaling trial.
+
+### Future EDOPro human client
+
+An EDOPro bot connection could let a human play this policy in the EDOPro
+client. A local GOAT duel server would need to translate EDOPro's bot protocol
+to this project's action interface and log the human's complete legal-action
+set, player-visible observation, and chosen response at each decision. Importing
+an EDOPro replay alone is not a substitute for that live log: the current
+replay reader has not established complete decision reconstruction or
+player-knowledge validation for real EDOPro files. Before any EDOPro match is
+used for training, verify core/script/card-ID parity against the pinned GOAT
+engine, replay the match exactly, and pass the visibility audit. Keep the
+client bridge optional so the Python training and Stardust-facing policy
+interfaces remain independent of EDOPro's client and license.

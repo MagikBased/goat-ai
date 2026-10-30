@@ -47,10 +47,12 @@ def test_live_game_rejects_invalid_requests(tmp_path):
 def test_auto_pass_keeps_optional_effect_choices_and_respects_priority_hold():
     pass_action = SimpleNamespace(kind="pass")
     chain_action = SimpleNamespace(kind="chain")
+    other_response = SimpleNamespace(kind="activate")
     no_action = SimpleNamespace(kind="no")
     yes_action = SimpleNamespace(kind="yes")
     assert _automatic_pass([pass_action], True) is pass_action
     assert _automatic_pass([chain_action, pass_action], False) is pass_action
+    assert _automatic_pass([other_response, pass_action], False) is pass_action
     assert _automatic_pass([chain_action, pass_action], True) is None
     assert _automatic_pass([no_action, yes_action], False) is None
 
@@ -96,6 +98,14 @@ def test_setting_monster_returns_to_actionable_turn_without_manual_pass(tmp_path
         assert state["decisions"] == 6
         assert state["observation"]["acting_player"] == 0
         assert state["observation"]["phase"] == "main1"
+        assert state["presentation_frames"]
+        assert all(frame["observation"]["viewer"] == 0
+                   for frame in state["presentation_frames"])
+        assert all("opponent_hand" not in frame["observation"]
+                   for frame in state["presentation_frames"])
+        assert any(card["position"] == "facedown" and card["controller"] == 0
+                   for frame in state["presentation_frames"]
+                   for card in frame["observation"]["field"])
         assert "pass" not in {action["kind"] for action in state["legal_actions"]}
         assert "end_phase" in {action["kind"] for action in state["legal_actions"]}
         journal = manager.creator.output_dir / "_in_progress" / f"{state['id']}.json"
@@ -148,7 +158,9 @@ def test_unfinished_duel_recovers_from_verified_actions_after_server_restart(tmp
 
     resumed = _manager(tmp_path, native)
     try:
-        assert resumed.get(state["id"]) == state
+        assert resumed.get(state["id"]) == {
+            key: value for key, value in state.items()
+            if key not in ("presentation_frames", "presentation_card_names")}
         next_state = resumed.choose(state["id"], 0, state["decisions"])
         assert next_state["decisions"] > state["decisions"]
         assert resumed.close(state["id"]) == {"closed": True}

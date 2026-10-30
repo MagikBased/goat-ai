@@ -30,8 +30,9 @@ def _automatic_pass(actions, hold_priority: bool):
     passes = [action for action in actions if action.kind == "pass"]
     if len(passes) != 1:
         return None
-    if len(actions) == 1 or (not hold_priority and
-                             all(action.kind in ("pass", "chain") for action in actions)):
+    # The native adapter emits Pass only for a chain response. Decline that
+    # window by default even if a future adapter adds other response kinds.
+    if len(actions) == 1 or not hold_priority:
         return passes[0]
     return None
 
@@ -58,6 +59,7 @@ class LiveGame:
         self.effect_texts: dict[tuple[int, int], str] = {}
         self.effect_codes_loaded: set[int] = set()
         self.max_decisions = max_decisions
+        self._presentation_frames: list[dict] | None = None
         self.spec = spec
         self.journal_path = journal_path
         self.journal_entries: list[dict] = []
@@ -89,6 +91,15 @@ class LiveGame:
         })
         self.env.step(action)
         self.decisions += 1
+        if self._presentation_frames is not None:
+            # Query only the human's redacted view. The current Decision may
+            # belong to the opponent and must never be sent to the browser.
+            visible = asdict(self.env.engine.visible_observation(
+                self.human_seat, terminal=self.env.is_terminal()))
+            frame = {"observation": visible, "kind": action.kind, "origin": origin}
+            if (not self._presentation_frames or
+                    self._presentation_frames[-1]["observation"] != visible):
+                self._presentation_frames.append(frame)
 
     def _save_journal(self) -> None:
         if self.env.is_terminal():
@@ -288,11 +299,27 @@ class LiveGame:
             raise ValueError("manual decision flag must be boolean")
         if type(hold_priority) is not bool:
             raise ValueError("hold priority flag must be boolean")
-        self._apply(self.env.legal_actions()[index],
-                    "manual" if manual else "automatic" if manual is False else "unknown")
-        self._advance_opponent(hold_priority=hold_priority)
-        self._save_journal()
-        return self.snapshot()
+        self._presentation_frames = []
+        try:
+            self._apply(self.env.legal_actions()[index],
+                        "manual" if manual else "automatic" if manual is False else "unknown")
+            self._advance_opponent(hold_priority=hold_priority)
+            self._save_journal()
+            result = self.snapshot()
+            result["presentation_frames"] = self._presentation_frames
+            visible_codes = set()
+            for frame in self._presentation_frames:
+                observation = frame["observation"]
+                for card in (*observation["hand"], *observation["field"],
+                             *observation["graveyards"][0], *observation["graveyards"][1],
+                             *observation["banished"][0], *observation["banished"][1]):
+                    if card["code"] is not None:
+                        visible_codes.add(card["code"])
+            result["presentation_card_names"] = {
+                str(code): self.names.get(code, f"Card #{code}") for code in visible_codes}
+            return result
+        finally:
+            self._presentation_frames = None
 
     def terminal(self) -> bool:
         return self.env.is_terminal()

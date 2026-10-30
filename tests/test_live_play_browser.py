@@ -507,3 +507,162 @@ def test_turning_off_chain_pause_resumes_automatic_pass(tmp_path):
     match = re.search(r'data-resume-probe="([^"]+)"', result.stdout)
     assert match, result.stderr[-1200:]
     assert match.group(1) == "true|true|true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+@pytest.mark.parametrize("width,height", [(1920, 1080), (1365, 768)])
+def test_context_menu_centers_and_suppresses_card_preview(tmp_path, width, height):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      const observation = {viewer:0,acting_player:0,turn_player:0,turn:1,phase:'main1',
+        life_points:[8000,8000],hand:[{code:123,sequence:0}],field:[],
+        graveyards:[[],[]],banished:[[],[]],extra_deck_counts:[0,0],
+        deck_counts:[35,35],opponent_hand_count:5,public_history:[],
+        known_opponent_hand_cards:[],known_opponent_field_cards:[],
+        own_extra_deck:[],restrictions:[],chain:[]};
+      render({id:'1234567890abcdef',decisions:0,human_seat:0,terminal:false,
+        observation,card_names:{123:'Test Card'},legal_actions:[
+          {id:'0',kind:'set_monster',actor:0,
+            parameters:{code:123,location:2,controller:0,sequence:0}}]});
+      const card = document.querySelector('#own-hand .card');
+      showPreview(card);
+      const previewWasVisible = !document.getElementById('card-preview').hidden;
+      card.click();
+      const tray = document.getElementById('card-actions');
+      const previewHidden = document.getElementById('card-preview').hidden;
+      const board = document.getElementById('board').getBoundingClientRect();
+      const rect = tray.getBoundingClientRect();
+      const source = card.getBoundingClientRect();
+      document.body.dataset.menuProbe = [previewWasVisible,previewHidden,
+        rect.left >= board.left && rect.right <= board.right,
+        rect.top >= board.top && rect.bottom <= board.bottom,
+        Math.abs((rect.left + rect.right)/2 - (source.left + source.right)/2) < 5].join('|');
+    </script></body>"""
+    path = tmp_path / f"centered_menu_{width}_{height}.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", f"--window-size={width},{height}",
+        "--virtual-time-budget=700", "--dump-dom", path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-menu-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "true|true|true|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_required_yes_no_uses_choice_dialog(tmp_path):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      const observation = {viewer:0,acting_player:0,turn_player:0,turn:1,phase:'main1',
+        life_points:[8000,8000],hand:[],field:[],graveyards:[[],[]],banished:[[],[]],
+        extra_deck_counts:[0,0],deck_counts:[35,35],opponent_hand_count:5,
+        public_history:[],known_opponent_hand_cards:[],known_opponent_field_cards:[],
+        own_extra_deck:[],restrictions:[],chain:[]};
+      render({id:'1234567890abcdef',decisions:0,human_seat:0,terminal:false,
+        observation,card_names:{},legal_actions:['yes','no'].map((kind,id) =>
+          ({id:String(id),kind,actor:0,parameters:{}}))});
+      const dialog = document.getElementById('choice-dialog');
+      const yesNo = [dialog.open,
+        document.getElementById('choice-title').textContent === 'Use this effect?',
+        [...dialog.querySelectorAll('button')].map(button => button.textContent).join(',')];
+      render({id:'1234567890abcdef',decisions:1,human_seat:0,terminal:false,
+        observation,card_names:{},legal_actions:[0,1].map(index =>
+          ({id:String(index),kind:'select_card',actor:0,
+            parameters:{location:2,controller:1}}))});
+      document.body.dataset.choiceProbe = [...yesNo,
+        dialog.open && [...dialog.querySelectorAll('button')].every(button =>
+          button.textContent.includes('choice'))]
+        .join('|');
+    </script></body>"""
+    path = tmp_path / "yes_no_dialog.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=700", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-choice-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "true|true|Yes,No|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_ai_card_sets_are_presented_one_at_a_time(tmp_path):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      const action = kind => ({id:kind,kind,actor:0,parameters:{}});
+      const base = {viewer:0,acting_player:0,turn_player:0,turn:1,phase:'main1',
+        life_points:[8000,8000],hand:[],field:[],graveyards:[[],[]],banished:[[],[]],
+        extra_deck_counts:[0,0],deck_counts:[35,35],opponent_hand_count:5,
+        public_history:[],known_opponent_hand_cards:[],known_opponent_field_cards:[],
+        own_extra_deck:[],restrictions:[],chain:[]};
+      const facedown = sequence => ({controller:1,zone:'spell_trap',sequence,
+        code:null,position:'facedown',orientation:'attack'});
+      const first = {...base,field:[facedown(0)]};
+      const second = {...base,field:[facedown(0),facedown(1)]};
+      const initial = {id:'1234567890abcdef',decisions:0,human_seat:0,
+        terminal:false,observation:base,card_names:{},legal_actions:[action('end_phase')]};
+      const final = {...initial,decisions:3,observation:second,
+        legal_actions:[action('end_phase')],presentation_frames:[
+          {observation:first,kind:'set_spell_trap',origin:'agent'},
+          {observation:second,kind:'set_spell_trap',origin:'agent'}]};
+      render(initial);
+      const seen = [];
+      new MutationObserver(() => {
+        const count = document.querySelectorAll('#opp-spell .card').length;
+        if (count && !seen.some(entry => entry[0] === count))
+          seen.push([count,performance.now()]);
+      }).observe(document.getElementById('opp-spell'),{childList:true,subtree:true});
+      window.fetch = async () => new Response(JSON.stringify(final));
+      choose(0).then(() => {
+        document.body.dataset.framesProbe = [seen.map(item => item[0]).join(','),
+          seen.length === 2 && seen[1][1] - seen[0][1] >= 320,
+          state.decisions === 3].join('|');
+      });
+    </script></body>"""
+    path = tmp_path / "ai_frames.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=1600", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-frames-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "1,2|true|true"
+
+
+@pytest.mark.skipif(not shutil.which("chromium"), reason="Chromium unavailable")
+def test_large_card_name_prompt_is_searchable_without_rendering_every_option(tmp_path):
+    template = (Path(__file__).resolve().parents[1] / "examples/play_game.html").read_text()
+    probe = """<script>
+      const observation = {viewer:0,acting_player:0,turn_player:0,turn:1,phase:'main1',
+        life_points:[8000,8000],hand:[],field:[],graveyards:[[],[]],banished:[[],[]],
+        extra_deck_counts:[0,0],deck_counts:[35,35],opponent_hand_count:5,
+        public_history:[],known_opponent_hand_cards:[],known_opponent_field_cards:[],
+        own_extra_deck:[],restrictions:[],chain:[]};
+      const legal_actions = Array.from({length:250},(_,index) =>
+        ({id:String(index),kind:'announce_card',actor:0,parameters:{code:index+1}}));
+      render({id:'1234567890abcdef',decisions:0,human_seat:0,terminal:false,
+        observation,card_names:{201:'Target Card'},legal_actions});
+      const dialog = document.getElementById('choice-dialog');
+      const search = document.getElementById('choice-search');
+      const initial = dialog.querySelectorAll('#choice-options button').length;
+      search.value = 'Target Card';
+      search.dispatchEvent(new Event('input'));
+      document.body.dataset.searchProbe = [dialog.open,!search.hidden,
+        initial === 100,dialog.querySelectorAll('#choice-options button').length === 1,
+        dialog.querySelector('#choice-options button').textContent.includes('Target Card')]
+        .join('|');
+    </script></body>"""
+    path = tmp_path / "large_choice_dialog.html"
+    path.write_text(template.replace("</body>", probe), encoding="utf-8")
+    result = subprocess.run([
+        shutil.which("chromium"), "--headless", "--no-sandbox", "--disable-gpu",
+        "--disable-dev-shm-usage", "--virtual-time-budget=700", "--dump-dom",
+        path.as_uri(),
+    ], capture_output=True, text=True, timeout=20, check=True)
+    match = re.search(r'data-search-probe="([^"]+)"', result.stdout)
+    assert match, result.stderr[-1200:]
+    assert match.group(1) == "true|true|true|true|true"

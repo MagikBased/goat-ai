@@ -147,7 +147,8 @@ server's art cache; missing artwork displays the card name instead.
 When an effect asks for multiple cards, such as Graceful Charity's two
 discards, click the cards in your hand or on the field, then press **Confirm
 selected cards**. Click a selected card again to undo it. The advanced action
-list remains available for choices outside the board. When one card offers
+list remains available for debugging; required Yes/No, card, position, and
+effect-option decisions open a choice dialog. When one card offers
 multiple effect modes, its action buttons show distinct descriptions from the
 pinned card database; the full text appears on hover and in the advanced list.
 Open placement zones are
@@ -159,8 +160,9 @@ action you may want to answer with a Trap or quick effect; uncheck it to resume
 automatic passing. A reload starts with automatic passing enabled, and the
 sidebar explains when this pause is holding a chain response.
 The server resolves optional Chain/Pass windows by default, so progress does
-not depend on a browser timer. It also passes automatically whenever **Pass**
-is your only native legal action, including after an AI move. Such passes stay in the verified
+not depend on a browser timer. It automatically declines a native chain window
+whenever **Pass** is available and response pausing is off, including after an
+AI move. Such passes stay in the verified
 trajectory and unfinished-game journal. When response pausing is enabled,
 available Chain responses stop for your choice. Hover or focus a card to enlarge
 it; your own face-down cards preview their known faces, while unknown opponent cards stay
@@ -179,11 +181,12 @@ including when opened offline. Browsers may wait for a click before playing
 audio. No game sound files are committed to Git; see
 [EDOPro's sound credits](https://github.com/ProjectIgnis/Distribution/blob/master/sound/CREDITS.md).
 Click a future phase to pass through intermediate priority windows. Enable
-**Pause for chain responses** to keep response windows after your activations.
+**Pause at each chain response** to keep response windows after your activations.
 Use **Pass** for individual responses, or use **End turn** to pass through
 intermediate windows, enter the End Phase, and finish the turn in one click.
 Consecutive automatic Pass choices
-are resolved before the next board decision appears. Unusual prompts and every
+are resolved before the next board decision appears. Visible AI card changes
+are shown in order with a short entrance animation. Unusual prompts and every
 legal choice remain available under **All legal actions** in the sidebar.
 The board and controls use only the human player's visible observation and
 native legal actions. On completion the server replay-verifies the duel,

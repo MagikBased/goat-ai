@@ -365,6 +365,10 @@ def test_question_card_name_prompt_hides_graveyard_and_resolves(
                 assert all(card.code is None for card in observation.graveyards[1])
             if actions[0].kind == "announce_card":
                 assert observation.acting_player == 0
+                # Live presentation uses this same viewer-scoped path even
+                # when the native decision belongs to another player.
+                live_view = env.engine.visible_observation(0)
+                assert live_view.graveyards == observation.graveyards
                 assert len(actions) > 1000
                 assert all(card.code is None for card in observation.graveyards[1])
                 assert all(card.code is not None for card in observation.graveyards[0])

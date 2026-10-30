@@ -92,6 +92,21 @@ class RestrictedOcgcoreEngine:
             self.close()
             raise
 
+    def visible_observation(self, viewer: int, *, terminal: bool = False):
+        """Return the same redacted view for live presentation and decisions."""
+        if self.probe is None:
+            raise RuntimeError("native duel is closed")
+        observation = self.probe.observation(viewer, terminal=terminal)
+        if any(link.card_code == 38723936 and link.controller != viewer
+               for link in observation.chain):
+            # Question hides its controller's Graveyard during the answer.
+            hidden = 1 - viewer
+            graveyards = list(observation.graveyards)
+            graveyards[hidden] = tuple(replace(card, code=None, position="hidden")
+                                       for card in graveyards[hidden])
+            observation = replace(observation, graveyards=tuple(graveyards))
+        return observation
+
     def _decision(self, pending_attack: TargetSlotView | None = None,
                   *, reuse_observation: bool = False) -> Decision:
         if self.probe is None or self.probe._pending_message is None:
@@ -202,21 +217,11 @@ class RestrictedOcgcoreEngine:
         observation = (self._last_observation if reuse_observation
                        and self._last_observation is not None
                        and self._last_observation.viewer == native.player
-                       else self.probe.observation(native.player))
+                       else self.visible_observation(native.player))
         if pending_attack is not None and native.player == pending_attack.controller \
                 and any(choice.kind == "select_card" and choice.location == 0x04
                         for choice in native.choices):
             observation = replace(observation, pending_attack=pending_attack)
-        if any(link.card_code == 38723936 and link.controller != native.player
-               for link in observation.chain):
-            # Question forbids inspecting its controller's Graveyard at the
-            # announcement. Previously visible cards remain available to an
-            # agent only through its own memory of earlier decisions.
-            hidden = 1 - native.player
-            graveyards = list(observation.graveyards)
-            graveyards[hidden] = tuple(replace(card, code=None, position="hidden")
-                                       for card in graveyards[hidden])
-            observation = replace(observation, graveyards=tuple(graveyards))
         zones = {0x04: "monster", 0x08: "spell_trap", 0x10: "graveyard", 0x20: "banished"}
         visible_cards = (*observation.field, *observation.graveyards[0],
                          *observation.graveyards[1], *observation.banished[0],

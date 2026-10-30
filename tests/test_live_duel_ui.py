@@ -22,7 +22,7 @@ def test_optional_effect_decline_is_not_labeled_as_pass(tmp_path):
       setTimeout(() => {
         render(wrap([{kind:'no',parameters:{}},{kind:'yes',parameters:{}}]));
         const effect = byId('pass-action').hidden && byId('end-turn').disabled &&
-          [...document.querySelectorAll('#card-actions button')].some(button =>
+          [...document.querySelectorAll('#choice-dialog button')].some(button =>
             button.textContent.includes('No'));
         render(wrap([{kind:'cancel',parameters:{}},
           {kind:'select_card',parameters:{code:123,location:2,controller:0,sequence:0}}]));

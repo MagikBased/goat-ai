@@ -72,6 +72,9 @@
     .card.selectable { cursor: pointer; outline: 2px solid #e5c963; outline-offset: -2px; }
     .card.selected { outline: 4px solid #55e2c0; outline-offset: -4px; filter: brightness(1.2); }
     .card img { z-index: 1; }
+    .card.entering { animation: card-arrives .32s ease-out; }
+    @keyframes card-arrives { from { opacity: .25; filter: brightness(2); }
+      to { opacity: 1; filter: brightness(1); } }
     .phase { grid-column: 2; grid-row: 3 / 7; min-height: 0; display: flex;
       flex-direction: column; justify-content: center; align-items: center; gap: min(1.2dvh, 7px);
       border-left: 1px solid #678a86; background: #071923ba;
@@ -93,12 +96,15 @@
       background: #193c43; }
     #card-selection button { width: 100%; margin-top: 6px; }
     #card-actions { position: absolute; z-index: 20; display: flex; align-items: center;
-      gap: 5px; padding: 6px; max-width: min(92%, 650px); overflow-x: auto;
+      justify-content: center; gap: 5px; padding: 6px; width: max-content;
+      max-width: calc(100% - 16px); max-height: calc(100% - 16px);
+      overflow: auto;
       background: #172e3af5; border: 1px solid #e5c963; border-radius: 10px;
       box-shadow: 0 8px 24px #000c; }
     #card-actions[hidden] { display: none; }
-    #card-actions button { display: grid; justify-items: center; gap: 2px; flex: 0 0 70px;
-      min-height: 56px; padding: 4px; font-size: .72rem; white-space: normal; }
+    #card-actions button { display: grid; justify-items: center; align-content: center;
+      gap: 2px; flex: 0 0 70px; min-height: 56px; padding: 4px;
+      font-size: .72rem; white-space: normal; overflow-wrap: anywhere; }
     #card-actions button.effect-choice { flex-basis: 128px; }
     #card-actions button svg { width: 24px; height: 24px; }
     #card-actions .close-actions { flex-basis: 34px; min-height: 34px; align-self: flex-start; }
@@ -129,6 +135,14 @@
     #pile-list button { width: 100%; text-align: left; font-size: .8rem; overflow-wrap: anywhere; }
     #pile-list button:disabled { opacity: 1; cursor: default; }
     dialog::backdrop { background: #000a; }
+    #choice-dialog { width: min(520px, calc(100vw - 24px)); padding: 18px;
+      box-shadow: 0 18px 50px #000d; }
+    #choice-dialog h2 { margin: 0 0 10px; font-size: 1.2rem; }
+    #choice-search { width: 100%; margin-bottom: 8px; }
+    #choice-count { margin: 0 0 8px; color: #a8d6da; font-size: .85rem; }
+    #choice-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 8px; max-height: 55dvh; overflow-y: auto; }
+    #choice-options button { min-height: 48px; text-align: center; overflow-wrap: anywhere; }
     @media (max-width: 850px) { #game { height: auto; display: block; }
       #board { height: 720px; } #sidebar { margin-top: 12px; height: 400px; }
       #setup .seats { grid-template-columns: 1fr; } }
@@ -194,6 +208,11 @@
   </main>
   <dialog id="pile-dialog"><h2 id="pile-title"></h2><ul id="pile-list"></ul>
     <button id="close-pile" type="button">Close</button></dialog>
+  <dialog id="choice-dialog" aria-labelledby="choice-title">
+    <h2 id="choice-title">Choose an action</h2>
+    <input id="choice-search" type="search" placeholder="Search card or option" hidden>
+    <p id="choice-count"></p><div id="choice-options"></div>
+  </dialog>
   <div id="card-preview" hidden aria-hidden="true"></div>
   <script src="/examples/duel_audio.js"></script>
   <script>
@@ -208,14 +227,14 @@
     let previewSource = null;
     let previewHeight = 250;
     let forcedPassTimer = null;
+    let presentationPlaying = false;
     function automaticPassIndex(data) {
       if (!data || data.terminal) return -1;
       const options = data.legal_actions || [];
       const passIndex = options.findIndex(action => action.kind === "pass");
       if (passIndex < 0) return -1;
       if (options.length === 1) return passIndex;
-      if (!byId("hold-priority").checked &&
-          options.every(action => ["pass", "chain"].includes(action.kind)))
+      if (!byId("hold-priority").checked)
         return passIndex;
       return -1;
     }
@@ -251,6 +270,7 @@
       preview.style.top = `${Math.max(8, Math.min(innerHeight - height - 8, preferred))}px`;
     }
     function showPreview(source) {
+      if (!byId("card-actions").hidden) return;
       const code = Number(source.dataset.previewCode);
       if (!code) return;
       previewSource = source;
@@ -379,6 +399,7 @@
     function closeCardActions() { byId("card-actions").hidden = true; }
     function showActionTray(offered, anchor, _titleText, destination = null) {
       if (!offered.length) { closeCardActions(); return; }
+      hidePreview();
       const tray = byId("card-actions"); tray.replaceChildren();
       for (const {action, index} of offered) {
         const button = document.createElement("button"); button.type = "button";
@@ -399,7 +420,9 @@
       const hand = anchor.closest(".hand")?.getBoundingClientRect();
       const visibleBottom = Math.min(box.bottom, hand?.bottom ?? box.bottom);
       tray.hidden = false;
-      tray.style.left = `${Math.max(8, Math.min(box.left - bounds.left, bounds.width - tray.offsetWidth - 8))}px`;
+      tray.style.left = `${Math.max(8, Math.min(
+        box.left + box.width / 2 - bounds.left - tray.offsetWidth / 2,
+        bounds.width - tray.offsetWidth - 8))}px`;
       const below = visibleBottom + tray.offsetHeight + 5 <= bounds.bottom - 8;
       const top = below ? visibleBottom - bounds.top + 5 : box.top - bounds.top - tray.offsetHeight - 5;
       tray.style.top = `${Math.max(8, Math.min(top, bounds.height - tray.offsetHeight - 8))}px`;
@@ -589,6 +612,8 @@
         `P${item.controller + 1} ${locationName(item.location)} ${item.sequence + 1}`
       ).join(", "));
       if (params.position != null) parts.push(positionName(params.position));
+      if (params.option != null) parts.push(`Option ${params.option + 1}`);
+      if (params.amount != null) parts.push(`${params.amount} counters`);
       if (params.number != null) parts.push(String(params.number));
       if (params.race != null) parts.push(`Type ${params.race}`);
       if (params.attribute != null) parts.push(`Attribute ${params.attribute}`);
@@ -689,17 +714,54 @@
     }
     function renderPromptActions() {
       const kinds = new Set(["yes", "no", "select_position", "announce_race",
-        "announce_attribute", "announce_number", "announce_card", "select_option"]);
+        "announce_attribute", "announce_number", "announce_card", "select_option",
+        "select_card", "unselect_card", "select_counters", "finish_selection",
+        "sort_cards", "tribute", "tribute_cards", "place_zones",
+        "disable_zones", "cancel"]);
       const choices = state.legal_actions.map((action, index) => ({action, index}))
         .filter(({action}) => kinds.has(action.kind));
-      if (choices.length && choices.length === state.legal_actions.length)
-        showActionTray(choices.slice(0, 32), byId("phase"), "Choose a response");
+      const dialog = byId("choice-dialog");
+      if (!choices.length || choices.length !== state.legal_actions.length) {
+        if (dialog.open) dialog.close();
+        return;
+      }
+      const title = choices.every(({action}) => ["yes", "no"].includes(action.kind))
+        ? "Use this effect?" : choices.every(({action}) => action.kind === "select_position")
+          ? "Choose a position" : choices.every(({action}) => action.kind === "select_card")
+            ? "Choose a card" : "Choose an option";
+      byId("choice-title").textContent = title;
+      const labels = choices.map(({action}) => ["yes", "no"].includes(action.kind)
+        ? action.kind[0].toUpperCase() + action.kind.slice(1) : actionLabel(action));
+      const search = byId("choice-search");
+      search.hidden = choices.length <= 24;
+      search.value = "";
+      function paintOptions() {
+        const term = search.value.toLowerCase();
+        const matches = choices.map((choice, ordinal) => ({...choice, ordinal}))
+          .filter(({ordinal}) => labels[ordinal].toLowerCase().includes(term));
+        byId("choice-count").textContent = search.hidden ? "" :
+          `${matches.length} choices${matches.length > 100 ? " · showing first 100" : ""}`;
+        const options = byId("choice-options"); options.replaceChildren();
+        for (const {index, ordinal} of matches.slice(0, 100)) {
+          const button = document.createElement("button"); button.type = "button";
+          button.textContent = labels[ordinal] +
+            (labels.indexOf(labels[ordinal]) === labels.lastIndexOf(labels[ordinal])
+              ? "" : ` · choice ${ordinal + 1}`);
+          button.onclick = () => { dialog.close(); choose(index); };
+          options.append(button);
+        }
+      }
+      search.oninput = paintOptions;
+      paintOptions();
+      if (!dialog.open) dialog.showModal();
     }
     function render(data) {
+      const previous = state?.observation;
       state = data; clearTimeout(forcedPassTimer); closeCardActions(); hidePreview();
       selectedCards = [];
       byId("setup").hidden = true; byId("game").hidden = false;
       if (data.terminal) {
+        if (byId("choice-dialog").open) byId("choice-dialog").close();
         byId("card-selection").hidden = true;
         byId("message").textContent = data.winner == null ? "Duel ended in a draw." :
           `Duel ended. Player ${data.winner + 1} won.`;
@@ -729,6 +791,17 @@
                "Deck", o.deck_counts[you]);
       boardRow("own-spell", o, you, "spell_trap", "Banished", o.banished[you].length,
                "GY", o.graveyards[you].length);
+      if (previous) for (const card of o.field) {
+        const before = previous.field.find(old => old.controller === card.controller &&
+          old.zone === card.zone && old.sequence === card.sequence);
+        if (before && before.code === card.code && before.position === card.position &&
+            before.orientation === card.orientation) continue;
+        const row = byId(`${card.controller === you ? "own" : "opp"}-${
+          card.zone === "monster" ? "monster" : "spell"}`);
+        const zoneIndex = card.zone === "spell_trap" && card.sequence === 5 ? 0 :
+          card.sequence + 1;
+        row?.children[zoneIndex]?.querySelector(".card")?.classList.add("entering");
+      }
       byId("history").textContent = o.public_history.slice(-6).join(" · ");
       const visibleInfo = byId("visible-info"); visibleInfo.replaceChildren();
       const facts = [
@@ -751,7 +824,7 @@
       actions();
       renderCardSelection();
       renderPromptActions();
-      scheduleForcedPass(data);
+      if (!presentationPlaying) scheduleForcedPass(data);
     }
     async function request(path, payload) {
       const response = await fetch(path, payload ? {
@@ -773,16 +846,22 @@
         let next = await request("/api/live/choice", {id: state.id,
           action_index: index, expected_decisions: state.decisions, manual,
           hold_priority: byId("hold-priority").checked});
+        const frames = [...(next.presentation_frames || [])];
+        const frameNames = {...next.presentation_card_names};
         if (destination && !next.terminal) {
           const matching = next.legal_actions.map((action, index) => ({action, index}))
             .filter(({action}) => ["place", "select_card"].includes(action.kind)
               && action.parameters?.location === destination.location
               && action.parameters?.controller === destination.controller
               && action.parameters?.sequence === destination.sequence);
-          if (matching.length === 1) next = await request("/api/live/choice", {
-            id: next.id, action_index: matching[0].index,
-            expected_decisions: next.decisions, manual,
-            hold_priority: byId("hold-priority").checked});
+          if (matching.length === 1) {
+            next = await request("/api/live/choice", {
+              id: next.id, action_index: matching[0].index,
+              expected_decisions: next.decisions, manual,
+              hold_priority: byId("hold-priority").checked});
+            frames.push(...(next.presentation_frames || []));
+            Object.assign(frameNames, next.presentation_card_names);
+          }
         }
         if (byId("auto-place").checked) {
           for (let count = 0; count < 4 && !next.terminal; count++) {
@@ -793,6 +872,8 @@
               action_index: placements[0].index,
               expected_decisions: next.decisions, manual: false,
               hold_priority: byId("hold-priority").checked});
+            frames.push(...(next.presentation_frames || []));
+            Object.assign(frameNames, next.presentation_card_names);
           }
         }
         for (let count = 0; count < 32 && !next.terminal; count++) {
@@ -801,6 +882,26 @@
           next = await request("/api/live/choice", {id: next.id,
             action_index: pass, expected_decisions: next.decisions, manual: false,
             hold_priority: byId("hold-priority").checked});
+          frames.push(...(next.presentation_frames || []));
+          Object.assign(frameNames, next.presentation_card_names);
+        }
+        if (frames.length) {
+          presentationPlaying = true;
+          const cardNames = {...oldState.card_names, ...next.card_names, ...frameNames};
+          for (const frame of frames) {
+            render({...next, terminal:false, human_seat:oldState.human_seat,
+              observation:frame.observation,
+              legal_actions:[], card_names:cardNames, presentation_frames:[]});
+            if (frame.origin === "agent") {
+              const effect = window.DuelAudio?.action(frame.kind);
+              if (effect) window.DuelAudio.play(effect);
+            }
+            await new Promise(resolve => setTimeout(resolve,
+              ["place", "set_monster", "set_spell_trap", "normal_summon",
+               "special_summon", "flip_summon", "activate", "chain"].includes(frame.kind)
+                ? 380 : 120));
+          }
+          presentationPlaying = false;
         }
         render(next);
         const own = oldState.human_seat;
@@ -821,8 +922,10 @@
         return next;
       }
       catch (error) { byId("message").textContent = error.message;
-        byId("message").classList.add("error"); return null; }
-      finally { busy = false; actions(); renderQuickControls();
+        byId("message").classList.add("error");
+        if (state && !state.terminal) renderPromptActions();
+        return null; }
+      finally { presentationPlaying = false; busy = false; actions(); renderQuickControls();
         if (state && !state.terminal) renderPhase(state.observation);
         scheduleForcedPass(state); }
     }
@@ -857,6 +960,7 @@
     byId("sidebar").querySelector("[data-duel-mute]").addEventListener("click", () =>
       window.DuelAudio?.toggle());
     byId("close-pile").addEventListener("click", () => byId("pile-dialog").close());
+    byId("choice-dialog").addEventListener("cancel", event => event.preventDefault());
     byId("quit").addEventListener("click", async () => {
       if (!state || state.terminal || !confirm("Leave this unfinished duel? It will not be saved as a replay.")) return;
       try { await request("/api/live/close", {id: state.id}); location.href = "/games/play"; }
@@ -877,7 +981,7 @@
     (async () => {
       try {
         const liveVersion = await request("/api/live/version");
-        if (liveVersion.api_version !== 6)
+        if (liveVersion.api_version !== 7)
           throw new Error("This duel server is outdated. Reopen the game creator shortcut to start the current server, then reload your duel there.");
         const options = await request("/api/games/options");
         const decks = options.decks.map(name => [name, name.replace(/\.ydk$/, "").replaceAll("_", " ")]);
