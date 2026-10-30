@@ -477,6 +477,51 @@ def test_parent_kl_fits_labels_while_keeps_reference_frozen():
                            labeled_weights=(0.0,))
 
 
+def test_batched_parent_kl_matches_scalar_on_variable_actions_and_weights():
+    torch.manual_seed(31)
+    vocabulary = CardVocabulary((10, 20))
+    scalar = LegalActionPolicy(vocabulary.size, width=16, feature_version=19)
+    parent = copy.deepcopy(scalar)
+    with torch.no_grad():
+        scalar.kind.weight[ACTION_KINDS.index("set_monster") + 1, 0] += 1.0
+    batched = copy.deepcopy(scalar)
+    two, three = actions()[:2], actions()
+    labeled = (
+        DecisionRecord(replace(view(), turn_player=0), two, two[1]),
+        DecisionRecord(replace(view(), turn_player=1), three, three[2]),
+        DecisionRecord(replace(view(), turn_player=0), three, three[0]),
+    )
+    preservation = (
+        DecisionRecord(replace(view(), turn_player=1), three, three[1]),
+        DecisionRecord(replace(view(), turn_player=0), two, two[0]),
+        DecisionRecord(replace(view(), turn_player=1), two, two[1]),
+    )
+    settings = dict(steps=3, preservation_batch=2, preservation_weight=0.7,
+                    learning_rate=0.0001, labeled_weights=(1.0, 2.0, 0.5))
+    scalar_losses = fit_with_parent_kl(
+        scalar, parent, vocabulary, labeled, preservation,
+        rng=random.Random(41), **settings)
+    batched_losses = fit_with_parent_kl(
+        batched, parent, vocabulary, labeled, preservation,
+        rng=random.Random(41), batched_forward=True, batch_size=2, **settings)
+    for scalar_series, batched_series in zip(scalar_losses, batched_losses):
+        assert batched_series == pytest.approx(scalar_series, abs=1e-4)
+    # Adam can amplify tiny floating-point differences in a near-zero KL,
+    # including directions that add the same score to every legal action.
+    for record in (*labeled, *preservation):
+        features = encode_decision(record.observation, record.legal_actions,
+                                   vocabulary, 19)
+        assert torch.allclose(
+            scalar(features).softmax(dim=0), batched(features).softmax(dim=0),
+            atol=1e-4, rtol=1e-4)
+    with pytest.raises(ValueError, match="supported v10"):
+        fit_with_parent_kl(
+            LegalActionPolicy(vocabulary.size, width=16, feature_version=9),
+            LegalActionPolicy(vocabulary.size, width=16, feature_version=9),
+            vocabulary, labeled, preservation, rng=random.Random(41),
+            batched_forward=True, **settings)
+
+
 def test_preference_kl_raises_a_reviewed_set_without_forcing_one_target():
     torch.manual_seed(7)
     vocabulary = CardVocabulary((10, 20))

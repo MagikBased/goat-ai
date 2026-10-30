@@ -15239,3 +15239,45 @@ Use `scripts/evaluate_policy.py --engine experimental
 named pairs and seeds; add `--require-unseen-main-decks` to the two unseen
 arms, then compare matched Tactical reports with
 `scripts/compare_tournament_reports.py --require-unseen-main-decks`.
+
+## Batched parent-KL scoring pilot (29 October 2026)
+
+The opt-in `--batched-forward --batch-size 16` path now scores the full
+labeled set in padded, variable-action chunks during each parent-KL step and
+batches its sampled preservation states. It uses the same weighted
+cross-entropy and parent-KL objective and still performs one optimizer update
+per step. Scalar behavior remains the default; the batched path requires a
+supported feature-v10+ policy. A regression test compares the two paths on
+mixed legal-action counts and nonuniform label weights.
+
+The [Rhymus/Beastdown Tactical pilot](#rhymus-and-beastdown-on-policy-tactical-pilot-29-october-2026)
+was rerun with identical four verified training duels, four current-core
+preservation duels, 244 labels, 64 sampled preservation states, 120 steps,
+seed 128016, learning rate 0.0001, and parent-KL weight 1. On this Linux
+x86-64 host with `OMP_NUM_THREADS=1`, scalar fit time was **86.66 seconds**;
+batched fit time was **14.65 seconds** (**5.91×** faster). Total run wall time,
+including replay verification and loading, fell from **90.47** to **18.35
+seconds** (**4.93×** faster). The scalar and batched final labeled losses
+were **0.271107** and **0.271116**; final sampled preservation KL values
+were **0.0187027** and **0.0187035**. These small numerical differences are
+expected from different floating-point reduction order.
+
+On two separate native-replay-verified Seattle parent-policy trajectories,
+the scalar and batched children selected the **same action at all 171
+multi-option decisions**. These Seattle states contributed to the parent-KL
+preservation pool, so this checks implementation agreement, not independent
+playing strength. The ignored batched checkpoint and agreement report are
+`.cache/goat-ai/fv23_rhymus_beast_tactical_kl120_batched_128016.pt` (SHA-256
+`616b3a0a9f9f0af2926f10daa1de523fe6475dacc51e210a3a886c7bdc1819c1`)
+and `.cache/goat-ai/rhymus_scalar_batched_agreement_99200.json` (SHA-256
+`6b8dd270390c9f06fb99788f178fbe038fb474e762006dcb9942b79fbe594621`).
+The batched child is not promoted; the previous held-out outcome test found
+no convincing gain for this training signal.
+
+Reproduce the scalar fit with the command in the Rhymus pilot above, then
+repeat it with `--batched-forward --batch-size 16` and a different ignored
+output path. Use `scripts/audit_policy_agreement.py --engine experimental
+--checkpoint` for both children on the two
+`seattle_parent_review_99200_99201/matchup_01_seed_99201_seat_{0,1}.json`
+trajectories. The `--batch-size` flag controls scoring chunk size for
+parent-KL; all labels still contribute to each update.

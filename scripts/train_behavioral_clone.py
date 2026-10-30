@@ -316,7 +316,8 @@ def main() -> None:
                         help="load v23 weights with distinct effect modes and v31 features")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=1,
-                        help="decisions per optimizer update; combine forward passes with --batched-forward")
+                        help="BC decisions per update; with parent KL, scoring chunk size "
+                             "(all labels still share each update)")
     parser.add_argument("--batched-forward", action="store_true",
                         help="opt-in padded variable-action policy forward for supported v10+ models")
     parser.add_argument("--skip-forced-training", action="store_true",
@@ -445,8 +446,9 @@ def main() -> None:
         parser.error("parent KL uses labeled decisions directly; omit sampling weights")
     if args.parent_kl_steps and args.on_policy_disagreement_weight > 1:
         parser.error("disagreement weighting is supported only for behavioral cloning")
-    if args.batched_forward and args.parent_kl_steps:
-        parser.error("batched forward is currently supported only for behavioral cloning")
+    if args.batched_forward and args.parent_kl_steps and (
+            args.feature_version < 10 or args.feature_version in (14, 15)):
+        parser.error("batched parent KL requires a supported v10+ feature version")
     if args.skip_forced_training and args.parent_kl_steps:
         parser.error("skipping forced choices is currently supported only for behavioral cloning")
     if args.omit_forced_forward and (not args.batched_forward
@@ -668,6 +670,7 @@ def main() -> None:
             steps=args.parent_kl_steps, preservation_batch=args.preserve_batch,
             preservation_weight=args.parent_kl_weight,
             learning_rate=args.learning_rate, rng=rng,
+            batched_forward=args.batched_forward, batch_size=args.batch_size,
             labeled_weights=[label_kind_weights.get(record.selected_action.kind, 1.0)
                              for record in records])
         preservation_metadata = {

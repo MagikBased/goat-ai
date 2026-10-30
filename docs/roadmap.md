@@ -999,6 +999,13 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+The [batched parent-KL fit](evaluation.md#batched-parent-kl-scoring-pilot-29-october-2026)
+now scores variable-length legal-action sets in padded chunks while preserving
+the full-label optimizer update. On the 244-decision Rhymus pilot it reduced
+measured fit time from 86.66 to 14.65 seconds; its scalar and batched children
+made the same choices on 171 separate multi-option Seattle states. This is a
+training-throughput gain, not a competitive-strength gain.
+
 A [fresh Rhymus/Beastdown on-policy Tactical pilot](evaluation.md#rhymus-and-beastdown-on-policy-tactical-pilot-29-october-2026)
 re-labeled 244 player-visible policy decisions from four verified duels and
 fit a 120-step, parent-KL child. It split 8–8 directly against v23 on new

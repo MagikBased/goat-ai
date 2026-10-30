@@ -39,6 +39,8 @@ def fit_with_parent_kl(
     learning_rate: float,
     rng: random.Random,
     labeled_weights: Sequence[float] | None = None,
+    batched_forward: bool = False,
+    batch_size: int = 16,
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """Fit selected labels while matching the parent on separate visible states.
 
@@ -47,7 +49,7 @@ def fit_with_parent_kl(
     """
     if (not labeled or not preservation or steps < 1 or preservation_batch < 1
             or preservation_batch > len(preservation) or not isfinite(learning_rate)
-            or learning_rate <= 0
+            or learning_rate <= 0 or batch_size < 1
             or not isfinite(preservation_weight) or preservation_weight <= 0):
         raise ValueError("parent KL needs records and positive finite settings")
     if parent is model or parent.feature_version != model.feature_version:
@@ -56,6 +58,9 @@ def fit_with_parent_kl(
                                         or any(not isfinite(weight) or weight <= 0
                                                for weight in labeled_weights)):
         raise ValueError("labeled weights must be finite, positive, and match labels")
+    if batched_forward and (model.feature_version < 10
+                            or model.feature_version in (14, 15)):
+        raise ValueError("batched parent KL requires a supported v10+ model")
     device = next(model.parameters()).device
     if next(parent.parameters()).device != device:
         raise ValueError("parent and student must use the same device")
@@ -70,8 +75,18 @@ def fit_with_parent_kl(
                          for record in preservation]
     parent.eval()
     with torch.no_grad():
-        parent_probabilities = [nn.functional.softmax(parent(features.to(device)), dim=0)
-                                for features in preserve_features]
+        if batched_forward:
+            parent_probabilities = []
+            for start in range(0, len(preserve_features), batch_size):
+                chunk = preserve_features[start:start + batch_size]
+                logits, _ = parent.forward_batch([features.to(device) for features in chunk])
+                probabilities = nn.functional.softmax(logits, dim=1)
+                parent_probabilities.extend(
+                    probabilities[index, :len(features.action_kinds)].clone()
+                    for index, features in enumerate(chunk))
+        else:
+            parent_probabilities = [nn.functional.softmax(parent(features.to(device)), dim=0)
+                                    for features in preserve_features]
     optimizer = torch.optim.Adam((parameter for parameter in model.parameters()
                                   if parameter.requires_grad), lr=learning_rate)
     labeled_losses = []
@@ -79,17 +94,42 @@ def fit_with_parent_kl(
     for _ in range(steps):
         model.train()
         optimizer.zero_grad()
-        labeled_loss = sum(weight *
-            nn.functional.cross_entropy(
-                model(features.to(device)).unsqueeze(0),
-                torch.tensor([target], dtype=torch.long, device=device))
-            for (features, target), weight in zip(target_examples, weights)) / weight_total
+        if batched_forward:
+            labeled_total = torch.zeros((), device=device)
+            for start in range(0, len(target_examples), batch_size):
+                chunk = target_examples[start:start + batch_size]
+                logits, _ = model.forward_batch([features.to(device)
+                                                 for features, _ in chunk])
+                targets = torch.tensor([target for _, target in chunk],
+                                       dtype=torch.long, device=device)
+                losses = nn.functional.cross_entropy(logits, targets, reduction="none")
+                chunk_weights = torch.tensor(weights[start:start + len(chunk)],
+                                             dtype=losses.dtype, device=device)
+                labeled_total = labeled_total + (losses * chunk_weights).sum()
+            labeled_loss = labeled_total / weight_total
+        else:
+            labeled_loss = sum(weight *
+                nn.functional.cross_entropy(
+                    model(features.to(device)).unsqueeze(0),
+                    torch.tensor([target], dtype=torch.long, device=device))
+                for (features, target), weight in zip(target_examples, weights)) / weight_total
         picks = rng.sample(range(len(preserve_features)), preservation_batch)
-        preservation_loss = sum(
-            nn.functional.kl_div(
-                nn.functional.log_softmax(model(preserve_features[index].to(device)), dim=0),
-                parent_probabilities[index], reduction="sum")
-            for index in picks) / len(picks)
+        if batched_forward:
+            selected = [preserve_features[index] for index in picks]
+            logits, _ = model.forward_batch([features.to(device) for features in selected])
+            parent_targets = torch.zeros_like(logits)
+            for row, index in enumerate(picks):
+                parent_targets[row, :len(parent_probabilities[index])] = (
+                    parent_probabilities[index])
+            preservation_loss = nn.functional.kl_div(
+                nn.functional.log_softmax(logits, dim=1), parent_targets,
+                reduction="sum") / len(picks)
+        else:
+            preservation_loss = sum(
+                nn.functional.kl_div(
+                    nn.functional.log_softmax(model(preserve_features[index].to(device)), dim=0),
+                    parent_probabilities[index], reduction="sum")
+                for index in picks) / len(picks)
         (labeled_loss + preservation_weight * preservation_loss).backward()
         optimizer.step()
         labeled_losses.append(float(labeled_loss.detach()))
