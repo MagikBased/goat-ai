@@ -31,6 +31,21 @@ named in the link. Run `scripts/shortlist_policy_disagreements.py` on the two
 `seat_0.json` files with `--limit 8 --per-replay 4 --render-viewers` to
 rebuild the focused queue in an empty output directory.
 
+A fixed-state check of the experimental visible-material-v5 child changed
+only one of these eight prompts: it would Set Heavy Storm rather than
+activate it immediately at decision 16. Its other seven choices matched
+selected v23, including passing on a Scapegoat chain at decision 37. Exact
+source-prefix branches that activate Heavy Storm, Set it, or Normal Summon
+D.D. Warrior Lady all lost with the same continuation agents; passing or
+chaining Scapegoat at decision 37 also both lost. These single-seed branch
+outcomes are diagnostics, not human labels or estimates of action value.
+The ignored reports are `v5_fixed_state_scores.json`,
+`heavy_dec16_branches/report.json`, and `scapegoat_dec37_branches/report.json`
+under the linked review directory. Their SHA-256 values are respectively
+`c9fe05b8a91c7a238066f8f26a2f5d7545c69c46468dae79dda0fc7fc2708b7e`,
+`17101458438375dd718e09cba067bb3450ae917b200073f5560217b2184b8aa5`,
+and `3bacdef5b1a43c8ad7e9ca18454540880ea125fcc14bbb850d7680a9a39c3585`.
+
 ## Fresh policy versus Tactical review queue (29 October 2026)
 
 The [focused local queue](../.cache/goat-ai/own_loss_review_source_126000_126007/review_queue.html)
