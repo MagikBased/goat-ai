@@ -28,6 +28,11 @@ reproduced under repeated seeds. The generator now exercises legal repeated
 copies and Main Deck sizes above 40, which earlier distinct-card sweeps did
 not cover. Sampled protocol success still does not prove all legal Decks or
 historical rulings.
+A paired 60-card opening differential changes one card in the opponent's
+private five-card hand while preserving Deck size and Extra Deck. The acting
+player receives exactly the same observation and legal actions in both native
+duels. This extends the opening privacy regression to a larger repeated-copy
+Deck; later hidden-card transitions still require separate checks.
 
 A second [40-duel independent whitelist/Fusion sample](evaluation.md#second-independent-random-whitelistfusion-sample--30-october-2026)
 completed at seeds 166000–166039. All 44,516 decisions passed native replay

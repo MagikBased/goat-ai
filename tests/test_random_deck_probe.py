@@ -9,7 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from goat_ai.engine.decks import read_goat_whitelist, read_ydk, validate_goat_deck
+from goat_ai.engine.decks import Decklist, read_goat_whitelist, read_ydk, validate_goat_deck
+from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
+from goat_ai.environments import GoatEnvironment
 from goat_ai.evaluation.competitive_corpus import (
     INDIANAPOLIS_2005_MAIN_DECKS,
     TOURNAMENT_MAIN_DECKS,
@@ -23,6 +25,7 @@ from scripts.probe_random_decks import (
     generate_tournament_mix,
     probe,
     probe_isolated,
+    write_deck,
 )
 
 
@@ -104,6 +107,35 @@ def test_sixty_card_repeated_copy_decks_complete_and_reproduce(tmp_path):
     assert game["replay_verified_decisions"] == game["decisions"]
     assert game["deterministic_repeat"] is True
     assert report["visibility_audit"]["decisions"] == game["decisions"]
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_sixty_card_duplicate_deck_hides_changed_opening_card(tmp_path):
+    """Replacing one private opening card must not alter the other seat's menu."""
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    original = generate_deck(native_root, 176100, include_random_extra=True,
+                             main_size=60)
+    changed = list(original.main)
+    changed[changed.index(5405694)] = 15025844
+    decks = (original, Decklist(tuple(changed), original.extra))
+    snapshots = []
+    private_hands = []
+    for index, deck in enumerate(decks):
+        path = tmp_path / f"opponent_{index}.ydk"
+        write_deck(path, deck)
+        with GoatEnvironment("examples/decks/nobleman_probe.ydk", str(path), 52,
+                             ExperimentalOcgcoreEngine(native_root)) as env:
+            observation = env.reset()
+            assert observation.viewer == observation.acting_player == 0
+            assert observation.opponent_hand_count == 5
+            assert observation.deck_counts[1] == 55
+            snapshots.append((observation, env.legal_actions()))
+            private_hands.append(tuple(card.code for card in
+                                       env.engine.probe.observation(1).hand))
+    assert private_hands[0] != private_hands[1]
+    assert 5405694 in private_hands[0]
+    assert 15025844 in private_hands[1]
+    assert snapshots[0] == snapshots[1]
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
