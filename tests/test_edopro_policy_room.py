@@ -11,7 +11,11 @@ from goat_ai.agents import RandomAgent
 from goat_ai.engine.historical_host_scripts import validate_pinned_host_assets
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory
-from goat_ai.replay.edopro_live_verify import verify_edopro_live_recording
+from goat_ai.replay.edopro_live_verify import (
+    verify_edopro_human_annotations,
+    verify_edopro_live_recording,
+)
+from goat_ai.replay.fingerprint import sha256_file
 from scripts.serve_edopro_policy import Bridge
 
 
@@ -121,6 +125,22 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
     assert verified["reviewable_prefix"] is surrender
     assert verified["deck_identity_verified"] is True
     assert verified["training_admitted"] is False
+    if authorized and not surrender:
+        human_index = next(index for index, record in enumerate(trajectory.decisions)
+                           if record.observation.acting_player == 1)
+        record = trajectory.decisions[human_index]
+        played = record.legal_actions.index(record.selected_action)
+        label_path = tmp_path / "confirmed_human.json"
+        label_path.write_text(json.dumps({
+            "schema_version": 1,
+            "source_trajectory_sha256": sha256_file(review_path),
+            "authorization": "self_recorded", "reviewer": "self",
+            "choices": [{"decision_index": human_index, "action_index": played}],
+        }))
+        confirmed = verify_edopro_human_annotations(
+            replay_path, review_path, metadata_path, label_path, mirror_root)
+        assert confirmed["confirmed_human_choices"] == 1
+        assert confirmed["training_admitted"] is False
     metadata["human_authorization"] = "unauthorized"
     metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
     with pytest.raises(ValueError, match="unsupported human recording authorization"):

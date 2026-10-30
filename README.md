@@ -137,6 +137,17 @@ review trajectory. EDOPro can answer some prompts automatically, so this does
 not prove which responses were deliberate clicks; those records remain excluded
 from raw behavioral-cloning intake until that distinction and the historical
 rules gate are resolved.
+An explicit `self_recorded` annotation on an EDOPro review trajectory now
+requires that authorization, the human client seat, and the exact action that
+was played. This permits retrospective confirmation of specific human choices
+without labeling the AI's actions or an unplayed alternative as human play.
+The training command still rejects EDOPro sources pending the remaining gates.
+For a manually confirmed choice, put its zero-based `decision_index` and
+recorded legal `action_index` in a schema-v1 `self_recorded` annotation tied to
+the review JSON's SHA-256. Check it with
+`python scripts/verify_edopro_human_labels.py <game>.yrpX <labels>.json --native-root .cache/goat-ai`.
+The checker independently reconstructs the duel before accepting the label;
+its output remains review-only.
 
 The external host package remains a separate AGPL dependency and must be on
 `PYTHONPATH`. The locally tested checkout is

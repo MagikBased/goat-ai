@@ -50,6 +50,35 @@ def test_local_ai_match_cannot_be_labeled_as_human_recording(tmp_path):
         read_decision_annotations(annotation_file(tmp_path), "a" * 64, generated)
 
 
+def test_edopro_self_recorded_labels_require_authorized_played_human_action(tmp_path):
+    base = trajectory()
+    opponent_view = replace(base.decisions[0].observation, viewer=1, acting_player=1)
+    human_actions = (Action("human-pass", "pass", 1),
+                     Action("human-end", "end_phase", 1))
+    human_record = DecisionRecord(opponent_view, human_actions, human_actions[0])
+    edopro = replace(base, source="edopro_pinned_historical",
+                     decisions=(*base.decisions, human_record),
+                     skill_metadata={"human_client_seat": 1,
+                                     "authorization": "self_recorded"})
+    labels, records = read_decision_annotations(annotation_file(
+        tmp_path, choices=[{"decision_index": 1, "action_index": 0}]),
+        "a" * 64, edopro)
+    assert labels.choices == ((1, 0),)
+    assert records == (human_record,)
+    with pytest.raises(ValueError, match="human seat"):
+        read_decision_annotations(annotation_file(
+            tmp_path, choices=[{"decision_index": 0, "action_index": 0}]),
+            "a" * 64, edopro)
+    with pytest.raises(ValueError, match="played action"):
+        read_decision_annotations(annotation_file(
+            tmp_path, choices=[{"decision_index": 1, "action_index": 1}]),
+            "a" * 64, edopro)
+    with pytest.raises(ValueError, match="authorized human seat"):
+        read_decision_annotations(annotation_file(
+            tmp_path, choices=[{"decision_index": 1, "action_index": 0}]),
+            "a" * 64, replace(edopro, skill_metadata={"human_client_seat": 1}))
+
+
 @pytest.mark.parametrize("change,message", [
     ({"authorization": "third_party"}, "authorization"),
     ({"reviewer": " "}, "reviewer"),

@@ -2983,6 +2983,12 @@ An explicit `--human-authorization self_recorded` room option now records the
 human client seat and self-recording permission alongside those identifiers.
 EDOPro can generate automatic responses, so the record cannot yet isolate
 deliberate human choices; raw cloning admission remains off.
+EDOPro `self_recorded` annotations now validate the authorized human seat and
+require the recorded action itself, so a later explicit confirmation cannot
+mistake an AI response or retrospective alternative for a human demonstration.
+A separate `verify_edopro_human_labels.py` command replays the EDOPro room
+recording before validating specific confirmed choices and reports their exact
+annotation hash. It remains a review artifact, not an admitted training set.
 
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The

@@ -4,8 +4,10 @@ import hashlib
 import json
 from pathlib import Path
 
+from goat_ai.replay.annotations import read_decision_annotations
 from goat_ai.replay.edopro_container import read_edopro_container
 from goat_ai.replay.edopro_reconstruct import reconstruct_legacy_responses
+from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.replay.trajectory import read_trajectory
 
 
@@ -92,3 +94,21 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         "deck_identity_verified": has_deck_hashes,
         "training_admitted": False,
     }
+
+
+def verify_edopro_human_annotations(replay_path: str | Path,
+                                    review_path: str | Path,
+                                    metadata_path: str | Path,
+                                    annotation_path: str | Path,
+                                    native_root: str | Path) -> dict:
+    """Validate explicit human confirmations against a replay-checked room game."""
+    report = verify_edopro_live_recording(replay_path, review_path,
+                                          metadata_path, native_root)
+    trajectory = read_trajectory(review_path)
+    annotations, records = read_decision_annotations(
+        annotation_path, sha256_file(review_path), trajectory)
+    if annotations.authorization != "self_recorded":
+        raise ValueError("EDOPro human confirmations require self_recorded labels")
+    return {**report, "confirmed_human_choices": len(records),
+            "reviewer": annotations.reviewer,
+            "annotation_sha256": sha256_file(annotation_path)}

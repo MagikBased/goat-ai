@@ -54,6 +54,13 @@ def read_decision_annotations(path: str | Path, trajectory_sha256: str,
     if authorization == "self_recorded" and trajectory.source in (
             "self_play_rl", "policy_evaluation", "local_ai_match"):
         raise ValueError("agent replay labels require their review authorization")
+    edopro_human_seat = None
+    if authorization == "self_recorded" and trajectory.source.startswith("edopro_"):
+        edopro_human_seat = metadata.get("human_client_seat")
+        if (metadata.get("authorization") != "self_recorded"
+                or type(edopro_human_seat) is not int
+                or edopro_human_seat not in (0, 1)):
+            raise ValueError("EDOPro self-recorded labels require authorized human seat")
     if raw.get("source_trajectory_sha256") != trajectory_sha256:
         raise ValueError("annotation source trajectory SHA-256 mismatch")
     reviewer = raw.get("reviewer")
@@ -83,11 +90,17 @@ def read_decision_annotations(path: str | Path, trajectory_sha256: str,
         if (authorization == "self_play_review"
                 and record.observation.acting_player != learner_seat):
             raise ValueError("self_play_review may label only the learner seat")
+        if (edopro_human_seat is not None
+                and record.observation.acting_player != edopro_human_seat):
+            raise ValueError("EDOPro self-recorded label must belong to the human seat")
         if not 0 <= action_index < len(record.legal_actions):
             raise ValueError("annotation action index is not legal")
         if (authorization == "scripted_scenario"
                 and record.legal_actions[action_index] != record.selected_action):
             raise ValueError("scripted_scenario label must match the replayed action")
+        if (edopro_human_seat is not None
+                and record.legal_actions[action_index] != record.selected_action):
+            raise ValueError("EDOPro self-recorded label must match the played action")
         selected.append(replace(record, selected_action=record.legal_actions[action_index]))
         parsed.append((decision_index, action_index))
     return (DecisionAnnotations(trajectory_sha256, reviewer.strip(), authorization,
