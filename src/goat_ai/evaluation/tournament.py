@@ -12,6 +12,8 @@ from random import Random
 from goat_ai.agents import Agent
 from goat_ai.engine import RulesEngine
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import verify_trajectory
 
 
 @dataclass(frozen=True)
@@ -22,6 +24,8 @@ class GameResult:
     a_seat: int
     winner: int | None
     decisions: int
+    replay_verified_decisions: int | None = None
+    visibility_audited_decisions: int | None = None
 
     @property
     def a_outcome(self) -> str:
@@ -173,6 +177,7 @@ def run_tournament(
     matchups: Sequence[tuple[str, str]], seeds: Sequence[int],
     agent_a: Callable[[int], Agent], agent_b: Callable[[int], Agent],
     engine_factory: Callable[[], RulesEngine], max_decisions: int = 5000,
+    verify_replays: bool = False,
 ) -> TournamentReport:
     """Run each matchup/seed twice, with candidate A in each seat once."""
     if not matchups or not seeds or max_decisions < 1:
@@ -180,13 +185,14 @@ def run_tournament(
     schedule = ((a, b, seed, seat) for a, b in matchups
                 for seed in seeds for seat in (0, 1))
     return TournamentReport(tuple(_play_game(job, agent_a, agent_b, engine_factory,
-                                             max_decisions) for job in schedule))
+                                             max_decisions, verify_replays)
+                                  for job in schedule))
 
 
 def _play_game(job: tuple[str, str, int, int],
                agent_a: Callable[[int], Agent], agent_b: Callable[[int], Agent],
                engine_factory: Callable[[], RulesEngine],
-               max_decisions: int) -> GameResult:
+               max_decisions: int, verify_replays: bool = False) -> GameResult:
     deck_a, deck_b, seed, a_seat = job
     decks = (deck_a, deck_b) if a_seat == 0 else (deck_b, deck_a)
     a, b = agent_a(seed), agent_b(seed)
@@ -198,8 +204,17 @@ def _play_game(job: tuple[str, str, int, int],
                 observation, env.legal_actions())
             observation = env.step(action)
             if env.is_terminal():
+                verified = audited = None
+                if verify_replays:
+                    trajectory = env.trajectory()
+                    verified = verify_trajectory(trajectory, engine_factory())
+                    if verified != decision_count:
+                        raise RuntimeError("tournament replay verification was incomplete")
+                    audited = audit_trajectory_visibility(trajectory)["decisions"]
+                    if audited != decision_count:
+                        raise RuntimeError("tournament visibility audit was incomplete")
                 return GameResult(deck_a, deck_b, seed, a_seat,
-                                  env.result(), decision_count)
+                                  env.result(), decision_count, verified, audited)
     raise RuntimeError(f"duel exceeded {max_decisions} decisions: "
                        f"decks={decks}, seed={seed}, A seat={a_seat}")
 
@@ -208,7 +223,7 @@ def run_tournament_parallel(
     matchups: Sequence[tuple[str, str]], seeds: Sequence[int],
     agent_a: Callable[[int], Agent], agent_b: Callable[[int], Agent],
     engine_factory: Callable[[], RulesEngine], max_decisions: int = 5000,
-    workers: int = 2,
+    workers: int = 2, verify_replays: bool = False,
 ) -> TournamentReport:
     """Run independent games in spawned processes, preserving schedule order.
 
@@ -228,5 +243,5 @@ def run_tournament_parallel(
     with ProcessPoolExecutor(max_workers=workers, mp_context=get_context("spawn")) as executor:
         games = tuple(executor.map(_play_game, schedule, repeat(agent_a),
                                    repeat(agent_b), repeat(engine_factory),
-                                   repeat(max_decisions)))
+                                   repeat(max_decisions), repeat(verify_replays)))
     return TournamentReport(games)

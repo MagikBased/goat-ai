@@ -1054,7 +1054,9 @@ sourced Main Decks and preserved the parent on 128 fresh visible policy states.
 On a matched held-out schedule its child scored 22–41–1 against Tactical-v14
 versus the parent's 24–39–1, with a paired interval crossing zero. Directly it
 split 33–31 against the parent. Keep v23 selected; more Tactical imitation on
-these decks did not close M4's competitive gap.
+these decks did not close M4's competitive gap. An opt-in tournament
+replay/visibility mode subsequently reconstructed all 128 matched Tactical
+duels and reproduced their exact outcomes; see the evaluation record.
 
 Unfinished browser duels can now contribute explicit human choices to
 behavioral cloning through a read-only, native-verified journal importer. It

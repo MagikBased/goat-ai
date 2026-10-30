@@ -110,6 +110,22 @@ def test_native_tournament_swaps_seats_and_reproduces_results():
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_native_tournament_opt_in_replay_and_visibility_verification():
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    decks = Path(__file__).resolve().parent.parent / "examples/decks"
+    matchup = [(str(decks / "vanilla_probe.ydk"), str(decks / "vanilla_reverse.ydk"))]
+    args = (matchup, [842], RandomAgent, RandomAgent,
+            partial(RestrictedOcgcoreEngine, root))
+    serial = run_tournament(*args, verify_replays=True)
+    parallel = run_tournament_parallel(*args, workers=2, verify_replays=True)
+    assert serial == parallel
+    assert len(serial.games) == 2
+    assert all(game.replay_verified_decisions == game.decisions
+               and game.visibility_audited_decisions == game.decisions
+               for game in serial.games)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_sourced_goat_chaos_tournament_reproduces_seat_swaps():
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     decks = Path(__file__).resolve().parent.parent / "examples/decks"

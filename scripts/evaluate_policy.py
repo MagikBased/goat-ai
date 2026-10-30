@@ -171,6 +171,8 @@ def main() -> None:
     parser.add_argument("--require-unseen-main-decks", action="store_true",
                         help="reject Main Deck multisets present in checkpoint training games")
     parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--verify-replays", action="store_true",
+                        help="replay-verify and visibility-audit every terminal duel")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.seeds < 1 or args.workers < 1 or args.max_decisions < 1:
@@ -264,6 +266,7 @@ def main() -> None:
                                              if args.own_loss_guard_version in (2, 5, 6) else None),
                                  position_guard=args.position_guard),
         opponent, partial(engine_type, args.native_root), args.max_decisions,
+        verify_replays=args.verify_replays,
         **({"workers": args.workers} if args.workers > 1 else {}),
     )
     wall = perf_counter() - started
@@ -318,6 +321,16 @@ def main() -> None:
         "engine": args.engine,
         "platform": platform.platform(), "cpu": platform.processor(),
         "workers": args.workers, "wall_seconds_tournament": wall,
+        "replay_verification": ({
+            "verified_games": sum(game.replay_verified_decisions is not None
+                                  for game in report.games),
+            "verified_decisions": sum(game.replay_verified_decisions or 0
+                                      for game in report.games),
+            "visibility_audited_games": sum(game.visibility_audited_decisions is not None
+                                            for game in report.games),
+            "visibility_audited_decisions": sum(
+                game.visibility_audited_decisions or 0 for game in report.games),
+        } if args.verify_replays else None),
         "duels_per_second": len(report.games) / wall,
         "decisions_per_second": sum(game.decisions for game in report.games) / wall,
         "deck_sha256": {deck: sha256(Path(deck)) for matchup in matchups for deck in matchup},

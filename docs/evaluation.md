@@ -15940,6 +15940,24 @@ keep the original v23 selected. The parent varied from 11–53 on seeds
 seed blocks must not be mistaken for a training effect. The evaluator did not
 independently replay-verify each tournament game.
 
+An opt-in `--verify-replays` mode was then added to the policy evaluator. It
+reconstructs each terminal game from its selected actions and audits every
+player-visible decision, in either serial or parallel workers. Repeating both
+matched Tactical-v14 reports with this mode reproduced every original winner
+and decision count. The parent had **64/64** games and **37,024** decisions
+replay-verified and visibility-audited; the child had **64/64** games and
+**37,345** decisions. The checked paired score difference remained −3.13
+percentage points (95% interval −10.94 to +4.69). The new ignored reports are
+`.cache/goat-ai/crossdeck_parent_vs_tactical_169000_verified.json` (SHA-256
+`810d4b80af0e408a126baad451df4a0b016a302dc3fd5b7746098d263eece304`)
+and `crossdeck_child_vs_tactical_169000_verified.json` (SHA-256
+`5f85e6089dd6efb60d200ffc9c5af468c30de11dc5222e61dbf3bffa18313881`).
+The verifier doubles native simulation work for these games; measured
+four-worker tournament times were 21.76 seconds for the parent and 21.50
+seconds for the child. This validates deterministic reconstruction and the
+observation audit for this schedule, not historical correctness of every
+card effect.
+
 The three ignored evaluation reports are
 `.cache/goat-ai/crossdeck_parent_vs_tactical_169000.json` (SHA-256
 `dc85814871ae9c4162903eba3c3550b36c3e4e537840167e6ba72c41919388f1`),
@@ -15997,4 +16015,5 @@ parent_ckpt=.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt
 For the three tournament reports, use the four Decks and evaluator flags in
 the preceding section, change the seed to 169000, and run the selected parent
 and child against Tactical plus the child against `--opponent-checkpoint
-"$parent_ckpt"`. Compare the two Tactical reports with the comparator above.
+"$parent_ckpt"`. Add `--verify-replays` when reproducing the verified Tactical
+reports. Compare the two Tactical reports with the comparator above.
