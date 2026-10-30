@@ -20,7 +20,8 @@ CONTROL_FIELDS = (
     "opponent_position_guard", "opponent_position_guard_version",
 )
 OPTIONAL_CONTROL_FIELDS = ("opponent_own_loss_guard",
-                           "opponent_own_loss_guard_version")
+                           "opponent_own_loss_guard_version",
+                           "evaluation_matchups")
 EXTENDED_FINGERPRINTS = ("card_scripts_sha256", "source_code_sha256")
 
 
@@ -61,7 +62,19 @@ def load_report(path: Path, *, verify_local_decks: bool = False,
     assignments = raw.get("both_deck_assignments")
     if type(assignments) is not bool:
         raise ValueError(f"{path}: missing deck-assignment setting")
-    pairs = {(game.deck_a, game.deck_b) for game in games}
+    declared = raw.get("evaluation_matchups")
+    observed_pairs = {(game.deck_a, game.deck_b) for game in games}
+    if declared is not None:
+        if (not isinstance(declared, list) or not declared
+                or any(not isinstance(pair, list) or len(pair) != 2
+                       or any(not isinstance(deck, str) or not deck for deck in pair)
+                       for pair in declared)):
+            raise ValueError(f"{path}: invalid declared evaluation matchups")
+        pairs = {tuple(pair) for pair in declared}
+        if len(pairs) != len(declared) or pairs != observed_pairs:
+            raise ValueError(f"{path}: observed matchups differ from declared schedule")
+    else:
+        pairs = observed_pairs
     if assignments and any((deck_b, deck_a) not in pairs for deck_a, deck_b in pairs):
         raise ValueError(f"{path}: reverse deck assignment is missing")
     actual_schedule = {(game.deck_a, game.deck_b, game.seed, game.a_seat)
@@ -156,6 +169,7 @@ def compare_reports(candidate_path: Path, control_path: Path, *,
         "control_report_sha256": sha256_file(control_path),
         "games_per_report": len(left),
         "unseen_main_decks_verified": require_unseen_main_decks,
+        "declared_schedule_verified": candidate.get("evaluation_matchups") is not None,
         "opponent": candidate["opponent"],
         "card_scripts_sha256": candidate.get("card_scripts_sha256"),
         "source_code_sha256": candidate.get("source_code_sha256"),

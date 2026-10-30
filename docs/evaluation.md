@@ -2,14 +2,17 @@
 
 ## Saved tournament schedule integrity
 
-`scripts/compare_tournament_reports.py` now checks the full Cartesian
-schedule in each saved policy report before calculating a paired result. Each
-observed ordered deck matchup must have both candidate seats for every
-declared evaluation seed, with no duplicate game. A report declaring both
-deck assignments must also contain each reverse matchup. Two reports that
-both omit the same game are rejected even if their summaries match. This
-validates recorded schedule completeness; it does not establish that the
-sample size is sufficient or that a learned policy is stronger.
+`scripts/evaluate_policy.py` now records its intended ordered matchups in
+`evaluation_matchups`. `scripts/compare_tournament_reports.py` checks that
+declaration against the saved games before calculating a paired result. Each
+declared matchup must have both candidate seats for every evaluation seed,
+with no duplicate game; a report requesting both deck assignments must also
+contain each reverse matchup. Two reports that both omit an entire matchup or
+the same individual game are rejected even if their summaries match. Older
+reports without the declaration remain readable and are marked
+`declared_schedule_verified: false`, since their intended matchups cannot be
+recovered from the results alone. These checks do not establish sufficient
+sample size or a learned-policy strength gain.
 
 ## Fresh distinct-whitelist Fusion protocol probe (29 October 2026)
 

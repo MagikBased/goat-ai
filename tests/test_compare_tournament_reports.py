@@ -170,6 +170,27 @@ def test_comparison_rejects_matching_reports_with_incomplete_schedule(tmp_path):
         compare_reports(a, b)
 
 
+def test_comparison_rejects_matching_reports_with_a_whole_matchup_missing(tmp_path):
+    a, b, left, right, deck_a = saved_pair(tmp_path)
+    deck_b = tmp_path / "b.ydk"
+    for saved in (left, right):
+        saved["evaluation_matchups"] = [
+            [str(deck_a), str(deck_b)], [str(deck_b), str(deck_a)]]
+    a.write_text(json.dumps(left))
+    b.write_text(json.dumps(right))
+    with pytest.raises(ValueError, match="observed matchups differ from declared"):
+        compare_reports(a, b)
+    for saved in (left, right):
+        saved["evaluation_matchups"] = [[str(deck_a), str(deck_b)]]
+    a.write_text(json.dumps(left))
+    b.write_text(json.dumps(right))
+    assert compare_reports(a, b)["declared_schedule_verified"] is True
+    right.pop("evaluation_matchups")
+    b.write_text(json.dumps(right))
+    with pytest.raises(ValueError, match="evaluation_matchups"):
+        compare_reports(a, b)
+
+
 def test_comparison_requires_reverse_decks_when_declared(tmp_path):
     a, b, left, right, _ = saved_pair(tmp_path)
     for saved in (left, right):

@@ -308,6 +308,7 @@ def main() -> None:
         "source_code_sha256": policy_source_sha256(repository),
         "training_games": checkpoint["training_games"],
         "evaluation_seeds": seeds,
+        "evaluation_matchups": [list(pair) for pair in matchups],
         "both_deck_assignments": args.both_deck_assignments,
         "opponent": "checkpoint" if args.opponent_checkpoint else args.opponent,
         "opponent_agent_version": (None if args.opponent_checkpoint else {
