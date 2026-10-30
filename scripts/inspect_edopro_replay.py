@@ -126,6 +126,9 @@ def main() -> None:
                         help="with --reconstruct-native, load external scripts unchanged for "
                              "compatibility comparison only; never a GOAT correctness or "
                              "training-intake result")
+    parser.add_argument("--allow-partial-reconstruction", action="store_true",
+                        help="audit saved responses even when a duel ends externally or "
+                             "the recording is interrupted; never a complete-duel result")
     parser.add_argument("--require-goat-candidate", action="store_true",
                         help="exit nonzero unless setup, native Decks, and complete native "
                              "reconstruction all pass; still not training authorization")
@@ -136,6 +139,10 @@ def main() -> None:
         parser.error("external comparison requires --reconstruct-native")
     if args.compare_external_unpatched and args.require_goat_candidate:
         parser.error("unpatched external comparison cannot pass strict GOAT intake")
+    if args.allow_partial_reconstruction and args.reconstruct_native is None:
+        parser.error("partial reconstruction requires --reconstruct-native")
+    if args.allow_partial_reconstruction and args.require_goat_candidate:
+        parser.error("partial reconstruction cannot pass strict GOAT intake")
     if args.native_deck_screen is not None and args.goat_whitelist is not None:
         parser.error("choose either native deck screening or an explicit GOAT whitelist")
     if args.require_goat_candidate and (
@@ -174,11 +181,15 @@ def main() -> None:
                 try:
                     trace = reconstruct_legacy_responses(
                         replay, args.reconstruct_native,
-                        historical_patches=not args.compare_external_unpatched)
+                        historical_patches=not args.compare_external_unpatched,
+                        allow_incomplete=args.allow_partial_reconstruction)
                     manifest = json.dumps(trace.asset_sha256, sort_keys=True,
                                           separators=(",", ":")).encode("ascii")
                     report.update({
-                        "conditional_native_reconstruction": "matched",
+                        "decision_reconstruction": "conditional_native",
+                        "conditional_native_reconstruction": (
+                            "matched" if trace.native_terminal else "partial"),
+                        "native_terminal": trace.native_terminal,
                         "reconstruction_asset_mode": (
                             "external_unpatched_comparison" if args.compare_external_unpatched
                             else "historical_patched"),

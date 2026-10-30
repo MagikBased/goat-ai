@@ -219,6 +219,15 @@ def test_reconstruction_rejects_divergent_and_incomplete_responses(
     with pytest.raises(ReplayReconstructionError, match="before native terminal"):
         reconstruct_legacy_responses(_legacy_replay(responses[:-1]), root)
 
+    partial = reconstruct_legacy_responses(
+        _legacy_replay(responses[:-1]), root, allow_incomplete=True)
+    assert partial.saved_response_count == len(responses) - 1
+    assert partial.native_terminal is False
+    assert partial.winner is None
+    assert len(partial.decisions) == len(responses) - 1
+    for record in partial.decisions:
+        audit_decision_visibility(record)
+
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 def test_reconstructs_embedded_yrpx_with_both_file_hashes(native_legacy_responses):
@@ -270,6 +279,31 @@ def test_unpatched_external_comparison_is_never_strict_intake(
     assert report["reconstruction_asset_mode"] == "external_unpatched_comparison"
     assert report["training_ready"] is False
     assert report["native_goat_compatibility_candidate"] is False
+    monkeypatch.setattr(sys, "argv", command + ["--require-goat-candidate"])
+    with pytest.raises(SystemExit) as rejected:
+        main()
+    assert rejected.value.code == 2
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_partial_inspection_reports_nonterminal_decisions(
+        native_legacy_responses, tmp_path, monkeypatch, capsys):
+    from scripts.inspect_edopro_replay import main
+
+    root, responses, _ = native_legacy_responses
+    path = tmp_path / "partial.yrp"
+    path.write_bytes(_legacy_replay(responses[:-1], raw=True))
+    command = ["inspect_edopro_replay.py", str(path),
+               "--reconstruct-native", str(root),
+               "--allow-partial-reconstruction"]
+    monkeypatch.setattr(sys, "argv", command)
+    main()
+    report = json.loads(capsys.readouterr().out)[0]
+    assert report["conditional_native_reconstruction"] == "partial"
+    assert report["native_terminal"] is False
+    assert report["reconstructed_decisions"] == len(responses) - 1
+    assert report["native_goat_compatibility_candidate"] is False
+    assert report["training_ready"] is False
     monkeypatch.setattr(sys, "argv", command + ["--require-goat-candidate"])
     with pytest.raises(SystemExit) as rejected:
         main()

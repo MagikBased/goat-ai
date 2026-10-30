@@ -40,6 +40,7 @@ class ReconstructedLegacyDuel:
     embedded_replay_sha256: str | None
     decisions: tuple[DecisionRecord, ...]
     saved_response_count: int
+    native_terminal: bool
     winner: int | None
     terminal_observation: Observation
     asset_sha256: dict[str, str]
@@ -49,6 +50,7 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                                  native_root: str | Path,
                                  *, max_responses: int = 10_000,
                                  historical_patches: bool = True,
+                                 allow_incomplete: bool = False,
                                  ) -> ReconstructedLegacyDuel:
     """Map each legacy native response to one player-visible legal action.
 
@@ -161,7 +163,7 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                 raise ReplayReconstructionError(
                     f"response {index}: native transition failed: {exc}",
                     code="native_transition_failed", response_index=index) from exc
-        if not decision.terminal:
+        if not decision.terminal and not allow_incomplete:
             raise ReplayReconstructionError("saved responses ended before native terminal state",
                                             code="incomplete_saved_responses")
         for index, record in enumerate(records):
@@ -177,7 +179,8 @@ def reconstruct_legacy_responses(replay: EdoReplayContainer,
                     code="visibility_audit_failed") from exc
         return ReconstructedLegacyDuel(source_sha256, embedded_sha256,
                                        tuple(records), len(replay.responses),
-                                       decision.winner, decision.observation,
+                                       decision.terminal, decision.winner,
+                                       decision.observation,
                                        engine.replay_manifest())
     finally:
         engine.close()

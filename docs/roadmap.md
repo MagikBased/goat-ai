@@ -2935,6 +2935,14 @@ intake because those external scripts have not passed this project's historical
 patch checks. The short desktop trial ends by surrender, which leaves its
 legacy response sequence nonterminal. A complete desktop duel on a matched,
 historically validated install is the next replay-data gate.
+Both the host and EDOPro desktop copies of the surrendered trial now pass an
+explicit partial reconstruction and player-visibility audit for all 23 saved
+decisions on the exact external install. They remain ineligible for training
+because the duel did not reach a native terminal state and the external scripts
+have not passed historical GOAT validation. A later GUI trial disconnected
+while awaiting a hand-size discard on turn 3, leaving full desktop completion
+unproven. The bridge must handle every EDOPro decision prompt before it can
+be considered a complete human match path.
 
 For training, the bot must log the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The
