@@ -16103,3 +16103,39 @@ The browser game and local EDOPro policy room already use this guarded mode.
 This is measured inference-time error prevention, not a learned improvement
 to the neural checkpoint. M4 still requires stronger unguarded cross-deck
 learning and independent human-quality evidence.
+
+## Guarded PPO collection pilot (30 October 2026)
+
+The self-play trainer now has `--learner-own-loss-guard` for clipped PPO. It
+applies the deployed visible own-loss guard v1 both when sampling learner
+actions and when computing old and updated action probabilities. Trajectories
+still record every legal action and identify the guard version. The mode is
+opt-in; loading its checkpoint does not automatically enable the guard for
+inference.
+
+Starting from the selected v23 checkpoint, a four-game pilot used Roberto
+Martinez's Phoenix Control against the Warrior probe, both learner seats,
+seeds 174000–174003, Tactical-v14 opponents, two CPU rollout workers, one
+PPO epoch, and a 5e-5 learning rate. All four games terminated and their
+trajectories independently replay-verified and passed the player-visibility
+audit. The learner made 275 multi-option decisions; the guard excluded at
+least one option at 17 of those decisions, with zero excluded actions chosen.
+The learner won one game and lost three. Runtime reported by the trainer was
+4.17 seconds on this local run. These four games establish that the guarded
+rollout and update paths execute; they cannot measure a strength change.
+The ignored pilot checkpoint is
+`.cache/goat-ai/guarded_ppo_pilot_174000_174003.pt` (SHA-256
+`b2ed7954e298f4258d3c99754905e3342153f42d23ae383cdd2c13491286abde`).
+Its four replay files are beside it in
+`guarded_ppo_pilot_174000_174003_replays/`.
+
+Reproduce by running `python -m scripts.train_self_play` with the selected
+v23 checkpoint, `--engine experimental`, the two named Main Decks,
+`--seed 174000 --games 4 --policy-update clipped_ppo
+--learner-own-loss-guard --baseline-opponent tactical
+--historical-probability 0 --ppo-rollout-games 2 --rollout-workers 2
+--ppo-epochs 1 --ppo-batch-size 16 --snapshot-every 2
+--learning-rate 5e-5 --max-decisions 3000` and an unused output path.
+The next gate is a larger, balanced, held-out comparison against both the
+unguarded parent and Tactical on unrelated deck families, with the guard
+disabled at evaluation time to test learned improvement.

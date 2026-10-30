@@ -35,7 +35,9 @@ def test_independent_opponent_sampling_does_not_advance_learner_stream():
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-def test_independent_snapshot_stream_matches_worker_and_batch_rollouts():
+@pytest.mark.parametrize("learner_own_loss_guard", [False, True])
+def test_independent_snapshot_stream_matches_worker_and_batch_rollouts(
+        learner_own_loss_guard):
     native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     vocabulary = CardVocabulary.from_goat_whitelist(
         native_root / "banlist/GOAT.lflist.conf")
@@ -51,6 +53,7 @@ def test_independent_snapshot_stream_matches_worker_and_batch_rollouts():
             policy_update="clipped_ppo", ppo_rollout_games=2,
             rollout_workers=workers, rollout_batch_inference=batch_inference,
             independent_opponent_rng=True, historical_probability=1,
+            learner_own_loss_guard=learner_own_loss_guard,
             snapshot_every=2, ppo_epochs=1, ppo_batch_size=8,
             max_decisions=2000, random_seed=90,
             record_episode=lambda _, episode, sink=episodes: sink.append(episode),

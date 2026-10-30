@@ -14,6 +14,10 @@ from torch import nn
 
 from goat_ai.actions import Action
 from goat_ai.agents import Agent, RandomAgent, TacticalHeuristicAgent
+from goat_ai.agents.tactical_guard import (
+    safe_optional_own_loss_indices,
+    safe_target_indices,
+)
 from goat_ai.engine import RulesEngine
 from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
@@ -229,11 +233,22 @@ def _selection_progress_actions(legal_actions: Sequence[Action]) -> tuple[Action
     return actions
 
 
+def _visible_own_loss_guard_indices(observation,
+                                    legal_actions: Sequence[Action]) -> tuple[int, ...]:
+    """Match PolicyAgent's version-1 visible guard on the offered action set."""
+    admissible = safe_optional_own_loss_indices(
+        observation, legal_actions, range(len(legal_actions)))
+    return tuple(safe_target_indices(
+        observation, legal_actions, admissible,
+        protect_removal_targets=True))
+
+
 def _sample_legal_action_with_features(
     model: LegalActionPolicy, vocabulary: CardVocabulary,
     observation, legal_actions, generator: torch.Generator,
     temperature: float = 1.0,
     scorer: Callable[[DecisionFeatures], torch.Tensor] | None = None,
+    own_loss_guard: bool = False,
 ) -> tuple[Action, DecisionFeatures | None, tuple[Action, ...]]:
     """Sample from visible legal options, with no native-state access."""
     if temperature <= 0:
@@ -249,6 +264,11 @@ def _sample_legal_action_with_features(
     with torch.inference_mode():
         logits = (scorer(features.to(device)) if scorer is not None
                   else model(features.to(device))) / temperature
+        if own_loss_guard:
+            admissible = _visible_own_loss_guard_indices(observation, policy_actions)
+            mask = torch.zeros(len(policy_actions), dtype=torch.bool, device=device)
+            mask[list(admissible)] = True
+            logits = logits.masked_fill(~mask, -1e9)
         probabilities = torch.softmax(logits, dim=0).cpu()
         index = int(torch.multinomial(probabilities, 1, generator=generator).item())
     return policy_actions[index], features, policy_actions
@@ -309,6 +329,7 @@ def run_learning_episode(
     max_decisions: int = 5000, learner_temperature: float = 1.0,
     collect_features: bool = False,
     rollout_scorer: TracedRolloutScorer | None = None,
+    own_loss_guard: bool = False,
 ) -> EpisodeResult:
     if learner_seat not in (0, 1) or max_decisions < 1 or learner_temperature <= 0:
         raise ValueError("invalid learner seat or decision cap")
@@ -323,7 +344,8 @@ def run_learning_episode(
             if observation.acting_player == learner_seat:
                 action, features, policy_actions = _sample_legal_action_with_features(
                     model, vocabulary, observation, legal_actions, generator,
-                    temperature=learner_temperature, scorer=rollout_scorer)
+                    temperature=learner_temperature, scorer=rollout_scorer,
+                    own_loss_guard=own_loss_guard)
                 if len(policy_actions) > 1:
                     records.append(DecisionRecord(observation, policy_actions, action))
                     if collect_features:
@@ -347,6 +369,7 @@ def run_batched_learning_episodes(
     engine_factory: Callable[[], RulesEngine], *, max_decisions: int = 5000,
     learner_temperature: float = 1.0,
     collect_features: bool = False,
+    own_loss_guard: bool = False,
 ) -> tuple[EpisodeResult, ...]:
     """Run independent native duels together and batch only learner inference.
 
@@ -430,6 +453,13 @@ def run_batched_learning_episodes(
                 for index, scores, actions in zip(ready, logits, policy_actions,
                                                    strict=True):
                     generator = games[index][4]
+                    if own_loss_guard:
+                        admissible = _visible_own_loss_guard_indices(
+                            observations[index], actions)
+                        mask = torch.zeros(len(actions), dtype=torch.bool,
+                                           device=scores.device)
+                        mask[list(admissible)] = True
+                        scores = scores.masked_fill(~mask, -1e9)
                     probabilities = torch.softmax(scores / learner_temperature,
                                                   dim=0).cpu()
                     choice = int(torch.multinomial(probabilities, 1,
@@ -444,7 +474,8 @@ def _parallel_rollout_worker(task):
     """Collect one CPU duel with a per-episode sampling stream."""
     (model_state, vocabulary, width, feature_version, opponent_state, decks,
      seed, learner_seat, engine_factory, max_decisions, temperature,
-     generator_seed, baseline_opponent_factory, independent_opponent_rng) = task
+     generator_seed, baseline_opponent_factory, independent_opponent_rng,
+     own_loss_guard) = task
     torch.set_num_threads(1)
     model = LegalActionPolicy(vocabulary.size, width=width,
                               feature_version=feature_version)
@@ -464,7 +495,8 @@ def _parallel_rollout_worker(task):
              if independent_opponent_rng else generator))
     return run_learning_episode(model, vocabulary, opponent, decks, seed,
                                 learner_seat, engine_factory, generator,
-                                max_decisions, temperature)
+                                max_decisions, temperature,
+                                own_loss_guard=own_loss_guard)
 
 
 def policy_gradient_update(model: LegalActionPolicy, vocabulary: CardVocabulary,
@@ -627,6 +659,7 @@ def ppo_clipped_update(
     preference_anchors: Sequence[PreferenceAnchor] = (),
     preference_weight: float = 0.0,
     preference_batch_size: int = 8,
+    own_loss_guard: bool = False,
 ) -> float:
     """Reuse on-policy visible decisions with a clipped objective.
 
@@ -668,6 +701,22 @@ def ppo_clipped_update(
                 if encoded_features is None else
                 [item.to(device) for item in encoded_features])
     selected = [record.legal_actions.index(record.selected_action) for record in records]
+    admissible = ([_visible_own_loss_guard_indices(
+        record.observation, record.legal_actions) for record in records]
+                  if own_loss_guard else None)
+    if admissible is not None and any(
+            not choices or selected[index] not in choices
+            for index, choices in enumerate(admissible)):
+        raise ValueError("PPO record selected an action outside the visible own-loss guard")
+
+    def masked_logits(logits: torch.Tensor, indices: Sequence[int]) -> torch.Tensor:
+        if admissible is None:
+            return logits
+        mask = torch.zeros(logits.shape, dtype=torch.bool, device=logits.device)
+        for row, index in enumerate(indices):
+            mask[row, list(admissible[index])] = True
+        return logits.masked_fill(~mask, -1e9)
+
     old_log_probs = []
     parent_log_prob_rows: list[torch.Tensor] = []
     parent_prob_rows: list[torch.Tensor] = []
@@ -676,12 +725,15 @@ def ppo_clipped_update(
         for start in range(0, len(records), batch_size):
             batch = features[start:start + batch_size]
             logits, _ = model.forward_batch(batch)
+            indices = list(range(start, min(start + batch_size, len(records))))
+            logits = masked_logits(logits, indices)
             choices = torch.tensor(selected[start:start + batch_size],
                                    dtype=torch.long, device=device)
             log_probs = torch.log_softmax(logits / temperature, dim=1)
             old_log_probs.extend(log_probs.gather(1, choices[:, None]).squeeze(1).tolist())
             if parent_kl_weight:
                 parent_logits, _ = parent_model.forward_batch(batch)
+                parent_logits = masked_logits(parent_logits, indices)
                 parent_log_probs = torch.log_softmax(parent_logits / temperature, dim=1)
                 for row, record in zip(parent_log_probs, records[start:start + batch_size],
                                        strict=True):
@@ -699,6 +751,7 @@ def ppo_clipped_update(
         for start in range(0, len(order), batch_size):
             indices = order[start:start + batch_size]
             logits, _ = model.forward_batch([features[index] for index in indices])
+            logits = masked_logits(logits, indices)
             log_probs = torch.log_softmax(logits / temperature, dim=1)
             probabilities = log_probs.exp()
             choices = torch.tensor([selected[index] for index in indices],
@@ -832,6 +885,7 @@ def train_against_snapshot_pool(
     baseline_opponent_factory: Callable[[int], Agent] = RandomAgent,
     baseline_opponent_name: str = "random",
     independent_opponent_rng: bool = False,
+    learner_own_loss_guard: bool = False,
     record_episode: Callable[[int, EpisodeResult], None] | None = None,
 ) -> tuple[dict, ...]:
     """Train one learner seat per duel against a baseline or frozen past policies.
@@ -872,6 +926,8 @@ def train_against_snapshot_pool(
         raise ValueError("invalid self-play policy update")
     if ppo_normalize_advantages and policy_update != "clipped_ppo":
         raise ValueError("advantage normalization requires clipped PPO")
+    if learner_own_loss_guard and policy_update != "clipped_ppo":
+        raise ValueError("visible own-loss guard requires clipped PPO")
     if ppo_baseline_timing in ("frozen_rollout", "leave_one_out") and (
             policy_update != "clipped_ppo" or ppo_rollout_games < 2):
         raise ValueError("rollout baseline requires multi-duel PPO")
@@ -962,12 +1018,13 @@ def train_against_snapshot_pool(
                                   batch_decks, batch_seed, batch_seat, engine_factory,
                                   max_decisions, learner_temperature,
                                   random_seed + batch_seed, baseline_opponent_factory,
-                                  independent_opponent_rng))
+                                  independent_opponent_rng,
+                                  learner_own_loss_guard))
                 if rollout_batch_inference:
                     batch_games = []
                     for task in tasks:
                         (_, _, _, _, opponent_state, batch_decks, batch_seed,
-                         batch_seat, _, _, _, generator_seed, _, _) = task
+                         batch_seat, _, _, _, generator_seed, _, _, _) = task
                         batch_generator = torch.Generator(device="cpu").manual_seed(
                             generator_seed)
                         if opponent_state is None:
@@ -988,7 +1045,9 @@ def train_against_snapshot_pool(
                         model, vocabulary, batch_games, engine_factory,
                         max_decisions=max_decisions,
                         learner_temperature=learner_temperature,
-                        collect_features=reuse_rollout_features)
+                        collect_features=reuse_rollout_features,
+                        **({"own_loss_guard": True}
+                           if learner_own_loss_guard else {}))
                 elif rollout_workers == 1:
                     previous_threads = torch.get_num_threads()
                     try:
@@ -1022,6 +1081,8 @@ def train_against_snapshot_pool(
                     episode = run_learning_episode(model, vocabulary, opponent, decks, seed,
                                                    learner_seat, engine_factory, generator,
                                                    max_decisions, learner_temperature,
+                                                   **({"own_loss_guard": True}
+                                                      if learner_own_loss_guard else {}),
                                                    **({"rollout_scorer": rollout_scorer}
                                                       if trace_rollout_inference else {}),
                                                    **({"collect_features": True}
@@ -1081,6 +1142,8 @@ def train_against_snapshot_pool(
                             preference_weight=preference_weight,
                             preference_batch_size=preference_batch_size,
                             random_seed=random_seed + seed,
+                            **({"own_loss_guard": True}
+                               if learner_own_loss_guard else {}),
                             encoded_features=(episode.learner_features
                                               if reuse_rollout_features else None))
                     else:
@@ -1172,6 +1235,8 @@ def train_against_snapshot_pool(
                         preference_weight=preference_weight,
                         preference_batch_size=preference_batch_size,
                         random_seed=random_seed + seed,
+                        **({"own_loss_guard": True}
+                           if learner_own_loss_guard else {}),
                         advantages=update_advantages, sample_weights=weights,
                         encoded_features=(rollout_features if reuse_rollout_features else None))
                     for report_index in rollout_report_indices:

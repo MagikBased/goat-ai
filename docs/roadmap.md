@@ -1100,6 +1100,15 @@ now finds the earlier optional Breaker activation even though its legal
 alternatives are phase transitions, not Pass. These are review candidates,
 not training labels; the queue has no human choices yet.
 
+Guarded clipped-PPO collection can now use the selected policy's visible
+own-loss guard v1 during both action sampling and policy updates. A
+[four-game pilot](evaluation.md#guarded-ppo-collection-pilot-30-october-2026)
+replay-verified all trajectories and exercised 17 masked learner decisions.
+It is an implementation check, not a policy promotion. Next, compare a
+substantially larger guarded-training child with its parent on unrelated
+decks, including unguarded inference to test whether the neural policy
+learned from those decisions.
+
 The matched-report comparator now exposes one paired score difference and
 interval per candidate Main Deck alongside the overall result. This makes
 deck-specific stalls visible during checkpoint selection; direct

@@ -58,6 +58,7 @@ from goat_ai.training.self_play import (
     VisibleStateValue,
     _sample_legal_action_with_features,
     _selection_progress_actions,
+    _visible_own_loss_guard_indices,
     clipped_surrogate,
     episode_schedule,
     normalize_rollout_advantages,
@@ -134,6 +135,34 @@ def actions() -> tuple[Action, ...]:
     return (Action("native-0", "normal_summon", 0, {"code": 10, "location": 2}),
             Action("native-1", "set_monster", 0, {"code": 10, "location": 2}),
             Action("native-2", "end_phase", 0))
+
+
+def test_guarded_ppo_samples_and_updates_the_same_visible_action_set():
+    own_set = CardView(0, "monster", "facedown", 504700178, 0)
+    observation = replace(view(), field=(own_set,))
+    nobleman = Action("nobleman", "activate", 0, {"code": 504700116})
+    battle = Action("battle", "battle_phase", 0)
+    end = Action("end", "end_phase", 0)
+    offered = (nobleman, battle, end)
+    vocabulary = CardVocabulary((504700116, 504700178))
+    model = LegalActionPolicy(vocabulary.size, width=8, feature_version=10)
+    assert _visible_own_loss_guard_indices(observation, offered) == (1, 2)
+    for seed in range(12):
+        sampled, features, policy_actions = _sample_legal_action_with_features(
+            model, vocabulary, observation, offered,
+            torch.Generator().manual_seed(seed), own_loss_guard=True)
+        assert sampled in (battle, end)
+        assert policy_actions == offered
+        assert features is not None
+    safe = DecisionRecord(observation, offered, battle)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    loss = ppo_clipped_update(model, vocabulary, (safe,), 1.0, 0.0,
+                              optimizer, epochs=2, own_loss_guard=True)
+    assert math.isfinite(loss)
+    with pytest.raises(ValueError, match="outside the visible own-loss guard"):
+        ppo_clipped_update(model, vocabulary,
+                           (DecisionRecord(observation, offered, nobleman),),
+                           1.0, 0.0, optimizer, own_loss_guard=True)
 
 
 def test_traced_rollout_scores_varying_legal_action_counts_exactly():

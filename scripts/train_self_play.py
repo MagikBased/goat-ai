@@ -188,6 +188,8 @@ def main() -> None:
                         help="optional undiscounted terminal GAE from a frozen visible-resource ridge")
     parser.add_argument("--learner-temperature", type=float, default=1.0,
                         help="softmax temperature for learner sampling and its policy update")
+    parser.add_argument("--learner-own-loss-guard", action="store_true",
+                        help="sample and update clipped PPO under the deployed visible own-loss guard v1")
     parser.add_argument("--baseline-scope", choices=("global", "learner_deck", "state_value",
                                                      "resource_ridge"),
                         default="global",
@@ -247,6 +249,8 @@ def main() -> None:
         parser.error("resource_ridge baseline requires --resource-ridge-artifact")
     if args.ppo_normalize_advantages and args.policy_update != "clipped_ppo":
         parser.error("advantage normalization requires clipped PPO")
+    if args.learner_own_loss_guard and args.policy_update != "clipped_ppo":
+        parser.error("learner own-loss guard requires clipped PPO")
     if args.ppo_gae_lambda is not None and (
             args.policy_update != "clipped_ppo"
             or args.baseline_scope != "resource_ridge"
@@ -322,7 +326,11 @@ def main() -> None:
                 "parent_checkpoint_sha256": parent_checkpoint_sha256,
                 "self_play_episode_index": index,
                 "learner_temperature": args.learner_temperature,
-                "learner_action_selection": "sampled_softmax",
+                "learner_action_selection": (
+                    "sampled_softmax_visible_own_loss_guard_v1"
+                    if args.learner_own_loss_guard else "sampled_softmax"),
+                "learner_own_loss_guard_version": (
+                    1 if args.learner_own_loss_guard else None),
                 "selection_progress_mask": 1,
                 "independent_opponent_rng": args.independent_opponent_rng,
             },
@@ -339,6 +347,7 @@ def main() -> None:
         snapshot_every=args.snapshot_every, max_snapshots=args.max_snapshots,
         entropy_coefficient=args.entropy_coefficient,
         learner_temperature=args.learner_temperature,
+        learner_own_loss_guard=args.learner_own_loss_guard,
         baseline_scope=args.baseline_scope,
         policy_gradient_reduction=args.policy_gradient_reduction,
         reinforce_batch_size=args.reinforce_batch_size,
@@ -401,6 +410,8 @@ def main() -> None:
               "snapshot_every": args.snapshot_every, "max_snapshots": args.max_snapshots,
               "entropy_coefficient": args.entropy_coefficient,
               "learner_temperature": args.learner_temperature,
+              "learner_own_loss_guard_version": (
+                  1 if args.learner_own_loss_guard else None),
               "selection_progress_mask": 1,
               "baseline_scope": args.baseline_scope,
               "policy_gradient_reduction": args.policy_gradient_reduction,
