@@ -1,5 +1,33 @@
 # Baseline evaluation log
 
+## Combined held-out weakness review queue (30 October 2026)
+
+Two existing, unlabeled review queues for the selected v23 policy were
+combined for human review: Chaos/Beastdown and Phoenix Control/Warrior. The
+result has **36 candidate decisions** from **19 distinct complete replays**.
+Every source replay and its selected legal action was checked against the
+pinned engine; **9,532 decisions** replay-verified and passed the visibility
+audit. The current viewer layout was regenerated for all 19 duels. The local
+queue is `.cache/goat-ai/combined_weak_holdout_review.json` (SHA-256
+`0131f1234aebde05757ccaa8fa11aefabbc824f4915ade4178ea8402664c0ea0`).
+Open it with `./start_review_viewer.sh
+.cache/goat-ai/combined_weak_holdout_review.json`. The proposed alternatives
+are review prompts, **not** expert labels or automatic training data; neither
+source queue has saved labels at this writing. This prepares independent
+feedback on the weak deck families without adding new rollout outcomes.
+
+Rebuild the ignored combined queue after reproducing its two source queues:
+
+```bash
+PYTHONPATH=src:. .venv/bin/python scripts/combine_review_queues.py \
+  .cache/goat-ai/chaos_weakness_policy_176000_176003/review_queue.json \
+  .cache/goat-ai/phoenix_policy_audit_172002_172009/review_queue.json \
+  --output .cache/goat-ai/combined_weak_holdout_review.json \
+  --native-root .cache/goat-ai
+PYTHONPATH=src:. .venv/bin/python scripts/refresh_review_queue.py \
+  .cache/goat-ai/combined_weak_holdout_review.json --native-root .cache/goat-ai
+```
+
 ## Third 60-card whitelist/Fusion sample (30 October 2026)
 
 Fresh seeds 177100–177119 generated 40 distinct whitelist-legal 60-card Main

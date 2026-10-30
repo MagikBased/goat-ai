@@ -1094,6 +1094,13 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A [combined held-out weakness review queue](evaluation.md#combined-held-out-weakness-review-queue-30-october-2026)
+now presents 36 unlabelled decisions from the weak Chaos/Beastdown and
+Phoenix Control/Warrior pairings in the current viewer. Its 19 source duels
+replay-verified across 9,532 decisions and passed visibility checks. No
+candidate is treated as a human correction until it is independently reviewed;
+this prepares M4 data collection but does not improve the selected policy.
+
 A fresh [64-duel held-out comparison](evaluation.md#selected-v23-versus-tactical-on-four-unseen-historical-main-decks--30-october-2026)
 put the selected v23 policy at 11–53 against Tactical-v14 across four sourced
 Main Deck compositions absent from its training provenance. Both deck
