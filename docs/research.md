@@ -25,6 +25,33 @@ Required regression cases: first-turn draw; summon response and Ignition priorit
 
 ## Replay and demonstration data
 
+### EDOPro live-client bridge probe (2026-10-30)
+
+The active [Project Ignis WindBot fork](https://github.com/ProjectIgnis/windbot)
+is an EDOPro-compatible room client. At inspected commit
+`bffe6b62679c8b2fafea8f59740e03a132517da4`, its
+[`BinaryClient`](https://github.com/ProjectIgnis/windbot/blob/bffe6b62679c8b2fafea8f59740e03a132517da4/YGOSharp.Network/BinaryClient.cs)
+uses a two-byte little-endian payload length, excluding the header, with
+maximum payload 65,535 bytes. The payload begins with a one-byte packet type.
+[`GameClient`](https://github.com/ProjectIgnis/windbot/blob/bffe6b62679c8b2fafea8f59740e03a132517da4/Game/GameClient.cs)
+sends player info and room join/create packets, and
+[`GameBehavior`](https://github.com/ProjectIgnis/windbot/blob/bffe6b62679c8b2fafea8f59740e03a132517da4/Game/GameBehavior.cs)
+answers duel prompts with `CtosMessage.Response`. Our optional
+`goat_ai.edopro.framing` implements and tests only this outer packet boundary;
+it has not connected to a room, parsed duel prompts, or produced a training
+trajectory. The inspected source remains outside the repository and no bot
+code has been copied.
+
+The Project Ignis [FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html)
+says its packaged WindBot supports Master Rule 3 and later and forcing older
+rules is unsupported. EDOPro itself can host GOAT, but whether a custom GOAT AI
+client can complete a GOAT room duel remains an integration test, not a proven
+capability. No EDOPro installation was found in the current local workspace.
+The next verification is a local GOAT room connection with one legal decision
+and exact core/script/card-ID comparison. A bot-side packet trace alone cannot
+label the human's legal choices; server-side logging or validated legacy replay
+reconstruction is required for that.
+
 [Project Ignis FAQ](https://github.com/ProjectIgnis/projectignis.github.io/blob/main/faq.html) says old `.yrp` replays re-enact decisions against a matching core and scripts, whereas `.yrpX` stores resulting actions and remains viewable across engine updates. Neither statement guarantees the complete legal action set or each player's knowledge at every choice. The [EDOPro replay header and flags](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.h) and [container reader](https://github.com/edo9300/edopro/blob/d0f111d6f3e0d4ee529b88a869ae0a971954bae3/gframe/replay.cpp) define `yrp1` as saved Decks plus engine responses and `yrpX` as a packet stream, with optional LZMA compression and an extended four-word seed. GOAT AI has a bounded structural reader for these two EDOPro containers and conditional native response reconstruction tested on synthetic GOAT duels. The reader prints a privacy-preserving summary by default. A public YGOPro `yrp2` sample from [ygopro-yrp-encode](https://github.com/purerosefallen/ygopro-yrp-encode) is a distinct format and is rejected explicitly. Real EDOPro replay compatibility and player-knowledge validation are **not established**. No EDOPro replay is yet admitted as a training trajectory. DuelingBook data and video-derived trajectories require rights and a separate extraction pipeline.
 
 Another MIT-licensed [YGOPro/YGOPro2 replay parser](https://github.com/RemarkWang/yrp-parser)
