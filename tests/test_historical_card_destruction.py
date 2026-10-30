@@ -187,6 +187,57 @@ def test_card_destruction_opponent_empty_deck_draw_result(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_card_destruction_both_players_fail_redraw(tmp_path):
+    """Record the pinned core's simultaneous short-Deck result, not a historical ruling."""
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    deck = tmp_path / "card_destruction_both_short.ydk"
+    deck.write_text("#main\n" + "\n".join(map(str, (
+        CARD_DESTRUCTION, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
+    with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=52,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert CARD_DESTRUCTION in {card.code for card in obs.hand}
+        activated = False
+        for _ in range(800):
+            if env.is_terminal():
+                assert activated
+                assert env.result() is None
+                assert obs.deck_counts == (0, 0)
+                assert obs.life_points == (8000, 8000)
+                assert obs.phase == "main1"
+                path = tmp_path / "card_destruction_both_short.json"
+                write_trajectory(path, env.trajectory())
+                trajectory = read_trajectory(path)
+                assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) == len(
+                    trajectory.decisions)
+                audit_trajectory_visibility(trajectory)
+                assert env.engine.probe.loaded_script_sha256[
+                    f"official/c{CARD_DESTRUCTION}.lua"] == PATCHED_CARD_DESTRUCTION_SHA256
+                return
+            actions = env.legal_actions()
+            action = None
+            if (not activated and obs.acting_player == 0 and obs.phase == "main1"
+                    and obs.deck_counts == (4, 5)
+                    and any(candidate.kind == "end_phase" for candidate in actions)):
+                assert len(obs.hand) - 1 > obs.deck_counts[0]
+                assert obs.opponent_hand_count > obs.deck_counts[1]
+                action = next((candidate for candidate in actions
+                               if candidate.kind == "activate" and
+                               candidate.parameters.get("code") == CARD_DESTRUCTION), None)
+                assert action is not None
+                activated = True
+            if action is None and actions[0].kind == "select_card":
+                action = next((candidate for candidate in actions
+                               if candidate.parameters.get("code") != CARD_DESTRUCTION),
+                              actions[0])
+            if action is None:
+                action = next((candidate for candidate in actions
+                               if candidate.kind in ("end_phase", "pass")), actions[0])
+            obs = env.step(action)
+    pytest.fail("Card Destruction did not reach the simultaneous short-Deck boundary")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize("chain_scapegoat", [False, True])
 def test_card_destruction_counts_hand_at_resolution_after_chain(tmp_path, chain_scapegoat):
     """A Quick-Play card spent as Chain Link 2 is absent from the later discard."""
