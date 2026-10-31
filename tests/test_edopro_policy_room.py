@@ -66,6 +66,56 @@ def test_stopped_room_keeps_launch_error_after_server_restart(tmp_path):
         "The room exited before saving a duel")
 
 
+def test_room_rechecks_changed_recording_input_even_if_newest_mtime_is_unchanged(
+        tmp_path, monkeypatch):
+    manager = EdoRoomManager(GameCreator(root=tmp_path, native_root=tmp_path))
+    session = manager.folder / ("a" * 16)
+    session.mkdir(parents=True)
+    replay = session / "game-001-seed-1.yrpX"
+    review = replay.with_suffix(".review.json")
+    metadata = replay.with_suffix(".meta.json")
+    for path in (replay, review, metadata):
+        path.write_text("original", encoding="utf-8")
+    newest = time.time_ns() + 1_000_000_000_000
+    os.utime(replay, ns=(newest, newest))
+    checks = []
+
+    def verify(*args):
+        checks.append(args)
+        if len(checks) > 1:
+            raise ValueError("changed recording input")
+        return {"complete": True, "historical_patches": True,
+                "asset_identity_verified": True, "deck_identity_verified": True,
+                "goat_decks_legal": True}
+
+    monkeypatch.setattr("scripts.edopro_local_room.verify_edopro_live_recording", verify)
+    monkeypatch.setattr("scripts.edopro_local_room.render_replay",
+                        lambda source, output, root: output.write_text("viewer"))
+    assert manager._recording(session)["verified"] is True
+    assert manager._recording(session)["verified"] is True
+    assert len(checks) == 1
+
+    previous_mtime = metadata.stat().st_mtime_ns
+    metadata.write_text("modified", encoding="utf-8")
+    os.utime(metadata, ns=(previous_mtime + 1_000_000_000,
+                           previous_mtime + 1_000_000_000))
+    assert metadata.stat().st_mtime_ns < replay.stat().st_mtime_ns
+    changed = manager._recording(session)
+    assert changed["verified"] is False
+    assert changed["verification_error"] == "changed recording input"
+    assert len(checks) == 2
+
+    previous = metadata.stat()
+    replacement = session / "replacement.tmp"
+    replacement.write_text("altered!", encoding="utf-8")
+    os.utime(replacement, ns=(previous.st_mtime_ns, previous.st_mtime_ns))
+    os.replace(replacement, metadata)
+    assert metadata.stat().st_size == previous.st_size
+    assert metadata.stat().st_mtime_ns == previous.st_mtime_ns
+    assert manager._recording(session)["verified"] is False
+    assert len(checks) == 3
+
+
 @pytest.mark.skipif(
     not (os.getenv("GOAT_AI_EDOPRO_HOST_ROOT") and os.getenv("GOAT_AI_EDOPRO_MIRROR_ROOT")
          and os.getenv("GOAT_AI_EDOPRO_HISTORICAL") == "1"),

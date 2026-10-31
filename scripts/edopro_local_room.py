@@ -78,7 +78,7 @@ class EdoRoomManager:
         self.verify_lock = Lock()
         self.process: subprocess.Popen | None = None
         self.session: str | None = None
-        self._verified: dict[str, tuple[int, dict]] = {}
+        self._verified: dict[str, tuple[tuple[tuple[int, ...], ...], dict]] = {}
         self.names: dict[int, str] | None = None
         self._recover_session()
 
@@ -348,8 +348,12 @@ class EdoRoomManager:
                   "verified": False, "training_admitted": False}
         if not metadata_path.is_file() or not review_path.is_file():
             return record
-        stamp = max(replay.stat().st_mtime_ns, metadata_path.stat().st_mtime_ns,
-                    review_path.stat().st_mtime_ns)
+        # Keep each input's identity in the cache key. A single maximum mtime
+        # can remain unchanged when a different, older file is replaced. Inode
+        # and ctime also catch an atomic replacement that preserves mtime/size.
+        stats = (replay.stat(), review_path.stat(), metadata_path.stat())
+        stamp = tuple((info.st_dev, info.st_ino, info.st_size,
+                       info.st_mtime_ns, info.st_ctime_ns) for info in stats)
         with self.verify_lock:
             cached = self._verified.get(directory.name)
             if cached and cached[0] == stamp:

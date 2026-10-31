@@ -3396,6 +3396,15 @@ deselected` in 33.03 seconds). The protocol clients in this test choose random
 responses; this does not validate additional human GUI interactions or claim
 competitive playing strength.
 
+The local EDOPro session list now invalidates its cached replay verification
+when any of the native replay, review trajectory, or metadata files changes.
+The cache key records each file's device, inode, size, modification time, and
+change time; a previously newer replay file no longer masks an altered older
+metadata file. A regression also replaces metadata atomically while preserving
+its size and modification time. This keeps the displayed verification status
+current; the separate training intake still independently re-verifies the
+recording and confirmed human choices.
+
 For training, the bot logs the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The
 human's decisions require equivalent logging at the server or validated
