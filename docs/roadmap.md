@@ -1113,9 +1113,12 @@ terminal win/loss as the full-return objective. A replay audit found and
 corrected token miscounting in the first pilot. Corrected matched 32-duel
 continuations and 32 replay-verified held-out head-to-head duels gave the
 candidate a 14–18 result against its control. This small, previously used
-deck family does not establish an improvement; the selected v23 checkpoint is unchanged.
-The next gate is a larger fresh-deck holdout against both its control and
-Tactical-v14.
+deck family does not establish an improvement. A subsequent fresh four-deck,
+64-game-per-checkpoint Tactical-v14 holdout scored the candidate 19–44–1
+against the control's 20–43–1; the paired interval crossed zero, and all
+69,688 decisions replay-verified and passed visibility audits. The selected
+v23 checkpoint remains unchanged. Further M4 work needs a different learning
+signal or architecture, followed by independent cross-deck strength evidence.
 
 A [combined held-out weakness review queue](evaluation.md#combined-held-out-weakness-review-queue-30-october-2026)
 now presents 36 unlabelled decisions from the weak Chaos/Beastdown and

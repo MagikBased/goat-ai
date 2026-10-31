@@ -54,6 +54,12 @@ PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
 
 ## Visible-material potential PPO pilot (30 October 2026)
 
+### Fresh-deck Tactical holdout
+
+The corrected potential candidate and its weight-zero control were each evaluated against Tactical-v14 on four sourced New Jersey 2005 Main Decks, with both Deck assignments, both policy seats, and fresh seeds 178000–178007. The evaluator rejected any Main Deck composition or exact YDK file used in either checkpoint's training games. All 64 games per checkpoint reached an outcome. The potential candidate scored **19–44–1** and the control **20–43–1**. The strict matched comparator verified the same opponent, assets, source, complete declared schedule, and unseen Main Decks; its candidate-minus-control score difference was **−1.56 percentage points**, with a paired 95% interval **[−9.38, +6.25]**. Candidate and control respectively replay-verified and visibility-audited **34,968/34,968** and **34,720/34,720** decisions. The candidate gained one score point on Phoenix Control but lost two on Warrior relative to control; Chaos remained at 2/16 for both. This fresh holdout gives no evidence that the potential improves competitive play, so neither experimental checkpoint is promoted.
+
+The ignored reports are `.cache/goat-ai/material_fullfacts_candidate_nj_178000.json` (SHA-256 `ba6bfcf61e3131190da1ba02b4c988af61d2eb4befcb48ce798af15a510e00f0`) and `.cache/goat-ai/material_fullfacts_control_nj_178000.json` (SHA-256 `128075da1dd7771e67a4ad5fc182f4f9ee2de69482ebf38e71b8a07726bb1329`). Reproduce with `scripts/evaluate_policy.py`, `--engine experimental --opponent tactical --both-deck-assignments --seed 178000 --seeds 8 --max-decisions 3000 --workers 4 --require-unseen-main-decks --reject-training-deck-hashes --verify-replays`, and matchups Beastdown/Chaos and Phoenix Control/Warrior named in the prior New Jersey holdout; run once per checkpoint above. Compare using `scripts/compare_tournament_reports.py --verify-local-decks --require-unseen-main-decks`.
+
 `--ppo-material-potential` is an opt-in credit-assignment experiment for
 `--ppo-gae-lambda`. At each learner decision it counts the learner's hand and
 controlled non-token field cards minus the opponent's hand count and controlled
