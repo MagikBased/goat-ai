@@ -19,10 +19,12 @@ MST = 5318639
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
-@pytest.mark.parametrize("activate_ocean,remove_ocean", (
-    (False, False), (True, False), (True, True)),
-    ids=("without_ocean", "ocean", "remove_ocean"))
-def test_ocean_changes_level_limit_position_effect(tmp_path, activate_ocean, remove_ocean):
+@pytest.mark.parametrize("activate_ocean,remove_ocean,manual_position", (
+    (False, False, False), (True, False, False), (True, True, False),
+    (False, False, True)),
+    ids=("without_ocean", "ocean", "remove_ocean", "manual_position"))
+def test_ocean_changes_level_limit_position_effect(
+        tmp_path, activate_ocean, remove_ocean, manual_position):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     scripts = {f"official/c{OCEAN}.lua", f"official/c{LEVEL_LIMIT}.lua"}
     if remove_ocean:
@@ -49,7 +51,7 @@ def test_ocean_changes_level_limit_position_effect(tmp_path, activate_ocean, rem
         if remove_ocean:
             assert MST in {c.code for c in env.engine.probe.observation(1).hand}
         ocean_used = summoned = limit_used = checked = False
-        mst_used = mst_targeted = limit_checked = False
+        mst_used = mst_targeted = limit_checked = position_changed = False
         agents = (RandomAgent(100), RandomAgent(101))
         for _ in range(3000):
             if env.is_terminal():
@@ -78,7 +80,7 @@ def test_ocean_changes_level_limit_position_effect(tmp_path, activate_ocean, rem
                         assert monster.level == (3 if activate_ocean else 4)
                         assert monster.orientation == ("attack" if activate_ocean else "defense")
                         limit_checked = True
-                        if not remove_ocean:
+                        if not remove_ocean and not manual_position:
                             checked = True
                     if remove_ocean and limit_checked and not mst_used:
                         action = next((a for a in actions if a.kind == "activate"
@@ -93,6 +95,17 @@ def test_ocean_changes_level_limit_position_effect(tmp_path, activate_ocean, rem
                     action = next((a for a in actions if a.parameters.get("code") == OCEAN
                                    and a.parameters.get("controller") == 0), None)
                     mst_targeted = action is not None
+                if (manual_position and limit_checked and obs.turn == 3
+                        and obs.phase == "main1" and obs.acting_player == 0):
+                    if not position_changed:
+                        action = next((a for a in actions if a.kind == "change_position"
+                                       and a.parameters.get("code") == GAGAGIGO), None)
+                        position_changed = action is not None
+                    elif not obs.chain:
+                        monster = next(c for c in obs.field if c.code == GAGAGIGO)
+                        assert monster.orientation == "defense"
+                        assert monster.level == 4
+                        checked = True
             if action is None:
                 action = (next((a for a in actions if a.kind in
                                ("place", "pass", "end_phase")), actions[0]) if not checked
@@ -100,9 +113,9 @@ def test_ocean_changes_level_limit_position_effect(tmp_path, activate_ocean, rem
             obs = env.step(action)
         assert checked and env.is_terminal(), (
             f"Ocean/Level Limit duel did not finish: {limit_checked=} {mst_used=} "
-            f"{mst_targeted=} {obs.turn=} {obs.phase=}")
+            f"{mst_targeted=} {position_changed=} {obs.turn=} {obs.phase=}")
         assert scripts <= env.engine.probe.loaded_script_sha256.keys()
-        path = tmp_path / f"level_limit_{activate_ocean}_{remove_ocean}.json"
+        path = tmp_path / f"level_limit_{activate_ocean}_{remove_ocean}_{manual_position}.json"
         write_trajectory(path, env.trajectory())
     replay = read_trajectory(path)
     assert audit_trajectory_visibility(replay)["decisions"] == len(replay.decisions)

@@ -579,7 +579,11 @@ in Attack Position at current Level 3 with Ocean. Both complete native duels
 replay-verify and pass visibility audits. A third duel removes Ocean with
 Mystical Space Typhoon while Level Limit remains face-up; the now-Level 4
 monster immediately turns to Defense Position. It also replay-verifies and
-passes the visibility audit. Manual position changes remain open.
+passes the visibility audit. A fourth branch checks the archived manual
+position-change ruling: the Level 4 monster can legally try to switch back
+to Attack Position on its controller's next turn, but Level Limit immediately
+leaves it in Defense Position. That duel also replay-verifies and passes the
+visibility audit. Other position-changing effects remain open.
 
 A paired [Dekoichi/Skill Drain fixture](goat_rules.md#dekoichi-and-chained-skill-drain) checks the archived Flip Summon response ruling: Skill Drain can chain to Dekoichi's effect, pay 1000 LP, and prevent its draw while Dekoichi remains face-up. A second pair checks the Damage Step boundary: pre-activated Drain prevents the draw, while Set Drain cannot chain to Dekoichi flipped by battle. All four complete native duels replay-verify and pass visibility audits. Other Damage Step responses remain open.
 
