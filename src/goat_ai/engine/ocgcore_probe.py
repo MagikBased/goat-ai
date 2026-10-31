@@ -61,6 +61,7 @@ MR1_SYNCHRO_CARDS = frozenset({
     65192027,  # Dark Armed Dragon; exact DARK count and destruction probe
     70095154,  # Cyber Dragon; inherent Summon and response probe
     26593852,  # Ally of Justice Catastor; pre-damage-calculation battle probe
+    41420027,  # Solemn Judgment; Synchro Summon negation probe
 })
 MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094, 7391448,
                                50321796, 26593852})

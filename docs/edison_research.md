@@ -1037,6 +1037,31 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_catastor_damage_step.py
 ```
 
+## Solemn Judgment against a Synchro Summon
+
+A [Konami 2009 feature
+match](https://yugiohblog.konami.com/2009/sjc/feature-match-side-event-playoffs-ryan-newburn-vs-sorosh-saberian/)
+records Solemn Judgment negating a Brionac Synchro Summon. Its [official card
+record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4861&ope=2&request_locale=en)
+states that it can negate a Summon for half the controller's Life Points; the
+[March 2010 list](https://www.yugioh-card.com/en/downloads/alt_format/2010-03-01.pdf)
+limits it to one copy. The narrow MR1 probe now admits exactly that one copy.
+A paired seed-52 native fixture Sets Solemn opposite Junk Synchron and
+Bokoichi, then Synchro Summons Junk Warrior. Solemn is offered at the Summon
+window. Activating it costs 4,000 LP and puts Warrior in the Graveyard; the
+two Synchro Materials remain in the Graveyard. Passing leaves Warrior on the
+field with both players at 8,000 LP. Before activation, the Set Solemn's
+identity is hidden from the opponent. Both complete duels serialize,
+replay-verify, and pass the player-visibility audit. The fixture tests the
+same historical Summon-negation rule on Junk Warrior, not a reconstruction of
+the reported Brionac duel or all 2010 Counter Trap interactions. Reproduce
+with:
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_solemn_synchro.py
+```
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including

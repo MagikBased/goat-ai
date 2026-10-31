@@ -2128,6 +2128,13 @@ selected v23 checkpoint stays unchanged.
 
 ## M5 — Search and other formats
 
+A [period-sourced Solemn Judgment/Synchro fixture](edison_research.md#solemn-judgment-against-a-synchro-summon)
+now checks the Summon-negation window in paired MR1 duels: one legal copy,
+4,000 LP payment, Junk Warrior in the Graveyard only when negated, and both
+materials spent in either branch. Both games replay-verify and pass visibility
+checks. This extends the isolated 2010 probe; the full regional release pool,
+historical effect audit, and separate Edison profile remain open.
+
 An [official-print audit of all 72 shared Duel Terminal 1 candidate IDs](edison_research.md#independent-date-filtered-candidate-comparison-27-october-2026)
 found a dated non-Terminal English TCG printing before the April 2010 cutoff
 for each alias root. The tracked evidence table links every Konami card page
