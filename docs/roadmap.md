@@ -2130,7 +2130,7 @@ replay-verifies and passes visibility checks. This extends one interaction,
 not the separately validated Edison profile required by M5.
 
 
-Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
+Evaluate policy-guided search and belief sampling only after M2 and M4. The [search-method comparison and experiment gate](search_research.md) favor a bounded root-sampled rollout as the first diagnostic, with information-set search considered only after safe belief sampling, state reconstruction, and held-out evidence exist. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
 
 The [Edison feasibility audit](edison_research.md) records the official March
 2010 Advanced Format restrictions as a checked data asset and lists the
