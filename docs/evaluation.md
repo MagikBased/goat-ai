@@ -17094,6 +17094,28 @@ Keep the selected checkpoint unchanged; prioritize independently reviewed
 human choices, stronger decision signals, and larger held-out cross-Deck
 tests before promoting another child.
 
+A separate off-policy agreement check used four new Tactical-v14 games on the
+two generated holdout pairs, duel seeds 203000–203001, with both teacher
+seats. All **2,463 decisions** replay-verified; **1,251** belonged to the
+designated teacher, of which **342** had more than one legal action. On those
+342 optional decisions, the selected parent matched Tactical **249** times
+and the child **254** times. For the **99** optional decisions whose selected
+action explicitly names a card ID absent from the 16 pilot training Decks,
+agreement was **53/99** for the parent and **60/99** for the child. On the
+**33** selected-action source IDs present in those Decks it was **18/33** and
+**20/33**; the remaining **210** optional choices did not name a source card
+and split **178/210** and **174/210**. Here “absent” is relative to this
+pilot's Decks, not necessarily absent from the selected parent's earlier
+training. Action agreement is not a win-rate or card-value estimate. The
+ignored audit is `.cache/goat-ai/broad_random_teacher_holdout_agreement_20261031.json`
+(SHA-256 `a6996fbec11e6993fc4fdcd59c8fedefa890bbae7a8019365a93546859cfd9cb`);
+the two ignored source manifests have SHA-256
+`f9c616fe98dc283383ccb3d4eda8513a6949325cf58257286c3e2ee78b6280af`
+and `972f85665e21a2e6bef779f14be5cb174d4f01dfc9766122966676bbb55a2835`.
+The child gained a few unfamiliar-card teacher matches without an observed
+competitive gain; the next M4 trial needs a better decision signal, not only
+more identities from the same synthetic teacher.
+
 To reproduce the data collection from the generated Deck files, run from the
 repository root after native setup:
 
@@ -17119,3 +17141,9 @@ evaluation used the two named Deck pairs and seed 202100 with the same flags.
 Each pair of reports was checked with
 `scripts/compare_tournament_reports.py --verify-local-decks
 --require-unseen-main-decks`.
+The off-policy check repeated the collection loop with `n` equal to 62008 and
+62009 and duel seeds 203000–203001. Run `scripts/audit_policy_agreement.py`
+on its four trajectories with both `--checkpoint` paths and
+`--engine experimental`; the source-card split above counts optional
+teacher-selected action `code` fields against the 16 training Decks' Main and
+Extra card IDs.

@@ -1202,6 +1202,17 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+The [broad-card random-Deck pilot](evaluation.md#broad-card-random-deck-tactical-pilot-31-october-2026)
+trained a child on 1,279 optional Tactical decisions from 16 verified games
+whose Decks contained 514 distinct card IDs. On untouched random-Deck
+holdouts it scored 14–18 against Tactical-v14 versus the selected parent's
+15–17; on two held-out published-2005 pairings it scored 10–22 versus the
+parent's 9–22–1. Both paired intervals crossed zero. A separate held-out
+teacher-action audit showed a small unfamiliar-card agreement gain (60/99
+versus 53/99) without an observed duel-strength gain. Keep the selected v23
+checkpoint; M4 needs stronger decisions and outcome credit before another
+promotion attempt.
+
 An opt-in [parent-KL labeled-minibatch pilot](evaluation.md#parent-kl-labeled-minibatch-pilot-31-october-2026)
 reduced measured 40-step fitting time on 5,995 optional labels from 81.48 to
 5.68 seconds with 256 labels sampled per update. A longer 200-step child
