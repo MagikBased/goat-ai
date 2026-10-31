@@ -17413,3 +17413,33 @@ using `--engine experimental --both-deck-assignments
 This pilot suggests that simply cloning the fallback's low-confidence
 decisions is insufficient; independent human corrections or better outcome
 credit are still needed for M4.
+
+## Full-whitelist Fusion-stress protocol sweep (31 October 2026)
+
+A fresh seed schedule 205000–205015 generated 16 independent, GOAT-whitelist-
+legal 40-card Main Deck pairs. Each side received a random legal Fusion Deck,
+three Scapegoat copies, three Metamorphosis copies, and Thousand-Eyes Restrict
+in the Fusion Deck. Tactical-v14 controlled both seats. All **16/16 duels
+reached terminal** below the 3,000-decision cap; all **9,367/9,367 decisions**
+replay-verified and passed the player-visibility audit. A second run repeated
+every seed and matched all 9,367 decisions and outcomes. The adapter loaded
+719 distinct native asset paths; legal actions offered 345 distinct source
+card IDs and the agents selected actions from 307. Of 902 selected source-card
+actions, 27 activated Metamorphosis and 23 chained Scapegoat; one Special
+Summon action was selected. This is breadth of protocol execution, not a
+historical-ruling or playing-strength result. It did not exercise most
+possible card interactions, and these random lists are not competitive Decks.
+
+The ignored report is
+`.cache/goat-ai/tactical_full_whitelist_fusion_205000_205015/report.json`
+(SHA-256 `4ba71a4a0c20d5b33940a26447efa7a99246304b8a5a192fe34ca124e2eda521`).
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai --seed 205000 --seeds 16 \
+  --max-decisions 3000 --card-pool whitelist --agent tactical \
+  --verify-replays --distinct-opponents --random-extra --fusion-stress \
+  --isolate-games --repeat-seeds --count-card-actions \
+  --output .cache/goat-ai/tactical_full_whitelist_fusion_205000_205015
+```

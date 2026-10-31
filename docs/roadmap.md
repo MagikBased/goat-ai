@@ -957,6 +957,14 @@ instead of recording a profile that the GOAT-mode core did not execute. See
 
 **Exit:** Every required fixture passes with pinned engine assets, or is marked as a known incompatibility that blocks a GOAT-correct claim. Run differential checks against documented examples or independently observed duels where practical. Expand the legal-card test corpus beyond the initial fixture decks.
 
+A fresh [full-whitelist Fusion-stress sweep](evaluation.md#full-whitelist-fusion-stress-protocol-sweep-31-october-2026)
+completed 16 independent legal random-Deck duels with Tactical-v14 on both
+seats. All 9,367 decisions replay-verified, passed visibility checks, and
+repeated identically from the same seeds; 345 distinct source-card IDs were
+offered in legal actions. This broadens the protocol corpus but does not
+certify those cards' historical effects. The M2 source-backed correctness
+gate remains open.
+
 The six-deck tournament action probe can now save and replay-verify complete
 JSON trajectories. One seeded CombatHeuristicAgent schedule covered all 15
 unordered pairs with both seats: all 30 duels and 16,979 decisions verified
