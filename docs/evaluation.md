@@ -711,6 +711,41 @@ comparison with `scripts/evaluate_policy.py --engine experimental
 `scripts/compare_tournament_reports.py --verify-local-decks
 --require-unseen-main-decks`.
 
+## Independent 60-card Fusion stress sweep (31 October 2026)
+
+The pinned native engine completed 100 isolated Tactical-agent duels on seeds
+62000–62099. Each seat used an independently generated whitelist-legal 60-card
+Main Deck with a random Fusion Extra Deck. The generator also forced
+Scapegoat/Metamorphosis stress cards into the sampled pool. The 200 generated
+Main/Extra Deck hashes were distinct. All 100 games reached terminal states
+within the 3,000-decision cap, with 50,172 total decisions (117–1,654 per
+game) and no reported native error. All 50,172 decisions independently
+replay-verified, passed the player-visibility audit, and reproduced exactly
+when each seed was rerun on a second native environment. The visibility audit
+covered 244 hidden-field, 2,416 opponent-field, and five opponent-hand choice
+contexts. This increases sampled protocol coverage; it does not establish
+historical correctness for every card or guarantee arbitrary-Deck completion.
+
+The ignored report is
+`.cache/goat-ai/random_probe_60_fusion_62000_62099_cap3000/report.json`
+(SHA-256 `8cf3cfe98e20502c989a16a7d71f2375bf6e73c29a7a5ac8bb6cc58e57e82928`).
+Reproduce with the pinned native assets from [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/random_probe_60_fusion_62000_62099_cap3000 \
+  --seed 62000 --seeds 100 --max-decisions 3000 \
+  --main-size 60 --card-pool whitelist --agent tactical \
+  --distinct-opponents --random-extra --fusion-stress \
+  --verify-replays --repeat-seeds --isolate-games
+```
+
+An earlier command accidentally used the script's default 500-decision cap
+and reported incomplete games. That configuration was discarded and the same
+seeds were rerun with the intended 3,000-decision cap above. The report does
+not record elapsed time, so this sweep makes no throughput claim.
+
 ## Fresh own-card effects: resolved material versus decision value (29 October 2026)
 
 ### Same-state activation branches across the varied-deck flags

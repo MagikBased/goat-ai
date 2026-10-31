@@ -21,6 +21,13 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+A [100-duel independent 60-card Fusion stress sweep](evaluation.md#independent-60-card-fusion-stress-sweep-31-october-2026)
+generated 200 distinct legal Main/Extra Deck combinations. All 100 tactical
+duels reached terminal states under a 3,000-decision cap; their 50,172
+decisions replay-verified, passed the player-visibility audit, and reproduced
+exactly on a second seeded run. This is sampled protocol evidence, not proof
+of arbitrary-deck completeness or historical ruling accuracy.
+
 A [published 2005 Deck pairwise sweep](evaluation.md#published-2005-deck-pairwise-protocol-sweep-31-october-2026)
 now covers all 136 pairings of the 17 playable published 2005 Deck examples,
 both seats, with RandomAgent. All 272 duels reached terminal outcomes and all
