@@ -194,7 +194,10 @@ immediately afterward. The owner sees their chosen card; the opponent sees
 only the hidden banished slot. Both full duels replay-verify and pass the
 visibility audit. The observation model independently rejects an opponent
 face-down banished card carrying an identity. This closes one banished-zone
-privacy case, not every hidden-information branch; see [GOAT rules](goat_rules.md).
+privacy case, not every hidden-information branch. The paired branches now
+also reach the opponent's next Main Phase and compare the complete ordered
+legal-action lists, including their public IDs; both match with more than one
+choice available. See [GOAT rules](goat_rules.md).
 
 Schema-v26 observations now count public turn boundaries since each face-up
 field card became face-up. Native Swords expiration and Giant Trunade/replay

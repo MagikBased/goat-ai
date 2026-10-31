@@ -38,6 +38,7 @@ def test_capsule_choice_changes_only_owner_visible_banished_identity(tmp_path):
     deck.write_text("#main\n" + "\n".join(map(str, (
         *([CAPSULE] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
     opponent_views = []
+    opponent_decisions = []
     own_codes = []
     for selected_code in (11321183, 15025844):
         with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=0,
@@ -69,6 +70,21 @@ def test_capsule_choice_changes_only_owner_visible_banished_identity(tmp_path):
             own_codes.append(own.banished[0][0].code)
             opponent_views.append(opposing)
 
+            for _ in range(25):
+                if (observation.turn == 2 and observation.acting_player == 1
+                        and observation.phase == "main1"):
+                    assert observation.banished[0][0].code is None
+                    assert len(env.legal_actions()) > 1
+                    opponent_decisions.append((observation, env.legal_actions()))
+                    break
+                actions = env.legal_actions()
+                action = next((candidate for candidate in actions
+                               if candidate.kind in ("place", "pass", "end_phase")),
+                              actions[0])
+                observation = env.step(action)
+            else:
+                pytest.fail("opponent Main Phase after Capsule was not reached")
+
             agents = (RandomAgent(0), RandomAgent(1))
             for _ in range(3000):
                 if env.is_terminal():
@@ -84,3 +100,4 @@ def test_capsule_choice_changes_only_owner_visible_banished_identity(tmp_path):
                 trajectory.decisions)
     assert own_codes[0] != own_codes[1]
     assert opponent_views[0] == opponent_views[1]
+    assert opponent_decisions[0] == opponent_decisions[1]
