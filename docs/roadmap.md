@@ -2210,6 +2210,12 @@ The existing Exiled Force/Torrential Tribute summon-priority fixture now also
 runs in the MR1 protocol, with both chain and pass branches replay-verified and
 visibility-audited. It checks one rulebook-backed priority interaction while
 leaving the complete historical Edison rules profile open.
+A [Dark Armed Dragon MR1 fixture](edison_research.md#dark-armed-dragons-exact-dark-count-in-the-mr1-probe)
+now checks the official exact-three-DARK Summon condition against two- and
+four-DARK counterexamples, then banishes a DARK as the destruction effect's
+cost and removes an opposing monster. All three full duels replay-verify and
+pass visibility audits. Its two added cards are in the explicit narrow probe
+set; the full 2010 release pool and historical effect audit remain open.
 An MR1 Desert Sunlight fixture now checks both owner-selected chain orders for
 simultaneous Dekoichi and Gravekeeper's Spy Flip Effects. Both full duels
 replay-verify and pass visibility checks under the pinned MR1 mode, advancing

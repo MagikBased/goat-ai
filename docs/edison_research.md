@@ -911,6 +911,33 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_sangan_synchro.py
 ```
 
+## Dark Armed Dragon's exact DARK count in the MR1 probe
+
+[Konami's Dark Armed Dragon card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7421&ope=2&request_locale=en)
+dates its first TCG printing to February 2008 and requires **exactly three**
+DARK monsters in the Graveyard to Special Summon it. Its destruction effect
+banishes a DARK monster from that Graveyard and targets a field card. The
+[official March 2010 restriction list](https://www.yugioh-card.com/en/downloads/alt_format/2010-03-01.pdf)
+limits Dark Armed Dragon and Card Destruction to one copy each. The MR1 probe's
+explicit eligible set now includes those two IDs; it remains a narrow test set,
+not a full Edison release pool.
+
+Three seed-52 MR1 duels use Card Destruction to put two, three, or four DARK
+monsters in the first player's Graveyard while drawing Dark Armed Dragon.
+Its Special Summon is absent from the legal actions with two or four DARK
+monsters and present with exactly three. In the three-DARK branch the player
+Summons it, banishes Sangan from the Graveyard as the destruction effect's
+cost, targets the opponent's face-up monster, and destroys that monster. All
+three complete duels serialize, replay-verify, and pass the player-visibility
+audit using pinned official scripts. This validates the count boundary and
+one effect cost and target; summon responses, alternate costs, and historical
+text differences elsewhere remain open. Reproduce with:
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_dark_armed_dragon.py
+```
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including
