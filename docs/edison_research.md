@@ -128,12 +128,42 @@ canonical IDs present in both candidates that have a Duel Terminal 1 printing.
 Shared membership does not establish period North American legality: some of
 these cards had earlier ordinary printings, while newly introduced cards
 need a dated non-Duel-Terminal release under Konami's March 2010 notice. This
-watchlist makes that remaining audit explicit; it does not classify the 72 as
-legal or illegal. Reproduce with the comparison command below, changing its
+watchlist isolates that release question; the dated print audit below checks
+it without classifying all 72 as tournament-legal. Reproduce the candidate
+comparison with the command below, changing its
 `--output` to
 `.cache/goat-ai/edison_pool_candidate_comparison_dt01_20261031.json`.
 That ignored report has SHA-256
 `e984216f2ce34e8a9b6ae8db86119c0f4dd6725bc8bcb8bee5c8f4fb7de00cfd`.
+
+The [72-card shared DT01 evidence table](../configs/historical/edison_shared_dt01_pre_cutoff_prints_2010_04_20.tsv)
+now records the individual official Konami card page, DT01 printing, earliest
+listed non-Terminal English TCG printing, and fetched-page SHA-256 for every
+watchlist alias root. All 72 pages show a non-Terminal printing dated no later
+than 20 April 2010. For example, the official records show [Goyo Guardian's
+*The Duelist Genesis* printing](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7736&ope=2&request_locale=en)
+in September 2008 and [Catastor's *Hidden Arsenal* printing](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7552&ope=2&request_locale=en)
+in November 2009. The Harpie Lady alias root needs care: DT01 printed
+[Harpie Lady 1](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6186&ope=2&request_locale=en),
+whose own earlier *Rise of Destiny* printing supplies this row's date; it is
+not a DT01 printing of the original Normal Monster. The table's SHA-256 is
+`822ec5ea6c841fd51191a7db99dad14488aa1d6579e8372204b61df47d3b705f`;
+the ignored parsed-page report is
+`.cache/goat-ai/edison_shared_dt01_official_20261031.json` (SHA-256
+`616a194d2e9570d4bc5b1ecfd0f667a7d82532726b3a2aecbeaf1b49730fd328`).
+This closes the *earlier non-Terminal printing* question for the bounded 72-card
+watchlist. It does not independently certify each product's North American
+distribution, the full 2010 release pool, historical text, or an Edison engine
+profile. The table contains links and factual print fields, not the fetched
+card-page HTML.
+
+Recheck the dated set entries against current official pages with
+`PYTHONPATH=src:. .venv/bin/python scripts/verify_edison_shared_dt01_official.py`.
+Pass `--card-id 26593852` for a single-card check. The command reports a
+changed raw-page hash separately from missing print evidence, since dynamic
+official-page HTML can change while its dated set entries stay the same. A
+single-card Catastor recheck on 31 October 2026 found both dated print entries
+still present; its raw page hash had changed.
 
 [Konami's archived 19 March 2010 Duel Terminal legality notice](https://web.archive.org/web/20231002070814/https://yugiohblog.konami.com/articles/?p=1622)
 supplies the primary policy source: new Duel Terminal cards did not become

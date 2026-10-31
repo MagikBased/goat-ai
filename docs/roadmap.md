@@ -2060,6 +2060,13 @@ gain.
 
 ## M5 — Search and other formats
 
+An [official-print audit of all 72 shared Duel Terminal 1 candidate IDs](edison_research.md#independent-date-filtered-candidate-comparison-27-october-2026)
+found a dated non-Terminal English TCG printing before the April 2010 cutoff
+for each alias root. The tracked evidence table links every Konami card page
+and records its fetched-page hash. This resolves one release-date watchlist;
+regional eligibility for every product, the full Edison pool, and 2010 rules
+validation remain open.
+
 A [period-sourced Catastor Damage Step fixture](edison_research.md#ally-of-justice-catastor-at-the-start-of-the-damage-step)
 now checks the Hidden Arsenal ruling in a full native MR1 duel: Catastor's
 effect chain appears before a face-up LIGHT monster is destroyed, with no
