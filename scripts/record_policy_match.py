@@ -3,6 +3,7 @@
 import argparse
 import json
 from dataclasses import replace
+from math import isfinite
 from pathlib import Path
 
 from goat_ai.agents import (
@@ -53,6 +54,9 @@ def main() -> None:
     parser.add_argument("--position-guard", action="store_true",
                         help="filter defending Sheep Token switches and empty-field "
                              "attack-to-weaker-defense switches")
+    parser.add_argument("--tactical-fallback-margin", type=float,
+                        help="use Tactical-v14 when the top two raw policy scores "
+                             "differ by less than this margin")
     parser.add_argument("--own-loss-guard", action="store_true",
                         help="experimental visible own-card-loss filter")
     parser.add_argument("--own-loss-guard-version", type=int, choices=(1, 2, 3, 4, 5, 6, 7, 8, 9), default=1,
@@ -70,8 +74,13 @@ def main() -> None:
         parser.error("--self-target-guard requires --tactical-guard")
     if args.self_target_guard and args.weak_flip_guard:
         parser.error("choose one experimental extension of guard v3")
-    if sum((args.position_guard, args.tactical_guard, args.own_loss_guard)) > 1:
+    if sum((args.position_guard, args.tactical_guard, args.own_loss_guard,
+            args.tactical_fallback_margin is not None)) > 1:
         parser.error("choose one standalone policy guard")
+    if args.tactical_fallback_margin is not None and (
+            not isfinite(args.tactical_fallback_margin)
+            or args.tactical_fallback_margin < 0):
+        parser.error("--tactical-fallback-margin must be finite and nonnegative")
     if args.own_loss_guard_version != 1 and not args.own_loss_guard:
         parser.error("--own-loss-guard-version requires --own-loss-guard")
     if args.opponent_own_loss_guard and not args.opponent_checkpoint:
@@ -80,7 +89,9 @@ def main() -> None:
         parser.error("--opponent-own-loss-guard-version requires --opponent-own-loss-guard")
     policy_options = {
         "tactical_guard": args.tactical_guard,
-        "card_races": load_card_races(args.native_root) if args.tactical_guard else None,
+        "card_races": (load_card_races(args.native_root)
+                       if args.tactical_guard or args.tactical_fallback_margin is not None
+                       else None),
         "weak_flip_attacks": (load_weak_flip_monster_attack(args.native_root)
                               if args.weak_flip_guard else None),
         "self_target_guard": args.self_target_guard,
@@ -90,6 +101,12 @@ def main() -> None:
         "card_facts": (load_card_facts(args.native_root)
                        if args.own_loss_guard and args.own_loss_guard_version in (2, 5, 6)
                        else None),
+        "tactical_fallback_agent": (TacticalHeuristicAgent(
+            load_flip_monster_codes(args.native_root),
+            load_card_races(args.native_root),
+            card_facts=load_card_facts(args.native_root))
+            if args.tactical_fallback_margin is not None else None),
+        "tactical_fallback_margin": args.tactical_fallback_margin,
     }
     policy = load_policy_agent(args.checkpoint, **policy_options)
     opponent_options = {
@@ -142,7 +159,10 @@ def main() -> None:
                                              "greedy_tactical_guard_v4"
                                              if args.weak_flip_guard else
                                              "greedy_tactical_guard_v3"
-                                             if args.tactical_guard else "greedy"),
+                                             if args.tactical_guard else
+                                             f"greedy_tactical_fallback_margin_{args.tactical_fallback_margin:g}"
+                                             if args.tactical_fallback_margin is not None
+                                             else "greedy"),
                         "policy_inference_version": POLICY_INFERENCE_VERSION,
                         "policy_feature_version": policy.model.feature_version,
                         "opponent": type(opponent).__name__,

@@ -2134,6 +2134,14 @@ weak at 5/32 fallback wins. All 130,426 decisions replay-verified and passed
 visibility checks. [Full protocol and reports](evaluation.md#fallback-on-the-previously-weak-zombie-and-phoenix-families-31-october-2026).
 Keep the selected policy unchanged; M4's baseline-strength gate remains open.
 
+A replay-level Zombie diagnostic now reproduces one fallback loss exactly
+(431 decisions) and verifies all choices against the recorded inference mode.
+Seven of 214 policy choices differ from the unchanged neural parent on the
+fallback's visited visible states; one early fallback discard spends Book of
+Life and Book of Moon. The [trace and audit protocol](evaluation.md#replay-level-fallback-diagnosis-on-zombie-31-october-2026)
+identify a deck-sensitive hypothesis, not a causal outcome explanation. M4
+still needs a learned, held-out strength gain.
+
 ## M5 — Search and other formats
 
 Konami's 2009 version-7 rulebook is now recorded as the period source for the

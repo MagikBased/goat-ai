@@ -17270,6 +17270,43 @@ Reproduce with `scripts/evaluate_policy.py` on the two named pairings using
 candidate, then compare with `scripts/compare_tournament_reports.py
 --verify-local-decks --require-unseen-main-decks`.
 
+### Replay-level fallback diagnosis on Zombie (31 October 2026)
+
+`scripts/record_policy_match.py` now accepts the same
+`--tactical-fallback-margin` option as the tournament evaluator and marks its
+trajectory with that inference mode. The companion
+`scripts/audit_tactical_fallback_replay.py` checks the checkpoint hash and
+mode, independently replay-verifies and visibility-audits the duel, recomputes
+every recorded fallback action, and lists disagreements with the unchanged
+parent on the **same player-visible states visited by the fallback**. Its
+parent choices are diagnostics, not alternate-game outcomes.
+
+On the exact Zombie-versus-Warrior, seed-204305, policy-seat-1 loss in the
+fresh tournament above, the recorder reproduced the report's **431 decisions**
+and winner. Its audit found **7 changed choices among 214 policy decisions**.
+At turn two's two-card discard, the fallback selected Book of Life and Book of
+Moon; the parent would have selected Mystical Space Typhoon and Spirit Reaper
+on that visible state. Book of Life is a Zombie revival card, so discarding it
+is a plausible deck-sensitive weakness of the generic Tactical fallback. The
+single trace does not identify which choice caused the eventual loss. A second
+seed-204300, policy-seat-0 loss reproduced the report's 332 decisions and had
+3 changed choices among 152 policy decisions. Both traces were reconstructed
+from the native engine, replay-verified, and visibility-audited. The first
+trace SHA-256 is
+`e353fa5cbc966406e3e7a4283a4af3125cb767a99892bd504d7adb0485078efe`;
+its audit JSON SHA-256 is
+`e41f6f911219d3081ce3a7646c9e55358b91274641a6ccae602d7f94f622a598`.
+Both files remain in ignored `.cache/goat-ai/diagnostics/`.
+
+Reproduce the first trace with the selected v23 checkpoint, `--deck1` set to
+`warrior_mary_triatafilidi_new_jersey_2005.ydk`, `--deck2` set to
+`zombie_jae_kim_charlotte_2005.ydk`, and
+`--seed 204305 --policy-seat 1 --opponent tactical
+--tactical-fallback-margin 1.0`; then pass that trajectory and checkpoint to
+`scripts/audit_tactical_fallback_replay.py`. This diagnosis motivates testing
+Deck-composition information or a learned gating signal before widening the
+fallback. It is not evidence that either intervention will improve strength.
+
 ### Low-margin synthetic-teacher distillation pilot (31 October 2026)
 
 The direct fallback gain above motivated a separate **weight-training** test.
