@@ -165,6 +165,9 @@ The human used the GUI's End Phase and hand-size discard controls; the room
 saved 165 responses with zero retries and zero Lua errors. Independent
 reconstruction matched all 165 player-visible decisions and the terminal
 result. This validates that specific path, not every possible EDOPro prompt.
+The room verifier now runs the player-visibility audit as part of its acceptance
+check. This desktop trial passed the revised check for all 165 decisions but
+lacks the later Deck and asset fingerprints needed for experimental training.
 New room recordings also store a SHA-256 identifier for each Deck's sorted
 Main and Extra Deck composition. Verification checks those identifiers against
 the Decks embedded in the EDOPro replay; it does not expose shuffled Deck order.
@@ -181,7 +184,8 @@ from raw behavioral-cloning intake until that distinction and the historical
 rules gate are resolved.
 An explicit `self_recorded` annotation on an EDOPro review trajectory now
 requires that authorization, the human client seat, and the exact action that
-was played. This permits retrospective confirmation of specific human choices
+was played, with at least one alternative legal action. This permits
+retrospective confirmation of specific human choices
 without labeling the AI's actions or an unplayed alternative as human play.
 The training command still rejects raw EDOPro trajectories. For a **complete,
 pinned, independently reconstructed** local room duel with explicitly

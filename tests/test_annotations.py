@@ -112,6 +112,12 @@ def test_edopro_self_recorded_labels_require_authorized_played_human_action(tmp_
         "a" * 64, edopro)
     assert labels.choices == ((1, 0),)
     assert records == (human_record,)
+    forced = replace(edopro, decisions=(base.decisions[0],
+                     replace(human_record, legal_actions=(human_actions[0],))))
+    with pytest.raises(ValueError, match="optional human choice"):
+        read_decision_annotations(annotation_file(
+            tmp_path, choices=[{"decision_index": 1, "action_index": 0}]),
+            "a" * 64, forced)
     with pytest.raises(ValueError, match="human seat"):
         read_decision_annotations(annotation_file(
             tmp_path, choices=[{"decision_index": 0, "action_index": 0}]),

@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay.annotations import read_decision_annotations
 from goat_ai.replay.edopro_container import read_edopro_container
 from goat_ai.replay.edopro_reconstruct import reconstruct_legacy_responses
@@ -87,6 +88,7 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
             or metadata.get("retries") != 0
             or metadata.get("lua_errors") != []):
         raise ValueError("EDOPro review trajectory or metadata differs from replay")
+    audit_trajectory_visibility(trajectory)
     return {
         "replay_sha256": replay.sha256,
         "responses": reconstructed.saved_response_count,
@@ -98,6 +100,7 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         "historical_goat_certified": False,
         "deck_identity_verified": has_deck_hashes,
         "asset_identity_verified": has_asset_hashes,
+        "visibility_audited_decisions": len(trajectory.decisions),
         "training_admitted": False,
     }
 

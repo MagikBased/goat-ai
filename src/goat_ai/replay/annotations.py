@@ -107,6 +107,8 @@ def read_decision_annotations(path: str | Path, trajectory_sha256: str,
         if (edopro_human_seat is not None
                 and record.observation.acting_player != edopro_human_seat):
             raise ValueError("EDOPro self-recorded label must belong to the human seat")
+        if edopro_human_seat is not None and len(record.legal_actions) < 2:
+            raise ValueError("EDOPro self-recorded label needs an optional human choice")
         if human_seat is not None and record.observation.acting_player != human_seat:
             raise ValueError("self-recorded label must belong to the human seat")
         if (explicit_human_indices is not None

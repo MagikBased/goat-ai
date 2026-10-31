@@ -3207,6 +3207,12 @@ deliberate human choices; raw cloning admission remains off.
 EDOPro `self_recorded` annotations now validate the authorized human seat and
 require the recorded action itself, so a later explicit confirmation cannot
 mistake an AI response or retrospective alternative for a human demonstration.
+The shared annotation verifier also rejects forced human-seat prompts even when
+labels are hand-edited rather than submitted through the web page. The live-room
+verifier now runs the player-visibility audit before calling any review
+trajectory verified; the older complete desktop trial passed all 165 decisions
+under this stricter check, while remaining ineligible for training because it
+lacks the later Deck and asset fingerprints.
 A separate `verify_edopro_human_labels.py` command replays the EDOPro room
 recording before validating specific confirmed choices and reports their exact
 annotation hash. It remains a review artifact, not an admitted training set.

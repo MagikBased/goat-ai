@@ -254,6 +254,7 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
     verified = verify_edopro_live_recording(
         replay_path, review_path, metadata_path, mirror_root)
     assert verified["visible_decisions"] == len(trajectory.decisions)
+    assert verified["visibility_audited_decisions"] == len(trajectory.decisions)
     assert verified["reviewable_prefix"] is surrender
     assert verified["deck_identity_verified"] is True
     assert verified["asset_identity_verified"] is True
@@ -262,7 +263,8 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
     assert "build/libocgcore.so" in trajectory.asset_sha256
     if authorized and not surrender:
         human_index = next(index for index, record in enumerate(trajectory.decisions)
-                           if record.observation.acting_player == 1)
+                           if record.observation.acting_player == 1
+                           and len(record.legal_actions) > 1)
         record = trajectory.decisions[human_index]
         played = record.legal_actions.index(record.selected_action)
         label_path = tmp_path / "confirmed_human.json"
@@ -276,6 +278,20 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
             replay_path, review_path, metadata_path, label_path, mirror_root)
         assert confirmed["confirmed_human_choices"] == 1
         assert confirmed["training_admitted"] is False
+        forced_index = next(index for index, candidate in
+                            enumerate(trajectory.decisions)
+                            if candidate.observation.acting_player == 1
+                            and len(candidate.legal_actions) == 1)
+        label_path.write_text(json.dumps({
+            "schema_version": 1,
+            "source_trajectory_sha256": sha256_file(review_path),
+            "authorization": "self_recorded", "reviewer": "self",
+            "choices": [{"decision_index": forced_index, "action_index": 0}],
+        }))
+        with pytest.raises(ValueError, match="optional human choice"):
+            verify_edopro_human_annotations(
+                replay_path, review_path, metadata_path, label_path, mirror_root)
+        label_path.unlink()
         reviewed_index = next(index for index, candidate in
                               enumerate(trajectory.decisions)
                               if candidate.observation.acting_player == 1
