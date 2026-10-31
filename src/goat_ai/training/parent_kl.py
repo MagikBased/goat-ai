@@ -41,6 +41,7 @@ def fit_with_parent_kl(
     labeled_weights: Sequence[float] | None = None,
     batched_forward: bool = False,
     batch_size: int = 16,
+    labeled_batch: int | None = None,
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """Fit selected labels while matching the parent on separate visible states.
 
@@ -50,6 +51,8 @@ def fit_with_parent_kl(
     if (not labeled or not preservation or steps < 1 or preservation_batch < 1
             or preservation_batch > len(preservation) or not isfinite(learning_rate)
             or learning_rate <= 0 or batch_size < 1
+            or labeled_batch is not None and (labeled_batch < 1
+                                              or labeled_batch > len(labeled))
             or not isfinite(preservation_weight) or preservation_weight <= 0):
         raise ValueError("parent KL needs records and positive finite settings")
     if parent is model or parent.feature_version != model.feature_version:
@@ -69,7 +72,6 @@ def fit_with_parent_kl(
                         record.legal_actions.index(record.selected_action))
                        for record in labeled]
     weights = tuple(labeled_weights) if labeled_weights is not None else (1.0,) * len(labeled)
-    weight_total = sum(weights)
     preserve_features = [encode_decision(record.observation, record.legal_actions,
                                          vocabulary, model.feature_version)
                          for record in preservation]
@@ -94,16 +96,21 @@ def fit_with_parent_kl(
     for _ in range(steps):
         model.train()
         optimizer.zero_grad()
+        labeled_indices = (rng.sample(range(len(target_examples)), labeled_batch)
+                           if labeled_batch is not None else range(len(target_examples)))
+        selected_examples = [target_examples[index] for index in labeled_indices]
+        selected_weights = [weights[index] for index in labeled_indices]
+        weight_total = sum(selected_weights)
         if batched_forward:
             labeled_total = torch.zeros((), device=device)
-            for start in range(0, len(target_examples), batch_size):
-                chunk = target_examples[start:start + batch_size]
+            for start in range(0, len(selected_examples), batch_size):
+                chunk = selected_examples[start:start + batch_size]
                 logits, _ = model.forward_batch([features.to(device)
                                                  for features, _ in chunk])
                 targets = torch.tensor([target for _, target in chunk],
                                        dtype=torch.long, device=device)
                 losses = nn.functional.cross_entropy(logits, targets, reduction="none")
-                chunk_weights = torch.tensor(weights[start:start + len(chunk)],
+                chunk_weights = torch.tensor(selected_weights[start:start + len(chunk)],
                                              dtype=losses.dtype, device=device)
                 labeled_total = labeled_total + (losses * chunk_weights).sum()
             labeled_loss = labeled_total / weight_total
@@ -112,7 +119,8 @@ def fit_with_parent_kl(
                 nn.functional.cross_entropy(
                     model(features.to(device)).unsqueeze(0),
                     torch.tensor([target], dtype=torch.long, device=device))
-                for (features, target), weight in zip(target_examples, weights)) / weight_total
+                for (features, target), weight in zip(selected_examples,
+                                                     selected_weights)) / weight_total
         picks = rng.sample(range(len(preserve_features)), preservation_batch)
         if batched_forward:
             selected = [preserve_features[index] for index in picks]

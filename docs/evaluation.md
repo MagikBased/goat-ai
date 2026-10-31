@@ -16935,3 +16935,63 @@ training labels**. Open this specific queue with:
 ```bash
 ./start_review_viewer.sh .cache/goat-ai/v23_diverse_review_51700_51703/review_queue.json
 ```
+
+## Parent-KL labeled minibatch pilot (31 October 2026)
+
+The parent-KL fitter now offers `--parent-kl-labeled-batch N`. For each
+optimizer step it samples N of the already replay-verified labeled decisions
+without replacement; the separate parent-preservation batch remains as
+before. The default is the original full labeled batch, so existing runs
+retain their behavior. Invalid or oversized batches fail explicitly. This
+reduces work per update but changes the training objective estimate and must
+be evaluated as an experimental optimizer choice.
+
+Using exactly the 64 verified Tactical demonstration duels, 5,995 optional
+labels, selected feature-v23 parent, 128 parent-preservation states, seed
+20261031, learning rate 0.0001, and batch-forward chunk size 32 from the
+[larger-data pilot](#larger-diverse-tactical-demonstration-pilot-31-october-2026),
+a matched **40-step** 256-label run spent **5.68 s fitting** versus **81.48 s**
+for the prior 40-step full-label run. Total measured wall time was 46.61 s
+versus 125.06 s, because replay verification and input preparation still run
+on every source trajectory. The final labeled losses (0.39299 versus
+0.36769) are computed on different sampled/full batches and are not directly
+comparable. The ignored 40-step minibatch checkpoint is
+`.cache/goat-ai/fv23_tactical_diverse_minibatch40_20261031.pt` (SHA-256
+`7ae6ab632fcd0041274469bfe1dc7e95cacc90fac657375a2ba5bc16262c371c`).
+These are two measured runs on the same local Intel i7-10700K; they are not
+hardware-independent throughput claims.
+
+A longer **200-step** 256-label run spent **20.55 s fitting**, 12.47 s verifying
+source trajectories, and 61.60 s total. Its final sampled-label loss was
+0.36917 and parent KL 0.00885. The ignored checkpoint is
+`.cache/goat-ai/fv23_tactical_diverse_minibatch_20261031.pt` (SHA-256
+`8367b153a07819be72bfc4661475bae8ef81f8c84d53aec195bda7e1c0fb0cda`).
+It used the same verified input and frozen parent as the full-label run.
+
+On the same two untouched published-2005 matchups and seed schedule 51400–
+51407, both Deck assignments and both policy seats, the 200-step child scored
+**13–50–1** against Tactical-v14; the selected parent scored **18–46**.
+The strict matched-report comparator verified the same opponent, schedule,
+assets, local Decks, and unseen Main Deck compositions. Its paired child-
+minus-parent score difference was **−7.03 percentage points** with a 95%
+interval of **−19.53 to +7.03**. All 64 parent games and 39,220 decisions,
+and all 64 child games and 36,506 decisions, replay-verified and passed the
+visibility audit. Ignored reports are
+`.cache/goat-ai/tactical_diverse_parent_minibatch_holdout_51400.json`
+(SHA-256 `3b613ca314cf6d7d65094a216159f7d814c359b0d4d456f5b7fd76977d2bdb49`)
+and `tactical_diverse_minibatch_minibatch_holdout_51400.json` (SHA-256
+`db5c5b43bcfa6c4b80b0993b16dd14aeca9f183b690ecfa32c67ab8c93a9729e`).
+This pilot shows a fitting-time reduction for this workload, not a playing-
+strength gain. Keep the selected checkpoint unchanged. A larger independent
+data source or better decision signal is still needed for M4.
+
+Reproduce the 200-step fit with the larger-data pilot's training command,
+changing `--parent-kl-steps` to `200`, adding
+`--parent-kl-labeled-batch 256`, and writing to the minibatch checkpoint path
+above. For the matched 40-step timing run, use `40` steps and its checkpoint
+path. Evaluate the parent and 200-step child with the two previously named
+held-out matchups and `--opponent tactical --both-deck-assignments
+--require-unseen-main-decks --seed 51400 --seeds 8 --workers 4
+--max-decisions 3000 --verify-replays`; compare their reports with
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.

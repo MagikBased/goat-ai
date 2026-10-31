@@ -313,9 +313,16 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clo
   --output checkpoints/tactical_v3_fv19_timing_parent_kl_52.pt
 ```
 
-The `--batch-size` option belongs to ordinary behavioral cloning; parent-KL
-uses all labeled decisions and `--preserve-batch` reference states at each
-step. Behavioral cloning now collects each minibatch's losses and makes one
+Parent-KL uses all labeled decisions at each step by default. Its optional
+`--parent-kl-labeled-batch N` samples N verified labels without replacement
+for each step, while `--preserve-batch` independently samples reference
+states. `--batch-size` controls batched-forward chunk size in both training
+paths; it is not the number of parent-KL labels per update. The optional
+minibatch changes the optimization trajectory and requires separate held-out
+evaluation. On one 5,995-choice workload, the 40-step fitting time fell from
+81.48 to 5.68 seconds with a 256-label batch, but a longer 200-step child did
+not improve held-out competitive play; see [the experiment](evaluation.md#parent-kl-labeled-minibatch-pilot-31-october-2026).
+Behavioral cloning collects each minibatch's losses and makes one
 backward call per optimizer update. `--batched-forward` pads visible states
 and legal-action sets, batches the chain encoder, and masks padded actions
 from the loss. It supports feature versions 10–13 and 16–25; versions

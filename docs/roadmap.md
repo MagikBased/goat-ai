@@ -1189,6 +1189,14 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+An opt-in [parent-KL labeled-minibatch pilot](evaluation.md#parent-kl-labeled-minibatch-pilot-31-october-2026)
+reduced measured 40-step fitting time on 5,995 optional labels from 81.48 to
+5.68 seconds with 256 labels sampled per update. A longer 200-step child
+scored 13–50–1 versus Tactical-v14 on a 64-game unseen-Main-Deck holdout,
+behind the selected parent's matched 18–46. The option improves training
+throughput on this workload but does not close M4's strength gate; keep the
+selected parent and evaluate any future use independently.
+
 A [larger diverse Tactical demonstration pilot](evaluation.md#larger-diverse-tactical-demonstration-pilot-31-october-2026)
 recorded 64 verified duels across eight published 2005 Main Decks and fitted
 5,995 optional synthetic teacher decisions with parent-KL preservation. On a

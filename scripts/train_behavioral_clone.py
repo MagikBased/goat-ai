@@ -412,6 +412,9 @@ def main() -> None:
                         help="train only these top-level policy modules; repeat to include more")
     parser.add_argument("--parent-kl-steps", type=int, default=0,
                         help="fit selected labels with parent-policy KL preservation")
+    parser.add_argument("--parent-kl-labeled-batch", type=int,
+                        help="sample this many labeled decisions per parent-KL step; "
+                             "default uses every label")
     parser.add_argument("--preserve-trajectories", nargs="+", type=Path, default=[],
                         help="replay-verified parent training games for KL preservation")
     parser.add_argument("--allow-policy-preservation", action="store_true",
@@ -524,8 +527,12 @@ def main() -> None:
         parser.error("disagreement weighting requires unfiltered on-policy teacher labels")
     if (args.parent_kl_steps < 0 or args.preserve_per_trajectory < 1
             or args.preserve_batch < 1 or not isfinite(args.parent_kl_weight)
-            or args.parent_kl_weight <= 0):
+            or args.parent_kl_weight <= 0
+            or args.parent_kl_labeled_batch is not None
+            and args.parent_kl_labeled_batch < 1):
         parser.error("parent KL settings must be finite and positive")
+    if args.parent_kl_labeled_batch is not None and not args.parent_kl_steps:
+        parser.error("--parent-kl-labeled-batch requires --parent-kl-steps")
     if args.parent_kl_steps and (not args.init_checkpoint or not args.preserve_trajectories):
         parser.error("parent KL requires --init-checkpoint and --preserve-trajectories")
     if not args.parent_kl_steps and args.preserve_trajectories:
@@ -833,6 +840,7 @@ def main() -> None:
             preservation_weight=args.parent_kl_weight,
             learning_rate=args.learning_rate, rng=rng,
             batched_forward=args.batched_forward, batch_size=args.batch_size,
+            labeled_batch=args.parent_kl_labeled_batch,
             labeled_weights=[label_kind_weights.get(record.selected_action.kind, 1.0)
                              for record in fit_records])
         preservation_metadata = {
@@ -841,6 +849,7 @@ def main() -> None:
             "states": len(preservation),
             "per_trajectory": args.preserve_per_trajectory,
             "batch": args.preserve_batch,
+            "labeled_batch": args.parent_kl_labeled_batch,
             "weight": args.parent_kl_weight,
             "label_kind_weights": label_kind_weights,
             "steps": args.parent_kl_steps,

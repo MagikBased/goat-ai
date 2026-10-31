@@ -508,6 +508,35 @@ def test_parent_kl_fits_labels_while_keeps_reference_frozen():
                            labeled_weights=(0.0,))
 
 
+def test_parent_kl_labeled_minibatch_is_seeded_and_preserves_reference():
+    torch.manual_seed(31)
+    vocabulary = CardVocabulary((10, 20))
+    student = LegalActionPolicy(vocabulary.size, width=16, feature_version=19)
+    repeated = copy.deepcopy(student)
+    parent = copy.deepcopy(student)
+    legal = actions()[:2]
+    labels = tuple(DecisionRecord(replace(view(), turn_player=index % 2), legal,
+                                  legal[index % 2]) for index in range(5))
+    preservation = (DecisionRecord(replace(view(), turn_player=0), legal, legal[0]),)
+    before = {name: parameter.detach().clone()
+              for name, parameter in parent.named_parameters()}
+    settings = dict(steps=3, preservation_batch=1, preservation_weight=0.5,
+                    learning_rate=0.0001, labeled_batch=2, batched_forward=True,
+                    batch_size=2)
+    losses = fit_with_parent_kl(student, parent, vocabulary, labels, preservation,
+                                rng=random.Random(41), **settings)
+    repeated_losses = fit_with_parent_kl(repeated, parent, vocabulary, labels,
+                                         preservation, rng=random.Random(41), **settings)
+    assert losses == repeated_losses
+    assert all(torch.equal(parameter, dict(repeated.named_parameters())[name])
+               for name, parameter in student.named_parameters())
+    assert all(torch.equal(parameter, before[name])
+               for name, parameter in parent.named_parameters())
+    with pytest.raises(ValueError, match="positive finite settings"):
+        fit_with_parent_kl(student, parent, vocabulary, labels, preservation,
+                           rng=random.Random(41), **(settings | {"labeled_batch": 6}))
+
+
 def test_batched_parent_kl_matches_scalar_on_variable_actions_and_weights():
     torch.manual_seed(31)
     vocabulary = CardVocabulary((10, 20))
