@@ -335,6 +335,12 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
             launched.append((deck, mode))
             return self.status()
 
+        def stop(self, identifier):
+            if identifier != "a" * 16:
+                raise ValueError("invalid EDOPro session ID")
+            launched.append((identifier, "stop"))
+            return self.status()
+
         def choices(self, identifier):
             return {"id": identifier, "candidates": [], "confirmed": 0,
                     "training_admitted": False}
@@ -378,6 +384,14 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
         assert _request(f"{base}/api/edopro/start", {
             "ai_deck": "ai.ydk", "ai_mode": "tactical_fallback_1"})[1]["room_running"]
         assert launched[-1] == ("ai.ydk", "tactical_fallback_1")
+        assert _request(f"{base}/api/edopro/stop", {"id": "a" * 16})[1][
+            "room_running"] is True
+        assert launched[-1] == ("a" * 16, "stop")
+        with pytest.raises(HTTPError, match="400"):
+            _request(f"{base}/api/edopro/stop", {"id": "../../outside"})
+        with pytest.raises(HTTPError, match="400"):
+            _request(f"{base}/api/edopro/stop", {"id": "a" * 16,
+                                                   "signal": "KILL"})
         assert _request(f"{base}/api/edopro/choices?id={'a' * 16}")[1]["confirmed"] == 0
         assert _request(f"{base}/api/edopro/confirm", {
             "id": "a" * 16, "frames": [1, 3]})[1]["confirmed"] == 2

@@ -110,7 +110,10 @@ ignored `.cache/goat-ai/edopro_games/<session-id>/` folder. The room process
 continues if you close the browser tab. On Linux, restarting the local review
 server also recovers a still-running room from its saved process ID after
 checking the process command and session directory. Start another room after
-the first duel ends. If a launched room exits before saving a duel, its log
+the first duel ends. The session list has **Stop room (ends unfinished duel)**
+for an abandoned room; it targets only the current room process. Completed
+recordings stay on disk, but an unfinished duel may not have a replay yet.
+If a launched room exits before saving a duel, its log
 error remains visible on the page after a web-server restart. Use **Older games**
 and **Newer games** on the creation page
 to revisit saved rooms beyond the ten most recent sessions. The local page needs

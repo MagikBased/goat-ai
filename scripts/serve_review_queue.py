@@ -29,7 +29,7 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 REVIEW_API_VERSION = 5
-LIVE_API_VERSION = 16
+LIVE_API_VERSION = 17
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -590,14 +590,14 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
             if endpoint not in ("/api/review/choice", "/api/review/bookmark",
                                 "/api/review/note", "/api/review/upstream",
                                 "/api/games", "/api/games/review",
-                                "/api/edopro/start", "/api/edopro/confirm",
+                                "/api/edopro/start", "/api/edopro/stop", "/api/edopro/confirm",
                                 "/api/edopro/train",
                                 "/api/live/start", "/api/live/choice",
                                 "/api/live/close"):
                 self._json(404, {"error": "unknown endpoint"})
                 return
             if endpoint not in ("/api/games", "/api/games/review",
-                                "/api/edopro/start", "/api/edopro/confirm",
+                                "/api/edopro/start", "/api/edopro/stop", "/api/edopro/confirm",
                                 "/api/edopro/train",
                                 "/api/live/start", "/api/live/choice",
                                 "/api/live/close") and store is None:
@@ -616,7 +616,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 data = json.loads(self.rfile.read(size))
                 expected = ({"id"} if endpoint in ("/api/games/review",
                                                  "/api/live/close",
-                                                 "/api/edopro/train") else
+                                                 "/api/edopro/train",
+                                                 "/api/edopro/stop") else
                             {"deck1", "deck2", "human_seat", "opponent", "seed"}
                             if endpoint == "/api/live/start" else
                             {"id", "action_index", "expected_decisions"}
@@ -658,6 +659,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                     result = creator.create(data)
                 elif endpoint == "/api/edopro/start":
                     result = edo_room.start(data["ai_deck"], data.get("ai_mode", "selected"))
+                elif endpoint == "/api/edopro/stop":
+                    result = edo_room.stop(data["id"])
                 elif endpoint == "/api/edopro/confirm":
                     result = edo_room.save_choices(data["id"], data["frames"])
                 elif endpoint == "/api/edopro/train":

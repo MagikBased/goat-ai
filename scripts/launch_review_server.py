@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REVIEW_API_VERSION = 5  # Keep in sync with serve_review_queue.py.
-LIVE_API_VERSION = 16  # Increment when live-server behavior changes.
+LIVE_API_VERSION = 17  # Increment when live-server behavior changes.
 SEARCH_DIRS = (ROOT / "replays", ROOT / ".cache/goat-ai")
 LOG = ROOT / ".cache/goat-ai/review_server.log"
 PORTS = range(8765, 8865)

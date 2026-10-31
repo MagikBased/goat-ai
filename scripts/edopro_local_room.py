@@ -4,10 +4,12 @@ import json
 import os
 import re
 import shlex
+import signal
 import socket
 import subprocess
 import sys
 import tempfile
+import time
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
@@ -408,6 +410,32 @@ class EdoRoomManager:
                 "pid": getattr(self.process, "pid", None),
                 "training_admitted": False,
             }, indent=2) + "\n", encoding="utf-8")
+            return self.status()
+
+    def stop(self, identifier: str) -> dict:
+        """Stop only this manager's current room; saved recordings stay on disk."""
+        with self.lock:
+            directory = self._session_directory(identifier)
+            if identifier != self.session or not self._room_running():
+                raise ValueError("This EDOPro room is no longer running")
+            if self.process is not None:
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired as exc:
+                    raise RuntimeError("EDOPro room did not stop within five seconds") from exc
+            else:
+                pid = json.loads((directory / "session.json").read_text(
+                    encoding="utf-8")).get("pid")
+                if not self._owned_pid_running(directory, pid):
+                    raise ValueError("EDOPro room process identity changed")
+                os.kill(pid, signal.SIGTERM)
+                for _ in range(50):
+                    if not self._owned_pid_running(directory, pid):
+                        break
+                    time.sleep(0.1)
+                else:
+                    raise RuntimeError("EDOPro room did not stop within five seconds")
             return self.status()
 
     def _recording(self, directory: Path) -> dict | None:

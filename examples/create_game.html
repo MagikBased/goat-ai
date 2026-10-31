@@ -54,6 +54,8 @@
       <option value="tactical_fallback_1">Experimental low-confidence Tactical fallback</option>
     </select></label>
     <button id="edopro-start" type="button">Start EDOPro room</button>
+    <p class="muted">To replace an unused room, stop it in the session list below.
+      Stopping ends an unfinished duel; saved replays remain available.</p>
     <p id="edopro-status" role="status" aria-live="polite"></p>
     <ul id="edopro-recordings"></ul>
     <p id="edopro-pages" hidden>
@@ -165,7 +167,14 @@
         const record = session.recording;
         item.append(`${deckLabel(session.ai_deck)} · ${session.ai_mode === "tactical_fallback_1"
           ? "experimental fallback" : "selected policy"} · `);
-        if (session.running) item.append("waiting for the duel to finish");
+        if (session.running) {
+          item.append("waiting for the duel to finish");
+          const stop = document.createElement("button");
+          stop.type = "button"; stop.className = "audit-button";
+          stop.dataset.edoproStopId = session.id;
+          stop.textContent = "Stop room (ends unfinished duel)";
+          item.append(stop);
+        }
         else if (record?.viewer) {
           const link = document.createElement("a");
           link.href = record.viewer;
@@ -248,6 +257,24 @@
       } catch (error) {
         byId("edopro-status").textContent = error.message;
         button.disabled = false;
+      }
+    });
+    byId("edopro-recordings").addEventListener("click", async event => {
+      const button = event.target.closest("button[data-edopro-stop-id]");
+      if (!button) return;
+      button.disabled = true;
+      byId("edopro-status").textContent = "Stopping the EDOPro room…";
+      try {
+        const response = await fetch("/api/edopro/stop", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({id: button.dataset.edoproStopId}),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not stop room");
+        await refreshEdoRoom();
+      } catch (error) {
+        button.disabled = false;
+        byId("edopro-status").textContent = error.message;
       }
     });
     let currentEdoReview = null;

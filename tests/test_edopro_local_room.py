@@ -46,8 +46,17 @@ def test_edopro_room_launch_and_verified_viewer(tmp_path, monkeypatch):
     room = EdoRoomManager(creator, port=0)
 
     class Child:
+        stopped = False
+
         def poll(self):
-            return None
+            return 0 if self.stopped else None
+
+        def terminate(self):
+            self.stopped = True
+
+        def wait(self, timeout=None):
+            assert timeout == 5
+            return 0
 
     calls = []
 
@@ -94,6 +103,14 @@ def test_edopro_room_launch_and_verified_viewer(tmp_path, monkeypatch):
     assert record["experimental_confirmed_eligible"] is False
     assert record["viewer"].endswith("/game-001-seed-42.html")
     assert (directory / "game-001-seed-42.html").is_file()
+    with pytest.raises(ValueError, match="unavailable"):
+        room.stop("f" * 16)
+    stopped = room.stop(started["sessions"][0]["id"])
+    assert stopped["room_running"] is False
+    assert replay.is_file()
+    assert stopped["sessions"][0]["recording"]["verified"] is True
+    with pytest.raises(ValueError, match="no longer running"):
+        room.stop(started["sessions"][0]["id"])
 
 
 def test_edopro_room_reports_missing_optional_host(tmp_path):
@@ -176,8 +193,11 @@ def test_edopro_room_survives_review_server_restart(tmp_path):
         assert status["sessions"][0]["running"] is True
         with pytest.raises(ValueError, match="already running"):
             restarted.start("ai.ydk")
+        stopped = restarted.stop(identifier)
+        assert stopped["room_running"] is False
+        assert (directory / "session.json").is_file()
     finally:
-        if first.process is not None:
+        if first.process is not None and first.process.poll() is None:
             first.process.terminate()
             first.process.wait(timeout=5)
     assert EdoRoomManager(creator, port=port).status()["room_running"] is False
