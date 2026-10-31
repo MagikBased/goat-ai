@@ -572,6 +572,12 @@ cannot attack through Gravity Bind without Ocean. Both full duels verify.
 A third branch chains Mystical Space Typhoon after an attack declaration;
 removing Ocean restores Level 4 and the attack ends without damage. It also
 replay-verifies and passes the visibility audit.
+A paired [Ocean/Level Limit – Area B fixture](goat_rules.md#a-legendary-ocean-and-level-limit--area-b)
+checks the adjacent continuous position effect: the Level 4 WATER monster
+turns to Defense Position when Level Limit resolves without Ocean, but stays
+in Attack Position at current Level 3 with Ocean. Both complete native duels
+replay-verify and pass visibility audits. Later Ocean removal and manual
+position changes remain open.
 
 A paired [Dekoichi/Skill Drain fixture](goat_rules.md#dekoichi-and-chained-skill-drain) checks the archived Flip Summon response ruling: Skill Drain can chain to Dekoichi's effect, pay 1000 LP, and prevent its draw while Dekoichi remains face-up. A second pair checks the Damage Step boundary: pre-activated Drain prevents the draw, while Set Drain cannot chain to Dekoichi flipped by battle. All four complete native duels replay-verify and pass visibility audits. Other Damage Step responses remain open.
 
