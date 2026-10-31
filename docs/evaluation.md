@@ -17790,8 +17790,10 @@ source manifest is
 An audit found **67** policy-seat opportunities with legal Heavy Storm, own
 Set backrow, and no opposing backrow; **20** had top-two parent logit margin
 below 1.0. Tactical chose Heavy Storm in **none** of the 67, while the parent
-chose it seven times. These are observed states, not a general Heavy Storm
-rule or evidence that all 67 labels were used by the margin filter.
+executed it in **one** own-only case. An earlier count of seven included other
+`activate` actions without checking their card code. These are observed states,
+not a general Heavy Storm rule or evidence that all 67 labels were used by the
+margin filter.
 
 The new child combined those 64 published-Deck games with the earlier 128
 random-Deck games: **192 source games, 91,823 verified decisions**. Tactical
@@ -17901,3 +17903,74 @@ using the mixed child, four published source pairs, `--opponent tactical
 --learning-rate 0.0001 --seed 208008`; the targeted arm alone adds
 `--on-policy-teacher-include-own-only-heavy`. Use four matching-parent
 trajectories as `--preserve-trajectories` and `--allow-policy-preservation`.
+
+### Masked-parent own-loss preference experiment
+
+The existing visible-rule preference pipeline identified **46** selected
+own-resource losses in the 64 mixed-child games above, including **15** Heavy
+Storm activations with a negative visible trade. The rule set was
+`visible_selected_own_loss_v10`; it is an automated strategic hypothesis,
+not human review or a claim that every alternative wins. The generator
+replay-verified and visibility-audited every source duel, then wrote
+36 preference files for the games with at least one selected loss. Its ignored
+manifest is `.cache/goat-ai/mixed_child_ownloss_v10_208000_208007/manifest.json`
+(SHA-256 `a65fce76a3f01a6f868efa55b62c27814f43ff697766d61c557b2177be7eae4b`).
+
+`scripts/train_review_preferences.py` continued the mixed child from these
+46 preferences with the `masked_parent` objective: remove probability from
+the selected visible loss while retaining the parent's relative probabilities
+among other legal actions. It used four parent-provenance preservation games,
+64 preservation states, 200 steps, preservation batch 32, KL weight 0.5,
+learning rate 0.0001, and seed 208100. The loss fell from 1.8653 to 0.7199;
+final preservation KL was 0.06696. The experimental checkpoint is
+`.cache/goat-ai/fv23_mixed_masked_ownloss_v10_208000_208007.pt`
+(SHA-256 `598e65b9d76482d4259a1d93f00fc2ea7e18ca6a6b8c39f5c2c3c4ec2e1afb08`).
+It stopped selecting Heavy Storm on **all ten** own-only loss states from its
+source games. On the earlier independent Beastdown turn-11 observation, it
+selected **Set Heavy Storm** instead of activating it. This proves only a
+fixed-state correction.
+
+Three unseen-composition panels used fresh seeds, both Deck assignments,
+both policy seats, exact native replay verification, and player-visibility
+audits. All **485,835 decisions** in the nine terminal reports passed those
+checks. The strict paired differences compare child and unchanged mixed parent
+against Tactical-v14 on identical schedules.
+
+| Holdout | Direct child vs mixed parent | Child vs Tactical-v14 | Mixed parent vs Tactical-v14 | Paired Tactical score difference |
+| --- | ---: | ---: | ---: | ---: |
+| Christian/Theeresak Seattle, Bryan/Theeresak NJ, 64 per arm | 41–23 | 20–44 | 17–47 | +4.69 points, 95% interval [−9.38, +18.75] |
+| Phoenix/Beastdown, Zombie/Warrior, 64 per arm | 28–36 | 23–41 | 26–38 | −4.69 points, [−14.06, +4.69] |
+| Eight fresh legal random Deck pairs with Fusion Extras, 128 per arm | 64–61–3 | 47–81 | 52–76 | −3.91 points, [−10.94, +3.13] |
+
+The first direct panel's paired score interval was 53.13%–75.00%; the other
+direct intervals included 50%. No paired Tactical comparison excluded zero,
+and the child still lost most games against Tactical on every panel. Its
+corrected Heavy Storm choices did **not** establish a broad competitive gain;
+keep it experimental and leave the selected checkpoint unchanged. This
+separates a useful local preference objective from the M4 strength gate.
+
+The fresh random Deck manifest SHA-256 is
+`c145f7185e14189f1d19ff92835cd1bb8bfd2161bb13394a0bf1fb78e7b57c37`.
+Reproduce preference generation with
+`scripts/derive_visible_rule_preferences.py --rule-set
+visible_selected_own_loss_v10` over the 64-game source manifest. Train with
+`scripts/train_review_preferences.py --objective masked_parent --steps 200
+--preserve-per-trajectory 16 --preserve-batch 32 --parent-kl-weight 0.5
+--learning-rate 0.0001 --seed 208100` and each generated `--case` plus four
+`--preserve-trajectory` games already in the parent checkpoint. Evaluate with
+`scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --workers 4 --max-decisions 3000
+--verify-replays --require-unseen-main-decks
+--reject-training-deck-hashes`; direct seeds were 208200, 208400, 208700,
+and Tactical seeds were 208300, 208500, 208800. Strict paired comparisons
+used `scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.
+
+Ignored report SHA-256 values, in each row as direct, child Tactical, mixed
+parent Tactical, and strict paired comparison:
+
+| Panel | Direct | Child Tactical | Parent Tactical | Comparison |
+| --- | --- | --- | --- | --- |
+| Seattle/NJ | `6d060d9babde58634312c7313e58b6f6df30d1551f3cc4da2756425b37af117c` | `60d464b0ee0afb897c8b22f81584a45f9ab0479873b606b1754079ff311d6219` | `8191517da76e3f87feb21caf8ad780978b491c470622d8ef29e8c8883ea0ef1c` | `cc5a1a7eb1701ba44401ffdabe85370db9248ce7d877e71f02973c282e5cc7b1` |
+| Phoenix etc. | `5a0550c550fc3065e4a2a573afa976ead0f2d0a3eff6b66e6c505d04679b609c` | `e754b639f2c140ce71ffd53ad9fbffaa6a9f8d49bfc96cf95bdbd3ef97dfb56e` | `17e419b7d401347ec3186341db2cb43407d8610e16a4cbf8117fd057e4a36875` | `76bf4be98fc00ba58eba435584cebbc55b7fb302e9083ba7d0ef6d32dfa016c5` |
+| Fresh random | `ff6d1e839794e13b96b6f86d4d687a31b4541384a7b022562e77ae1c4cb02a85` | `7be6bea7e1000a7af8855931d6ef20a30ca50057b700cbcd0ec250bee34fe5e3` | `5b17d59753a4dea6a77c1428f8b9794d4ceb58378aa5914be65ca8a2eed63504` | `2cd98afa49e6ac124d9e78c15db7f4305a58758acb0a0cde4050102cec9ea1bf` |
