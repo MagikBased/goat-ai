@@ -150,6 +150,17 @@ def test_audit_checks_multi_card_choices_and_decision_viewer():
                                                   known_opponent_field_cards=()), {}))
 
 
+def test_nested_card_choices_are_audited_for_every_action_kind():
+    observation = _observation()
+    hidden = {"controller": 1, "location": 4, "sequence": 2, "code": 456}
+    for kind in ("unselect_card", "future_card_choice"):
+        with pytest.raises(VisibilityViolation, match="face-down"):
+            audit_decision_visibility(_record(observation, {"cards": [hidden]}, kind))
+    with pytest.raises(VisibilityViolation, match="invalid payload"):
+        audit_decision_visibility(_record(observation, {"cards": {"hidden": hidden}},
+                                          "future_card_choice"))
+
+
 def test_audit_checks_single_and_multi_tribute_choices():
     observation = _observation()
     hidden = {"controller": 1, "location": 4, "sequence": 2, "code": 456}

@@ -54,9 +54,12 @@ def _choice_cards(action: Action) -> Iterable[dict]:
     if (action.kind not in _ZONE_KINDS and "controller" in action.parameters
             and "location" in action.parameters):
         yield action.parameters
-    if action.kind in ("select_card", "select_cards", "finish_selection",
-                       "tribute_cards", "sort_cards", "select_counters"):
-        yield from action.parameters.get("cards", ())
+    if "cards" in action.parameters:
+        cards = action.parameters["cards"]
+        if not isinstance(cards, (tuple, list)) or not all(
+                isinstance(card, dict) for card in cards):
+            raise VisibilityViolation("card choices have invalid payload")
+        yield from cards
 
 
 def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:

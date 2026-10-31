@@ -263,6 +263,13 @@ A [2022 Worlds first-place Chaos Return list](../examples/decks/chaos_return_din
 
 A [sixth sourced tournament Main Deck](../examples/decks/bazoo_return_weirdchamp_worlds.ydk) transcribes Weirdchamp's published sixth-place World Championship Bazoo Return list. It passes the pinned whitelist gate. Two seeded random-agent duels against Goat Control, with Bazoo Return in each seat, reached terminal below 3,000 decisions and their complete trajectories serialized and replay-verified. The source did not provide Extra or Side Deck contents, so both sections remain empty. These are protocol-coverage results; they do not prove that every card effect in the list is historically correct.
 
+The decision-visibility auditor now inspects every nested `cards` payload,
+regardless of action kind, and rejects malformed card lists. This closes a
+future-action route for leaking a hidden opponent identity through a legal
+option. The focused native suite passed 29 tests; a saved 648-decision duel
+also passed the stricter audit. This is a defense of the recorded action
+contract, not proof that every native prompt is player-visible.
+
 **Work**
 
 1. Implement `.ydk` parsing and April 2005 deck/card-pool validation. Begin with two small legal fixture decks and expand coverage.
