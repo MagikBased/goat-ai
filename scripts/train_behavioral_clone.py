@@ -216,7 +216,8 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
                            allow_v23_to_v30: bool = False,
                            allow_v23_to_v31: bool = False,
                            allow_v23_to_v32: bool = False,
-                           allow_v23_to_v33: bool = False) -> dict:
+                           allow_v23_to_v33: bool = False,
+                           allow_v23_to_v34: bool = False) -> dict:
     """Continue a clone only when weights and held-out provenance are compatible."""
     parent = torch.load(path, map_location="cpu", weights_only=True)
     if not isinstance(parent, dict) or parent.get("schema_version") != 1:
@@ -224,7 +225,7 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
     if (allow_v23_to_v24 or allow_v23_to_v25 or allow_v23_to_v26
             or allow_v23_to_v27 or allow_v23_to_v28 or allow_v23_to_v29
             or allow_v23_to_v30 or allow_v23_to_v31
-            or allow_v23_to_v32 or allow_v23_to_v33) and parent.get(
+            or allow_v23_to_v32 or allow_v23_to_v33 or allow_v23_to_v34) and parent.get(
             "feature_version") != 23:
         raise ValueError("feature upgrade requires a feature-v23 parent")
     upgrade = (parent.get("feature_version") == 23
@@ -237,7 +238,8 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
                     or (allow_v23_to_v30 and model.feature_version == 30)
                     or (allow_v23_to_v31 and model.feature_version == 31)
                     or (allow_v23_to_v32 and model.feature_version == 32)
-                    or (allow_v23_to_v33 and model.feature_version == 33)))
+                    or (allow_v23_to_v33 and model.feature_version == 33)
+                    or (allow_v23_to_v34 and model.feature_version == 34)))
     if (parent.get("width") != model.card.embedding_dim
             or (parent.get("feature_version", 1) != model.feature_version and not upgrade)
             or tuple(parent.get("vocabulary_codes", ())) != vocabulary.codes
@@ -276,7 +278,7 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
         if model.feature_version == 27:
             for key in ("action_query.weight", "attended_card.weight"):
                 state[key] = model.state_dict()[key].clone()
-        if model.feature_version in (28, 29, 30, 31, 32, 33):
+        if model.feature_version in (28, 29, 30, 31, 32, 33, 34):
             for key, axis, growth in (("kind.weight", 0, 1),
                                       ("target_context.0.weight", 1, 1),
                                       ("action_numbers.0.weight", 1,
@@ -294,15 +296,16 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
                 else:
                     expanded[:, :original.shape[1]] = original
                 state[key] = expanded
-        if model.feature_version in (29, 30, 31, 32, 33):
+        if model.feature_version in (29, 30, 31, 32, 33, 34):
             key = "card_numbers.0.weight"
             original = state[key]
             expanded = torch.zeros_like(model.state_dict()[key])
-            if expanded.shape != (original.shape[0], original.shape[1] + 1):
-                raise ValueError("feature upgrade needs one new public age input")
+            growth = 2 if model.feature_version == 34 else 1
+            if expanded.shape != (original.shape[0], original.shape[1] + growth):
+                raise ValueError("feature upgrade needs public age and Level inputs")
             expanded[:, :original.shape[1]] = original
             state[key] = expanded
-        if model.feature_version == 33:
+        if model.feature_version in (33, 34):
             key = "state_numbers.0.weight"
             original = state[key]
             expanded = torch.zeros_like(model.state_dict()[key])
@@ -372,6 +375,8 @@ def main() -> None:
                         help="load v23 weights with distinct effect modes and v31 features")
     parser.add_argument("--upgrade-feature-23-to-33", action="store_true",
                         help="load v23 weights with public recent-event history and v32 features")
+    parser.add_argument("--upgrade-feature-23-to-34", action="store_true",
+                        help="load v23 weights with visible current Level and v33 features")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=1,
                         help="BC decisions per update; with parent KL, scoring chunk size "
@@ -391,7 +396,7 @@ def main() -> None:
                         help="use optional orjson to decode input trajectories in the main "
                              "process and replay-verification workers")
     parser.add_argument("--width", type=int, default=64)
-    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 34)),
+    parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 35)),
                         default=POLICY_FEATURE_VERSION)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
@@ -482,11 +487,15 @@ def main() -> None:
     if args.upgrade_feature_23_to_33 and (not args.init_checkpoint
                                          or args.feature_version != 33):
         parser.error("--upgrade-feature-23-to-33 requires a parent and feature v33")
+    if args.upgrade_feature_23_to_34 and (not args.init_checkpoint
+                                         or args.feature_version != 34):
+        parser.error("--upgrade-feature-23-to-34 requires a parent and feature v34")
     if sum((args.upgrade_feature_23_to_24, args.upgrade_feature_23_to_25,
             args.upgrade_feature_23_to_26, args.upgrade_feature_23_to_27,
             args.upgrade_feature_23_to_28, args.upgrade_feature_23_to_29,
             args.upgrade_feature_23_to_30, args.upgrade_feature_23_to_31,
-            args.upgrade_feature_23_to_32, args.upgrade_feature_23_to_33)) > 1:
+            args.upgrade_feature_23_to_32, args.upgrade_feature_23_to_33,
+            args.upgrade_feature_23_to_34)) > 1:
         parser.error("select only one feature-upgrade path")
     if args.on_policy_teacher and (not args.init_checkpoint or args.annotation
                                    or args.annotation_for):
@@ -761,7 +770,8 @@ def main() -> None:
         allow_v23_to_v30=args.upgrade_feature_23_to_30,
         allow_v23_to_v31=args.upgrade_feature_23_to_31,
         allow_v23_to_v32=args.upgrade_feature_23_to_32,
-        allow_v23_to_v33=args.upgrade_feature_23_to_33)
+        allow_v23_to_v33=args.upgrade_feature_23_to_33,
+        allow_v23_to_v34=args.upgrade_feature_23_to_34)
               if args.init_checkpoint else None)
     try:
         restrict_trainable_modules(model, args.trainable_module)
@@ -864,7 +874,8 @@ def main() -> None:
         "parent_checkpoint_sha256": (hashlib.sha256(
             args.init_checkpoint.read_bytes()).hexdigest()
             if args.init_checkpoint else None),
-        "parent_feature_upgrade": ("v23_to_v33" if args.upgrade_feature_23_to_33
+        "parent_feature_upgrade": ("v23_to_v34" if args.upgrade_feature_23_to_34
+                                   else "v23_to_v33" if args.upgrade_feature_23_to_33
                                    else "v23_to_v32" if args.upgrade_feature_23_to_32
                                    else "v23_to_v31" if args.upgrade_feature_23_to_31
                                    else "v23_to_v30" if args.upgrade_feature_23_to_30

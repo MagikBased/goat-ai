@@ -1174,6 +1174,14 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+An opt-in [current-Level policy feature](ml.md) now uses schema-v31
+player-visible Level for the player's hand and face-up monsters. Feature v34
+zero-warm-starts from the selected v23 checkpoint, preserving its logits before
+training, while hidden opponent cards contribute no Level. This makes the
+recent Ocean/Metamorphosis and Ocean/Gravity Bind information available to
+the policy encoder. It has not been trained or shown to improve held-out play;
+the selected v23 checkpoint remains unchanged.
+
 An opt-in [public-history policy feature](evaluation.md#public-history-policy-feature-pilot-30-october-2026)
 now summarizes recent public events and zero-warm-starts from the selected
 v23 checkpoint. A one-replay, 154-optional-choice Tactical clone completed,

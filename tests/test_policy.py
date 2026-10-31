@@ -1985,6 +1985,44 @@ def test_v33_encodes_public_event_history_and_zero_warm_starts(tmp_path):
         assert torch.allclose(child(quiet), parent(old), atol=1e-6)
 
 
+def test_v34_encodes_visible_current_level_without_hidden_card_level(tmp_path):
+    vocabulary = CardVocabulary((10, 20), ((10, 33, 1000), (20, 33, 2000)))
+    base = replace(view(), hand=(CardView(0, "hand", "hidden", 10, 0, level=3),),
+                   field=(CardView(1, "monster", "facedown", None, 0, "defense"),
+                          CardView(1, "monster", "faceup", 20, 1, "attack",
+                                   2000, 1000, level=4)))
+    changed = replace(base, hand=(replace(base.hand[0], level=4),))
+    current = encode_decision(base, actions(), vocabulary, 34)
+    other = encode_decision(changed, actions(), vocabulary, 34)
+    assert current.state_card_numbers.shape == (3, 7)
+    assert current.state_card_numbers[:, -1].tolist() == pytest.approx(
+        [3 / 20, 0, 4 / 20])
+    assert other.state_card_numbers[0, -1] == pytest.approx(4 / 20)
+    assert torch.equal(encode_decision(base, actions(), vocabulary, 33).state_card_numbers,
+                       encode_decision(changed, actions(), vocabulary, 33).state_card_numbers)
+    assert base.field[0].code is None and base.field[0].level is None
+
+    torch.manual_seed(34)
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    path = tmp_path / "parent.pt"
+    torch.save({"schema_version": 1, "model_state": parent.state_dict(),
+                "vocabulary_codes": vocabulary.codes,
+                "vocabulary_card_properties": vocabulary.card_properties,
+                "width": 8, "feature_version": 23,
+                "trajectory_sha256": {"training.json": "a" * 64},
+                "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                                    "main_deck_composition_sha256": ("c", "d")}]}, path)
+    child = LegalActionPolicy(vocabulary.size, width=8, feature_version=34)
+    with pytest.raises(ValueError, match="architecture or vocabulary"):
+        load_parent_checkpoint(path, child, vocabulary)
+    load_parent_checkpoint(path, child, vocabulary, allow_v23_to_v34=True)
+    assert torch.count_nonzero(child.card_numbers[0].weight[:, -2:]) == 0
+    with torch.no_grad():
+        expected = parent(encode_decision(base, actions(), vocabulary, 23))
+        assert torch.allclose(child(current), expected, atol=1e-6)
+        assert torch.allclose(child(other), expected, atol=1e-6)
+
+
 def test_v31_distinguishes_unknown_announced_cards_and_warm_starts(tmp_path):
     from scripts.audit_policy_action_aliases import feature_aliases
 

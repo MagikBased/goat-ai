@@ -611,3 +611,14 @@ as one action number. `--upgrade-feature-23-to-30` zero-extends the selected
 v23 weights, preserving its initial logits and training provenance. This is
 a representation correction, not evidence of a playing-strength gain; the
 feature-v23 checkpoint remains selected pending a held-out comparison.
+
+Opt-in feature version 34 adds each card's **current visible Level** as a
+seventh card number. It reads Level from the player's own hand and face-up
+field monsters in trajectory schema v31. Face-down cards and the opponent's
+hidden hand contribute zero; printed card Level is not substituted for a
+hidden current Level. The explicit `--upgrade-feature-23-to-34` path copies
+the selected v23 architecture and zero-initializes the added Level, age,
+history, and action inputs, preserving parent logits before training. This
+exposes field-effect changes such as A Legendary Ocean to the model, but it
+has no measured competitive benefit yet. Existing checkpoints retain their
+original feature version.

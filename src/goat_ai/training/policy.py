@@ -80,6 +80,8 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # at one decision, using schema-v28 effect-option indices.
 # Version 33 summarizes the last 32 public turn, phase, chain, attack, and
 # Damage Step events with counts and recency. It adds no private-state input.
+# Version 34 adds current Level for own hand and face-up field monsters. The
+# simulator supplies it from the player-visible query, including field effects.
 HISTORY_EVENT_TYPES = ("turn", "phase", "chain", "attack", "damage_step")
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
@@ -149,7 +151,7 @@ class CardVocabulary:
 @dataclass(frozen=True)
 class DecisionFeatures:
     state_cards: Tensor  # [N, 4]: card, zone, owner, position
-    state_card_numbers: Tensor  # [N, 5/6]: ATK, DEF, counters, Spell Counters, visible, age
+    state_card_numbers: Tensor  # [N, 5/6/7]: ATK, DEF, counters, Spell Counters, visible, age, Level
     state_numbers: Tensor  # [10] for v1-v3, [42] for v4
     phase: Tensor  # scalar
     action_kinds: Tensor  # [A]
@@ -179,7 +181,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 34):
+    if feature_version not in range(1, 35):
         raise ValueError("unsupported policy feature version")
     if feature_version >= 22 and not vocabulary.card_properties:
         raise ValueError("feature version 22 requires pinned printed card properties")
@@ -225,16 +227,20 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
                   if feature_version >= 8 else (0.0,) * 5)
         if feature_version >= 29:
             values += (min(card.faceup_turns or 0, 20) / 20,)
+        if feature_version >= 34:
+            values += (min(card.level or 0, 20) / 20,)
         card_numbers.append(values)
     for link in observation.chain:
         cards.append((vocabulary.index(link.card_code), ZONE_IDS["chain"],
                       int(link.controller != observation.viewer) + 1, 3))
-        card_numbers.append((0.0,) * (6 if feature_version >= 29 else 5))
+        card_numbers.append((0.0,) * (7 if feature_version >= 34 else
+                                     6 if feature_version >= 29 else 5))
         card_sequences.append(-1)
         equip_slots.append((0, 0, -1))
     if not cards:
         cards.append((0, 0, 0, 0))
-        card_numbers.append((0.0,) * (6 if feature_version >= 29 else 5))
+        card_numbers.append((0.0,) * (7 if feature_version >= 34 else
+                                     6 if feature_version >= 29 else 5))
         card_sequences.append(-1)
         equip_slots.append((0, 0, -1))
 
@@ -540,7 +546,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 34):
+        if feature_version not in range(1, 35):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -549,7 +555,8 @@ class LegalActionPolicy(nn.Module):
         self.position = nn.Embedding(len(POSITIONS) + 1, width, padding_idx=0)
         if feature_version >= 8:
             self.card_numbers = nn.Sequential(nn.Linear(
-                6 if feature_version >= 29 else 5, width), nn.ReLU(),
+                7 if feature_version >= 34 else 6 if feature_version >= 29 else 5,
+                width), nn.ReLU(),
                                               nn.Linear(width, width))
         self.phase = nn.Embedding(len(PHASES) + 1, width, padding_idx=0)
         kind_count = (len(ACTION_KINDS)
