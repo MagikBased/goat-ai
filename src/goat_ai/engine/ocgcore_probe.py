@@ -56,6 +56,7 @@ MR1_SYNCHRO_CARDS = frozenset({
     22702055,  # Umi; period Field Spell replacement probe
     21502796,  # Ryko; pre-errata activation-time target below
     19665973,  # Battle Fader; direct-attack End Step timing probe
+    93016201,  # Royal Oppression; Synchro Summon negation probe
 })
 MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094, 7391448, 50321796})
 UPSTREAM_GOYO_SHA256 = "b1f8f68c428302b537a1bf4b660ef33ae800afd4a1716cd962f3908b2f24302b"

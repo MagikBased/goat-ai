@@ -704,6 +704,28 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_bottomless_book_synchro.py
 ```
 
+## Royal Oppression against a Synchro Summon
+
+The [official March 2010 Advanced list](https://www.yugioh-card.com/en/downloads/alt_format/2010-03-01.pdf)
+Semi-Limits Royal Oppression. A new MR1 probe admits two copies and loads its
+pinned official script; this remains a deliberately narrow eligible-card set,
+not an Edison whitelist. In paired seed-52 duels, player 1 Sets Oppression on
+turn two and activates it during the following Draw Phase. Player 0 then Flip
+Summons Bokoichi, Normal Summons Junk Synchron, and Synchro Summons Junk Warrior.
+The face-up Oppression offers player 1 a response. Paying 800 LP negates the
+Summon, sends Junk Warrior to the Graveyard, and leaves Oppression face-up;
+passing leaves Junk Warrior on the field with both players at 8000 LP. Before
+Oppression is activated, player 0 sees only an unidentified Set Spell/Trap.
+Both branches finish complete duels, serialize, replay-verify, and pass the
+player-visible trajectory audit. This checks the native MR1 response and
+cost for one Synchro Summon; the script's April 2010 text and other
+Oppression interactions still require independent historical validation.
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_royal_oppression_synchro.py
+```
+
 ## Same-time trigger ordering
 
 The [2009 official rulebook's simultaneous-effects section](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)

@@ -2003,6 +2003,11 @@ The [Book response pair](edison_research.md#book-of-moon-chained-to-the-synchro-
 adds a second chain link after Bottomless: Book protects the face-down Junk
 Warrior, while passing leaves it banished. Both complete MR1 duels replay-verify
 and pass visibility checks; the additional Edison profile gates remain open.
+The [Royal Oppression response pair](edison_research.md#royal-oppression-against-a-synchro-summon)
+adds a face-up Continuous Trap responding to Junk Warrior's Synchro Summon:
+paying 800 LP negates the Summon, while passing preserves Warrior. Both complete
+MR1 duels replay-verify and pass visibility checks; the period card text and
+broader Edison legality remain unaudited.
 
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.
