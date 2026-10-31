@@ -205,6 +205,9 @@ def test_game_creator_page_and_api_reject_unlisted_decks(tmp_path, monkeypatch):
     try:
         with urlopen(f"{base}/games/new", timeout=5) as response:
             assert b"Create a GOAT AI game" in response.read()
+        with urlopen(f"{base}/games/create", timeout=5) as response:
+            assert response.url.endswith("/examples/create_game.html")
+            assert b"Play in EDOPro" in response.read()
         options = _request(f"{base}/api/games/options")[1]
         assert options["decks"] == []
         assert not options["native_ready"]

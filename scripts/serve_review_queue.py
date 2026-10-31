@@ -453,7 +453,7 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 self.send_header("Location", start_path)
                 self.end_headers()
                 return
-            if parsed.path == "/games/new":
+            if parsed.path in ("/games/new", "/games/create"):
                 self.send_response(302)
                 self.send_header("Location", "/examples/create_game.html")
                 self.end_headers()
