@@ -16540,3 +16540,28 @@ resolving one-shot spell later in the duel. These are concrete review cases,
 not evidence that a single local material rule improves expected win rate.
 The ignored replay is `.cache/goat-ai/v23_theeresak_vs_jonathan_177000.json`
 (SHA-256 `ffed25c9ff37ef78aa07997182b158f4f8f206f39b3793f277959ed396005fb0`).
+
+The targeted one-shot-response guard v2 was also measured on the same
+64-game schedule. In the inspected replay the policy chained MST to an
+activated Nobleman of Crossout while Nobleman was the only opposing
+Spell/Trap; destruction does not negate the resolving Normal Spell. Guard v2
+defers that specific MST response when no other opposing back row is visible.
+It changed five complete-game decision traces relative to guard v1, but the
+score was again **20–44**. All 64 games and 36,385 decisions passed replay
+and visibility verification. The paired score difference was exactly zero
+on this schedule; this does not establish equivalent expected strength.
+The ignored guard-v2 report is
+`.cache/goat-ai/v23_guard2_tactical_seattle_charlotte_177000_177007.json`
+with SHA-256
+`bc6619ad318f486fbe4f501c5eaa718e932bfac97a86533f0b11feb7d440bf2b`.
+
+On the seed-177000 Theeresak replay, Tactical-v14 disagreed with the policy
+on 12 of 96 multi-option policy-seat choices. Seven of those disagreements
+were Tactical chaining Dust Tornado while the policy passed. These are
+synthetic teacher disagreements, not proof that either action was better;
+they warn against treating every baseline disagreement as a correction.
+The v23 action-alias audit found one indistinguishable `select_option` pair
+in 195 multi-action decisions, at an **opponent-seat** Enemy Controller
+prompt. No selected policy-seat action in this replay depended on feature
+v30's ordinal repair. This single replay does not exclude representation
+losses elsewhere.
