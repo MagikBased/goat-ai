@@ -558,6 +558,13 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired [A Legendary Ocean/Metamorphosis fixture](goat_rules.md#metamorphosis-under-a-legendary-ocean)
+checks the archived current-Level ruling against the pinned native scripts.
+Ocean changes a face-up Level 4 WATER monster to Level 3 and switches the only
+offered Fusion from a Level 4 candidate to a Level 3 candidate. Both branches
+reach terminal, replay-verify, and pass visibility audits. Other Level-changing
+effects and summon-response timing remain untested.
+
 A paired [Dekoichi/Skill Drain fixture](goat_rules.md#dekoichi-and-chained-skill-drain) checks the archived Flip Summon response ruling: Skill Drain can chain to Dekoichi's effect, pay 1000 LP, and prevent its draw while Dekoichi remains face-up. A second pair checks the Damage Step boundary: pre-activated Drain prevents the draw, while Set Drain cannot chain to Dekoichi flipped by battle. All four complete native duels replay-verify and pass visibility audits. Other Damage Step responses remain open.
 
 A paired [Call of the Haunted/Necrovalley fixture](goat_rules.md#call-of-the-haunted-under-necrovalley)
