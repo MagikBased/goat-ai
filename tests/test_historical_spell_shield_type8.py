@@ -75,8 +75,12 @@ def test_spell_shield_negation_modes_and_cost_visibility(tmp_path, spell):
                         selected_action=old_action(record.selected_action))
                         for record in replay.decisions)
                     def old_view(view):
-                        return replace(view, field=tuple(
-                            replace(card, attribute=None) for card in view.field))
+                        return replace(
+                            view,
+                            hand=tuple(replace(card, level=None)
+                                       for card in view.hand),
+                            field=tuple(replace(card, attribute=None, level=None)
+                                        for card in view.field))
 
                     old = replace(replay, schema_version=27,
                                   decisions=tuple(replace(record,

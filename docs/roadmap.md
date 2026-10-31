@@ -573,6 +573,12 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired [Spell Shield Type-8 / Snatch Steal fixture](goat_rules.md#spell-shield-type-8-against-snatch-steal)
+checks the historical free negation mode against a targeted Equip Spell. With
+Shield the monster stays under its original controller; without it Snatch
+takes control. Both complete duels replay-verify and pass visibility audits.
+The full historical correctness gate remains open.
+
 A paired [Scapegoat/Royal Oppression fixture](goat_rules.md#royal-oppression-responding-to-scapegoat)
 checks the archived 2005 activation-timing distinction. A Set Oppression can
 flip in response to Scapegoat but cannot use its separate effect in that chain;
