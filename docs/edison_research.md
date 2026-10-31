@@ -992,9 +992,10 @@ Catastor to the Extra Deck.
 A seed-3 native fixture uses Junk Synchron and Bokoichi to Synchro Summon
 Catastor, then attacks a face-up LIGHT Mystical Elf. A Catastor chain link
 appears in the Damage Step while Elf is still on the field; Elf then reaches
-the Graveyard and both players remain at 8000 LP. The complete duel
-serializes, replay-verifies, and passes the player-visibility audit. This
-checks one face-up non-DARK branch; face-down monsters, DARK monsters, other
+the Graveyard and both players remain at 8000 LP. A paired branch attacks the
+same Elf face-down: Catastor creates no Damage Step chain link, and ordinary
+battle destroys Elf with no LP change. Both complete duels serialize,
+replay-verify, and pass the player-visibility audit. DARK monsters, other
 Damage Step responses, and broader Edison correctness remain open. Reproduce
 with:
 

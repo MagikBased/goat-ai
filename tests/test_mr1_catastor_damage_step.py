@@ -1,4 +1,4 @@
-"""Catastor destroys a face-up non-DARK monster before damage calculation."""
+"""Catastor's start-of-Damage-Step effect depends on the opponent's position."""
 
 import hashlib
 import os
@@ -24,7 +24,8 @@ MYSTICAL_ELF = 15025844  # LIGHT, 800 ATK
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
                     reason="native assets not installed")
-def test_catastor_destroys_faceup_light_before_damage(tmp_path):
+@pytest.mark.parametrize("face_down", (False, True), ids=("faceup", "facedown"))
+def test_catastor_damage_step_faceup_boundary(tmp_path, face_down):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     script = root / f"scripts/official/c{ALLY_OF_JUSTICE_CATASTOR}.lua"
     if not script.is_file():
@@ -47,7 +48,8 @@ def test_catastor_destroys_faceup_light_before_damage(tmp_path):
     with GoatEnvironment(str(own_deck), str(other_deck), seed=3,
                          engine=Mr1SynchroProbeEngine(root)) as env:
         view = env.reset()
-        set_bokoichi = summon_elf = elf_attack = summon_junk = summon_catastor = False
+        set_bokoichi = summon_elf = summon_junk = summon_catastor = False
+        elf_attack = flip_bokoichi = face_down
         catastor_attack = destroyed = False
         agents = (RandomAgent(3), RandomAgent(4))
         for _ in range(3000):
@@ -62,14 +64,20 @@ def test_catastor_destroys_faceup_light_before_damage(tmp_path):
                     set_bokoichi = action is not None
                 if view.turn == 2 and view.acting_player == 1:
                     if not summon_elf:
-                        action = next((a for a in actions if a.kind == "normal_summon"
+                        action = next((a for a in actions if a.kind == (
+                            "set_monster" if face_down else "normal_summon")
                                        and a.parameters.get("code") == MYSTICAL_ELF), None)
                         summon_elf = action is not None
                     elif not elf_attack and view.phase.startswith("battle"):
                         action = next((a for a in actions if a.kind == "attack"), None)
                         elf_attack = action is not None
                 if view.turn == 3 and view.acting_player == 0:
-                    if not summon_junk:
+                    if face_down and flip_bokoichi:
+                        action = next((a for a in actions if a.kind == "flip_summon"
+                                       and a.parameters.get("code") == BOKOICHI), None)
+                        if action is not None:
+                            flip_bokoichi = False
+                    elif not summon_junk:
                         action = next((a for a in actions if a.kind == "normal_summon"
                                        and a.parameters.get("code") == JUNK_SYNCHRON), None)
                         summon_junk = action is not None
@@ -79,6 +87,11 @@ def test_catastor_destroys_faceup_light_before_damage(tmp_path):
                         summon_catastor = action is not None
                     elif not catastor_attack and view.phase.startswith("battle"):
                         action = next((a for a in actions if a.kind == "attack"), None)
+                        if action is not None:
+                            assert any(card.code == (None if face_down else MYSTICAL_ELF)
+                                       and card.controller == 1
+                                       and card.position == ("facedown" if face_down else "faceup")
+                                       for card in view.field)
                         catastor_attack = action is not None
                 if action is None:
                     action = next((a for kind in (
@@ -101,13 +114,15 @@ def test_catastor_destroys_faceup_light_before_damage(tmp_path):
             f"official/c{ALLY_OF_JUSTICE_CATASTOR}.lua"] == hashlib.sha256(
                 script.read_bytes()).hexdigest()
         trajectory = env.trajectory()
-        assert any(record.observation.phase == "damage_step"
-                   and any(link.card_code == ALLY_OF_JUSTICE_CATASTOR
-                           for link in record.observation.chain)
-                   and MYSTICAL_ELF not in {
-                       card.code for card in record.observation.graveyards[1]}
-                   for record in trajectory.decisions)
-        path = tmp_path / "catastor_damage_step.json"
+        catastor_chain = any(record.observation.turn == 3
+                             and record.observation.phase == "damage_step"
+                             and any(link.card_code == ALLY_OF_JUSTICE_CATASTOR
+                                     for link in record.observation.chain)
+                             and MYSTICAL_ELF not in {
+                                 card.code for card in record.observation.graveyards[1]}
+                             for record in trajectory.decisions)
+        assert catastor_chain is not face_down
+        path = tmp_path / f"catastor_damage_step_{face_down}.json"
         write_trajectory(path, trajectory)
     replay = read_trajectory(path)
     assert verify_trajectory(replay, Mr1SynchroProbeEngine(root)) == len(replay.decisions)
