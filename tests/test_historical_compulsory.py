@@ -9,6 +9,7 @@ from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 COMPULSORY = 94192409
@@ -23,6 +24,83 @@ def _deck(path, cards, extra=()):
     path.write_text("#main\n" + "\n".join(map(str, cards))
                     + "\n#extra\n" + "\n".join(map(str, extra)) + "\n!side\n")
     return str(path)
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_compulsory_hidden_set_target_ignores_opponent_deck_order(tmp_path):
+    """A face-down target is a public slot, even if its card identity differs."""
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    if not (root / f"scripts/official/c{COMPULSORY}.lua").is_file():
+        pytest.skip("Compulsory script not installed")
+    own = _deck(tmp_path / "compulsory_hidden_own.ydk",
+                (*([COMPULSORY] * 3), *VANILLA_DECK[3:]))
+
+    def run(name, opponent_cards):
+        other = _deck(tmp_path / f"compulsory_hidden_{name}.ydk", opponent_cards)
+        with GoatEnvironment(own, other, seed=15,
+                             engine=ExperimentalOcgcoreEngine(root)) as env:
+            obs = env.reset()
+            trap_set = monster_set = activated = targeted = False
+            target_snapshot = None
+            hidden_code = None
+            for _ in range(120):
+                actions = env.legal_actions()
+                action = None
+                if obs.turn == 1 and obs.acting_player == 0 and not trap_set:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == COMPULSORY), None)
+                    trap_set |= action is not None
+                if obs.turn == 2 and obs.acting_player == 1 and not monster_set:
+                    action = next((a for a in actions if a.kind == "set_monster"), action)
+                    if action is not None and action.kind == "set_monster":
+                        hidden_code = action.parameters["code"]
+                        monster_set = True
+                if obs.turn == 3 and obs.acting_player == 0 and monster_set \
+                        and not activated:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == COMPULSORY), action)
+                    activated |= action is not None and action.parameters.get(
+                        "code") == COMPULSORY
+                if activated and not targeted and actions[0].kind == "select_card":
+                    hidden = next(c for c in obs.field if c.controller == 1
+                                  and c.zone == "monster")
+                    assert hidden.code is None and hidden.position == "facedown"
+                    assert not obs.known_opponent_field_cards
+                    target_snapshot = (obs, tuple(actions))
+                    action = next((a for a in actions if a.parameters.get(
+                        "controller") == 1 and a.parameters.get("location") == 4), None)
+                    assert action is not None and "code" not in action.parameters
+                    targeted = True
+                if action is None:
+                    action = next((a for a in actions if a.kind in (
+                        "select_card", "place", "pass", "end_phase")), actions[0])
+                obs = env.step(action)
+                if targeted and COMPULSORY in {c.code for c in obs.graveyards[0]}:
+                    assert hidden_code in {c.code for c in env.engine.probe.observation(1).hand}
+                    assert not any(c.controller == 1 and c.zone == "monster"
+                                   for c in obs.field)
+                    assert obs.known_opponent_hand_cards == ()
+                    agents = (RandomAgent(81), RandomAgent(82))
+                    for _ in range(3000):
+                        if env.is_terminal():
+                            break
+                        obs = env.step(agents[obs.acting_player].select_action(
+                            obs, env.legal_actions()))
+                    else:
+                        pytest.fail("Compulsory hidden-target duel did not terminate")
+                    path = tmp_path / f"compulsory_hidden_{name}.json"
+                    write_trajectory(path, env.trajectory())
+                    assert verify_trajectory(read_trajectory(path),
+                                             ExperimentalOcgcoreEngine(root)) \
+                        == len(env.trajectory().decisions)
+                    audit_trajectory_visibility(read_trajectory(path))
+                    return hidden_code, target_snapshot
+            pytest.fail("Compulsory hidden-target line did not resolve")
+
+    first_code, first = run("original", VANILLA_DECK)
+    second_code, second = run("reordered", tuple(reversed(VANILLA_DECK)))
+    assert first_code != second_code
+    assert first == second
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
