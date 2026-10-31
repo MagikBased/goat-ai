@@ -17989,6 +17989,14 @@ self-play checkpoints also carry their inherited preference-file hashes, so
 another round can revalidate the same anchors. The checkpoint from this pilot
 predates that metadata fix and should not be used as the parent of another
 retained-anchor round without rebuilding its provenance.
+A separate two-game continuation after the fix wrote all 36 parent preference
+hashes unchanged, reloaded and revalidated all 46 anchors from its own child
+checkpoint, and replay-verified both terminal duels across 1,607 decisions.
+That ignored smoke checkpoint is
+`.cache/goat-ai/fv23_masked_ownloss_provenance_smoke_209700_209701.pt`
+(SHA-256 `fe8f44d143edbe9a96b887ba127d753850f2fd94966ae55428e7a429033a8b53`).
+Two games cannot measure strength and this checkpoint is not a promotion
+candidate.
 
 The pilot trained on 64 four-role games from the four published 2005 source
 pairs used in the preceding mixed-child collection. It used Tactical-v14 or a
