@@ -17444,6 +17444,36 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
   --output .cache/goat-ai/tactical_full_whitelist_fusion_205000_205015
 ```
 
+### Independent full-whitelist Deck sweep without Fusion stress
+
+The seed-206000–206015 schedule generated 16 further independent, legal
+40-card Main Deck pairs with random legal Extra Decks, but without forcing
+Scapegoat, Metamorphosis, or Thousand-Eyes Restrict into each Deck. Tactical-v14
+controlled both seats. All **16/16 duels reached terminal** within the 3,000
+decision cap. All **7,269/7,269 decisions** replay-verified and passed the
+player-visibility audit, and repeated runs matched all 7,269 decisions and
+outcomes. These games loaded 776 distinct native asset paths; legal actions
+offered 349 distinct source-card IDs, and agents selected actions from 313.
+Across this and the Fusion-stress sweep, 626 distinct source-card IDs were
+offered and 569 were selected; 281 offered and 262 selected IDs were new in
+this second sweep. These are protocol coverage measurements on random Decks,
+not a GOAT ruling audit or a competitive-strength result. The absence of a
+failure in 32 games does not establish complete card coverage.
+
+The ignored report is
+`.cache/goat-ai/tactical_full_whitelist_plain_206000_206015/report.json`
+(SHA-256 `7905f57f4ad2cbd430c8f728322ca9689c2b19dd85d5357d3c01a170f375ffba`).
+Reproduce with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
+  --native-root .cache/goat-ai --seed 206000 --seeds 16 \
+  --max-decisions 3000 --card-pool whitelist --agent tactical \
+  --verify-replays --distinct-opponents --random-extra \
+  --isolate-games --repeat-seeds --count-card-actions \
+  --output .cache/goat-ai/tactical_full_whitelist_plain_206000_206015
+```
+
 ### Low-margin fallback on the full-whitelist Deck pairs
 
 The already opt-in margin-1.0 Tactical fallback was tested on the 16 Deck
