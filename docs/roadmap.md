@@ -1031,6 +1031,13 @@ The related Monster Gate example was excluded because its first TCG release
 postdates the GOAT pool. This advances one M2 trigger interaction; it does not
 certify all Special Summon effects.
 
+A [Mystic Tomato/Royal Oppression Damage Step fixture](goat_rules.md#royal-oppression-and-mystic-tomato-in-the-damage-step)
+checks the archived timing restriction with Oppression already face-up. Tomato
+recruits Sangan during battle, Oppression is absent from both players' Damage
+Step responses, and no 800-LP cost is paid. The complete native duel
+replay-verifies and passes visibility checks. This closes one M2 Damage Step
+branch; the broader timing and arbitrary-card gate remains open.
+
 ## M3 — Evaluation and data
 
 The local replay server now also supports a browser human-versus-AI duel on

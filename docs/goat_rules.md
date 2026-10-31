@@ -199,6 +199,19 @@ face-up and Oppression's controller stays at 8000 LP. Both complete duels
 serialize, replay-verify, and pass the player-visibility audit. This covers
 one monster-triggered Special Summon, not all effects that summon from hand.
 
+**Royal Oppression and Mystic Tomato in the Damage Step:** The same
+[archived Oppression FAQ](https://www.goatformat.com/rulings6.html) explicitly
+says the face-up Trap's effect cannot activate during the Damage Step to stop
+Mystic Tomato's battle recruitment. A seed-72 pinned-native fixture Sets
+Tomato and Oppression opposite an attacking Gemini Elf, flips Oppression
+before battle, then attacks the Set Tomato. Oppression remains face-up but is
+absent from both players' legal activation and chain actions throughout the
+Damage Step, including Tomato's Chain Link 1. Tomato recruits GOAT Sangan
+from the Deck, reducing its owner's Deck count by one, and Oppression's
+controller pays no Life Points. The complete duel serializes, replay-verifies,
+and passes the visibility audit. This tests battle-destroyed Tomato; other
+Damage Step summon effects remain separate cases.
+
 The same FAQ discusses Monster Gate, but [Konami's card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5980&ope=2)
 places its first TCG release on October 20, 2005. The GOAT whitelist
 correctly rejects it for this April/August 2005 profile. We did not use that
