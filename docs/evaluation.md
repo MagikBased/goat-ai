@@ -17030,3 +17030,92 @@ held-out matchups and `--opponent tactical --both-deck-assignments
 --max-decisions 3000 --verify-replays`; compare their reports with
 `scripts/compare_tournament_reports.py --verify-local-decks
 --require-unseen-main-decks`.
+
+## Broad-card random-Deck Tactical pilot (31 October 2026)
+
+To test whether exposure to more card identities addresses the selected
+policy's cross-Deck weakness, `scripts/probe_random_decks.py`'s previously
+generated, GOAT-whitelist 60-card/Fusion Decks at seeds 62000–62007 were used
+as eight disjoint Tactical-v14-versus-Tactical-v14 pairings. For each pairing,
+`scripts/collect_heuristic_demos.py` with `--engine experimental
+--teacher tactical --opponent tactical --verify-replays --seeds 1
+--max-decisions 3000` recorded
+both teacher seats with duel seeds 201000–201007. The 16 completed games have
+8,614 replay-verified, visibility-audited decisions, 4,313 on the designated
+teacher seats, and 1,279 optional training decisions. Their 16 Main/Extra
+Decks contain 514 distinct card IDs. The ignored manifests and trajectories
+are under `.cache/goat-ai/broad_random_teacher_20261031/seed_62000/` through
+`seed_62007/`. These are synthetic Tactical labels from randomly assembled
+Decks, not human demonstrations or evidence of good Deck construction.
+
+A feature-v23, width-32 child of the selected checkpoint was fitted with 200
+parent-KL steps, 256 sampled labels per step, learning rate 0.0001, seed
+20261031, and the same 128 parent-policy preservation states used in the
+larger Tactical pilot above. The fit also set `--skip-forced-training`,
+`--batched-forward`, `--batch-size 32`, `--verification-workers 4`, and
+`--parent-kl-weight 0.5`.
+The measured fitting time was 18.84 s and total command time 36.88 s on the
+local Intel i7-10700K; final sampled-label loss was 0.30924 and preservation
+KL 0.02958. This is a training diagnostic, not a playing-strength result.
+The ignored child is `.cache/goat-ai/fv23_broad_random_20261031.pt`
+(SHA-256 `f1c697b5413bfd45b83c18705598527e8893aafc83ab9f9d877d964767901b8c`).
+
+On untouched generated Deck pairs 62008 and 62009, with 108 of their 172
+distinct card IDs absent from the 16 source Decks, both checkpoints played
+Tactical-v14 on the same seeds 202000–202003, both Deck assignments, and both
+policy seats. The selected parent scored **15–17** and the child **14–18** in
+32 games each. The strict comparator accepted unseen Main Decks and the
+matched schedule; child-minus-parent paired score difference was **−3.125
+percentage points**, 95% interval **−15.625 to +15.625**. All 29,618 decisions
+across the 64 games replay-verified and passed the visibility audit. The
+ignored reports are `broad_random_parent_holdout_20261031.json` (SHA-256
+`261bbe08e2107c35dc82374da40571519953acb55270ab7bb09c827bc565771d`)
+and `broad_random_child_holdout_20261031.json` (SHA-256
+`0bea95d08884d457f13df5795777de590af90e9e889f9162853f0c37054eb56f`)
+under `.cache/goat-ai/`.
+
+The same checkpoints were also matched on two unseen published-2005 pairs:
+Ramon Ciriano Beastdown/Roberto Martinez Phoenix Control and Jonathan LaBounty
+Chaos/Max Suffridge Goat Control, seeds 202100–202103, both Deck assignments
+and policy seats. Against Tactical-v14, the parent scored **9–22–1** and the
+child **10–22** in 32 games each. The child-minus-parent paired score
+difference was **+1.5625 percentage points**, 95% interval **−17.1875 to
++21.875**. All 37,358 decisions replay-verified and passed the visibility
+audit. Strict comparison accepted the unchanged opponent, assets, schedule,
+and unseen Main Decks. The ignored parent and child reports are
+`broad_random_parent_historical_holdout_20261031.json` (SHA-256
+`4933cfcd99455a8def758603bcdda3763044e876128461f4274fb1d15a1eff13`)
+and `broad_random_child_historical_holdout_20261031.json` (SHA-256
+`7579b8bbeefdd142717276a68218ee08232098244be6445c9b843d3867834ae6`).
+
+This test does not show a competitive gain from broader card exposure alone.
+The randomly assembled Decks also create unusual, often low-quality states.
+Keep the selected checkpoint unchanged; prioritize independently reviewed
+human choices, stronger decision signals, and larger held-out cross-Deck
+tests before promoting another child.
+
+To reproduce the data collection from the generated Deck files, run from the
+repository root after native setup:
+
+```bash
+for n in 62000 62001 62002 62003 62004 62005 62006 62007; do
+  PYTHONPATH=src:. .venv/bin/python scripts/collect_heuristic_demos.py \
+    --engine experimental --teacher tactical --opponent tactical \
+    --deck-a .cache/goat-ai/random_probe_60_fusion_62000_62099_cap3000/isolated/seed_$n/seed_$n.ydk \
+    --deck-b .cache/goat-ai/random_probe_60_fusion_62000_62099_cap3000/isolated/seed_$n/seed_${n}_opponent.ydk \
+    --seed $((201000+n-62000)) --seeds 1 --max-decisions 3000 \
+    --verify-replays --output-dir .cache/goat-ai/broad_random_teacher_20261031/seed_$n
+done
+```
+
+The child used the larger Tactical pilot's trainer command with these 16
+trajectories as its positional inputs, `--parent-kl-steps 200`,
+`--parent-kl-labeled-batch 256`, and output to the child path above. The
+random-Deck evaluation used `scripts/evaluate_policy.py` with two `--matchup`
+pairs from generated Deck seeds 62008 and 62009, `--opponent tactical
+--both-deck-assignments --require-unseen-main-decks --seed 202000 --seeds 4
+--workers 4 --max-decisions 3000 --verify-replays`. The published-2005
+evaluation used the two named Deck pairs and seed 202100 with the same flags.
+Each pair of reports was checked with
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.
