@@ -1196,6 +1196,11 @@ matched 64-game Tactical-v14 holdout using four unseen Main Decks, the child
 won 15 games against the selected parent's 18; the paired interval crossed
 zero. Parent-KL fitting now supports skipping forced choices, but this extra
 teacher data did not establish a strength gain. Keep v23 selected and M4 open.
+A separate 16-duel held-out teacher-action audit found 944/1,108 optional
+matches for the child versus 948/1,108 for the parent. A new 24-item
+[review queue](evaluation.md#held-out-teacher-choice-diagnostic-and-review-queue)
+from selected-parent games targets human feedback on divergent actions;
+its Tactical suggestions are not labels until independently reviewed.
 
 An opt-in [current-Level policy feature](ml.md) now uses schema-v31
 player-visible Level for the player's hand and face-up monsters. Feature v34

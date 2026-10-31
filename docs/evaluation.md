@@ -16887,3 +16887,51 @@ Run `scripts/evaluate_policy.py` for each checkpoint with the two held-out
 --max-decisions 3000 --verify-replays`, then compare the reports with
 `scripts/compare_tournament_reports.py --verify-local-decks
 --require-unseen-main-decks`.
+
+### Held-out teacher-choice diagnostic and review queue
+
+A separate 16-duel Tactical-v14-versus-CombatHeuristicAgent set used the same
+four held-out Main Decks with new seeds: Beastdown/Phoenix Control at
+51500–51503 and Nationals Chaos/Max Suffridge Goat Control at 51600–51603,
+both teacher seats. All **6,540 decisions** replay-verified and passed the
+visibility audit; **3,335** belonged to Tactical and **1,108** of those had
+multiple legal actions. On identical visible teacher states, the selected v23
+parent matched **948/1,108** optional actions, while the larger-data child
+matched **944/1,108**. Their chain-response optional-action agreements were
+93/120 and 94/120 respectively. These are off-policy diagnostics, not
+strength estimates; the direct held-out duel comparison above remains the
+promotion gate. The ignored agreement reports are
+`.cache/goat-ai/tactical_diverse_parent_agreement_20261031.json` (SHA-256
+`9d593248f7d0b4cc6f0939609904b6945b19608e148ade4f1e06e81a0987328b`)
+and `tactical_diverse_child_agreement_20261031.json` (SHA-256
+`96f70d470270d44d9b179d341f0a04f7c5ee4f3d8bbe593a2dae0e2ec47cbaa2`).
+The two teacher manifests are under
+`.cache/goat-ai/tactical_diverse_holdout_teacher_20261031/{beast_phoenix,chaos_max}/`
+with SHA-256
+`2692f590f5975263da51a8ccfe4c4e6a16d9a1b0d97d5f1aaa1b92b89984c7af`
+and `8e0fe7f00567e2352583804935c29ef256f818d6425648a96306ed8a5d8c39ac`.
+Reproduce the recordings with `scripts/collect_heuristic_demos.py
+--engine experimental --teacher tactical --opponent combat_heuristic
+--verify-replays --seeds 4` and the named Decks/seeds. Run
+`scripts/audit_policy_agreement.py` on their `seed_*.json` trajectories for
+each checkpoint.
+
+To prepare independent corrections, 16 additional selected-parent-versus-
+Tactical games at seeds 51700–51703 on those two matchups produced **8,932**
+replay-verified, visibility-audited decisions. The match manifest SHA-256 is
+`5bb7deae4c896384bce2745b6c289bfdce0922869f71905feeaedfb48bd8721b`.
+`scripts/shortlist_policy_disagreements.py` found 347 candidate disagreements
+and selected 24 across 14 games, at most two per replay. Six selected cases
+carry automated visible-risk flags, including own-only backrow destruction,
+own-set-monster Nobleman, and a removal target on a resolving one-shot Spell/
+Trap. The ignored queue is
+`.cache/goat-ai/v23_diverse_review_51700_51703/review_queue.json` (SHA-256
+`8b876fbe87f47404775832198876cefd102883a546de6f108a9c6c0e92554cd2`).
+The queue has a current-layout HTML index and 14 linked duel viewers; the
+index-only refresher validated all 24 links.
+These flags and Tactical alternatives are **review candidates, not approved
+training labels**. Open this specific queue with:
+
+```bash
+./start_review_viewer.sh .cache/goat-ai/v23_diverse_review_51700_51703/review_queue.json
+```
