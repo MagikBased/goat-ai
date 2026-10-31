@@ -1163,6 +1163,12 @@ and +4/64 wins on Ramon Ciriano Beastdown versus Roberto Martinez Phoenix.
 The latter matched interval was above zero, but the child won only 24/64
 against Tactical and split a separate direct parent match 33–31. These are
 exploratory results, not a promotion; see [evaluation](evaluation.md#human-prefix-clone-against-tactical-on-unseen-decks--30-october-2026).
+A broader preselected four-deck holdout on fresh seeds then scored that child
+22–42 against Tactical-v14 versus the parent's 24–40, with a paired interval
+touching zero; a direct child-parent match split 31–33. All 114,013 decisions
+replay-verified and passed visibility audits. Keep the parent selected and
+collect more independent human choices before treating a clone as a strength
+gain; see [the new holdout](evaluation.md#human-prefix-child-on-a-broader-matched-holdout-30-october-2026).
 
 A [new 12-item PPO-child review queue](replay_audit.md#experimental-ppo-child-on-weak-sourced-deck-assignments-30-october-2026)
 comes from eight replay-verified, visibility-audited Tactical duels on two
