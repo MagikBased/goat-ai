@@ -17652,6 +17652,65 @@ and compare the Tactical reports with
 `scripts/compare_tournament_reports.py --verify-local-decks
 --require-unseen-main-decks`.
 
+### Stronger parent-preservation ablation and Beastdown trace
+
+The larger child above lost six Beastdown wins relative to its parent on the
+first sourced holdout. A matched seed-206800, policy-seat-0 Beastdown versus
+Phoenix duel was re-recorded for both checkpoints: the child lost in 727
+decisions, while the parent won in 638. Each complete trace independently
+replay-verified and matched its tournament outcome. On the child's visited
+visible states, the child made **3 different choices among 347 policy-seat
+decisions**: it attacked Sangan instead of Apprentice Magician on turn 3,
+activated Heavy Storm instead of Setting it on turn 11, and Normal Summoned
+D.D. Assailant instead of Setting it on turn 13. The turn-11 field had the
+child's own Set Dust Tornado and **no opposing Spell/Trap**; Heavy Storm
+destroyed that Dust Tornado. Tactical-v14 would have entered the Battle
+Phase on the same observation. This is an observed own-resource mistake,
+not proof that it alone caused the eventual loss. The ignored child and
+parent traces are `.cache/goat-ai/diagnostics/plain_child_beastdown_206800_seat0.json`
+(SHA-256 `5fa9bee1f7fd0908318b65750e69355822e62d985b05865515dd749a057856e8`)
+and `plain_parent_beastdown_206800_seat0.json`
+(`5fa1a7db0935c42561b2b875923b8c5bfe3151583fbe2edfbc73fa658526bde6`).
+
+To test whether more parent preservation curbs that drift, the exact same
+1,990 synthetic labels, 128 preservation states, 200 steps, sampled batches,
+learning rate, and seed were fitted with KL weight **2.0** instead of 0.5.
+The new child's final labeled loss was 0.84426 and preservation KL 0.02763;
+the fit reported 164.09 seconds overall, including 38.71 seconds of
+verification and 94.81 seconds of fitting. The checkpoint is
+`.cache/goat-ai/fv23_plain_low_margin_kl2_child_206600_206603.pt`
+(SHA-256 `a2c19c723bd02a20e83af44ea8bb6b259abeffb9296e5784c0646064bddc4072`).
+It **still activated Heavy Storm** on the fixed child-visible turn-11 state.
+
+On fresh seeds 206900–206907, the same two historical Deck pairs, both
+assignments and policy seats, the KL-2 child scored **26–38** against
+Tactical-v14 over 64 games. The KL-0.5 child scored **28–36** and the
+unchanged parent **29–35** on the matched schedule. The strict KL-2 minus
+KL-0.5 score difference was **−3.13 points** (95% paired interval
+[−12.50, +4.69]); KL-2 minus parent was **−4.69 points**
+([−17.19, +7.81]). All **97,361 decisions** across the three reports
+replay-verified and passed visibility checks. Stronger preservation did not
+fix the observed Heavy Storm choice or establish held-out strength. The
+selected checkpoint stays unchanged. The result points to more precise
+label selection or decision feedback before another synthetic teacher fit;
+it does not establish which training change will work.
+
+Ignored report hashes: `eval_plain_low_margin_kl2_tactical_206900.json`
+`d33200df990f82678557c2817bacda161aeb3dc5f8866073d8fc92df515c814c`;
+`eval_plain_low_margin_kl05_tactical_206900.json`
+`86fc014f7615e5f1f6d3740993f60aa1b3d3d0b818b5062f21cef927661cb591`;
+`eval_plain_low_margin_parent_tactical_206900.json`
+`fe39f8b97c1ecbce2c0a57280456072487cd6d181804145eec171628f3c249ba`.
+Strict comparison hashes are `36d64c951d4dc7a737a7c33b3c161fc9527cdb37eaa35bac08ac6f52d8e9e4e9`
+(KL-2 versus KL-0.5) and
+`d69454515b5b69cb69ffa9fbde3e2536c388f5e1fc621dfda0e94bea274ed69e`
+(KL-2 versus parent), under `.cache/goat-ai/`. Reproduce the child with
+the preceding pilot's training command and `--parent-kl-weight 2.0`;
+reproduce each arm with `scripts/evaluate_policy.py --engine experimental
+--opponent tactical --both-deck-assignments --seed 206900 --seeds 8
+--workers 4 --require-unseen-main-decks --reject-training-deck-hashes
+--verify-replays`.
+
 ### Random-Deck PPO continuation of the low-margin child
 
 The experimental low-margin child above was continued with **64** native

@@ -2216,6 +2216,18 @@ zero; all 101,108 evaluation decisions replay-verified and passed visibility
 audit. More synthetic labels did not close M4's cross-deck strength gate.
 Keep the selected v23 checkpoint unchanged.
 
+A [Beastdown replay diagnosis and stronger-KL ablation](evaluation.md#stronger-parent-preservation-ablation-and-beastdown-trace)
+found the enlarged synthetic-label child activating Heavy Storm into its own
+Set Dust Tornado with no opposing backrow. Its parent and Tactical-v14 did
+not make that activation on the same visible state. Raising the parent-KL
+weight from 0.5 to 2.0 on identical labels reduced measured preservation
+KL but kept the bad choice. On 64 fresh, matched historical-Deck games per
+arm, the stronger-KL child scored 26–38 against Tactical-v14 versus 28–36
+for the earlier child and 29–35 for the selected parent. All 97,361
+evaluation decisions replay-verified and passed visibility checks. Neither
+child clears M4; more synthetic labels or stronger uniform preservation alone
+are not justified by these tests.
+
 ## M5 — Search and other formats
 
 Konami's 2009 version-7 rulebook is now recorded as the period source for the
