@@ -1,5 +1,13 @@
 # Baseline evaluation log
 
+## Tactical 60-card and Fusion stress probes (30 October 2026)
+
+A fresh isolated 16-duel probe used 32 independently generated whitelist-legal 60-card Main Decks, random Fusion Extra Decks, and Tactical-v14 on both seats. All **16/16** duels reached terminal, and all **6,220/6,220** decisions replay-verified and passed the player-visibility audit. The sample offered 26 action kinds, including 42 hidden-field, 170 opponent-field, and two opponent-hand choices. The ignored report is `.cache/goat-ai/random_probe_60_tactical_179000/report.json` (SHA-256 `1bbb06613f5177a7d99bfe3c297927f37569cca2f7521489bc3332c85f866d4d`).
+
+A separate 16-duel 40-card sample stressed Scapegoat, Metamorphosis, and random Fusion Extra Decks, again with distinct opponents and Tactical-v14. Its first run found a visibility-auditor error at seed 179101, decision 426: Ground Collapse offered the public empty opponent Monster Zone 1 as a `disable_zone` choice, but the auditor incorrectly required every opponent field coordinate to contain a card. The action carried no card ID or hidden stats. The auditor now validates zone-choice coordinates independently and rejects identity data in them; it still checks actual card targets against the visible field. After the fix, all **16/16** duels reached terminal, and all **9,242/9,242** decisions replay-verified and passed the visibility audit. The sample offered 27 action kinds, including 48 hidden-field, 450 opponent-field, and two opponent-hand card choices. The ignored corrected report is `.cache/goat-ai/random_probe_40_fusion_tactical_179100_fixed/report.json` (SHA-256 `df85a266dd7158bc0c2ad2838a83404a3b13abca1b551726689726238b49de97`). The original failed report is retained in `.cache/goat-ai/random_probe_40_fusion_tactical_179100/` for diagnosis. These samples widen protocol and audit coverage; they do not certify arbitrary-deck GOAT correctness or tactical strength.
+
+Reproduce using `scripts/probe_random_decks.py --native-root .cache/goat-ai --seeds 16 --max-decisions 3000 --agent tactical --random-extra --distinct-opponents --verify-replays --isolate-games` with `--seed 179000 --main-size 60` for the first sample, or `--seed 179100 --fusion-stress` for the second. Use a fresh ignored output directory for each run.
+
 ## Combined held-out weakness review queue (30 October 2026)
 
 Two existing, unlabeled review queues for the selected v23 policy were

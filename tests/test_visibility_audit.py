@@ -49,6 +49,34 @@ def test_audit_accepts_hidden_slots_and_addressed_hand_choices():
     }
 
 
+def test_audit_treats_zone_disabling_as_public_coordinates_not_card_targets():
+    observation = _observation()
+    # The opponent's empty Monster Zone 1 is a valid Ground Collapse choice.
+    assert audit_decision_visibility(_record(observation, {
+        "controller": 1, "location": 4, "sequence": 1,
+    }, "disable_zone")) == {}
+    assert audit_decision_visibility(_record(observation, {
+        "controller": 1, "location": 4, "sequence": 1,
+    }, "place")) == {}
+    assert audit_decision_visibility(_record(observation, {
+        "zones": [{"controller": 1, "location": 4, "sequence": 1},
+                  {"controller": 1, "location": 4, "sequence": 4}],
+    }, "disable_zones")) == {}
+    assert audit_decision_visibility(_record(observation, {
+        "zones": [{"controller": 0, "location": 8, "sequence": 4},
+                  {"controller": 1, "location": 4, "sequence": 1}],
+    }, "place_zones")) == {}
+    for parameters in (
+            {"controller": 1, "location": 4, "sequence": 1, "code": 999},
+            {"controller": 1, "location": 4, "sequence": 7},
+            {"zones": [{"controller": 1, "location": 4, "sequence": 1,
+                        "code": 999}]},
+            {"zones": [{"controller": 1, "location": 4, "sequence": 1}] * 2}):
+        kind = "disable_zones" if "zones" in parameters else "disable_zone"
+        with pytest.raises(VisibilityViolation, match="zone choice"):
+            audit_decision_visibility(_record(observation, parameters, kind))
+
+
 @pytest.mark.parametrize("parameters,reason", [
     ({"controller": 1, "location": 4, "sequence": 2, "code": 456},
      "face-down"),

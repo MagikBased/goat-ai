@@ -11,11 +11,48 @@ class VisibilityViolation(ValueError):
     """A recorded legal choice discloses information absent from its observation."""
 
 
+_ZONE_KINDS = frozenset(("place", "place_zones", "disable_zone", "disable_zones"))
+
+
+def _audit_zone_action(action: Action) -> None:
+    """Zone prompts choose public coordinates, including empty opponent slots."""
+    parameters = action.parameters
+    if any(key in parameters for key in ("code", "attack", "defense", "counters")):
+        raise VisibilityViolation("zone choice carries card identity or private stats")
+    allowed = ({"zones", "selection_minimum", "selection_maximum", "selected_count"}
+               if action.kind.endswith("zones") else
+               {"controller", "location", "sequence"})
+    if set(parameters) - allowed:
+        raise VisibilityViolation("zone choice carries non-coordinate data")
+    zones = (parameters.get("zones") if action.kind.endswith("zones") else
+             (parameters,))
+    if not isinstance(zones, (tuple, list)) or not zones:
+        raise VisibilityViolation("zone choice has no public coordinates")
+    seen = set()
+    for zone in zones:
+        if not isinstance(zone, dict):
+            raise VisibilityViolation("zone choice has invalid public coordinates")
+        if set(zone) != {"controller", "location", "sequence"}:
+            raise VisibilityViolation("zone choice carries non-coordinate data")
+        controller, location, sequence = (zone.get(key) for key in (
+            "controller", "location", "sequence"))
+        if (type(controller) is not int or controller not in (0, 1)
+                or type(location) is not int or location not in (4, 8)
+                or type(sequence) is not int
+                or not 0 <= sequence < (7 if location == 4 else 8)):
+            raise VisibilityViolation("zone choice has invalid public coordinates")
+        slot = (controller, location, sequence)
+        if slot in seen:
+            raise VisibilityViolation("zone choice repeats a public coordinate")
+        seen.add(slot)
+
+
 def _choice_cards(action: Action) -> Iterable[dict]:
     # A card reference can be the action's source as well as a selection
     # payload. Check both: an unlisted action kind must not become a route for
     # exposing the identity of an opponent's hidden card.
-    if "controller" in action.parameters and "location" in action.parameters:
+    if (action.kind not in _ZONE_KINDS and "controller" in action.parameters
+            and "location" in action.parameters):
         yield action.parameters
     if action.kind in ("select_card", "select_cards", "finish_selection",
                        "tribute_cards", "sort_cards", "select_counters"):
@@ -40,6 +77,8 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
     for action in record.legal_actions:
         if action.actor != observation.acting_player:
             raise VisibilityViolation("legal action actor differs from acting player")
+        if action.kind in _ZONE_KINDS:
+            _audit_zone_action(action)
         if action.parameters.get("location") in (1, 64) and "sequence" in action.parameters:
             raise VisibilityViolation("Deck choice exposes native slot")
         if "effect_option" in action.parameters and (
