@@ -21,6 +21,12 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+The legal-action visibility auditor now walks card references nested anywhere
+in an action payload, including future prompt wrappers, rather than checking
+only a direct reference or top-level `cards` list. Native reconstruction tests
+and two saved trajectories (1,677 decisions) pass the strengthened audit.
+This closes one auditor bypass, not every hidden-state or observation case.
+
 A [second combined 60-card Fusion stress block](evaluation.md#combined-60-card-fusion-stress-probe-30-october-2026)
 adds 16 disjoint seeded duels and 9,056 replay-verified, visibility-audited,
 deterministically repeated decisions. The sampled protocol gate widens; full

@@ -159,6 +159,16 @@ def test_nested_card_choices_are_audited_for_every_action_kind():
     with pytest.raises(VisibilityViolation, match="invalid payload"):
         audit_decision_visibility(_record(observation, {"cards": {"hidden": hidden}},
                                           "future_card_choice"))
+    for parameters in ({"target": hidden},
+                       {"choice": {"cards": [hidden]}},
+                       {"options": [{"target": hidden}]}):
+        with pytest.raises(VisibilityViolation, match="face-down"):
+            audit_decision_visibility(_record(observation, parameters,
+                                              "future_card_choice"))
+    with pytest.raises(VisibilityViolation, match="invalid payload"):
+        audit_decision_visibility(_record(observation,
+                                          {"choice": {"cards": {"hidden": hidden}}},
+                                          "future_card_choice"))
 
 
 def test_action_ids_cannot_encode_hidden_information():

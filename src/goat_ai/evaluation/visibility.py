@@ -48,18 +48,25 @@ def _audit_zone_action(action: Action) -> None:
 
 
 def _choice_cards(action: Action) -> Iterable[dict]:
-    # A card reference can be the action's source as well as a selection
-    # payload. Check both: an unlisted action kind must not become a route for
-    # exposing the identity of an opponent's hidden card.
-    if (action.kind not in _ZONE_KINDS and "controller" in action.parameters
-            and "location" in action.parameters):
-        yield action.parameters
-    if "cards" in action.parameters:
-        cards = action.parameters["cards"]
-        if not isinstance(cards, (tuple, list)) or not all(
-                isinstance(card, dict) for card in cards):
-            raise VisibilityViolation("card choices have invalid payload")
-        yield from cards
+    # Inspect every nested card reference, including fields added by later
+    # prompt decoders. Zone actions are public coordinates checked separately.
+    if action.kind in _ZONE_KINDS:
+        return
+
+    def walk(value):
+        if isinstance(value, dict):
+            if "controller" in value and "location" in value:
+                yield value
+            for key, child in value.items():
+                if key == "cards" and (not isinstance(child, (tuple, list))
+                                       or not all(isinstance(card, dict) for card in child)):
+                    raise VisibilityViolation("card choices have invalid payload")
+                yield from walk(child)
+        elif isinstance(value, (tuple, list)):
+            for child in value:
+                yield from walk(child)
+
+    yield from walk(action.parameters)
 
 
 def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
