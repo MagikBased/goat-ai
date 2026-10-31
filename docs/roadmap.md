@@ -21,6 +21,11 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+A [second combined 60-card Fusion stress block](evaluation.md#combined-60-card-fusion-stress-probe-30-october-2026)
+adds 16 disjoint seeded duels and 9,056 replay-verified, visibility-audited,
+deterministically repeated decisions. The sampled protocol gate widens; full
+arbitrary-Deck and historical card correctness remain open.
+
 The [combined 60-card Fusion stress probe](evaluation.md#combined-60-card-fusion-stress-probe-30-october-2026) now tests both previously separate deck-generation paths together. Sixteen fresh tactical duels generated 32 legal 60-card decks with Scapegoat, Metamorphosis, and random Fusion Extra Decks. All 10,157 decisions replay-verified, passed visibility audits, and reproduced exactly under a second seeded native engine. This strengthens sampled M1 evidence without claiming arbitrary-deck completeness.
 
 A [tactical random-Deck probe](evaluation.md#tactical-60-card-and-fusion-stress-probes-30-october-2026) now covers 16 fresh 60-card duels and 16 Scapegoat/Metamorphosis Fusion stress duels. All 15,462 decisions replay-verified and passed visibility audits after fixing the auditor's treatment of Ground Collapse's public empty-zone choice. This broadens sampled legal-action coverage while leaving arbitrary-deck completeness and historical correctness open.

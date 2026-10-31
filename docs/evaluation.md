@@ -113,6 +113,26 @@ The ignored reports are `.cache/goat-ai/human_prefix_child_holdout_180000.json` 
 
 ## Combined 60-card Fusion stress probe (30 October 2026)
 
+A second, disjoint seed block, 42000–42015, used the same combined 60-card
+Fusion setup with independently generated opponents and Tactical-v14 on both
+seats. All **16/16** isolated duels reached terminal within 3,000 decisions.
+All **9,056/9,056** decisions replay-verified, passed the player-visibility
+audit, and reproduced identically in a second seeded engine run. Across the
+block, 27 action kinds were offered; the audit covered 25 hidden-field, 449
+opponent-field, and three opponent-hand choice contexts. These are additional
+sampled protocol results, not proof of arbitrary-deck or historical card
+correctness. The two ignored reports are
+`.cache/goat-ai/random_probe_60_fusion_20261030_b/report.json` (SHA-256
+`46081766126af95f82816b023ad23419ee6494f83557d1eada8eb26c69197699`)
+and `.cache/goat-ai/random_probe_60_fusion_20261030_c/report.json`
+(SHA-256 `cf6ce6274191df7e78987a4f74cb16882c700f15cf871ac94df327c6905cb173`).
+Reproduce each with `scripts/probe_random_decks.py --native-root
+.cache/goat-ai --output <fresh ignored directory> --seed 42000 --seeds 4
+--max-decisions 3000 --agent tactical --main-size 60 --distinct-opponents
+--random-extra --fusion-stress --verify-replays --repeat-seeds
+--count-card-actions --isolate-games`; use `--seed 42004 --seeds 12` for the
+second report.
+
 The whitelist probe now combines 40–60-card Main Decks with Scapegoat/Metamorphosis Fusion stress. It preserves the original seeded 40-card prefix, adds only copies below each GOAT whitelist limit, and includes Thousand-Eyes Restrict in a random 15-card Fusion Extra Deck. The previous probe option restriction prevented testing this combination; it was a generator limit, not a duel-rule restriction.
 
 Fresh seeds 179200–179215 generated 32 independently sampled legal 60-card Main Decks. Tactical-v14 completed **16/16** isolated duels; all **10,157/10,157** decisions replay-verified and passed the player-visibility audit. The sample offered 26 action kinds, including 77 hidden-field, 676 opponent-field, and one opponent-hand card-choice contexts. Each seed was rerun on a second native engine: all **10,157** ordered decisions, terminal observations, and outcomes matched. The ignored report is `.cache/goat-ai/random_probe_60_fusion_tactical_179200/report.json` (SHA-256 `5fd4a973157ca8be2036c177b1a45d5e069a877fe68eb8e961a5a1ad72fa02dd`). Reproduce with `scripts/probe_random_decks.py --native-root .cache/goat-ai --output <fresh ignored directory> --seed 179200 --seeds 16 --max-decisions 3000 --main-size 60 --agent tactical --random-extra --fusion-stress --distinct-opponents --verify-replays --repeat-seeds --isolate-games`. These outcomes test sampled protocol paths and determinism on pinned local assets; they do not prove all legal decks or historically correct card rulings.
