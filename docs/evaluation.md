@@ -16520,3 +16520,23 @@ with `scripts/evaluate_policy.py`, the selected v23 checkpoint,
 --seed 177000 --seeds 8 --workers 4 --max-decisions 3000
 --require-unseen-main-decks --reject-training-deck-hashes --verify-replays`,
 the two named pairings above, and `--own-loss-guard` only for the guarded run.
+
+The same schedule was then run with `--own-loss-guard-version 8`, which also
+defers Heavy Storm when its visible friendly collateral meets or exceeds the
+opponent's back row. It scored **19–45** over 64 games; all 36,873 decisions
+replay-verified and passed visibility checks. Relative to guard v1, the
+paired score difference was **−1.56 percentage points** with a 95% interval
+**−4.69 to 0.00**. Its ignored report is
+`.cache/goat-ai/v23_guard8_tactical_seattle_charlotte_177000_177007.json`
+(SHA-256 `58e8d13e2b6282ecaabdd6d28150d0f99966569724149c72703e3bf3ac41f558`).
+
+A verified unguarded replay of Theeresak Goat versus Jonathan Chaos at seed
+177000 and policy seat 0 contained one flagged Heavy Storm activation on
+turn 3: two friendly and two opposing back-row cards were visible. The
+policy's guard-v8 alternative was to Set Heavy Storm. A deterministic
+fixed-hidden-deal continuation lost from either action; the Set branch never
+activated that Heavy Storm. The same replay also flagged MST targeting a
+resolving one-shot spell later in the duel. These are concrete review cases,
+not evidence that a single local material rule improves expected win rate.
+The ignored replay is `.cache/goat-ai/v23_theeresak_vs_jonathan_177000.json`
+(SHA-256 `ffed25c9ff37ef78aa07997182b158f4f8f206f39b3793f277959ed396005fb0`).
