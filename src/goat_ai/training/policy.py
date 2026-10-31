@@ -3,7 +3,7 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import cached_property, lru_cache
-from math import cos, log1p, sin, sqrt
+from math import cos, isfinite, log1p, sin, sqrt
 from pathlib import Path
 
 import torch
@@ -11,6 +11,7 @@ from torch import Tensor, nn
 from torch.nn.utils.rnn import pack_padded_sequence
 
 from goat_ai.actions import Action
+from goat_ai.agents.baseline import Agent
 from goat_ai.agents.card_metadata import FLIP_MONSTER_TYPE, load_card_properties
 from goat_ai.agents.tactical_guard import (
     admissible_action_indices,
@@ -796,7 +797,9 @@ class PolicyAgent:
                  own_loss_guard_version: int = 1,
                  card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                  position_guard: bool = False,
-                 position_guard_version: int = 2) -> None:
+                 position_guard_version: int = 2,
+                 tactical_fallback_agent: Agent | None = None,
+                 tactical_fallback_margin: float | None = None) -> None:
         self.model = model
         self.vocabulary = vocabulary
         self.tactical_guard = tactical_guard
@@ -814,6 +817,13 @@ class PolicyAgent:
         if position_guard_version not in (1, 2):
             raise ValueError("unknown position guard version")
         self.position_guard_version = position_guard_version
+        if tactical_fallback_margin is not None and (
+                not isfinite(tactical_fallback_margin)
+                or tactical_fallback_margin < 0
+                or tactical_fallback_agent is None):
+            raise ValueError("tactical fallback requires a nonnegative finite margin and agent")
+        self.tactical_fallback_agent = tactical_fallback_agent
+        self.tactical_fallback_margin = tactical_fallback_margin
         self._cancel_turn: int | None = None
         self._cancelled_prompts: list[tuple[Observation, tuple[tuple, ...]]] = []
 
@@ -827,6 +837,14 @@ class PolicyAgent:
             self.model.eval()
         with torch.inference_mode():
             scores = self.model(features.to(device))
+        fallback_choice = None
+        if self.tactical_fallback_margin is not None:
+            top_two = torch.topk(scores, 2).values
+            if (top_two[0] - top_two[1]).item() < self.tactical_fallback_margin:
+                fallback_choice = self.tactical_fallback_agent.select_action(
+                    observation, legal_actions)
+                if fallback_choice not in legal_actions:
+                    raise ValueError("tactical fallback returned an illegal action")
         admissible = (admissible_action_indices(observation, legal_actions,
                                                 self.card_races)
                       if self.tactical_guard else range(len(legal_actions)))
@@ -861,7 +879,8 @@ class PolicyAgent:
             admissible = safe_position_indices(
                 observation, legal_actions, admissible,
                 empty_field_attack_guard=self.position_guard_version >= 2)
-        chosen = legal_actions[max(admissible, key=lambda i: scores[i].item())]
+        chosen = (fallback_choice if fallback_choice is not None else
+                  legal_actions[max(admissible, key=lambda i: scores[i].item())])
         if self.tactical_guard and self.weak_flip_attacks:
             chosen = (weak_flip_set_substitute(
                 observation, legal_actions, chosen, self.weak_flip_attacks)

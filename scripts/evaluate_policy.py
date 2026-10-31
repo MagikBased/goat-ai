@@ -6,6 +6,7 @@ import json
 import platform
 from dataclasses import asdict
 from functools import partial
+from math import isfinite
 from pathlib import Path
 from time import perf_counter
 
@@ -37,7 +38,12 @@ def make_policy_agent(_seed: int, checkpoint: str, tactical_guard: bool = False,
                       own_loss_guard: bool = False,
                       own_loss_guard_version: int = 1,
                       card_facts: dict[int, tuple[int, int, int]] | None = None,
-                      position_guard: bool = False):
+                      position_guard: bool = False,
+                      tactical_fallback_margin: float | None = None,
+                      flip_codes: frozenset[int] | None = None):
+    fallback = (TacticalHeuristicAgent(flip_codes or frozenset(), card_races,
+                                      card_facts=card_facts)
+                if tactical_fallback_margin is not None else None)
     return load_policy_agent(checkpoint, tactical_guard=tactical_guard,
                              card_races=card_races,
                              weak_flip_attacks=weak_flip_attacks,
@@ -45,7 +51,9 @@ def make_policy_agent(_seed: int, checkpoint: str, tactical_guard: bool = False,
                              own_loss_guard=own_loss_guard,
                              own_loss_guard_version=own_loss_guard_version,
                              card_facts=card_facts,
-                             position_guard=position_guard)
+                             position_guard=position_guard,
+                             tactical_fallback_agent=fallback,
+                             tactical_fallback_margin=tactical_fallback_margin)
 
 
 def make_heuristic_agent(_seed: int):
@@ -148,6 +156,9 @@ def main() -> None:
                              "v8 defers negative visible Heavy Storm trades from v1")
     parser.add_argument("--position-guard", action="store_true",
                         help="standalone Sheep Token and empty-field position filter")
+    parser.add_argument("--tactical-fallback-margin", type=float,
+                        help="experimental: use Tactical when the policy's top-two raw logits "
+                             "differ by less than this margin")
     parser.add_argument("--opponent-tactical-guard", action="store_true",
                         help="guard the opponent checkpoint for a direct ablation")
     parser.add_argument("--opponent-position-guard", action="store_true",
@@ -187,6 +198,13 @@ def main() -> None:
         parser.error("position guard is a standalone ablation")
     if args.own_loss_guard and (args.tactical_guard or args.position_guard):
         parser.error("own-loss guard is a standalone ablation")
+    if args.tactical_fallback_margin is not None and (
+            not isfinite(args.tactical_fallback_margin)
+            or args.tactical_fallback_margin < 0):
+        parser.error("--tactical-fallback-margin must be finite and nonnegative")
+    if args.tactical_fallback_margin is not None and (
+            args.tactical_guard or args.own_loss_guard or args.position_guard):
+        parser.error("tactical fallback is a standalone ablation")
     if args.own_loss_guard_version != 1 and not args.own_loss_guard:
         parser.error("--own-loss-guard-version requires --own-loss-guard")
     if args.opponent_tactical_guard and not args.opponent_checkpoint:
@@ -251,7 +269,8 @@ def main() -> None:
                     "tactical": tactical_opponent,
                 }[args.opponent])
     started = perf_counter()
-    card_races = load_card_races(args.native_root) if args.tactical_guard else None
+    card_races = (load_card_races(args.native_root)
+                  if args.tactical_guard or args.tactical_fallback_margin is not None else None)
     weak_flip_attacks = (load_weak_flip_monster_attack(args.native_root)
                          if args.weak_flip_guard else None)
     report = runner(
@@ -263,8 +282,12 @@ def main() -> None:
                                  own_loss_guard=args.own_loss_guard,
                                  own_loss_guard_version=args.own_loss_guard_version,
                                  card_facts=(load_card_facts(args.native_root)
-                                             if args.own_loss_guard_version in (2, 5, 6) else None),
-                                 position_guard=args.position_guard),
+                                             if args.own_loss_guard_version in (2, 5, 6)
+                                             or args.tactical_fallback_margin is not None else None),
+                                 position_guard=args.position_guard,
+                                 tactical_fallback_margin=args.tactical_fallback_margin,
+                                 flip_codes=(load_flip_monster_codes(args.native_root)
+                                             if args.tactical_fallback_margin is not None else None)),
         opponent, partial(engine_type, args.native_root), args.max_decisions,
         verify_replays=args.verify_replays,
         **({"workers": args.workers} if args.workers > 1 else {}),
@@ -291,6 +314,7 @@ def main() -> None:
         "own_loss_guard_version": (args.own_loss_guard_version if args.own_loss_guard
                                     else None),
         "position_guard": args.position_guard,
+        "tactical_fallback_margin": args.tactical_fallback_margin,
         "position_guard_version": 2 if args.position_guard else None,
         "tactical_guard_version": (5 if args.self_target_guard else
                                    4 if args.weak_flip_guard else 3

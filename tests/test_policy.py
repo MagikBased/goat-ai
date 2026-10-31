@@ -138,6 +138,58 @@ def actions() -> tuple[Action, ...]:
             Action("native-2", "end_phase", 0))
 
 
+def test_policy_tactical_fallback_uses_visible_legal_actions_only_for_close_scores():
+    class FixedScores(torch.nn.Module):
+        feature_version = 10
+
+        def __init__(self, scores):
+            super().__init__()
+            self.parameter = torch.nn.Parameter(torch.zeros(1))
+            self.scores = scores
+
+        def forward(self, _features):
+            return torch.tensor(self.scores, device=self.parameter.device)
+
+    class Fallback:
+        def __init__(self):
+            self.calls = 0
+
+        def select_action(self, observation, legal_actions):
+            assert observation is visible
+            assert legal_actions is offered
+            self.calls += 1
+            return legal_actions[1]
+
+    visible, offered = view(), actions()
+    fallback = Fallback()
+    vocabulary = CardVocabulary((10,))
+    close = PolicyAgent(FixedScores((1.0, 0.5, 0.0)), vocabulary,
+                        tactical_fallback_agent=fallback,
+                        tactical_fallback_margin=1.0)
+    assert close.select_action(visible, offered) == offered[1]
+    assert fallback.calls == 1
+    confident = PolicyAgent(FixedScores((2.0, 0.5, 0.0)), vocabulary,
+                            tactical_fallback_agent=fallback,
+                            tactical_fallback_margin=1.0)
+    assert confident.select_action(visible, offered) == offered[0]
+    assert fallback.calls == 1
+    assert close.select_action(visible, offered[:1]) == offered[0]
+    assert fallback.calls == 1
+    with pytest.raises(ValueError, match="nonnegative finite margin"):
+        PolicyAgent(FixedScores((1.0, 0.5, 0.0)), vocabulary,
+                    tactical_fallback_agent=fallback,
+                    tactical_fallback_margin=float("nan"))
+
+    class IllegalFallback:
+        def select_action(self, observation, legal_actions):
+            return Action("illegal", "pass", 0)
+
+    with pytest.raises(ValueError, match="illegal action"):
+        PolicyAgent(FixedScores((1.0, 0.5, 0.0)), vocabulary,
+                    tactical_fallback_agent=IllegalFallback(),
+                    tactical_fallback_margin=1.0).select_action(visible, offered)
+
+
 def test_guarded_ppo_samples_and_updates_the_same_visible_action_set():
     own_set = CardView(0, "monster", "facedown", 504700178, 0)
     observation = replace(view(), field=(own_set,))

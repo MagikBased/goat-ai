@@ -5,6 +5,8 @@ from pathlib import Path
 
 import torch
 
+from goat_ai.agents.baseline import Agent
+
 from goat_ai.training.policy import CardVocabulary, LegalActionPolicy, PolicyAgent
 
 
@@ -17,7 +19,9 @@ def load_policy_agent(path: str | Path, *, device: str = "cpu",
                       own_loss_guard_version: int = 1,
                       card_facts: Mapping[int, tuple[int, int, int]] | None = None,
                       position_guard: bool = False,
-                      position_guard_version: int = 2) -> PolicyAgent:
+                      position_guard_version: int = 2,
+                      tactical_fallback_agent: Agent | None = None,
+                      tactical_fallback_margin: float | None = None) -> PolicyAgent:
     checkpoint = torch.load(path, map_location=device, weights_only=True)
     if not isinstance(checkpoint, dict) or checkpoint.get("schema_version") != 1:
         raise ValueError("unsupported policy checkpoint schema")
@@ -38,4 +42,6 @@ def load_policy_agent(path: str | Path, *, device: str = "cpu",
                        own_loss_guard_version=own_loss_guard_version,
                        card_facts=card_facts,
                        position_guard=position_guard,
-                       position_guard_version=position_guard_version)
+                       position_guard_version=position_guard_version,
+                       tactical_fallback_agent=tactical_fallback_agent,
+                       tactical_fallback_margin=tactical_fallback_margin)

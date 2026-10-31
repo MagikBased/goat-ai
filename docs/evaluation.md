@@ -17147,3 +17147,48 @@ on its four trajectories with both `--checkpoint` paths and
 `--engine experimental`; the source-card split above counts optional
 teacher-selected action `code` fields against the 16 training Decks' Main and
 Extra card IDs.
+
+### Experimental low-margin Tactical fallback (31 October 2026)
+
+The selected v23 checkpoint is unchanged. An opt-in inference mode passes an
+optional decision to Tactical-v14 when the policy's top two **raw action
+logits** differ by less than 1.0. The threshold was chosen after inspecting
+the 342 optional decisions in the held-out Tactical agreement audit above:
+the parent matched Tactical on only 34 of 81 decisions with a margin below
+1.0. This is a teacher-agreement diagnostic, not evidence that Tactical's
+alternative improves the duel. The fallback sees the same redacted
+observation and legal actions as the policy. Its returned action must be in
+that list, and the policy's existing cancel/selection progress handling still
+applies. No model weights or selected-policy pointer change.
+
+To measure complete-duel strength, the fallback and unchanged parent each
+played Tactical-v14 on the same two **unseen published-2005 Deck pairs** used
+above, both Deck assignments and both policy seats, with fresh seeds
+204000–204011. Seeds 204000–204003 were an exploratory 32-game batch:
+fallback **12–20**, parent **6–26**, paired score difference **+18.75
+percentage points**, 95% paired interval **0 to +37.5**. Seeds 204004–204011
+were a separate 64-game confirmation batch: fallback **26–38**, parent
+**22–42**, paired difference **+6.25 points**, 95% interval **−4.6875 to
++17.1875**. The strict comparator accepted the matched opponent, assets,
+schedule, and unseen Main Decks. All **113,746** decisions across the 192
+duels replay-verified and passed the visibility audit. Across both batches,
+the fallback scored **38/96** and the parent **28/96**; a pooled paired
+interval is **+1.04 to +20.83 points**, but the exploratory batch informed
+this follow-up and the separate confirmation interval still spans zero.
+This is encouraging, not sufficient to promote the mode or claim the policy
+beats Tactical; it still loses more games than it wins against that baseline.
+
+The ignored reports are `eval_fallback_margin1_204000_204003.json` (SHA-256
+`453c04b761ddb417d2b09127db6dc73a99382430e39d64b8ebb99ddfea0f73f7`),
+`eval_parent_204000_204003.json` (`3818a13778718b6567c3b3c95077e61e124836feaa88a057d7786cb1b8cde5dd`),
+`eval_fallback_margin1_204004_204011.json` (`b02dab1770edbcb0d46c8e0b8478c7fe220a39032545bcbfe6331ed53f9a56f0`),
+and `eval_parent_204004_204011.json` (`55c5158cf516fe56219dc37084917462da6e999f3a9276abb69ab7903a832792`),
+under `.cache/goat-ai/`. Reproduce with `scripts/evaluate_policy.py` using
+`--engine experimental --opponent tactical --both-deck-assignments
+--require-unseen-main-decks --verify-replays --workers 4 --max-decisions 3000`
+and the named Deck pairs; add `--tactical-fallback-margin 1.0` only to the
+candidate. Compare each matched batch with
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`. The next test should use additional unseen
+archetypes and seeds, and examine why Phoenix Control specifically fell from
+2/16 parent wins to 0/16 fallback wins in the confirmation batch.
