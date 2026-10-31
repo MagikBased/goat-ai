@@ -202,6 +202,18 @@ face-up and Oppression's controller stays at 8000 LP. Both complete duels
 serialize, replay-verify, and pass the player-visibility audit. This covers
 one monster-triggered Special Summon, not all effects that summon from hand.
 
+**Royal Oppression against Black Luster Soldier's inherent Summon:** The same
+[archived Oppression FAQ](https://www.goatformat.com/rulings6.html) permits its
+effect to negate a Special Summon that does not start a Chain. A paired seed-100
+pinned-native fixture first discards LIGHT and DARK monsters, Sets and flips
+Oppression, then attempts the GOAT BLS Summon. The banish cost is paid before
+the opponent's response. If Oppression is used, its controller pays 800 LP,
+BLS goes to the Graveyard, and the banished materials stay banished; another
+BLS Summon is not offered. If Oppression is passed, BLS stays face-up and no
+Life Points are paid. Both complete duels serialize, replay-verify, and pass
+the visibility audit. This checks one inherent Summon, not every special
+summoning condition.
+
 **Royal Oppression and Mystic Tomato in the Damage Step:** The same
 [archived Oppression FAQ](https://www.goatformat.com/rulings6.html) explicitly
 says the face-up Trap's effect cannot activate during the Damage Step to stop

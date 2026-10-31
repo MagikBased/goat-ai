@@ -1038,6 +1038,13 @@ Step responses, and no 800-LP cost is paid. The complete native duel
 replay-verifies and passes visibility checks. This closes one M2 Damage Step
 branch; the broader timing and arbitrary-card gate remains open.
 
+A paired [BLS/Royal Oppression fixture](goat_rules.md#royal-oppression-against-black-luster-soldiers-inherent-summon)
+checks the archived FAQ's other Special Summon category: an inherent Summon
+without a Chain. Negation pays 800 LP and destroys BLS after its LIGHT/DARK
+banish cost; passing leaves BLS on the field. Both complete duels replay-verify
+and pass visibility checks. The wider M2 Summon and card-coverage gate remains
+open.
+
 ## M3 — Evaluation and data
 
 The local replay server now also supports a browser human-versus-AI duel on
