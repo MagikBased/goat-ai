@@ -2142,6 +2142,14 @@ Life and Book of Moon. The [trace and audit protocol](evaluation.md#replay-level
 identify a deck-sensitive hypothesis, not a causal outcome explanation. M4
 still needs a learned, held-out strength gain.
 
+A prompt-type ablation that defers `select_card` and `select_cards`
+choices to the neural policy corrected one observed Zombie discard, but
+scored 28/64 against Tactical-v14 on a fresh eight-Main-Deck schedule versus
+30/64 for the original fallback and 24/64 for the neural parent. Both paired
+intervals crossed zero. [The verified 192-duel experiment](evaluation.md#card-choice-fallback-ablation-31-october-2026)
+keeps this gate opt-in and M4 open; a local card-choice fix alone did not
+establish competitive improvement.
+
 ## M5 — Search and other formats
 
 Konami's 2009 version-7 rulebook is now recorded as the period source for the

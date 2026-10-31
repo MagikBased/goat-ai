@@ -21,7 +21,8 @@ def load_policy_agent(path: str | Path, *, device: str = "cpu",
                       position_guard: bool = False,
                       position_guard_version: int = 2,
                       tactical_fallback_agent: Agent | None = None,
-                      tactical_fallback_margin: float | None = None) -> PolicyAgent:
+                      tactical_fallback_margin: float | None = None,
+                      tactical_fallback_defer_card_choices: bool = False) -> PolicyAgent:
     checkpoint = torch.load(path, map_location=device, weights_only=True)
     if not isinstance(checkpoint, dict) or checkpoint.get("schema_version") != 1:
         raise ValueError("unsupported policy checkpoint schema")
@@ -44,4 +45,6 @@ def load_policy_agent(path: str | Path, *, device: str = "cpu",
                        position_guard=position_guard,
                        position_guard_version=position_guard_version,
                        tactical_fallback_agent=tactical_fallback_agent,
-                       tactical_fallback_margin=tactical_fallback_margin)
+                       tactical_fallback_margin=tactical_fallback_margin,
+                       tactical_fallback_defer_card_choices=(
+                           tactical_fallback_defer_card_choices))

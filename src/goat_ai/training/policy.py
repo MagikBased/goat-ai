@@ -799,7 +799,8 @@ class PolicyAgent:
                  position_guard: bool = False,
                  position_guard_version: int = 2,
                  tactical_fallback_agent: Agent | None = None,
-                 tactical_fallback_margin: float | None = None) -> None:
+                 tactical_fallback_margin: float | None = None,
+                 tactical_fallback_defer_card_choices: bool = False) -> None:
         self.model = model
         self.vocabulary = vocabulary
         self.tactical_guard = tactical_guard
@@ -824,6 +825,9 @@ class PolicyAgent:
             raise ValueError("tactical fallback requires a nonnegative finite margin and agent")
         self.tactical_fallback_agent = tactical_fallback_agent
         self.tactical_fallback_margin = tactical_fallback_margin
+        if tactical_fallback_defer_card_choices and tactical_fallback_margin is None:
+            raise ValueError("defer-card-choices requires a tactical fallback margin")
+        self.tactical_fallback_defer_card_choices = tactical_fallback_defer_card_choices
         self._cancel_turn: int | None = None
         self._cancelled_prompts: list[tuple[Observation, tuple[tuple, ...]]] = []
 
@@ -838,7 +842,11 @@ class PolicyAgent:
         with torch.inference_mode():
             scores = self.model(features.to(device))
         fallback_choice = None
-        if self.tactical_fallback_margin is not None:
+        card_choice_prompt = all(action.kind in ("select_card", "select_cards")
+                                 for action in legal_actions)
+        if (self.tactical_fallback_margin is not None
+                and not (self.tactical_fallback_defer_card_choices
+                         and card_choice_prompt)):
             top_two = torch.topk(scores, 2).values
             if (top_two[0] - top_two[1]).item() < self.tactical_fallback_margin:
                 fallback_choice = self.tactical_fallback_agent.select_action(

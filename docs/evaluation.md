@@ -17307,6 +17307,53 @@ Reproduce the first trace with the selected v23 checkpoint, `--deck1` set to
 Deck-composition information or a learned gating signal before widening the
 fallback. It is not evidence that either intervention will improve strength.
 
+### Card-choice fallback ablation (31 October 2026)
+
+The Zombie diagnostic above motivated an opt-in
+`--tactical-fallback-defer-card-choices` switch. With a fallback margin set,
+it keeps the neural policy's action when every legal action is a `select_card`
+or `select_cards` choice; other close-score decisions still use Tactical-v14.
+This is a prompt-type gate rather than a Zombie-specific card rule. On the
+recorded seed-204305 Zombie discard state, it selects the parent's Mystical
+Space Typhoon and Spirit Reaper instead of the original fallback's Book of
+Life and Book of Moon. This single-state correction did not predict a duel
+outcome.
+
+A fresh exploratory schedule used four pairs: Zombie/Warrior, Phoenix
+Control/Beastdown, guide Dimension Fusion Turbo/Bryan Coronel Chaos, and
+Jonathan LaBounty Chaos/Max Suffridge Goat Control. All eight Main Decks
+were unseen in the selected checkpoint's training games. Seeds
+204400–204403, both Deck assignments and both candidate seats, gave **64
+matched games per arm** against Tactical-v14. The card-choice gate scored
+**28/64**, the original margin-1.0 fallback **30/64**, and the unchanged
+neural parent **24/64**. Gate minus original fallback was **−3.13 percentage
+points**, 95% paired interval **−14.06 to +7.81 points**. Gate minus parent
+was **+6.25 points**, interval **−6.25 to +18.75 points**. Neither comparison
+establishes a gain. On just eight Zombie-seat games, the gate won 2 versus
+zero for either control; on eight Warrior-seat games it won 5 versus the
+original fallback's 8. These deck slices are too small to justify a general
+rule. All **96,966 decisions** across 192 duels replay-verified and passed
+visibility checks; no game reached the 3,000-decision cap. The strict
+comparator accepted the matched schedule, pinned assets, source fingerprint,
+and unseen Main Decks. The candidate remains a CLI experiment and is not
+used in the EDOPro room or selected policy.
+
+Ignored report SHA-256 values are
+`ada070567f4fc37b91390d48eb4e613d9e86b5f7730109be03f0e8786f40cc10`
+for `eval_fallback_defer_choices_204400_204403.json`,
+`b2a39d71ce22afb9280bb030a566355d8c027ce69cf0e3db2cf90bee35601783`
+for `eval_fallback_original_204400_204403.json`, and
+`8326b6db6774a92f41414d9c2af49401b9f6c13e92e02354ae000cff007e0932`
+for `eval_parent_defer_choices_204400_204403.json`, all under
+`.cache/goat-ai/`. Reproduce each with `scripts/evaluate_policy.py` on the
+four named pairings and `--engine experimental --opponent tactical
+--both-deck-assignments --require-unseen-main-decks --verify-replays
+--workers 4 --max-decisions 3000 --seed 204400 --seeds 4`. Add
+`--tactical-fallback-margin 1.0` to the two fallback arms and
+`--tactical-fallback-defer-card-choices` only to the candidate. Compare
+matched reports with `scripts/compare_tournament_reports.py
+--verify-local-decks --require-unseen-main-decks`.
+
 ### Low-margin synthetic-teacher distillation pilot (31 October 2026)
 
 The direct fallback gain above motivated a separate **weight-training** test.

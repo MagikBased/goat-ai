@@ -40,6 +40,7 @@ def make_policy_agent(_seed: int, checkpoint: str, tactical_guard: bool = False,
                       card_facts: dict[int, tuple[int, int, int]] | None = None,
                       position_guard: bool = False,
                       tactical_fallback_margin: float | None = None,
+                      tactical_fallback_defer_card_choices: bool = False,
                       flip_codes: frozenset[int] | None = None):
     fallback = (TacticalHeuristicAgent(flip_codes or frozenset(), card_races,
                                       card_facts=card_facts)
@@ -53,7 +54,9 @@ def make_policy_agent(_seed: int, checkpoint: str, tactical_guard: bool = False,
                              card_facts=card_facts,
                              position_guard=position_guard,
                              tactical_fallback_agent=fallback,
-                             tactical_fallback_margin=tactical_fallback_margin)
+                             tactical_fallback_margin=tactical_fallback_margin,
+                             tactical_fallback_defer_card_choices=(
+                                 tactical_fallback_defer_card_choices))
 
 
 def make_heuristic_agent(_seed: int):
@@ -159,6 +162,8 @@ def main() -> None:
     parser.add_argument("--tactical-fallback-margin", type=float,
                         help="experimental: use Tactical when the policy's top-two raw logits "
                              "differ by less than this margin")
+    parser.add_argument("--tactical-fallback-defer-card-choices", action="store_true",
+                        help="experimental: keep neural choices for select_card/select_cards prompts")
     parser.add_argument("--opponent-tactical-guard", action="store_true",
                         help="guard the opponent checkpoint for a direct ablation")
     parser.add_argument("--opponent-position-guard", action="store_true",
@@ -202,6 +207,8 @@ def main() -> None:
             not isfinite(args.tactical_fallback_margin)
             or args.tactical_fallback_margin < 0):
         parser.error("--tactical-fallback-margin must be finite and nonnegative")
+    if args.tactical_fallback_defer_card_choices and args.tactical_fallback_margin is None:
+        parser.error("--tactical-fallback-defer-card-choices requires --tactical-fallback-margin")
     if args.tactical_fallback_margin is not None and (
             args.tactical_guard or args.own_loss_guard or args.position_guard):
         parser.error("tactical fallback is a standalone ablation")
@@ -286,6 +293,8 @@ def main() -> None:
                                              or args.tactical_fallback_margin is not None else None),
                                  position_guard=args.position_guard,
                                  tactical_fallback_margin=args.tactical_fallback_margin,
+                                 tactical_fallback_defer_card_choices=(
+                                     args.tactical_fallback_defer_card_choices),
                                  flip_codes=(load_flip_monster_codes(args.native_root)
                                              if args.tactical_fallback_margin is not None else None)),
         opponent, partial(engine_type, args.native_root), args.max_decisions,
@@ -315,6 +324,7 @@ def main() -> None:
                                     else None),
         "position_guard": args.position_guard,
         "tactical_fallback_margin": args.tactical_fallback_margin,
+        "tactical_fallback_defer_card_choices": args.tactical_fallback_defer_card_choices,
         "position_guard_version": 2 if args.position_guard else None,
         "tactical_guard_version": (5 if args.self_target_guard else
                                    4 if args.weak_flip_guard else 3
