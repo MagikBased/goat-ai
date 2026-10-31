@@ -17,6 +17,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 import torch
 
+from goat_ai.actions import Action
 from goat_ai.agents.card_metadata import load_card_names
 from goat_ai.replay import read_decision_annotations, read_trajectory
 from goat_ai.replay.edopro_live_verify import (
@@ -27,6 +28,42 @@ from goat_ai.replay.fingerprint import sha256_file
 from scripts.confirm_edopro_human_actions import confirm_frames
 from scripts.create_viewer_game import GameCreator
 from scripts.render_replay import render_replay
+
+_ACTION_LOCATIONS = {1: "Deck", 2: "hand", 4: "monster zone",
+                     8: "Spell/Trap zone", 16: "Graveyard", 32: "banished",
+                     64: "Extra Deck"}
+_ACTION_POSITIONS = {1: "face-up attack", 2: "face-down attack",
+                     4: "face-up defense", 8: "face-down defense"}
+
+
+def _recorded_choice_label(action: Action, names: dict[int, str]) -> str:
+    """Describe the actual replay action without consulting complete duel state."""
+    params = action.parameters
+    parts = [action.kind.replace("_", " ")]
+    code = params.get("code")
+    if type(code) is int:
+        parts.append(names.get(code, f"Card #{code}"))
+    cards = params.get("cards")
+    if isinstance(cards, list):
+        parts.append(", ".join(
+            names.get(card["code"], f"Card #{card['code']}")
+            if type(card.get("code")) is int else "hidden card"
+            for card in cards if isinstance(card, dict)))
+    controller, location, sequence = (params.get(key) for key in
+                                      ("controller", "location", "sequence"))
+    if type(controller) is int and type(location) is int:
+        place = _ACTION_LOCATIONS.get(location, f"zone {location}")
+        slot = (f" {sequence + 1}" if type(sequence) is int and location in (4, 8)
+                else "")
+        parts.append(f"P{controller + 1} {place}{slot}")
+    position = params.get("position")
+    if type(position) is int:
+        parts.append(_ACTION_POSITIONS.get(position, f"position {position}"))
+    for key in ("race", "attribute", "number"):
+        value = params.get(key)
+        if type(value) is int:
+            parts.append(f"{key} {value}")
+    return " · ".join(part for part in parts if part)
 
 
 class EdoRoomManager:
@@ -172,6 +209,7 @@ class EdoRoomManager:
                                "phase": record.observation.phase,
                                "action": action.kind.replace("_", " "),
                                "card": card,
+                               "label": _recorded_choice_label(action, self.names),
                                "confirmed": index + 1 in confirmed})
         recording = self._recording(replay.parent)
         command = [str(self.root / ".venv/bin/python"),

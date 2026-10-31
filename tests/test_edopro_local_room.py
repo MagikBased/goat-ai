@@ -13,7 +13,20 @@ from goat_ai.observations import Observation
 from goat_ai.replay import DecisionRecord, Trajectory, read_decision_annotations, write_trajectory
 from goat_ai.replay.fingerprint import sha256_file
 from scripts.create_viewer_game import GameCreator
-from scripts.edopro_local_room import EdoRoomManager
+from scripts.edopro_local_room import EdoRoomManager, _recorded_choice_label
+
+
+def test_recorded_edopro_choice_label_includes_selected_cards_and_target_slot():
+    names = {87621407: "Dekoichi", 55144522: "Mystical Space Typhoon"}
+    discard = Action("a", "select_cards", 1, {"cards": [
+        {"code": 87621407, "controller": 1, "location": 2},
+        {"code": None, "controller": 0, "location": 4, "sequence": 0}]})
+    assert _recorded_choice_label(discard, names) == (
+        "select cards · Dekoichi, hidden card")
+    target = Action("b", "select_card", 1, {"code": 55144522,
+                    "controller": 0, "location": 8, "sequence": 2})
+    assert _recorded_choice_label(target, names) == (
+        "select card · Mystical Space Typhoon · P1 Spell/Trap zone 3")
 
 
 def test_edopro_room_launch_and_verified_viewer(tmp_path, monkeypatch):
@@ -217,6 +230,7 @@ def test_edopro_web_confirmations_only_label_optional_human_choices(tmp_path, mo
     choices = room.choices("a" * 16)
     assert [item["frame"] for item in choices["candidates"]] == [2]
     assert choices["candidates"][0]["card"] == "Dekoichi"
+    assert choices["candidates"][0]["label"] == "normal summon · Dekoichi"
     assert choices["training_admitted"] is False
     assert choices["experimental_confirmed_eligible"] is True
     assert choices["native_replay"].endswith("game-001-seed-42.yrpX")

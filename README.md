@@ -109,7 +109,9 @@ the optional host and pinned assets described
 below; it reports a missing prerequisite instead of starting an unpatched room.
 After a verified duel, press **Confirm my choices** beside its replay. The
 scrollable list shows optional decisions from the human seat with links to
-their viewer frames. Check only actions you personally chose; EDOPro may answer
+their viewer frames. It shows selected card names, target slots, and multi-card
+selections when present in the recorded legal action. Check only actions you
+personally chose; EDOPro may answer
 some prompts automatically. **Save confirmations** writes and verifies
 `<game>.human_labels.json` beside the recording. Reopening the dialog restores
 the saved checkmarks, and unchecking one removes that confirmation. These
