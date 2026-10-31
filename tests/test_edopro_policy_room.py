@@ -274,6 +274,8 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
     assert verified["visibility_audited_decisions"] == len(trajectory.decisions)
     assert verified["reviewable_prefix"] is surrender
     assert verified["deck_identity_verified"] is True
+    assert verified["goat_decks_legal"] is True
+    assert verified["goat_deck_error"] is None
     assert verified["asset_identity_verified"] is True
     assert verified["training_admitted"] is False
     assert metadata["asset_sha256"] == trajectory.asset_sha256

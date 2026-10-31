@@ -32,6 +32,13 @@ can use only those confirmed choices from a complete pinned-room recording
 with GOAT-legal Main and Extra Decks;
 raw or arbitrary external EDOPro replays are still excluded. See the
 [EDOPro room instructions](../README.md#experimental-edopro-room).
+With the pinned host and native assets installed, the four-case network-room
+regression completed on 30 October 2026: complete and interrupted games,
+each with and without `self_recorded` authorization. All four cases passed
+independent replay reconstruction, player-visibility checks, asset and Deck
+fingerprints, and the recorded Main/Extra Deck GOAT legality check. The
+authorized complete case also trained a one-decision experimental clone;
+that test establishes intake mechanics, not playing-strength improvement.
 
 ## Useful first sample
 
