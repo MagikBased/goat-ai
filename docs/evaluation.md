@@ -17557,3 +17557,67 @@ Reproduce collection with `scripts/collect_policy_matches.py` using the 16
 and the parent-KL parameters above. Evaluate with `scripts/evaluate_policy.py
 --engine experimental --both-deck-assignments --workers 4
 --require-unseen-main-decks --reject-training-deck-hashes --verify-replays`.
+
+### Random-Deck PPO continuation of the low-margin child
+
+The experimental low-margin child above was continued with **64** native
+four-role PPO duels on four of its training Deck pairs, seeds 205900–205963.
+Each Deck appeared in both learner seats. Four-game frozen rollouts, four
+workers, two PPO epochs, minibatch 32, per-episode weighting, Tactical-v14
+as the baseline opponent, 0.5 historical-snapshot probability, frozen-parent
+KL weight 0.05, independent opponent RNG, and learning rate 0.0005 matched
+the earlier larger-step PPO protocol. The run finished in **33.75 reported
+wall seconds**, with 28 learner wins and 36 losses. Those are training
+outcomes. All **64 terminal replays and 40,799 decisions** independently
+replay-verified and passed visibility checks. There were no capped or
+unsupported games. The ignored checkpoint is
+`.cache/goat-ai/ppo_full_whitelist_child_205900_205963.pt` (SHA-256
+`22b61486aaf41c1edf4448a3466bc01a361e49dbe06922348a72e52fe1b417cc`);
+the full replay audit is
+`.cache/goat-ai/ppo_full_whitelist_child_205900_205963_audit.json`
+(`18bbca677b10eec305b065d4edb817b6a17a33acbf13729facacdb03c141ba8f`).
+
+On the same eight untouched random Deck pairs used above, fresh seeds
+206200–206203 gave the PPO child **69–59 directly** against its starting
+child across 128 duels (95% paired score interval **49.22%–58.59%**).
+Against Tactical-v14 on matched seeds 206300–206303, the PPO child scored
+**55–73** versus **54–74** for its starting child; the strict paired score
+difference was **+0.78 points**, 95% interval **−4.69 to +6.25 points**.
+On the same two sourced historical pairs as the previous section, fresh
+seeds 206400–206407 gave the PPO child **31–33 directly** against its start.
+Matched Tactical games on seeds 206500–206507 gave **29–35** for PPO versus
+**26–38** for the start; the strict paired difference was **+4.69 points**,
+95% interval **0 to +9.38 points**. Both direct score intervals included 50%.
+The comparators verified local Deck files, unseen Main Deck compositions,
+assets, code, opponent, and matched schedules. All **318,684** decisions in
+these six evaluation reports replay-verified and passed visibility checks.
+The PPO update did not establish a held-out strength gain; both policies
+still lost more than they won against Tactical. The selected v23 checkpoint
+remains unchanged.
+
+Ignored evaluation reports, all under `.cache/goat-ai/`:
+
+| Report | SHA-256 |
+| --- | --- |
+| `eval_ppo_full_whitelist_vs_start_206200_206203.json` | `aafd1a4d107ff634119aa39525ce88f889c498b97db21af463080802b6b6847d` |
+| `eval_ppo_full_whitelist_random_ppo_vs_tactical_206300.json` | `133933631b8137060d2d23f5a840941be975b38b86aa3f302a91a0da4707ef06` |
+| `eval_ppo_full_whitelist_random_start_vs_tactical_206300.json` | `9042876a018173bffa74b43970692a2230006a040ca9115781971bcd9119e4d7` |
+| `eval_ppo_full_whitelist_sourced_vs_start_206400_206407.json` | `819fd3bbe51c8ec6678b6b2a01171880833fd8d76708f0424a054dd770d01e28` |
+| `eval_ppo_full_whitelist_sourced_ppo_vs_tactical_206500.json` | `e8032ad2b0f85231b869ddf921f28612bf33a9114c9e8452aa8b52c0ead92b29` |
+| `eval_ppo_full_whitelist_sourced_start_vs_tactical_206500.json` | `f435638461606d57dfea36885a4b41d2529f58eaa56c1ce362899062aa8f2bdc` |
+
+The strict paired-comparison reports are
+`compare_ppo_full_whitelist_random_206300.json` (SHA-256
+`e327cf39868a16081b2f28f9ddbbfe4853d6741ad6d62e3ac0e34f45b5b38e26`)
+and `compare_ppo_full_whitelist_sourced_206500.json`
+(`2ebd286b580d341c7f1aabf228afe831f9d89e65e26e2db1b0432dde58ee76bb`).
+
+Reproduce the update with `scripts/train_self_play.py` and the four generated
+`--matchup` Deck pairs, `--schedule-mode four_roles --seed 205900 --games 64
+--policy-update clipped_ppo --ppo-rollout-games 4 --rollout-workers 4
+--ppo-rollout-weighting per_episode --ppo-epochs 2 --ppo-batch-size 32
+--learning-rate 0.0005 --baseline-opponent tactical
+--historical-probability 0.5 --parent-kl-weight 0.05
+--independent-opponent-rng`. Use `scripts/audit_selfplay_replays.py` on all
+64 recorded trajectories. Evaluate with the same held-out gates and balanced
+seats as the preceding distillation comparison.

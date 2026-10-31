@@ -2198,6 +2198,14 @@ and parent each scored 21–43 against Tactical. All 312,481 evaluation
 decisions replay-verified and passed visibility audits. The selected neural
 checkpoint stays unchanged; M4's competitive gain remains unproven.
 
+A [64-duel PPO continuation](evaluation.md#random-deck-ppo-continuation-of-the-low-margin-child)
+from that child recorded 40,799 replay-verified, visibility-safe decisions on
+four balanced training matchups. Across new random and sourced held-out Decks,
+six evaluation reports covered 318,684 verified decisions. Direct child/start
+intervals included 50%; the matched Tactical score differences were +0.78
+points on random Decks and +4.69 points on sourced Decks, with intervals
+including or touching zero. This outcome update did not close M4.
+
 ## M5 — Search and other formats
 
 Konami's 2009 version-7 rulebook is now recorded as the period source for the
