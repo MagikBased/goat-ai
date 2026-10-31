@@ -565,6 +565,10 @@ Ocean changes a face-up Level 4 WATER monster to Level 3 and switches the only
 offered Fusion from a Level 4 candidate to a Level 3 candidate. Both branches
 reach terminal, replay-verify, and pass visibility audits. Other Level-changing
 effects and summon-response timing remain untested.
+A separate [Ocean/Gravity Bind pair](goat_rules.md#a-legendary-ocean-and-gravity-bind)
+checks battle legality from the historical FAQ: a Level 4 WATER monster can
+attack under Ocean because its current Level is 3, while the same monster
+cannot attack through Gravity Bind without Ocean. Both full duels verify.
 
 A paired [Dekoichi/Skill Drain fixture](goat_rules.md#dekoichi-and-chained-skill-drain) checks the archived Flip Summon response ruling: Skill Drain can chain to Dekoichi's effect, pay 1000 LP, and prevent its draw while Dekoichi remains face-up. A second pair checks the Damage Step boundary: pre-activated Drain prevents the draw, while Set Drain cannot chain to Dekoichi flipped by battle. All four complete native duels replay-verify and pass visibility audits. Other Damage Step responses remain open.
 
