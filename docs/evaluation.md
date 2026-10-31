@@ -16662,3 +16662,46 @@ in 195 multi-action decisions, at an **opponent-seat** Enemy Controller
 prompt. No selected policy-seat action in this replay depended on feature
 v30's ordinal repair. This single replay does not exclude representation
 losses elsewhere.
+
+## Current-Level feature v34 matched pilot (30 October 2026)
+
+Two complete Tactical-v14 versus Tactical-v14 native duels on the sourced
+Jesse Twohig Goat Control and Montague Warrior decks were recorded at seed
+50001 with the current schema-v31 observation. All 674 decisions replay-verified
+and passed the visibility audit; 335 belonged to the designated teacher seat.
+The ignored trajectories are under
+`.cache/goat-ai/level_v34_pilot_demos_50001/` (SHA-256
+`dc7c5328a7199d8a10c7adc49cc6e1ba0030c0f7a478cb36d0f42a488ac966d6`
+and `38bf5046f12c952f8375779fea5c1804171aa601ea7e0cd4751933b7e5c75e7a`).
+
+The selected feature-v23 parent was copied into two children. Both trained
+for one epoch on the same 90 non-forced teacher choices, with batch size 16,
+seed 34001, and padded batched inference. The v34 child used the explicit
+zero-initialized `--upgrade-feature-23-to-34` path; the control stayed v23.
+Their saved checkpoints are
+`.cache/goat-ai/level_v34_pilot_level_v34.pt` (SHA-256
+`108ccbe8ef135ea394ad93bb118f5b53e5a53e6939e6cc2a7ef365763dc1ae0e`)
+and `.cache/goat-ai/level_v34_pilot_control_v23.pt` (SHA-256
+`ba6e781e1ed78ef55a6a41d0f757f30b9cf9ad8fd81d13b64dac0c2f32a0d871`).
+The training Decks contained no A Legendary Ocean, so this signal does not
+exercise a changed current Level for that card.
+
+Direct head-to-head evaluation used both Deck assignments and both seats on
+eight new seeds per matchup. The Chaos Jonathan LaBounty versus Warrior Mary
+Triatafilidi pairing at seeds 50100–50107 split **16–16**. The Phoenix Control
+Roberto Martinez versus Beastdown Ramon Ciriano pairing at seeds 50200–50207
+also split **16–16**. All 64 games and 34,040 decisions replay-verified and
+passed visibility audits. The evaluator's unseen-Main-Deck gate accepted each
+pair against both children's inherited and new training provenance. Reports:
+`.cache/goat-ai/level_v34_pilot_direct_50100.json` (SHA-256
+`4280a1c1fe83d1673531c5c7719cb03204582a82414d93a07a6808d6c5ec8142`)
+and `.cache/goat-ai/level_v34_pilot_direct_50200.json` (SHA-256
+`20beb74e5b8bbc23d12b29424db61abe510426f2ce48b188fbe47fef6d0ff1ff`).
+Each report's 95% Wilson interval for the 50% decisive rate is 33.6%–66.4%;
+the paired bootstrap is exactly 50% because every sampled block scores evenly,
+which does not imply certainty across other matchups. On the 203 optional
+decisions in the two source trajectories, the children's greedy actions agreed
+on all 203. This pilot establishes that the representation and training path
+run on real current-schema duels. It does **not** show a competitive gain or
+isolate an effect of current Level. Keep the v23 parent selected; collect
+independent decisions involving Level changes before judging v34's value.

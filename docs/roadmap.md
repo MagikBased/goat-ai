@@ -1179,8 +1179,13 @@ player-visible Level for the player's hand and face-up monsters. Feature v34
 zero-warm-starts from the selected v23 checkpoint, preserving its logits before
 training, while hidden opponent cards contribute no Level. This makes the
 recent Ocean/Metamorphosis and Ocean/Gravity Bind information available to
-the policy encoder. It has not been trained or shown to improve held-out play;
-the selected v23 checkpoint remains unchanged.
+the policy encoder. A [matched schema-v31 pilot](evaluation.md#current-level-feature-v34-matched-pilot-30-october-2026)
+trained v34 and v23 children on the same 90 non-forced Tactical choices, then
+split 32–32 directly across 64 replay-verified, unseen-Main-Deck duels. The
+children agreed on all 203 optional source decisions; the source Decks had no
+Ocean and gave no Level-change-specific training signal. This does not show a
+competitive gain. The selected v23 checkpoint remains unchanged; gather
+independent Level-changing decisions before repeating the feature ablation.
 
 An opt-in [public-history policy feature](evaluation.md#public-history-policy-feature-pilot-30-october-2026)
 now summarizes recent public events and zero-warm-starts from the selected
