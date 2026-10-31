@@ -28,7 +28,8 @@ for the command.
 A complete local EDOPro desktop room duel has been reconstructed against the
 matching pinned native assets. The local game page can launch that room and
 save explicitly confirmed human-seat choices. The experimental clone command
-can use only those confirmed choices from a complete pinned-room recording;
+can use only those confirmed choices from a complete pinned-room recording
+with GOAT-legal Main and Extra Decks;
 raw or arbitrary external EDOPro replays are still excluded. See the
 [EDOPro room instructions](../README.md#experimental-edopro-room).
 

@@ -170,6 +170,13 @@
             button.dataset.edoproId = session.id;
             button.textContent = "Confirm my choices";
             item.append(button);
+          } else if (record.goat_deck_error) {
+            const reason = document.createElement("span");
+            reason.className = "error";
+            reason.textContent = ` · Training unavailable: ${record.goat_deck_error}`;
+            item.append(reason);
+          } else if (!record.complete) {
+            item.append(" · Training unavailable: duel did not reach a native terminal result");
           }
         } else if (record) item.append(`native replay saved; review unavailable${record.verification_error ? `: ${record.verification_error}` : ""}`);
         else item.append(session.error || "no replay saved");

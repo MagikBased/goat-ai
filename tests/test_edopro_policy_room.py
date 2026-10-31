@@ -129,6 +129,7 @@ def test_page_room_launcher_completes_and_lists_verified_game():
             else:
                 pytest.fail(f"launched room did not save a verified game: {recording}")
             assert recording["complete"] is True
+            assert recording["goat_decks_legal"] is True
             assert recording["experimental_confirmed_eligible"] is True
             assert recording["viewer"].endswith(".html")
             choices = manager.choices(identifier)
