@@ -18,6 +18,7 @@ class CardView:
     race: int | None = None  # Current Type mask of a face-up monster, including field effects.
     owner: int | None = None  # Original owner of a face-up field monster; public in a duel.
     faceup_turns: int | None = None  # Turn boundaries since becoming face-up on the field.
+    attribute: int | None = None  # Current Attribute of a face-up monster.
 
 
 @dataclass(frozen=True)
@@ -191,7 +192,8 @@ class Observation:
                      *self.banished[0], *self.banished[1], *self.own_extra_deck):
             if (card.zone != "monster" or card.position != "faceup") and (
                     card.attack is not None or card.defense is not None
-                    or card.race is not None or card.owner is not None):
+                    or card.race is not None or card.owner is not None
+                    or card.attribute is not None):
                 raise ValueError("dynamic monster data require a face-up monster")
             if card.counters and (card.zone not in ("monster", "spell_trap")
                                   or card.position != "faceup"):
@@ -201,6 +203,9 @@ class Observation:
                                                    or not 0 < card.race < 1 << 64))
                     or (card.owner is not None and
                         (type(card.owner) is not int or card.owner not in (0, 1)))
+                    or (card.attribute is not None and
+                        (type(card.attribute) is not int
+                         or not 0 < card.attribute < 1 << 32))
                     or any(kind <= 0 or count <= 0 for kind, count in card.counters)
                     or tuple(sorted(card.counters)) != card.counters):
                 raise ValueError("invalid visible monster stats or counters")

@@ -195,7 +195,7 @@ def test_public_scapegoat_restriction_replays_in_new_and_old_schemas(
         def old_cards(cards):
             return tuple(replace(card, attack=None, defense=None, counters=(),
                                  equipped_to=None, race=None, owner=None,
-                                 faceup_turns=None)
+                                 faceup_turns=None, attribute=None)
                          for card in cards)
 
         return replace(

@@ -74,7 +74,16 @@ def test_spell_shield_negation_modes_and_cost_visibility(tmp_path, spell):
                                             for action in record.legal_actions),
                         selected_action=old_action(record.selected_action))
                         for record in replay.decisions)
-                    old = replace(replay, schema_version=27, decisions=old_records)
+                    def old_view(view):
+                        return replace(view, field=tuple(
+                            replace(card, attribute=None) for card in view.field))
+
+                    old = replace(replay, schema_version=27,
+                                  decisions=tuple(replace(record,
+                                      observation=old_view(record.observation))
+                                      for record in old_records),
+                                  terminal_observation=old_view(
+                                      replay.terminal_observation))
                     old_path = tmp_path / "spell_shield_v27.json"
                     write_trajectory(old_path, old)
                     assert verify_trajectory(read_trajectory(old_path),

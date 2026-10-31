@@ -6,6 +6,7 @@ from functools import lru_cache
 
 QUERY_CODE = 0x1
 QUERY_POSITION = 0x2
+QUERY_ATTRIBUTE = 0x40
 QUERY_RACE = 0x80
 QUERY_ATTACK = 0x100
 QUERY_DEFENSE = 0x200
@@ -29,6 +30,7 @@ class QueriedCard:
     equip_target: tuple[int, int, int] | None = None  # controller, location, sequence
     race: int | None = None  # Current Type mask; public only for face-up monsters.
     owner: int | None = None
+    attribute: int | None = None  # Current Attribute mask; public for face-up monsters.
 
 
 @dataclass(frozen=True)
@@ -129,7 +131,8 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
                 break
             if flag in values:
                 raise ValueError("duplicate query flag")
-            if flag in (QUERY_CODE, QUERY_POSITION, QUERY_ATTACK, QUERY_DEFENSE):
+            if flag in (QUERY_CODE, QUERY_POSITION, QUERY_ATTRIBUTE,
+                        QUERY_ATTACK, QUERY_DEFENSE):
                 if len(payload) != 4:
                     raise ValueError("invalid query uint32")
                 values[flag] = struct.unpack("<i" if flag in (QUERY_ATTACK, QUERY_DEFENSE)
@@ -171,7 +174,7 @@ def decode_location(buffer: bytes) -> tuple[QueriedCard | None, ...]:
                                  bool(values.get(QUERY_IS_PUBLIC, 0)),
                                  values.get(QUERY_ATTACK), values.get(QUERY_DEFENSE),
                                  counters, equip_target, values.get(QUERY_RACE),
-                                 values.get(QUERY_OWNER)))
+                                 values.get(QUERY_OWNER), values.get(QUERY_ATTRIBUTE)))
     return tuple(cards)
 
 

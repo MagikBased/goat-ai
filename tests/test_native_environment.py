@@ -46,7 +46,7 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     trajectory = play()
     assert trajectory == play()
     assert trajectory.winner == 1
-    assert trajectory.schema_version == 28
+    assert trajectory.schema_version == 29
     assert trajectory.rules_profile == vars(RestrictedOcgcoreEngine(root).ruleset)
     assert trajectory.deck_sha256 is not None
     assert trajectory.asset_sha256 is not None
@@ -79,6 +79,18 @@ def test_random_agent_completes_native_duel_and_records_visible_trajectory(tmp_p
     assert read_trajectory(path) == trajectory
     assert verify_trajectory(read_trajectory(path), RestrictedOcgcoreEngine(root)) == len(
         trajectory.decisions)
+    v28 = json.loads(path.read_text())
+    v28["schema_version"] = 28
+    for view in [*(row["observation"] for row in v28["decisions"]),
+                 v28["terminal_observation"]]:
+        for cards in (view["hand"], view["field"], *view["graveyards"],
+                      *view["banished"], view["own_extra_deck"]):
+            for card in cards:
+                card.pop("attribute", None)
+    v28_path = tmp_path / "duel_v28.json"
+    v28_path.write_text(json.dumps(v28))
+    assert verify_trajectory(read_trajectory(v28_path),
+                             RestrictedOcgcoreEngine(root)) == len(trajectory.decisions)
     older = json.loads(path.read_text())
     older["schema_version"] = 21
     for view in [*(row["observation"] for row in older["decisions"]),

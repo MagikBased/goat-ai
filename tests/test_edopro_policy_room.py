@@ -280,6 +280,20 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
     assert verified["training_admitted"] is False
     assert metadata["asset_sha256"] == trajectory.asset_sha256
     assert "build/libocgcore.so" in trajectory.asset_sha256
+    if historical and authorized and not surrender:
+        legacy = json.loads(review_path.read_text())
+        legacy["schema_version"] = 28
+        for view in [*(row["observation"] for row in legacy["decisions"]),
+                     legacy["terminal_observation"]]:
+            for cards in (view["hand"], view["field"], *view["graveyards"],
+                          *view["banished"], view["own_extra_deck"]):
+                for card in cards:
+                    card.pop("attribute", None)
+        old_review = tmp_path / "legacy_v28.review.json"
+        old_review.write_text(json.dumps(legacy))
+        assert verify_edopro_live_recording(
+            replay_path, old_review, metadata_path, mirror_root)[
+                "visible_decisions"] == len(trajectory.decisions)
     if authorized and not surrender:
         human_index = next(index for index, record in enumerate(trajectory.decisions)
                            if record.observation.acting_player == 1

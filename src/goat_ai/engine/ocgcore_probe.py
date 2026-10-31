@@ -284,7 +284,9 @@ def _view_card(viewer: int, player: int, location: int, sequence: int,
                     and card.equip_target[1] == LOCATION_MZONE else None,
                     # Magical Hats can occupy a Monster Zone with zero Type.
                     (card.race or None) if location == LOCATION_MZONE and faceup else None,
-                    card.owner if location == LOCATION_MZONE and faceup else None)
+                    card.owner if location == LOCATION_MZONE and faceup else None,
+                    attribute=((card.attribute or None)
+                               if location == LOCATION_MZONE and faceup else None))
 
 
 POSITION_FACEDOWN_DEFENSE = 0x08
@@ -1265,6 +1267,7 @@ class OcgcoreProbe:
     def _query_location(self, player: int, location: int):
         from goat_ai.engine.native_queries import (
             QUERY_ATTACK,
+            QUERY_ATTRIBUTE,
             QUERY_CODE,
             QUERY_COUNTERS,
             QUERY_DEFENSE,
@@ -1277,7 +1280,8 @@ class OcgcoreProbe:
 
         flags = QUERY_CODE | QUERY_POSITION
         if location == LOCATION_MZONE:
-            flags |= QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE | QUERY_COUNTERS | QUERY_OWNER
+            flags |= (QUERY_ATTRIBUTE | QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE
+                      | QUERY_COUNTERS | QUERY_OWNER)
         elif location == LOCATION_SZONE:
             flags |= QUERY_EQUIP_CARD | QUERY_COUNTERS
         query = QueryInfo(flags, player, location, 0, 0)

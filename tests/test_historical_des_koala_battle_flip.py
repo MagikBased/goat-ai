@@ -54,10 +54,14 @@ def test_attacked_des_koala_damages_for_attacker_hand_after_battle(tmp_path):
                 legacy = replace(
                     loaded, schema_version=26,
                     decisions=tuple(replace(record, observation=replace(
-                        record.observation, recent_attacks=()))
+                        record.observation, recent_attacks=(),
+                        field=tuple(replace(card, attribute=None)
+                                    for card in record.observation.field)))
                         for record in loaded.decisions),
                     terminal_observation=replace(
-                        loaded.terminal_observation, recent_attacks=()),
+                        loaded.terminal_observation, recent_attacks=(),
+                        field=tuple(replace(card, attribute=None)
+                                    for card in loaded.terminal_observation.field)),
                 )
                 legacy_path = tmp_path / "des_koala_battle_v26.json"
                 write_trajectory(legacy_path, legacy)

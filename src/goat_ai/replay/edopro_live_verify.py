@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from goat_ai.engine.decks import Decklist, read_goat_whitelist, validate_goat_deck
@@ -11,6 +12,17 @@ from goat_ai.replay.edopro_container import read_edopro_container
 from goat_ai.replay.edopro_reconstruct import reconstruct_legacy_responses
 from goat_ai.replay.fingerprint import sha256_file
 from goat_ai.replay.trajectory import read_trajectory
+
+
+def _without_attributes(view):
+    """Compare a schema-v28 room replay with the newer public view."""
+    def cards(items):
+        return tuple(replace(card, attribute=None) for card in items)
+
+    return replace(view, hand=cards(view.hand), field=cards(view.field),
+                   graveyards=tuple(cards(zone) for zone in view.graveyards),
+                   banished=tuple(cards(zone) for zone in view.banished),
+                   own_extra_deck=cards(view.own_extra_deck))
 
 
 def deck_composition_sha256(main, extra) -> str:
@@ -76,6 +88,13 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         replay, native_root, historical_patches=historical,
         allow_incomplete=prefix)
     trajectory = read_trajectory(review_path)
+    reconstructed_decisions = reconstructed.decisions
+    reconstructed_terminal = reconstructed.terminal_observation
+    if trajectory.schema_version == 28:
+        reconstructed_decisions = tuple(replace(
+            decision, observation=_without_attributes(decision.observation))
+            for decision in reconstructed_decisions)
+        reconstructed_terminal = _without_attributes(reconstructed_terminal)
     provenance = trajectory.skill_metadata or {}
     authorization = metadata.get("human_authorization")
     if authorization not in (None, "self_recorded"):
@@ -90,7 +109,7 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
     status = provenance.get("recording_status")
     if (trajectory.source != (base_source if complete else base_source + "_partial")
             or trajectory.ruleset != ruleset
-            or trajectory.schema_version != 28
+            or trajectory.schema_version not in (28, 29)
             or (status not in (None, "complete") if complete
                 else status != "interrupted")
             or trajectory.decks != tuple(metadata.get("names", ()))
@@ -105,8 +124,8 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
             or reconstructed.native_terminal is not complete
             or trajectory.winner != reconstructed.winner
             or complete and trajectory.winner != metadata.get("winner_team")
-            or trajectory.decisions != reconstructed.decisions
-            or trajectory.terminal_observation != reconstructed.terminal_observation
+            or trajectory.decisions != reconstructed_decisions
+            or trajectory.terminal_observation != reconstructed_terminal
             or metadata.get("host_responses") != reconstructed.saved_response_count
             or metadata.get("mirror_responses") != reconstructed.saved_response_count
             or metadata.get("retries") != 0

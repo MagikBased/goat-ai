@@ -326,6 +326,21 @@ def test_native_announcement_resolves_in_real_duel(tmp_path, code, kind, paramet
                 assert observation.life_points == ((6000, 8000) if kind == "announce_number"
                                                    else (8000, 8000))
                 assert env.legal_actions()
+                if kind == "announce_attribute":
+                    for _ in range(12):
+                        changed = [card for card in observation.field
+                                   if card.code == code and card.position == "faceup"
+                                   and card.attribute == chosen]
+                        if changed:
+                            assert any(card.attribute == chosen for card in
+                                       env.engine.probe.observation(1).field
+                                       if card.code == code)
+                            break
+                        follow = env.legal_actions()
+                        observation = env.step(next((action for action in follow
+                                                     if action.kind == "pass"), follow[0]))
+                    else:
+                        pytest.fail("announced Attribute was not visible after resolution")
                 return
             selected = next((action for action in actions
                              if action.kind in ("activate", "chain")

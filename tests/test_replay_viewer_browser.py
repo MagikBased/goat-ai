@@ -217,6 +217,8 @@ def test_inspecting_ai_played_row_does_not_create_review_label(tmp_path):
         {"observation": _observation(), "selected_action": first,
          "legal_actions": [first, other]},
     ]}
+    replay.update(source="policy_evaluation", skill_metadata={
+        "demonstrator_seat": 0, "policy_checkpoint_sha256": "1" * 64})
     html = _embed_viewer(replay, "0" * 64, {}, {}, {})
     probe = """<script>
       const played = document.querySelector('#legal button.recorded');
@@ -250,6 +252,8 @@ def test_local_review_only_enables_decisions_offered_by_queue(tmp_path):
                 "legal_actions": [played, other]}
     replay = {"seed": 1, "source": "test", "winner": 0,
               "decisions": [decision, decision]}
+    replay.update(source="policy_evaluation", skill_metadata={
+        "demonstrator_seat": 0, "policy_checkpoint_sha256": "1" * 64})
     html = _embed_viewer(replay, "0" * 64, {}, {}, {})
     probe = """<script>
       localReviewMode = true;
@@ -400,6 +404,8 @@ def test_search_selects_alternative_beyond_first_100_actions(tmp_path):
         {"observation": _observation(), "selected_action": played,
          "legal_actions": [played, *alternatives]},
     ]}
+    replay.update(source="policy_evaluation", skill_metadata={
+        "demonstrator_seat": 0, "policy_checkpoint_sha256": "1" * 64})
     html = _embed_viewer(replay, "0" * 64, {}, {}, {})
     probe = """<script>
       const initial = document.querySelectorAll('#legal li').length === 100;

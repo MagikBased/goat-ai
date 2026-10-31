@@ -21,6 +21,13 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+Schema v29 now records the native current Attribute of face-up monsters while
+redacting it on face-down cards. A Homunculus announcement fixture observes
+the changed Attribute after resolution from both players' views. The
+versioned reader and verifier retain v28 replay compatibility, including
+EDOPro room recordings already in progress. The selected neural policy does
+not yet consume this field, and other dynamic public state remains unaudited.
+
 The legal-action visibility auditor now walks card references nested anywhere
 in an action payload, including future prompt wrappers, rather than checking
 only a direct reference or top-level `cards` list. Native reconstruction tests,
