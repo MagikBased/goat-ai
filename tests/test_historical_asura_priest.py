@@ -8,10 +8,13 @@ import pytest
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
+from goat_ai.replay import verify_trajectory
 
 ASURA_PRIEST = 2134346
 SCAPEGOAT = 504700123
 SHEEP_TOKENS = {73915052, 73915053, 73915054, 73915055}
+SPIRIT_REAPER = 504700038
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
@@ -158,3 +161,93 @@ def test_asura_cannot_attack_new_sheep_after_completed_direct_attack(tmp_path):
                     env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Asura attacked again after a completed direct attack")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
+                    reason="native assets not installed")
+def test_asura_cannot_attack_surviving_reaper_twice_but_can_attack_sheep(tmp_path):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for relative in (f"scripts/official/c{ASURA_PRIEST}.lua",
+                     f"scripts/goat/c{SPIRIT_REAPER}.lua",
+                     f"scripts/goat/c{SCAPEGOAT}.lua"):
+        if not (root / relative).is_file():
+            pytest.skip(f"{relative} not installed")
+    own_deck = tmp_path / "asura.ydk"
+    own_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([ASURA_PRIEST] * 3), *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
+    other_deck = tmp_path / "reaper_goat.ydk"
+    other_deck.write_text("#main\n" + "\n".join(map(str, (
+        *([SPIRIT_REAPER] * 3), *([SCAPEGOAT] * 3),
+        *VANILLA_DECK[6:]))) + "\n#extra\n!side\n")
+
+    with GoatEnvironment(str(own_deck), str(other_deck), seed=11,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        reaper_set = goat_used = asura_summoned = battle = False
+        reaper_targeted = reaper_survived = sheep_targeted = False
+        for _ in range(160):
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 2 and obs.acting_player == 1:
+                if not reaper_set:
+                    action = next((a for a in actions if a.kind == "set_monster"
+                                   and a.parameters.get("code") == SPIRIT_REAPER), None)
+                    reaper_set |= action is not None
+                if reaper_set and not goat_used and action is None:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == SCAPEGOAT), None)
+                    goat_used |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and goat_used:
+                if not asura_summoned:
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == ASURA_PRIEST), None)
+                    asura_summoned |= action is not None
+                if asura_summoned and not battle and action is None:
+                    action = next((a for a in actions if a.kind == "battle_phase"), None)
+                    battle |= action is not None
+                if battle and not sheep_targeted and action is None:
+                    action = next((a for a in actions if a.kind == "attack"
+                                   and a.parameters.get("code") == ASURA_PRIEST), None)
+            if battle and actions[0].kind == "select_card":
+                targets = [a for a in actions if a.kind == "select_card"]
+                if not reaper_targeted:
+                    action = next((a for a in targets
+                                   if a.parameters.get("controller") == 1
+                                   and a.parameters.get("code") in (None, SPIRIT_REAPER)
+                                   and a.parameters.get("sequence") == 0), None)
+                    reaper_targeted = action is not None
+                else:
+                    assert all(a.parameters.get("code") != SPIRIT_REAPER
+                               and a.parameters.get("sequence") != 0
+                               for a in targets)
+                    action = next((a for a in targets
+                                   if a.parameters.get("code") in SHEEP_TOKENS), None)
+                    sheep_targeted = action is not None
+            if action is None:
+                action = next((a for a in actions if a.kind in (
+                    "place", "pass", "end_phase")), actions[0])
+            obs = env.step(action)
+            if reaper_targeted and not reaper_survived and obs.turn == 3:
+                reaper = next((c for c in obs.field if c.code == SPIRIT_REAPER), None)
+                if reaper is not None and reaper.position == "faceup":
+                    reaper_survived = True
+            if sheep_targeted:
+                break
+        assert reaper_set and goat_used and asura_summoned and battle
+        assert reaper_targeted and reaper_survived and sheep_targeted
+        assert obs.life_points == (8000, 8000)
+        assert any(c.code == SPIRIT_REAPER for c in obs.field)
+        assert f"official/c{ASURA_PRIEST}.lua" in env.engine.probe.loaded_script_sha256
+        assert f"goat/c{SPIRIT_REAPER}.lua" in env.engine.probe.loaded_script_sha256
+        for _ in range(3000):
+            if env.is_terminal():
+                break
+            actions = env.legal_actions()
+            obs = env.step(next((a for a in actions if a.kind in (
+                "place", "pass", "end_phase")), actions[0]))
+        assert env.is_terminal()
+        trajectory = env.trajectory()
+        assert verify_trajectory(trajectory, ExperimentalOcgcoreEngine(root)) == len(
+            trajectory.decisions)
+        assert audit_trajectory_visibility(trajectory)["decisions"] == len(
+            trajectory.decisions)
