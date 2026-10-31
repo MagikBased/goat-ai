@@ -1124,6 +1124,14 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+An opt-in [public-history policy feature](evaluation.md#public-history-policy-feature-pilot-30-october-2026)
+now summarizes recent public events and zero-warm-starts from the selected
+v23 checkpoint. A one-replay, 154-optional-choice Tactical clone completed,
+but its v33 child lost 11–21 to the parent on 32 held-out direct games, versus
+12–20 for a matched v23 child. All 36,722 decisions across the two reports
+replay-verified and passed visibility audit. The paired v33-minus-v23 interval
+was [−9.38, 0] percentage points; the selected v23 policy remains unchanged.
+
 An opt-in [visible-material potential PPO pilot](evaluation.md#visible-material-potential-ppo-pilot-30-october-2026)
 now assigns intermediate credit from legal hand/field counts while retaining
 terminal win/loss as the full-return objective. A replay audit found and

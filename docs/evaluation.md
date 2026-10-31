@@ -1,5 +1,46 @@
 # Baseline evaluation log
 
+## Public-history policy feature pilot (30 October 2026)
+
+Opt-in policy feature v33 adds ten numbers from the last 32
+`Observation.public_history` events: normalized counts and recency for turn,
+phase, chain, attack, and Damage Step events. It reads only the player-visible
+observation. The v23-to-v33 checkpoint upgrade zero-initializes the new state
+inputs, so the selected v23 policy's initial logits are exactly preserved.
+
+One newly recorded, replay-verified v23-versus-Tactical duel on sourced
+Lolmarcus Goat Control and Riclar Chaos Turbo yielded **154 optional
+policy-seat decisions** labeled by Tactical-v14. One batched cloning epoch
+trained both a v33 child and a matched v23 control from the same selected
+parent, labels, seed, width 32, and batch size 32. These are synthetic teacher
+labels, not human demonstrations.
+
+On previously unseen Jae Kim Charlotte Zombie and Rhymus Lizo New Jersey Goat
+Control Main Decks, with both Deck assignments, both learner seats, and seeds
+182200–182207, v33 scored **11–21** directly against its unchanged v23 parent.
+The matched v23 child scored **12–20**. The strict report comparator verified
+the declared schedules and unseen Main Deck compositions; v33 minus v23 was
+**−3.13 percentage points**, paired 95% interval **[−9.38, 0]**. All **18,319**
+v33 decisions and **18,403** control decisions replay-verified and passed the
+player-visibility audit. This small pilot gives no evidence that recent-event
+features improve competitive play; neither child is promoted.
+
+The ignored v33 and control reports are
+`.cache/goat-ai/v33_history_pilot_vs_parent_182200.json` (SHA-256
+`f28df8df7bf21e326e1b69c4b7b51007bc7588102053f8c73f6ef2f650a4638d`)
+and `.cache/goat-ai/v23_history_control_vs_parent_182200.json` (SHA-256
+`05c8aedd156fa9dde01cc860acba42510faf815eca03d3f67d01a343387f9049`).
+The pilot checkpoint hashes are `0eae2a45ac0005891cd70e73822f02cbe0754526a72684dd6bbc556e0c9feaba`
+for v33 and `b4df48af15d779d5f16d980f834c8805715bd823ef4828d211a69dcf3017e373`
+for v23. Reproduce with `scripts/record_policy_match.py` at seed 182100,
+`scripts/train_behavioral_clone.py --on-policy-teacher tactical_v14`
+(`--feature-version 33 --upgrade-feature-23-to-33` for v33), and
+`scripts/evaluate_policy.py --engine experimental --both-deck-assignments
+--opponent-checkpoint <selected-v23-parent> --seed 182200 --seeds 8
+--require-unseen-main-decks --verify-replays` on the two named Decks. Compare
+the two reports with `scripts/compare_tournament_reports.py
+--verify-local-decks --require-unseen-main-decks`.
+
 ## Call of the Haunted timing pilot (30 October 2026)
 
 `tactical_call_end_phase` is an opt-in Tactical-v14 variant. When Tactical

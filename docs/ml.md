@@ -60,7 +60,7 @@ replay review found a Tribe-Infecting Virus Type choice whose old policy
 scored all three actions almost equally; the [replay audit](replay_audit.md)
 and [evaluation](evaluation.md) track the measured follow-up.
 
-This is a first representation, not a validated strong architecture. It does not yet model public event history, recipient-scoped reveals, other restrictions, changes to the Deck since duel start, or individual Damage Step substeps. Unknown card IDs share one embedding. Target context is pooled and may still lose relationships among cards. The model does not infer hidden hands or deck order. Ordinary inference scores one decision at a time; behavioral cloning can optionally pad variable-length decisions and score a minibatch together with `--batched-forward`. Batched inference across live duels, recurrent memory, and action-set attention remain open experiments. The original batch size 1 remains the default because faster training has not demonstrated stronger play. See [the measured training comparison](evaluation.md) and [throughput benchmark](benchmarks.md).
+This is a first representation, not a validated strong architecture. The selected model does not yet use public event history, recipient-scoped reveals, other restrictions, changes to the Deck since duel start, or individual Damage Step substeps. Unknown card IDs share one embedding. Target context is pooled and may still lose relationships among cards. The model does not infer hidden hands or deck order. Ordinary inference scores one decision at a time; behavioral cloning can optionally pad variable-length decisions and score a minibatch together with `--batched-forward`. Batched inference across live duels, recurrent memory, and action-set attention remain open experiments. The original batch size 1 remains the default because faster training has not demonstrated stronger play. See [the measured training comparison](evaluation.md) and [throughput benchmark](benchmarks.md).
 
 Feature v32 is an opt-in action feature for schema-v28 decisions where one
 visible card offers multiple effects. It encodes the public effect-option
@@ -68,6 +68,14 @@ index, distinguishing choices that earlier encoders represented identically.
 The behavioral-cloning command can zero-extend a v23 parent with
 `--upgrade-feature-23-to-32`; its initial logits remain those of the parent.
 No v32 playing-strength result is available yet.
+
+Feature v33 is an opt-in summary of the last 32 public-history events. It adds
+counts and recency for turn, phase, chain, attack, and Damage Step events,
+using only `Observation.public_history`. `--upgrade-feature-23-to-33`
+zero-extends the selected v23 policy and preserves its initial logits. A
+matched one-replay Tactical-clone pilot lost 11–21 to its parent on unseen Main
+Decks, versus 12–20 for the same update without the history inputs. This is
+not evidence of a playing-strength benefit; see [evaluation](evaluation.md#public-history-policy-feature-pilot-30-october-2026).
 
 Feature v27 is an opt-in action-to-visible-card attention branch from v23.
 It uses the same player-visible input and starts with identical v23 logits.

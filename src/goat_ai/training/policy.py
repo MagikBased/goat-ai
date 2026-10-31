@@ -78,6 +78,9 @@ POLICY_FEATURE_VERSION = 10  # later versions are opt-in representation experime
 # distinguishable without exposing the opponent's hidden hand.
 # Version 32 distinguishes multiple public effects offered by the same card
 # at one decision, using schema-v28 effect-option indices.
+# Version 33 summarizes the last 32 public turn, phase, chain, attack, and
+# Damage Step events with counts and recency. It adds no private-state input.
+HISTORY_EVENT_TYPES = ("turn", "phase", "chain", "attack", "damage_step")
 EQUIP_FEATURE_VERSIONS = (13, 14, 15)
 CHAIN_TARGET_FEATURE_VERSIONS = (14, 15)
 SPELL_TYPE = 0x2  # TYPE_SPELL in pinned ocgcore constant.lua
@@ -176,7 +179,7 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
         raise ValueError("cannot score an empty legal-action set")
     if any(action.actor != observation.acting_player for action in legal_actions):
         raise ValueError("legal-action actor differs from observation")
-    if feature_version not in range(1, 33):
+    if feature_version not in range(1, 34):
         raise ValueError("unsupported policy feature version")
     if feature_version >= 22 and not vocabulary.card_properties:
         raise ValueError("feature version 22 requires pinned printed card properties")
@@ -271,6 +274,14 @@ def encode_decision(observation: Observation, legal_actions: Sequence[Action],
     if feature_version >= 19:
         numbers += (float(observation.turn_player == own),
                     float(observation.turn_player is not None))
+    if feature_version >= 33:
+        history = observation.public_history[-32:]
+        events = tuple(event.split(":", 1)[0] for event in history)
+        numbers += tuple(events.count(kind) / 32 for kind in HISTORY_EVENT_TYPES)
+        numbers += tuple(next((1 / (offset + 1)
+                               for offset, event in enumerate(reversed(events))
+                               if event == kind), 0.0)
+                         for kind in HISTORY_EVENT_TYPES)
     kind_indices = []
     card_indices = []
     targets = []
@@ -529,7 +540,7 @@ class LegalActionPolicy(nn.Module):
     def __init__(self, vocabulary_size: int, width: int = 64,
                  feature_version: int = POLICY_FEATURE_VERSION) -> None:
         super().__init__()
-        if feature_version not in range(1, 33):
+        if feature_version not in range(1, 34):
             raise ValueError("unsupported policy feature version")
         self.feature_version = feature_version
         self.card = nn.Embedding(vocabulary_size, width, padding_idx=0)
@@ -549,7 +560,8 @@ class LegalActionPolicy(nn.Module):
         self.kind = nn.Embedding(kind_count + 1, width, padding_idx=0)
         number_width = (44 if feature_version >= 19 else 54
                         if feature_version == 15 else 42 if feature_version >= 4 else 10)
-        self.state_numbers = nn.Sequential(nn.Linear(number_width, width), nn.ReLU(),
+        self.state_numbers = nn.Sequential(nn.Linear(
+            number_width + (10 if feature_version >= 33 else 0), width), nn.ReLU(),
                                            nn.Linear(width, width))
         action_number_width = (138 if feature_version >= 32 else
                                137 if feature_version >= 31 else

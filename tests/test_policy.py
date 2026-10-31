@@ -1953,6 +1953,38 @@ def test_v32_distinguishes_public_effect_modes_without_hidden_cards(tmp_path):
             **choices[0].parameters, "effect_option": -1}),), vocabulary, 32)
 
 
+def test_v33_encodes_public_event_history_and_zero_warm_starts(tmp_path):
+    vocabulary = CardVocabulary((10,), ((10, 0, 1000),))
+    before = replace(view(), public_history=("turn:3", "phase:main1"))
+    after = replace(view(), public_history=("turn:3", "phase:main1",
+                                                    "attack", "damage_step:start"))
+    old = encode_decision(before, actions(), vocabulary, 23)
+    recent = encode_decision(after, actions(), vocabulary, 33)
+    quiet = encode_decision(before, actions(), vocabulary, 33)
+    assert recent.state_numbers.shape == (54,)
+    assert quiet.state_numbers.shape == (54,)
+    assert not torch.equal(recent.state_numbers, quiet.state_numbers)
+    assert torch.equal(encode_decision(before, actions(), vocabulary, 32).state_numbers,
+                       encode_decision(after, actions(), vocabulary, 32).state_numbers)
+    parent = LegalActionPolicy(vocabulary.size, width=8, feature_version=23)
+    path = tmp_path / "parent.pt"
+    torch.save({"schema_version": 1, "model_state": parent.state_dict(),
+                "vocabulary_codes": vocabulary.codes,
+                "vocabulary_card_properties": vocabulary.card_properties,
+                "width": 8, "feature_version": 23,
+                "trajectory_sha256": {"training.json": "a" * 64},
+                "training_games": [{"seed": 42, "deck_sha256": ("a", "b"),
+                                    "main_deck_composition_sha256": ("c", "d")}]}, path)
+    child = LegalActionPolicy(vocabulary.size, width=8, feature_version=33)
+    with pytest.raises(ValueError, match="architecture or vocabulary"):
+        load_parent_checkpoint(path, child, vocabulary)
+    load_parent_checkpoint(path, child, vocabulary, allow_v23_to_v33=True)
+    assert torch.count_nonzero(child.state_numbers[0].weight[:, -10:]) == 0
+    with torch.no_grad():
+        assert torch.allclose(child(recent), parent(old), atol=1e-6)
+        assert torch.allclose(child(quiet), parent(old), atol=1e-6)
+
+
 def test_v31_distinguishes_unknown_announced_cards_and_warm_starts(tmp_path):
     from scripts.audit_policy_action_aliases import feature_aliases
 
