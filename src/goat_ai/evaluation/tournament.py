@@ -1,9 +1,11 @@
 """Seat-swapped, seeded duels and decisive-win confidence intervals."""
 
 import pickle
+import json
 from collections.abc import Callable, Sequence
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from hashlib import sha256
 from itertools import repeat
 from math import sqrt
 from multiprocessing import get_context
@@ -26,6 +28,7 @@ class GameResult:
     decisions: int
     replay_verified_decisions: int | None = None
     visibility_audited_decisions: int | None = None
+    decision_trace_sha256: str | None = None
 
     @property
     def a_outcome(self) -> str:
@@ -204,7 +207,7 @@ def _play_game(job: tuple[str, str, int, int],
                 observation, env.legal_actions())
             observation = env.step(action)
             if env.is_terminal():
-                verified = audited = None
+                verified = audited = decision_trace_sha256 = None
                 if verify_replays:
                     trajectory = env.trajectory()
                     verified = verify_trajectory(trajectory, engine_factory())
@@ -213,8 +216,16 @@ def _play_game(job: tuple[str, str, int, int],
                     audited = audit_trajectory_visibility(trajectory)["decisions"]
                     if audited != decision_count:
                         raise RuntimeError("tournament visibility audit was incomplete")
+                    digest = sha256()
+                    for record in trajectory.decisions:
+                        digest.update(json.dumps(asdict(record.selected_action),
+                                                 sort_keys=True,
+                                                 separators=(",", ":")).encode("utf-8"))
+                        digest.update(b"\n")
+                    decision_trace_sha256 = digest.hexdigest()
                 return GameResult(deck_a, deck_b, seed, a_seat,
-                                  env.result(), decision_count, verified, audited)
+                                  env.result(), decision_count, verified, audited,
+                                  decision_trace_sha256)
     raise RuntimeError(f"duel exceeded {max_decisions} decisions: "
                        f"decks={decks}, seed={seed}, A seat={a_seat}")
 

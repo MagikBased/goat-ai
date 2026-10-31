@@ -103,6 +103,7 @@ def test_native_tournament_swaps_seats_and_reproduces_results():
     assert [(game.seed, game.a_seat) for game in report.games] == [
         (42, 0), (42, 1), (43, 0), (43, 1),
     ]
+    assert all(game.decision_trace_sha256 is None for game in report.games)
     summary = report.summary()
     assert summary["overall"]["games"] == 4
     assert summary["a_first"]["games"] == summary["a_second"]["games"] == 2
@@ -122,6 +123,8 @@ def test_native_tournament_opt_in_replay_and_visibility_verification():
     assert len(serial.games) == 2
     assert all(game.replay_verified_decisions == game.decisions
                and game.visibility_audited_decisions == game.decisions
+               and isinstance(game.decision_trace_sha256, str)
+               and len(game.decision_trace_sha256) == 64
                for game in serial.games)
 
 

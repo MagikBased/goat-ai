@@ -513,13 +513,18 @@ both policy seats, and seeds 181000–181007. The unseen-Main-Deck gate passed.
 All 64 terminal duels and 43,008 decisions independently replay-verified and
 passed the visibility audit. For all 32 matching seed and physical-seat Deck
 configurations, swapping which guard played which seat left the terminal
-winner and decision count unchanged. This comparison did not save each
-response stream for a strict action-by-action identity check, and it does not
-prove v9 can never change a game. It supplies no measured reason to promote
-v9 over v1. The ignored report is
-`.cache/goat-ai/guard_v9_vs_v1_181000_181007.json` (SHA-256
-`6b2ad12f3ff4818dfde388870edcf41486421aeb0ee98af8e37593af4db0b3a4`);
-the tournament took 38.79 seconds with two local workers. Reproduce with
+winner and decision count unchanged. A second run on the identical schedule
+added a per-duel SHA-256 digest of the exact selected-action sequence after
+replay verification. All 32 mirrored action digests matched as well: the two
+guards made the same choices in this schedule. This does not prove v9 can
+never change a game; the focused fixture above exercises its distinct
+condition. It supplies no measured reason to promote v9 over v1. The first
+ignored report is `.cache/goat-ai/guard_v9_vs_v1_181000_181007.json`
+(SHA-256 `6b2ad12f3ff4818dfde388870edcf41486421aeb0ee98af8e37593af4db0b3a4`);
+the action-digest rerun is
+`.cache/goat-ai/guard_v9_vs_v1_action_trace_181000_181007.json` (SHA-256
+`20565599d5dd00ffb06cc839e2ab7dcfed1a5a72db7fa2e4568e0bc41e751e4f`).
+The first tournament took 38.79 seconds with two local workers. Reproduce with
 `scripts/evaluate_policy.py` using the selected checkpoint for both seats,
 `--own-loss-guard --own-loss-guard-version 9`,
 `--opponent-own-loss-guard --opponent-own-loss-guard-version 1`,
