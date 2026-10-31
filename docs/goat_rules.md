@@ -182,9 +182,12 @@ discards Mystical Elf with Graceful Charity, Sets Call and Oppression on
 opposite fields, and flips Oppression before Call activates. Oppression's
 effect is offered at Chain Link 2. Taking it leaves Elf in the Graveyard and
 reduces the responding player's Life Points to 7200; passing it lets Call
-revive Elf and leaves Life Points at 8000. Both branches finish, serialize,
-replay-verify, and pass the visibility audit. This covers the face-up response
-and cost, not every Oppression/Special Summon interaction.
+revive Elf and leaves Life Points at 8000. The same FAQ says that destroying
+Oppression with a chained Mystical Space Typhoon makes its effect disappear.
+A third branch chains Typhoon at Link 3 to destroy Oppression: its controller
+still pays 800 LP, but Call revives Elf. All three branches finish, serialize,
+replay-verify, and pass the visibility audit. This covers one interrupted
+Continuous Trap response, not every Oppression/Special Summon interaction.
 
 **Royal Oppression responding to Marauding Captain:** The [archived
 Royal Oppression FAQ](https://www.goatformat.com/rulings6.html) explicitly

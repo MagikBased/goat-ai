@@ -1,4 +1,4 @@
-"""A face-up Royal Oppression may negate Call of the Haunted's revival.
+"""Royal Oppression responds to Call, but loses its effect if destroyed first.
 
 Archived FAQ: https://www.goatformat.com/rulings6.html (Royal Oppression).
 """
@@ -18,22 +18,23 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 GRACEFUL = 79571449
 CALL = 97077563
 OPPRESSION = 93016201
+MST = 5318639
 MYSTICAL_ELF = 15025844
 MAD_DOG = 79182538
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
                     reason="native assets not installed")
-@pytest.mark.parametrize("negate_call", [False, True])
-def test_faceup_oppression_can_negate_call_revival(tmp_path, negate_call):
+@pytest.mark.parametrize("response", ["pass", "oppression", "oppression_then_mst"])
+def test_faceup_oppression_call_revival_and_chained_mst(tmp_path, response):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
-    scripts = {f"official/c{code}.lua" for code in (GRACEFUL, CALL, OPPRESSION)}
+    scripts = {f"official/c{code}.lua" for code in (GRACEFUL, CALL, OPPRESSION, MST)}
     if any(not (root / "scripts" / script).is_file() for script in scripts):
         pytest.skip("required card script not installed")
     caller = tmp_path / "caller.ydk"
     responder = tmp_path / "oppression.ydk"
     caller.write_text("#main\n" + "\n".join(map(str, (
-        GRACEFUL, CALL, *VANILLA_DECK[2:]))) + "\n#extra\n!side\n")
+        GRACEFUL, CALL, MST, *VANILLA_DECK[3:]))) + "\n#extra\n!side\n")
     responder.write_text("#main\n" + "\n".join(map(str, (
         OPPRESSION, *VANILLA_DECK[1:]))) + "\n#extra\n!side\n")
 
@@ -41,12 +42,12 @@ def test_faceup_oppression_can_negate_call_revival(tmp_path, negate_call):
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
         graceful = discarded = call_set = oppression_set = oppression_up = False
-        call_started = target_chosen = responded = checked = False
+        call_started = target_chosen = responded = mst_chained = mst_targeted = checked = False
         agents = (RandomAgent(100), RandomAgent(101))
         for _ in range(3000):
             if env.is_terminal():
                 assert checked
-                path = tmp_path / f"call_oppression_{negate_call}.json"
+                path = tmp_path / f"call_oppression_{response}.json"
                 write_trajectory(path, env.trajectory())
                 replay = read_trajectory(path)
                 assert verify_trajectory(replay, ExperimentalOcgcoreEngine(root)) == len(
@@ -95,11 +96,20 @@ def test_faceup_oppression_can_negate_call_revival(tmp_path, negate_call):
                 target_chosen |= action is not None
             if target_chosen and not responded and obs.acting_player == 1 \
                     and [(link.index, link.card_code) for link in obs.chain] == [(1, CALL)]:
-                response = choose("chain", OPPRESSION)
-                assert response is not None
-                if negate_call:
-                    action = response
+                oppression_action = choose("chain", OPPRESSION)
+                assert oppression_action is not None
+                if response != "pass":
+                    action = oppression_action
                 responded = True
+            if response == "oppression_then_mst" and responded and not mst_chained \
+                    and obs.acting_player == 0 and len(obs.chain) == 2:
+                action = choose("chain", MST)
+                assert action is not None
+                mst_chained = True
+            if mst_chained and not mst_targeted and actions[0].kind == "select_card":
+                action = choose("select_card", OPPRESSION)
+                assert action is not None
+                mst_targeted = True
             if action is None:
                 action = (agents[obs.acting_player].select_action(obs, actions)
                           if checked else next((candidate for candidate in actions
@@ -110,12 +120,16 @@ def test_faceup_oppression_can_negate_call_revival(tmp_path, negate_call):
             if responded and not checked and not obs.chain:
                 revived = any(card.code == MYSTICAL_ELF and card.zone == "monster"
                               for card in obs.field)
-                if negate_call:
+                if response == "oppression":
                     assert not revived
                     assert MYSTICAL_ELF in {card.code for card in obs.graveyards[0]}
                     assert obs.life_points[1] == 7200
                 else:
                     assert revived
-                    assert obs.life_points[1] == 8000
+                    assert obs.life_points[1] == (8000 if response == "pass" else 7200)
+                if response == "oppression_then_mst":
+                    assert mst_chained and mst_targeted
+                    assert not any(card.code == OPPRESSION for card in obs.field)
+                    assert OPPRESSION in {card.code for card in obs.graveyards[1]}
                 checked = True
     pytest.fail("Call/Oppression fixture did not reach a verified terminal duel")

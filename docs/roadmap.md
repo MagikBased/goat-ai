@@ -3062,9 +3062,12 @@ gate and M4 learned-policy strength gate remain open.
 
 A paired [Royal Oppression/Call fixture](goat_rules.md#royal-oppression-responding-to-call-of-the-haunted)
 checks the archived face-up response ruling. Paying 800 LP at Chain Link 2
-prevents Call's revival; passing permits it. Both native duels terminate,
-replay-verify, and pass visibility checks. This advances M2 for one common
-continuous Trap interaction; the wider correctness gate remains open.
+prevents Call's revival; passing permits it. The FAQ's interrupted-Continuous-
+Trap branch chains Mystical Space Typhoon at Link 3 to destroy Oppression
+before its effect resolves. Oppression's 800 LP stays paid, while Call revives
+its target. All three native duels terminate, replay-verify, and pass visibility
+checks. This advances M2 for one common continuous Trap interaction; the wider
+correctness gate remains open.
 
 A larger 240-duel mixed-deck PPO continuation of the selected v23 policy
 completed without a decision cap; all 123,494 recorded decisions replay-verified
