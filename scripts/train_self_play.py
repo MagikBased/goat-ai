@@ -487,9 +487,11 @@ def main() -> None:
         "self_play_config": config, "self_play_reports": reports,
         "torch_version": str(torch.__version__),
     }
-    if preference_anchors:
-        # Future rounds must be able to revalidate the retained labels against
-        # the exact files admitted by this checkpoint's parent.
+    if "preference_sha256" in parent:
+        # Preserve source-label provenance even if this round does not use the
+        # labels, so a later round can revalidate them before retention.
+        if not isinstance(parent["preference_sha256"], dict):
+            raise TypeError("starting checkpoint has invalid preference provenance")
         checkpoint["preference_sha256"] = dict(parent["preference_sha256"])
     if value_model is not None:
         checkpoint["value_model_state"] = value_model.state_dict()

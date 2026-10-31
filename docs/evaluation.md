@@ -17997,6 +17997,14 @@ That ignored smoke checkpoint is
 (SHA-256 `fe8f44d143edbe9a96b887ba127d753850f2fd94966ae55428e7a429033a8b53`).
 Two games cannot measure strength and this checkpoint is not a promotion
 candidate.
+An additional two-game continuation **without** preference anchoring inherited
+the same 36 hashes, recorded zero retained-preference updates, and still let
+the next round revalidate all 46 labels. Both new duels replay-verified across
+1,497 decisions. Its ignored checkpoint is
+`.cache/goat-ai/fv23_masked_unanchored_provenance_smoke_209702_209703.pt`
+(SHA-256 `7487ae04a33b9fa712e54892e6f2db1cda35a33b57836b645349aefa896b17e6`).
+This verifies provenance continuity when an intermediate self-play round does
+not use the labels; it is not a policy-strength test.
 
 The pilot trained on 64 four-role games from the four published 2005 source
 pairs used in the preceding mixed-child collection. It used Tactical-v14 or a

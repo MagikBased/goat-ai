@@ -115,6 +115,13 @@ PYTHONPATH=src:.:.cache/goat-ai/edopro_probe/ygo_agent_host \
   .venv/bin/pytest -q tests/test_edopro_policy_room.py \
   -k test_page_room_launcher_completes_and_lists_verified_game
 ```
+The broader pinned-host room suite, including these four launch-and-train
+cases, network save/interruption cases, and local manager checks, passed
+**22 tests with no skips in 87.46 seconds** on the same installed assets.
+Run the same command without `-k` and include `tests/test_edopro_local_room.py`
+to reproduce that wider check. This is a protocol-bridge and recording-pipeline
+regression result, not a new human desktop-GUI validation.
+
 `scripts/verify_edopro_live_game.py` now independently replays the saved
 `.yrpX`, reconstructs every legal player-visible decision on the exact
 external core, and compares it with the review JSON, metadata seed, response
