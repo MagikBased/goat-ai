@@ -41,9 +41,11 @@ from goat_ai.training import (
     LegalActionPolicy,
     fit_behavioral_clone,
     fit_with_parent_kl,
+    load_policy_agent,
 )
 from goat_ai.training.on_policy_teacher import (
     filter_activation_opportunities,
+    filter_low_parent_margin_opportunities,
     filter_thunder_search_opportunities,
     label_policy_trajectory,
     teacher_disagreement_flags,
@@ -342,6 +344,9 @@ def main() -> None:
                              "named synthetic teacher; requires --init-checkpoint")
     parser.add_argument("--on-policy-teacher-activation-focus-only", action="store_true",
                         help="train only decisions offering activation of a --focus-card")
+    parser.add_argument("--on-policy-teacher-max-parent-margin", type=float,
+                        help="train only policy-visited optional decisions whose exact parent "
+                             "top-two raw logits differ by less than this value")
     parser.add_argument("--on-policy-thunder-search-only", action="store_true",
                         help="train only staged Thunder Dragon search prompts with an "
                              "offered Deck copy; requires tactical_thunder_search")
@@ -516,6 +521,14 @@ def main() -> None:
     if args.on_policy_teacher_activation_focus_only and (
             not args.on_policy_teacher or not args.focus_card):
         parser.error("activation focus requires --on-policy-teacher and --focus-card")
+    if args.on_policy_teacher_max_parent_margin is not None and (
+            not args.on_policy_teacher
+            or not isfinite(args.on_policy_teacher_max_parent_margin)
+            or args.on_policy_teacher_max_parent_margin <= 0
+            or args.on_policy_teacher_activation_focus_only
+            or args.on_policy_thunder_search_only):
+        parser.error("parent-margin focus requires an on-policy teacher, a positive "
+                     "finite margin, and no other teacher filter")
     if args.on_policy_thunder_search_only and (
             args.on_policy_teacher != "tactical_thunder_search"
             or args.on_policy_teacher_activation_focus_only):
@@ -523,7 +536,8 @@ def main() -> None:
                      "and cannot combine with activation focus")
     if args.on_policy_disagreement_weight > 1 and (
             not args.on_policy_teacher or args.on_policy_teacher_activation_focus_only
-            or args.on_policy_thunder_search_only):
+            or args.on_policy_thunder_search_only
+            or args.on_policy_teacher_max_parent_margin is not None):
         parser.error("disagreement weighting requires unfiltered on-policy teacher labels")
     if (args.parent_kl_steps < 0 or args.preserve_per_trajectory < 1
             or args.preserve_batch < 1 or not isfinite(args.parent_kl_weight)
@@ -562,6 +576,8 @@ def main() -> None:
         if args.on_policy_teacher else None)
     teacher_parent_hash = (hashlib.sha256(args.init_checkpoint.read_bytes()).hexdigest()
                            if teacher is not None else None)
+    margin_parent = (load_policy_agent(args.init_checkpoint)
+                     if args.on_policy_teacher_max_parent_margin is not None else None)
     records = []
     record_sources = []
     record_disagreements = []
@@ -629,6 +645,11 @@ def main() -> None:
                 selected, disagreements = filter_thunder_search_opportunities(
                     trajectory, selected)
                 disagreement_flags = (False,) * len(selected)
+            if margin_parent is not None:
+                selected, disagreements = filter_low_parent_margin_opportunities(
+                    trajectory, selected, margin_parent.model,
+                    margin_parent.vocabulary, args.on_policy_teacher_max_parent_margin)
+                disagreement_flags = (False,) * len(selected)
         elif label_path is not None:
             annotation, selected = read_decision_annotations(
                 label_path, hashlib.sha256(raw).hexdigest(), trajectory)
@@ -649,6 +670,8 @@ def main() -> None:
             thunder_corrections += corrections
         if teacher is not None:
             source = f"automated_teacher_{args.on_policy_teacher}"
+            if margin_parent is not None:
+                source += f"_parent_margin_lt_{args.on_policy_teacher_max_parent_margin:g}"
         elif annotation is not None:
             source = {"self_recorded": "human_annotation",
                       "scripted_scenario": "synthetic_annotation",
@@ -686,6 +709,8 @@ def main() -> None:
                                                    (trajectory.skill_metadata or {}).get(
                                                        "teacher_version")),
                                "automated_teacher": args.on_policy_teacher,
+                               "automated_teacher_max_parent_margin": (
+                                   args.on_policy_teacher_max_parent_margin),
                                "automated_teacher_disagreements": disagreements,
                                "opponent": (trajectory.skill_metadata or {}).get("opponent"),
                                "verified_decisions": count,
@@ -909,6 +934,7 @@ def main() -> None:
         "focus_cards": tuple(sorted(focus_codes)),
         "focus_weight": args.focus_weight,
         "on_policy_activation_focus_only": args.on_policy_teacher_activation_focus_only,
+        "on_policy_teacher_max_parent_margin": args.on_policy_teacher_max_parent_margin,
         "on_policy_thunder_search_only": args.on_policy_thunder_search_only,
         "on_policy_disagreement_weight": args.on_policy_disagreement_weight,
         "on_policy_disagreements": sum(

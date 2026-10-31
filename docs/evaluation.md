@@ -17232,3 +17232,63 @@ the unchanged policy on this schedule. It does not show a trained weight
 improvement, a net win against Tactical-v14, or transfer to arbitrary legal
 Decks. Keep the fallback opt-in while investigating the Zombie regression and
 collecting independent decision labels.
+
+### Low-margin synthetic-teacher distillation pilot (31 October 2026)
+
+The direct fallback gain above motivated a separate **weight-training** test.
+`--on-policy-teacher-max-parent-margin 1.0` now filters synthetic Tactical-v14
+labels to optional policy-visited decisions where the exact parent checkpoint's
+top two raw scores differ by less than 1.0. It scores only the acting player's
+observation and legal actions, requires an exact parent checkpoint hash, and
+keeps the source explicitly named
+`automated_teacher_tactical_v14_parent_margin_lt_1`. It does not call these
+human demonstrations or promote the fallback itself.
+
+The source collection used the selected v23 checkpoint against Tactical-v14
+on Beastdown/Phoenix and Jonathan LaBounty Chaos/Max Suffridge Goat Control,
+seeds 204100–204103, both policy seats. All **16 duels and 9,219 decisions**
+replay-verified and passed visibility checks. Their ignored manifest is
+`.cache/goat-ai/parent_margin_teacher_204100_204103/manifest.json` (SHA-256
+`10deb4304563005a74b81be7cb296e91698b5ba1f3c75277f46e6632e924f901`).
+The margin filter retained **254** optional Tactical labels. A feature-v23,
+width-32 child of the selected parent used 200 parent-KL steps, 128 sampled
+labels per step, 128 replay-verified preservation states from four of the
+parent-policy games, KL weight 0.5, learning rate 0.0001, and seed 204104.
+The run took **23.78 s** total, including **4.59 s** input verification and
+**10.42 s** fitting; final sampled-label loss was 0.67666 and preservation
+KL 0.03482. These are process diagnostics. The ignored child is
+`.cache/goat-ai/fv23_low_margin_tactical_child_204100_204103.pt` (SHA-256
+`60b41d91a4d419d4a055835fa065838e04fbdd769f6bf737b24709729f6d2619`).
+
+On **different, unseen Main Decks** (Jae Kim Zombie/Mary Triatafilidi Warrior
+and guide Dimension Fusion Turbo/Bryan Coronel Chaos), seeds 204200–204207,
+both assignments and seats, the child scored **29–35 directly against its
+parent** over 64 duels (95% paired-bootstrap score interval **32.81%–59.38%**).
+On a separate matched Tactical-v14 schedule, seeds 204208–204215, the child
+scored **24–39–1** versus the parent's **20–44**. The child-minus-parent
+paired score difference was **+7.03 percentage points**, 95% interval
+**−3.91 to +17.97**. The strict comparator accepted the opponent, asset,
+schedule, and unseen-Main-Deck controls. All **105,825 decisions** across
+these 192 evaluation duels replay-verified and passed visibility checks.
+The child gained 4.5 Tactical score points but did not beat the parent
+directly; neither comparison establishes a transferable learned-strength
+gain. Keep the selected checkpoint unchanged.
+
+The ignored reports and SHA-256 identifiers are
+`eval_low_margin_child_vs_parent_204200_204207.json`
+(`3b285dd1918c764c98d4298719143c534a2b1de1db4a3c41a2b2cdbdb6ccd4dc`),
+`eval_low_margin_child_vs_tactical_204208_204215.json`
+(`d632f2a7d4244cae5baff4ebc16ba69fd75782d225c70eeb58e560d931c3649f`),
+and `eval_parent_vs_tactical_204208_204215.json`
+(`ba741c12741e6f135ed0b9123c6b61b40fff012a61262c279b1e16260d1fce2d`)
+under `.cache/goat-ai/`. Reproduce source games with
+`scripts/collect_policy_matches.py --opponent tactical --seed 204100 --seeds 4
+--workers 4`, then fit with `scripts/train_behavioral_clone.py` using the
+16 positional trajectories, `--init-checkpoint` set to selected v23,
+`--on-policy-teacher tactical_v14 --on-policy-teacher-max-parent-margin 1.0`,
+and the parent-KL settings above. Evaluate with `scripts/evaluate_policy.py`
+using `--engine experimental --both-deck-assignments
+--require-unseen-main-decks --verify-replays --workers 4 --max-decisions 3000`.
+This pilot suggests that simply cloning the fallback's low-confidence
+decisions is insufficient; independent human corrections or better outcome
+credit are still needed for M4.

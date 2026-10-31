@@ -47,6 +47,7 @@ from goat_ai.training import (
 )
 from goat_ai.training.on_policy_teacher import (
     filter_activation_opportunities,
+    filter_low_parent_margin_opportunities,
     filter_thunder_search_opportunities,
     label_policy_trajectory,
     teacher_disagreement_flags,
@@ -309,6 +310,39 @@ def test_on_policy_teacher_rejects_illegal_label():
 
     with pytest.raises(ValueError, match="illegal action"):
         label_policy_trajectory(trajectory, BadTeacher(), "a" * 64)
+
+
+def test_parent_margin_focus_keeps_only_aligned_low_confidence_teacher_labels():
+    class Scorer(torch.nn.Module):
+        feature_version = 10
+
+        def __init__(self):
+            super().__init__()
+            self.parameter = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, features):
+            return (torch.tensor((1.0, 0.5, 0.0)) if
+                    len(features.action_kinds) == 3 else torch.tensor((2.0, 0.0)))
+
+    low = DecisionRecord(view(), actions(), actions()[0])
+    high = DecisionRecord(view(), actions()[:2], actions()[0])
+    source = Trajectory("goat", ("a", "b"), 7, (low, high), 0,
+                        source="policy_evaluation",
+                        skill_metadata={"demonstrator_seat": 0})
+    labels = (replace(low, selected_action=actions()[1]),
+              replace(high, selected_action=actions()[1]))
+    selected, disagreements = filter_low_parent_margin_opportunities(
+        source, labels, Scorer(), CardVocabulary((10,)), 1.0)
+    assert selected == labels[:1]
+    assert disagreements == 1
+    assert filter_low_parent_margin_opportunities(
+        source, labels, Scorer(), CardVocabulary((10,)), 0.5) == ((), 0)
+    with pytest.raises(ValueError, match="finite and nonnegative"):
+        filter_low_parent_margin_opportunities(
+            source, labels, Scorer(), CardVocabulary((10,)), float("nan"))
+    with pytest.raises(ValueError, match="aligned"):
+        filter_low_parent_margin_opportunities(
+            source, labels[:1], Scorer(), CardVocabulary((10,)), 1.0)
 
 
 def test_activation_focus_keeps_both_good_and_bad_trade_opportunities():
