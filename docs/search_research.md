@@ -40,7 +40,9 @@ feasibility study after a reliable short-horizon subgame representation exists.
    a **known** deal, and the viewer's private reveal sidecar intentionally
    contains hidden Deck order. Neither is an online belief sampler. Never
    pass reviewer sidecars, actual seed words, or private native queries to
-   action selection.
+   action selection. A [measured prefix benchmark](benchmarks.md#exact-replay-prefix-reconstruction-for-search-feasibility-31-october-2026)
+   took 0.210 seconds for 302 decisions and 0.567 seconds for 964 decisions
+   on two recorded deals; those timings exclude sampling and rollouts.
 3. At the root, enumerate actions from the real player-visible legal-action
    API. Before executing a sampled continuation, reject a sample whose
    public observation or root legal-action set differs. Use one common

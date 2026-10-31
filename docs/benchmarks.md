@@ -1453,3 +1453,44 @@ The ignored report SHA-256 values for A1, A2, B1, B2 are respectively
 `a2c66793a10845a6ded844c0e83ba4dadcd7af917707448900c15c229062526f`,
 `fb786c0d48d306c76144e1bf7674607f175e52ca07cf82a175401cf696082bbf`,
 and `9ececbe40e96b02248191c5b0ebc5091ff21461c5a469825d09e303fe4b8953f`.
+
+## Exact replay-prefix reconstruction for search feasibility (31 October 2026)
+
+`scripts/benchmark_prefix_reconstruction.py` fully verifies each source
+trajectory and its player-visible observations before timing. The timed part
+creates a fresh pinned native engine, resets with the recorded seed and Decks,
+replays a fixed number of selected actions, and checks the endpoint's legal
+actions or terminal winner. These are **offline recorded hidden deals**, not
+player-consistent hidden-state samples or online search. Full verification is
+excluded from the timed samples. No neural inference or continuation rollout
+is timed. Runs were sequential in one warmed Python 3.12.3 process with
+`OMP_NUM_THREADS=1` on an Intel i7-10700K (16 logical CPUs); three samples
+per depth. Times include native reset and Python action stepping.
+
+| Verified source | Decisions replayed | Median reset | Median half prefix | Median full prefix |
+| --- | ---: | ---: | ---: | ---: |
+| New Jersey Goat Control vs Phoenix Control, seed 99900, policy seat 0 | 302 | 0.0610 s | 0.1341 s at 151 | 0.2100 s |
+| Same Deck pairing, seed 99905, policy seat 0 | 964 | 0.0587 s | 0.2768 s at 482 | 0.5667 s |
+
+The two ignored reports are
+`.cache/goat-ai/prefix_reconstruction_seed99900_20261031.json` (SHA-256
+`705ababc45e781a93ee7aafa492cf22c241ce6cdc25ae0623e42e41edea49519`)
+and `.cache/goat-ai/prefix_reconstruction_seed99905_20261031.json` (SHA-256
+`6fa45c45bd7f3aa6dc67534f060c2d210d6dd8d34a665f6f535b71f906017a43`).
+Both source Decks and pinned assets are required. Reproduce from the project
+root with the same command, changing `99900` to `99905` for the second run:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python \
+  scripts/benchmark_prefix_reconstruction.py \
+  .cache/goat-ai/own_card_parent_review_99900_99907/seed_99900_seat_0.json \
+  --native-root .cache/goat-ai --repeats 3 \
+  --output .cache/goat-ai/prefix_reconstruction_seed99900_20261031.json
+```
+
+The older tactical-v14 seed-6803 replay failed strict verification against
+today's native assets because four recorded asset hashes differ; it was not
+timed or mixed into these results. This benchmark establishes the current
+prefix-reconstruction cost for two games only. A search benchmark still needs
+player-consistent belief sampling, several branches per decision, rollout
+cost, tail latency, memory, and held-out competitive comparison.
