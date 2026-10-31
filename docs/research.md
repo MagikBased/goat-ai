@@ -97,6 +97,24 @@ install it passed in 2.56 seconds, checked the client replay, zero host
 retries/Lua errors, complete mirror metadata, deserialized review trajectory,
 and visibility audit. The test skips unless both external roots and the AGPL
 host package are supplied; it is not a desktop-GUI or historical-rulings test.
+On 31 October 2026 the pinned historical-host launcher regression passed four
+real TCP-room deck pairings: Warrior/Gravekeeper, Goat Control/Chaos Turbo,
+Flip Control/Zombie, and an added WikiFormat Dimension Fusion/Chaos Return
+pairing. Each run launched an isolated private room, used an EDOPro-protocol
+client, saved a complete `.yrpX`, independently reconstructed its player-visible
+trajectory, checked the GOAT Deck screen, and trained one explicitly confirmed
+optional choice into a separate experimental child. All four cases passed
+together in 79.98 seconds on the local machine. These are automated clients, not human
+desktop-GUI games, and the results do not certify all EDOPro prompts or
+historical card effects. Reproduce with the pinned host and native roots:
+
+```bash
+GOAT_AI_EDOPRO_HOST_ROOT=.cache/goat-ai/edopro_pinned_host \
+GOAT_AI_EDOPRO_MIRROR_ROOT=.cache/goat-ai GOAT_AI_EDOPRO_HISTORICAL=1 \
+PYTHONPATH=src:.:.cache/goat-ai/edopro_probe/ygo_agent_host \
+  .venv/bin/pytest -q tests/test_edopro_policy_room.py \
+  -k test_page_room_launcher_completes_and_lists_verified_game
+```
 `scripts/verify_edopro_live_game.py` now independently replays the saved
 `.yrpX`, reconstructs every legal player-visible decision on the exact
 external core, and compares it with the review JSON, metadata seed, response

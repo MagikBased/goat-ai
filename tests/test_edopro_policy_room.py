@@ -180,6 +180,8 @@ def test_edopro_training_publishes_only_verified_checkpoint(
     ("goat_control_jesse_twohig_indianapolis_2005.ydk", "chaos_turbo_riclar_2020.ydk"),
     ("flip_control_cas_stomphorst_indianapolis_2005.ydk",
      "zombie_jae_kim_charlotte_2005.ydk"),
+    ("dimension_fusion_turbo_wikiformat_reference.ydk",
+     "chaos_return_dingosig_worlds_2022.ydk"),
 ))
 def test_page_room_launcher_completes_and_lists_verified_game(ai_deck, client_deck):
     """Exercise the real child process and the room manager used by the page."""
