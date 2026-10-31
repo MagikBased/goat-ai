@@ -2111,6 +2111,10 @@ The [Edison feasibility audit](edison_research.md) records the official March
 2010 Advanced Format restrictions as a checked data asset and lists the
 remaining card-pool, native-rule, and observation validation gates. This is
 M5 preparation; Edison duels are not yet supported.
+The candidate-pool comparator now exposes 72 shared IDs with Duel Terminal 1
+printings for separate release-date checks. Agreement between the two
+candidate lists is not itself a legality source; this watchlist prevents those
+cards from disappearing inside the 3,622-ID shared count.
 The historical Edison target is now explicitly North American TCG play;
 contemporary Konami policy makes promotional-card legality region-dependent.
 The two external candidate pools do not establish regional eligibility, and

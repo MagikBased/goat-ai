@@ -81,6 +81,8 @@ def compare(api_json: Path, community_csv: Path, database: Path,
                             - set(missing_metadata_ids))
     unresolved_dt1_ids = sorted(set(unresolved_ids) & {
         metadata.get(code, (code, 0))[0] for code in api_dt1_ids})
+    shared_dt1_ids = sorted((api_canonical & community_canonical) & {
+        metadata.get(code, (code, 0))[0] for code in api_dt1_ids})
     return {
         "purpose": "candidate_disagreement_not_edison_legality",
         "jurisdiction_status": "not_established_by_candidate_sources",
@@ -100,6 +102,7 @@ def compare(api_json: Path, community_csv: Path, database: Path,
         "api_only_missing_metadata_ids": missing_metadata_ids,
         "api_only_unresolved_ids": unresolved_ids,
         "api_only_unresolved_with_duel_terminal_1_print_ids": unresolved_dt1_ids,
+        "shared_with_duel_terminal_1_print_ids": shared_dt1_ids,
         "community_only_ids": sorted(community_canonical - api_canonical),
     }
 

@@ -122,6 +122,19 @@ pinned database also lacks metadata
 for ten raw API IDs and nine raw community IDs. No complete Edison whitelist
 has been selected.
 
+The candidate comparator now also emits
+`shared_with_duel_terminal_1_print_ids`. The pinned-input run found **72**
+canonical IDs present in both candidates that have a Duel Terminal 1 printing.
+Shared membership does not establish period North American legality: some of
+these cards had earlier ordinary printings, while newly introduced cards
+need a dated non-Duel-Terminal release under Konami's March 2010 notice. This
+watchlist makes that remaining audit explicit; it does not classify the 72 as
+legal or illegal. Reproduce with the comparison command below, changing its
+`--output` to
+`.cache/goat-ai/edison_pool_candidate_comparison_dt01_20261031.json`.
+That ignored report has SHA-256
+`e984216f2ce34e8a9b6ae8db86119c0f4dd6725bc8bcb8bee5c8f4fb7de00cfd`.
+
 [Konami's archived 19 March 2010 Duel Terminal legality notice](https://web.archive.org/web/20231002070814/https://yugiohblog.konami.com/articles/?p=1622)
 supplies the primary policy source: new Duel Terminal cards did not become
 tournament legal merely by appearing in the machine; they required release
