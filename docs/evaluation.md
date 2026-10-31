@@ -505,6 +505,27 @@ owned boss facing only opposing Set monsters, so v9 has no
 measured duel-strength effect yet. It changes a narrow optional play filter,
 not simulator legality or the checkpoint's learned preferences.
 
+On a fresh 64-duel direct comparison, the selected feature-v23 checkpoint
+with experimental guard v9 scored **32–32** against the same checkpoint with
+the selected v1 guard. The schedule used Bryan Coronel's Chaos list against
+Rhymus Lizo's and Ryan Hayakawa's Goat Control lists, both Deck assignments,
+both policy seats, and seeds 181000–181007. The unseen-Main-Deck gate passed.
+All 64 terminal duels and 43,008 decisions independently replay-verified and
+passed the visibility audit. For all 32 matching seed and physical-seat Deck
+configurations, swapping which guard played which seat left the terminal
+winner and decision count unchanged. This comparison did not save each
+response stream for a strict action-by-action identity check, and it does not
+prove v9 can never change a game. It supplies no measured reason to promote
+v9 over v1. The ignored report is
+`.cache/goat-ai/guard_v9_vs_v1_181000_181007.json` (SHA-256
+`6b2ad12f3ff4818dfde388870edcf41486421aeb0ee98af8e37593af4db0b3a4`);
+the tournament took 38.79 seconds with two local workers. Reproduce with
+`scripts/evaluate_policy.py` using the selected checkpoint for both seats,
+`--own-loss-guard --own-loss-guard-version 9`,
+`--opponent-own-loss-guard --opponent-own-loss-guard-version 1`,
+`--both-deck-assignments --seed 181000 --seeds 8`, the two named matchups,
+`--require-unseen-main-decks --verify-replays --workers 2`.
+
 ## Negative visible Heavy Storm trade ablation (29 October 2026)
 
 An opt-in v8 inference variant extends the selected v1 own-loss filter at
