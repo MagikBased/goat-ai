@@ -147,9 +147,9 @@ def evaluate_branches(source_path: Path, checkpoint: Path, native_root: Path,
         raise ValueError("source inference option requires a continuation checkpoint")
     if (continuation_guard_version is not None
             and (type(continuation_guard_version) is not int
-                 or continuation_guard_version not in range(1, 8)
+                 or continuation_guard_version not in range(1, 10)
                  or continuation_use_source_inference)):
-        raise ValueError("continuation guard version must be 1..7 and distinct "
+        raise ValueError("continuation guard version must be 1..9 and distinct "
                          "from source-inference override")
     if output_dir.exists() and any(output_dir.iterdir()):
         raise ValueError("output directory must be empty")

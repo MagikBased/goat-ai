@@ -29,7 +29,9 @@ class FirstActionAgent:
 @pytest.mark.parametrize("inference", (
     "greedy", "greedy_own_loss_guard_v1", "greedy_own_loss_guard_v2",
     "greedy_own_loss_guard_v3", "greedy_own_loss_guard_v4",
-    "greedy_own_loss_guard_v5", "greedy_own_loss_guard_v6"))
+    "greedy_own_loss_guard_v5", "greedy_own_loss_guard_v6",
+    "greedy_own_loss_guard_v7", "greedy_own_loss_guard_v8",
+    "greedy_own_loss_guard_v9"))
 def test_native_branch_reproduces_source_and_alternate(tmp_path, monkeypatch,
                                                        inference):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
@@ -113,6 +115,11 @@ def test_native_branch_reproduces_source_and_alternate(tmp_path, monkeypatch,
         assert v3["continuation_inference"] == "greedy_own_loss_guard_v3"
         assert options[-1]["own_loss_guard_version"] == 3
         assert v3["branches"][0]["recorded_action"] is True
+        v9 = branches.evaluate_branches(
+            source_path, checkpoint, root, index, (0, 1),
+            tmp_path / "v9_continuation_branches", continuation_guard_version=9)
+        assert v9["continuation_inference"] == "greedy_own_loss_guard_v9"
+        assert options[-1]["own_loss_guard_version"] == 9
     with pytest.raises(ValueError, match="include the recorded action"):
         branches.evaluate_branches(source_path, checkpoint, root, index,
                                    (1,), tmp_path / "rejected")
