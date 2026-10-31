@@ -126,6 +126,50 @@ def test_edopro_training_requires_saved_human_confirmations(tmp_path, monkeypatc
     assert not replay.with_suffix(".pt").exists()
 
 
+@pytest.mark.parametrize("trainer_result", ["failed", "bad_provenance", "verified"])
+def test_edopro_training_publishes_only_verified_checkpoint(
+        tmp_path, monkeypatch, trainer_result):
+    manager = EdoRoomManager(GameCreator(root=tmp_path, native_root=tmp_path))
+    replay = tmp_path / "game-001.yrpX"
+    review = replay.with_suffix(".review.json")
+    metadata = replay.with_suffix(".meta.json")
+    labels = replay.with_suffix(".human_labels.json")
+    for path in (replay, review, labels):
+        path.write_text("fixture", encoding="utf-8")
+    metadata.write_text("{}", encoding="utf-8")
+    output = tmp_path / "confirmed_pilot.pt"
+    monkeypatch.setattr(manager, "_verified_game", lambda _: (replay, review, metadata))
+    monkeypatch.setattr("scripts.edopro_local_room.verify_edopro_human_annotations",
+                        lambda *_: {"confirmed_human_choices": 1})
+    monkeypatch.setattr(manager, "choices", lambda _: {
+        "training_command": f"PYTHONPATH=src:. python trainer.py --output {output}",
+        "continues_recorded_policy": False})
+
+    def fake_trainer(command, **_):
+        candidate = Path(command[command.index("--output") + 1])
+        assert candidate != output and candidate.parent != output.parent
+        if trainer_result != "failed":
+            torch.save({"source_decisions": {
+                "edopro_human_confirmed_experimental": (
+                    1 if trainer_result == "verified" else 0)}}, candidate)
+            return subprocess.CompletedProcess(command, 0, '{"decisions": 1}', "")
+        candidate.write_bytes(b"partial checkpoint")
+        return subprocess.CompletedProcess(command, 1, "", "injected trainer failure")
+
+    monkeypatch.setattr("scripts.edopro_local_room.subprocess.run", fake_trainer)
+    if trainer_result == "verified":
+        result = manager.train_confirmed("a" * 16)
+        assert result["decisions"] == 1
+        assert result["checkpoint_sha256"] == sha256_file(output)
+    else:
+        expected = ("injected trainer failure" if trainer_result == "failed"
+                    else "lacks the confirmed human-choice provenance")
+        with pytest.raises((ValueError, RuntimeError), match=expected):
+            manager.train_confirmed("a" * 16)
+    assert output.is_file() is (trainer_result == "verified")
+    assert not list(tmp_path.glob(".edopro-train-*"))
+
+
 @pytest.mark.skipif(
     not (os.getenv("GOAT_AI_EDOPRO_HOST_ROOT") and os.getenv("GOAT_AI_EDOPRO_MIRROR_ROOT")
          and os.getenv("GOAT_AI_EDOPRO_HISTORICAL") == "1"),

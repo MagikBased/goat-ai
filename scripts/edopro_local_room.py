@@ -255,7 +255,8 @@ class EdoRoomManager:
                              for path in (replay, review, metadata, labels)}
             choice_info = self.choices(identifier)
             command = shlex.split(choice_info["training_command"])[1:]
-            output = Path(command[command.index("--output") + 1])
+            output_index = command.index("--output") + 1
+            output = Path(command[output_index])
             if output.exists() or output.is_symlink():
                 raise ValueError("An experimental checkpoint already exists for this room; "
                                  "use the displayed command with a different output path")
@@ -263,39 +264,43 @@ class EdoRoomManager:
             env["PYTHONPATH"] = os.pathsep.join((
                 str(self.root / "src"), str(self.root), str(self.host_package),
                 env.get("PYTHONPATH", "")))
-            try:
-                completed = subprocess.run(
-                    command, cwd=self.root, env=env, capture_output=True,
-                    text=True, timeout=600, check=False)
-            except subprocess.TimeoutExpired as exc:
-                raise ValueError("Experimental training exceeded ten minutes") from exc
-            if completed.returncode != 0:
-                raise ValueError("Experimental training failed: " +
-                                 (completed.stderr.strip()[-600:] or
-                                  f"exit code {completed.returncode}"))
-            if not output.is_file():
-                raise RuntimeError("Training returned success without a checkpoint")
-            if any(sha256_file(path) != digest for path, digest in source_hashes.items()):
-                output.unlink()
-                raise RuntimeError("EDOPro replay or confirmations changed during training")
-            summary = json.loads(completed.stdout)
-            if summary["decisions"] != checked["confirmed_human_choices"]:
-                output.unlink()
-                raise RuntimeError("Trainer used a different number of confirmed choices")
-            checkpoint = torch.load(output, map_location="cpu", weights_only=True)
-            parent_hash = json.loads(metadata.read_text(encoding="utf-8")).get(
-                "checkpoint_sha256")
-            source_field = ("new_source_decisions" if choice_info["continues_recorded_policy"]
-                            else "source_decisions")
-            if checkpoint.get(source_field, {}).get(
-                    "edopro_human_confirmed_experimental") != checked[
-                        "confirmed_human_choices"]:
-                output.unlink()
-                raise RuntimeError("Checkpoint lacks the confirmed human-choice provenance")
-            if (choice_info["continues_recorded_policy"]
-                    and checkpoint.get("parent_checkpoint_sha256") != parent_hash):
-                output.unlink()
-                raise RuntimeError("Trainer used a different parent checkpoint")
+            with tempfile.TemporaryDirectory(prefix=".edopro-train-",
+                                             dir=output.parent) as temporary:
+                candidate = Path(temporary) / output.name
+                command[output_index] = str(candidate)
+                try:
+                    completed = subprocess.run(
+                        command, cwd=self.root, env=env, capture_output=True,
+                        text=True, timeout=600, check=False)
+                except subprocess.TimeoutExpired as exc:
+                    raise ValueError("Experimental training exceeded ten minutes") from exc
+                if completed.returncode != 0:
+                    raise ValueError("Experimental training failed: " +
+                                     (completed.stderr.strip()[-600:] or
+                                      f"exit code {completed.returncode}"))
+                if not candidate.is_file():
+                    raise RuntimeError("Training returned success without a checkpoint")
+                if any(sha256_file(path) != digest for path, digest in source_hashes.items()):
+                    raise RuntimeError("EDOPro replay or confirmations changed during training")
+                summary = json.loads(completed.stdout)
+                if summary["decisions"] != checked["confirmed_human_choices"]:
+                    raise RuntimeError("Trainer used a different number of confirmed choices")
+                checkpoint = torch.load(candidate, map_location="cpu", weights_only=True)
+                parent_hash = json.loads(metadata.read_text(encoding="utf-8")).get(
+                    "checkpoint_sha256")
+                source_field = ("new_source_decisions" if choice_info["continues_recorded_policy"]
+                                else "source_decisions")
+                if checkpoint.get(source_field, {}).get(
+                        "edopro_human_confirmed_experimental") != checked[
+                            "confirmed_human_choices"]:
+                    raise RuntimeError("Checkpoint lacks the confirmed human-choice provenance")
+                if (choice_info["continues_recorded_policy"]
+                        and checkpoint.get("parent_checkpoint_sha256") != parent_hash):
+                    raise RuntimeError("Trainer used a different parent checkpoint")
+                # The temporary file and final name share a directory. Linking
+                # publishes only a verified candidate and refuses to replace a
+                # checkpoint created by another process during training.
+                os.link(candidate, output)
             return {"id": identifier, "experimental_trained": True,
                     "checkpoint": str(output),
                     "checkpoint_sha256": sha256_file(output),

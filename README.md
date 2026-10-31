@@ -128,6 +128,9 @@ checks, runs the displayed training command without a shell, and saves the
 checkpoint beside the replay. It refuses to overwrite an existing child;
 use the displayed command with a different output path for another run. The
 button waits for training to finish, which can take a while for a long duel.
+The room publishes the child checkpoint only after verifying the trainer's
+decision count and provenance; a failed run removes its temporary output so
+the same session can be retried.
 If you change any checkmarks, save those changes first; the page disables
 training and bundle download until the displayed choices match the saved ones.
 The session also offers **Download EDOPro replay** for its native `.yrpX`
