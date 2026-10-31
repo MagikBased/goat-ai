@@ -17588,6 +17588,70 @@ and the parent-KL parameters above. Evaluate with `scripts/evaluate_policy.py
 --engine experimental --both-deck-assignments --workers 4
 --require-unseen-main-decks --reject-training-deck-hashes --verify-replays`.
 
+### Larger low-margin teacher collection on independent random Decks
+
+A second distillation pilot used all 16 independent full-whitelist Deck pairs
+from the non-Fusion-stress sweep above, rather than the first pilot's 16
+Fusion-stress pairs. The unchanged selected feature-v23 parent faced
+Tactical-v14 in both policy seats for seeds 206600–206603. All **128 games**
+and **50,600 decisions** were replay-verified and visibility-audited. The
+ignored source manifest is
+`.cache/goat-ai/parent_plain_teacher_206600_206603/manifest.json`
+(SHA-256 `50fb7dae4c8b6dbbc0053f0ca9c4461120de740b0545f8216f6deca636975448`).
+
+The same margin-1.0 Tactical teacher, width-32 feature-v23 architecture,
+200 parent-KL steps, 128 labels and 32 preservation states per step, KL
+weight 0.5, and learning rate 0.0001 retained **1,990 optional labels**.
+Four source trajectories supplied 128 parent-preservation states. The fit
+reported 163.15 seconds overall, including 38.52 seconds of verification
+and 94.15 seconds of fitting; final labeled loss was 0.77230 and
+preservation KL was 0.06743. These are training diagnostics only. The child
+is `.cache/goat-ai/fv23_plain_low_margin_child_206600_206603.pt`
+(SHA-256 `7d2f41b2d906c54285e6b56f735c6dc3f12685d06d23b36be91a946398515715`).
+
+On two sourced historical Deck pairs absent from training provenance
+(Roberto Martinez Phoenix versus Ramon Ciriano Beastdown, and Jae Kim
+Zombie versus Mary Triatafilidi Warrior), both Deck assignments and both
+policy seats were evaluated on fresh seeds. The child scored **29–35**
+directly against its parent over 64 games, seeds 206700–206707 (paired 95%
+score interval 35.94%–53.13%). On matched seeds 206800–206807 against
+Tactical-v14, the child scored **18–46** and the parent **24–40**. The strict
+paired child-minus-parent difference was **−9.38 percentage points**, 95%
+interval **[−23.44, +4.69]**. All **101,108 decisions** in the three
+64-game reports replay-verified and passed visibility audit. The Beastdown
+subgroup lost six wins relative to parent on 16 matched games; this is an
+exploratory diagnostic, not a causal explanation. More synthetic teacher
+labels on independent random Decks did not establish a competitive gain on
+these historical holdouts. Keep the child experimental and the selected
+checkpoint unchanged.
+
+The ignored reports are
+`eval_plain_low_margin_direct_206700.json` (SHA-256
+`ad4c1b209afbf197763ee5ba0a0266556753f664286b751c0a453039840e326b`),
+`eval_plain_low_margin_child_tactical_206800.json`
+(`ab560aeaadd9bf3688f10758e7241f2e7ccd5fcbabd407da6a6f5fa89e60fe2b`),
+and `eval_plain_low_margin_parent_tactical_206800.json`
+(`973ee976c713247712dfb8b1578a31839b366dfd3b2694f26ccfb25e7ab8eaf2`).
+The strict comparison is
+`.cache/goat-ai/compare_plain_low_margin_sourced_206800.json`
+(SHA-256 `b67fcd28e93901986fbb7d30e667b7b354e349992969ae939c878a054568a6c1`).
+Reproduce collection with `scripts/collect_policy_matches.py`, the 16
+`--matchup` pairs from the non-Fusion-stress report, `--opponent tactical
+--seed 206600 --seeds 4 --workers 4`. Fit with
+`scripts/train_behavioral_clone.py` and all 128 source trajectories,
+`--init-checkpoint` set to the selected v23 parent,
+`--on-policy-teacher tactical_v14
+--on-policy-teacher-max-parent-margin 1.0 --parent-kl-steps 200
+--parent-kl-labeled-batch 128 --preserve-per-trajectory 32
+--preserve-batch 32 --parent-kl-weight 0.5 --learning-rate 0.0001
+--seed 206604`; use four source games as `--preserve-trajectories` and
+`--allow-policy-preservation`. Evaluate with `scripts/evaluate_policy.py
+--engine experimental --both-deck-assignments --seeds 8 --workers 4
+--require-unseen-main-decks --reject-training-deck-hashes --verify-replays`,
+and compare the Tactical reports with
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.
+
 ### Random-Deck PPO continuation of the low-margin child
 
 The experimental low-margin child above was continued with **64** native

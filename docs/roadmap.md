@@ -2206,6 +2206,16 @@ intervals included 50%; the matched Tactical score differences were +0.78
 points on random Decks and +4.69 points on sourced Decks, with intervals
 including or touching zero. This outcome update did not close M4.
 
+A second [larger low-margin teacher pilot](evaluation.md#larger-low-margin-teacher-collection-on-independent-random-decks)
+collected 128 verified parent games on different full-whitelist random Decks
+and trained a child on 1,990 low-margin Tactical labels. On four untouched
+sourced historical Main Decks, the child scored 29–35 directly against its
+parent and 18–46 against Tactical-v14, versus the parent's matched 24–40.
+The paired Tactical difference was −9.38 points with a 95% interval crossing
+zero; all 101,108 evaluation decisions replay-verified and passed visibility
+audit. More synthetic labels did not close M4's cross-deck strength gate.
+Keep the selected v23 checkpoint unchanged.
+
 ## M5 — Search and other formats
 
 Konami's 2009 version-7 rulebook is now recorded as the period source for the
