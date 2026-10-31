@@ -566,6 +566,14 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired [Scapegoat/Royal Oppression fixture](goat_rules.md#royal-oppression-responding-to-scapegoat)
+checks the archived 2005 activation-timing distinction. A Set Oppression can
+flip in response to Scapegoat but cannot use its separate effect in that chain;
+an already face-up Oppression can chain its effect, pay 800 LP, and prevent the
+four Tokens without lifting Scapegoat's turn-long Summon restriction. Both
+complete duels replay-verify and pass visibility audits. This adds one sourced
+common-card interaction; the full M2 gate remains open.
+
 A paired [A Legendary Ocean/Metamorphosis fixture](goat_rules.md#metamorphosis-under-a-legendary-ocean)
 checks the archived current-Level ruling against the pinned native scripts.
 Ocean changes a face-up Level 4 WATER monster to Level 3 and switches the only
