@@ -17207,3 +17207,28 @@ and `eval_parent_new_archetypes_204012_204015.json`
 (`adb183a48f9df9a9648f701eb262c41cef7ae102e506018d452b06e34fbd12de`).
 This direction is consistent with the first two batches, but the transfer
 interval is wide and the fallback still has a losing record against Tactical.
+
+To distinguish an improvement over the neural parent from a favorable Tactical
+matchup, the opt-in fallback played the **unchanged parent directly** on all
+four published/guide Deck pairs above, seeds 204016–204023, both Deck
+assignments and both seats. The fallback scored **83–44–1** in 128 games,
+**65.23%** including the draw, with a 95% paired-bootstrap score interval of
+**57.81%–72.27%**. First seat was 45–19 and second seat 38–25–1. All **75,446**
+decisions replay-verified and passed the player-visibility audit. The native
+assets and Deck compositions were fingerprinted; the evaluator rejected Main
+Decks in the parent's training games. The ignored report is
+`.cache/goat-ai/eval_fallback_vs_parent_204016_204023.json` (SHA-256
+`11307e915791b0c91852a31c53876aeb990153f9d1d193058353ec2411439cb9`).
+Reproduce by using the four `--matchup` pairs above with
+`scripts/evaluate_policy.py`, `--opponent-checkpoint` set to the same selected
+v23 checkpoint, `--tactical-fallback-margin 1.0 --seed 204016 --seeds 8`,
+and the same engine, assignment, unseen-Deck, worker, decision-cap, and
+verification flags as the Tactical comparisons.
+
+The gain is uneven: the fallback scored 14/16 with Beastdown and 13/16 with
+Max Suffridge Goat Control, but only **4/16 with Jae Kim Zombie** against its
+parent. This directly supports a stronger *composite inference agent* than
+the unchanged policy on this schedule. It does not show a trained weight
+improvement, a net win against Tactical-v14, or transfer to arbitrary legal
+Decks. Keep the fallback opt-in while investigating the Zombie regression and
+collecting independent decision labels.
