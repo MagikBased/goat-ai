@@ -23,8 +23,11 @@ The repository has a Python environment contract, observation and action types, 
 
 The legal-action visibility auditor now walks card references nested anywhere
 in an action payload, including future prompt wrappers, rather than checking
-only a direct reference or top-level `cards` list. Native reconstruction tests
-and two saved trajectories (1,677 decisions) pass the strengthened audit.
+only a direct reference or top-level `cards` list. Native reconstruction tests,
+two saved trajectories (1,677 decisions), and the 30 saved tournament
+trajectories (16,979 decisions) pass the strengthened audit. The latter
+visibility check covered 55 hidden-field, 583 opponent-field, and 13
+opponent-hand card-choice contexts.
 This closes one auditor bypass, not every hidden-state or observation case.
 
 A [second combined 60-card Fusion stress block](evaluation.md#combined-60-card-fusion-stress-probe-30-october-2026)
