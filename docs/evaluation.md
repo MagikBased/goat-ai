@@ -17192,3 +17192,18 @@ candidate. Compare each matched batch with
 --require-unseen-main-decks`. The next test should use additional unseen
 archetypes and seeds, and examine why Phoenix Control specifically fell from
 2/16 parent wins to 0/16 fallback wins in the confirmation batch.
+
+A transfer check then used four different unseen Main Deck compositions:
+Jae Kim Zombie versus Mary Triatafilidi Warrior, and guide Dimension Fusion
+Turbo versus Bryan Coronel Chaos, seeds 204012–204015 with both assignments
+and seats. The fallback scored **15–17** against Tactical-v14; the unchanged
+parent scored **11–20–1**. The paired score difference was **+10.9375 points**
+with a 95% interval of **−17.1875 to +37.5**. All **29,912** decisions across
+the 64 duels replay-verified and passed visibility checks. The strict
+comparator verified new Main Deck compositions and the matched controls. The
+ignored reports are `eval_fallback_margin1_new_archetypes_204012_204015.json`
+(SHA-256 `7ffb5477580e0e9575872a38e0ec60d6ef617c216f2c43346a50a5f10aa38df0`)
+and `eval_parent_new_archetypes_204012_204015.json`
+(`adb183a48f9df9a9648f701eb262c41cef7ae102e506018d452b06e34fbd12de`).
+This direction is consistent with the first two batches, but the transfer
+interval is wide and the fallback still has a losing record against Tactical.

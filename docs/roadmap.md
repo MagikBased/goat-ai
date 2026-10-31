@@ -3512,3 +3512,5 @@ Stardust-facing policy interfaces remain independent of EDOPro's client and
 license.
 
 An [opt-in low-margin Tactical fallback](evaluation.md#experimental-low-margin-tactical-fallback-31-october-2026) uses the same player-visible observation and legal-action boundary as the neural policy. On 96 matched held-out published-deck games per arm, it won 38 against Tactical-v14 versus the unchanged policy's 28. The fresh 64-game confirmation subset improved by only four wins and its paired interval spans zero; Phoenix Control regressed. Keep the selected policy unchanged and M4 open. Next, test additional unseen archetypes and obtain independent human corrections for low-confidence decisions rather than using Tactical agreement as a training target by itself.
+
+A four-Deck transfer check added 32 unseen-composition games per arm: the fallback scored 15–17 against Tactical-v14 and the unchanged parent 11–20–1. The paired interval again spans zero. The next M4 test needs a larger independent schedule, especially new archetypes and expert-labeled low-confidence decisions; this opt-in fallback alone does not establish the learned-strength gate.
