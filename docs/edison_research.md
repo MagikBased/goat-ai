@@ -938,6 +938,30 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_dark_armed_dragon.py
 ```
 
+## Cyber Dragon's inherent Summon and Bottomless response
+
+[Konami's Cyber Dragon record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6390&ope=2&request_locale=en)
+allows its hand Special Summon when only the opponent controls a monster;
+its 2100 ATK exceeds the threshold in
+[Bottomless Trap Hole's official text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5400&ope=2).
+The [March 2010 list](https://www.yugioh-card.com/en/downloads/alt_format/2010-03-01.pdf)
+allows two Cyber Dragons. The narrow MR1 probe now admits that card ID.
+
+A paired seed-52 native fixture starts with Cyber Dragon in player 0's hand,
+checks that its Special Summon is unavailable on an empty opposing field,
+then has player 1 Summon a monster and Set Bottomless. On player 0's next
+turn, Cyber Dragon is offered as a Special Summon and Bottomless is offered in
+the response window. Activating Bottomless banishes Cyber Dragon; passing
+leaves it on the field. Both branches reach terminal, serialize, replay-verify,
+and pass the player-visibility audit. This checks one inherent Summon and
+response window, not full Edison legality or every Summon-negation interaction.
+Reproduce with:
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_cyber_dragon_bottomless.py
+```
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including

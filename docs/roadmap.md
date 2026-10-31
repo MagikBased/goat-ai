@@ -2060,6 +2060,13 @@ gain.
 
 ## M5 — Search and other formats
 
+A paired [Cyber Dragon/Bottomless MR1 fixture](edison_research.md#cyber-dragons-inherent-summon-and-bottomless-response)
+now checks that Cyber Dragon's hand Special Summon is unavailable before the
+opponent controls a monster, then tests Bottomless in its Summon response
+window. Both branches finish and pass replay and visibility verification. This
+extends the narrow 2010 protocol probe; the separately validated Edison
+profile remains open.
+
 An [offline branch diagnostic](evaluation.md#offline-action-branch-outcome-diagnostic-29-october-2026)
 now reconstructs a verified duel to one decision and plays legal alternatives
 with observation-only continuation agents. Six own-card-loss comparisons show
