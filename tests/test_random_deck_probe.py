@@ -159,6 +159,34 @@ def test_fusion_stress_reaches_extra_deck_card_actions(tmp_path):
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
+def test_sixty_card_fusion_stress_keeps_legal_prefix_and_replays(tmp_path):
+    native_root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    forty = generate_deck(native_root, 179200, include_random_extra=True,
+                          fusion_stress=True)
+    sixty = generate_deck(native_root, 179200, include_random_extra=True,
+                          fusion_stress=True, main_size=60)
+    assert sixty.main[:40] == forty.main
+    assert sixty.extra == forty.extra
+    assert len(sixty.main) == 60
+    assert Counter(sixty.main)[SCAPEGOAT] == 3
+    assert Counter(sixty.main)[METAMORPHOSIS] == 3
+    assert THOUSAND_EYES_RESTRICT in sixty.extra
+    assert sixty == generate_deck(native_root, 179200, include_random_extra=True,
+                                  fusion_stress=True, main_size=60)
+    limits = read_goat_whitelist(native_root / "banlist/GOAT.lflist.conf")
+    assert all(count <= limits[code] for code, count in Counter(sixty.main).items())
+    report = probe(native_root, tmp_path / "sixty_stress", 179200, 1, 3000,
+                   verify_replays=True, distinct_opponents=True,
+                   repeat_seeds=True, random_extra=True, fusion_stress=True,
+                   main_size=60, agent_name="tactical")
+    game = report["games"][0]
+    assert game["terminal"] and game["error"] is None
+    assert game["replay_verified_decisions"] == game["decisions"]
+    assert game["deterministic_repeat"] is True
+    assert report["visibility_audit"]["decisions"] == game["decisions"]
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")
 @pytest.mark.parametrize(("seed", "source_code"),
                          [(10772, 93671934), (10786, 28566710)])
 def test_fusion_stress_native_regressions(tmp_path, seed, source_code):

@@ -45,11 +45,9 @@ FUSION_STRESS_MAIN = (SCAPEGOAT, METAMORPHOSIS)
 
 def generate_deck(root: Path, seed: int, *, include_random_extra: bool = False,
                   fusion_stress: bool = False, main_size: int = 40) -> Decklist:
-    """Choose whitelist cards; larger Main Decks add legal repeated copies."""
+    """Choose whitelist cards; larger Main Decks add only legal repeated copies."""
     if not 40 <= main_size <= 60:
         raise ValueError("whitelist probe Main Deck size must be 40..60")
-    if fusion_stress and main_size != 40:
-        raise ValueError("Fusion stress uses a 40-card Main Deck")
     if fusion_stress and not include_random_extra:
         raise ValueError("Fusion stress requires a random Extra Deck")
     limits = read_goat_whitelist(root / "banlist/GOAT.lflist.conf")
@@ -91,14 +89,17 @@ def generate_deck(root: Path, seed: int, *, include_random_extra: bool = False,
         raise ValueError("GOAT card pool lacks Fusion stress Main Deck cards")
     if fusion_stress:
         chosen = [*(code for code in FUSION_STRESS_MAIN for _ in range(3)), *chosen]
-    elif main_size > 40:
+    if main_size > 40:
         # Keep the old 40-card prefix stable so the same seed isolates the
         # effect of additional legal copies. A separate seed shuffles which
         # eligible printed cards receive those copies.
-        repeated = [code for code in chosen if limits[code] > 1]
+        counts = Counter(chosen)
+        repeated = list(dict.fromkeys(
+            code for code in chosen if counts[code] < limits[code]))
         random.Random(seed + 3_000_000).shuffle(repeated)
         for code in repeated:
-            chosen.extend([code] * min(limits[code] - 1, main_size - len(chosen)))
+            chosen.extend([code] * min(limits[code] - counts[code],
+                                        main_size - len(chosen)))
             if len(chosen) == main_size:
                 break
         if len(chosen) != main_size:
@@ -176,8 +177,6 @@ def validate_probe_options(card_pool: str, random_extra: bool,
         raise ValueError("whitelist probe Main Deck size must be 40..60")
     if main_size != 40 and card_pool != "whitelist":
         raise ValueError("larger Main Decks require the whitelist card pool")
-    if main_size != 40 and fusion_stress:
-        raise ValueError("Fusion stress uses a 40-card Main Deck")
 
 
 def probe(root: Path, output: Path, first_seed: int, seeds: int,
