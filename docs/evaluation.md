@@ -1,5 +1,37 @@
 # Baseline evaluation log
 
+## Call of the Haunted timing pilot (30 October 2026)
+
+`tactical_call_end_phase` is an opt-in Tactical-v14 variant. When an idle Call of
+the Haunted activation is offered on the opponent's turn, it passes during the
+Draw, Standby, Main 1, Battle Start, and Main 2 phases. It retains ordinary
+Tactical behavior at the End Phase, during attack and chain responses, and on
+its own turn. This tests the reviewer's timing suggestion without changing the
+selected baseline or neural policy.
+
+Against Tactical-v14, the variant scored **32–32** in 64 complete duels across
+Lolmarcus Goat Control versus Riclar Chaos Turbo and Montague Warrior versus
+Insids Chaos Control. The schedule used seeds 181000–181007, both Deck
+assignments, both agent seats, and four isolated workers. All **34,432**
+decisions independently replay-verified and passed the player-visibility audit.
+The paired score difference was zero on this schedule. One of the four Decks
+contained Call of the Haunted, so this is a small timing pilot, not evidence of
+general strength. The default Tactical agent remains unchanged.
+
+The ignored report is `.cache/goat-ai/tactical_call_end_181000_181007.json`
+(SHA-256 `71bb32d87cf9c4509f96e23cddfd511b6f48e3350b14907215df48352c985c6e`).
+Reproduce it with:
+
+```bash
+GOAT_AI_NATIVE_ROOT=$PWD/.cache/goat-ai PYTHONPATH=src:. \
+  .venv/bin/python scripts/evaluate_native.py --engine experimental \
+  --matchup examples/decks/goat_control_lolmarcus_2020.ydk examples/decks/chaos_turbo_riclar_2020.ydk \
+  --matchup examples/decks/warrior_montague_clash.ydk examples/decks/chaos_control_insids_worlds_2022.ydk \
+  --both-deck-assignments --agent-a tactical_call_end_phase --agent-b tactical \
+  --seed 181000 --seeds 8 --workers 4 --verify-replays \
+  --output .cache/goat-ai/tactical_call_end_181000_181007.json
+```
+
 ## Broader 60-card Fusion and Tactical protocol probe (30 October 2026)
 
 Fresh seeds 182000–182063 generated 128 independently sampled, whitelist-legal

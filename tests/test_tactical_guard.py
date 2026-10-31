@@ -54,6 +54,26 @@ def test_opt_in_tactical_sets_spell_trap_after_battle_when_possible():
                                    (set_trap, battle)) == set_trap
 
 
+def test_opt_in_call_timing_waits_for_opponent_end_phase_without_missing_responses():
+    call = Action("call", "chain", 0, {"code": 97077563})
+    wait = Action("wait", "pass", 0)
+    baseline = TacticalHeuristicAgent()
+    candidate = TacticalHeuristicAgent(call_end_phase_guard=True)
+    idle = board(phase="main1", turn=3, turn_player=1)
+    assert baseline.select_action(idle, (call, wait)) == call
+    assert candidate.select_action(idle, (call, wait)) == wait
+    assert candidate.select_action(board(phase="end", turn=3, turn_player=1),
+                                   (call, wait)) == call
+    assert candidate.select_action(board(phase="battle_step", turn=3,
+                                         turn_player=1), (call, wait)) == call
+    response = board(phase="main1", turn=3, turn_player=1,
+                     chain=(ChainLinkView(1, 19613556, 1, 8, 0),))
+    assert candidate.select_action(response, (call, wait)) == call
+    assert candidate.select_action(board(phase="main1", turn=3,
+                                         turn_player=0), (call, wait)) == call
+    assert candidate.select_action(idle, (call,)) == call
+
+
 def test_heavy_storm_avoids_solely_damaging_own_backrow():
     storm = Action("storm", "activate", 0, {"code": 19613556})
     wait = Action("wait", "end_phase", 0)

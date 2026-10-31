@@ -161,6 +161,7 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
     SPIRIT_REAPER: ClassVar[int] = 504700038  # GOAT variant
     MAGICIAN_OF_FAITH: ClassVar[int] = 31560081
     SANGAN: ClassVar[int] = 504700178  # GOAT variant
+    CALL_OF_THE_HAUNTED: ClassVar[int] = 97077563
     SPELL_TYPE: ClassVar[int] = 0x2
 
     def __init__(self, flip_monster_codes: Collection[int] = (),
@@ -176,7 +177,8 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                  card_advantage_guard: bool = False,
                  thunder_search_guard: bool = False,
                  mof_readiness_guard: bool = False,
-                 main2_set_guard: bool = False) -> None:
+                 main2_set_guard: bool = False,
+                 call_end_phase_guard: bool = False) -> None:
         super().__init__(flip_monster_codes)
         self.card_races = dict(card_races or {})
         self.card_facts = dict(card_facts or {})
@@ -192,6 +194,7 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
         self.thunder_search_guard = thunder_search_guard
         self.mof_readiness_guard = mof_readiness_guard
         self.main2_set_guard = main2_set_guard
+        self.call_end_phase_guard = call_end_phase_guard
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
@@ -200,6 +203,20 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
                     and action.parameters.get("code") == self.SINISTER), None)
         if yes is not None:
             return yes
+
+        if (self.call_end_phase_guard
+                and observation.turn_player is not None
+                and observation.turn_player != observation.viewer
+                and observation.phase in ("draw", "standby", "main1",
+                                          "battle_start", "main2")
+                and not observation.chain
+                and any(action.kind in ("activate", "chain")
+                        and action.parameters.get("code") == self.CALL_OF_THE_HAUNTED
+                        for action in legal_actions)):
+            wait = next((action for action in legal_actions
+                         if action.kind == "pass"), None)
+            if wait is not None:
+                return wait
 
         if self.v8_guards and observation.chain:
             source = observation.chain[-1]
