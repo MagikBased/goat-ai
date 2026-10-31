@@ -17974,3 +17974,87 @@ parent Tactical, and strict paired comparison:
 | Seattle/NJ | `6d060d9babde58634312c7313e58b6f6df30d1551f3cc4da2756425b37af117c` | `60d464b0ee0afb897c8b22f81584a45f9ab0479873b606b1754079ff311d6219` | `8191517da76e3f87feb21caf8ad780978b491c470622d8ef29e8c8883ea0ef1c` | `cc5a1a7eb1701ba44401ffdabe85370db9248ce7d877e71f02973c282e5cc7b1` |
 | Phoenix etc. | `5a0550c550fc3065e4a2a573afa976ead0f2d0a3eff6b66e6c505d04679b609c` | `e754b639f2c140ce71ffd53ad9fbffaa6a9f8d49bfc96cf95bdbd3ef97dfb56e` | `17e419b7d401347ec3186341db2cb43407d8610e16a4cbf8117fd057e4a36875` | `76bf4be98fc00ba58eba435584cebbc55b7fb302e9083ba7d0ef6d32dfa016c5` |
 | Fresh random | `ff6d1e839794e13b96b6f86d4d687a31b4541384a7b022562e77ae1c4cb02a85` | `7be6bea7e1000a7af8855931d6ef20a30ca50057b700cbcd0ec250bee34fe5e3` | `5b17d59753a4dea6a77c1428f8b9794d4ceb58378aa5914be65ca8a2eed63504` | `2cd98afa49e6ac124d9e78c15db7f4305a58758acb0a0cde4050102cec9ea1bf` |
+
+### Retained own-loss preferences during PPO self-play
+
+A follow-up tested whether game-outcome training could preserve the local
+Heavy Storm correction and improve complete-duel play. The starting checkpoint
+was the experimental masked-parent child above (`598e65b9...e1afb08`).
+`scripts/train_self_play.py` now accepts the already validated V10 automated
+own-loss manifest for retained-preference anchors, in addition to V11. It
+checks source replay and preference hashes against the starting checkpoint,
+replays every duel, audits player visibility, and validates the rule labels.
+These **46 labels are automated hypotheses, not human reviews**. Future
+self-play checkpoints also carry their inherited preference-file hashes, so
+another round can revalidate the same anchors. The checkpoint from this pilot
+predates that metadata fix and should not be used as the parent of another
+retained-anchor round without rebuilding its provenance.
+
+The pilot trained on 64 four-role games from the four published 2005 source
+pairs used in the preceding mixed-child collection. It used Tactical-v14 or a
+historical snapshot with equal probability, independent opponent random
+streams, clipped PPO with four-game rollouts, two epochs, per-episode
+weighting, learning rate 0.0005, parent KL weight 0.05, and retained-preference
+weight 0.1 with batch size eight. All 64 games were terminal (25 learner wins,
+36 losses, three draws); 6,349 learner decisions were used. The 64 saved
+trajectories passed exact native reconstruction and visibility audit over
+**40,823 decisions**; the audit reported 31 strategic review candidates.
+The checkpoint is
+`.cache/goat-ai/fv23_masked_ownloss_ppo_anchor_209000_209063.pt`
+(SHA-256 `1f5df682874755b5f5ae8f89e54762265c344815363a81cb58290710c624fb20`).
+It still avoided Heavy Storm on all ten original own-only source states.
+That is a fixed-state retention check, not a strength result.
+
+Three independent-from-training holdouts used unseen Main Deck compositions,
+both Deck assignments and seats, fresh duel seeds, exact replay verification,
+and player-visibility audit. The third reused the eight *evaluation* random
+Deck pairs from the preceding masked-parent study; those Decks were unseen
+during this PPO training, but the panel is not a newly designed blind test.
+All **659,689 decisions** in the nine terminal tournament reports passed both
+audits. The paired Tactical comparison uses identical Deck/seat/seed schedules
+for PPO and its unchanged starting checkpoint.
+
+| Holdout | PPO vs start | PPO vs Tactical-v14 | Start vs Tactical-v14 | Paired Tactical score difference |
+| --- | ---: | ---: | ---: | ---: |
+| Seattle/NJ published, 64 per arm | 30–34 | 16–48 | 18–46 | −3.13 points, 95% interval [−14.06, +7.81] |
+| Phoenix/Beastdown/Zombie/Warrior, 64 per arm | 33–31 | 26–38 | 22–41–1 | +5.47 points, [−3.13, +15.63] |
+| Eight legal random Deck pairs, 256 per arm | 132–119–5 | 101–155 | 97–158–1 | +1.37 points, [−2.54, +5.47] |
+
+The random-panel direct score was 52.54%, with a paired-bootstrap interval
+of 48.44%–56.64%. Every matched Tactical interval contains zero; PPO still
+lost most games to Tactical on every panel. The observed local correction and
+weak direct gain do not establish a transferable competitive improvement.
+Keep the PPO child experimental and the selected v23 checkpoint unchanged.
+M4's learned-strength and self-play gates remain open. The next trial should
+use independent human review of own-resource losses, more source Decks, and
+a new blind evaluation schedule before any promotion.
+
+Reproduce the PPO run with `scripts/train_self_play.py` using the masked-parent
+checkpoint, `--engine experimental --schedule-mode four_roles --seed 209000
+--games 64 --learning-rate 0.0005 --historical-probability 0.5
+--independent-opponent-rng --baseline-opponent tactical
+--parent-kl-weight 0.05 --retain-preferences-manifest
+.cache/goat-ai/mixed_child_ownloss_v10_208000_208007/manifest.json
+--retain-preference-weight 0.1 --retain-preference-batch-size 8
+--policy-update clipped_ppo --ppo-rollout-games 4 --rollout-workers 4
+--ppo-rollout-weighting per_episode --ppo-epochs 2 --ppo-batch-size 32
+--max-decisions 3000 --fast-trajectory-json`, plus the four published source
+`--matchup` pairs and an `--output` path. The retained manifest SHA-256 is
+`a65fce76a3f01a6f868efa55b62c27814f43ff697766d61c557b2177be7eae4b`;
+the training replay audit report SHA-256 is
+`61b95e693a4daa8d0b419a29af488c5e9a92c880e6756a053bc37be558374b7d`.
+Evaluate with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --workers 4 --max-decisions 3000 --verify-replays
+--require-unseen-main-decks --reject-training-deck-hashes`. Direct seeds were
+209100, 209300, and 209500; matched Tactical seeds were 209200, 209400, and
+209600. Use `scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks` for the paired comparisons.
+
+Ignored report SHA-256 values, by row as direct, PPO Tactical, starting-policy
+Tactical, and strict paired comparison:
+
+| Panel | Direct | PPO Tactical | Start Tactical | Comparison |
+| --- | --- | --- | --- | --- |
+| Seattle/NJ | `494faa5165f33653f487a5959ffd14430ffa483c34237de64bec82276ac2f481` | `6b6e5d890ef7ac00ae99e95fed2ea72393f15acc64ab2bea9c714d45c332fda7` | `79a3213a0ea4273e0446c6f278e55471e3912344850e908b8ea89609335e9010` | `8a64edab8a57b5a9cae74a50a4363d0df07020e7b16c060b10249c6bef1eacea` |
+| Phoenix etc. | `a4702a4ae740a3e8fd958ac2dae268dacbf8ca97595362e4763baf6bde492608` | `b8c719aac1e3fd5bce4cc3b9a700d0525551015039ad1fe1aa71add8c53c068b` | `458a451aa2df76274a7e19262564a7ae8fcaa548782b3999ba4c25361fccae19` | `cf2116994f9b69b39661e848d972be1cdc4bc863ac06279dd4139a8ec8f8b83f` |
+| Random | `a06031fc1abfb9c118fef7adf5ba5a3701a0e7a41c79b01578a821493ac1dcb8` | `3c3c23deefeb34a395d22405a71ea3cdb4eead4ab1977e27beaa42f5231cc496` | `09a0eabf24c0497aa99a2e0a5a7c8d4e172c2496e8fdc9809be706fa887d31dd` | `399d58513498d65f734bc03eb4b31d060c2039ec8f92026df9170f365158a23e` |

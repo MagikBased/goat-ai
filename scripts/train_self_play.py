@@ -87,11 +87,13 @@ def load_retained_preferences(manifest_path: Path, parent: dict,
                               native_root: Path) -> list:
     """Revalidate only preferences already present in the starting checkpoint."""
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if (manifest.get("rule_set_id") != "visible_selected_own_loss_with_responses_v11"
+    if (manifest.get("rule_set_id") not in (
+            "visible_selected_own_loss_v10",
+            "visible_selected_own_loss_with_responses_v11")
             or manifest.get("labels_are_human_reviewed") is not False
             or not isinstance(manifest.get("replays"), list)
             or not manifest["replays"]):
-        raise ValueError("retention requires a nonempty V11 automated-rule manifest")
+        raise ValueError("retention requires a nonempty V10/V11 automated-rule manifest")
     old_replays = parent.get("trajectory_sha256", {})
     old_preferences = parent.get("preference_sha256", {})
     if not isinstance(old_replays, dict) or not isinstance(old_preferences, dict):
@@ -155,7 +157,7 @@ def main() -> None:
     parser.add_argument("--parent-kl-weight", type=float, default=0.0,
                         help="penalize divergence from the frozen starting policy on learner decisions")
     parser.add_argument("--retain-preferences-manifest", type=Path,
-                        help="revalidate starting-checkpoint V11 preferences as PPO anchors")
+                        help="revalidate starting-checkpoint V10/V11 preferences as PPO anchors")
     parser.add_argument("--retain-preference-weight", type=float, default=0.0)
     parser.add_argument("--retain-preference-batch-size", type=int, default=8)
     parser.add_argument("--policy-update", choices=("reinforce", "clipped_ppo"),
@@ -485,6 +487,10 @@ def main() -> None:
         "self_play_config": config, "self_play_reports": reports,
         "torch_version": str(torch.__version__),
     }
+    if preference_anchors:
+        # Future rounds must be able to revalidate the retained labels against
+        # the exact files admitted by this checkpoint's parent.
+        checkpoint["preference_sha256"] = dict(parent["preference_sha256"])
     if value_model is not None:
         checkpoint["value_model_state"] = value_model.state_dict()
         checkpoint["value_model_width"] = args.value_width
