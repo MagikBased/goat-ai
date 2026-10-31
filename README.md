@@ -90,6 +90,12 @@ from the engine and assets used for the replay.
 
 The local game creation page now has **Play in EDOPro**. Start it with
 `start_review_viewer.sh` or `python scripts/launch_review_server.py --game-creator`.
+To open that page and the locally installed EDOPro desktop client together,
+run `./start_edopro_duel.sh`. The client stays in ignored local cache; if your
+EDOPro executable is elsewhere, run
+`GOAT_AI_EDOPRO_CLIENT=/absolute/path/to/EDOPro ./start_edopro_duel.sh`.
+The launcher does not start a duel until you press **Start EDOPro room** on
+the page and join the displayed address in the client.
 The browser [play page](examples/play_game.html) also links to this room and
 shows whether it is listening; EDOPro recording and confirmed-choice review
 remain on the game creation page.
