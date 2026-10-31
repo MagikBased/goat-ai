@@ -186,6 +186,24 @@ revive Elf and leaves Life Points at 8000. Both branches finish, serialize,
 replay-verify, and pass the visibility audit. This covers the face-up response
 and cost, not every Oppression/Special Summon interaction.
 
+**Royal Oppression responding to Marauding Captain:** The [archived
+Royal Oppression FAQ](https://www.goatformat.com/rulings6.html) explicitly
+uses Marauding Captain as an example: Oppression may chain to its optional
+Normal-Summon trigger, negate that effect, prevent the hand Special Summon,
+and destroy Captain. A paired seed-100 pinned-native fixture Sets Oppression,
+flips it before Captain is Normal Summoned, and accepts Captain's trigger.
+Oppression appears as a Chain Link 2 response. Taking it pays 800 LP, sends
+Captain to the Graveyard, and leaves no monster on Captain's field. Passing
+it lets Captain Special Summon Mystical Elf from hand; both monsters remain
+face-up and Oppression's controller stays at 8000 LP. Both complete duels
+serialize, replay-verify, and pass the player-visibility audit. This covers
+one monster-triggered Special Summon, not all effects that summon from hand.
+
+The same FAQ discusses Monster Gate, but [Konami's card record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=5980&ope=2)
+places its first TCG release on October 20, 2005. The GOAT whitelist
+correctly rejects it for this April/August 2005 profile. We did not use that
+out-of-pool example as a GOAT regression fixture.
+
 **Opponent End Phase Scapegoat into Metamorphosis:** [GOAT World Championship coverage](https://www.goatformat.com/home/world-championship-2022-feature-match-geistd-vs-insids) records Scapegoat activated in the opponent's End Phase followed by Metamorphosis on a Sheep Token during the controller's next turn. A seeded pinned-native fixture Sets Scapegoat, waits through the opponent's Normal Summon to its End Phase, then activates Scapegoat in that response window. Four Tokens appear and the public same-turn Summon restriction is visible through the remainder of that turn. At the controller's next Main Phase, the restriction is gone: a Normal Summon is legal, and Metamorphosis can Tribute one Sheep Token to Summon GOAT Thousand-Eyes Restrict. Three Tokens remain, both Spells are in their owner's Graveyard, and the complete duel serializes and replay-verifies. This synthetic fixture checks the tournament-described timing and turn boundary, not the complete recorded match state.
 
 **Breaker summon trigger against Torrential Tribute:** A [February 2005 contemporary ruling discussion](https://www.cogonline.net/threads/question-on-breaker-the-magicial-warrior.38967/) describes Torrential chaining to Breaker's Spell Counter trigger, destroying Breaker before that trigger can put a counter on it. This agrees with the [2003 Netrep explanation](https://www.scribd.com/document/489838018/netrep30-pdf) that Breaker cannot spend a counter during the summon-response chain because it has not yet received one. A seeded native fixture leaves one other monster on each side, Sets Torrential, and then Normal Summons Breaker. The response prompt shows Breaker at 1600 ATK with no counter; Torrential destroys all three monsters, leaves both players at 8000 LP, and Breaker never receives a destruction action. Both pinned official scripts load. Other multi-link summon-response chains remain untested.

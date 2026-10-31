@@ -1023,6 +1023,14 @@ or eight sourced-deck Tactical duels. The opt-in feature remains available for
 such decisions, but these samples supply no v32 training signal. Prioritize
 broader independently reviewed play and M4's held-out strength gate.
 
+A paired [Marauding Captain/Royal Oppression fixture](goat_rules.md#royal-oppression-responding-to-marauding-captain)
+checks a second archived Oppression example: negating Captain's summon trigger
+pays 800 LP and destroys Captain; passing allows a hand monster to be Special
+Summoned. Both complete native duels replay-verify and pass visibility checks.
+The related Monster Gate example was excluded because its first TCG release
+postdates the GOAT pool. This advances one M2 trigger interaction; it does not
+certify all Special Summon effects.
+
 ## M3 — Evaluation and data
 
 The local replay server now also supports a browser human-versus-AI duel on
