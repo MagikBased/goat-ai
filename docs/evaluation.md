@@ -1,5 +1,31 @@
 # Baseline evaluation log
 
+## Broader 60-card Fusion and Tactical protocol probe (30 October 2026)
+
+Fresh seeds 182000–182063 generated 128 independently sampled, whitelist-legal
+60-card Main Decks, each with a random 15-card Fusion Extra Deck. Three
+Scapegoats and three Metamorphoses in each Main Deck, plus Thousand-Eyes
+Restrict in each Extra Deck, stressed Fusion decisions. Tactical-v14 played
+both seats. All **64/64** isolated duels reached terminal within the
+3,000-decision cap, with **40,638** decisions total (238–2,828 per game) and
+no reported native errors. Every decision independently replay-verified and
+passed the player-visible audit, including 223 hidden-field, 1,840
+opponent-field, and 19 opponent-hand choice contexts. Across the sample,
+30 action kinds and 1,254 loaded card scripts were recorded. A second native
+engine reproduced every ordered decision, terminal observation, and outcome:
+**40,638/40,638** repeated decisions matched. These synthetic Decks broaden
+protocol and reproducibility evidence; they do not prove arbitrary-deck
+completeness, all 1,254 scripts' historical rulings, or playing strength.
+
+The ignored report is
+`.cache/goat-ai/random_probe_60_fusion_tactical_182000/report.json` (SHA-256
+`0a161a2faaac1baf7b40421c5026930ff1fe87c25241bd2d05a1eed9e577eb30`).
+Reproduce with `scripts/probe_random_decks.py --native-root .cache/goat-ai
+--output <fresh ignored directory> --seed 182000 --seeds 64
+--max-decisions 3000 --main-size 60 --agent tactical --random-extra
+--fusion-stress --distinct-opponents --verify-replays --repeat-seeds
+--count-card-actions --isolate-games`.
+
 ## Human-prefix child on a broader matched holdout (30 October 2026)
 
 The experimental feature-v23 child fitted to 41 self-recorded browser choices was compared again with its selected parent. Before running, the schedule fixed two sourced New Jersey pairings: Rhymus Lizo Goat Control versus Mary Triatafilidi Warrior, and Ryan Hayakawa Goat Control versus Roberto Martinez Phoenix Control. Both Deck assignments and both policy seats were evaluated on fresh seeds 180000–180007, with the same visible own-loss guard v1 and Tactical-v14 opponent for both checkpoints. Exact YDK and Main Deck composition overlap with each checkpoint's training games was rejected. The child scored **22–42** and the parent **24–40** across 64 games each. The strict matched score difference was **−3.13 percentage points**, paired 95% interval **[−7.81, 0]**. The difference came from Phoenix Control (child 4/16, parent 6/16); the other three assigned Decks tied. Both reports replay-verified and visibility-audited all **70,655** decisions.
