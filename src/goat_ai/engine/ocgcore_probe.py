@@ -286,7 +286,8 @@ def _view_card(viewer: int, player: int, location: int, sequence: int,
                     (card.race or None) if location == LOCATION_MZONE and faceup else None,
                     card.owner if location == LOCATION_MZONE and faceup else None,
                     attribute=((card.attribute or None)
-                               if location == LOCATION_MZONE and faceup else None))
+                               if location == LOCATION_MZONE and faceup else None),
+                    level=(card.level if location == LOCATION_MZONE and faceup else None))
 
 
 POSITION_FACEDOWN_DEFENSE = 0x08
@@ -1272,6 +1273,7 @@ class OcgcoreProbe:
             QUERY_COUNTERS,
             QUERY_DEFENSE,
             QUERY_EQUIP_CARD,
+            QUERY_LEVEL,
             QUERY_OWNER,
             QUERY_POSITION,
             QUERY_RACE,
@@ -1280,7 +1282,7 @@ class OcgcoreProbe:
 
         flags = QUERY_CODE | QUERY_POSITION
         if location == LOCATION_MZONE:
-            flags |= (QUERY_ATTRIBUTE | QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE
+            flags |= (QUERY_LEVEL | QUERY_ATTRIBUTE | QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE
                       | QUERY_COUNTERS | QUERY_OWNER)
         elif location == LOCATION_SZONE:
             flags |= QUERY_EQUIP_CARD | QUERY_COUNTERS

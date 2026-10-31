@@ -25,6 +25,17 @@ def _without_attributes(view):
                    own_extra_deck=cards(view.own_extra_deck))
 
 
+def _without_levels(view):
+    """Compare a pre-v30 room replay with the newer public view."""
+    def cards(items):
+        return tuple(replace(card, level=None) for card in items)
+
+    return replace(view, hand=cards(view.hand), field=cards(view.field),
+                   graveyards=tuple(cards(zone) for zone in view.graveyards),
+                   banished=tuple(cards(zone) for zone in view.banished),
+                   own_extra_deck=cards(view.own_extra_deck))
+
+
 def deck_composition_sha256(main, extra) -> str:
     """Identify a deck by its cards, independent of shuffled draw order."""
     composition = {"main": sorted(main), "extra": sorted(extra)}
@@ -90,6 +101,11 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
     trajectory = read_trajectory(review_path)
     reconstructed_decisions = reconstructed.decisions
     reconstructed_terminal = reconstructed.terminal_observation
+    if trajectory.schema_version < 30:
+        reconstructed_decisions = tuple(replace(
+            decision, observation=_without_levels(decision.observation))
+            for decision in reconstructed_decisions)
+        reconstructed_terminal = _without_levels(reconstructed_terminal)
     if trajectory.schema_version == 28:
         reconstructed_decisions = tuple(replace(
             decision, observation=_without_attributes(decision.observation))
@@ -109,7 +125,7 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
     status = provenance.get("recording_status")
     if (trajectory.source != (base_source if complete else base_source + "_partial")
             or trajectory.ruleset != ruleset
-            or trajectory.schema_version not in (28, 29)
+            or trajectory.schema_version not in (28, 29, 30)
             or (status not in (None, "complete") if complete
                 else status != "interrupted")
             or trajectory.decks != tuple(metadata.get("names", ()))

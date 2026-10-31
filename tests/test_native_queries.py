@@ -11,6 +11,7 @@ from goat_ai.engine.native_queries import (
     QUERY_CODE,
     QUERY_END,
     QUERY_EQUIP_CARD,
+    QUERY_LEVEL,
     QUERY_OWNER,
     QUERY_POSITION,
     QUERY_RACE,
@@ -151,6 +152,27 @@ def test_query_location_decodes_current_monster_attribute_and_hides_it_facedown(
         decode_location(struct.pack("<I", len(malformed)) + malformed)
 
 
+def test_query_location_decodes_current_monster_level_and_hides_it_facedown():
+    def record(flag, payload=b""):
+        return struct.pack("<HI", 4 + len(payload), flag) + payload
+
+    def frame(position, level):
+        card = (record(QUERY_CODE, struct.pack("<I", 49003308))
+                + record(QUERY_POSITION, struct.pack("<I", position))
+                + record(QUERY_LEVEL, struct.pack("<I", level))
+                + record(QUERY_END))
+        return decode_location(struct.pack("<I", len(card)) + card)[0]
+
+    assert _view_card(1, 0, LOCATION_MZONE, 2, frame(1, 4)).level == 4
+    assert _view_card(1, 0, LOCATION_MZONE, 2, frame(8, 4)).level is None
+    assert _view_card(0, 0, LOCATION_MZONE, 2, frame(8, 4)).level is None
+    malformed = (record(QUERY_CODE, struct.pack("<I", 49003308))
+                 + record(QUERY_POSITION, struct.pack("<I", 1))
+                 + record(QUERY_LEVEL, bytes(8)) + record(QUERY_END))
+    with pytest.raises(ValueError, match="query uint32"):
+        decode_location(struct.pack("<I", len(malformed)) + malformed)
+
+
 def test_query_location_decodes_original_owner():
     def record(flag, payload=b""):
         return struct.pack("<HI", 4 + len(payload), flag) + payload
@@ -211,4 +233,5 @@ def test_native_observation_redacts_opponent_facedown_monster():
         assert opponent.field[0].defense is None
         assert opponent.field[0].counters == ()
         assert opponent.field[0].race is None
+        assert opponent.field[0].level is None
         assert opponent.field[0].owner is None

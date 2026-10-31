@@ -59,7 +59,7 @@ def _json_dataclass(value):
 def write_trajectory(path: str | Path, trajectory: Trajectory, *,
                      fast_json: bool = False) -> None:
     version = trajectory.schema_version
-    if version not in range(1, 30):
+    if version not in range(1, 31):
         raise ValueError("unsupported trajectory schema")
     if version < 28 and any("effect_option" in action.parameters
                             for record in trajectory.decisions
@@ -116,6 +116,8 @@ def write_trajectory(path: str | Path, trajectory: Trajectory, *,
             raise ValueError("public attack slots require schema v27")
         if version < 29 and any(card.attribute is not None for card in cards):
             raise ValueError("current monster Attribute requires schema v29")
+        if version < 30 and any(card.level is not None for card in cards):
+            raise ValueError("current monster Level requires schema v30")
     if fast_json:
         try:
             import orjson
@@ -140,7 +142,7 @@ def read_trajectory(path: str | Path, *, fast_json: bool = False) -> Trajectory:
     else:
         raw = json.loads(data)
     version = raw.get("schema_version")
-    if version not in range(1, 30):
+    if version not in range(1, 31):
         raise ValueError("unsupported trajectory schema")
     if version < 28 and any("effect_option" in action.get("parameters", {})
                             for record in raw.get("decisions", ())
@@ -168,6 +170,8 @@ def read_trajectory(path: str | Path, *, fast_json: bool = False) -> Trajectory:
                 item.pop("faceup_turns", None)
             if version < 29:
                 item.pop("attribute", None)
+            if version < 30:
+                item.pop("level", None)
             result.append(CardView(**item))
         return tuple(result)
 
@@ -183,6 +187,10 @@ def read_trajectory(path: str | Path, *, fast_json: bool = False) -> Trajectory:
                                  and card.get("position") == "faceup"
                                  and "attribute" not in card for card in view["field"]):
             raise ValueError("schema v29 requires an Attribute field for face-up monsters")
+        if version >= 30 and any(card.get("zone") == "monster"
+                                 and card.get("position") == "faceup"
+                                 and "level" not in card for card in view["field"]):
+            raise ValueError("schema v30 requires a Level field for face-up monsters")
         view["field"] = cards(view["field"])
         if version >= 25 and any(card.zone == "monster" and card.position == "faceup"
                                  and card.owner is None for card in view["field"]):

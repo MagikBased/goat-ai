@@ -195,7 +195,7 @@ class Bridge:
                             "human_client_seat": 1,
                             "authorization": bridge.human_authorization,
                         },
-                        schema_version=29,
+                        schema_version=30,
                         deck_sha256=deck_hashes,
                         asset_sha256=asset_sha256,
                         terminal_observation=mirror.decision.observation,

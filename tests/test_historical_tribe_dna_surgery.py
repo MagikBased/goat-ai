@@ -79,6 +79,9 @@ def test_dna_surgery_chained_after_tribe_type_declaration(tmp_path, chain_dna):
                         assert {(c.code, c.race) for c in obs.field
                                 if c.zone == "monster"} == {
                                     (TRIBE, AQUA), (GAGAGIGO, REPTILE)}
+                        assert {c.code: c.level for c in obs.field
+                                if c.zone == "monster"} == {
+                                    TRIBE: 4, GAGAGIGO: 4}
                         action = next(a for a in actions
                                       if a.parameters["race"] == REPTILE)
                         declared = True
@@ -112,6 +115,10 @@ def test_dna_surgery_chained_after_tribe_type_declaration(tmp_path, chain_dna):
                         if c.zone == "monster"} == {
                             (c.controller, c.sequence, c.race)
                             for c in opponent_view.field if c.zone == "monster"}
+                assert {c.code: c.level for c in own.field
+                        if c.zone == "monster"} == {
+                            c.code: c.level for c in opponent_view.field
+                            if c.zone == "monster"}
                 assert (GAGAGIGO in {c.code for c in own.graveyards[1]}) != chain_dna
                 assert (DNA_SURGERY in {c.code for c in own.field}) == chain_dna
                 assert SERPENT in {c.code for c in own.graveyards[0]}

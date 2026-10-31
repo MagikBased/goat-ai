@@ -563,7 +563,7 @@ def test_schema_twenty_seven_terminal_observation_round_trip_and_verification(tm
         final = env.step(env.legal_actions()[0])
         assert env.is_terminal()
         trajectory = env.trajectory()
-    assert trajectory.schema_version == 29
+    assert trajectory.schema_version == 30
     assert trajectory.terminal_observation == final
     path = tmp_path / "terminal.json"
     write_trajectory(path, trajectory)
@@ -595,6 +595,26 @@ def test_schema_twenty_nine_requires_current_faceup_attribute(tmp_path):
     del raw["decisions"][0]["observation"]["field"][0]["attribute"]
     path.write_text(json.dumps(raw))
     with pytest.raises(ValueError, match="schema v29"):
+        read_trajectory(path)
+
+
+def test_schema_thirty_requires_current_faceup_level(tmp_path):
+    action = Action("0", "pass", 0)
+    monster = CardView(0, "monster", "faceup", 49003308, 0,
+                       owner=0, attribute=0x20, level=4)
+    snapshot = replace(view(), field=(monster,), turn_player=0)
+    trajectory = Trajectory("goat", ("a", "b"), 7,
+                            (DecisionRecord(snapshot, (action,), action),), 0,
+                            schema_version=30, terminal_observation=snapshot)
+    path = tmp_path / "level.json"
+    write_trajectory(path, trajectory)
+    assert read_trajectory(path) == trajectory
+    with pytest.raises(ValueError, match="schema v30"):
+        write_trajectory(path, replace(trajectory, schema_version=29))
+    raw = json.loads(path.read_text())
+    del raw["decisions"][0]["observation"]["field"][0]["level"]
+    path.write_text(json.dumps(raw))
+    with pytest.raises(ValueError, match="schema v30"):
         read_trajectory(path)
 
 
