@@ -77,7 +77,9 @@ def audit_decision_visibility(record: DecisionRecord) -> Counter[str]:
     }
     known_hand = Counter(observation.known_opponent_hand_cards)
     counts: Counter[str] = Counter()
-    for action in record.legal_actions:
+    for index, action in enumerate(record.legal_actions):
+        if action.id != str(index):
+            raise VisibilityViolation("legal action ID is not a public ordinal")
         if action.actor != observation.acting_player:
             raise VisibilityViolation("legal action actor differs from acting player")
         if action.kind in _ZONE_KINDS:

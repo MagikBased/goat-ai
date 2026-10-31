@@ -161,6 +161,14 @@ def test_nested_card_choices_are_audited_for_every_action_kind():
                                           "future_card_choice"))
 
 
+def test_action_ids_cannot_encode_hidden_information():
+    observation = _observation()
+    for action_id in ("hidden-card-456", "1", "00"):
+        action = Action(action_id, "pass", 0)
+        with pytest.raises(VisibilityViolation, match="public ordinal"):
+            audit_decision_visibility(DecisionRecord(observation, (action,), action))
+
+
 def test_audit_checks_single_and_multi_tribute_choices():
     observation = _observation()
     hidden = {"controller": 1, "location": 4, "sequence": 2, "code": 456}
