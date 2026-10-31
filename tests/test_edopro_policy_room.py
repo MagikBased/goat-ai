@@ -4,7 +4,6 @@ import asyncio
 import hashlib
 import json
 import os
-import shlex
 import shutil
 import socket
 import subprocess
@@ -116,6 +115,17 @@ def test_room_rechecks_changed_recording_input_even_if_newest_mtime_is_unchanged
     assert len(checks) == 3
 
 
+def test_edopro_training_requires_saved_human_confirmations(tmp_path, monkeypatch):
+    manager = EdoRoomManager(GameCreator(root=tmp_path, native_root=tmp_path))
+    replay = tmp_path / "game-001.yrpX"
+    monkeypatch.setattr(manager, "_verified_game", lambda identifier: (
+        replay, replay.with_suffix(".review.json"),
+        replay.with_suffix(".meta.json")))
+    with pytest.raises(ValueError, match="Confirm your EDOPro choices"):
+        manager.train_confirmed("a" * 16)
+    assert not replay.with_suffix(".pt").exists()
+
+
 @pytest.mark.skipif(
     not (os.getenv("GOAT_AI_EDOPRO_HOST_ROOT") and os.getenv("GOAT_AI_EDOPRO_MIRROR_ROOT")
          and os.getenv("GOAT_AI_EDOPRO_HISTORICAL") == "1"),
@@ -203,11 +213,14 @@ def test_page_room_launcher_completes_and_lists_verified_game(ai_deck, client_de
                 manifest = json.loads(bundle.read("bundle_manifest.json"))
                 assert manifest["confirmed_human_choices"] == 1
                 assert manifest["historical_goat_certified"] is False
-            child_run = subprocess.run(
-                shlex.split(choices["training_command"])[1:],
-                cwd=project, env=os.environ, check=True,
-                capture_output=True, text=True)
-            assert json.loads(child_run.stdout)["decisions"] == 1
+            trained = manager.train_confirmed(identifier)
+            assert trained["experimental_trained"] is True
+            assert trained["decisions"] == 1
+            assert trained["continues_recorded_policy"] is True
+            assert trained["historical_goat_certified"] is False
+            assert trained["training_admitted"] is False
+            with pytest.raises(ValueError, match="already exists"):
+                manager.train_confirmed(identifier)
             child = torch.load(manager.folder / identifier / "confirmed_child.pt",
                                map_location="cpu", weights_only=True)
             assert child["parent_checkpoint_sha256"] == hashlib.sha256(

@@ -3405,6 +3405,16 @@ its size and modification time. This keeps the displayed verification status
 current; the separate training intake still independently re-verifies the
 recording and confirmed human choices.
 
+The game page now has an explicit **Train experimental child** button after
+human choices are saved. Its local endpoint accepts only a session ID, repeats
+the complete pinned replay and human-choice checks, runs the displayed trainer
+without a shell, checks the recorded parent hash and input-file hashes, and
+refuses to overwrite a previous child checkpoint. The new checkpoint remains
+experimental and never replaces the selected AI. All three historical-deck
+temporary-port room integrations passed this button's manager path; a separate
+server-route test rejects an output-path injection. This shortens the
+authorized-data handoff but does not supply expert demonstrations or close M4.
+
 For training, the bot logs the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The
 human's decisions require equivalent logging at the server or validated

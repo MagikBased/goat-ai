@@ -122,6 +122,12 @@ experimental trainer described below. The dialog gives a command to train a
 separate child of the AI used in that duel when its checkpoint hash still
 matches. If that parent has changed, it labels a from-scratch pilot instead.
 Neither result replaces the selected AI without held-out evaluation.
+After saving at least one confirmation, you can press **Train experimental
+child** in the same dialog. The local server repeats replay and authorization
+checks, runs the displayed training command without a shell, and saves the
+checkpoint beside the replay. It refuses to overwrite an existing child;
+use the displayed command with a different output path for another run. The
+button waits for training to finish, which can take a while for a long duel.
 The session also offers **Download EDOPro replay** for its native `.yrpX`
 file, including when a saved replay has not passed independent reconstruction.
 Only complete, verified recordings can supply confirmed choices to the

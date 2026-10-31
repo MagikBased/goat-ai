@@ -344,6 +344,13 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
             return {"id": identifier, "confirmed": len(frames),
                     "training_admitted": False}
 
+        def train_confirmed(self, identifier):
+            if identifier != "a" * 16:
+                raise ValueError("invalid EDOPro session ID")
+            launched.append((identifier, "train"))
+            return {"id": identifier, "experimental_trained": True,
+                    "training_admitted": False}
+
         def native_replay(self, identifier):
             if identifier != "a" * 16:
                 raise ValueError("invalid EDOPro session ID")
@@ -372,6 +379,14 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
         assert _request(f"{base}/api/edopro/confirm", {
             "id": "a" * 16, "frames": [1, 3]})[1]["confirmed"] == 2
         assert launched[-1] == ("a" * 16, [1, 3])
+        assert _request(f"{base}/api/edopro/train", {
+            "id": "a" * 16})[1]["experimental_trained"] is True
+        assert launched[-1] == ("a" * 16, "train")
+        with pytest.raises(HTTPError, match="400"):
+            _request(f"{base}/api/edopro/train", {
+                "id": "a" * 16, "output": "outside.pt"})
+        with pytest.raises(HTTPError, match="400"):
+            _request(f"{base}/api/edopro/train", {"id": "../../outside"})
         with urlopen(f"{base}/api/edopro/replay?id={'a' * 16}", timeout=5) as response:
             assert response.read() == b"yrpX-test"
             assert response.headers["Content-Disposition"] == (

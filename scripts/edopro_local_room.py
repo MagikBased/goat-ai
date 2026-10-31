@@ -229,6 +229,7 @@ class EdoRoomManager:
             continuation = True
         command += ["--output", str(replay.parent / (
             "confirmed_child.pt" if continuation else "confirmed_pilot.pt"))]
+        output = Path(command[-1])
         return {"id": identifier, "viewer": recording["viewer"],
                 "native_replay": recording["native_replay"],
                 "experimental_confirmed_eligible": recording.get(
@@ -236,7 +237,72 @@ class EdoRoomManager:
                 "candidates": candidates, "confirmed": len(confirmed),
                 "training_command": "PYTHONPATH=src:. " + shlex.join(command),
                 "continues_recorded_policy": continuation,
+                "experimental_checkpoint_exists": output.is_file(),
                 "training_admitted": False}
+
+    def train_confirmed(self, identifier: str) -> dict:
+        """Fit a separate experimental child from this room's confirmed choices."""
+        with self.lock:
+            replay, review, metadata = self._verified_game(identifier)
+            labels = replay.with_suffix(".human_labels.json")
+            if not labels.is_file():
+                raise ValueError("Confirm your EDOPro choices before training")
+            checked = verify_edopro_human_annotations(
+                replay, review, metadata, labels, self.creator.native_root)
+            if checked["confirmed_human_choices"] < 1:
+                raise ValueError("No optional human choices are confirmed")
+            source_hashes = {path: sha256_file(path)
+                             for path in (replay, review, metadata, labels)}
+            choice_info = self.choices(identifier)
+            command = shlex.split(choice_info["training_command"])[1:]
+            output = Path(command[command.index("--output") + 1])
+            if output.exists() or output.is_symlink():
+                raise ValueError("An experimental checkpoint already exists for this room; "
+                                 "use the displayed command with a different output path")
+            env = os.environ.copy()
+            env["PYTHONPATH"] = os.pathsep.join((
+                str(self.root / "src"), str(self.root), str(self.host_package),
+                env.get("PYTHONPATH", "")))
+            try:
+                completed = subprocess.run(
+                    command, cwd=self.root, env=env, capture_output=True,
+                    text=True, timeout=600, check=False)
+            except subprocess.TimeoutExpired as exc:
+                raise ValueError("Experimental training exceeded ten minutes") from exc
+            if completed.returncode != 0:
+                raise ValueError("Experimental training failed: " +
+                                 (completed.stderr.strip()[-600:] or
+                                  f"exit code {completed.returncode}"))
+            if not output.is_file():
+                raise RuntimeError("Training returned success without a checkpoint")
+            if any(sha256_file(path) != digest for path, digest in source_hashes.items()):
+                output.unlink()
+                raise RuntimeError("EDOPro replay or confirmations changed during training")
+            summary = json.loads(completed.stdout)
+            if summary["decisions"] != checked["confirmed_human_choices"]:
+                output.unlink()
+                raise RuntimeError("Trainer used a different number of confirmed choices")
+            checkpoint = torch.load(output, map_location="cpu", weights_only=True)
+            parent_hash = json.loads(metadata.read_text(encoding="utf-8")).get(
+                "checkpoint_sha256")
+            source_field = ("new_source_decisions" if choice_info["continues_recorded_policy"]
+                            else "source_decisions")
+            if checkpoint.get(source_field, {}).get(
+                    "edopro_human_confirmed_experimental") != checked[
+                        "confirmed_human_choices"]:
+                output.unlink()
+                raise RuntimeError("Checkpoint lacks the confirmed human-choice provenance")
+            if (choice_info["continues_recorded_policy"]
+                    and checkpoint.get("parent_checkpoint_sha256") != parent_hash):
+                output.unlink()
+                raise RuntimeError("Trainer used a different parent checkpoint")
+            return {"id": identifier, "experimental_trained": True,
+                    "checkpoint": str(output),
+                    "checkpoint_sha256": sha256_file(output),
+                    "decisions": summary["decisions"],
+                    "continues_recorded_policy": choice_info["continues_recorded_policy"],
+                    "historical_goat_certified": False,
+                    "training_admitted": False}
 
     def save_choices(self, identifier: str, frames: list[int]) -> dict:
         if (not isinstance(frames, list) or len(frames) > 1000

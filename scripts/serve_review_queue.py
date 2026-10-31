@@ -591,12 +591,14 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                                 "/api/review/note", "/api/review/upstream",
                                 "/api/games", "/api/games/review",
                                 "/api/edopro/start", "/api/edopro/confirm",
+                                "/api/edopro/train",
                                 "/api/live/start", "/api/live/choice",
                                 "/api/live/close"):
                 self._json(404, {"error": "unknown endpoint"})
                 return
             if endpoint not in ("/api/games", "/api/games/review",
                                 "/api/edopro/start", "/api/edopro/confirm",
+                                "/api/edopro/train",
                                 "/api/live/start", "/api/live/choice",
                                 "/api/live/close") and store is None:
                 self._json(404, {"error": "no review queue is open"})
@@ -613,7 +615,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                     raise ValueError("request body size is invalid")
                 data = json.loads(self.rfile.read(size))
                 expected = ({"id"} if endpoint in ("/api/games/review",
-                                                 "/api/live/close") else
+                                                 "/api/live/close",
+                                                 "/api/edopro/train") else
                             {"deck1", "deck2", "human_seat", "opponent", "seed"}
                             if endpoint == "/api/live/start" else
                             {"id", "action_index", "expected_decisions"}
@@ -655,6 +658,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                     result = edo_room.start(data["ai_deck"])
                 elif endpoint == "/api/edopro/confirm":
                     result = edo_room.save_choices(data["id"], data["frames"])
+                elif endpoint == "/api/edopro/train":
+                    result = edo_room.train_confirmed(data["id"])
                 elif endpoint == "/api/review/choice":
                     result = store.choose(data["source"], data["decision_index"],
                                           data["action_index"])
