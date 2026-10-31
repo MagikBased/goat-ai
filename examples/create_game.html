@@ -276,7 +276,9 @@
           link.href = `${review.viewer}#decision=${choice.frame}`;
           link.target = "_blank"; link.rel = "noopener";
           link.textContent = `Decision ${choice.frame}`;
-          label.append(link, ` · T${choice.turn} ${choice.phase} · ${choice.label}`);
+          const choiceLabel = choice.label ||
+            `${choice.action}${choice.card ? ` · ${choice.card}` : ""}`;
+          label.append(link, ` · T${choice.turn} ${choice.phase} · ${choiceLabel}`);
           item.append(label); list.append(item);
         }
         if (!review.candidates.length) list.textContent = "No optional human-seat decisions in this recording.";
