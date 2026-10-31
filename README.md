@@ -90,6 +90,9 @@ from the engine and assets used for the replay.
 
 The local game creation page now has **Play in EDOPro**. Start it with
 `start_review_viewer.sh` or `python scripts/launch_review_server.py --game-creator`.
+The browser [play page](examples/play_game.html) also links to this room and
+shows whether it is listening; EDOPro recording and confirmed-choice review
+remain on the game creation page.
 Choose a published AI Deck and press **Start EDOPro room**. When the page says
 the room is running, join `127.0.0.1:7911` through EDOPro's LAN host-address
 screen. The page shows the latest room sessions and links a recording only

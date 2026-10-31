@@ -153,6 +153,7 @@
     <p><a href="/games/new">← AI game creator</a></p>
     <h1>Play against GOAT AI</h1>
     <p>Choose your Deck, an AI opponent, and a seed. Your decisions use the native GOAT rules engine. A completed game becomes a verified local replay.</p>
+    <p><a href="/games/new#edopro-heading">Play in the EDOPro client</a> · <span id="edopro-room-status" role="status">Checking EDOPro room…</span></p>
     <form id="new-game">
       <div class="seats">
         <label>Player 1 Deck<select id="deck1" required></select></label>
@@ -189,6 +190,7 @@
     <aside id="sidebar">
       <h1>GOAT AI · live duel</h1>
       <a href="/games/new">Create an AI replay</a>
+      <a href="/games/new#edopro-heading">Play in EDOPro</a>
       <button data-duel-mute type="button" aria-label="Toggle duel sounds">🔊 Sound on</button>
       <button id="quit" type="button">Leave unfinished duel</button>
       <p id="message" role="status" aria-live="polite"></p>
@@ -978,6 +980,21 @@
       } catch (error) { byId("setup-status").textContent = error.message;
         byId("start").disabled = false; }
     });
+    async function refreshEdoRoomStatus() {
+      try {
+        const response = await fetch("/api/edopro/status", {cache: "no-store"});
+        const room = await response.json();
+        if (!response.ok) throw new Error(room.error || "Room status unavailable");
+        byId("edopro-room-status").textContent = !room.available
+          ? "Local EDOPro setup is unavailable"
+          : room.listening ? `Room open at ${room.host}:${room.port}`
+          : room.room_running ? "Room starting…" : "Room ready to start";
+      } catch (_) {
+        byId("edopro-room-status").textContent = "Room status unavailable";
+      }
+    }
+    refreshEdoRoomStatus();
+    setInterval(() => { if (!document.hidden && byId("game").hidden) refreshEdoRoomStatus(); }, 10000);
     (async () => {
       try {
         const liveVersion = await request("/api/live/version");
