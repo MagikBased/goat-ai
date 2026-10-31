@@ -518,6 +518,8 @@ completeness unproven; see
 
 ## M2 — Historical correctness gate
 
+A paired [Dekoichi/Skill Drain fixture](goat_rules.md#dekoichi-and-chained-skill-drain) now checks the archived Flip Summon response ruling: Skill Drain can chain to Dekoichi's effect, pay 1000 LP, and prevent its draw while Dekoichi remains face-up. Both complete native duels replay-verify and pass visibility audits. The Damage Step restriction remains a separate test.
+
 A paired [Call of the Haunted/Necrovalley fixture](goat_rules.md#call-of-the-haunted-under-necrovalley)
 now checks the pinned core's effect-negation timing with and without Mystical
 Space Typhoon removing Necrovalley before Call resolves. A third branch
