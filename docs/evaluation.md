@@ -17233,6 +17233,43 @@ improvement, a net win against Tactical-v14, or transfer to arbitrary legal
 Decks. Keep the fallback opt-in while investigating the Zombie regression and
 collecting independent decision labels.
 
+### Fallback on the previously weak Zombie and Phoenix families (31 October 2026)
+
+A fresh, targeted follow-up used Jae Kim Zombie versus Mary Triatafilidi
+Warrior and Roberto Martinez Phoenix Control versus Ramon Ciriano Beastdown.
+These four published 2005 Main Decks were absent from the selected v23
+checkpoint's training games. Seeds 204300–204315, both Deck assignments, and
+both candidate seats produced **128 games per arm** against the unchanged
+Tactical-v14 opponent. The candidate used the opt-in raw-logit-margin-1.0
+fallback; the control used the same selected v23 checkpoint without fallback.
+The strict report comparator confirmed the matched schedule, identical pinned
+assets and source, and unseen Main Deck compositions. All **130,426 decisions**
+across 256 games replay-verified and passed the visibility audit; no duel hit
+the 3,000-decision cap.
+
+The fallback scored **54/128** against Tactical; the parent scored **47/128**.
+The paired score difference was **+5.47 percentage points**, 95% paired
+interval **−2.34 to +13.28 points**. By candidate Deck, fallback versus parent
+scores were Beastdown **24/32 versus 20/32**, Phoenix **7/32 versus 4/32**,
+Warrior **18/32 versus 17/32**, and Zombie **5/32 versus 6/32**. Zombie thus
+remained weak in absolute terms and showed no fallback gain. This schedule was
+chosen because earlier results identified Zombie and Phoenix as weak; it is a
+fresh-seed diagnostic, not an unselected confirmation of general transfer.
+Neither arm beat Tactical overall, and the paired interval includes zero.
+Keep the fallback opt-in and the selected checkpoint unchanged.
+
+The ignored reports are
+`.cache/goat-ai/eval_fallback_weak_families_204300_204315.json` (SHA-256
+`941abe0b079fd3f774a63b0793989369b4fd73999d3f900156f210f3a65c5ef6`)
+and `.cache/goat-ai/eval_parent_weak_families_204300_204315.json`
+(`7442036a207405e26df222529923543975f5d4d0fc3bd039a3385a51339cfea7`).
+Reproduce with `scripts/evaluate_policy.py` on the two named pairings using
+`--engine experimental --opponent tactical --both-deck-assignments
+--require-unseen-main-decks --verify-replays --workers 4 --max-decisions 3000
+--seed 204300 --seeds 16`; add `--tactical-fallback-margin 1.0` only to the
+candidate, then compare with `scripts/compare_tournament_reports.py
+--verify-local-decks --require-unseen-main-decks`.
+
 ### Low-margin synthetic-teacher distillation pilot (31 October 2026)
 
 The direct fallback gain above motivated a separate **weight-training** test.

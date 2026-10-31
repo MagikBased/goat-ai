@@ -2126,6 +2126,14 @@ duels replay-verified and passed visibility audit. Lower training loss at width
 64 did not yield an established competitive gain. M4 remains open, and the
 selected v23 checkpoint stays unchanged.
 
+A fresh 128-game-per-arm targeted fallback check on unseen Zombie, Phoenix,
+Warrior, and Beastdown Main Decks gave the optional margin-1.0 fallback 54
+wins against Tactical-v14 versus the unchanged v23 parent's 47. The paired
+95% interval for the +5.47-point difference crossed zero; Zombie remained
+weak at 5/32 fallback wins. All 130,426 decisions replay-verified and passed
+visibility checks. [Full protocol and reports](evaluation.md#fallback-on-the-previously-weak-zombie-and-phoenix-families-31-october-2026).
+Keep the selected policy unchanged; M4's baseline-strength gate remains open.
+
 ## M5 — Search and other formats
 
 Konami's 2009 version-7 rulebook is now recorded as the period source for the
