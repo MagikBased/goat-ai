@@ -2180,6 +2180,15 @@ intervals crossed zero. [The verified 192-duel experiment](evaluation.md#card-ch
 keeps this gate opt-in and M4 open; a local card-choice fix alone did not
 establish competitive improvement.
 
+On 16 independent full-whitelist random Deck pairs, the existing opt-in
+margin-1.0 Tactical fallback scored 159–97 directly against its unchanged
+parent over 256 fresh held-out games. Against Tactical-v14 on a separate
+matched 128-game-per-arm schedule it scored 61–66–1 versus the parent's
+45–82–1; the paired +12.5-point interval excluded zero. All 363,969
+decisions replay-verified and passed visibility checks. [The full protocol](evaluation.md#low-margin-fallback-on-the-full-whitelist-deck-pairs)
+supports a hybrid gain on these random compositions, but not a competitive
+GOAT strength or neural-weight gain. Keep M4 open and the fallback opt-in.
+
 ## M5 — Search and other formats
 
 Konami's 2009 version-7 rulebook is now recorded as the period source for the

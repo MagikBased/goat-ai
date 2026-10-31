@@ -17443,3 +17443,51 @@ OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.p
   --isolate-games --repeat-seeds --count-card-actions \
   --output .cache/goat-ai/tactical_full_whitelist_fusion_205000_205015
 ```
+
+### Low-margin fallback on the full-whitelist Deck pairs
+
+The already opt-in margin-1.0 Tactical fallback was tested on the 16 Deck
+pairs from the sweep above, with fresh duel seeds, both Deck assignments, and
+both policy seats. All 32 Main Deck compositions were absent from the
+selected feature-v23 checkpoint's recorded training games. The source Decks
+were fixed before this policy comparison; these randomly assembled lists
+test protocol transfer across unfamiliar cards, not competitive GOAT play.
+
+In a **256-game direct match** against the unchanged parent checkpoint on
+seeds 205100–205103, the fallback won **159–97**. Its 62.11% score had a
+95% paired-bootstrap interval of **57.03%–67.19%**. All **193,012** decisions
+replay-verified and passed the visibility audit. A separate matched Tactical-
+v14 comparison on seeds 205200–205201 used **128 games per arm**: the fallback
+scored **61–66–1**, the unchanged parent **45–82–1**. The strict comparator
+verified the same opponent, Deck files, unseen Main Deck compositions, native
+assets, code, and declared schedule; its paired score difference was **+12.5
+percentage points**, 95% interval **+3.91 to +21.88 points**. All **170,957**
+Tactical-game decisions replay-verified and passed visibility checks.
+
+This is a measured gain for an inference-time hybrid on one random-Deck
+sample, not a weight update or evidence of superhuman play. The fallback's
+absolute Tactical score remained below 50%, and earlier held-out historical
+Main Deck tests showed uneven archetype results. Keep the fallback opt-in and
+the selected neural checkpoint unchanged until broader sourced-Deck and human
+evaluations support a different choice.
+
+The ignored direct report is
+`.cache/goat-ai/eval_fallback_vs_parent_full_whitelist_205100_205103.json`
+(SHA-256 `344de726b87f1159cf89a4ff144b0a0c7e3df5cb78e8efa4ccaf94acf854cb26`).
+The matched Tactical reports are
+`eval_fallback_vs_tactical_full_whitelist_205200_205201.json`
+(`22b293c0f64ee3e87ad6396404f14392796e3ffc0c5fbe7bf7f40a5c162a3836`)
+and `eval_parent_vs_tactical_full_whitelist_205200_205201.json`
+(`773d7a3aee427cb270c77c0e1688071878e86882229c314ca7a64e062972b452`),
+under the same ignored `.cache/goat-ai/` directory. The strict comparison is
+`compare_fallback_parent_full_whitelist_205200_205201.json`
+(`b4705a93ffdf31838fbb37ae2f14f9569242235e1df48285106a31431ed4e6ca`).
+Reproduce the direct report with `scripts/evaluate_policy.py`, the selected
+v23 checkpoint in both policy seats (`--opponent-checkpoint`),
+`--tactical-fallback-margin 1.0`, `--engine experimental`,
+`--both-deck-assignments`, `--seed 205100 --seeds 4`, `--workers 4`,
+`--require-unseen-main-decks --reject-training-deck-hashes --verify-replays`,
+and one `--matchup` per generated Deck pair from the sweep report above.
+For the Tactical arms, replace the checkpoint opponent with
+`--opponent tactical`, use `--seed 205200 --seeds 2`, and include the fallback
+flag only on the candidate.
