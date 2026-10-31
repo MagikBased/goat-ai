@@ -60,8 +60,10 @@ MR1_SYNCHRO_CARDS = frozenset({
     72892473,  # Card Destruction; period DARK Graveyard setup probe
     65192027,  # Dark Armed Dragon; exact DARK count and destruction probe
     70095154,  # Cyber Dragon; inherent Summon and response probe
+    26593852,  # Ally of Justice Catastor; pre-damage-calculation battle probe
 })
-MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094, 7391448, 50321796})
+MR1_SYNCHRO_EXTRA = frozenset({60800381, 73580471, 44508094, 7391448,
+                               50321796, 26593852})
 UPSTREAM_GOYO_SHA256 = "b1f8f68c428302b537a1bf4b660ef33ae800afd4a1716cd962f3908b2f24302b"
 GOYO_TUNER_REQUIREMENT_CURRENT = (
     b"Synchro.AddProcedure(c,aux.FilterBoolFunctionEx(Card.IsAttribute,"

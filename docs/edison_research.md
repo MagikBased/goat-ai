@@ -979,6 +979,30 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_cyber_dragon_bottomless.py
 ```
 
+## Ally of Justice Catastor at the start of the Damage Step
+
+[Konami's Hidden Arsenal product page](https://www.yugioh-card.com/en/products/past_products/ha01/)
+gives a North American tournament-legal date of 10 November 2009, before the
+Edison cutoff. Its [period Hidden Arsenal rulings
+document](https://img.yugioh-card.com/ygo_cms/ygo/all/uploads/100304-HA_SDWS_ST09_Rules.pdf)
+says Catastor destroys a face-up non-DARK battle opponent at the start of the
+Damage Step, before damage calculation. The narrow MR1 probe now admits
+Catastor to the Extra Deck.
+
+A seed-3 native fixture uses Junk Synchron and Bokoichi to Synchro Summon
+Catastor, then attacks a face-up LIGHT Mystical Elf. A Catastor chain link
+appears in the Damage Step while Elf is still on the field; Elf then reaches
+the Graveyard and both players remain at 8000 LP. The complete duel
+serializes, replay-verifies, and passes the player-visibility audit. This
+checks one face-up non-DARK branch; face-down monsters, DARK monsters, other
+Damage Step responses, and broader Edison correctness remain open. Reproduce
+with:
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_catastor_damage_step.py
+```
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including

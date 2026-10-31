@@ -36,6 +36,7 @@ ROYAL_OPPRESSION = 93016201
 CARD_DESTRUCTION = 72892473
 DARK_ARMED_DRAGON = 65192027
 CYBER_DRAGON = 70095154
+ALLY_OF_JUSTICE_CATASTOR = 26593852
 PROBE_ELIGIBLE_IDS = frozenset(VANILLA_DECK) | {
     JUNK_SYNCHRON, JUNK_WARRIOR, BLACK_ROSE_DRAGON, STARDUST_DRAGON,
     GOYO_GUARDIAN, BRIONAC,
@@ -43,7 +44,8 @@ PROBE_ELIGIBLE_IDS = frozenset(VANILLA_DECK) | {
     BOTTOMLESS_TRAP_HOLE, BOOK_OF_MOON,
     DEKOICHI, GRAVEKEEPERS_SPY, DESERT_SUNLIGHT, BOKOICHI,
     SOUL_EXCHANGE, SANGAN, CAIUS, YAMI, UMI, RYKO, BATTLE_FADER,
-    ROYAL_OPPRESSION, CARD_DESTRUCTION, DARK_ARMED_DRAGON, CYBER_DRAGON}
+    ROYAL_OPPRESSION, CARD_DESTRUCTION, DARK_ARMED_DRAGON, CYBER_DRAGON,
+    ALLY_OF_JUSTICE_CATASTOR}
 RESTRICTION_TABLE = (Path(__file__).resolve().parents[3]
                      / "configs/historical/edison_2010_03_01_advanced_limits.tsv")
 RESTRICTION_ASSET = "historical/edison_2010_03_01_advanced_limits.tsv"
@@ -62,11 +64,12 @@ class Mr1SynchroProbeEngine(Mr1VanillaEngine):
     def _load_deck(self, path: str) -> Decklist:
         deck = read_ydk(path)
         if deck.side or any(code not in (JUNK_WARRIOR, BLACK_ROSE_DRAGON,
-                                        STARDUST_DRAGON, GOYO_GUARDIAN, BRIONAC)
+                                        STARDUST_DRAGON, GOYO_GUARDIAN, BRIONAC,
+                                        ALLY_OF_JUSTICE_CATASTOR)
                             for code in deck.extra):
             raise ValueError("MR1 Synchro probe allows only Junk Warrior, "
                              "Black Rose Dragon, Stardust Dragon, Goyo Guardian, "
-                             "or Brionac "
+                             "Brionac, or Ally of Justice Catastor "
                              "in Extra, no Side")
         restrictions = read_advanced_restrictions(RESTRICTION_TABLE)
         validate_edison_deck(deck, PROBE_ELIGIBLE_IDS, restrictions,

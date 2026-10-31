@@ -2060,6 +2060,13 @@ gain.
 
 ## M5 — Search and other formats
 
+A [period-sourced Catastor Damage Step fixture](edison_research.md#ally-of-justice-catastor-at-the-start-of-the-damage-step)
+now checks the Hidden Arsenal ruling in a full native MR1 duel: Catastor's
+effect chain appears before a face-up LIGHT monster is destroyed, with no
+battle damage. The trajectory replay-verifies and passes the visibility audit.
+This is one more interaction within the narrow probe, not a validated Edison
+profile.
+
 A paired [Cyber Dragon/Bottomless MR1 fixture](edison_research.md#cyber-dragons-inherent-summon-and-bottomless-response)
 now checks that Cyber Dragon's hand Special Summon is unavailable before the
 opponent controls a monster, then tests Bottomless in its Summon response
