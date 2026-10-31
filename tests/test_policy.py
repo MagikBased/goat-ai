@@ -2023,6 +2023,30 @@ def test_v34_encodes_visible_current_level_without_hidden_card_level(tmp_path):
         assert torch.allclose(child(other), expected, atol=1e-6)
 
 
+def test_v34_binds_current_level_to_the_selected_public_monster():
+    vocabulary = CardVocabulary((10, 20), ((10, 33, 1000), (20, 33, 1000)))
+    first = replace(view(), field=(
+        CardView(1, "monster", "faceup", 20, 0, "attack", 1000, 1000, level=3),
+        CardView(1, "monster", "faceup", 20, 1, "attack", 1000, 1000, level=4)))
+    swapped = replace(first, field=(replace(first.field[0], level=4),
+                                    replace(first.field[1], level=3)))
+    choices = (Action("slot-0", "select_card", 0,
+                      {"code": 20, "controller": 1, "location": 4, "sequence": 0}),
+               Action("slot-1", "select_card", 0,
+                      {"code": 20, "controller": 1, "location": 4, "sequence": 1}))
+    assert torch.equal(encode_decision(first, choices, vocabulary, 33).state_card_numbers,
+                       encode_decision(swapped, choices, vocabulary, 33).state_card_numbers)
+    before = encode_decision(first, choices, vocabulary, 34)
+    after = encode_decision(swapped, choices, vocabulary, 34)
+    assert before.action_field_slots.tolist() == [[2, 2, 0], [2, 2, 1]]
+    torch.manual_seed(341)
+    policy = LegalActionPolicy(vocabulary.size, width=16, feature_version=34)
+    with torch.no_grad():
+        original_scores = policy(before)
+        swapped_scores = policy(after)
+    assert not torch.allclose(original_scores, swapped_scores)
+
+
 def test_v31_distinguishes_unknown_announced_cards_and_warm_starts(tmp_path):
     from scripts.audit_policy_action_aliases import feature_aliases
 

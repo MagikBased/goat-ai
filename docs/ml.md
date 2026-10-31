@@ -620,5 +620,8 @@ hidden current Level. The explicit `--upgrade-feature-23-to-34` path copies
 the selected v23 architecture and zero-initializes the added Level, age,
 history, and action inputs, preserving parent logits before training. This
 exposes field-effect changes such as A Legendary Ocean to the model, but it
-has no measured competitive benefit yet. Existing checkpoints retain their
+has no measured competitive benefit yet. The v34 encoder also binds a chosen
+field slot to that monster's current Level: swapping the Levels of two otherwise
+identical face-up targets changes their action scores in a regression test.
+Existing checkpoints retain their
 original feature version.
