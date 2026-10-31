@@ -59,7 +59,7 @@ def _json_dataclass(value):
 def write_trajectory(path: str | Path, trajectory: Trajectory, *,
                      fast_json: bool = False) -> None:
     version = trajectory.schema_version
-    if version not in range(1, 31):
+    if version not in range(1, 32):
         raise ValueError("unsupported trajectory schema")
     if version < 28 and any("effect_option" in action.parameters
                             for record in trajectory.decisions
@@ -118,6 +118,8 @@ def write_trajectory(path: str | Path, trajectory: Trajectory, *,
             raise ValueError("current monster Attribute requires schema v29")
         if version < 30 and any(card.level is not None for card in cards):
             raise ValueError("current monster Level requires schema v30")
+        if version < 31 and any(card.level is not None for card in view.hand):
+            raise ValueError("current own-hand Level requires schema v31")
     if fast_json:
         try:
             import orjson
@@ -142,7 +144,7 @@ def read_trajectory(path: str | Path, *, fast_json: bool = False) -> Trajectory:
     else:
         raw = json.loads(data)
     version = raw.get("schema_version")
-    if version not in range(1, 31):
+    if version not in range(1, 32):
         raise ValueError("unsupported trajectory schema")
     if version < 28 and any("effect_option" in action.get("parameters", {})
                             for record in raw.get("decisions", ())
@@ -172,10 +174,14 @@ def read_trajectory(path: str | Path, *, fast_json: bool = False) -> Trajectory:
                 item.pop("attribute", None)
             if version < 30:
                 item.pop("level", None)
+            elif version < 31 and item.get("zone") == "hand":
+                item.pop("level", None)
             result.append(CardView(**item))
         return tuple(result)
 
     def observation(view: dict) -> Observation:
+        if version >= 31 and any("level" not in card for card in view["hand"]):
+            raise ValueError("schema v31 requires a Level field for own hand cards")
         view["hand"] = cards(view["hand"])
         if "own_extra_deck" in view:
             view["own_extra_deck"] = cards(view["own_extra_deck"])

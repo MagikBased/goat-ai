@@ -19,7 +19,7 @@ class CardView:
     owner: int | None = None  # Original owner of a face-up field monster; public in a duel.
     faceup_turns: int | None = None  # Turn boundaries since becoming face-up on the field.
     attribute: int | None = None  # Current Attribute of a face-up monster.
-    level: int | None = None  # Current Level of a face-up monster.
+    level: int | None = None  # Current Level of a face-up monster or own hand monster.
 
 
 @dataclass(frozen=True)
@@ -194,8 +194,13 @@ class Observation:
             if (card.zone != "monster" or card.position != "faceup") and (
                     card.attack is not None or card.defense is not None
                     or card.race is not None or card.owner is not None
-                    or card.attribute is not None or card.level is not None):
+                    or card.attribute is not None):
                 raise ValueError("dynamic monster data require a face-up monster")
+            if card.level is not None and not (
+                    card.zone == "monster" and card.position == "faceup"
+                    or card.zone == "hand" and card.controller == self.viewer
+                    and card.code is not None):
+                raise ValueError("current Level requires a face-up monster or own hand card")
             if card.counters and (card.zone not in ("monster", "spell_trap")
                                   or card.position != "faceup"):
                 raise ValueError("counters require a face-up field card")

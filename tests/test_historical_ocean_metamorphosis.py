@@ -15,6 +15,8 @@ from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 OCEAN = 295517
 METAMORPHOSIS = 46411259
 GAGAGIGO = 49003308  # Level 4 WATER monster.
+AQUA_MADOOR = 85639257  # Another Level 4 WATER monster, held in hand.
+X_HEAD_CANNON = 62651957
 FLAME_GHOST = 58528964  # Level 3 Fusion.
 DARKFIRE_DRAGON = 17881964  # Level 4 Fusion.
 
@@ -29,6 +31,8 @@ def test_ocean_changes_metamorphosis_fusion_choice(tmp_path, activate_ocean):
     deck = tmp_path / "ocean_meta.ydk"
     remaining = list(VANILLA_DECK)
     remaining.remove(GAGAGIGO)
+    remaining = [AQUA_MADOOR if code == X_HEAD_CANNON else code
+                 for code in remaining]
     deck.write_text("#main\n" + "\n".join(map(str, (
         OCEAN, METAMORPHOSIS, GAGAGIGO, *remaining[:37])))
         + f"\n#extra\n{FLAME_GHOST}\n{DARKFIRE_DRAGON}\n!side\n")
@@ -36,7 +40,9 @@ def test_ocean_changes_metamorphosis_fusion_choice(tmp_path, activate_ocean):
     with GoatEnvironment(str(deck), "examples/decks/vanilla_probe.ydk", seed=100,
                          engine=ExperimentalOcgcoreEngine(root)) as env:
         obs = env.reset()
-        assert {OCEAN, METAMORPHOSIS, GAGAGIGO} <= {c.code for c in obs.hand}
+        assert {OCEAN, METAMORPHOSIS, GAGAGIGO, AQUA_MADOOR} <= {
+            c.code for c in obs.hand}
+        assert next(c for c in obs.hand if c.code == AQUA_MADOOR).level == 4
         ocean_used = summoned = meta_used = paid = fusion_chosen = checked = False
         expected_fusion = FLAME_GHOST if activate_ocean else DARKFIRE_DRAGON
         agents = (RandomAgent(100), RandomAgent(101))
@@ -67,6 +73,9 @@ def test_ocean_changes_metamorphosis_fusion_choice(tmp_path, activate_ocean):
                         other = env.engine.probe.observation(1)
                         assert next(c for c in other.field if c.code == GAGAGIGO).level \
                             == faceup.level
+                        assert any(c.code == AQUA_MADOOR and c.level == faceup.level
+                                   for c in obs.hand)
+                        assert other.opponent_hand_count == len(obs.hand)
                     action = meta_option
                     meta_used |= action is not None
             if meta_used and not paid and actions[0].kind == "select_card":

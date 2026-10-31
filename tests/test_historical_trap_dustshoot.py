@@ -90,7 +90,7 @@ def test_trap_dustshoot_reveals_hand_only_to_chooser_and_returns_monster(tmp_pat
                     observation = env.step(action)
                     if env.is_terminal():
                         trajectory = env.trajectory()
-                        assert trajectory.schema_version == 30
+                        assert trajectory.schema_version == 31
                         assert chosen_code is not None
                         path = tmp_path / "dustshoot.json"
                         write_trajectory(path, trajectory)

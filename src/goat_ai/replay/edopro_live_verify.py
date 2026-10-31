@@ -36,6 +36,11 @@ def _without_levels(view):
                    own_extra_deck=cards(view.own_extra_deck))
 
 
+def _without_hand_levels(view):
+    """Compare a schema-v30 room replay before own-hand Level was recorded."""
+    return replace(view, hand=tuple(replace(card, level=None) for card in view.hand))
+
+
 def deck_composition_sha256(main, extra) -> str:
     """Identify a deck by its cards, independent of shuffled draw order."""
     composition = {"main": sorted(main), "extra": sorted(extra)}
@@ -106,6 +111,11 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
             decision, observation=_without_levels(decision.observation))
             for decision in reconstructed_decisions)
         reconstructed_terminal = _without_levels(reconstructed_terminal)
+    elif trajectory.schema_version < 31:
+        reconstructed_decisions = tuple(replace(
+            decision, observation=_without_hand_levels(decision.observation))
+            for decision in reconstructed_decisions)
+        reconstructed_terminal = _without_hand_levels(reconstructed_terminal)
     if trajectory.schema_version == 28:
         reconstructed_decisions = tuple(replace(
             decision, observation=_without_attributes(decision.observation))
@@ -125,7 +135,7 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
     status = provenance.get("recording_status")
     if (trajectory.source != (base_source if complete else base_source + "_partial")
             or trajectory.ruleset != ruleset
-            or trajectory.schema_version not in (28, 29, 30)
+            or trajectory.schema_version not in (28, 29, 30, 31)
             or (status not in (None, "complete") if complete
                 else status != "interrupted")
             or trajectory.decks != tuple(metadata.get("names", ()))

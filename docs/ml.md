@@ -124,6 +124,13 @@ observation or action contract still needs its own compatibility review.
 
 The fixture command demonstrates software integration. Its source is random self-play, not skilled human data, and its training loss says nothing about playing strength. No automated EDOPro or DuelingBook human replay parser, authorized tournament human dataset, or trained competitive checkpoint is available yet. Before using human imitation as a strength baseline, collect authorized trajectories with legal actions and visibility reconstructed, split them by players/decks/matches, verify them, and measure win rate against held-out agents and deck families.
 
+The ordinary behavioral-cloning intake now accepts fingerprinted trajectory
+schemas v3–v31 after exact native replay verification and visibility auditing.
+It continues to reject unannotated scripted games and raw EDOPro trajectories;
+the opt-in, separately verified EDOPro confirmed-choice path remains distinct.
+A native browser-game regression trains one explicitly labeled human choice
+from a schema-v31 recording. This is a pipeline check, not a strength result.
+
 A local version-3 pipeline check on 2026-10-24 replay-verified a schema-v6 vanilla duel with seed 42 and 1,368 decisions, trained one epoch at width 16 with mean decision loss 0.5268, then loaded the checkpoint for seat-swapped inference on seeds 43–44. It won 2/4 against RandomAgent, with both wins in the second seat. This is a protocol check on two seeds and random demonstration labels, not evidence of stronger play. The replay and checkpoint were kept under ignored `.cache/goat-ai/`.
 
 A version-4 pipeline check on 2026-10-24 replay-verified the schema-v9 Ground Collapse fixture produced by `examples/record_ground_collapse.py`: 1,126 decisions, including one selected two-zone action and 1,119 observations with disabled-zone state. One epoch at width 16 and seed 17 completed with mean decision loss 0.5452. The demonstration is mostly random play and the resulting checkpoint has no held-out strength evaluation. This verifies training compatibility with the new action and observation fields only.

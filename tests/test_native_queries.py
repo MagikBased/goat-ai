@@ -208,6 +208,9 @@ def test_native_observation_hides_opponent_hand_and_deck_order():
     assert viewer_a.turn == 1 and viewer_a.phase == "draw"
     assert viewer_a.life_points == (8000, 8000)
     assert viewer_a.deck_counts == (34, 35)
+    assert all(card.level is not None and card.level > 0 for card in viewer_a.hand)
+    assert all(card.level is not None and card.level > 0 for card in opponent_a.hand)
+    assert viewer_a.opponent_hand_count == len(opponent_a.hand)
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"), reason="native assets not installed")

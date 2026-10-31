@@ -1284,6 +1284,8 @@ class OcgcoreProbe:
         if location == LOCATION_MZONE:
             flags |= (QUERY_LEVEL | QUERY_ATTRIBUTE | QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE
                       | QUERY_COUNTERS | QUERY_OWNER)
+        elif location == LOCATION_HAND:
+            flags |= QUERY_LEVEL
         elif location == LOCATION_SZONE:
             flags |= QUERY_EQUIP_CARD | QUERY_COUNTERS
         query = QueryInfo(flags, player, location, 0, 0)
@@ -1386,7 +1388,8 @@ class OcgcoreProbe:
             acting_player=viewer if terminal else self.decode_pending().player,
             turn=self._turn, phase=self._phase, turn_player=self._turn_player,
             life_points=lp,
-            hand=tuple(CardView(viewer, "hand", "hidden", card.code, sequence)
+            hand=tuple(CardView(viewer, "hand", "hidden", card.code, sequence,
+                                level=(card.level or None))
                        for sequence, card in enumerate(hand) if card is not None),
             field=field, graveyards=graveyards, banished=banished,
             opponent_hand_count=opponent_hand_count,

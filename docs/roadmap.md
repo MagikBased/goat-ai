@@ -21,14 +21,15 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
-Schema v30 now records the native current Level of face-up monsters while
-redacting it on face-down cards. A seeded Tribe/DNA duel checks both players'
-visible Level alongside the changing public Type; the native query decoder
-also tests face-down redaction. Schema v29 introduced current Attribute,
-checked by the Homunculus fixture. The versioned reader and verifier retain
-v28/v29 replay compatibility, including EDOPro room recordings already in
-progress. The selected neural policy does not yet consume Level or Attribute,
-and other dynamic public state remains unaudited.
+Schema v31 now also records the native current Level of cards in the viewer’s
+own hand, where a Level exists. A paired A Legendary Ocean/Metamorphosis fixture
+checks that a WATER monster held in hand changes from Level 4 to 3 while
+remaining absent from the opponent’s hand view. Schema v30 added current Level
+for face-up field monsters with face-down redaction, and schema v29 added current
+Attribute. The versioned reader and verifier retain v28–v30 replay
+compatibility, including EDOPro room recordings already in progress. The
+selected neural policy does not yet consume Level or Attribute, and other
+dynamic public state remains unaudited.
 
 The legal-action visibility auditor now walks card references nested anywhere
 in an action payload, including future prompt wrappers, rather than checking

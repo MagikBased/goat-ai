@@ -83,6 +83,10 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                            banished=tuple(cards(zone) for zone in view.banished),
                            own_extra_deck=cards(view.own_extra_deck))
 
+        def without_hand_levels(view):
+            return replace(view, hand=tuple(replace(card, level=None)
+                                            for card in view.hand))
+
         def without_summon_context(view):
             def cards(items):
                 return tuple(replace(card, owner=None) for card in items)
@@ -106,6 +110,9 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
             if trajectory.schema_version < 30:
                 compared_observation = without_levels(compared_observation)
                 recorded_observation = without_levels(recorded_observation)
+            elif trajectory.schema_version < 31:
+                compared_observation = without_hand_levels(compared_observation)
+                recorded_observation = without_hand_levels(recorded_observation)
             if trajectory.schema_version < 29:
                 compared_observation = without_attributes(compared_observation)
                 recorded_observation = without_attributes(recorded_observation)
@@ -191,6 +198,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
                                 if trajectory.schema_version == 19 else observation)
         if trajectory.schema_version < 30:
             terminal_observation = without_levels(terminal_observation)
+        elif trajectory.schema_version < 31:
+            terminal_observation = without_hand_levels(terminal_observation)
         if trajectory.schema_version < 29:
             terminal_observation = without_attributes(terminal_observation)
         if trajectory.schema_version < 24:
@@ -210,6 +219,8 @@ def verify_trajectory(trajectory: Trajectory, engine: RulesEngine,
         recorded_terminal = trajectory.terminal_observation
         if trajectory.schema_version < 30 and recorded_terminal is not None:
             recorded_terminal = without_levels(recorded_terminal)
+        elif trajectory.schema_version < 31 and recorded_terminal is not None:
+            recorded_terminal = without_hand_levels(recorded_terminal)
         if trajectory.schema_version < 29 and recorded_terminal is not None:
             recorded_terminal = without_attributes(recorded_terminal)
         if trajectory.schema_version < 26 and recorded_terminal is not None:
