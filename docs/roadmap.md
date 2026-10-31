@@ -1189,6 +1189,14 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+A [larger diverse Tactical demonstration pilot](evaluation.md#larger-diverse-tactical-demonstration-pilot-31-october-2026)
+recorded 64 verified duels across eight published 2005 Main Decks and fitted
+5,995 optional synthetic teacher decisions with parent-KL preservation. On a
+matched 64-game Tactical-v14 holdout using four unseen Main Decks, the child
+won 15 games against the selected parent's 18; the paired interval crossed
+zero. Parent-KL fitting now supports skipping forced choices, but this extra
+teacher data did not establish a strength gain. Keep v23 selected and M4 open.
+
 An opt-in [current-Level policy feature](ml.md) now uses schema-v31
 player-visible Level for the player's hand and face-up monsters. Feature v34
 zero-warm-starts from the selected v23 checkpoint, preserving its logits before

@@ -539,8 +539,6 @@ def main() -> None:
     if args.batched_forward and args.parent_kl_steps and (
             args.feature_version < 10 or args.feature_version in (14, 15)):
         parser.error("batched parent KL requires a supported v10+ feature version")
-    if args.skip_forced_training and args.parent_kl_steps:
-        parser.error("skipping forced choices is currently supported only for behavioral cloning")
     if args.omit_forced_forward and (not args.batched_forward
                                     or args.skip_forced_training
                                     or args.parent_kl_steps):
@@ -825,14 +823,18 @@ def main() -> None:
                 args.preserve_per_trajectory, len(candidates))))
             preservation_hashes[str(path)] = digest
         fitting_started = perf_counter()
+        fit_records = ([record for record in records if len(record.legal_actions) > 1]
+                       if args.skip_forced_training else records)
+        if not fit_records:
+            raise ValueError("no multi-option labeled decisions available for parent KL fit")
         losses, preservation_losses = fit_with_parent_kl(
-            model, reference, vocabulary, records, preservation,
+            model, reference, vocabulary, fit_records, preservation,
             steps=args.parent_kl_steps, preservation_batch=args.preserve_batch,
             preservation_weight=args.parent_kl_weight,
             learning_rate=args.learning_rate, rng=rng,
             batched_forward=args.batched_forward, batch_size=args.batch_size,
             labeled_weights=[label_kind_weights.get(record.selected_action.kind, 1.0)
-                             for record in records])
+                             for record in fit_records])
         preservation_metadata = {
             "trajectory_sha256": preservation_hashes,
             "source_kinds": preservation_kinds,
@@ -893,7 +895,7 @@ def main() -> None:
         "skip_forced_training": args.skip_forced_training,
         "omit_forced_forward": args.omit_forced_forward,
         "fit_decisions": (sum(len(record.legal_actions) > 1 for record in records)
-                          if args.skip_forced_training and not preservation_metadata
+                          if args.skip_forced_training
                           else len(records)),
         "focus_cards": tuple(sorted(focus_codes)),
         "focus_weight": args.focus_weight,

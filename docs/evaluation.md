@@ -16807,3 +16807,83 @@ This is sampled native protocol and information-boundary coverage across the
 currently published 2005 Deck examples. It does not validate every GOAT ruling,
 every legal Deck, or gameplay quality. The timing includes process scheduling,
 so it is a measured run rather than a hardware-independent throughput claim.
+
+## Larger diverse Tactical demonstration pilot (31 October 2026)
+
+To test whether the selected v23 policy's weak cross-deck play was mainly a
+small-demonstration-data problem, four disjoint published-2005 Deck pairings
+were recorded with Tactical-v14 as demonstrator against CombatHeuristicAgent:
+Seattle Goat Control/Bryan Coronel Chaos (seeds 51000–51007), Charlotte Zombie/
+Jesse Twohig Goat Control (51100–51107), Daryl Gessler Gravekeepers/Cas
+Stomphorst Flip Control (51200–51207), and Rhymus Lizo Goat Control/Mary
+Triatafilidi Warrior (51300–51307). Each seed used both demonstrator seats.
+All **64 complete duels and 36,787 decisions** replay-verified and passed
+visibility audits. The Tactical seat made **18,656** recorded decisions;
+**5,995** had more than one legal action. Tactical won 55 of the 64 source
+games. These are synthetic teacher decisions, not human demonstrations.
+The four ignored manifests are under
+`.cache/goat-ai/tactical_diverse_20261031/{seattle_chaos,zombie_jesse,gravekeeper_flip,rhymus_warrior}/`.
+Their SHA-256 values in that order are
+`652f7c340212259891eb99a983b559155e0e10dc238c095c7a1ec6753b1e3a3d`,
+`147451e8a675d74bcb4d6617b58437bfed6d4b08224d69bd6618718ef886429d`,
+`fb83b09accde06e4e4b2f1aedeb74022c2d37a1d0c159560a182ef4cf9ac98e2`, and
+`a580bc6f6dcc7db97eff8c24444a27e55c38024de98cc867b6a35af5cf0bdadf`.
+
+The parent-KL trainer now accepts `--skip-forced-training`: it filters
+one-action decisions from the labeled fitting batch, while preserving their
+replay verification and source provenance. The separate parent-preservation
+states already require multiple legal actions. Starting from selected v23
+checkpoint `fv23_current_tactical_broader_33000_33031.pt`, a 40-step,
+width-32, feature-v23 fit used the 5,995 optional labels and 128 verified
+parent-policy preservation states. The final labeled cross-entropy was
+**0.36769** and parent KL **0.00408**. The measured run took **125.06 s**,
+including **12.62 s** trajectory verification and **81.48 s** fitting on the
+recorded CPU. There is no matched unfiltered timing comparison, so this is
+not a measured speedup claim. The ignored child checkpoint is
+`.cache/goat-ai/fv23_tactical_diverse_20261031.pt` (SHA-256
+`f6f79a8c21663fc9348674dc4ab7f83b31415883bf7b9ff8e23f1ad1d88728e2`).
+
+Held-out evaluation paired Ramon Ciriano Beastdown with Roberto Martinez
+Phoenix Control and Jonathan LaBounty Chaos with Max Suffridge Goat Control.
+Those four Main Deck compositions were absent from both checkpoint training
+provenances. Seeds 51400–51407, both Deck assignments, and both policy seats
+made **64 matched games per checkpoint** against Tactical-v14. The selected
+parent won **18–46**; the child won **15–49**. The strict comparator verified
+the schedule, native assets, local Deck bytes, and unseen Main Decks. Its
+child-minus-parent paired score difference was **−4.69 percentage points**
+with a 95% interval of **−14.06 to +4.69**. All 64 parent games and 39,220
+decisions, and all 64 child games and 37,383 decisions, replay-verified and
+passed visibility audits. Reports are
+`.cache/goat-ai/tactical_diverse_parent_holdout_51400.json` (SHA-256
+`88be06e55b040e6a07091fa85c906f596244537c5d9557237f94d07782e58388`)
+and `tactical_diverse_child_holdout_51400.json` (SHA-256
+`68ceedc48459e27372ccfe6506d0fcbfd98bc305e5b124f26fd469eacf9d0ebf`).
+The extra synthetic data did not establish a competitive gain. Keep the
+selected checkpoint unchanged and prioritize independently reviewed choices
+and better credit assignment over further scaling of the same teacher signal.
+
+Reproduce each source pairing with `scripts/collect_heuristic_demos.py
+--engine experimental --teacher tactical --opponent combat_heuristic
+--verify-replays --seeds 8 --max-decisions 3000`, setting the named Decks,
+starting seed, and output directory above. Train with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/tactical_diverse_20261031/*/seed_*.json \
+  --native-root .cache/goat-ai --engine experimental \
+  --init-checkpoint .cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt \
+  --feature-version 23 --width 32 --parent-kl-steps 40 --parent-kl-weight 0.5 \
+  --preserve-per-trajectory 16 --preserve-batch 16 \
+  --preserve-trajectories .cache/goat-ai/fv23_preserve_168300_a/matchup_*.json \
+    .cache/goat-ai/fv23_preserve_168400_b/matchup_*.json \
+  --allow-policy-preservation --batched-forward --batch-size 32 \
+  --skip-forced-training --verification-workers 4 --learning-rate 0.0001 \
+  --seed 20261031 --output .cache/goat-ai/fv23_tactical_diverse_20261031.pt
+```
+
+Run `scripts/evaluate_policy.py` for each checkpoint with the two held-out
+`--matchup` pairs, `--opponent tactical --both-deck-assignments
+--require-unseen-main-decks --seed 51400 --seeds 8 --workers 4
+--max-decisions 3000 --verify-replays`, then compare the reports with
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.
