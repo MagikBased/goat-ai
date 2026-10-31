@@ -2,8 +2,9 @@
 
 ## Call of the Haunted timing pilot (30 October 2026)
 
-`tactical_call_end_phase` is an opt-in Tactical-v14 variant. When an idle Call of
-the Haunted activation is offered on the opponent's turn, it passes during the
+`tactical_call_end_phase` is an opt-in Tactical-v14 variant. When Tactical
+selects an idle Call of the Haunted activation on the opponent's turn, the
+variant passes during the
 Draw, Standby, Main 1, Battle Start, and Main 2 phases. It retains ordinary
 Tactical behavior at the End Phase, during attack and chain responses, and on
 its own turn. This tests the reviewer's timing suggestion without changing the
@@ -14,12 +15,15 @@ Lolmarcus Goat Control versus Riclar Chaos Turbo and Montague Warrior versus
 Insids Chaos Control. The schedule used seeds 181000–181007, both Deck
 assignments, both agent seats, and four isolated workers. All **34,432**
 decisions independently replay-verified and passed the player-visibility audit.
-The paired score difference was zero on this schedule. One of the four Decks
+The paired score difference was zero on this schedule. Tightening the guard
+from any offered Call to only a selected Call changed **0 of 64** complete
+decision traces and **0** outcomes in a repeat of this schedule. One of the four Decks
 contained Call of the Haunted, so this is a small timing pilot, not evidence of
 general strength. The default Tactical agent remains unchanged.
 
-The ignored report is `.cache/goat-ai/tactical_call_end_181000_181007.json`
-(SHA-256 `71bb32d87cf9c4509f96e23cddfd511b6f48e3350b14907215df48352c985c6e`).
+The ignored corrected report is
+`.cache/goat-ai/tactical_call_end_selected_181000_181007.json`
+(SHA-256 `b1bd6fecac891cd4c82fc5776f70fb94cc5fa43ae35f627b6eeac00594790347`).
 Reproduce it with:
 
 ```bash
@@ -29,7 +33,7 @@ GOAT_AI_NATIVE_ROOT=$PWD/.cache/goat-ai PYTHONPATH=src:. \
   --matchup examples/decks/warrior_montague_clash.ydk examples/decks/chaos_control_insids_worlds_2022.ydk \
   --both-deck-assignments --agent-a tactical_call_end_phase --agent-b tactical \
   --seed 181000 --seeds 8 --workers 4 --verify-replays \
-  --output .cache/goat-ai/tactical_call_end_181000_181007.json
+  --output .cache/goat-ai/tactical_call_end_selected_181000_181007.json
 ```
 
 ## Broader 60-card Fusion and Tactical protocol probe (30 October 2026)

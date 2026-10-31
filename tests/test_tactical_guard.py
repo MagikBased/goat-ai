@@ -54,7 +54,7 @@ def test_opt_in_tactical_sets_spell_trap_after_battle_when_possible():
                                    (set_trap, battle)) == set_trap
 
 
-def test_opt_in_call_timing_waits_for_opponent_end_phase_without_missing_responses():
+def test_opt_in_call_timing_waits_for_opponent_end_phase_without_missing_responses(monkeypatch):
     call = Action("call", "chain", 0, {"code": 97077563})
     wait = Action("wait", "pass", 0)
     baseline = TacticalHeuristicAgent()
@@ -72,6 +72,12 @@ def test_opt_in_call_timing_waits_for_opponent_end_phase_without_missing_respons
     assert candidate.select_action(board(phase="main1", turn=3,
                                          turn_player=0), (call, wait)) == call
     assert candidate.select_action(idle, (call,)) == call
+    serpent = Action("serpent", "yes", 0, {"code": candidate.SINISTER})
+    assert candidate.select_action(idle, (call, wait, serpent)) == serpent
+    another_response = Action("other", "chain", 0, {"code": 53582587})
+    monkeypatch.setattr(candidate, "_select_action_base",
+                        lambda _observation, _actions: another_response)
+    assert candidate.select_action(idle, (call, another_response, wait)) == another_response
 
 
 def test_heavy_storm_avoids_solely_damaging_own_backrow():

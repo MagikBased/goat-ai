@@ -197,26 +197,29 @@ class TacticalHeuristicAgent(CombatFlipHeuristicAgent):
         self.call_end_phase_guard = call_end_phase_guard
 
     def select_action(self, observation: Observation, legal_actions: Sequence[Action]) -> Action:
+        chosen = self._select_action_base(observation, legal_actions)
+        if (self.call_end_phase_guard
+                and chosen.kind in ("activate", "chain")
+                and chosen.parameters.get("code") == self.CALL_OF_THE_HAUNTED
+                and observation.turn_player is not None
+                and observation.turn_player != observation.viewer
+                and observation.phase in ("draw", "standby", "main1",
+                                          "battle_start", "main2")
+                and not observation.chain):
+            wait = next((action for action in legal_actions
+                         if action.kind == "pass"), None)
+            if wait is not None:
+                return wait
+        return chosen
+
+    def _select_action_base(self, observation: Observation,
+                            legal_actions: Sequence[Action]) -> Action:
         if not legal_actions:
             raise ValueError("no legal actions")
         yes = next((action for action in legal_actions if action.kind == "yes"
                     and action.parameters.get("code") == self.SINISTER), None)
         if yes is not None:
             return yes
-
-        if (self.call_end_phase_guard
-                and observation.turn_player is not None
-                and observation.turn_player != observation.viewer
-                and observation.phase in ("draw", "standby", "main1",
-                                          "battle_start", "main2")
-                and not observation.chain
-                and any(action.kind in ("activate", "chain")
-                        and action.parameters.get("code") == self.CALL_OF_THE_HAUNTED
-                        for action in legal_actions)):
-            wait = next((action for action in legal_actions
-                         if action.kind == "pass"), None)
-            if wait is not None:
-                return wait
 
         if self.v8_guards and observation.chain:
             source = observation.chain[-1]
