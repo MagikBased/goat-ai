@@ -124,6 +124,7 @@ class EdoRoomManager:
             if not (report["complete"] and report["historical_patches"]
                     and report["asset_identity_verified"]
                     and report["deck_identity_verified"]
+                    and report["goat_decks_legal"]
                     and report["confirmed_human_choices"] > 0):
                 raise ValueError("Only complete, fingerprinted games with confirmed choices qualify")
             files = (replay, review, metadata, labels)
@@ -325,10 +326,14 @@ class EdoRoomManager:
                 record["viewer"] = "/" + viewer.relative_to(self.root).as_posix()
                 record["verified"] = True
                 record["review_ready"] = True
+                record["goat_decks_legal"] = bool(report.get("goat_decks_legal"))
+                if report.get("goat_deck_error"):
+                    record["goat_deck_error"] = report["goat_deck_error"]
                 record["experimental_confirmed_eligible"] = bool(
                     report.get("complete") and report.get("historical_patches")
                     and report.get("asset_identity_verified")
-                    and report.get("deck_identity_verified"))
+                    and report.get("deck_identity_verified")
+                    and report.get("goat_decks_legal"))
             except (ValueError, OSError, RuntimeError) as exc:
                 record["verification_error"] = str(exc)
             self._verified[directory.name] = (stamp, record)

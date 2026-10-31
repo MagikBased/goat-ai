@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from goat_ai.engine.decks import Decklist, read_goat_whitelist, validate_goat_deck
 from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay.annotations import read_decision_annotations
 from goat_ai.replay.edopro_container import read_edopro_container
@@ -17,6 +18,27 @@ def deck_composition_sha256(main, extra) -> str:
     composition = {"main": sorted(main), "extra": sorted(extra)}
     encoded = json.dumps(composition, separators=(",", ":")).encode("ascii")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def goat_replay_deck_legality(decks, native_root: str | Path) -> tuple[bool, str | None]:
+    """Check the recorded Main/Extra Decks against the pinned GOAT card pool.
+
+    Replay containers do not retain the Side Deck. This gate checks only cards
+    that could enter the recorded duel; broader historical rulings are separate.
+    """
+    root = Path(native_root)
+    limits = read_goat_whitelist(root / "banlist/GOAT.lflist.conf")
+    if len(decks) != 2:
+        return False, "EDOPro replay must contain exactly two player Decks"
+    for seat, deck in enumerate(decks):
+        try:
+            validate_goat_deck(
+                Decklist(tuple(deck.main), tuple(deck.extra)), limits,
+                root / "database/cards.cdb", root / "database/goat-entries.cdb",
+                root / "database/cards-unofficial.cdb")
+        except ValueError as error:
+            return False, f"player {seat + 1} Deck: {error}"
+    return True, None
 
 
 def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Path,
@@ -48,6 +70,8 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         raise ValueError("metadata core seed differs from replay")
     deck_hashes = tuple(deck_composition_sha256(deck.main, deck.extra)
                         for deck in embedded.decks)
+    goat_decks_legal, goat_deck_error = goat_replay_deck_legality(
+        embedded.decks, native_root)
     reconstructed = reconstruct_legacy_responses(
         replay, native_root, historical_patches=historical,
         allow_incomplete=prefix)
@@ -99,6 +123,8 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
         "historical_patches": historical,
         "historical_goat_certified": False,
         "deck_identity_verified": has_deck_hashes,
+        "goat_decks_legal": goat_decks_legal,
+        "goat_deck_error": goat_deck_error,
         "asset_identity_verified": has_asset_hashes,
         "visibility_audited_decisions": len(trajectory.decisions),
         "training_admitted": False,

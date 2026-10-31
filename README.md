@@ -114,7 +114,8 @@ some prompts automatically. **Save confirmations** writes and verifies
 `<game>.human_labels.json` beside the recording. Reopening the dialog restores
 the saved checkmarks, and unchecking one removes that confirmation. These
 annotations are excluded from automatic training. A complete, pinned,
-asset-fingerprinted game with confirmed choices can enter the opt-in
+asset-fingerprinted game with GOAT-legal recorded Main and Extra Decks and
+confirmed choices can enter the opt-in
 experimental trainer described below. The dialog gives a command to train a
 separate child of the AI used in that duel when its checkpoint hash still
 matches. If that parent has changed, it labels a from-scratch pilot instead.
@@ -127,6 +128,10 @@ ZIP containing the native replay, verified review trajectory, metadata,
 human confirmations, and SHA-256 manifest. Unzip all files together before
 using `--experimental-edopro-confirmed`; training still needs the same pinned
 native assets and remains experimental.
+The legality check uses the pinned GOAT whitelist and copy limits for both
+recorded Main and Extra Decks. EDOPro replays do not retain Side Decks, so this
+does not validate sideboarding. A replay with an ineligible Deck can still be
+viewed, but its confirmed choices cannot enter training.
 
 You can play the selected PyTorch policy through an EDOPro LAN room using the
 optional external `mostwanted7/ygo-agent` host. The host is AGPL-3.0-or-later,

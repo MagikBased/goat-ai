@@ -199,7 +199,9 @@ def test_edopro_web_confirmations_only_label_optional_human_choices(tmp_path, mo
                         lambda *args: {"complete": True,
                                        "historical_patches": True,
                                        "asset_identity_verified": True,
-                                       "deck_identity_verified": True})
+                                       "deck_identity_verified": True,
+                                       "goat_decks_legal": True,
+                                       "goat_deck_error": None})
     monkeypatch.setattr("scripts.confirm_edopro_human_actions.verify_edopro_live_recording",
                         lambda *args: {"complete": True})
     monkeypatch.setattr("scripts.edopro_local_room.verify_edopro_human_annotations",
@@ -237,7 +239,9 @@ def test_edopro_web_confirmations_only_label_optional_human_choices(tmp_path, mo
                         lambda *args: {"complete": False,
                                        "historical_patches": True,
                                        "asset_identity_verified": True,
-                                       "deck_identity_verified": True})
+                                       "deck_identity_verified": True,
+                                       "goat_decks_legal": True,
+                                       "goat_deck_error": None})
     interrupted = EdoRoomManager(GameCreator(root=tmp_path, native_root=native))
     assert interrupted.status()["sessions"][0]["recording"]["review_ready"] is True
     assert interrupted.status()["sessions"][0]["recording"]["experimental_confirmed_eligible"] is False

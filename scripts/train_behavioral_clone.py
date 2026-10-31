@@ -102,7 +102,8 @@ def load_experimental_edopro_confirmations(replay: Path, native_root: Path):
         replay, review, metadata, labels, native_root)
     if (not report["complete"] or not report["historical_patches"]
             or not report["asset_identity_verified"]
-            or not report["deck_identity_verified"]):
+            or not report["deck_identity_verified"]
+            or not report["goat_decks_legal"]):
         raise ValueError(f"{replay}: only complete asset- and deck-fingerprinted pinned room "
                          "duels qualify")
     trajectory = read_trajectory(review)
