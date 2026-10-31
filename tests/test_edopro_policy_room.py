@@ -74,6 +74,8 @@ def test_stopped_room_keeps_launch_error_after_server_restart(tmp_path):
 @pytest.mark.parametrize(("ai_deck", "client_deck"), (
     ("warrior_montague_clash.ydk", "gravekeeper_daryl_gessler_indianapolis_2005.ydk"),
     ("goat_control_jesse_twohig_indianapolis_2005.ydk", "chaos_turbo_riclar_2020.ydk"),
+    ("flip_control_cas_stomphorst_indianapolis_2005.ydk",
+     "zombie_jae_kim_charlotte_2005.ydk"),
 ))
 def test_page_room_launcher_completes_and_lists_verified_game(ai_deck, client_deck):
     """Exercise the real child process and the room manager used by the page."""

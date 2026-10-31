@@ -3386,6 +3386,16 @@ integration test executed the displayed continuation command on one confirmed
 choice and verified the child's parent hash and source provenance. This
 improves the human-data handoff; it is not evidence of a competitive gain.
 
+The same page-launcher integration test now covers a third historical Main Deck
+pairing, Flip Control versus Zombie, in addition to Warrior/Gravekeeper and
+Goat Control/Chaos Turbo. On 31 October 2026 all three temporary-port LAN
+duels completed, saved native EDOPro replays, passed independent native
+reconstruction and player-visibility checks, and trained separate experimental
+children from one explicitly confirmed client choice each (`3 passed, 7
+deselected` in 33.03 seconds). The protocol clients in this test choose random
+responses; this does not validate additional human GUI interactions or claim
+competitive playing strength.
+
 For training, the bot logs the EDOPro server's decision prompt, the AI's
 player-visible state and legal responses, and the response it sends. The
 human's decisions require equivalent logging at the server or validated
