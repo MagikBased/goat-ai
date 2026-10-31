@@ -9,6 +9,7 @@ from goat_ai.agents import RandomAgent
 from goat_ai.engine.experimental_adapter import ExperimentalOcgcoreEngine
 from goat_ai.engine.probe_deck import VANILLA_DECK
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 BAZOO = 40133511
@@ -432,3 +433,102 @@ def test_kycoo_timing_controls_bazoo_banish_cost(tmp_path, kycoo_already_faceup)
                         env.engine.probe.loaded_script_sha256)
                 return
     pytest.fail("Kycoo/Call chain did not finish after Bazoo's cost")
+
+
+@pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
+                    reason="native assets not installed")
+@pytest.mark.parametrize("chain_return", [False, True])
+def test_return_chained_to_bazoo_after_banish_cost(tmp_path, chain_return):
+    root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
+    for code in (BAZOO, GRACEFUL, RETURN):
+        if not (root / f"scripts/official/c{code}.lua").is_file():
+            pytest.skip(f"script for {code} not installed")
+    own = tmp_path / "bazoo_chain_return.ydk"
+    own.write_text("#main\n" + "\n".join(map(str, (
+        GRACEFUL, *([BAZOO] * 3), *([RETURN] * 3), *VANILLA_DECK[7:])))
+                   + "\n#extra\n!side\n")
+    with GoatEnvironment(str(own), "examples/decks/vanilla_probe.ydk", seed=3,
+                         engine=ExperimentalOcgcoreEngine(root)) as env:
+        obs = env.reset()
+        assert {GRACEFUL, BAZOO, RETURN, FIRST, SECOND}.issubset(
+            c.code for c in obs.hand)
+        graceful = discarded = trap_set = bazoo_summoned = False
+        bazoo_used = cost_paid = return_chained = resolved = checked = False
+        agents = (RandomAgent(13), RandomAgent(14))
+        for _ in range(3000):
+            if env.is_terminal():
+                assert checked
+                path = tmp_path / f"bazoo_return_chain_{chain_return}.json"
+                write_trajectory(path, env.trajectory())
+                replay = read_trajectory(path)
+                count = verify_trajectory(replay, ExperimentalOcgcoreEngine(root))
+                assert count == len(replay.decisions)
+                assert audit_trajectory_visibility(replay)["decisions"] == count
+                assert {f"official/c{code}.lua" for code in (
+                    BAZOO, RETURN)}.issubset(env.engine.probe.loaded_script_sha256)
+                return
+            actions = env.legal_actions()
+            action = None
+            if obs.turn == 1 and obs.acting_player == 0:
+                if not graceful:
+                    action = next((a for a in actions if a.kind == "activate"
+                                   and a.parameters.get("code") == GRACEFUL), None)
+                    graceful |= action is not None
+                if graceful and not discarded:
+                    action = next((a for a in actions if a.kind == "select_cards"
+                                   and {c["code"] for c in a.parameters["cards"]}
+                                   == {FIRST, SECOND}), action)
+                    discarded |= action is not None and action.kind == "select_cards"
+                if discarded and not trap_set and action is None:
+                    action = next((a for a in actions if a.kind == "set_spell_trap"
+                                   and a.parameters.get("code") == RETURN), None)
+                    trap_set |= action is not None
+            if obs.turn == 3 and obs.acting_player == 0 and not checked:
+                if not bazoo_summoned:
+                    assert trap_set and {FIRST, SECOND}.issubset(
+                        c.code for c in obs.graveyards[0])
+                    action = next((a for a in actions if a.kind == "normal_summon"
+                                   and a.parameters.get("code") == BAZOO), None)
+                    bazoo_summoned |= action is not None
+                if bazoo_summoned and not bazoo_used and action is None:
+                    action = next((a for a in actions if a.kind in ("activate", "chain")
+                                   and a.parameters.get("code") == BAZOO), None)
+                    bazoo_used |= action is not None
+                if bazoo_used and not cost_paid:
+                    action = next((a for a in actions if a.kind == "select_cards"
+                                   and {c["code"] for c in a.parameters["cards"]}
+                                   == {FIRST, SECOND}), action)
+                    cost_paid |= action is not None and action.kind == "select_cards"
+                if (chain_return and cost_paid and not return_chained and
+                        obs.chain and obs.acting_player == 0 and action is None):
+                    assert [link.card_code for link in obs.chain] == [BAZOO]
+                    assert {c.code for c in obs.banished[0]} == {FIRST, SECOND}
+                    action = next((a for a in actions if a.kind == "chain"
+                                   and a.parameters.get("code") == RETURN), None)
+                    return_chained |= action is not None
+            if action is None and not checked:
+                action = next((a for a in actions if a.kind in (
+                    "select_cards", "select_card", "place", "select_position",
+                    "pass", "end_phase")), actions[0])
+            if action is None:
+                action = agents[obs.acting_player].select_action(obs, actions)
+            obs = env.step(action)
+            if cost_paid and not resolved and not obs.chain and obs.turn == 3 \
+                    and obs.phase == "main1" and obs.acting_player == 0:
+                assert any(c.code == BAZOO and c.attack == 2200 for c in obs.field)
+                if chain_return:
+                    assert return_chained
+                    assert obs.life_points == (4000, 8000)
+                    assert {FIRST, SECOND}.issubset(c.code for c in obs.field)
+                    assert not obs.banished[0]
+                else:
+                    assert obs.life_points == (8000, 8000)
+                    assert {c.code for c in obs.banished[0]} == {FIRST, SECOND}
+                    assert not any(c.code in (FIRST, SECOND) for c in obs.field)
+                resolved = True
+            if resolved and obs.turn >= 4 and not checked:
+                if chain_return:
+                    assert {c.code for c in obs.banished[0]} == {FIRST, SECOND}
+                    assert not any(c.code in (FIRST, SECOND) for c in obs.field)
+                checked = True
+        pytest.fail("Bazoo/Return chain did not finish")

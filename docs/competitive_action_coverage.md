@@ -33,6 +33,12 @@ Dustshoot (19 decisions). Both cards' underlying interaction already has a
 source-backed native fixture. The broad probe is therefore a coverage screen;
 it does not replace the targeted historical tests.
 
+Four Return from the Different Dimension responses to Bazoo's activated effect
+led to a new [paired chain-order fixture](goat_rules.md)
+that checks paid banish cost, Link 2 revival, Bazoo's ATK boost, and End Phase
+cleanup. The pair count selected a case for audit; it did not determine the
+historical ruling by itself.
+
 ## First-activation probe on preserved 2005 decks (29 October 2026)
 
 The `first_activation` agent prefers each card ID's first offered `activate`
