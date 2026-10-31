@@ -267,12 +267,15 @@ API-only video-game promotion (Darkness Destroyer), one included community-only
 ID (Genesis Dragon), and one pending community-only subscription promotion. The
 magazine assessment accepts a `YYYY-MM` issue only when its **last possible
 day** precedes the cutoff and the recorded territory is North America; this
-does not certify the inferred territory. Its
+does not certify the inferred territory. The report also reconciles the
+candidate counts and explicitly records that the **3,622 shared canonical
+IDs have not received individual independent release checks**. Resolving the
+two remaining one-sided candidates would still not make a complete pool. Its
 `complete_release_pool` field is always false: neither candidate source nor
 this reconciliation establishes every eligible North American card. The
 ignored local output is
 `.cache/goat-ai/edison_partial_adjudication_20261030.json` (SHA-256
-`5b6d0a45ef6b2352867fa98642b834d1bff2d1d0350ce7903756dbbc1de229d4`).
+`50e6a90e8262d10b9db7faa1dc940b857361dd565c08e00a9f757838816f0084`).
 
 ```sh
 PYTHONPATH=src:. .venv/bin/python scripts/adjudicate_edison_pool_disagreements.py \

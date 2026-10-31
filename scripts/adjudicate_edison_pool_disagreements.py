@@ -40,6 +40,9 @@ def adjudicate(report_path: Path, dt01_path: Path,
     if report.get("purpose") != "candidate_disagreement_not_edison_legality":
         raise ValueError("input is not an Edison candidate comparison")
     api_only = set(report["api_only_unresolved_ids"])
+    shared_count = report["shared_canonical_ids"]
+    if type(shared_count) is not int or shared_count <= 0:
+        raise ValueError("candidate comparison has invalid shared count")
     dt01_candidates = set(report["api_only_unresolved_with_duel_terminal_1_print_ids"])
     dt01_rows = _rows(dt01_path)
     other_rows = _rows(non_dt01_path)
@@ -97,6 +100,12 @@ def adjudicate(report_path: Path, dt01_path: Path,
         raise ValueError("community evidence does not exactly cover community-only differences")
     if api_only & community_only:
         raise ValueError("candidate-only sets overlap")
+    api_difference_count = sum(len(report[key]) for key in (
+        "api_only_forbidden_ids", "api_only_token_ids",
+        "api_only_missing_metadata_ids", "api_only_unresolved_ids"))
+    if (report["api_canonical_ids"] != shared_count + api_difference_count
+            or report["community_canonical_ids"] != shared_count + len(community_only)):
+        raise ValueError("shared candidate count conflicts with one-sided differences")
     if set.union(*decisions.values()) != api_only:
         raise ValueError("evidence decisions do not partition API-only differences")
     community_decisions = {"exclude": set(), "include": set(), "pending": set()}
@@ -118,6 +127,8 @@ def adjudicate(report_path: Path, dt01_path: Path,
         "purpose": "partial_edison_candidate_disagreement_adjudication_not_whitelist",
         "cutoff": CUTOFF.isoformat(),
         "candidate_comparison_sha256": sha256_file(report_path),
+        "shared_candidate_count": shared_count,
+        "shared_release_audited": False,
         "dt01_evidence_sha256": sha256_file(dt01_path),
         "other_evidence_sha256": sha256_file(non_dt01_path),
         "community_evidence_sha256": sha256_file(community_path),

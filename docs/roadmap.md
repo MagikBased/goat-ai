@@ -2052,7 +2052,10 @@ and [Edison audit](edison_research.md).
 The candidate-disagreement audit command now verifies that the documented
 DT01 and non-DT01 evidence covers every named API-only difference exactly
 once, while keeping Darkness Destroyer and Exodius unresolved. It produces
-no Edison whitelist; see [the Edison audit](edison_research.md).
+no Edison whitelist. The report now records the 3,622 IDs shared by both
+candidate lists as **not independently release-audited**, so even resolving
+the two remaining discrepancies cannot close the full card-pool gate; see
+[the Edison audit](edison_research.md).
 The MR1 Synchro probe now applies a checksum-guarded in-memory correction for
 Goyo Guardian's period generic-Tuner material text. Paired seed-5 duels use a
 non-EARTH Tuner, accept or decline its battle recruitment effect, reach

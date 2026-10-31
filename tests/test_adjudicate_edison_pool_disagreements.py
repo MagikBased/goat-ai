@@ -16,6 +16,12 @@ def _inputs(tmp_path):
         "api_only_unresolved_ids": [1, 2, 3],
         "api_only_unresolved_with_duel_terminal_1_print_ids": [1],
         "community_only_ids": [4],
+        "shared_canonical_ids": 2,
+        "api_canonical_ids": 5,
+        "community_canonical_ids": 3,
+        "api_only_forbidden_ids": [],
+        "api_only_token_ids": [],
+        "api_only_missing_metadata_ids": [],
     }))
     dt01 = tmp_path / "dt01.tsv"
     dt01.write_text("card_id\tdt01_set_code\tfirst_non_dt_date\tfirst_non_dt_set_code\n"
@@ -37,6 +43,8 @@ def test_adjudication_keeps_unresolved_cards_and_refuses_whitelist(tmp_path):
     assert result["api_only_pending_ids"] == [3]
     assert result["community_only_pending_ids"] == [4]
     assert result["complete_release_pool"] is False
+    assert result["shared_candidate_count"] == 2
+    assert result["shared_release_audited"] is False
     assert len(result["candidate_comparison_sha256"]) == 64
 
 
@@ -110,6 +118,16 @@ def test_adjudication_requires_community_evidence(tmp_path):
     report, dt01, other, community = _inputs(tmp_path)
     community.write_text("card_id\tassessment\n5\tpending_north_america_subscription_promo\n")
     with pytest.raises(ValueError, match="community evidence does not exactly cover"):
+        adjudicate(report, dt01, other, community)
+
+
+@pytest.mark.parametrize("shared", (0, -1, 3, "2"))
+def test_adjudication_rejects_invalid_shared_candidate_counts(tmp_path, shared):
+    report, dt01, other, community = _inputs(tmp_path)
+    payload = json.loads(report.read_text())
+    payload["shared_canonical_ids"] = shared
+    report.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="shared"):
         adjudicate(report, dt01, other, community)
 
 
