@@ -9,8 +9,11 @@ import argparse
 import asyncio
 import hashlib
 import json
+from math import isfinite
 from pathlib import Path
 
+from goat_ai.agents import (TacticalHeuristicAgent, load_card_facts,
+                            load_card_races, load_flip_monster_codes)
 from goat_ai.engine.decks import Decklist
 from goat_ai.engine.historical_host_scripts import validate_pinned_host_assets
 from goat_ai.replay.edopro_live_verify import deck_composition_sha256
@@ -36,7 +39,14 @@ def main() -> None:
                         help="require the pinned core, DBs, list and checksum-guarded GOAT scripts")
     parser.add_argument("--human-authorization", choices=("self_recorded",),
                         help="mark the human client's decisions as your authorized self-recording")
+    parser.add_argument("--tactical-fallback-margin", type=float, choices=(1.0,),
+                        help="experimental: use Tactical when the policy's top-two logits "
+                             "differ by less than this value")
     args = parser.parse_args()
+    if args.tactical_fallback_margin is not None and (
+            not isfinite(args.tactical_fallback_margin)
+            or args.tactical_fallback_margin < 0):
+        parser.error("--tactical-fallback-margin must be finite and nonnegative")
     try:
         from ygo_agent.arena.deck import DeckSizes, find_banlist, load_banlists, load_ydk
         from ygo_agent.arena.duel import DuelConfig, DuelObserver
@@ -52,7 +62,18 @@ def main() -> None:
     if args.historical_pinned:
         validate_pinned_host_assets(engine, args.mirror_root)
     banlist = find_banlist(load_banlists(engine.install.lflist_paths), "2005.4 GOAT")
-    policy = load_policy_agent(args.checkpoint, own_loss_guard=True)
+    fallback = (TacticalHeuristicAgent(
+        load_flip_monster_codes(args.mirror_root),
+        load_card_races(args.mirror_root),
+        card_facts=load_card_facts(args.mirror_root))
+        if args.tactical_fallback_margin is not None else None)
+    policy = load_policy_agent(
+        args.checkpoint,
+        own_loss_guard=args.tactical_fallback_margin is None,
+        tactical_fallback_agent=fallback,
+        tactical_fallback_margin=args.tactical_fallback_margin)
+    ai_inference = ("policy_own_loss_guard_v1" if fallback is None else
+                    f"policy_tactical_fallback_margin_{args.tactical_fallback_margin:g}")
     config = RoomConfig(name="GOAT AI experimental", duel=DuelConfig(rules="goat"),
                         banlist=banlist, seed=args.seed, max_matches=1, rematch=False,
                         deck_sizes=DeckSizes(main=(40, 999), extra=(0, 999)),
@@ -63,7 +84,8 @@ def main() -> None:
                     hashlib.sha256(args.checkpoint.read_bytes()).hexdigest(),
                     DuelObserver, RoomObserver,
                     historical_patches=args.historical_pinned,
-                    human_authorization=args.human_authorization)
+                    human_authorization=args.human_authorization,
+                    ai_inference=ai_inference)
     room.add_local(1, bridge.seat(Seat), deck)
     room.duel_observers.append(bridge.duel_observer())
     room.room_observers.append(bridge.room_observer())
@@ -86,7 +108,8 @@ class Bridge:
 
     def __init__(self, native_root, out, policy, checkpoint_sha256,
                  duel_observer_type, room_observer_type, *, historical_patches=False,
-                 human_authorization=None):
+                 human_authorization=None,
+                 ai_inference="policy_own_loss_guard_v1"):
         if human_authorization not in (None, "self_recorded"):
             raise ValueError("unsupported human recording authorization")
         self.native_root = native_root
@@ -95,6 +118,7 @@ class Bridge:
         self.checkpoint_sha256 = checkpoint_sha256
         self.historical_patches = historical_patches
         self.human_authorization = human_authorization
+        self.ai_inference = ai_inference
         self.duel_observer_type = duel_observer_type
         self.room_observer_type = room_observer_type
         self.mirror = None
@@ -164,6 +188,7 @@ class Bridge:
                     "training_admitted": False,
                     "historical_patches": bridge.historical_patches,
                     "checkpoint_sha256": bridge.checkpoint_sha256,
+                    "ai_inference": bridge.ai_inference,
                     "mirror_complete": complete,
                     "mirror_prefix_valid": prefix,
                     "core_seed": list(duel.core_seed),
@@ -194,6 +219,7 @@ class Bridge:
                             "recording_status": "complete" if complete else "interrupted",
                             "human_client_seat": 1,
                             "authorization": bridge.human_authorization,
+                            "ai_inference": bridge.ai_inference,
                         },
                         schema_version=31,
                         deck_sha256=deck_hashes,

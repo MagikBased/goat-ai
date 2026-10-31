@@ -29,7 +29,7 @@ from scripts.validate_review_queue_labels import queue_sources, verify_queue_ite
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 REVIEW_API_VERSION = 5
-LIVE_API_VERSION = 15
+LIVE_API_VERSION = 16
 
 
 def prepare_review_labels(queue: Path, output_dir: Path,
@@ -634,6 +634,8 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                             {"source", "decision_index", "kind", "text"})
                 valid = isinstance(data, dict) and (
                     set(data) == expected or
+                    (endpoint == "/api/edopro/start" and
+                     set(data) == {"ai_deck", "ai_mode"}) or
                     (endpoint == "/api/live/choice" and
                      set(data) in (expected | {"manual"},
                                    expected | {"hold_priority"},
@@ -655,7 +657,7 @@ def make_server(queue: Path | None, output_dir: Path | None, *, port: int = 8765
                 elif endpoint == "/api/games":
                     result = creator.create(data)
                 elif endpoint == "/api/edopro/start":
-                    result = edo_room.start(data["ai_deck"])
+                    result = edo_room.start(data["ai_deck"], data.get("ai_mode", "selected"))
                 elif endpoint == "/api/edopro/confirm":
                     result = edo_room.save_choices(data["id"], data["frames"])
                 elif endpoint == "/api/edopro/train":

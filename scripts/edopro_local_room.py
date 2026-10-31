@@ -364,8 +364,10 @@ class EdoRoomManager:
             return False
         return self._owned_pid_running(directory, pid)
 
-    def start(self, deck_name: str) -> dict:
+    def start(self, deck_name: str, ai_mode: str = "selected") -> dict:
         with self.lock:
+            if ai_mode not in ("selected", "tactical_fallback_1"):
+                raise ValueError("Choose a supported EDOPro AI mode")
             ready, reason = self.readiness()
             if not ready:
                 raise ValueError(reason)
@@ -393,13 +395,15 @@ class EdoRoomManager:
                     "--ai-deck", str(decks[deck_name]), "--out", str(output),
                     "--bind", "127.0.0.1", "--port", str(self.port),
                     "--human-authorization", "self_recorded"]
+            if ai_mode == "tactical_fallback_1":
+                argv.extend(("--tactical-fallback-margin", "1.0"))
             with log_path.open("ab") as log:
                 self.process = subprocess.Popen(
                     argv, cwd=self.root, env=env, stdin=subprocess.DEVNULL,
                     stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             self.session = identifier
             (output / "session.json").write_text(json.dumps({
-                "schema_version": 1, "ai_deck": deck_name,
+                "schema_version": 1, "ai_deck": deck_name, "ai_mode": ai_mode,
                 "checkpoint": self.creator.checkpoint.name,
                 "pid": getattr(self.process, "pid", None),
                 "training_admitted": False,
@@ -470,6 +474,7 @@ class EdoRoomManager:
             running = current and self._room_running()
             recording = self._recording(directory)
             item = {"id": directory.name, "ai_deck": session["ai_deck"],
+                    "ai_mode": session.get("ai_mode", "selected"),
                     "running": running, "recording": recording}
             # A web-server restart loses the Popen handle. Keep the launch
             # failure visible for sessions that were started by this manager.

@@ -95,7 +95,16 @@ shows whether it is listening; EDOPro recording and confirmed-choice review
 remain on the game creation page.
 Choose a published AI Deck and press **Start EDOPro room**. When the page says
 the room is running, join `127.0.0.1:7911` through EDOPro's LAN host-address
-screen. The page shows the latest room sessions and links a recording only
+screen. **AI play style** defaults to the selected neural policy. You can
+instead choose **Experimental low-confidence Tactical fallback**, which uses
+Tactical-v14 for optional decisions where the policy's top two raw scores
+differ by less than 1.0. This mode beat its unchanged policy parent in a
+[held-out direct test](docs/evaluation.md#experimental-low-margin-tactical-fallback-31-october-2026),
+but still lost more games than it won against Tactical. The session and saved
+replay metadata record the AI mode. Both modes save native replays and permit
+the same explicit human-choice confirmation and experimental child training;
+neither mode automatically changes the selected checkpoint. The page shows
+the latest room sessions and links a recording only
 after independent replay reconstruction succeeds. Each session stays in the
 ignored `.cache/goat-ai/edopro_games/<session-id>/` folder. The room process
 continues if you close the browser tab. On Linux, restarting the local review

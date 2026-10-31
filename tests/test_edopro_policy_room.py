@@ -175,15 +175,16 @@ def test_edopro_training_publishes_only_verified_checkpoint(
          and os.getenv("GOAT_AI_EDOPRO_HISTORICAL") == "1"),
     reason="pinned EDOPro host and exact matching native root not supplied",
 )
-@pytest.mark.parametrize(("ai_deck", "client_deck"), (
-    ("warrior_montague_clash.ydk", "gravekeeper_daryl_gessler_indianapolis_2005.ydk"),
-    ("goat_control_jesse_twohig_indianapolis_2005.ydk", "chaos_turbo_riclar_2020.ydk"),
+@pytest.mark.parametrize(("ai_deck", "client_deck", "ai_mode"), (
+    ("warrior_montague_clash.ydk", "gravekeeper_daryl_gessler_indianapolis_2005.ydk", "selected"),
+    ("goat_control_jesse_twohig_indianapolis_2005.ydk", "chaos_turbo_riclar_2020.ydk", "selected"),
     ("flip_control_cas_stomphorst_indianapolis_2005.ydk",
-     "zombie_jae_kim_charlotte_2005.ydk"),
+     "zombie_jae_kim_charlotte_2005.ydk", "selected"),
     ("dimension_fusion_turbo_wikiformat_reference.ydk",
-     "chaos_return_dingosig_worlds_2022.ydk"),
+     "chaos_return_dingosig_worlds_2022.ydk", "tactical_fallback_1"),
 ))
-def test_page_room_launcher_completes_and_lists_verified_game(ai_deck, client_deck):
+def test_page_room_launcher_completes_and_lists_verified_game(ai_deck, client_deck,
+                                                            ai_mode):
     """Exercise the real child process and the room manager used by the page."""
     pytest.importorskip("ygo_agent")
     from ygo_agent.arena.client import ArenaClient
@@ -205,8 +206,9 @@ def test_page_room_launcher_completes_and_lists_verified_game(ai_deck, client_de
         manager.session = None
         manager.process = None
         try:
-            launched = manager.start(ai_deck)
+            launched = manager.start(ai_deck, ai_mode)
             assert launched["room_running"]
+            assert launched["sessions"][0]["ai_mode"] == ai_mode
             identifier = launched["sessions"][0]["id"]
             for _ in range(150):
                 if manager.status()["listening"]:
@@ -240,6 +242,10 @@ def test_page_room_launcher_completes_and_lists_verified_game(ai_deck, client_de
             else:
                 pytest.fail(f"launched room did not save a verified game: {recording}")
             assert recording["complete"] is True
+            saved_metadata = json.loads(next((manager.folder / identifier).glob("*.meta.json")).read_text())
+            assert saved_metadata["ai_inference"] == (
+                "policy_tactical_fallback_margin_1" if ai_mode == "tactical_fallback_1"
+                else "policy_own_loss_guard_v1")
             assert recording["goat_decks_legal"] is True
             assert recording["experimental_confirmed_eligible"] is True
             assert recording["viewer"].endswith(".html")
@@ -396,6 +402,7 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
     assert verified["training_admitted"] is False
     assert metadata["asset_sha256"] == trajectory.asset_sha256
     assert "build/libocgcore.so" in trajectory.asset_sha256
+    assert metadata["ai_inference"] == trajectory.skill_metadata["ai_inference"]
     if historical and authorized and not surrender:
         legacy = json.loads(review_path.read_text())
         legacy["schema_version"] = 30
@@ -537,6 +544,13 @@ def test_network_room_saves_audited_game_or_prefix(tmp_path, surrender, authoriz
         with pytest.raises(ValueError, match="authorized self-recording"):
             confirm_frames(replay_path, [1], mirror_root,
                            tmp_path / "unauthorized.json")
+    original_inference = metadata["ai_inference"]
+    metadata["ai_inference"] = "policy_tactical_fallback_margin_1"
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    with pytest.raises(ValueError, match="differs from replay"):
+        verify_edopro_live_recording(replay_path, review_path,
+                                     metadata_path, mirror_root)
+    metadata["ai_inference"] = original_inference
     metadata["human_authorization"] = "unauthorized"
     metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
     with pytest.raises(ValueError, match="unsupported human recording authorization"):

@@ -58,15 +58,19 @@ def test_edopro_room_launch_and_verified_viewer(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.edopro_local_room.subprocess.Popen", spawn)
     with pytest.raises(ValueError, match="published AI deck"):
         room.start("../../outside.ydk")
-    started = room.start("ai.ydk")
+    with pytest.raises(ValueError, match="supported EDOPro AI mode"):
+        room.start("ai.ydk", "untrusted")
+    started = room.start("ai.ydk", "tactical_fallback_1")
     assert started["room_running"] is True
     assert started["training_admitted"] is False
     assert len(started["sessions"]) == 1
     assert started["sessions"][0]["ai_deck"] == "ai.ydk"
+    assert started["sessions"][0]["ai_mode"] == "tactical_fallback_1"
     argv, kwargs = calls[0]
     assert "--historical-pinned" in argv
     assert argv[argv.index("--human-authorization") + 1] == "self_recorded"
     assert argv[argv.index("--ai-deck") + 1] == str(deck_folder / "ai.ydk")
+    assert argv[argv.index("--tactical-fallback-margin") + 1] == "1.0"
     assert str(native / "edopro_probe/ygo_agent_host") in kwargs["env"]["PYTHONPATH"]
     with pytest.raises(ValueError, match="already running"):
         room.start("ai.ydk")

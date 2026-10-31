@@ -331,8 +331,8 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
                     "session_offset": offset, "session_limit": 10,
                     "session_count": 0}
 
-        def start(self, deck):
-            launched.append(deck)
+        def start(self, deck, mode="selected"):
+            launched.append((deck, mode))
             return self.status()
 
         def choices(self, identifier):
@@ -374,7 +374,10 @@ def test_edopro_page_route_starts_only_selected_local_room(tmp_path, monkeypatch
         with pytest.raises(HTTPError, match="400"):
             _request(f"{base}/api/edopro/status?offset=-1")
         assert _request(f"{base}/api/edopro/start", {"ai_deck": "ai.ydk"})[1]["room_running"]
-        assert launched == ["ai.ydk"]
+        assert launched == [("ai.ydk", "selected")]
+        assert _request(f"{base}/api/edopro/start", {
+            "ai_deck": "ai.ydk", "ai_mode": "tactical_fallback_1"})[1]["room_running"]
+        assert launched[-1] == ("ai.ydk", "tactical_fallback_1")
         assert _request(f"{base}/api/edopro/choices?id={'a' * 16}")[1]["confirmed"] == 0
         assert _request(f"{base}/api/edopro/confirm", {
             "id": "a" * 16, "frames": [1, 3]})[1]["confirmed"] == 2

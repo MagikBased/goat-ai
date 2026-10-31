@@ -133,6 +133,12 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
     has_asset_hashes = (metadata.get("asset_sha256") is not None
                         or trajectory.asset_sha256 is not None)
     status = provenance.get("recording_status")
+    ai_inference = metadata.get("ai_inference")
+    if ai_inference is not None and (
+            not isinstance(ai_inference, str)
+            or not (ai_inference == "policy_own_loss_guard_v1"
+                    or ai_inference == "policy_tactical_fallback_margin_1")):
+        raise ValueError("unknown EDOPro AI inference mode")
     if (trajectory.source != (base_source if complete else base_source + "_partial")
             or trajectory.ruleset != ruleset
             or trajectory.schema_version not in (28, 29, 30, 31)
@@ -141,6 +147,7 @@ def verify_edopro_live_recording(replay_path: str | Path, review_path: str | Pat
             or trajectory.decks != tuple(metadata.get("names", ()))
             or provenance.get("authorization") != authorization
             or provenance.get("human_client_seat") != human_seat
+            or provenance.get("ai_inference") != ai_inference
             or has_deck_hashes and (trajectory.deck_sha256 != deck_hashes
                                     or metadata.get("deck_sha256") != list(deck_hashes))
             or has_asset_hashes and (

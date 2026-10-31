@@ -49,6 +49,10 @@
        from complete pinned games can enter the opt-in experimental trainer;
        raw replays are not automatically used for training.</p>
     <label>AI deck<select id="edopro-deck"></select></label>
+    <label>AI play style<select id="edopro-ai-mode">
+      <option value="selected">Selected neural policy</option>
+      <option value="tactical_fallback_1">Experimental low-confidence Tactical fallback</option>
+    </select></label>
     <button id="edopro-start" type="button">Start EDOPro room</button>
     <p id="edopro-status" role="status" aria-live="polite"></p>
     <ul id="edopro-recordings"></ul>
@@ -159,7 +163,8 @@
       for (const session of room.sessions) {
         const item = document.createElement("li");
         const record = session.recording;
-        item.append(`${deckLabel(session.ai_deck)} · `);
+        item.append(`${deckLabel(session.ai_deck)} · ${session.ai_mode === "tactical_fallback_1"
+          ? "experimental fallback" : "selected policy"} · `);
         if (session.running) item.append("waiting for the duel to finish");
         else if (record?.viewer) {
           const link = document.createElement("a");
@@ -233,7 +238,8 @@
       try {
         const response = await fetch("/api/edopro/start", {
           method: "POST", headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ai_deck: byId("edopro-deck").value}),
+          body: JSON.stringify({ai_deck: byId("edopro-deck").value,
+            ai_mode: byId("edopro-ai-mode").value}),
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Could not start room");
