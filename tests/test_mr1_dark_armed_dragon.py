@@ -95,6 +95,10 @@ def test_mr1_dark_armed_dragon_requires_three_dark_and_pays_gy_cost(
                         effect_used = action is not None
                 if effect_used and not cost_paid and action is None \
                         and actions[0].kind == "select_card":
+                    # DAD itself is a face-up DARK monster on the field. The
+                    # script scans that zone for Spirit Elimination, but with
+                    # no such card active only Graveyard costs are legal.
+                    assert all(a.parameters.get("location") == 16 for a in actions)
                     action = next((a for a in actions if a.parameters.get("code") == SANGAN
                                    and a.parameters.get("location") == 16), None)
                     cost_paid = action is not None
