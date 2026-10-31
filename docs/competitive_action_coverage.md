@@ -1,5 +1,38 @@
 # Competitive-deck action coverage probe
 
+## Full sourced tournament-corpus first-activation probe (31 October 2026)
+
+The `first_activation` agent ran all 15 unordered pairings of the six sourced
+tournament Decks, both seat orders, on seeds 210000–210002. All **90 duels**
+reached terminal states within 3,000 decisions (161–1,283 per game). Their
+**76,692 decisions** serialized to ignored trajectory files, replay-verified
+against fresh native engines, and passed the player-visibility audit. The
+report recorded 70 card identities in Decks or source-action offers; 69 had at
+least one selected source action. The sole offered but unselected identity was
+Dark Blade the Dragon Knight. The agent selected 298 chain responses. Its
+source-action choices are deliberately aggressive, so none of these counts
+measure historical play rates or playing strength. Native replay and
+visibility checks establish sampled protocol behavior, not the 2005 ruling
+correctness of each interaction.
+
+The ignored report is
+`.cache/goat-ai/first_activation_2005_corpus_210000_210002.json`
+(SHA-256 `2f3dba17c939dda4e9a4cf9d687bc936240e7dfd9a5e02391d7d398c40038544`).
+Reproduce on the pinned native assets with:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_competitive_card_actions.py \
+  --native-root .cache/goat-ai --tournament-corpus --agent first_activation \
+  --seed 210000 --seeds 3 --max-decisions 3000 --verify-replays \
+  --record-dir .cache/goat-ai/first_activation_2005_corpus_210000_210002_replays \
+  --output .cache/goat-ai/first_activation_2005_corpus_210000_210002.json
+```
+
+The most frequent sampled response pair was Solemn Judgment chained to Trap
+Dustshoot (19 decisions). Both cards' underlying interaction already has a
+source-backed native fixture. The broad probe is therefore a coverage screen;
+it does not replace the targeted historical tests.
+
 ## First-activation probe on preserved 2005 decks (29 October 2026)
 
 The `first_activation` agent prefers each card ID's first offered `activate`

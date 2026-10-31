@@ -21,6 +21,14 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+A [full sourced tournament-corpus first-activation probe](competitive_action_coverage.md#full-sourced-tournament-corpus-first-activation-probe-31-october-2026)
+completed 90 duels across all 15 pairings of six tournament Decks, both seats,
+and three fresh seeds. All 76,692 decisions serialized, replay-verified, and
+passed the player-visibility audit; 69 card-source identities were selected
+and 298 chain responses occurred. This broadens effect-heavy sampled protocol
+coverage, while arbitrary-Deck completeness and M2 historical correctness
+remain open.
+
 A [100-duel independent 60-card Fusion stress sweep](evaluation.md#independent-60-card-fusion-stress-sweep-31-october-2026)
 generated 200 distinct legal Main/Extra Deck combinations. All 100 tactical
 duels reached terminal states under a 3,000-decision cap; their 50,172
