@@ -73,6 +73,28 @@ def test_adjudication_rejects_unrecognized_assessment(tmp_path):
         adjudicate(report, dt01, other, community)
 
 
+@pytest.mark.parametrize("release_date,region,accepted", [
+    ("2011-10-04", "north_america", True),
+    ("2010-04-20", "north_america", False),
+    ("2011-10-04", "europe", False),
+    ("unknown", "north_america", False),
+])
+def test_video_promo_exclusion_requires_post_cutoff_north_american_release(
+        tmp_path, release_date, region, accepted):
+    report, dt01, other, community = _inputs(tmp_path)
+    other.write_text(
+        "card_id\tassessment\trelease_date\trelease_region\n"
+        "2\tinclude_pre_cutoff_booster\t-\t-\n"
+        f"3\texclude_post_cutoff_north_america_promo\t{release_date}\t{region}\n")
+    if accepted:
+        result = adjudicate(report, dt01, other, community)
+        assert result["api_only_excluded_ids"] == [1, 3]
+        assert result["api_only_pending_ids"] == []
+    else:
+        with pytest.raises(ValueError, match="promotional exclusion"):
+            adjudicate(report, dt01, other, community)
+
+
 def test_promo_inclusion_requires_pre_cutoff_north_american_release(tmp_path):
     report, dt01, other, community = _inputs(tmp_path)
     header = "card_id\tassessment\trelease_date\trelease_region\n"
@@ -184,6 +206,12 @@ def test_yu_jo_friendship_partial_inclusion_keeps_release_provenance():
     assert card["release_region"] == "north_america"
     assert "Duelist volume 16" in card["pre_cutoff_record"]
     assert card["primary_evidence"].startswith("https://www.db.yugioh-card.com/")
+    darkness = rows[93709215]
+    assert darkness["assessment"] == "exclude_post_cutoff_north_america_promo"
+    assert darkness["release_date"] == "2011-10-04"
+    assert darkness["release_region"] == "north_america"
+    assert darkness["primary_evidence"].startswith("https://www.yugioh-card.com/")
+    assert "historical inference" in darkness["basis"]
     for code, month in ((62180201, "2008-01"), (57793869, "2007-09")):
         promo = rows[code]
         assert promo["assessment"] == "include_pre_cutoff_magazine_issue"

@@ -69,6 +69,7 @@ def adjudicate(report_path: Path, dt01_path: Path,
             "include_pre_cutoff_booster", "include_pre_cutoff_promo",
             "include_pre_cutoff_magazine_issue",
             "exclude_north_america",
+            "exclude_post_cutoff_north_america_promo",
             "pending_north_america_promo", "pending_cross_territory_video_promo",
         }:
             raise ValueError(f"unknown evidence assessment: {assessment}")
@@ -79,6 +80,13 @@ def adjudicate(report_path: Path, dt01_path: Path,
                 raise ValueError("promotional inclusion requires a release date") from error
             if release_date > CUTOFF or row.get("release_region") != "north_america":
                 raise ValueError("promotional inclusion must predate the North American cutoff")
+        if assessment == "exclude_post_cutoff_north_america_promo":
+            try:
+                release_date = date.fromisoformat(row["release_date"])
+            except (KeyError, TypeError, ValueError) as error:
+                raise ValueError("promotional exclusion requires a release date") from error
+            if release_date <= CUTOFF or row.get("release_region") != "north_america":
+                raise ValueError("promotional exclusion must postdate the North American cutoff")
         if assessment == "include_pre_cutoff_magazine_issue":
             issue = row.get("issue_month", "")
             try:

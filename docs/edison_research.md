@@ -172,13 +172,15 @@ an inference from the booster record and the [March 2010 restriction list](https
 not a period North American event ruling. The
 [2010 European Konami policy](https://www.etcg.de/uploads/pdf/KDE_YuGiOh_Policy.pdf)
 allows some video-game promos from games released in a different territory.
-Therefore [Konami's statement](https://www.yugioh-card.com/en/products/past_products/legendary_coll2/)
-that Darkness Destroyer first released *in North America* in October 2011
-does not itself prove it was ineligible there in April 2010: its
-[English TCG game-bundle print](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7983&ope=2&request_locale=en)
-is dated November 2008. The European rule is not a North American ruling;
-Darkness Destroyer remains unresolved pending a period North American policy
-or event ruling. The
+The [English TCG game-bundle print](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7983&ope=2&request_locale=en)
+for Darkness Destroyer is dated November 2008, but
+[Konami says](https://www.yugioh-card.com/en/products/past_products/legendary_coll2/)
+its first North American release was October 2011. The archived North American
+policy below requires a video-game promo's game to go on sale *within that
+continent*. We therefore exclude the card at the April 2010 North American
+cutoff. This applies policy wording documented in November 2010 to the earlier
+cutoff, so the historical interpretation is an inference; a pre-cutoff North
+American event ruling would strengthen it. The
 [Wicked Dreadroot](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6405&ope=2&request_locale=en)
 and [Wicked Eraser](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7092&ope=2&request_locale=en)
 have older promotional records, but their exact period North American legal
@@ -195,9 +197,9 @@ bounded-date inference. The [period Konami Mexico FAQ](https://web.archive.org/w
 distinguishes SHONEN JUMP promos unavailable in Latin America; the North
 American release conclusion remains an inference, not a located April 2010
 event ruling. A period North American card-legality appendix or dated event
-ruling would strengthen it. Thus 29 of the 34 named API-only discrepancies
-have a source-backed exclusion, four have provisional pre-cutoff inclusions,
-and Darkness Destroyer awaits a cross-territory check. One community-only
+ruling would strengthen it. Thus 30 of the 34 named API-only discrepancies
+have a source-backed exclusion, and four have provisional pre-cutoff inclusions.
+One community-only
 promotion remains open, as does the wider release pool.
 
 A later [official Konami Central America WCQ FAQ](https://www.yugioh-card.com/en/events-item/2025-ca-wcq/)
@@ -228,10 +230,12 @@ older Wicked promos (`JUMP-EN016` and `JUMP-EN018`), but does not by itself
 establish their April 2010 status. Its separate video-game footnote says legality begins on the
 game's sale date *within that continent*, which differs from the February
 2010 European policy's allowance for certain games not scheduled locally.
-This reinforces why Darkness Destroyer's April North American status remains
-unsettled. The archived HTML SHA-256 is
+Together with Konami's 2011 first-North-American-release statement, this
+supports the provisional exclusion recorded above. The archived HTML SHA-256 is
 `5889e081d7cbd794af64e94c514179cfab987ca03cb9b82059d78c3fd3f896bb`;
 the capture was read without vendoring it.
+The updated six-card ledger SHA-256 is
+`77d35bb6c7556111042d3416c077f9bbb38b61019a609ad59fce441708eb2406`.
 
 The ignored report is
 `.cache/goat-ai/edison_pool_candidate_comparison_20261027.json` (SHA-256
@@ -261,9 +265,9 @@ API-only named differences in the candidate comparison, and that the
 covers the opposite difference, with no duplicate or conflicting IDs. It
 rejects a DT01 exclusion if its first listed ordinary
 printing precedes the cutoff. Against the cached comparison above, it reports
-29 excluded IDs, four provisionally included API-only IDs (Restructer
-Revolution, Yu-Jo Friendship, and both Wicked magazine promos), one pending
-API-only video-game promotion (Darkness Destroyer), one included community-only
+30 excluded IDs, four provisionally included API-only IDs (Restructer
+Revolution, Yu-Jo Friendship, and both Wicked magazine promos), no pending
+API-only IDs, one included community-only
 ID (Genesis Dragon), and one pending community-only subscription promotion. The
 magazine assessment accepts a `YYYY-MM` issue only when its **last possible
 day** precedes the cutoff and the recorded territory is North America; this

@@ -2132,8 +2132,11 @@ book promotion, the official card record, and the period promotional-release
 policy. The two older Wicked magazine promos are now also provisional
 inclusions: their official issue months end well before the cutoff under
 Konami's period newsstand rule, while North American distribution is inferred
-from the regional records. Darkness Destroyer's cross-territory game promo
-still needs period North American adjudication.
+from the regional records. The archived November 2010 North American
+video-game promo policy and Konami's statement that Darkness Destroyer first
+released in North America in October 2011 now support its provisional
+exclusion, bringing the source-backed exclusion count to 30. The earlier
+April 2010 wording remains an inference.
 Konami's January 2010 Los Angeles SHONEN JUMP Championship coverage shows
 Genesis Dragon in sanctioned play before the Edison cutoff, resolving one
 community-only discrepancy. Exodius remains open. See the
@@ -2141,7 +2144,7 @@ community-only discrepancy. Exodius remains open. See the
 and [Edison audit](edison_research.md).
 The candidate-disagreement audit command now verifies that the documented
 DT01 and non-DT01 evidence covers every named API-only difference exactly
-once, while keeping Darkness Destroyer and Exodius unresolved. It produces
+once, while keeping Exodius unresolved. It produces
 no Edison whitelist. The report now records the 3,622 IDs shared by both
 candidate lists as **not independently release-audited**, so even resolving
 the two remaining discrepancies cannot close the full card-pool gate; see
