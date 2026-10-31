@@ -182,10 +182,21 @@ or event ruling. The
 [Wicked Dreadroot](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6405&ope=2&request_locale=en)
 and [Wicked Eraser](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7092&ope=2&request_locale=en)
 have older promotional records, but their period North American legal dates
-remain unproved. Thus 29 of the 34 named API-only discrepancies have a
-source-backed exclusion, two have provisional pre-cutoff inclusions, and
-three await a promotional-card or cross-territory check. One of the two community-only
-promotions remains open, and so does the wider release pool.
+remain unproved. The [February 2010 Konami tournament policy](https://www.etcg.de/uploads/pdf/KDE_YuGiOh_Policy.pdf)
+specifically says a SHONEN JUMP magazine promo becomes legal on the magazine's
+official **newsstand date**, not when an early subscriber receives it. That
+policy is issued by Konami's European office and warns that legality dates
+vary by territory. Konami's card records identify Dreadroot with the January
+2008 magazine promotion and Eraser with September 2007, but list neither
+newsstand day. Those issue labels and the European rule are strong leads, not
+proof of the exact North American dates. The next useful source is a period
+North American card-legality appendix, dated event ruling, or publisher
+newsstand record for `JUMP-EN018` and `JUMP-EN016`; a later reprint date does
+not answer their earlier promotional status. Thus 29 of the 34 named API-only
+discrepancies have a source-backed exclusion, two have provisional pre-cutoff
+inclusions, and three await a promotional-card or cross-territory check. One
+of the two community-only promotions remains open, and so does the wider
+release pool.
 
 A later [official Konami Central America WCQ FAQ](https://www.yugioh-card.com/en/events-item/2025-ca-wcq/)
 lists Yu-Jo Friendship among promos unavailable in Latin America and says
