@@ -8,6 +8,8 @@ A separate 16-duel 40-card sample stressed Scapegoat, Metamorphosis, and random 
 
 Reproduce using `scripts/probe_random_decks.py --native-root .cache/goat-ai --seeds 16 --max-decisions 3000 --agent tactical --random-extra --distinct-opponents --verify-replays --isolate-games` with `--seed 179000 --main-size 60` for the first sample, or `--seed 179100 --fusion-stress` for the second. Use a fresh ignored output directory for each run.
 
+Both schedules were repeated in fresh isolated output directories with `--repeat-seeds`. For each of the **32** seeded duels, a second native engine reproduced the full ordered decision records, terminal observation, and outcome: **15,462/15,462** repeated decisions identical. All original trajectories also replay-verified and passed visibility audits again. The repeat reports match the earlier per-seed decision counts and winners; their SHA-256 values are `7ce29b95889b5dca213fdb67e6df5fa233e7c875496838d2be86f7f7084c9e3e` for `.cache/goat-ai/random_probe_60_tactical_repeat_179000/report.json` and `f15a9801fad753d3d66354cab8044b3f491d9712d8f23445e89c3f5df5452223` for `.cache/goat-ai/random_probe_40_fusion_tactical_repeat_179100/report.json`. This is reproducibility on the pinned local assets and sampled decks, not a guarantee across engine versions or all legal decks.
+
 ## Combined held-out weakness review queue (30 October 2026)
 
 Two existing, unlabeled review queues for the selected v23 policy were
