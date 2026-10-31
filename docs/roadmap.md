@@ -2058,6 +2058,14 @@ loss. Keep both children experimental and the selected v23 checkpoint
 unchanged. M4 still needs a transferable decision signal and held-out strength
 gain.
 
+The [matched width-32 versus width-64 pilot](evaluation.md#matched-policy-width-pilot-on-historical-holdouts-31-october-2026)
+trained two fresh feature-v23 clones on the same 1,354 optional Tactical
+choices. They scored 0–32 and 1–31 against Tactical-v14 on four unseen 2005
+Main Decks; width 64 scored 17–15 directly against width 32. All 96 held-out
+duels replay-verified and passed visibility audit. Lower training loss at width
+64 did not yield an established competitive gain. M4 remains open, and the
+selected v23 checkpoint stays unchanged.
+
 ## M5 — Search and other formats
 
 An [official-print audit of all 72 shared Duel Terminal 1 candidate IDs](edison_research.md#independent-date-filtered-candidate-comparison-27-october-2026)

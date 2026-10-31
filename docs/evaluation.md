@@ -16705,3 +16705,67 @@ on all 203. This pilot establishes that the representation and training path
 run on real current-schema duels. It does **not** show a competitive gain or
 isolate an effect of current Level. Keep the v23 parent selected; collect
 independent decisions involving Level changes before judging v34's value.
+
+## Matched policy-width pilot on historical holdouts (31 October 2026)
+
+To test whether width alone explains the weak cross-deck policy, two fresh
+feature-v23 behavioral clones used the same 16 verified Tactical-v14 duels:
+`.cache/goat-ai/tactical_crossdeck_168000_a/seed_*.json` and
+`tactical_crossdeck_168100_b/seed_*.json`. These cover Seattle Goat Control
+versus Dimension Fusion and Charlotte Zombie versus Nationals Chaos, both
+teacher seats. Each run selected 4,054 Tactical decisions, of which 1,354
+had more than one legal action and entered the fit. Both used seed 20261031,
+two epochs, learning rate 0.0002, batch size 32, batched forward, and the
+same pinned experimental core. Only `--width` differed: 32 versus 64. The
+two final training losses were **1.1673** and **1.0812** respectively. Those
+losses measure imitation fit, not competitive quality. The ignored checkpoints
+are `.cache/goat-ai/width_ablation_v23_w32_20261031.pt` (SHA-256
+`3de5457749992193b7181f10ea4a972c06028e023b166e8f8bd14c150ae2201a`)
+and `width_ablation_v23_w64_20261031.pt` (SHA-256
+`5bc893ea91c7ff139834d75b842e0e1991d608099ac0265ea9e06e1a538a6c36`).
+Reproduce either training arm from the project root, substituting `32` or
+`64` for `WIDTH`:
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
+  .cache/goat-ai/tactical_crossdeck_168000_a/seed_*.json \
+  .cache/goat-ai/tactical_crossdeck_168100_b/seed_*.json \
+  --native-root .cache/goat-ai --engine experimental \
+  --feature-version 23 --width WIDTH --epochs 2 --batch-size 32 \
+  --batched-forward --verification-workers 4 --skip-forced-training \
+  --learning-rate 0.0002 --seed 20261031 \
+  --output .cache/goat-ai/width_ablation_v23_wWIDTH_20261031.pt
+```
+
+Held-out evaluation used Theeresak Goat Control versus Mary Triatafilidi
+Warrior and Roberto Martinez Phoenix Control versus Ramon Ciriano Beastdown.
+Each matchup ran both Deck assignments, both policy seats, and seeds
+20261100–20261103: 32 duels per checkpoint against Tactical-v14. The
+unseen-Main-Deck gate accepted all four Decks. Width 32 scored **0–32**;
+width 64 scored **1–31**. Independent native replay reconstruction and the
+visibility audit passed all 64 games and 31,982 decisions. The checked paired
+width-64-minus-width-32 score difference was **+3.125 percentage points**
+with a paired 95% interval of **0 to +9.375** points, entirely from one
+Beastdown-assigned game. The reports are
+`.cache/goat-ai/width_ablation_w32_tactical_20261100.json` (SHA-256
+`865b45db094a04ade87a724ae2cc8a7b5cedcb68b98ea964e5895c5506f33ef7`)
+and `width_ablation_w64_tactical_20261100.json` (SHA-256
+`69f1d6cbf48b3b5c12b2e325cc821974fbb8802b7eb35b179515346cb7bd0819`).
+The strict report comparator accepted matching schedule, opponent, source,
+assets, local Deck bytes, and unseen Main Decks.
+The evaluator used `--seed 20261100 --seeds 4 --both-deck-assignments
+--require-unseen-main-decks --verify-replays --workers 2`, both `--matchup`
+pairs named above, and either `--opponent tactical` or
+`--opponent-checkpoint` for the direct comparison.
+
+On that same held-out schedule, width 64 played width 32 directly and scored
+**17–15** (paired 95% score interval **40.625%–65.625%**). All 32 duels and
+37,655 decisions replay-verified and passed the visibility audit. The ignored
+direct report is `.cache/goat-ai/width_ablation_w64_vs_w32_20261100.json`
+(SHA-256
+`bf359670f92f4a02ff008e97379cfe9ea3054bac83969e1bff180be5dfbeb3e5`).
+The direct interval includes 50%, and both clones are far weaker than
+Tactical on these Decks. This single training seed and 1,354 optional examples
+do not establish that greater width helps or hurts with more data. Keep the
+selected v23 checkpoint unchanged; prioritize stronger decision data and
+cross-deck evaluation over increasing width by itself.
