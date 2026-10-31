@@ -82,6 +82,30 @@ def test_promo_inclusion_requires_pre_cutoff_north_american_release(tmp_path):
     assert result["complete_release_pool"] is False
 
 
+@pytest.mark.parametrize("issue_month,region,accepted", [
+    ("2008-01", "north_america", True),
+    ("2010-04", "north_america", False),
+    ("2010-05", "north_america", False),
+    ("2008-01", "europe", False),
+    ("2008-13", "north_america", False),
+    ("2008", "north_america", False),
+])
+def test_magazine_issue_inclusion_uses_latest_possible_day(
+        tmp_path, issue_month, region, accepted):
+    report, dt01, other, community = _inputs(tmp_path)
+    other.write_text(
+        "card_id\tassessment\tissue_month\trelease_region\n"
+        "2\tinclude_pre_cutoff_booster\t\t\n"
+        f"3\tinclude_pre_cutoff_magazine_issue\t{issue_month}\t{region}\n")
+    if accepted:
+        result = adjudicate(report, dt01, other, community)
+        assert result["api_only_included_ids"] == [2, 3]
+        assert result["complete_release_pool"] is False
+    else:
+        with pytest.raises(ValueError, match="magazine inclusion"):
+            adjudicate(report, dt01, other, community)
+
+
 def test_adjudication_requires_community_evidence(tmp_path):
     report, dt01, other, community = _inputs(tmp_path)
     community.write_text("card_id\tassessment\n5\tpending_north_america_subscription_promo\n")
@@ -142,3 +166,9 @@ def test_yu_jo_friendship_partial_inclusion_keeps_release_provenance():
     assert card["release_region"] == "north_america"
     assert "Duelist volume 16" in card["pre_cutoff_record"]
     assert card["primary_evidence"].startswith("https://www.db.yugioh-card.com/")
+    for code, month in ((62180201, "2008-01"), (57793869, "2007-09")):
+        promo = rows[code]
+        assert promo["assessment"] == "include_pre_cutoff_magazine_issue"
+        assert promo["release_region"] == "north_america"
+        assert promo["issue_month"] == month
+        assert "provisional" in promo["basis"]

@@ -181,22 +181,24 @@ Darkness Destroyer remains unresolved pending a period North American policy
 or event ruling. The
 [Wicked Dreadroot](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=6405&ope=2&request_locale=en)
 and [Wicked Eraser](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7092&ope=2&request_locale=en)
-have older promotional records, but their period North American legal dates
-remain unproved. The [February 2010 Konami tournament policy](https://www.etcg.de/uploads/pdf/KDE_YuGiOh_Policy.pdf)
+have older promotional records, but their exact period North American legal
+dates remain unproved. The [February 2010 Konami tournament policy](https://www.etcg.de/uploads/pdf/KDE_YuGiOh_Policy.pdf)
 specifically says a SHONEN JUMP magazine promo becomes legal on the magazine's
 official **newsstand date**, not when an early subscriber receives it. That
 policy is issued by Konami's European office and warns that legality dates
 vary by territory. Konami's card records identify Dreadroot with the January
 2008 magazine promotion and Eraser with September 2007, but list neither
-newsstand day. Those issue labels and the European rule are strong leads, not
-proof of the exact North American dates. The next useful source is a period
-North American card-legality appendix, dated event ruling, or publisher
-newsstand record for `JUMP-EN018` and `JUMP-EN016`; a later reprint date does
-not answer their earlier promotional status. Thus 29 of the 34 named API-only
-discrepancies have a source-backed exclusion, two have provisional pre-cutoff
-inclusions, and three await a promotional-card or cross-territory check. One
-of the two community-only promotions remains open, and so does the wider
-release pool.
+newsstand day. Since both issue months end more than two years before the
+cutoff, the unknown day cannot cross the cutoff if these are North American
+magazine releases. The ledger now includes both **provisionally** on that
+bounded-date inference. The [period Konami Mexico FAQ](https://web.archive.org/web/20101101213813id_/http://www.yugioh-card.com/en/events/ycs/YCS-MX_FAQ.html)
+distinguishes SHONEN JUMP promos unavailable in Latin America; the North
+American release conclusion remains an inference, not a located April 2010
+event ruling. A period North American card-legality appendix or dated event
+ruling would strengthen it. Thus 29 of the 34 named API-only discrepancies
+have a source-backed exclusion, four have provisional pre-cutoff inclusions,
+and Darkness Destroyer awaits a cross-territory check. One community-only
+promotion remains open, as does the wider release pool.
 
 A later [official Konami Central America WCQ FAQ](https://www.yugioh-card.com/en/events-item/2025-ca-wcq/)
 lists Yu-Jo Friendship among promos unavailable in Latin America and says
@@ -222,8 +224,8 @@ An [archived official card-legality page captured 6 November
 identifies itself as updated 4 November 2010. It lists SHONEN JUMP promos
 through `JUMP-EN044` as legal, subject to a regional footnote excluding them
 outside North America unless reprinted. This is later corroboration for the
-older Wicked promos (`JUMP-EN016` and `JUMP-EN018`), not a direct April 2010
-legality record. Its separate video-game footnote says legality begins on the
+older Wicked promos (`JUMP-EN016` and `JUMP-EN018`), but does not by itself
+establish their April 2010 status. Its separate video-game footnote says legality begins on the
 game's sale date *within that continent*, which differs from the February
 2010 European policy's allowance for certain games not scheduled locally.
 This reinforces why Darkness Destroyer's April North American status remains
@@ -259,14 +261,18 @@ API-only named differences in the candidate comparison, and that the
 covers the opposite difference, with no duplicate or conflicting IDs. It
 rejects a DT01 exclusion if its first listed ordinary
 printing precedes the cutoff. Against the cached comparison above, it reports
-29 excluded IDs, two provisionally included API-only IDs (Restructer
-Revolution and Yu-Jo Friendship), three pending API-only promotions, one included community-only
-ID (Genesis Dragon), and one pending community-only promotion. Its
+29 excluded IDs, four provisionally included API-only IDs (Restructer
+Revolution, Yu-Jo Friendship, and both Wicked magazine promos), one pending
+API-only video-game promotion (Darkness Destroyer), one included community-only
+ID (Genesis Dragon), and one pending community-only subscription promotion. The
+magazine assessment accepts a `YYYY-MM` issue only when its **last possible
+day** precedes the cutoff and the recorded territory is North America; this
+does not certify the inferred territory. Its
 `complete_release_pool` field is always false: neither candidate source nor
 this reconciliation establishes every eligible North American card. The
 ignored local output is
-`.cache/goat-ai/edison_partial_adjudication_20261029.json` (SHA-256
-`d2b618b7e1f1ca8264863bdd283b0128369f2d31266177b6b43f0ae42f6157de`).
+`.cache/goat-ai/edison_partial_adjudication_20261030.json` (SHA-256
+`5b6d0a45ef6b2352867fa98642b834d1bff2d1d0350ce7903756dbbc1de229d4`).
 
 ```sh
 PYTHONPATH=src:. .venv/bin/python scripts/adjudicate_edison_pool_disagreements.py \
@@ -274,7 +280,7 @@ PYTHONPATH=src:. .venv/bin/python scripts/adjudicate_edison_pool_disagreements.p
   configs/historical/edison_dt01_new_card_exclusions_2010_04_20.tsv \
   configs/historical/edison_non_dt01_candidate_discrepancies_2010_04_20.tsv \
   configs/historical/edison_community_only_candidate_discrepancies_2010_04_20.tsv \
-  --output .cache/goat-ai/edison_partial_adjudication_20261029.json
+  --output .cache/goat-ai/edison_partial_adjudication_20261030.json
 ```
 
 [Konami's Exodius record](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=7392&ope=2&request_locale=en)
@@ -320,8 +326,8 @@ explicitly excludes SHONEN JUMP magazine promotions from Latin American
 tournament play unless the card was released another way there. It also gives
 Latin American restrictions on cards from North American Duel Terminal sets.
 This period official FAQ confirms that an event's territorial rules matter;
-it does **not** decide whether Exodius, the Wicked promotions, or those Duel
-Terminal cards were legal in North America by 20 April. The retrieved HTML is
+it does **not** independently certify whether Exodius, the Wicked promotions,
+or those Duel Terminal cards were legal in North America by 20 April. The retrieved HTML is
 kept only in ignored local cache at
 `.cache/goat-ai/edison_ycs_mexico_faq_2010_11_01.html` (SHA-256
 `47c251ea7fa5c2a8e42cf68d4097878ebfc3dcf01134c8c9f1408025e84bf807`).

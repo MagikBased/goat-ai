@@ -6,6 +6,7 @@ community-only cards unresolved until they receive their own evidence.
 """
 
 import argparse
+import calendar
 import csv
 import json
 from datetime import date
@@ -63,6 +64,7 @@ def adjudicate(report_path: Path, dt01_path: Path,
         assessment = row["assessment"]
         if assessment not in {
             "include_pre_cutoff_booster", "include_pre_cutoff_promo",
+            "include_pre_cutoff_magazine_issue",
             "exclude_north_america",
             "pending_north_america_promo", "pending_cross_territory_video_promo",
         }:
@@ -74,6 +76,18 @@ def adjudicate(report_path: Path, dt01_path: Path,
                 raise ValueError("promotional inclusion requires a release date") from error
             if release_date > CUTOFF or row.get("release_region") != "north_america":
                 raise ValueError("promotional inclusion must predate the North American cutoff")
+        if assessment == "include_pre_cutoff_magazine_issue":
+            issue = row.get("issue_month", "")
+            try:
+                if len(issue) != 7 or issue[4] != "-":
+                    raise ValueError("invalid issue month")
+                first = date.fromisoformat(issue + "-01")
+                latest = date(first.year, first.month,
+                              calendar.monthrange(first.year, first.month)[1])
+            except ValueError as error:
+                raise ValueError("magazine inclusion requires a valid issue month") from error
+            if latest > CUTOFF or row.get("release_region") != "north_america":
+                raise ValueError("magazine inclusion must predate the North American cutoff")
         category = assessment.split("_", 1)[0]
         decisions[category].add(int(row["card_id"]))
 
