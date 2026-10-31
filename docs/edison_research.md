@@ -324,6 +324,14 @@ capture of this page, so it cannot prove the April status. The candidate
 remains pending until a period North American legality page, policy, or
 sanctioned-play record establishes it. Its 2010 tin reprint is too late.
 
+[Konami's later Turbo Pack 5 coverage](https://yugiohblog.konami.com/2011/ycs/turbo-pack-5-unveiled/)
+states that SHONEN JUMP magazine promotions were distributed in the United
+States and Canada, and that two such cards became tournament-legal in Europe
+and Latin America only after their regional Turbo Pack release. This is
+official evidence that promo distribution and legality were regional. It is
+from 2011, concerns different cards, and supplies no April 2010 legal date
+for Exodius; it therefore does not change the pending assessment.
+
 A [Konami Mexico YCS FAQ archived on 1 November 2010](https://web.archive.org/web/20101101213813id_/http://www.yugioh-card.com/en/events/ycs/YCS-MX_FAQ.html)
 explicitly excludes SHONEN JUMP magazine promotions from Latin American
 tournament play unless the card was released another way there. It also gives
