@@ -17852,3 +17852,52 @@ The next M4 experiment should target independently reviewed own-card loss
 states in the collected human/reviewer pipeline, then recheck both the exact
 Heavy Storm regression state and broad held-out Deck schedules. Tactical
 agreement alone has not made the learned policy reliably stronger.
+
+### Executed own-only Heavy Storm label ablation
+
+An opt-in teacher filter now adds **executed** Heavy Storm choices where the
+acting player's visible field has other friendly Spell/Trap cards and no
+opposing backrow, even when the parent's top-two score margin exceeds the
+usual 1.0 cutoff. It excludes a Set Heavy Storm's own source slot. This
+labels a visible decision, not a rule of GOAT legality; it does not read
+hidden opponent card identities.
+
+Re-running the preceding 192-game fit with the new filter produced the same
+3,360 labels and byte-identical model tensors: those games contained only
+**one** executed own-only Storm loss, and it already had margin below 1.0.
+The resulting ignored checkpoint SHA-256 is
+`86dc4fbbcc4f6e00121d41743ade9d100a812fff7eb3fbd9b4cc396dca82edce`.
+Its different file hash reflects provenance metadata, not a policy update.
+
+To find states actually visited by the mixed child, it played Tactical-v14
+on the four previously used published Deck pairs, both policy seats, seeds
+208000–208007. All **64 games and 41,034 decisions** passed the collector's
+native replay and visibility checks. The ignored manifest SHA-256 is
+`3bb071f108bbcb5b7507b2727e57ca3f31469b06cf4bf6773f8b009c894cbbc8`.
+There were **ten** executed own-only Heavy Storm decisions. Five had margins
+at least 1.0, and Tactical chose a different offered action at all ten.
+
+Two children were trained from that same mixed parent, 64 source games, four
+preservation games, seed 208008, 100 parent-KL steps, batch 64 labels, batch
+32 preservation states, KL weight 0.5, and learning rate 0.0001. The control
+used 1,182 low-margin labels; the targeted arm used **1,187**, adding only
+the five high-margin cases. Their SHA-256 values are respectively
+`caea7f58f141f77418e39b1c8a3ac9184fbde583d0d2b8322a2d77ce558f3f3f`
+and `661312fd7a21ad748bd6301763325cbcd7518c2210573df39575766a5abe7bae`.
+Both arms **still chose own-only Heavy Storm on all ten source states** and on
+the previously identified independent Beastdown turn-11 observation. This
+fixed-state failure makes a broad strength claim unwarranted; no tournament
+evaluation or promotion was performed for these children. A next experiment
+must change the treatment of rare correction labels, then independently test
+both that exact decision and competitive transfer.
+
+Reproduce the source collection with `scripts/collect_policy_matches.py`
+using the mixed child, four published source pairs, `--opponent tactical
+--seed 208000 --seeds 8 --workers 4 --max-decisions 3000`. Fit each arm with
+`scripts/train_behavioral_clone.py --init-checkpoint` set to the mixed child,
+`--on-policy-teacher tactical_v14 --on-policy-teacher-max-parent-margin 1.0
+--parent-kl-steps 100 --parent-kl-labeled-batch 64
+--preserve-per-trajectory 32 --preserve-batch 32 --parent-kl-weight 0.5
+--learning-rate 0.0001 --seed 208008`; the targeted arm alone adds
+`--on-policy-teacher-include-own-only-heavy`. Use four matching-parent
+trajectories as `--preserve-trajectories` and `--allow-policy-preservation`.

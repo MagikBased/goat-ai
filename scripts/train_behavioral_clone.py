@@ -367,6 +367,9 @@ def main() -> None:
     parser.add_argument("--on-policy-teacher-max-parent-margin", type=float,
                         help="train only policy-visited optional decisions whose exact parent "
                              "top-two raw logits differ by less than this value")
+    parser.add_argument("--on-policy-teacher-include-own-only-heavy", action="store_true",
+                        help="also label executed Heavy Storm choices with visible friendly "
+                             "backrow and no enemy backrow, regardless of parent margin")
     parser.add_argument("--on-policy-thunder-search-only", action="store_true",
                         help="train only staged Thunder Dragon search prompts with an "
                              "offered Deck copy; requires tactical_thunder_search")
@@ -558,6 +561,9 @@ def main() -> None:
             or args.on_policy_thunder_search_only):
         parser.error("parent-margin focus requires an on-policy teacher, a positive "
                      "finite margin, and no other teacher filter")
+    if (args.on_policy_teacher_include_own_only_heavy
+            and args.on_policy_teacher_max_parent_margin is None):
+        parser.error("own-only Heavy Storm inclusion requires parent-margin focus")
     if args.on_policy_thunder_search_only and (
             args.on_policy_teacher != "tactical_thunder_search"
             or args.on_policy_teacher_activation_focus_only):
@@ -677,7 +683,8 @@ def main() -> None:
             if margin_parent is not None:
                 selected, disagreements = filter_low_parent_margin_opportunities(
                     trajectory, selected, margin_parent.model,
-                    margin_parent.vocabulary, args.on_policy_teacher_max_parent_margin)
+                    margin_parent.vocabulary, args.on_policy_teacher_max_parent_margin,
+                    include_own_only_heavy=args.on_policy_teacher_include_own_only_heavy)
                 disagreement_flags = (False,) * len(selected)
         elif label_path is not None:
             annotation, selected = read_decision_annotations(
@@ -701,6 +708,8 @@ def main() -> None:
             source = f"automated_teacher_{args.on_policy_teacher}"
             if margin_parent is not None:
                 source += f"_parent_margin_lt_{args.on_policy_teacher_max_parent_margin:g}"
+                if args.on_policy_teacher_include_own_only_heavy:
+                    source += "_plus_own_only_heavy"
         elif annotation is not None:
             source = {"self_recorded": "human_annotation",
                       "scripted_scenario": "synthetic_annotation",
@@ -964,6 +973,8 @@ def main() -> None:
         "focus_weight": args.focus_weight,
         "on_policy_activation_focus_only": args.on_policy_teacher_activation_focus_only,
         "on_policy_teacher_max_parent_margin": args.on_policy_teacher_max_parent_margin,
+        "on_policy_teacher_include_own_only_heavy": (
+            args.on_policy_teacher_include_own_only_heavy),
         "on_policy_thunder_search_only": args.on_policy_thunder_search_only,
         "on_policy_disagreement_weight": args.on_policy_disagreement_weight,
         "on_policy_disagreements": sum(

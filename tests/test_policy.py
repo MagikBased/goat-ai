@@ -383,6 +383,41 @@ def test_parent_margin_focus_keeps_only_aligned_low_confidence_teacher_labels():
             source, labels[:1], Scorer(), CardVocabulary((10,)), 1.0)
 
 
+def test_parent_margin_focus_can_include_visible_own_only_heavy_choice():
+    class HighMargin(torch.nn.Module):
+        feature_version = 10
+
+        def __init__(self):
+            super().__init__()
+            self.parameter = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, _features):
+            return torch.tensor((3.0, 0.0))
+
+    storm = Action("storm", "activate", 0, {"code": HEAVY_STORM, "location": 2})
+    end = Action("end", "end_phase", 0)
+    own_set = CardView(0, "spell_trap", "facedown", 60082869, 1)
+    enemy_set = CardView(1, "spell_trap", "facedown", None, 1)
+    risky = DecisionRecord(replace(view(), field=(own_set,)), (storm, end), storm)
+    safe = DecisionRecord(replace(view(), field=(own_set, enemy_set)),
+                          (storm, end), storm)
+    set_storm = CardView(0, "spell_trap", "facedown", HEAVY_STORM, 2)
+    set_storm_action = Action("set-storm", "activate", 0,
+                              {"code": HEAVY_STORM, "location": 8,
+                               "sequence": 2})
+    source_only = DecisionRecord(replace(view(), field=(set_storm,)),
+                                 (set_storm_action, end), set_storm_action)
+    source = Trajectory("goat", ("a", "b"), 7, (risky, safe, source_only), 0,
+                        source="policy_evaluation",
+                        skill_metadata={"demonstrator_seat": 0})
+    labels = tuple(replace(record, selected_action=end) for record in source.decisions)
+    assert filter_low_parent_margin_opportunities(
+        source, labels, HighMargin(), CardVocabulary((HEAVY_STORM,)), 1.0) == ((), 0)
+    assert filter_low_parent_margin_opportunities(
+        source, labels, HighMargin(), CardVocabulary((HEAVY_STORM,)), 1.0,
+        include_own_only_heavy=True) == ((labels[0],), 1)
+
+
 def test_activation_focus_keeps_both_good_and_bad_trade_opportunities():
     storm = Action("storm", "activate", 0, {"code": HEAVY_STORM})
     end = Action("end", "end_phase", 0)

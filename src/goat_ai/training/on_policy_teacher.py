@@ -7,6 +7,7 @@ from math import isfinite
 import torch
 
 from goat_ai.agents import Agent
+from goat_ai.agents.tactical_guard import HEAVY_STORM
 from goat_ai.evaluation.thunder_search_audit import thunder_search_choice
 from goat_ai.replay import DecisionRecord, Trajectory
 from goat_ai.training.policy import CardVocabulary, LegalActionPolicy, encode_decision
@@ -111,8 +112,9 @@ def teacher_disagreement_flags(
 def filter_low_parent_margin_opportunities(
     trajectory: Trajectory, labeled: Sequence[DecisionRecord],
     parent: LegalActionPolicy, vocabulary: CardVocabulary, margin: float,
+    *, include_own_only_heavy: bool = False,
 ) -> tuple[tuple[DecisionRecord, ...], int]:
-    """Keep synthetic labels only where the exact parent scores are close.
+    """Keep close-score labels and optionally exact visible own-only Storm losses.
 
     The margin is computed from the acting player's visible observation and
     offered actions. The replay's hidden deal is never passed to the model.
@@ -138,7 +140,27 @@ def filter_low_parent_margin_opportunities(
                                        vocabulary, parent.feature_version)
             scores = parent(features.to(device))
             top_two = torch.topk(scores, 2).values
-            if (top_two[0] - top_two[1]).item() < margin:
+            if ((top_two[0] - top_two[1]).item() < margin
+                    or include_own_only_heavy and _own_only_heavy_choice(original)):
                 kept.append(teacher)
                 disagreements += original.selected_action != teacher.selected_action
     return tuple(kept), disagreements
+
+
+def _own_only_heavy_choice(record: DecisionRecord) -> bool:
+    """Detect an executed Storm that can hit own backrow but no enemy backrow."""
+    action = record.selected_action
+    if (action.kind not in ("activate", "chain")
+            or action.parameters.get("code") != HEAVY_STORM):
+        return False
+    observation = record.observation
+    own = observation.viewer
+    if any(card.controller != own and card.zone == "spell_trap"
+           for card in observation.field):
+        return False
+    source_slot = (action.parameters.get("sequence")
+                   if action.parameters.get("location") == 8 else None)
+    return any(card.controller == own and card.zone == "spell_trap"
+               and not (source_slot is not None and card.sequence == source_slot
+                        and card.code == HEAVY_STORM)
+               for card in observation.field)
