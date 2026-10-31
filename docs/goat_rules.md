@@ -967,16 +967,21 @@ remain unaudited.
 distinguishes a monster Summoned by Call at Chain Link 2 from a later monster
 Summoned by Monster Reborn at Chain Link 1: after resolution, Bottomless can
 remove only the latter. A paired seed-100 native fixture checks this timing
-with GOAT Bottomless Set opposite Call. Graceful Charity puts 1900-ATK Gemini
+with GOAT Bottomless Set opposite Call. A second pair uses Torrential Tribute:
+its [historical FAQ](https://www.goatformat.com/rulings7.html) permits it after
+a monster is Summoned by Call, while the archived Bottomless example supplies
+the midchain-versus-last-link timing distinction. Graceful Charity puts 1900-ATK Gemini
 Elf in the Graveyard. When Call activates alone at Chain Link 1, Bottomless
-is offered after the Summon and banishes Gemini Elf. When Call chains to
-Upstart Goblin at Chain Link 2, Gemini Elf is Summoned before Upstart
-resolves, Bottomless is not offered after the chain, and Gemini Elf remains
-on the field at that checkpoint. Upstart then draws and grants the opponent
-1,000 LP. Both branches finish as complete duels, serialize, replay-verify,
-and pass the player-visibility audit. This verifies one midchain Summon and
-one ordinary Call Summon; it does not imply that every Call at Chain Link 2
-avoids a Summon response regardless of what the remaining links do.
+is offered after the Summon and banishes Gemini Elf; Torrential is offered in
+the analogous branch and destroys Gemini Elf to its owner's Graveyard. When
+Call chains to Upstart Goblin at Chain Link 2, Gemini Elf is Summoned before
+Upstart resolves, neither Trap is offered after the chain, and Gemini Elf
+remains on the field at that checkpoint. Upstart then draws and grants the
+opponent 1,000 LP. All four branches finish as complete duels, serialize,
+replay-verify, and pass the player-visibility audit. Applying the archived
+Bottomless timing example to Torrential is an inference checked against the
+pinned engine. These checks do not imply that every Call at Chain Link 2 avoids
+a Summon response regardless of what the remaining links do.
 
 **Ceasefire versus a Set Flip monster:** [Konami's Ceasefire card text](https://www.db.yugioh-card.com/yugiohdb/card_search.action?cid=4956&ope=2&request_locale=en) flips all face-down Defense Position monsters face-up without activating their Flip Effects, then deals 500 damage for each Effect Monster on the field. [Historical Ceasefire rulings](https://www.goatformat.com/rulings1.html) allow activation when a face-down Defense Position monster is present, and exclude Tokens from the Effect Monster count. Paired seed-100 native fixtures spend Pot of Greed and Set either Magician of Faith or the Normal Monster Mystical Elf. The opponent Sets Ceasefire and activates it on the next turn. Both monsters turn face-up in Defense Position. The Faith branch deals 500 damage to the Faith controller, but its Flip Effect does not return Pot from the Graveyard; the Elf branch deals no damage. The opponent sees only an unidentified Set monster before Ceasefire resolves. Both complete duels serialize, replay-verify, and pass the visibility audit.
 
