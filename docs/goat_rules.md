@@ -6,7 +6,9 @@ Sources: [GoatFormat mechanics](https://www.goatformat.com/basics.html), [card p
 
 ### Dekoichi and chained Skill Drain
 
-The archived [Skill Drain Individual Card FAQ](https://www.goatformat.com/rulings7.html) permits chaining Skill Drain to a Flip Effect during a Main Phase Flip Summon and says it negates the effect while that monster remains face-up. A paired seed-52 native fixture Sets Dekoichi and Skill Drain, then Flip Summons Dekoichi. Chaining Skill Drain costs 1000 LP and prevents Dekoichi's draw; declining the response lets Dekoichi draw one card with no LP cost. Dekoichi remains face-up in both branches. Both complete duels serialize, replay-verify, and pass the player-visibility audit. The same FAQ forbids activating Skill Drain during the Damage Step, so this fixture does not establish the attacked-face-down branch.
+The archived [Skill Drain Individual Card FAQ](https://www.goatformat.com/rulings7.html) permits chaining Skill Drain to a Flip Effect during a Main Phase Flip Summon and says it negates the effect while that monster remains face-up. A paired seed-52 native fixture Sets Dekoichi and Skill Drain, then Flip Summons Dekoichi. Chaining Skill Drain costs 1000 LP and prevents Dekoichi's draw; declining the response lets Dekoichi draw one card with no LP cost. Dekoichi remains face-up in both branches. Both complete duels serialize, replay-verify, and pass the player-visibility audit.
+
+The same FAQ forbids activating Skill Drain during the Damage Step. A second seed-52 pair Sets Dekoichi, then has Gemini Elf attack it after Skill Drain was Set on the attacker’s prior turn. If Drain is activated before the attack, its controller pays 1000 LP and Dekoichi’s Flip Effect draws nothing. If Drain remains Set, Dekoichi’s Flip Effect appears on a Damage Step chain with no Drain activation or response offered; Dekoichi’s owner draws exactly one card. Dekoichi is destroyed by battle in both branches without piercing damage. Both complete duels replay-verify and pass the player-visibility audit. This checks the activation boundary for this battle; other Damage Step responses remain untested.
 
 ### Appropriate and Graceful Charity
 
