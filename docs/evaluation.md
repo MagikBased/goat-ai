@@ -17491,3 +17491,69 @@ and one `--matchup` per generated Deck pair from the sweep report above.
 For the Tactical arms, replace the checkpoint opponent with
 `--opponent tactical`, use `--seed 205200 --seeds 2`, and include the fallback
 flag only on the candidate.
+
+### Full-whitelist low-margin teacher distillation
+
+To test whether the hybrid gain above could be learned into weights,
+`collect_policy_matches.py` recorded the unchanged selected parent against
+Tactical-v14 on all 16 previously generated random Deck pairs, seeds
+205300–205301, both policy seats. All **64 games and 37,445 decisions**
+replay-verified and passed visibility checks. The ignored source manifest is
+`.cache/goat-ai/parent_full_whitelist_teacher_205300_205301/manifest.json`
+(SHA-256 `ebb3ffb27bdb33167628689c81197427077a1f2f53716759a1ff4de8060d990d`).
+An exact-parent, margin-1.0 filter retained **1,546** optional Tactical-v14
+labels. A width-32, feature-v23 child used 200 parent-KL steps, 128 sampled
+labels and 32 preservation states per step, KL weight 0.5, learning rate
+0.0001, and seed 205304. Four replay-verified source games supplied 128
+preservation states. The complete fit took **148.20 s**, including **31.83 s**
+of verification and **88.34 s** of fitting. Final sampled-label loss was
+0.76525 and preservation KL 0.11609; these are training diagnostics, not
+strength measures. The ignored child is
+`.cache/goat-ai/fv23_full_whitelist_low_margin_child_205300_205301.pt`
+(SHA-256 `d1b15c2052911e07171e1d7cf6a84e0cd8c310b022774335b3f8e4dfeea733de`).
+
+For evaluation, eight **new** whitelist-legal random Deck pairs with Fusion
+stress were generated from seeds 205400–205407, separate from the 16 source
+pairs. Their ignored manifest is
+`.cache/goat-ai/full_whitelist_child_holdout_205400_205407/manifest.json`
+(SHA-256 `7aeda8814c3c11a5e9ee3208e2d2579343bbcd5eec0edad945db8fd573d29cfe`).
+Both assignments and seats were used. Over 128 direct duels, seeds
+205500–205503, the child scored **72–56** against the parent (95% paired
+score interval **48.44%–64.06%**). On a separate matched 128-game-per-arm
+Tactical-v14 schedule, seeds 205600–205603, the child scored **43–85** and
+the parent **31–97**. The strict paired difference was **+9.38 points**, 95%
+interval **0 to +18.75 points**. The comparator verified the Decks and
+unseen Main Deck compositions. All **217,793** decisions across these three
+reports replay-verified and passed visibility checks.
+
+On two **sourced historical Deck pairs** absent from training provenance
+(Roberto Martinez Phoenix Control versus Ramon Ciriano Beastdown, and Jae Kim
+Zombie versus Mary Triatafilidi Warrior), the child scored **36–28** directly
+against the parent over 64 duels, seeds 205700–205707 (95% paired score
+interval **45.31%–67.19%**). In matched 64-game-per-arm Tactical-v14 tests,
+seeds 205800–205807, both scored **21–43**. The strict paired difference was
+**0 points**, 95% interval **−10.94 to +12.50 points**. All **94,688**
+decisions across these three sourced-Deck reports replay-verified and passed
+visibility checks. The wider random-Deck teacher signal has not produced a
+demonstrated competitive gain on historical Decks. Keep the selected v23
+checkpoint unchanged; this child remains an experiment.
+
+The ignored evaluation reports and SHA-256 identifiers are:
+
+| Report suffix under `.cache/goat-ai/` | SHA-256 |
+| --- | --- |
+| `eval_full_whitelist_child_vs_parent_205500_205503.json` | `127459e5ca357fb5513eaa9287ee43fb418d5dc362d5596d913cb06c4a300c83` |
+| `eval_full_whitelist_child_vs_tactical_205600_205603.json` | `8e080d1c3bea539cf0c29f1edacc4d2b914f51ba79bf8283918deb4deab2fd9a` |
+| `eval_full_whitelist_parent_vs_tactical_205600_205603.json` | `5ea071a72cd96d5b87e8f3d7004b31de9251e1fb80948fb90be345dcaea13d32` |
+| `eval_full_whitelist_child_sourced_direct.json` | `48d2df568ce335a47d64298e64c3e1fc782f61f11c67f94c60737954a090da4a` |
+| `eval_full_whitelist_child_sourced_child_tactical.json` | `4cf49f1dc7f062a79a70853f965bce6b24d4387af87dca7dbafdb1f525793215` |
+| `eval_full_whitelist_child_sourced_parent_tactical.json` | `5cc3b126577266ccf9a6658fac8ded13d873b70a70db2b4a1890c0552604b89b` |
+
+Reproduce collection with `scripts/collect_policy_matches.py` using the 16
+`--matchup` pairs from the prior sweep, `--opponent tactical --seed 205300
+--seeds 2 --workers 4`. Fit with `scripts/train_behavioral_clone.py` and all
+64 positional trajectories, `--init-checkpoint` set to selected v23,
+`--on-policy-teacher tactical_v14 --on-policy-teacher-max-parent-margin 1.0`,
+and the parent-KL parameters above. Evaluate with `scripts/evaluate_policy.py
+--engine experimental --both-deck-assignments --workers 4
+--require-unseen-main-decks --reject-training-deck-hashes --verify-replays`.

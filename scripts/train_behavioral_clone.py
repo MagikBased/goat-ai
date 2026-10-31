@@ -319,6 +319,26 @@ def load_parent_checkpoint(path: Path, model: LegalActionPolicy,
     return parent
 
 
+def training_architecture(parent_path: Path | None, width: int | None,
+                          feature_version: int | None,
+                          upgrade_target: int | None = None) -> tuple[int, int]:
+    """Use a parent's architecture unless the caller explicitly overrides it."""
+    if parent_path is None:
+        return (64 if width is None else width,
+                POLICY_FEATURE_VERSION if feature_version is None else feature_version)
+    if width is not None and feature_version is not None:
+        return width, feature_version
+    parent = torch.load(parent_path, map_location="cpu", weights_only=True)
+    if (not isinstance(parent, dict) or parent.get("schema_version") != 1
+            or type(parent.get("width")) is not int or parent["width"] < 1
+            or type(parent.get("feature_version")) is not int
+            or not 1 <= parent["feature_version"] <= 34):
+        raise ValueError("unsupported parent policy checkpoint architecture")
+    return (parent["width"] if width is None else width,
+            (upgrade_target or parent["feature_version"])
+            if feature_version is None else feature_version)
+
+
 def main() -> None:
     started = perf_counter()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -400,9 +420,10 @@ def main() -> None:
     parser.add_argument("--fast-trajectory-json", action="store_true",
                         help="use optional orjson to decode input trajectories in the main "
                              "process and replay-verification workers")
-    parser.add_argument("--width", type=int, default=64)
+    parser.add_argument("--width", type=int,
+                        help="default: parent checkpoint width, or 64 for a new policy")
     parser.add_argument("--feature-version", type=int, choices=tuple(range(1, 35)),
-                        default=POLICY_FEATURE_VERSION)
+                        help="default: parent feature version, or current default for a new policy")
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--focus-card", type=int, action="append", default=[],
@@ -435,6 +456,14 @@ def main() -> None:
                         help="sample rare selected action kinds more often in cloning; "
                              "weight their loss in parent-KL training")
     args = parser.parse_args()
+    upgrades = [version for version in range(24, 35)
+                if getattr(args, f"upgrade_feature_23_to_{version}")]
+    try:
+        args.width, args.feature_version = training_architecture(
+            args.init_checkpoint, args.width, args.feature_version,
+            upgrades[0] if len(upgrades) == 1 else None)
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
     if not args.trajectories and not args.human_journal and not args.experimental_edopro_confirmed:
         parser.error("provide a trajectory, --human-journal, or "
                      "--experimental-edopro-confirmed")

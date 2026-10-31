@@ -2189,6 +2189,15 @@ decisions replay-verified and passed visibility checks. [The full protocol](eval
 supports a hybrid gain on these random compositions, but not a competitive
 GOAT strength or neural-weight gain. Keep M4 open and the fallback opt-in.
 
+A wider [low-margin teacher distillation pilot](evaluation.md#full-whitelist-low-margin-teacher-distillation)
+fit a width-32, feature-v23 child on 1,546 synthetic Tactical labels from 64
+verified policy games. On new random Deck pairs it scored 72–56 directly
+against its parent and gained 9.38 Tactical score points, but both paired
+intervals touched 50% or zero. On two sourced historical Deck pairs the child
+and parent each scored 21–43 against Tactical. All 312,481 evaluation
+decisions replay-verified and passed visibility audits. The selected neural
+checkpoint stays unchanged; M4's competitive gain remains unproven.
+
 ## M5 — Search and other formats
 
 Konami's 2009 version-7 rulebook is now recorded as the period source for the

@@ -300,6 +300,14 @@ reduction; see [evaluation](evaluation.md#optional-fast-trajectory-reading-for-c
 
 Parent-KL example:
 
+When continuing with `--init-checkpoint`, the trainer now reads the parent's
+width and feature version if those flags are omitted. An explicit width or
+feature version still overrides the inferred value and must pass the existing
+architecture check. A `--upgrade-feature-23-to-N` flag supplies N as the
+default target feature version while retaining the parent's width. A one-step
+native replay-verified smoke run continued the selected width-32, feature-v23
+checkpoint without either architecture flag.
+
 ```bash
 OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/train_behavioral_clone.py \
   replays/scapegoat_end_timing_probe_seed52.json \
