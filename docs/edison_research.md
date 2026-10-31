@@ -453,7 +453,14 @@ the complete Edison card pool.
 
 An isolated `mr1_startup` probe now starts the pinned core with its exact
 `DUEL_MODE_MR1` bit mask (`853760`) and the unmodified upstream `utility.lua`.
-It accepts only 40-card-or-larger Normal Monster Main Decks and empty Extra
+Konami's [2009 official rulebook, version 7.0](https://www.edisonformat.com/uploads/1/3/4/1/134149181/yugioh5dsofficialrulebook.pdf)
+(archived copy SHA-256
+`57ab292323e20a949b6b676434e8db9873677b63988264648eb821fe2106eefc`)
+specifies a five-card starting hand, one card drawn at the start of each
+turn including the first, and no Battle Phase for the first player on their
+first turn. The cited copy is an original Konami document hosted by a format
+community site; it is retained only in ignored local cache.
+The startup probe accepts only 40-card-or-larger Normal Monster Main Decks and empty Extra
 Decks. On seed 42, the 40-card vanilla fixture reached the first native
 decision with hand counts `(6, 5)`, Deck counts `(34, 35)`, and draw events
 `(0, 5)`, `(1, 5)`, `(0, 1)`. The GOAT mode produced the same startup counts
@@ -476,7 +483,11 @@ label is `mr1-vanilla-protocol`, separate from GOAT and Edison. It accepts only
 canonical copies and empty Extra/Side Decks. No card-specific scripts or GOAT
 metadata overrides are loaded. The seed-42 fixture finished in 1,368 decisions with
 winner seat 1; its complete trajectory replay-verified and passed the
-player-visibility audit. An opening-decision differential also produced equal
+player-visibility audit. The fixture checks the first player's six-card hand
+after their draw, the second player's five-card opening hand and later
+six-card hand after their draw, the corresponding Deck counts, and the absence
+of a Battle Phase action on turn one versus its availability on turn two.
+An opening-decision differential also produced equal
 observations and legal actions when only the hidden opponent Deck changed.
 Run the example after native setup:
 

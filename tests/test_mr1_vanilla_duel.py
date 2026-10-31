@@ -30,16 +30,30 @@ def test_mr1_vanilla_complete_duel_replay_and_visibility(tmp_path):
         assert engine.probe.loaded_script_sha256["utility.lua"] == hashlib.sha256(
             (native_root / "scripts/utility.lua").read_bytes()).hexdigest()
         agents = (RandomAgent(42), RandomAgent(43))
+        seen_turn_boundaries = set()
         for _ in range(5000):
             actions = env.legal_actions()
             assert actions
             if view.turn == 1 and view.phase == "draw":
                 assert view.life_points == (8000, 8000)
+                assert view.deck_counts == (34, 35)
+                assert len(view.hand) == (6 if view.acting_player == 0 else 5)
+            if (view.turn, view.phase, view.acting_player) == (1, "main1", 0):
+                seen_turn_boundaries.add("first_main")
+                assert not any(action.kind == "battle_phase" for action in actions)
+            if (view.turn, view.phase, view.acting_player) == (2, "draw", 1):
+                seen_turn_boundaries.add("second_draw")
+                assert view.deck_counts == (34, 34)
+                assert len(view.hand) == 6
+            if (view.turn, view.phase, view.acting_player) == (2, "main1", 1):
+                if any(action.kind == "battle_phase" for action in actions):
+                    seen_turn_boundaries.add("second_main")
             view = env.step(agents[view.acting_player].select_action(view, actions))
             if env.is_terminal():
                 break
         else:
             pytest.fail("MR1 vanilla duel exceeded decision cap")
+        assert seen_turn_boundaries == {"first_main", "second_draw", "second_main"}
         trajectory = env.trajectory()
     assert trajectory.ruleset == "mr1-vanilla-protocol"
     assert trajectory.rules_profile["april_2005_banlist"] is False

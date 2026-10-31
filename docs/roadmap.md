@@ -2128,6 +2128,14 @@ selected v23 checkpoint stays unchanged.
 
 ## M5 — Search and other formats
 
+Konami's 2009 version-7 rulebook is now recorded as the period source for the
+five-card opening hand, first-turn draw, and first-turn Battle Phase
+restriction. The complete MR1 vanilla fixture now checks those hand/Deck
+counts and the absent/present Battle Phase legal action on turns one/two.
+This settles this narrow turn-structure input for the protocol probe, while
+the Edison release pool and broader rules audit remain open; see
+[the MR1 startup audit](edison_research.md#native-engine-assessment).
+
 A [period-sourced Solemn Judgment/Synchro fixture](edison_research.md#solemn-judgment-against-a-synchro-summon)
 now checks the Summon-negation window in paired MR1 duels: one legal copy,
 4,000 LP payment, Junk Warrior in the Graveyard only when negated, and both
