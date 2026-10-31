@@ -27,6 +27,16 @@ Required regression cases: first-turn draw; summon response and Ignition priorit
 
 ### EDOPro live-client bridge probe (2026-10-30)
 
+An additional 31 October 2026 end-to-end LAN regression ran the page's room
+launcher with a protocol test client on a temporary port for two published
+deck pairs: Warrior/Gravekeeper and Goat Control/Chaos Turbo. Both complete
+games passed native mirror and player-visibility verification, produced a
+viewable recording with human-seat choice descriptions, and exercised one
+explicitly confirmed choice through the separate experimental clone command.
+The test client uses a seeded random policy; these are plumbing tests, not
+human demonstrations or evidence of AI playing strength. The user-facing room
+on port 7911 was left running separately.
+
 **Pinned historical-patch room update.** The optional host can load the
 project's pinned `baa3881` native core, three pinned card databases in the
 same precedence order as the native adapter, and the pinned GOAT list through

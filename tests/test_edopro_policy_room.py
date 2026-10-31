@@ -71,7 +71,11 @@ def test_stopped_room_keeps_launch_error_after_server_restart(tmp_path):
          and os.getenv("GOAT_AI_EDOPRO_HISTORICAL") == "1"),
     reason="pinned EDOPro host and exact matching native root not supplied",
 )
-def test_page_room_launcher_completes_and_lists_verified_game():
+@pytest.mark.parametrize(("ai_deck", "client_deck"), (
+    ("warrior_montague_clash.ydk", "gravekeeper_daryl_gessler_indianapolis_2005.ydk"),
+    ("goat_control_jesse_twohig_indianapolis_2005.ydk", "chaos_turbo_riclar_2020.ydk"),
+))
+def test_page_room_launcher_completes_and_lists_verified_game(ai_deck, client_deck):
     """Exercise the real child process and the room manager used by the page."""
     pytest.importorskip("ygo_agent")
     from ygo_agent.arena.client import ArenaClient
@@ -93,7 +97,7 @@ def test_page_room_launcher_completes_and_lists_verified_game():
         manager.session = None
         manager.process = None
         try:
-            launched = manager.start("warrior_montague_clash.ydk")
+            launched = manager.start(ai_deck)
             assert launched["room_running"]
             identifier = launched["sessions"][0]["id"]
             for _ in range(150):
@@ -105,8 +109,7 @@ def test_page_room_launcher_completes_and_lists_verified_game():
             else:
                 pytest.fail("launched EDOPro room did not start listening")
 
-            deck = load_ydk(str(project / "examples/decks/"
-                                "gravekeeper_daryl_gessler_indianapolis_2005.ydk"),
+            deck = load_ydk(str(project / "examples/decks" / client_deck),
                             engine.cards).deck
             random = RandomPolicy(9303)
             client = ArenaClient("Protocol human", deck=deck,
@@ -134,6 +137,8 @@ def test_page_room_launcher_completes_and_lists_verified_game():
             assert recording["viewer"].endswith(".html")
             choices = manager.choices(identifier)
             assert choices["candidates"]
+            assert all(choice["label"] and "undefined" not in choice["label"]
+                       for choice in choices["candidates"])
             assert choices["training_admitted"] is False
             assert choices["continues_recorded_policy"] is True
             assert "--init-checkpoint" in choices["training_command"]
