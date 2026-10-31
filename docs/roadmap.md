@@ -2064,7 +2064,9 @@ A [period-sourced Catastor Damage Step fixture](edison_research.md#ally-of-justi
 now checks the Hidden Arsenal ruling in a full native MR1 duel: Catastor's
 effect chain appears before a face-up LIGHT monster is destroyed, with no
 battle damage. A second branch attacks that monster face-down and sees no
-Catastor chain. Both trajectories replay-verify and pass the visibility audit.
+Catastor chain. A third branch attacks a face-up DARK monster and sees ordinary
+battle destruction with 350 damage and no Catastor effect chain. All three
+trajectories replay-verify and pass the visibility audit.
 This is one more interaction within the narrow probe, not a validated Edison
 profile.
 

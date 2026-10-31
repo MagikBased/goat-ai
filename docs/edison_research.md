@@ -995,8 +995,11 @@ appears in the Damage Step while Elf is still on the field; Elf then reaches
 the Graveyard and both players remain at 8000 LP. A paired branch attacks the
 same Elf face-down: Catastor creates no Damage Step chain link, and ordinary
 battle destroys Elf with no LP change. Both complete duels serialize,
-replay-verify, and pass the player-visibility audit. DARK monsters, other
-Damage Step responses, and broader Edison correctness remain open. Reproduce
+replay-verify, and pass the player-visibility audit. A third branch attacks a
+face-up DARK Mechanicalchaser. Catastor creates no effect chain; ordinary
+battle destroys Mechanicalchaser and deals 350 damage. This tests the DARK
+exception with a surviving Catastor. Other Damage Step responses and broader
+Edison correctness remain open. Reproduce
 with:
 
 ```sh

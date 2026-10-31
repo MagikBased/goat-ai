@@ -20,12 +20,20 @@ from goat_ai.evaluation.visibility import audit_trajectory_visibility
 from goat_ai.replay import read_trajectory, verify_trajectory, write_trajectory
 
 MYSTICAL_ELF = 15025844  # LIGHT, 800 ATK
+MECHANICALCHASER = 7359741  # DARK, 1850 ATK
 
 
 @pytest.mark.skipif(not os.getenv("GOAT_AI_NATIVE_ROOT"),
                     reason="native assets not installed")
-@pytest.mark.parametrize("face_down", (False, True), ids=("faceup", "facedown"))
-def test_catastor_damage_step_faceup_boundary(tmp_path, face_down):
+@pytest.mark.parametrize(
+    ("target_code", "face_down", "target_attacks", "expected_chain", "expected_lp"),
+    ((MYSTICAL_ELF, False, True, True, (8000, 8000)),
+     (MYSTICAL_ELF, True, False, False, (8000, 8000)),
+     (MECHANICALCHASER, False, False, False, (8000, 7650))),
+    ids=("faceup-light", "facedown-light", "faceup-dark"),
+)
+def test_catastor_damage_step_faceup_boundary(
+        tmp_path, target_code, face_down, target_attacks, expected_chain, expected_lp):
     root = Path(os.environ["GOAT_AI_NATIVE_ROOT"])
     script = root / f"scripts/official/c{ALLY_OF_JUSTICE_CATASTOR}.lua"
     if not script.is_file():
@@ -37,19 +45,20 @@ def test_catastor_damage_step_faceup_boundary(tmp_path, face_down):
     permutation = list(range(40))
     random.Random(3 * 2 + 1).shuffle(permutation)
     other_main = list(VANILLA_DECK)
-    first_elf = other_main.index(MYSTICAL_ELF)
+    first_target = other_main.index(target_code)
     opening_slot = permutation[34]
-    other_main[first_elf], other_main[opening_slot] = (
-        other_main[opening_slot], other_main[first_elf])
-    other_deck = tmp_path / "light_opponent.ydk"
+    other_main[first_target], other_main[opening_slot] = (
+        other_main[opening_slot], other_main[first_target])
+    other_deck = tmp_path / "target_opponent.ydk"
     other_deck.write_text("#main\n" + "\n".join(map(str, other_main))
                           + "\n#extra\n!side\n")
 
     with GoatEnvironment(str(own_deck), str(other_deck), seed=3,
                          engine=Mr1SynchroProbeEngine(root)) as env:
         view = env.reset()
-        set_bokoichi = summon_elf = summon_junk = summon_catastor = False
-        elf_attack = flip_bokoichi = face_down
+        set_bokoichi = summon_target = summon_junk = summon_catastor = False
+        target_attack = not target_attacks
+        flip_bokoichi = not target_attacks
         catastor_attack = destroyed = False
         agents = (RandomAgent(3), RandomAgent(4))
         for _ in range(3000):
@@ -63,16 +72,16 @@ def test_catastor_damage_step_faceup_boundary(tmp_path, face_down):
                                    and a.parameters.get("code") == BOKOICHI), None)
                     set_bokoichi = action is not None
                 if view.turn == 2 and view.acting_player == 1:
-                    if not summon_elf:
+                    if not summon_target:
                         action = next((a for a in actions if a.kind == (
                             "set_monster" if face_down else "normal_summon")
-                                       and a.parameters.get("code") == MYSTICAL_ELF), None)
-                        summon_elf = action is not None
-                    elif not elf_attack and view.phase.startswith("battle"):
+                                       and a.parameters.get("code") == target_code), None)
+                        summon_target = action is not None
+                    elif not target_attack and view.phase.startswith("battle"):
                         action = next((a for a in actions if a.kind == "attack"), None)
-                        elf_attack = action is not None
+                        target_attack = action is not None
                 if view.turn == 3 and view.acting_player == 0:
-                    if face_down and flip_bokoichi:
+                    if flip_bokoichi:
                         action = next((a for a in actions if a.kind == "flip_summon"
                                        and a.parameters.get("code") == BOKOICHI), None)
                         if action is not None:
@@ -88,7 +97,7 @@ def test_catastor_damage_step_faceup_boundary(tmp_path, face_down):
                     elif not catastor_attack and view.phase.startswith("battle"):
                         action = next((a for a in actions if a.kind == "attack"), None)
                         if action is not None:
-                            assert any(card.code == (None if face_down else MYSTICAL_ELF)
+                            assert any(card.code == (None if face_down else target_code)
                                        and card.controller == 1
                                        and card.position == ("facedown" if face_down else "faceup")
                                        for card in view.field)
@@ -101,13 +110,13 @@ def test_catastor_damage_step_faceup_boundary(tmp_path, face_down):
             else:
                 action = agents[view.acting_player].select_action(view, actions)
             view = env.step(action)
-            if catastor_attack and MYSTICAL_ELF in {
+            if catastor_attack and target_code in {
                     card.code for card in view.graveyards[1]} and not destroyed:
-                assert view.life_points == (8000, 8000)
+                assert view.life_points == expected_lp
                 assert any(card.code == ALLY_OF_JUSTICE_CATASTOR
                            for card in view.field)
                 destroyed = True
-        assert env.is_terminal() and all((set_bokoichi, summon_elf, elf_attack,
+        assert env.is_terminal() and all((set_bokoichi, summon_target, target_attack,
                                           summon_junk, summon_catastor,
                                           catastor_attack, destroyed))
         assert env.engine.probe.loaded_script_sha256[
@@ -118,11 +127,11 @@ def test_catastor_damage_step_faceup_boundary(tmp_path, face_down):
                              and record.observation.phase == "damage_step"
                              and any(link.card_code == ALLY_OF_JUSTICE_CATASTOR
                                      for link in record.observation.chain)
-                             and MYSTICAL_ELF not in {
+                             and target_code not in {
                                  card.code for card in record.observation.graveyards[1]}
                              for record in trajectory.decisions)
-        assert catastor_chain is not face_down
-        path = tmp_path / f"catastor_damage_step_{face_down}.json"
+        assert catastor_chain is expected_chain
+        path = tmp_path / f"catastor_damage_step_{target_code}_{face_down}.json"
         write_trajectory(path, trajectory)
     replay = read_trajectory(path)
     assert verify_trajectory(replay, Mr1SynchroProbeEngine(root)) == len(replay.decisions)
