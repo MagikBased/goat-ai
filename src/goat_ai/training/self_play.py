@@ -2,7 +2,7 @@
 
 import copy
 import random
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
@@ -21,6 +21,7 @@ from goat_ai.agents.tactical_guard import (
 from goat_ai.engine import RulesEngine
 from goat_ai.engine.protocol import SimulatorUnavailable
 from goat_ai.environments import GoatEnvironment
+from goat_ai.evaluation.effect_material import material_margin
 from goat_ai.replay import DecisionRecord, ReviewedPreference, Trajectory
 from goat_ai.training.parent_kl import masked_parent_distribution
 from goat_ai.training.policy import (
@@ -642,6 +643,49 @@ def terminal_gae_advantages(values: Sequence[float], reward: float,
     return tuple(result)
 
 
+def visible_material_gae_advantages(
+    values: Sequence[float], reward: float, trace_lambda: float,
+    records: Sequence[DecisionRecord], card_facts: Mapping[int, tuple[int, int, int]],
+    learner_seat: int, weight: float,
+) -> tuple[float, ...]:
+    """Experimental potential differences between learner-visible decisions.
+
+    With gamma=1 the shaped rewards telescope to ``reward - potential(state)``
+    from every learner decision. The terminal potential is zero. This preserves
+    the competitive return up to a state-only baseline; lambda<1 changes the
+    finite-trace credit assignment and must be evaluated experimentally.
+    """
+    if (len(values) != len(records) or not values or learner_seat not in (0, 1)
+            or not isfinite(weight) or weight < 0 or not card_facts):
+        raise ValueError("material GAE needs aligned records and nonnegative weight")
+    if any(record.observation.viewer != learner_seat for record in records):
+        raise ValueError("material GAE requires the learner's legal view")
+    # Tokens are created by effects and need not be present in the policy's
+    # Deck-card vocabulary. Use the pinned full database's printed Type.
+    if any(card.code is not None and card.code not in card_facts
+           for record in records for card in record.observation.field):
+        raise ValueError("material GAE lacks a visible field card's printed Type")
+    potentials = tuple(max(-2.0, min(2.0,
+                           weight * material_margin(record.observation,
+                                                    learner_seat, card_facts)))
+                       for record in records)
+    if (not isfinite(reward) or not isfinite(trace_lambda)
+            or not 0 <= trace_lambda <= 1
+            or any(not isfinite(value) for value in values)):
+        raise ValueError("material GAE needs finite values, reward, and lambda in [0, 1]")
+    result = [0.0] * len(values)
+    advantage = 0.0
+    for index in range(len(values) - 1, -1, -1):
+        next_value = values[index + 1] if index + 1 < len(values) else 0.0
+        next_potential = potentials[index + 1] if index + 1 < len(values) else 0.0
+        immediate_reward = reward if index + 1 == len(values) else 0.0
+        delta = (immediate_reward + next_potential - potentials[index]
+                 + next_value - values[index])
+        advantage = delta + trace_lambda * advantage
+        result[index] = advantage
+    return tuple(result)
+
+
 def ppo_clipped_update(
     model: LegalActionPolicy, vocabulary: CardVocabulary,
     records: Sequence[DecisionRecord], reward: float, baseline: float,
@@ -876,6 +920,8 @@ def train_against_snapshot_pool(
     ppo_normalize_advantages: bool = False,
     ppo_baseline_timing: str = "online",
     ppo_gae_lambda: float | None = None,
+    ppo_material_potential: float = 0.0,
+    ppo_material_card_facts: Mapping[int, tuple[int, int, int]] | None = None,
     rollout_workers: int = 0,
     rollout_batch_inference: bool = False,
     trace_rollout_inference: bool = False,
@@ -914,6 +960,10 @@ def train_against_snapshot_pool(
                 (not isfinite(ppo_gae_lambda) or not 0 <= ppo_gae_lambda <= 1
                  or policy_update != "clipped_ppo" or resource_value_model is None
                  or ppo_baseline_timing == "leave_one_out"))
+            or not isfinite(ppo_material_potential) or ppo_material_potential < 0
+            or ppo_material_potential > 1
+            or ppo_material_potential > 0 and ppo_gae_lambda is None
+            or ppo_material_potential > 0 and not ppo_material_card_facts
             or schedule_mode not in ("paired_seats", "four_roles")):
         raise ValueError("invalid self-play schedule or hyperparameters")
     if (policy_update not in ("reinforce", "clipped_ppo")
@@ -1123,6 +1173,15 @@ def train_against_snapshot_pool(
                          else baselines).get(baseline_key, 0.0))
             loss = None
             if episode.learner_records:
+                gae_advantages = (
+                    visible_material_gae_advantages(
+                        state_baselines, episode.reward, ppo_gae_lambda,
+                        episode.learner_records, ppo_material_card_facts, learner_seat,
+                        ppo_material_potential)
+                    if ppo_gae_lambda is not None and ppo_material_potential > 0
+                    else terminal_gae_advantages(
+                        state_baselines, episode.reward, ppo_gae_lambda)
+                    if ppo_gae_lambda is not None else None)
                 if policy_update == "clipped_ppo":
                     if ppo_rollout_games == 1:
                         loss = ppo_clipped_update(
@@ -1133,9 +1192,7 @@ def train_against_snapshot_pool(
                             entropy_coefficient=entropy_coefficient,
                             temperature=learner_temperature,
                             state_baselines=state_baselines,
-                            advantages=(terminal_gae_advantages(
-                                state_baselines, episode.reward, ppo_gae_lambda)
-                                if ppo_gae_lambda is not None else None),
+                            advantages=gae_advantages,
                             parent_model=parent_model,
                             parent_kl_weight=parent_kl_weight,
                             preference_anchors=preference_anchors,
@@ -1151,9 +1208,7 @@ def train_against_snapshot_pool(
                         if reuse_rollout_features:
                             rollout_features.extend(episode.learner_features)
                         rollout_advantages.extend(
-                            terminal_gae_advantages(state_baselines, episode.reward,
-                                                    ppo_gae_lambda)
-                            if ppo_gae_lambda is not None else
+                            gae_advantages if gae_advantages is not None else
                             (episode.reward - value for value in state_baselines)
                             if state_baselines is not None else
                             [episode.reward - baseline] * len(episode.learner_records))

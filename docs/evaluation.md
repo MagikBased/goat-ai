@@ -52,6 +52,56 @@ PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
   --random-extra --distinct-opponents --verify-replays --isolate-games
 ```
 
+## Visible-material potential PPO pilot (30 October 2026)
+
+`--ppo-material-potential` is an opt-in credit-assignment experiment for
+`--ppo-gae-lambda`. At each learner decision it counts the learner's hand and
+controlled non-token field cards minus the opponent's hand count and controlled
+non-token field cards, **using only that learner's observation**. Face-down
+opponent cards count as cards without revealing their identities. The potential
+is the weighted margin clipped to [-2, 2]; the next visible decision supplies
+the difference, and the terminal potential is zero. With undiscounted full
+returns, these differences telescope to terminal win/loss minus the starting
+state's potential. Lambda below one changes finite-trace credit assignment;
+the value baseline still estimates terminal win/loss. This is a rough material
+signal, not a counterfactual card value or a replacement for winning.
+
+The initial four-duel smoke and 32-duel pilot exposed a measurement error:
+generated Sheep Token IDs are absent from the policy's Deck-card vocabulary.
+That version counted some tokens as material. Its 17–14–1 candidate result is
+**invalid for the intended non-token signal** and was not used for promotion.
+The implementation now uses the pinned full card database's printed Type and
+rejects any visible field card without type metadata. A regression test puts a
+token outside the policy vocabulary and confirms it is excluded.
+
+Two corrected matched 32-duel continuations used the selected v23 parent,
+seeds 94300–94331, two training pairings, the same frozen resource ridge,
+lambda 0.5, PPO settings, and parent KL 0.1. Only the potential weight differed:
+0 for the control, 0.3 for the candidate. Both reached 32/32 terminal without
+censoring. Their first four games had identical ordered selected actions and
+outcomes before the first policy update. The control's training record was
+26–5–1, and the candidate's was 23–9. All **31,978 decisions** in the 64
+training replays replayed exactly and
+passed the visibility audit. The ignored checkpoints are
+`.cache/goat-ai/material_fullfacts_control_94300_94331.pt` (SHA-256
+`2143342e6da33dbc27d8d7b6a7613c8ed018aa643f5ab0fe0500d656634d1f32`)
+and `.cache/goat-ai/material_fullfacts_candidate_94300_94331.pt` (SHA-256
+`ecc13442248110a1c67de7b2dfc5bad75eaca9b8636636b9abcdbd87499dd38c`).
+
+On held-out seeds 94400–94407 with both deck assignments and policy seats,
+the corrected candidate scored **14–18** directly against the control across
+32 duels: 43.75% score, paired bootstrap 95% interval **21.88–65.63%**. Both
+evaluation Main Decks were absent from these checkpoints' training games. All
+**17,092** evaluation decisions replayed exactly and passed the visibility
+audit. This small, previously used deck family does not establish a gain; the
+selected v23 policy is unchanged. The next experiment needs a larger, genuinely
+fresh deck and seed holdout and matched Tactical-v14 results. The ignored audit
+is `.cache/goat-ai/material_fullfacts_94300_94331_replay_audit.json` (SHA-256
+`7e2a9a6f90b26d5354cb4ddf8e4e4af227e61bcc5227f4156c32ece245ed55f2`);
+the direct comparison is
+`.cache/goat-ai/material_fullfacts_candidate_vs_control_94400_94407.json`
+(SHA-256 `b59ed43577517dea016a4b5521def5bcb71d7d0eb7f24c6a07876c672d99fc5c`).
+
 ## Saved tournament schedule integrity
 
 `scripts/evaluate_policy.py` now records its intended ordered matchups in

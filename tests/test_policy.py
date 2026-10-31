@@ -70,6 +70,7 @@ from goat_ai.training.self_play import (
     state_value_update,
     terminal_gae_advantages,
     train_against_snapshot_pool,
+    visible_material_gae_advantages,
 )
 from scripts.audit_policy_agreement import (
     STAPLES,
@@ -2775,6 +2776,38 @@ def test_terminal_gae_uses_visible_value_changes_and_terminal_outcome():
         terminal_gae_advantages(values, 1.0, 1.1)
     with pytest.raises(ValueError, match="GAE"):
         terminal_gae_advantages((float("nan"),), 1.0, 0.5)
+
+
+def test_material_potential_telescopes_and_ignores_hidden_card_identity():
+    # Generated token 20 is deliberately absent from the policy vocabulary.
+    card_facts = {10: (1, 4, 1600), 20: (0x4001, 1, 0)}
+    before = replace(view(), hand=(CardView(0, "hand", "hidden", 10),),
+                     opponent_hand_count=1, field=())
+    after = replace(before, hand=(), opponent_hand_count=0, field=(
+        CardView(0, "monster", "faceup", 10),
+        CardView(1, "monster", "facedown", None),
+        CardView(0, "monster", "faceup", 20)))
+    records = tuple(DecisionRecord(state, actions(), actions()[0])
+                    for state in (before, after))
+    values = (0.2, 0.4)
+    shaped = visible_material_gae_advantages(
+        values, 1.0, 1.0, records, card_facts, 0, 0.3)
+    # Both states have zero margin: moving a real card from hand to field is
+    # neutral, the opponent's face-down card counts, and tokens do not count.
+    assert shaped == pytest.approx(terminal_gae_advantages(values, 1.0, 1.0))
+    stronger = replace(after, field=after.field[:1] + after.field[2:])
+    records = (records[0], DecisionRecord(stronger, actions(), actions()[0]))
+    assert visible_material_gae_advantages(
+        values, 1.0, 1.0, records, card_facts, 0, 0.3) == pytest.approx((0.8, 0.3))
+    assert visible_material_gae_advantages(
+        values, 1.0, 0.5, records, card_facts, 0, 0.3) == pytest.approx((0.65, 0.3))
+    with pytest.raises(ValueError, match="printed Type"):
+        visible_material_gae_advantages(
+            values, 1.0, 0.5, records, {10: card_facts[10]}, 0, 0.3)
+    with pytest.raises(ValueError, match="legal view"):
+        visible_material_gae_advantages(
+            values, 1.0, 0.5, (records[0], replace(records[1], observation=
+                replace(stronger, viewer=1, hand=()))), card_facts, 0, 0.3)
 
 
 def test_frozen_visible_value_gae_reaches_multi_duel_ppo(monkeypatch):

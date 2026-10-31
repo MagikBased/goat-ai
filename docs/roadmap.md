@@ -1103,6 +1103,16 @@ A newer balanced six-tournament-deck run put CombatHeuristicAgent at 269–205 w
 
 ## M4 — Learn a competitive policy
 
+An opt-in [visible-material potential PPO pilot](evaluation.md#visible-material-potential-ppo-pilot-30-october-2026)
+now assigns intermediate credit from legal hand/field counts while retaining
+terminal win/loss as the full-return objective. A replay audit found and
+corrected token miscounting in the first pilot. Corrected matched 32-duel
+continuations and 32 replay-verified held-out head-to-head duels gave the
+candidate a 14–18 result against its control. This small, previously used
+deck family does not establish an improvement; the selected v23 checkpoint is unchanged.
+The next gate is a larger fresh-deck holdout against both its control and
+Tactical-v14.
+
 A [combined held-out weakness review queue](evaluation.md#combined-held-out-weakness-review-queue-30-october-2026)
 now presents 36 unlabelled decisions from the weak Chaos/Beastdown and
 Phoenix Control/Warrior pairings in the current viewer. Its 19 source duels
