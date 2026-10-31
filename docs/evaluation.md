@@ -18074,3 +18074,95 @@ Tactical, and strict paired comparison:
 | Seattle/NJ | `494faa5165f33653f487a5959ffd14430ffa483c34237de64bec82276ac2f481` | `6b6e5d890ef7ac00ae99e95fed2ea72393f15acc64ab2bea9c714d45c332fda7` | `79a3213a0ea4273e0446c6f278e55471e3912344850e908b8ea89609335e9010` | `8a64edab8a57b5a9cae74a50a4363d0df07020e7b16c060b10249c6bef1eacea` |
 | Phoenix etc. | `a4702a4ae740a3e8fd958ac2dae268dacbf8ca97595362e4763baf6bde492608` | `b8c719aac1e3fd5bce4cc3b9a700d0525551015039ad1fe1aa71add8c53c068b` | `458a451aa2df76274a7e19262564a7ae8fcaa548782b3999ba4c25361fccae19` | `cf2116994f9b69b39661e848d972be1cdc4bc863ac06279dd4139a8ec8f8b83f` |
 | Random | `a06031fc1abfb9c118fef7adf5ba5a3701a0e7a41c79b01578a821493ac1dcb8` | `3c3c23deefeb34a395d22405a71ea3cdb4eead4ab1977e27beaa42f5231cc496` | `09a0eabf24c0497aa99a2e0a5a7c8d4e172c2496e8fdc9809be706fa887d31dd` | `399d58513498d65f734bc03eb4b31d060c2039ec8f92026df9170f365158a23e` |
+
+### Broader-Deck retained-preference PPO trial
+
+A prespecified follow-up asked whether wider training Deck coverage could
+turn the masked-parent Heavy Storm correction into a competitive gain. It
+started again from the experimental masked-parent checkpoint
+`598e65b9...e1afb08`, rather than continuing the prior 64-game PPO child.
+The schedule kept its four published 2005 source pairs and added four
+GOAT-legal pairs: Chaos Control/Warrior, Chaos Return/Bazoo Return, modern
+Goat Control/Chaos Turbo, and WikiFormat Dimension Fusion/Flip Control.
+These eight pairs have 16 distinct Main Deck compositions. The 128-game
+four-role schedule used seeds 211000–211127, 16 games per pair, the same
+PPO/parent-KL/preference settings as the 64-game pilot, and all 46 V10
+automated visible-own-loss anchors. Deck-source era and game count both
+changed from the previous PPO pilot, so this is a broader training trial,
+not an isolated causal test of Deck diversity.
+
+The exact ordered `--matchup` arguments, with each filename under
+`examples/decks/`, were:
+
+| Deck A | Deck B |
+| --- | --- |
+| `chaos_jonathan_labounty_nationals_2005.ydk` | `goat_control_max_suffridge_nationals_2005.ydk` |
+| `goat_control_jesse_twohig_indianapolis_2005.ydk` | `goat_control_matt_peddle_indianapolis_2005.ydk` |
+| `goat_control_rhymus_lizo_new_jersey_2005.ydk` | `goat_control_ryan_hayakawa_new_jersey_2005.ydk` |
+| `gravekeeper_daryl_gessler_indianapolis_2005.ydk` | `flip_control_cas_stomphorst_indianapolis_2005.ydk` |
+| `chaos_control_insids_worlds_2022.ydk` | `warrior_montague_clash.ydk` |
+| `chaos_return_dingosig_worlds_2022.ydk` | `bazoo_return_weirdchamp_worlds.ydk` |
+| `goat_control_lolmarcus_2020.ydk` | `chaos_turbo_riclar_2020.ydk` |
+| `dimension_fusion_turbo_wikiformat_reference.ydk` | `flip_control_goatformat_guide.ydk` |
+
+All 128 training games reached terminal states (56 learner wins, 72 losses,
+no draws; 11,358 learner decisions), with zero unsupported or capped games.
+Their saved trajectories passed exact native replay and visibility audits
+over **68,491 decisions**. The checkpoint inherited all 36 preference-file
+hashes and recorded 46 retained anchors. Its ignored path is
+`.cache/goat-ai/fv23_masked_broad_ppo_anchor_211000_211127.pt`
+(SHA-256 `f6da77db74d693638929dfe6b9bad9a2778ed063fdd1262114a05939defb46a1`).
+The training audit report SHA-256 is
+`a7bdfa7d8018eac8235cebf3b2186c21ea5c675fe2e310e52f7776a5f071044f`.
+On the 15 original V10 Heavy Storm source states flagged as negative visible
+trades, the greedy start and broad PPO child both selected a non-Heavy-Storm
+legal action in all 15. This checks retention on known states, not their
+generalization or game value.
+
+The unseen-composition historical holdout used Christian/Theeresak Seattle,
+Bryan/Theeresak New Jersey, Phoenix/Beastdown, and Zombie/Warrior, each in
+both Deck assignments and policy seats, with eight fresh seeds. The three
+128-game reports replay-verified and visibility-audited all **203,414**
+decisions. The direct child-versus-start score was **60–68** (46.88%, paired
+bootstrap interval 39.84%–53.91%). On an identical Tactical-v14 schedule,
+the child scored **45–82–1** and the start **43–85**. Their strict paired score
+difference was **+1.95 percentage points**, 95% interval **[−6.64,+10.16]**.
+The child still lost most games to Tactical. The stronger Warrior split
+(14–2 versus the start's 10–6) did not carry across the other Decks; the
+New Jersey Theeresak split was 5–11 versus 8–8. These are small per-Deck
+samples and do not establish either a specialization or a broad gain.
+
+Keep the child experimental and the selected v23 checkpoint unchanged. More
+source Decks and twice as many self-play games did not meet M4's held-out
+learned-strength gate in this trial. The next training change needs a better
+outcome-credit signal or independently corrected decisions; repeating the
+same PPO configuration on more of these source games has no evidence of
+helping yet. The historical holdout overlaps Deck compositions used in
+earlier *evaluation* experiments, though not this trial's training inputs;
+future promotion would require a newly designed blind panel.
+
+Reproduce training with `scripts/train_self_play.py` from the masked-parent
+checkpoint and the eight source pairs above, using `--engine experimental
+--schedule-mode four_roles --seed 211000 --games 128 --learning-rate 0.0005
+--historical-probability 0.5 --independent-opponent-rng
+--baseline-opponent tactical --parent-kl-weight 0.05
+--retain-preferences-manifest
+.cache/goat-ai/mixed_child_ownloss_v10_208000_208007/manifest.json
+--retain-preference-weight 0.1 --retain-preference-batch-size 8
+--policy-update clipped_ppo --ppo-rollout-games 4 --rollout-workers 4
+--ppo-rollout-weighting per_episode --ppo-epochs 2 --ppo-batch-size 32
+--max-decisions 3000 --fast-trajectory-json` and a new ignored `--output`.
+Evaluate with `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --workers 4 --max-decisions 3000 --verify-replays
+--require-unseen-main-decks --reject-training-deck-hashes --seeds 8` over
+the four holdout pairs. Direct seed was 211200; matched Tactical seed was
+211300. The strict comparison used
+`scripts/compare_tournament_reports.py --verify-local-decks
+--require-unseen-main-decks`.
+
+Ignored report SHA-256 values in order of direct, child Tactical, start
+Tactical, and strict comparison are
+`5e0a561f6fed0cf445a636c7ca7b6aedc3d4f2810027f34bff6c55d2837f10dc`,
+`1eff54523b5d1856d73de30dadca0abfbe96a4d7a989f32ffe1d7341d9b74b14`,
+`1c16bc0df89e32dc7dde6ce24b5263481c014821ea204baadfbf3e4d4354e7f4`,
+and `1e6cbae501b55c809b6edb7fc0d446f15e81c175670a91a82a982086339bac95`.
