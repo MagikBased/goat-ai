@@ -6,7 +6,7 @@ from goat_ai.evaluation.competitive_corpus import (
     INDIANAPOLIS_2005_MAIN_DECKS,
     TOURNAMENT_MAIN_DECKS,
 )
-from scripts.evaluate_native import tournament_matchups
+from scripts.evaluate_native import published_2005_matchups, tournament_matchups
 from scripts.report_competitive_card_priorities import priority_rows
 
 
@@ -37,6 +37,16 @@ def test_indianapolis_2005_corpus_is_separate_and_has_ten_pairs():
     assert len(matchups) == 10
     assert {Path(deck).name for pair in matchups for deck in pair} == set(
         INDIANAPOLIS_2005_MAIN_DECKS)
+
+
+def test_published_2005_corpus_pairs_all_seventeen_playable_examples():
+    root = Path(__file__).resolve().parent.parent / "examples/decks"
+    matchups = published_2005_matchups(root)
+    names = sorted(path.name for path in root.glob("*2005.ydk"))
+    assert len(names) == 17
+    assert len(matchups) == 136
+    assert {Path(deck).name for pair in matchups for deck in pair} == set(names)
+    assert matchups[0] == (str(root / names[0]), str(root / names[1]))
 
 
 def test_priority_rows_uses_main_decks_and_exact_card_ids(tmp_path):

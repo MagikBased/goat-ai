@@ -21,6 +21,13 @@ The repository has a Python environment contract, observation and action types, 
 
 ## M1 — Complete a duel safely
 
+A [published 2005 Deck pairwise sweep](evaluation.md#published-2005-deck-pairwise-protocol-sweep-31-october-2026)
+now covers all 136 pairings of the 17 playable published 2005 Deck examples,
+both seats, with RandomAgent. All 272 duels reached terminal outcomes and all
+296,527 decisions replay-verified and passed the player-visibility audit. This
+widens sampled M1 protocol coverage; arbitrary-deck completeness and the M2
+historical-rulings gate remain open.
+
 Schema v31 now also records the native current Level of cards in the viewer’s
 own hand, where a Level exists. A paired A Legendary Ocean/Metamorphosis fixture
 checks that a WATER monster held in hand changes from Level 4 to 3 while

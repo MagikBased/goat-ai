@@ -38,6 +38,14 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def published_2005_matchups(fixtures: Path) -> list[tuple[str, str]]:
+    """Pair the playable published 2005 YDK fixtures in deterministic order."""
+    decks = sorted(fixtures.glob("*2005.ydk"))
+    if len(decks) < 2:
+        raise ValueError("at least two published 2005 Deck files are required")
+    return [(str(a), str(b)) for a, b in combinations(decks, 2)]
+
+
 def file_set_sha256(root: Path, paths) -> str:
     """Fingerprint a file set, including relative names as well as contents."""
     digest = hashlib.sha256()
@@ -191,6 +199,8 @@ def main() -> None:
                         help="pair every sourced tournament Main Deck once")
     corpus.add_argument("--indianapolis-2005", action="store_true",
                         help="pair the five executable Indianapolis 2005 Top 8 Main Decks")
+    corpus.add_argument("--published-2005-corpus", action="store_true",
+                        help="pair all playable published 2005 YDK examples once")
     parser.add_argument("--both-deck-assignments", action="store_true",
                         help="evaluate each deck pair with either agent assigned either deck")
     parser.add_argument("--agent-a", choices=("random", "heuristic", "combat_heuristic",
@@ -219,10 +229,13 @@ def main() -> None:
     if args.seeds < 1 or args.workers < 1 or args.max_decisions < 1:
         parser.error("--seeds, --workers, and --max-decisions must be positive")
     fixtures = Path(__file__).resolve().parent.parent / "examples/decks"
-    matchups = (tournament_matchups(fixtures, indianapolis_2005=args.indianapolis_2005)
-                if args.tournament_corpus or args.indianapolis_2005
-                else args.matchup or [[str(fixtures / "vanilla_probe.ydk"),
-                                       str(fixtures / "vanilla_reverse.ydk")]])
+    if args.published_2005_corpus:
+        matchups = published_2005_matchups(fixtures)
+    elif args.tournament_corpus or args.indianapolis_2005:
+        matchups = tournament_matchups(fixtures, indianapolis_2005=args.indianapolis_2005)
+    else:
+        matchups = args.matchup or [[str(fixtures / "vanilla_probe.ydk"),
+                                    str(fixtures / "vanilla_reverse.ydk")]]
     if args.both_deck_assignments:
         matchups = both_deck_assignments(matchups)
     seeds = list(range(args.seed, args.seed + args.seeds))
@@ -283,6 +296,7 @@ def main() -> None:
         "seeds": seeds, "both_deck_assignments": args.both_deck_assignments,
         "tournament_corpus": args.tournament_corpus,
         "indianapolis_2005_corpus": args.indianapolis_2005,
+        "published_2005_corpus": args.published_2005_corpus,
         "summary": report.summary(),
         "games": [asdict(game) | {"a_outcome": game.a_outcome} for game in report.games],
     }

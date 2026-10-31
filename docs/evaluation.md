@@ -16769,3 +16769,41 @@ Tactical on these Decks. This single training seed and 1,354 optional examples
 do not establish that greater width helps or hurts with more data. Keep the
 selected v23 checkpoint unchanged; prioritize stronger decision data and
 cross-deck evaluation over increasing width by itself.
+
+## Published 2005 Deck pairwise protocol sweep (31 October 2026)
+
+`scripts/evaluate_native.py --published-2005-corpus` pairs every `*2005.ydk`
+file in `examples/decks` once, in sorted order. At this revision there are 17
+playable published 2005 Main Deck examples, giving 136 unordered pairings.
+RandomAgent played each pairing in both seats at seed 20261031. All **272/272**
+duels reached a terminal outcome below the 3,000-decision cap. Independent
+native replay reconstruction and the player-visibility audit passed all
+**296,527** decisions. There were 130 wins, 137 losses, and 5 draws from
+agent A's perspective; these random-agent outcomes do not measure Deck or
+policy strength. The smallest, median, and largest duel had 176, 1,123.5,
+and 1,514 decisions. All 272 decision traces had distinct SHA-256 hashes.
+
+The eight-worker tournament took **64.39 seconds** on Linux x86_64 with an
+Intel Core i7-10700K, Python 3.12.3, and `OMP_NUM_THREADS=1`: **4.22 complete
+duels/s** and **4,605 decisions/s**, including replay and visibility checks.
+The ignored report is
+`.cache/goat-ai/published_2005_pairwise_random_20261031.json` (SHA-256
+`a0e8a6f58c2f7e2767627fd3e1b28d95a93e1c1cc569587ae6a33c96e65424d4`).
+It records each Deck hash and the loaded core/database hashes, source-code
+fingerprint `7342aef7124184ba39bddc01121491964fc87d1f3c29f3117869b1ecf66a5842`,
+and Lua script-tree fingerprint
+`f886f54c419d3792fd69888d74190c070992609caad8f5737e3f563bd736b71c`.
+Reproduce from the project root after [native setup](native_setup.md):
+
+```bash
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/evaluate_native.py \
+  --engine experimental --published-2005-corpus \
+  --agent-a random --agent-b random --seed 20261031 --seeds 1 \
+  --max-decisions 3000 --workers 8 --verify-replays \
+  --output .cache/goat-ai/published_2005_pairwise_random_20261031.json
+```
+
+This is sampled native protocol and information-boundary coverage across the
+currently published 2005 Deck examples. It does not validate every GOAT ruling,
+every legal Deck, or gameplay quality. The timing includes process scheduling,
+so it is a measured run rather than a hardware-independent throughput claim.
