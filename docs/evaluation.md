@@ -16487,3 +16487,36 @@ PYTHONPATH=src:. .venv/bin/python scripts/probe_random_decks.py \
   --seed 176200 --seeds 12 --max-decisions 3000 --main-size 60 \
   --random-extra --distinct-opponents --verify-replays --isolate-games
 ```
+
+## Selected v23 versus Tactical on Seattle and Charlotte holdouts (30 October 2026)
+
+The selected feature-v23 checkpoint was evaluated without and with its
+optional own-card-loss inference guard against Tactical-v14. Two 2005
+pairings were used: Christian Martinez Goat Control versus Jae Kim Zombie,
+and Theeresak Poonsombat Seattle Goat Control versus Jonathan LaBounty Chaos.
+Both Deck assignments and both policy seats were covered at seeds
+177000–177007, for 64 games per report. Exact Deck file and Main Deck
+composition checks excluded the checkpoint's training Decks.
+
+The unguarded policy scored **20–44** (31.25%, paired 95% bootstrap interval
+20.31–42.19%). All 64 games and 39,084 decisions passed independent replay
+verification and the player-visibility audit. The guarded policy also scored
+**20–44**, with 36,359 replay-verified, visibility-audited decisions. The
+strict paired comparator reported a **0.00 percentage-point** score
+difference, 95% interval **−6.25 to +6.25**. Guarded Deck scores were 5/16
+on Jonathan Chaos, 7/16 on Christian Goat, 5/16 on Theeresak Goat, and 3/16
+on Jae Zombie. The guard helped neither total score nor the weak Zombie
+assignment on this schedule. No model promotion follows from these results.
+
+The ignored reports are
+`.cache/goat-ai/v23_tactical_seattle_charlotte_177000_177007.json`
+(SHA-256 `e93b7a6853208aafa69e4050b41771521ec0b511fb21db627b771a7274f7b288`)
+and `.cache/goat-ai/v23_guarded_tactical_seattle_charlotte_177000_177007.json`
+(SHA-256 `4574afa9ed7411a9329e30b34fa1816dfc147ca3b055db5e482cdae1c6c68c54`).
+The paired comparison used `scripts/compare_tournament_reports.py` with
+`--verify-local-decks --require-unseen-main-decks`. Reproduce each report
+with `scripts/evaluate_policy.py`, the selected v23 checkpoint,
+`--engine experimental --opponent tactical --both-deck-assignments
+--seed 177000 --seeds 8 --workers 4 --max-decisions 3000
+--require-unseen-main-decks --reject-training-deck-hashes --verify-replays`,
+the two named pairings above, and `--own-loss-guard` only for the guarded run.
