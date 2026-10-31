@@ -353,10 +353,13 @@ class EdoRoomManager:
             recording = self._recording(directory)
             item = {"id": directory.name, "ai_deck": session["ai_deck"],
                     "running": running, "recording": recording}
-            if current and self.process is not None and not running and recording is None:
+            # A web-server restart loses the Popen handle. Keep the launch
+            # failure visible for sessions that were started by this manager.
+            if type(session.get("pid")) is int and not running and recording is None:
                 log = directory / "room.log"
-                item["error"] = (log.read_text(encoding="utf-8", errors="replace")[-500:]
-                                 if log.is_file() else "The room exited before saving a duel")
+                detail = (log.read_text(encoding="utf-8", errors="replace")[-500:].strip()
+                          if log.is_file() else "")
+                item["error"] = detail or "The room exited before saving a duel"
             sessions.append(item)
         listening = False
         if self._room_running():

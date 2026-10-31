@@ -50,6 +50,22 @@ def test_room_download_uses_only_known_saved_session(tmp_path):
         manager.native_replay("b" * 16)
 
 
+def test_stopped_room_keeps_launch_error_after_server_restart(tmp_path):
+    session = tmp_path / "edopro_games" / ("a" * 16)
+    session.mkdir(parents=True)
+    (session / "session.json").write_text(json.dumps({
+        "ai_deck": "fixture.ydk", "pid": 999_999_999}))
+    (session / "room.log").write_text("EDOPro host failed to load card script\n")
+    manager = EdoRoomManager(GameCreator(root=tmp_path, native_root=tmp_path))
+    assert manager.process is None
+    status = manager.status()
+    assert status["sessions"][0]["running"] is False
+    assert status["sessions"][0]["error"] == "EDOPro host failed to load card script"
+    (session / "room.log").write_text("")
+    assert manager.status()["sessions"][0]["error"] == (
+        "The room exited before saving a duel")
+
+
 @pytest.mark.skipif(
     not (os.getenv("GOAT_AI_EDOPRO_HOST_ROOT") and os.getenv("GOAT_AI_EDOPRO_MIRROR_ROOT")
          and os.getenv("GOAT_AI_EDOPRO_HISTORICAL") == "1"),
