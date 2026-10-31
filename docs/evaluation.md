@@ -17774,3 +17774,81 @@ Reproduce the update with `scripts/train_self_play.py` and the four generated
 --independent-opponent-rng`. Use `scripts/audit_selfplay_replays.py` on all
 64 recorded trajectories. Evaluate with the same held-out gates and balanced
 seats as the preceding distillation comparison.
+
+### Mixed historical and random Deck low-margin distillation
+
+The preceding 128-game random-Deck Tactical teacher corpus had no policy-seat
+state in which Heavy Storm was legal, the player had Set backrow, and the
+opponent had none. This explains why its low-margin labels could not directly
+teach the observed own-backrow Heavy Storm case. To add such contexts, the
+unchanged selected v23 policy faced Tactical-v14 in **64** games on four
+published-2005 Deck pairs, both seats, seeds 207000–207007. All **41,223**
+decisions passed exact native replay and player-visibility verification. The
+source manifest is
+`.cache/goat-ai/parent_published_heavy_207000_207007/manifest.json`
+(SHA-256 `00b4737f5b5b815c4cefc6ca1e0db619cec8c9cf02e046ada2fc08ec71fb5cf3`).
+An audit found **67** policy-seat opportunities with legal Heavy Storm, own
+Set backrow, and no opposing backrow; **20** had top-two parent logit margin
+below 1.0. Tactical chose Heavy Storm in **none** of the 67, while the parent
+chose it seven times. These are observed states, not a general Heavy Storm
+rule or evidence that all 67 labels were used by the margin filter.
+
+The new child combined those 64 published-Deck games with the earlier 128
+random-Deck games: **192 source games, 91,823 verified decisions**. Tactical
+teacher actions at margin below 1.0 supplied **3,360** optional labels. The
+width-32 feature-v23 policy used 200 parent-KL steps, 128 labeled examples
+per step, 256 parent-preservation states sampled in batches of 64, KL weight
+0.5, learning rate 0.0001, and seed 207008. Fit diagnostics were labeled
+loss 0.86612 and preservation KL 0.07694; the run reported 250.06 seconds,
+including 73.18 seconds verification and 112.89 seconds fitting. The ignored
+child is `.cache/goat-ai/fv23_mixed_published_low_margin_207000_207007.pt`
+(SHA-256 `6598b03e52652d7e57eabe40fb021ff8876628871de723e933bbe6d4c85381c0`);
+the fit report SHA-256 is
+`3a0c6906e9a568569a6dc624f68a452c19d96bc1c9f3d2afc875fe48560df72f`.
+The child **still chose Heavy Storm** in the previously identified turn-11
+own-Set-Dust-Tornado state, so the specific observed mistake remains.
+
+Three independent evaluation panels used Main Deck compositions absent from
+the child's training provenance, new seeds, both Deck assignments and both
+policy seats. Every duel was terminal; all **440,253 decisions** in the nine
+evaluation reports passed exact replay and player-visibility verification.
+
+| Holdout | Direct child vs parent | Child vs Tactical-v14 | Parent vs Tactical-v14 | Paired child-minus-parent Tactical score |
+| --- | ---: | ---: | ---: | ---: |
+| Four other published 2005 Decks, 64 games per arm | 35–28–1 | 22–42 | 11–53 | +17.19 points, 95% interval [+4.69, +29.69] |
+| Phoenix, Beastdown, Warrior, Zombie published 2005 Decks, 64 per arm | 34–30 | 25–39 | 22–42 | +4.69 points, [−6.25, +15.63] |
+| Eight fresh whitelist-legal random Deck pairs with 15-card Fusion Extras, 128 per arm | 76–52 | 41–87 | 34–94 | +5.47 points, [−3.13, +14.06] |
+
+The first historical panel's paired Tactical comparison excludes zero, but
+the other two panels do not. The random-Deck direct score interval was
+53.91%–64.84%, above 50%; each historical direct interval crossed 50%.
+The child still won fewer than half its games against Tactical on every
+panel. These results support a schedule-specific direct improvement, not
+consistent cross-archetype superiority or a fix for the concrete Heavy Storm
+error. The selected checkpoint remains
+`.cache/goat-ai/fv23_current_tactical_broader_33000_33031.pt`.
+
+The fresh random Decks are recorded in
+`.cache/goat-ai/mixed_random_holdout_207500_207507/manifest.json`
+(SHA-256 `ca425e32b7d49f493990efb51e3579ad6b29e72763234e6ed3d5280f0a76a796`).
+Evaluation used `scripts/evaluate_policy.py --engine experimental
+--both-deck-assignments --workers 4 --max-decisions 3000
+--verify-replays --require-unseen-main-decks
+--reject-training-deck-hashes`; Tactical arms shared seeds 207200, 207400,
+or 207600 by panel, while direct arms used 207100, 207300, or 207700.
+Paired reports used `scripts/compare_tournament_reports.py
+--verify-local-decks --require-unseen-main-decks`.
+
+Ignored evaluation report SHA-256 values, in row order above and within each
+row as direct, child Tactical, parent Tactical, strict paired comparison:
+
+| Panel | Direct | Child Tactical | Parent Tactical | Comparison |
+| --- | --- | --- | --- | --- |
+| Other published | `a797bcd559810212d1e34d3eb1fa72a6ff1c7cb3f8899a9ba3958c8b36abacc2` | `dc18f3ff3d48ae80b7b7d90552f6cb38f19604bc7e4f3c919e7358e89b41b3bb` | `972ef6f87494daad973dda1891a4016e72954def96cd236ed7474eb07f474c1a` | `5c306d657df88ddc3cf29d6397c1ec7abb8e9a8a7cc632cdc582dd731c2a192a` |
+| Phoenix etc. | `eee772704686678c9aedc4ef731167a4f1c7cf2e448e438746adb01ca35d7af3` | `217e0c468e5839d6cfbaf4dce3cb7ddd6c22d5c79774e9c1dd287028ab364bd6` | `f2e34c632f3f060b2d954a32ed13cb7ac6507c3089bf272821766f32e77158fa` | `98d09a27d1fa8745d5c0c6fef085963af86f392f17eb5134bf1281dd314d8d60` |
+| Fresh random | `e65ca4f6e2f0b908895b58e1561c7c36297e84b9bc3877cad7e47d2937a52c17` | `7c17672051ea186d0599e6a1ce6f4c308c4b331af46b101153fb2f56f421f428` | `3a6217d812ae19967fb432b0a53474ab2c88fa93fe3c936dbc860fe2628805d5` | `1d6d3e9c6d872ac876e59950199a9dace9a7cf4513a0366a5d14ca0f01181606` |
+
+The next M4 experiment should target independently reviewed own-card loss
+states in the collected human/reviewer pipeline, then recheck both the exact
+Heavy Storm regression state and broad held-out Deck schedules. Tactical
+agreement alone has not made the learned policy reliably stronger.
