@@ -128,6 +128,8 @@ checks, runs the displayed training command without a shell, and saves the
 checkpoint beside the replay. It refuses to overwrite an existing child;
 use the displayed command with a different output path for another run. The
 button waits for training to finish, which can take a while for a long duel.
+If you change any checkmarks, save those changes first; the page disables
+training and bundle download until the displayed choices match the saved ones.
 The session also offers **Download EDOPro replay** for its native `.yrpX`
 file, including when a saved replay has not passed independent reconstruction.
 Only complete, verified recordings can supply confirmed choices to the

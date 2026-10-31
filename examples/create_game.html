@@ -9,6 +9,7 @@
     body { max-width: 900px; margin: 0 auto; padding: 22px; background: #071923; color: #f4f7f5; }
     h1 { margin-bottom: 2px; } p { color: #a9c6cc; }
     a { color: #9ee6da; }
+    a[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
     .panel { background: #142c36; border: 1px solid #446873; border-radius: 12px;
              padding: 18px; margin: 18px 0; }
     .seats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
@@ -244,20 +245,46 @@
       }
     });
     let currentEdoReview = null;
+    let savedEdoFrames = [];
+    function checkedEdoFrames() {
+      return [...byId("edopro-choices").querySelectorAll("input:checked")]
+        .map(input => Number(input.value)).sort((a, b) => a - b);
+    }
+    function edoChoicesChanged() {
+      const frames = checkedEdoFrames();
+      return frames.length !== savedEdoFrames.length ||
+        frames.some((frame, index) => frame !== savedEdoFrames[index]);
+    }
+    function refreshEdoTrainingActions() {
+      const changed = edoChoicesChanged();
+      const bundle = byId("edopro-bundle");
+      bundle.setAttribute("aria-disabled", String(changed));
+      bundle.href = changed ? "#" :
+        "/api/edopro/confirmed-bundle?id=" + encodeURIComponent(currentEdoReview.id);
+      byId("edopro-train").disabled = changed ||
+        !!currentEdoReview.experimental_checkpoint_exists;
+    }
     function showEdoTrainingCommand(review, count) {
       const box = byId("edopro-training");
       box.hidden = !(count > 0 && review.experimental_confirmed_eligible);
       if (box.hidden) return;
-      const session = review.id;
-      byId("edopro-bundle").href =
-        "/api/edopro/confirmed-bundle?id=" + encodeURIComponent(session);
       byId("edopro-training-note").textContent = review.continues_recorded_policy
         ? "From the project directory, train an experimental child of the AI used in this duel. The current AI is not replaced; evaluate the child before using it. Historical GOAT correctness is still uncertified."
         : "The AI checkpoint used in this duel is no longer available unchanged. This command starts an experimental model from scratch; it does not update the current AI.";
       byId("edopro-training-command").textContent = review.training_command;
       byId("edopro-train").hidden = !Object.hasOwn(review, "experimental_checkpoint_exists");
-      byId("edopro-train").disabled = !!review.experimental_checkpoint_exists;
+      refreshEdoTrainingActions();
     }
+    byId("edopro-bundle").addEventListener("click", event => {
+      if (edoChoicesChanged()) event.preventDefault();
+    });
+    byId("edopro-choices").addEventListener("change", () => {
+      const changed = edoChoicesChanged();
+      if (!byId("edopro-training").hidden) refreshEdoTrainingActions();
+      byId("edopro-review-status").textContent = changed
+        ? "Unsaved changes. Save confirmations before training or downloading a bundle."
+        : `${savedEdoFrames.length} confirmed choices saved.`;
+    });
     byId("edopro-recordings").addEventListener("click", async event => {
       const button = event.target.closest("button[data-edopro-id]");
       if (!button) return;
@@ -267,6 +294,8 @@
         const review = await response.json();
         if (!response.ok) throw new Error(review.error || "Could not open decisions");
         currentEdoReview = review;
+        savedEdoFrames = review.candidates.filter(choice => choice.confirmed)
+          .map(choice => choice.frame).sort((a, b) => a - b);
         const list = byId("edopro-choices"); list.replaceChildren();
         for (const choice of review.candidates) {
           const item = document.createElement("li");
@@ -295,8 +324,7 @@
     byId("edopro-save").addEventListener("click", async () => {
       if (!currentEdoReview) return;
       const button = byId("edopro-save"); button.disabled = true;
-      const frames = [...byId("edopro-choices").querySelectorAll("input:checked")]
-        .map(input => Number(input.value));
+      const frames = checkedEdoFrames();
       byId("edopro-review-status").textContent = "Verifying replay and saving choices…";
       try {
         const response = await fetch("/api/edopro/confirm", {
@@ -305,6 +333,7 @@
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Could not save choices");
+        savedEdoFrames = frames;
         byId("edopro-review-status").textContent = `${result.confirmed} choices saved and verified. No automatic training occurs.`;
         showEdoTrainingCommand(currentEdoReview, result.confirmed);
       } catch (error) {
@@ -312,7 +341,7 @@
       } finally { button.disabled = false; }
     });
     byId("edopro-train").addEventListener("click", async () => {
-      if (!currentEdoReview) return;
+      if (!currentEdoReview || edoChoicesChanged()) return;
       const button = byId("edopro-train"); button.disabled = true;
       byId("edopro-review-status").textContent =
         "Training a separate experimental checkpoint from your saved confirmations…";
