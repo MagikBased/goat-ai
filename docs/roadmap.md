@@ -2008,6 +2008,11 @@ adds a face-up Continuous Trap responding to Junk Warrior's Synchro Summon:
 paying 800 LP negates the Summon, while passing preserves Warrior. Both complete
 MR1 duels replay-verify and pass visibility checks; the period card text and
 broader Edison legality remain unaudited.
+The [Sangan Synchro-material fixture](edison_research.md#sangan-as-synchro-material-in-a-period-feature-match)
+now checks a period Konami match account against a native Brionac Summon:
+Sangan searches after being sent as material. The complete MR1 duel
+replay-verifies and passes visibility checks. This extends one interaction,
+not the separately validated Edison profile required by M5.
 
 
 Evaluate policy-guided search and belief sampling only after M2 and M4. Search must sample hidden information from a player-consistent belief and must never inspect the real hidden state when choosing actions. Add Edison as a separately validated rules profile, not a changed banlist.

@@ -863,6 +863,26 @@ GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
   tests/test_mr1_ryko_probe.py
 ```
 
+## Sangan as Synchro Material in a period feature match
+
+A [February 2010 Konami feature match](https://yugiohblog.konami.com/2010/sjc/201002-nashville/round-1-feature-match-kevin-moon-vs-carl-randolph/)
+records Sangan being used with a Tuner for a Synchro Summon and then searching
+the Deck. That contemporary game report supplies an outcome check without
+relying on Sangan's current, later-errata text. A seed-3 MR1 fixture Normal
+Summons Sangan, then Junk Synchron on the next own turn, and uses both to
+Synchro Summon Brionac. The native decision stream places the two materials
+in the Graveyard, puts Brionac on the field, and then opens Sangan's search
+chain. Selecting a legal monster moves it from Deck to hand. Random-agent
+continuation reaches a terminal duel; the complete trajectory serializes,
+replay-verifies, and passes the player-visibility audit. This checks one
+Synchro-material trigger, not a complete Edison rules profile or every
+historical Sangan interaction. Reproduce with:
+
+```sh
+GOAT_AI_NATIVE_ROOT=.cache/goat-ai PYTHONPATH=src:. .venv/bin/pytest -q \
+  tests/test_mr1_sangan_synchro.py
+```
+
 ## Validation gates before an Edison duel can be claimed
 
 1. Establish a dated card-pool ID set through *Duelist Pack: Kaiba*, including
