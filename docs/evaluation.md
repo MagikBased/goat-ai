@@ -15373,6 +15373,35 @@ This is a sampled protocol and determinism check. Random play does not validate
 card-specific 2005 rulings, decision quality, or complete arbitrary-deck
 coverage; M1 and M2 remain open.
 
+## Fourth first-activation whitelist partition (31 October 2026)
+
+On the pinned native assets, a fresh shuffled partition of 1,624 canonical
+Main Deck IDs and 52 Fusion IDs formed 41 valid decks and 21 duels. With seed
+`212000`, a 3,000-decision limit, and four workers, the first-activation agent
+completed **21/21** duels. All **21,020** decisions replay-verified and passed
+the player-visibility audit. It offered 335 distinct activation IDs and
+selected 333; 32 selected IDs were absent from the three earlier
+first-activation partitions, bringing their four-run observed union to **594**.
+
+The ignored report is
+`.cache/goat-ai/whitelist_first_activation_212000/report.json` (SHA-256
+`29066ce146c078f73eedb2e16ba8bb2e7e596e26640a0c9d60f539ae56bc57cb`).
+The measured four-worker wall time was 14.07 seconds. A one-worker repeat of
+the same seed took 50.46 seconds; all 21 ordered decision streams, terminal
+observations, winners, and pinned asset hashes matched exactly. Reproduce
+after [native setup](native_setup.md):
+
+```sh
+OMP_NUM_THREADS=1 PYTHONPATH=src:. .venv/bin/python scripts/probe_whitelist_coverage.py \
+  --native-root .cache/goat-ai \
+  --output .cache/goat-ai/whitelist_first_activation_212000 \
+  --seed 212000 --max-decisions 3000 --workers 4 \
+  --agent-mode first_activation
+```
+
+This is sampled protocol and deterministic-replay evidence. It does not
+validate 2005 card rulings, every effect's resolution, or playing strength.
+
 ## Third first-activation whitelist partition (29 October 2026)
 
 On pinned GOAT native assets, `scripts/probe_whitelist_coverage.py` shuffled

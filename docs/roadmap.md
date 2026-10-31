@@ -121,6 +121,14 @@ terminal observations exactly. This extends sampled protocol coverage, while
 historical effects and arbitrary-deck completeness remain open; see the
 [evaluation entry](evaluation.md#third-first-activation-whitelist-partition-29-october-2026).
 
+A [fourth independent partition](evaluation.md#fourth-first-activation-whitelist-partition-31-october-2026)
+completed 21/21 full duels with 21,020 replay-verified, visibility-audited
+decisions. It selected 32 activation IDs absent from the earlier three runs,
+raising the observed union to 594. A one-worker repeat reproduced all ordered
+decisions, terminal observations, and outcomes exactly. This extends sampled
+protocol coverage; historical correctness and arbitrary-deck completeness
+remain open.
+
 A further [20-duel Tactical-v14 whitelist/Fusion sample](evaluation.md#fresh-tactical-whitelistfusion-protocol-sample-29-october-2026)
 on seeds 112000–112019 completed and native-replay/visibility-verified all
 9,824 decisions with distinct independently sampled opponent Main Decks and
