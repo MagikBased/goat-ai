@@ -635,6 +635,15 @@ replacement effects and other Damage Step windows remain untested.
 
 **Thunder Dragon:** [Historical Netrep rulings](https://www.goatformat.com/rulings7.html) permit discarding Thunder Dragon to search for zero copies, and [the historical mechanics guide](https://www.goatformat.com/basics.html) explicitly gives the no-copy case as a Deck verification example. Neither source explicitly distinguishes choosing zero **while copies remain** from finding zero because the Deck contains none. The pinned GOAT script `504700054` interprets the Netrep wording literally: it permits an empty selection with two copies present. This is a documented historical ambiguity, not a proven 2005 ruling for the copies-remain case. The pinned official script requires at least one copy in Deck, so GOAT AI uses the GOAT variant to cover the sourced no-copy behavior. A seeded native fixture offers a zero-card selection alongside one- and two-card choices while two copies remain; both the explicit empty selection and the native cancel response leave the Deck unchanged and reveal nothing to the opponent. A second fixture takes both copies and checks the opponent-only reveal, then discards another Thunder Dragon with no copies in Deck. The opponent still remembers the remaining searched Thunder Dragon in hand after the other copy’s public discard. That effect remains legal and reveals the remaining 32-card Deck to the opponent for verification. These fixtures verify the selected script and information boundary; they do not settle the copies-remain historical ambiguity. Other replacement effects remain untested.
 
+A [February 2006 rules discussion](https://www.cogonline.net/threads/thunder-dragon.43814/page-2)
+asked this exact copies-remain question. Participants disagreed: one argued
+that zero can be chosen, another distinguished a zero-card result from a
+deliberate zero-card choice, and a third said the question could not then be
+answered concretely. It is a near-period community discussion, not an
+official 2005 judge ruling. It strengthens the case for keeping the
+copies-remain behavior marked unresolved rather than treating either
+interpretation as established historical TCG law.
+
 The OCG ruling supplied in player review says the effect cannot be activated
 with no Thunder Dragon in Deck. That conflicts with the archived TCG Netrep
 ruling used for this 2005 GOAT profile; it is not a reason to change the TCG
